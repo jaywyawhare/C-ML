@@ -1,6 +1,5 @@
 #include<math.h>
 
 float leakyRelu(float x) {
-    if (x > 0) return x;
-    else return 0.01 * x;
+   return x > 0 ? x : 0.01 * x;
 }
