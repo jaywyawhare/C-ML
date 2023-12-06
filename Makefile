@@ -1,5 +1,5 @@
 CC      = gcc
-CFLAGS  = -g -Wall
+CFLAGS  = -g -Wall -lm
 SRC     = src
 OBJ     = obj
 SRCS    = $(wildcard $(SRC)/*.c) $(wildcard $(SRC)/Activations/*.c) $(wildcard $(SRC)/Layers/*.c) $(wildcard $(SRC)/Optimizers/*.c) $(wildcard $(SRC)/Regularizers/*.c)
