@@ -9,11 +9,11 @@ typedef struct {
     float dropout_rate;
 } DropoutLayer;
 
-
+float elu(float x, float alpha);
 float relu(float x);
 float sigmoid(float x);
 float tanH(float x);
-float softmax(float *x, int size);
+float* softmax(float *x, int size);
 float linear(float x);
 float leakyRelu(float x);
 
@@ -26,6 +26,8 @@ void freeDense(DenseLayer *layer);
 void initializeDropout(DropoutLayer *layer, float dropout_rate);
 void forwardDropout(DropoutLayer *layer, float *input, float *output, int size);
 void backwardDropout(DropoutLayer *layer, float *input, float *output, float *d_output, float *d_input, int size);
+
+void freeSoftmax(float *output);
 
 float Adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b, float *s_w, float *s_b, float beta1, float beta2, float epsilon);
 float RMSprop(float x, float y, float lr, float *w, float *b, float *cache_w, float *cache_b, float epsilon, float beta1, float beta2);
