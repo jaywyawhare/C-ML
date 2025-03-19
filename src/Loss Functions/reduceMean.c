@@ -1,7 +1,13 @@
-float reduceMean(float *loss) {
+float reduceMean(float *loss, int size)
+{
     float sum = 0;
-    for (int i = 0; i < sizeof(loss); i++) {
+    for (int i = 0; i < size; i++)
+    {
         sum += loss[i];
     }
-    return sum / sizeof(loss);
+    if (size == 0)
+    {
+        return 0;
+    }
+    return sum / size;
 }
