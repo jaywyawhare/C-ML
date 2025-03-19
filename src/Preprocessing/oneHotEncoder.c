@@ -11,6 +11,13 @@ typedef struct
 
 int *oneHotEncoding(char *x, int size, CharMap **map, int *mapSize)
 {
+    if (size == 0)
+    {
+        fprintf(stderr, "Input size is zero\n");
+        return NULL;
+    }
+
+    *map = NULL; 
     *map = malloc(sizeof(CharMap) * size);
     if (*map == NULL)
     {
@@ -83,7 +90,10 @@ char *oneHotDecoding(int *x, int size, CharMap *map, int mapSize)
 
 void freeOneHotMemory(int *x, char *y, CharMap *map)
 {
-    free(x);
-    free(y);
-    free(map);
+    if (x != NULL)
+        free(x);
+    if (y != NULL)
+        free(y);
+    if (map != NULL)
+        free(map);
 }
