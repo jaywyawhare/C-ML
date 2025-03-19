@@ -1,4 +1,3 @@
-#include "../my_functions.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
