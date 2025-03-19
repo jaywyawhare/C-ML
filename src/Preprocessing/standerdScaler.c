@@ -1,19 +1,36 @@
-#include<math.h>
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-float* standerdScaler(float *x){
-    float *scaled = malloc(sizeof(float) * sizeof(x));
+float *standardScaler(float *x, int size)
+{
+    float *scaled = malloc(sizeof(float) * size);
+    if (scaled == NULL)
+    {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
     float mean = 0;
-    for(int i = 0; i < sizeof(x); i++){
+    for (int i = 0; i < size; i++)
+    {
         mean += x[i];
     }
-    mean /= sizeof(x);
+    mean /= size;
     float std = 0;
-    for(int i = 0; i < sizeof(x); i++){
+    for (int i = 0; i < size; i++)
+    {
         std += pow(x[i] - mean, 2);
     }
-    std /= sizeof(x);
+    std /= size;
     std = sqrt(std);
-    for(int i = 0; i < sizeof(x); i++){
+    if (std == 0)
+    {
+        fprintf(stderr, "Standard deviation is zero\n");
+        free(scaled);
+        exit(1);
+    }
+    for (int i = 0; i < size; i++)
+    {
         scaled[i] = (x[i] - mean) / std;
     }
     return scaled;

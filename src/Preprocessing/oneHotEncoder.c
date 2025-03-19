@@ -1,64 +1,88 @@
 #include <stdbool.h>
 #include <string.h>
-#include <stdlib.h> 
+#include <stdlib.h>
+#include <stdio.h>
 
-typedef struct {
+typedef struct
+{
     char character;
     int encodedValue;
 } CharMap;
 
-int* oneHotEncoding(char *x, int size, CharMap *map, int *mapSize) {
-    int uniqueCount = 0;
+int *oneHotEncoding(char *x, int size, CharMap **map, int *mapSize)
+{
+    *map = malloc(sizeof(CharMap) * size);
+    if (*map == NULL)
+    {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
 
-    for (int i = 0; i < size; i++) {
+    int uniqueCount = 0;
+    for (int i = 0; i < size; i++)
+    {
         int isNew = 1;
-        for (int j = 0; j < uniqueCount; j++) {
-            if (x[i] == map[j].character) {
+        for (int j = 0; j < uniqueCount; j++)
+        {
+            if (x[i] == (*map)[j].character)
+            {
                 isNew = 0;
                 break;
             }
         }
-        if (isNew) {
-            map[uniqueCount].character = x[i];
-            map[uniqueCount].encodedValue = uniqueCount;
+        if (isNew)
+        {
+            (*map)[uniqueCount].character = x[i];
+            (*map)[uniqueCount].encodedValue = uniqueCount;
             uniqueCount++;
         }
     }
+    *mapSize = uniqueCount;
 
-    *mapSize = uniqueCount; 
-    
     int *encoded = malloc(sizeof(int) * size * uniqueCount);
-    
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < uniqueCount; j++) {
-            if (x[i] == map[j].character) {
-                encoded[i * uniqueCount + j] = 1;
-            } else {
-                encoded[i * uniqueCount + j] = 0;
-            }
-        }
+    if (encoded == NULL)
+    {
+        fprintf(stderr, "Memory allocation failed\n");
+        free(*map);
+        exit(1);
     }
 
+    for (int i = 0; i < size; i++)
+    {
+        for (int j = 0; j < uniqueCount; j++)
+        {
+            encoded[i * uniqueCount + j] = (x[i] == (*map)[j].character) ? 1 : 0;
+        }
+    }
     return encoded;
 }
 
-char* oneHotDecoding(int *x, int size, CharMap *map, int mapSize) {
-    char *decoded = malloc(sizeof(char) * (size + 1)); 
-
-    for (int i = 0; i < size; i++) {
-        decoded[i] = '\0'; 
-        for (int j = 0; j < mapSize; j++) {
-            if (x[i * mapSize + j] == 1) {
+char *oneHotDecoding(int *x, int size, CharMap *map, int mapSize)
+{
+    char *decoded = malloc(sizeof(char) * (size + 1));
+    if (decoded == NULL)
+    {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
+    for (int i = 0; i < size; i++)
+    {
+        decoded[i] = '\0';
+        for (int j = 0; j < mapSize; j++)
+        {
+            if (x[i * mapSize + j] == 1)
+            {
                 decoded[i] = map[j].character;
                 break;
             }
         }
     }
-    decoded[size] = '\0'; 
+    decoded[size] = '\0';
     return decoded;
 }
 
-void freeMemory(int *x, char *y, CharMap *map) {
+void freeOneHotMemory(int *x, char *y, CharMap *map)
+{
     free(x);
     free(y);
     free(map);
