@@ -1,28 +1,61 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
-typedef struct {
+typedef struct
+{
     float dropout_rate;
 } DropoutLayer;
 
-void initializeDropout(DropoutLayer *layer, float dropout_rate) {
+void initializeDropout(DropoutLayer *layer, float dropout_rate)
+{
+    if (layer == NULL)
+    {
+        fprintf(stderr, "Layer is NULL\n");
+        exit(1);
+    }
+
     layer->dropout_rate = dropout_rate;
+    srand((unsigned int)time(NULL));
 }
 
-void forwardDropout(DropoutLayer *layer, float *input, float *output, int size) {
-    for (int i = 0; i < size; i++) {
-        if ((float)rand() / RAND_MAX < layer->dropout_rate) {
+void forwardDropout(DropoutLayer *layer, float *input, float *output, int size)
+{
+    if (layer == NULL || input == NULL || output == NULL)
+    {
+        fprintf(stderr, "Layer, input, or output is NULL\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < size; i++)
+    {
+        if ((float)rand() / RAND_MAX < layer->dropout_rate)
+        {
             output[i] = 0;
-        } else {
+        }
+        else
+        {
             output[i] = input[i] / (1 - layer->dropout_rate);
         }
     }
 }
 
-void backwardDropout(DropoutLayer *layer, float *input, float *output, float *d_output, float *d_input, int size) {
-    for (int i = 0; i < size; i++) {
-        if (input[i] == 0) {
+void backwardDropout(DropoutLayer *layer, float *input, float *output, float *d_output, float *d_input, int size)
+{
+    if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL)
+    {
+        fprintf(stderr, "One or more arguments are NULL\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < size; i++)
+    {
+        if (input[i] == 0)
+        {
             d_input[i] = 0;
-        } else {
+        }
+        else
+        {
             d_input[i] = d_output[i] / (1 - layer->dropout_rate);
         }
     }
