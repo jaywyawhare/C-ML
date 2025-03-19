@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "../my_functions.h" 
 
 int *labelEncoder(char *x, int size, CharMap **map, int *mapSize)
 {
