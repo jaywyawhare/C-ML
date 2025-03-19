@@ -1,3 +1,4 @@
-float linear(float x) {
+float linear(float x)
+{
     return x;
 }
