@@ -11,15 +11,35 @@ SRCS    = $(wildcard $(SRC)/*.c) \
           $(wildcard $(SRC)/Regularizers/*.c) \
           main.c
 OBJS    = $(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
-OBJS    := $(OBJS)  
-
 BINDIR  = bin
 BIN     = $(BINDIR)/main
+
+TEST_BIN_DIR = test_bin
+
+TEST_SRCS = $(wildcard test/**/*.c)
 
 all: $(BIN)
 
 release: CFLAGS = -Wall -O2 -DNDEBUG
 release: clean $(BIN)
+
+.PHONY: test
+test:
+	@echo "Running tests..."
+
+	# Create necessary directories
+	mkdir -p $(BINDIR)
+	mkdir -p $(TEST_BIN_DIR)
+
+	$(foreach test_src, $(TEST_SRCS), \
+		test_bin=$$(basename $(notdir $(test_src))); \
+		test_folder=$$(dirname $(test_src)); \
+		src_file=$$(echo $(test_src) | sed 's|test/|src/|;s|test_||'); \
+		echo ""; \
+		$(CC) $(CFLAGS) $$test_folder/$$test_bin $$src_file -lm -o $(TEST_BIN_DIR)/$$test_bin && ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
+	)
+
+	@echo "\nALL TESTS PASSED"
 
 $(BIN): $(OBJS)
 	mkdir -p $(BINDIR)
@@ -34,4 +54,4 @@ $(OBJ)/main.o: main.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BINDIR) $(OBJ)
+	rm -rf $(BINDIR) $(OBJ) $(TEST_BIN_DIR) a.out
