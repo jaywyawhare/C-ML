@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Optimizers/Adam.h"
 
 void test_AdamOptimizer()
 {

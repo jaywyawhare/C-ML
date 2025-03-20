@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include "../../src/my_functions.h"
+#include "../../src/Preprocessing/oneHotEncoder.h"
 
 void test_oneHotEncoder_normal_case()
 {

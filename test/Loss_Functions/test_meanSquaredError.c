@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Loss_Functions/meanSquaredError.h"
 
 void test_meanSquaredError()
 {

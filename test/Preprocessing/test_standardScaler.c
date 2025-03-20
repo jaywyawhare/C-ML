@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Preprocessing/standardScaler.h"
 
 void test_standardScaler_normal_case()
 {

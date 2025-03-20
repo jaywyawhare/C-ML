@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Regularizers/l2.h"
 
 void test_l2()
 {
@@ -16,9 +16,9 @@ void test_l2()
     float reg_l2 = 0.01;
     float threshold = 1e-6;
 
-    float loss = l2(x, y, lr, w, b, v_w, v_b, s_w, s_b, beta1, beta2, epsilon);
-    assert(fabs(loss - 1.96) < threshold);
-    printf("l2 test passed");
+    float loss = l2(x, y, lr, &w, &b, &v_w, &v_b, &s_w, &s_b, beta1, beta2, epsilon, reg_l2);
+    assert(fabs(loss - (1.96 + reg_l2 * pow(0.5, 2))) < threshold); // Include L2 regularization in the expected loss
+    printf("l2 test passed\n");
 }
 
 int main()

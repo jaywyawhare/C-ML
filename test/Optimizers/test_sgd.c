@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Optimizers/sgd.h"
 
 void test_sgd_normal_case()
 {
@@ -28,7 +28,6 @@ void test_sgd_normal_case()
 
 void test_sgd_error_case()
 {
-    float error_thresh = 1e-6f;
     float x = 3.0f;
     float y = 7.0f;
     float lr = 0.01f;

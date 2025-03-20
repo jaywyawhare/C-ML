@@ -2,7 +2,7 @@
 #include<stdlib.h>
 #include<assert.h>
 #include<math.h>
-#include"../../src/my_functions.h"
+#include"../../src/Activations/softmax.h"
 
 void test_softmax(){
     float input[4][3] = {

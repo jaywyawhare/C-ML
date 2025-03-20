@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
-#include "../../src/my_functions.h"
+#include "../../src/Loss_Functions/reduceMean.h"
 
 void test_reduceMean()
 {

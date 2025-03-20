@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Loss_Functions/binaryCrossEntropyLoss.h"
 
 void test_binaryCrossEntropyLoss()
 {
@@ -11,7 +11,6 @@ void test_binaryCrossEntropyLoss()
     float tolerance = 1e-6;
 
     float actual = binaryCrossEntropyLoss(yHat, y, 3);
-    printf("Expected: %f, Actual: %f\n", expected, actual);
     assert(fabs(actual - expected) < tolerance);
 
     float y2[3] = {1.0, 0.0, 1.0};
@@ -19,7 +18,6 @@ void test_binaryCrossEntropyLoss()
     float expected2 = 0.0001f;
 
     float actual2 = binaryCrossEntropyLoss(yHat2, y2, 3);
-    printf("Expected2: %f, Actual2: %f\n", expected2, actual2);
     assert(fabs(actual2 - expected2) < tolerance);
 
     float y3[3] = {0.0, 1.0, 0.0};

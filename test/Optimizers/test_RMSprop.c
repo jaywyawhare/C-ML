@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/my_functions.h"
+#include "../../src/Optimizers/RMSprop.h"
 
 void test_rmsprop_normal_case()
 {
@@ -25,7 +25,6 @@ void test_rmsprop_normal_case()
 
 void test_rmsprop_error_cases()
 {
-    float error_thresh = 1e-6f;
     float w = 2.0f;
     float b = 1.0f;
     float x = 3.0f;

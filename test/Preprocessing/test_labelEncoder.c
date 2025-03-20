@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include "../../src/my_functions.h"
+#include "../../src/Preprocessing/labelEncoder.h"
 
 void test_labelEncoder_normal_case()
 {

@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<assert.h>
 #include<math.h>
-#include"../../src/my_functions.h"
+#include"../../src/Activations/sigmoid.h"
 
 void test_sigmoid(){
     float input[7] = {0.0, 1.0, -1.0, 2.0, -2.0, 1e6, -1e6};
