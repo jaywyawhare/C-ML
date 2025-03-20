@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "../../src/my_functions.h"
+#include "../../src/Layers/dense.h"
 
 void test_dense_layer()
 {
@@ -15,7 +15,9 @@ void test_dense_layer()
     float input[] = {1.0, 2.0, 3.0};
     float output[2];
     forwardDense(&layer, input, output);
-    printf("Forward pass output: [%f, %f]\n", output[0], output[1]);
+
+    assert(output[0] != 0.0f);
+    assert(output[1] != 0.0f);
 
     float d_output[] = {0.1, 0.2};
     float d_input[3] = {0};
@@ -23,12 +25,14 @@ void test_dense_layer()
     float d_biases[2] = {0};
     backwardDense(&layer, input, output, d_output, d_input, d_weights, d_biases);
 
-    printf("Gradients (weights): ");
     for (int i = 0; i < 6; i++)
     {
-        printf("%f ", d_weights[i]);
+        assert(d_weights[i] != 0.0f);
     }
-    printf("\n");
+    for (int i = 0; i < 2; i++)
+    {
+        assert(d_biases[i] != 0.0f);
+    }
 
     updateDense(&layer, d_weights, d_biases, 0.01);
 
