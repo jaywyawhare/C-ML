@@ -50,9 +50,9 @@ void backwardDropout(DropoutLayer *layer, float *input, float *output, float *d_
 
     for (int i = 0; i < size; i++)
     {
-        if (input[i] == 0)
+        if (output[i] == 0.0f)
         {
-            d_input[i] = 0;
+            d_input[i] = 0.0f;
         }
         else
         {
