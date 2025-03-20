@@ -1,7 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "../my_functions.h" 
+
+typedef struct
+{
+    char character;
+    int encodedValue;
+} CharMap;
 
 int *labelEncoder(char *x, int size, CharMap **map, int *mapSize)
 {

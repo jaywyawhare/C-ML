@@ -27,7 +27,7 @@ float *minMaxScaler(float *x, int size)
     {
         fprintf(stderr, "Max and min are equal\n");
         free(scaled);
-        exit(1);
+        return NULL;
     }
     for (int i = 0; i < size; i++)
     {

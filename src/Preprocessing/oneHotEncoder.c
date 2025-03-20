@@ -17,7 +17,7 @@ int *oneHotEncoding(char *x, int size, CharMap **map, int *mapSize)
         return NULL;
     }
 
-    *map = NULL; 
+    *map = NULL;
     *map = malloc(sizeof(CharMap) * size);
     if (*map == NULL)
     {
