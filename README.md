@@ -1,7 +1,7 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="./docs/dark-logo.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./docs/dark-mode.svg">
   <img alt="C-ML logo" src="./docs/light-mode.svg" width="50%" height="50%">
 </picture>
 
