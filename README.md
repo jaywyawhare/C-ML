@@ -1,6 +1,15 @@
-# C-ML: A Lightweight Machine Learning Library in C
+<div align="center">
 
-C-ML is a lightweight machine learning library written in C. It provides implementations for layers, activations, optimizers, preprocessing, and loss functions, enabling you to build and train simple neural networks.
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="./docs/dark-logo.svg">
+  <img alt="C-ML logo" src="./docs/light-mode.svg" width="50%" height="50%">
+</picture>
+
+</div>
+
+---
+
+C-ML is a lightweight machine learning library written in C. It provides implementations for various neural network components.
 
 ## Features
 
@@ -10,6 +19,7 @@ C-ML is a lightweight machine learning library written in C. It provides impleme
 - **Optimizers**: SGD, Adam, RMSprop
 - **Preprocessing**: Label Encoding, One-Hot Encoding, Standard Scaler, Min-Max Scaler
 - **Regularizers**: L1, L2, Combined L1-L2
+
 
 ## Directory Structure
 
@@ -35,10 +45,12 @@ C-ML/
 └── README.md             # Documentation
 ```
 
+
 ## Prerequisites
 
 - GCC (GNU Compiler Collection)
 - `make` build tool
+
 
 ## Build Instructions
 
@@ -67,6 +79,7 @@ C-ML/
    ```bash
    make clean
    ```
+
 
 ## Example Usage
 
@@ -121,9 +134,11 @@ int main()
 }
 ```
 
+
 ## Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests.
+
 
 ## License
 
