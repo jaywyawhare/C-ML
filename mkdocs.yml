@@ -1,0 +1,68 @@
+site_name: Documentation
+site_description: Lightweight Machine Learning Library in C
+repo_url: https://github.com/jaywyawhare/C-ML
+site_author: Arrry
+
+theme:
+  name: material
+  logo: light-mode.svg
+  favicon: light-mode.svg
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
+  font:
+    text: "Roboto"
+    code: "Source Code Pro"
+  icon:
+    logo: logo
+
+nav:
+  - Home: index.md
+  - Features: features.md
+  - Installation: installation.md
+  - Usage: usage.md
+  - Modules:
+      - Layers: modules/layers.md
+      - Activations: modules/activations.md
+      - Loss Functions: modules/loss_functions.md
+      - Optimizers: modules/optimizers.md
+      - Preprocessing: modules/preprocessing.md
+      - Regularizers: modules/regularizers.md
+  - Testing: testing.md
+  - Development Guidelines: development_guidelines.md
+  - Contributing: contributing.md
+  - License: license.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jaywyawhare/C-ML
+
+markdown_extensions:
+  - toc
+  - tables
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.emoji
+  - pymdownx.tasklist
+  - pymdownx.details
+  - pymdownx.mark
+  - pymdownx.tilde
