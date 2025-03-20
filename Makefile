@@ -2,19 +2,13 @@ CC      = gcc
 CFLAGS  = -g -Wall -lm
 SRC     = src
 OBJ     = obj
-SRCS    = $(wildcard $(SRC)/*.c) \
-          $(wildcard $(SRC)/Activations/*.c) \
-          $(wildcard $(SRC)/Layers/*.c) \
-          $(wildcard $(SRC)/Loss_Functions/*.c) \
-          $(wildcard $(SRC)/Optimizers/*.c) \
-          $(wildcard $(SRC)/Preprocessing/*.c) \
-          $(wildcard $(SRC)/Regularizers/*.c) \
-          main.c
-OBJS    = $(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
 BINDIR  = bin
 BIN     = $(BINDIR)/main
 
 TEST_BIN_DIR = test_bin
+
+SRCS    = $(wildcard $(SRC)/**/*.c) main.c
+OBJS    = $(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
 
 TEST_SRCS = $(wildcard test/**/*.c)
 
@@ -27,7 +21,6 @@ release: clean $(BIN)
 test:
 	@echo "Running tests..."
 
-	# Create necessary directories
 	mkdir -p $(BINDIR)
 	mkdir -p $(TEST_BIN_DIR)
 
@@ -40,6 +33,7 @@ test:
 	)
 
 	@echo "\nALL TESTS PASSED"
+
 
 $(BIN): $(OBJS)
 	mkdir -p $(BINDIR)
