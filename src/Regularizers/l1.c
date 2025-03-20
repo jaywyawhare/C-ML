@@ -3,8 +3,8 @@
 float l1(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b, float *s_w, float *s_b, float beta1, float beta2, float epsilon)
 {
     float y_pred = (*w) * x + (*b);
-    float loss = pow(y_pred - y, 2) + fabs(*w);                             // Include L1 regularization in the loss
-    float dw = 2 * (y_pred - y) * x + ((*w) > 0 ? 1 : ((*w) < 0 ? -1 : 0)); // L1 gradient
+    float loss = pow(y_pred - y, 2) + fabs(*w);                             
+    float dw = 2 * (y_pred - y) * x + ((*w) > 0 ? 1 : ((*w) < 0 ? -1 : 0)); 
     float db = 2 * (y_pred - y);
     *v_w = beta1 * (*v_w) + (1 - beta1) * dw;
     *v_b = beta1 * (*v_b) + (1 - beta1) * db;
