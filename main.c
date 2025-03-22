@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "src/Layers/dense.h"
-#include "src/Activations/relu.h"
-#include "src/Loss_Functions/meanSquaredError.h"
+#include "include/Layers/dense.h"
+#include "include/Activations/relu.h"
+#include "include/Loss_Functions/mean_squared_error.h"
 
 int main()
 {

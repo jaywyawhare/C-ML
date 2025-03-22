@@ -1,11 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include "../../include/Layers/dropout.h"
 
-typedef struct
-{
-    float dropout_rate;
-} DropoutLayer;
 
 void initializeDropout(DropoutLayer *layer, float dropout_rate)
 {

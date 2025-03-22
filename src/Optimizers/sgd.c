@@ -1,4 +1,5 @@
 #include <math.h>
+#include "../../include/Optimizers/sgd.h"
 
 float SGD(float x, float y, float lr, float *w, float *b)
 {

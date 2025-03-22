@@ -1,14 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include "../../include/Layers/dense.h"
 
-typedef struct
-{
-    float *weights;
-    float *biases;
-    int input_size;
-    int output_size;
-} DenseLayer;
 
 void initializeDense(DenseLayer *layer, int input_size, int output_size)
 {
