@@ -1,8 +1,6 @@
 #ifndef DENSE_H
 #define DENSE_H
 
-#include <stdio.h>
-
 typedef struct
 {
     float *weights;

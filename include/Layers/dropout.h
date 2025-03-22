@@ -1,8 +1,6 @@
 #ifndef DROPOUT_H
 #define DROPOUT_H
 
-#include <stdio.h>
-
 typedef struct
 {
     float dropout_rate;
