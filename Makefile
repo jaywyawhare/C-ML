@@ -1,51 +1,52 @@
 CC      = gcc
-CFLAGS  = -g -Wall -lm
+CFLAGS  = -g -Wall -MMD -lm
 SRC     = src
 OBJ     = obj
 BINDIR  = bin
-BIN     = $(BINDIR)/main
-
+LIB     = libmylib.a
 TEST_BIN_DIR = test_bin
 
 SRCS    = $(wildcard $(SRC)/**/*.c) main.c
-OBJS    = $(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
+OBJS    = $(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(filter $(SRC)%,$(SRCS))) \
+          $(patsubst %.c, $(OBJ)/%.o, $(filter main.c,$(SRCS)))
+LIB_OBJS = $(filter-out $(OBJ)/main.o, $(OBJS))
+DEPS    = $(OBJS:.o=.d)
 
 TEST_SRCS = $(wildcard test/**/*.c)
 
-all: $(BIN)
+all: $(BINDIR)/main
 
-release: CFLAGS = -Wall -O2 -DNDEBUG
-release: clean $(BIN)
+release: CFLAGS = -Wall -O2 -DNDEBUG -MMD
+release: clean all
 
-.PHONY: test
-test:
-	@echo "Running tests..."
-
-	mkdir -p $(BINDIR)
-	mkdir -p $(TEST_BIN_DIR)
-
-	$(foreach test_src, $(TEST_SRCS), \
-		test_bin=$$(basename $(notdir $(test_src))); \
-		test_folder=$$(dirname $(test_src)); \
-		src_file=$$(echo $(test_src) | sed 's|test/|src/|;s|test_||'); \
-		echo ""; \
-		$(CC) $(CFLAGS) $$test_folder/$$test_bin $$src_file -lm -o $(TEST_BIN_DIR)/$$test_bin && ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
-	)
-
-	@echo "\nALL TESTS PASSED"
-
-
-$(BIN): $(OBJS)
-	mkdir -p $(BINDIR)
+$(BINDIR)/main: $(OBJS)
+	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ -lm
 
 $(OBJ)/%.o: $(SRC)/%.c
-	mkdir -p $(@D)
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJ)/main.o: main.c
-	mkdir -p $(OBJ)
+	@mkdir -p $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(LIB): $(LIB_OBJS)
+	ar rcs $@ $^
+
+.PHONY: test
+test: $(LIB)
+	@mkdir -p $(TEST_BIN_DIR)
+	@echo "Running tests..."
+	@for test_src in $(TEST_SRCS); do \
+		test_bin=$$(basename $$test_src .c); \
+		src_file=$$(echo $$test_src | sed 's|^test/|src/|; s|test_||'); \
+		echo "\nCompiling and running $$test_bin..."; \
+		$(CC) $(CFLAGS) $$test_src $$src_file -L. -lmylib -lm -o $(TEST_BIN_DIR)/$$test_bin && ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
+	done
+	@echo "\nALL TESTS PASSED"
+
 clean:
-	rm -rf $(BINDIR) $(OBJ) $(TEST_BIN_DIR) a.out
+	rm -rf $(BINDIR) $(OBJ) $(TEST_BIN_DIR) $(LIB) a.out
+
+-include $(DEPS)
