@@ -1,24 +1,49 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/Activations/elu.h"
+#include <float.h>
+#include "../../include/Activations/elu.h"
+#include "../../include/Core/error_codes.h"
 
 void test_elu()
 {
-    float input[7] = {0.0, 1.0, -1.0, 2.0, -2.0, 1e6, -1e6};
-    float alpha = 1.0;
-    float expected_output[7] = {0.0f, 1.0f, -0.63212055f, 2.0f, -0.86466472f, 1e6f, -1.0f}; // Adjusted for large inputs
+    float input[11] = {0.0, 1.0, -1.0, 2.0, -2.0, 1e6, -1e6, FLT_MAX, -FLT_MAX, NAN, INFINITY};
+    float alpha_values[6] = {0.0, 1.0, FLT_MAX, -FLT_MAX, NAN, INFINITY};
     float tolerance = 1e-6;
-    for (int i = 0; i < 7; i++)
+
+    for (int a = 0; a < 6; a++)
     {
-        assert(fabs(elu(input[i], alpha) - expected_output[i]) < tolerance);
+        float alpha = alpha_values[a];
+
+        for (int i = 0; i < 11; i++)
+        {
+            if (isnan(input[i]) || isnan(alpha) || isinf(input[i]) || isinf(alpha))
+            {
+                assert(CM_INVALID_INPUT_ERROR == elu(input[i], alpha));
+            }
+            else
+            {
+                float expected_output;
+                if (input[i] >= 0)
+                {
+                    expected_output = input[i];
+                }
+                else
+                {
+                    expected_output = alpha * (expf(input[i]) - 1);
+                }
+
+                float output = elu(input[i], alpha);
+                assert(fabs(output - expected_output) < tolerance);
+            }
+        }
     }
-    printf("elu activation function test passed\n");
+    printf("ELU activation function test passed\n");
 }
 
 int main()
 {
-    printf("Testing elu activation function\n");
+    printf("Testing ELU activation function\n");
     test_elu();
     return 0;
 }
