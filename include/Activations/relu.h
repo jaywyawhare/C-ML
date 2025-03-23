@@ -9,4 +9,4 @@
  */
 float relu(float x);
 
-#endif // RELU_H
+#endif 

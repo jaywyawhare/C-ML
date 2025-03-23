@@ -1,4 +1,9 @@
+#include <math.h>
+#include <float.h>
 #include "../../include/Activations/elu.h"
+#include "../../include/Core/error_codes.h"
+
+#define EPSILON 1e-6f
 
 /**
  * @brief Applies the Exponential Linear Unit (ELU) activation function.
@@ -9,9 +14,14 @@
  *
  * @param x The input value.
  * @param alpha The scaling factor for negative values.
- * @return The result of the ELU activation function.
+ * @return The result of the ELU activation function, or an error code.
  */
 float elu(float x, float alpha)
 {
+    if (isnan(x) || isnan(alpha) || isinf(x) || isinf(alpha) || x == -INFINITY || alpha == -INFINITY)
+    {
+        return CM_INVALID_INPUT_ERROR;
+    }
+
     return x >= 0 ? x : alpha * (expf(x) - 1);
 }

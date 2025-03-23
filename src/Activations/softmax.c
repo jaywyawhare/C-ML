@@ -1,8 +1,8 @@
 #include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <float.h>
 #include "../../include/Activations/softmax.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/error_codes.h"
 
 /**
  * @brief Applies the softmax activation function.
@@ -16,6 +16,19 @@
  */
 float *softmax(float *z, int n)
 {
+    if (z == NULL || n <= 0)
+    {
+        return (float *)CM_NULL_ERROR;
+    }
+
+    for (int i = 0; i < n; i++)
+    {
+        if (isnan(z[i]) || isinf(z[i]) || z[i] == -INFINITY || z[i] == INFINITY)
+        {
+            return (float *)CM_INVALID_INPUT_ERROR;
+        }
+    }
+
     float max_val = z[0];
     for (int i = 1; i < n; i++)
     {
@@ -25,16 +38,25 @@ float *softmax(float *z, int n)
         }
     }
 
-    float sum = 0.0f; // Initialize sum to 0 for clarity
+    float sum = 0.0f;
     float *output = cm_safe_malloc(n * sizeof(float), __FILE__, __LINE__);
+    if (output == NULL)
+    {
+        return (float *)CM_MEMORY_ALLOCATION_ERROR;
+    }
 
     for (int i = 0; i < n; i++)
     {
-        output[i] = expf(z[i] - max_val); // Exponentiate with max_val shift for numerical stability
+        output[i] = expf(z[i] - max_val);
         sum += output[i];
     }
 
-    // Normalize the output array to get softmax values
+    if (sum == 0.0f)
+    {
+        cm_safe_free(output);
+        return (float *)CM_DIVISION_BY_ZERO_ERROR;
+    }
+
     for (int i = 0; i < n; i++)
     {
         output[i] /= sum;
@@ -53,6 +75,5 @@ void freeSoftmax(float **output)
     if (output != NULL && *output != NULL)
     {
         cm_safe_free(*output);
-        *output = NULL; // Set the caller's pointer to NULL
     }
 }
