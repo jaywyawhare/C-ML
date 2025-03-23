@@ -14,6 +14,17 @@
     } while (0)
 #endif
 
+/**
+ * @brief Allocates memory safely and logs the file and line number in case of failure.
+ *
+ * This function attempts to allocate the requested memory size. If the allocation fails,
+ * it logs an error message with the file name and line number, then exits the program.
+ *
+ * @param size The size of memory to allocate in bytes.
+ * @param file The name of the file where the allocation is requested.
+ * @param line The line number in the file where the allocation is requested.
+ * @return A pointer to the allocated memory, or exits the program on failure.
+ */
 void *cm_safe_malloc(size_t size, const char *file, int line)
 {
     void *ptr = malloc(size);
@@ -27,11 +38,19 @@ void *cm_safe_malloc(size_t size, const char *file, int line)
     return ptr;
 }
 
+/**
+ * @brief Frees allocated memory safely and sets the pointer to NULL.
+ *
+ * This function frees the memory pointed to by the given pointer. If the pointer is NULL,
+ * the function does nothing. It also logs the memory address being freed if debugging is enabled.
+ *
+ * @param ptr A pointer to the memory to be freed.
+ */
 void cm_safe_free(void *ptr)
 {
     if (ptr != NULL)
     {
-        DEBUG_LOG("Freed memory at %p\n", ptr); // Log before freeing
+        DEBUG_LOG("Freed memory at %p\n", ptr);
         free(ptr);
         ptr = NULL;
     }

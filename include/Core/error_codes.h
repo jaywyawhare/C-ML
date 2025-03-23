@@ -4,14 +4,31 @@
 /**
  * @brief Defines the error codes for the C-ML library.
  */
-typedef enum {
-    CM_SUCCESS = 0,                  /**< Success */
-    CM_NULL_POINTER_ERROR = -1,       /**< Null pointer error */
-    CM_MEMORY_ALLOCATION_ERROR = -2,  /**< Memory allocation error */
-    CM_INVALID_PARAMETER_ERROR = -3,   /**< Invalid parameter error */
-    CM_INVALID_STRIDE_ERROR = -4,     /**< Invalid stride error */
-    CM_INVALID_KERNEL_SIZE_ERROR = -5, /**< Invalid kernel size error */
-    CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR = -6 /**< Input size smaller than kernel error */
+typedef enum
+{
+    CM_SUCCESS = 0,
+    CM_NULL_ERROR = -1,
+    CM_NULL_POINTER_ERROR = -2,
+    CM_UNDERFLOW_ERROR = -3,
+    CM_OVERFLOW_ERROR = -4,
+    CM_INVALID_INPUT_ERROR = -5,
+    CM_MEMORY_ALLOCATION_ERROR = -6,
+    CM_INVALID_PARAMETER_ERROR = -7,
+    CM_INVALID_STRIDE_ERROR = -8,
+    CM_INVALID_KERNEL_SIZE_ERROR = -9,
+    CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR = -10,
+    CM_DIVISION_BY_ZERO_ERROR = -11,
+    CM_FILE_OPEN_ERROR = -12,
+    CM_FILE_READ_ERROR = -13,
+    CM_FILE_WRITE_ERROR = -14,
+    CM_INVALID_FILE_FORMAT_ERROR = -15,
+    CM_INVALID_INPUT_DIMENSIONS_ERROR = -16,
+    CM_INVALID_OUTPUT_DIMENSIONS_ERROR = -17,
+    CM_INCOMPATIBLE_DATA_TYPES_ERROR = -18,
+    CM_MATH_DOMAIN_ERROR = -19,
+    CM_SINGULAR_MATRIX_ERROR = -20,
+    CM_NON_POSITIVE_DEFINITE_MATRIX_ERROR = -21,
+    CM_NOT_IMPLEMENTED_ERROR = -22
 } CM_Error;
 
-#endif // C_ML_ERROR_CODES_H
+#endif
