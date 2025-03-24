@@ -1,8 +1,11 @@
 #include <math.h>
 #include <float.h>
+#include <stdio.h>
 #include "../../include/Activations/softmax.h"
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
+
+#define DEBUG_LOGGING 0
 
 /**
  * @brief Applies the softmax activation function.
@@ -18,13 +21,15 @@ float *softmax(float *z, int n)
 {
     if (z == NULL || n <= 0)
     {
-        return (float *)CM_NULL_ERROR;
+        fprintf(stderr, "[softmax] Error: Null input pointer or invalid size (%d).\n", n);
+        return (float *)CM_NULL_POINTER_ERROR;
     }
 
     for (int i = 0; i < n; i++)
     {
-        if (isnan(z[i]) || isinf(z[i]) || z[i] == -INFINITY || z[i] == INFINITY)
+        if (isnan(z[i]) || isinf(z[i]))
         {
+            fprintf(stderr, "[softmax] Error: Invalid input value (NaN or Inf) at index %d.\n", i);
             return (float *)CM_INVALID_INPUT_ERROR;
         }
     }
@@ -42,6 +47,7 @@ float *softmax(float *z, int n)
     float *output = cm_safe_malloc(n * sizeof(float), __FILE__, __LINE__);
     if (output == NULL)
     {
+        fprintf(stderr, "[softmax] Error: Memory allocation failed.\n");
         return (float *)CM_MEMORY_ALLOCATION_ERROR;
     }
 
@@ -53,13 +59,17 @@ float *softmax(float *z, int n)
 
     if (sum == 0.0f)
     {
-        cm_safe_free(output);
+        fprintf(stderr, "[softmax] Error: Division by zero (sum of exponentials is zero).\n");
+        cm_safe_free((void **)&output);
         return (float *)CM_DIVISION_BY_ZERO_ERROR;
     }
 
     for (int i = 0; i < n; i++)
     {
         output[i] /= sum;
+#if DEBUG_LOGGING
+        printf("[softmax] Output[%d]: %f\n", i, output[i]);
+#endif
     }
 
     return output;
@@ -74,6 +84,9 @@ void freeSoftmax(float **output)
 {
     if (output != NULL && *output != NULL)
     {
-        cm_safe_free(*output);
+        cm_safe_free((void **)output); // Pass double pointer
+#if DEBUG_LOGGING
+        printf("[freeSoftmax] Memory freed for softmax output.\n");
+#endif
     }
 }

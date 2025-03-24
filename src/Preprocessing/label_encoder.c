@@ -2,16 +2,41 @@
 #include <string.h>
 #include <stdio.h>
 #include "../../include/Preprocessing/label_encoder.h"
+#include "../../include/Core/error_codes.h"
+#include "../../include/Core/memory_management.h"
 
+#define DEBUG_LOGGING 0
 
-
-int *labelEncoder(char *x, int size, CharMap **map, int *mapSize)
+/**
+ * @brief Encodes a character array into integer labels.
+ *
+ * The function maps each unique character in the input array to a unique integer label.
+ *
+ * @param x The input character array.
+ * @param size The size of the input array.
+ * @param map A pointer to the character-to-integer mapping.
+ * @param mapSize A pointer to store the size of the mapping.
+ * @return A pointer to the encoded integer array, or an error code.
+ */
+int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
 {
-    *map = malloc(sizeof(CharMap) * size);
+    if (x == NULL || map == NULL || mapSize == NULL)
+    {
+        fprintf(stderr, "[labelEncoder] Error: Null pointer argument\n");
+        return (int *)CM_NULL_POINTER_ERROR;
+    }
+
+    if (size <= 0)
+    {
+        fprintf(stderr, "[labelEncoder] Error: Invalid size argument\n");
+        return (int *)CM_INVALID_PARAMETER_ERROR;
+    }
+
+    *map = (CharMap *)cm_safe_malloc(sizeof(CharMap) * size, __FILE__, __LINE__);
     if (*map == NULL)
     {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(1);
+        fprintf(stderr, "[labelEncoder] Memory allocation failed\n");
+        return (int *)CM_MEMORY_ALLOCATION_ERROR;
     }
     int uniqueCount = 0;
     for (int i = 0; i < size; i++)
@@ -34,12 +59,12 @@ int *labelEncoder(char *x, int size, CharMap **map, int *mapSize)
     }
     *mapSize = uniqueCount;
 
-    int *encoded = malloc(sizeof(int) * size);
+    int *encoded = (int *)cm_safe_malloc(sizeof(int) * size, __FILE__, __LINE__);
     if (encoded == NULL)
     {
-        fprintf(stderr, "Memory allocation failed\n");
+        fprintf(stderr, "[labelEncoder] Memory allocation failed\n");
         free(*map);
-        exit(1);
+        return (int *)CM_MEMORY_ALLOCATION_ERROR;
     }
     for (int i = 0; i < size; i++)
     {
@@ -52,16 +77,42 @@ int *labelEncoder(char *x, int size, CharMap **map, int *mapSize)
             }
         }
     }
+#if DEBUG_LOGGING
+    printf("[labelEncoder] Encoding complete.\n");
+#endif
     return encoded;
 }
 
-char *labelDecoder(int *x, int size, CharMap *map, int mapSize)
+/**
+ * @brief Decodes integer labels back into a character array.
+ *
+ * The function converts the encoded integer labels back into the original character array
+ * using the provided mapping.
+ *
+ * @param x The encoded integer array.
+ * @param size The size of the input array.
+ * @param map The character-to-integer mapping.
+ * @param mapSize The size of the mapping.
+ * @return A pointer to the decoded character array, or NULL if an error occurs.
+ */
+char *label_decoder(int *x, int size, CharMap *map, int mapSize)
 {
-    char *decoded = malloc(sizeof(char) * (size + 1));
+    if (x == NULL || map == NULL)
+    {
+        fprintf(stderr, "[labelDecoder] Error: Null pointer argument\n");
+        return NULL;
+    }
+
+    if (size <= 0 || mapSize <= 0)
+    {
+        fprintf(stderr, "[labelDecoder] Error: Invalid size argument\n");
+        return NULL;
+    }
+    char *decoded = (char *)cm_safe_malloc(sizeof(char) * (size + 1), __FILE__, __LINE__);
     if (decoded == NULL)
     {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(1);
+        fprintf(stderr, "[labelDecoder] Memory allocation failed\n");
+        return NULL;
     }
     for (int i = 0; i < size; i++)
     {
@@ -75,12 +126,25 @@ char *labelDecoder(int *x, int size, CharMap *map, int mapSize)
         }
     }
     decoded[size] = '\0';
+#if DEBUG_LOGGING
+    printf("[labelDecoder] Decoding complete.\n");
+#endif
     return decoded;
 }
 
-void freeLabelMemory(CharMap *map, int *encoded, char *decoded)
+/**
+ * @brief Frees the memory allocated for label encoding and decoding.
+ *
+ * This function releases the memory allocated for the character-to-integer mapping,
+ * the encoded integer array, and the decoded character array.
+ *
+ * @param map The character-to-integer mapping.
+ * @param encoded The encoded integer array.
+ * @param decoded The decoded character array.
+ */
+void free_label_memory(CharMap *map, int *encoded, char *decoded)
 {
-    free(map);
-    free(encoded);
-    free(decoded);
+    cm_safe_free((void **)&map);
+    cm_safe_free((void **)&encoded);
+    cm_safe_free((void **)&decoded);
 }

@@ -8,6 +8,6 @@
  * @return The result of the Leaky ReLU activation function.
  */
 
-float leakyRelu(float x);
+float leaky_relu(float x);
 
 #endif

@@ -1,13 +1,34 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "../../include/Core/error_codes.h"
 
+#define DEBUG_LOGGING 0
+
+/**
+ * @brief Applies combined L1 and L2 regularization to update gradients.
+ *
+ * The combined regularization adds both the absolute and squared values of weights
+ * to the loss function and updates the gradients accordingly.
+ *
+ * @param w Pointer to the weights array.
+ * @param dw Pointer to the gradients array.
+ * @param l1 Regularization strength for L1.
+ * @param l2 Regularization strength for L2.
+ * @param n Number of weights.
+ * @return The computed loss or an error code.
+ */
 float l1_l2(float *w, float *dw, float l1, float l2, int n)
 {
-    if (w == NULL || dw == NULL || n <= 0)
+    if (w == NULL || dw == NULL)
     {
-        fprintf(stderr, "Error: Invalid input to l1_l2\n");
-        return -1;
+        fprintf(stderr, "[l1_l2] Error: Null pointer argument.\n");
+        return CM_NULL_POINTER_ERROR;
+    }
+    if (n <= 0)
+    {
+        fprintf(stderr, "[l1_l2] Error: length of weights must be positive.\n");
+        return CM_INVALID_PARAMETER_ERROR;
     }
 
     float loss = 0;
@@ -19,6 +40,10 @@ float l1_l2(float *w, float *dw, float l1, float l2, int n)
                                                     : 0;
 
         dw[i] += l1 * l1_grad + 2 * l2 * w[i];
+
+#if DEBUG_LOGGING
+        printf("[l1_l2] i: %d, w[i]: %f, dw[i]: %f, loss: %f\n", i, w[i], dw[i], loss);
+#endif
     }
     return loss;
 }

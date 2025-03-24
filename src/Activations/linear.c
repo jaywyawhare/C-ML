@@ -1,7 +1,10 @@
 #include <math.h>
 #include <float.h>
+#include <stdio.h>
 #include "../../include/Core/error_codes.h"
 #include "../../include/Activations/linear.h"
+
+#define DEBUG_LOGGING 0
 
 /**
  * @brief Applies the Linear (identity) activation function.
@@ -16,7 +19,13 @@ float linear(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
+        fprintf(stderr, "[linear] Error: Invalid input (NaN or Inf)\n");
         return CM_INVALID_INPUT_ERROR;
     }
-    return x;
+
+    float result = x;
+#if DEBUG_LOGGING
+    printf("[linear] Input: x=%f, Output: %f\n", x, result);
+#endif
+    return result;
 }

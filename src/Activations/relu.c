@@ -1,7 +1,10 @@
 #include <math.h>
 #include <float.h>
+#include <stdio.h>
 #include "../../include/Core/error_codes.h"
 #include "../../include/Activations/relu.h"
+
+#define DEBUG_LOGGING 0
 
 /**
  * @brief Applies the Rectified Linear Unit (ReLU) activation function.
@@ -17,8 +20,13 @@ float relu(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
+        fprintf(stderr, "[relu] Error: Invalid input (NaN or Inf)\n");
         return CM_INVALID_INPUT_ERROR;
     }
 
-    return x > 0 ? x : 0;
+    float result = x > 0 ? x : 0;
+#if DEBUG_LOGGING
+    printf("[relu] Input: x=%f, Output: %f\n", x, result);
+#endif
+    return result;
 }
