@@ -32,3 +32,32 @@ float elu(float x, float alpha)
 #endif
     return result;
 }
+
+/**
+ * @brief Computes the derivative of the ELU activation function.
+ *
+ * The derivative of ELU is:
+ * - f'(x) = 1, if x >= 0
+ * - f'(x) = f(x) + alpha, if x < 0
+ *
+ * @param x The input value.
+ * @param alpha The scaling factor for negative values.
+ * @return The derivative of the ELU function.
+ */
+float elu_derivative(float x, float alpha)
+{
+    if (isnan(x) || isnan(alpha) || isinf(x) || isinf(alpha))
+    {
+        fprintf(stderr, "[elu_derivative] Error: Invalid input (NaN or Inf)\n");
+        return CM_INVALID_INPUT_ERROR;
+    }
+
+    if (x >= 0)
+    {
+        return 1.0f;
+    }
+    else
+    {
+        return alpha * expf(x);
+    }
+}

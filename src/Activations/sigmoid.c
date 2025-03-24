@@ -40,3 +40,23 @@ float sigmoid(float x)
 #endif
     return result;
 }
+
+/**
+ * @brief Computes the derivative of the sigmoid activation function.
+ *
+ * The derivative of sigmoid is:
+ * - f'(x) = f(x) * (1 - f(x))
+ *
+ * @param sigmoid_output The output of the sigmoid function (f(x)).
+ * @return The derivative of the sigmoid function.
+ */
+float sigmoid_derivative(float sigmoid_output)
+{
+    if (isnan(sigmoid_output) || isinf(sigmoid_output) || sigmoid_output < 0.0f || sigmoid_output > 1.0f)
+    {
+        fprintf(stderr, "[sigmoid_derivative] Error: Invalid sigmoid output (NaN, Inf, or out of range)\n");
+        return CM_INVALID_INPUT_ERROR;
+    }
+
+    return sigmoid_output * (1.0f - sigmoid_output);
+}

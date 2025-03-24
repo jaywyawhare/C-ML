@@ -29,3 +29,23 @@ float linear(float x)
 #endif
     return result;
 }
+
+/**
+ * @brief Computes the derivative of the Linear activation function.
+ *
+ * The derivative of Linear is:
+ * - f'(x) = 1
+ *
+ * @param x The input value.
+ * @return The derivative of the Linear function.
+ */
+float linear_derivative(float x)
+{
+    if (isnan(x) || isinf(x))
+    {
+        fprintf(stderr, "[linear_derivative] Error: Invalid input (NaN or Inf)\n");
+        return CM_INVALID_INPUT_ERROR;
+    }
+
+    return 1.0f;
+}

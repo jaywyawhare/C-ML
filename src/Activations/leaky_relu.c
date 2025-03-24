@@ -31,3 +31,24 @@ float leaky_relu(float x)
 #endif
    return result;
 }
+
+/**
+ * @brief Computes the derivative of the Leaky ReLU activation function.
+ *
+ * The derivative of Leaky ReLU is:
+ * - f'(x) = 1, if x > 0
+ * - f'(x) = alpha, if x <= 0
+ *
+ * @param x The input value.
+ * @return The derivative of the Leaky ReLU function.
+ */
+float leaky_relu_derivative(float x)
+{
+   if (isnan(x) || isinf(x))
+   {
+      fprintf(stderr, "[leaky_relu_derivative] Error: Invalid input (NaN or Inf)\n");
+      return CM_INVALID_INPUT_ERROR;
+   }
+
+   return x > 0 ? 1.0f : LEAKY_RELU_ALPHA;
+}

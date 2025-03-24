@@ -53,3 +53,23 @@ float tanH(float x)
         return result;
     }
 }
+
+/**
+ * @brief Computes the derivative of the tanh activation function.
+ *
+ * The derivative of tanh is:
+ * - f'(x) = 1 - f(x)^2
+ *
+ * @param tanh_output The output of the tanh function (f(x)).
+ * @return The derivative of the tanh function.
+ */
+float tanh_derivative(float tanh_output)
+{
+    if (isnan(tanh_output) || isinf(tanh_output) || tanh_output < -1.0f || tanh_output > 1.0f)
+    {
+        fprintf(stderr, "[tanh_derivative] Error: Invalid tanh output (NaN, Inf, or out of range)\n");
+        return CM_INVALID_INPUT_ERROR;
+    }
+
+    return 1.0f - tanh_output * tanh_output;
+}

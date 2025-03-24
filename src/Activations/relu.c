@@ -30,3 +30,24 @@ float relu(float x)
 #endif
     return result;
 }
+
+/**
+ * @brief Computes the derivative of the ReLU activation function.
+ *
+ * The derivative of ReLU is:
+ * - f'(x) = 1, if x > 0
+ * - f'(x) = 0, if x <= 0
+ *
+ * @param x The input value.
+ * @return The derivative of the ReLU function.
+ */
+float relu_derivative(float x)
+{
+    if (isnan(x) || isinf(x))
+    {
+        fprintf(stderr, "[relu_derivative] Error: Invalid input (NaN or Inf)\n");
+        return CM_INVALID_INPUT_ERROR;
+    }
+
+    return x > 0 ? 1.0f : 0.0f;
+}

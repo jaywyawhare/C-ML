@@ -90,3 +90,50 @@ void freeSoftmax(float **output)
 #endif
     }
 }
+
+/**
+ * @brief Computes the derivative of the softmax activation function.
+ *
+ * The derivative of softmax is:
+ * - f'(z_i) = f(z_i) * (1 - f(z_i)) for diagonal elements
+ * - f'(z_i, z_j) = -f(z_i) * f(z_j) for off-diagonal elements
+ *
+ * @param softmax_output Pointer to the softmax output array.
+ * @param n The number of elements in the output array.
+ * @param jacobian Pointer to the output Jacobian matrix (n x n).
+ * @return Error code indicating success or failure.
+ */
+int softmax_derivative(float *softmax_output, int n, float *jacobian)
+{
+    if (softmax_output == NULL || jacobian == NULL || n <= 0)
+    {
+        fprintf(stderr, "[softmax_derivative] Error: Null pointer or invalid size.\n");
+        return CM_NULL_POINTER_ERROR;
+    }
+
+    for (int i = 0; i < n; i++)
+    {
+        if (isnan(softmax_output[i]) || isinf(softmax_output[i]) || softmax_output[i] < 0.0f || softmax_output[i] > 1.0f)
+        {
+            fprintf(stderr, "[softmax_derivative] Error: Invalid softmax output at index %d.\n", i);
+            return CM_INVALID_INPUT_ERROR;
+        }
+    }
+
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            if (i == j)
+            {
+                jacobian[i * n + j] = softmax_output[i] * (1.0f - softmax_output[i]);
+            }
+            else
+            {
+                jacobian[i * n + j] = -softmax_output[i] * softmax_output[j];
+            }
+        }
+    }
+
+    return CM_SUCCESS;
+}
