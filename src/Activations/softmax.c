@@ -84,7 +84,7 @@ void freeSoftmax(float **output)
 {
     if (output != NULL && *output != NULL)
     {
-        cm_safe_free((void **)output); // Pass double pointer
+        cm_safe_free((void **)output);
 #if DEBUG_LOGGING
         printf("[freeSoftmax] Memory freed for softmax output.\n");
 #endif
