@@ -27,7 +27,7 @@ int main()
     }
     printf("Activated Output: [%f, %f]\n", dense_output[0], dense_output[1]);
 
-    float loss = meanSquaredError(target, dense_output, output_size);
+    float loss = mean_squared_error(target, dense_output, output_size);
     printf("Loss: %f\n", loss);
 
     float d_output[2] = {dense_output[0] - target[0], dense_output[1] - target[1]};
