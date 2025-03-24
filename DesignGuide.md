@@ -2,7 +2,7 @@
 
 This document provides the conventions and best practices for contributing to the C-ML codebase. Adhering to these guidelines will ensure consistency, readability, and maintainability throughout the project.
 
----
+
 
 ## 1. General Coding Conventions
 
@@ -39,7 +39,7 @@ This document provides the conventions and best practices for contributing to th
 
 - **Avoid over-commenting**: Do not comment obvious code or trivial operations. Comments should focus on explaining "why" something is done, not "what" is done.
 
----
+
 
 ## 2. Variable Naming Conventions
 
@@ -54,7 +54,7 @@ This document provides the conventions and best practices for contributing to th
 ### 2.3 Pointers
 - **Pointer variables**: Prefix pointer variables with `p_` to indicate they are pointers (e.g., `p_layer`, `p_input`).
 
----
+
 
 ## 3. Function Naming Conventions
 
@@ -73,7 +73,7 @@ This document provides the conventions and best practices for contributing to th
 ### 3.3 Documentation
 - **Document each function** using Doxygen-style comments. Describe the function's purpose, parameters, and return values.
   
----
+
 
 ## 4. Layer Design Conventions
 
@@ -98,7 +98,7 @@ int polling_layer_output_size(int input_size, int kernel_size, int stride);
 void polling_layer_free(PollingLayer *layer);
 ```
 
----
+
 
 ## 5. Debugging Conventions
 
@@ -121,7 +121,7 @@ void polling_layer_free(PollingLayer *layer);
   fprintf(stderr, "[function_name] Error: Invalid parameter (%d).\n", param);
   ```
 
----
+
 
 ## 6. File Organization
 
@@ -133,7 +133,7 @@ void polling_layer_free(PollingLayer *layer);
 ### 6.2 File Naming
 - **File names**: Use **snake_case** for file names (e.g., `polling.c`, `maxpooling.h`).
 
----
+
 
 ## 7. Error Handling
 
@@ -151,7 +151,7 @@ void polling_layer_free(PollingLayer *layer);
 ### 7.2 Error Propagation
 - **Propagate errors**: Functions should return error codes (`CM_Error`), which can be checked by the caller.
 
----
+
 
 ## 8. Testing
 
@@ -162,7 +162,7 @@ void polling_layer_free(PollingLayer *layer);
 ### 8.2 Test Naming
 - **File naming**: Use the format `<module>_test.c` for test files (e.g., `polling_test.c`).
 
----
+
 
 ## 9. Code Review Checklist
 
@@ -173,7 +173,7 @@ Before submitting a pull request:
 4. Error handling is implemented and tested.
 5. Unit tests are written and pass successfully.
 
----
+
 
 ## 10. Example Code
 
@@ -211,7 +211,7 @@ int main() {
 }
 ```
 
----
+
 
 ## 11. Memory Management
 
@@ -226,7 +226,7 @@ int main() {
 - Always use `cm_safe_malloc` for memory allocation and `cm_safe_free` for deallocation.
 - The `cm_safe_malloc` function should include file and line numbers for easier debugging.
 
----
+
 
 ## 12. Import Minimization
 
@@ -236,6 +236,56 @@ int main() {
 ### 12.2 Minimize Library Imports
 - When using external libraries, only import the specific components needed rather than the entire library. This reduces the size of the compiled code.
 
----
 
-By adhering to these guidelines, contributors will maintain a clean, organized, and efficient C-ML codebase that is easy to understand, extend, and debug.
+
+## 13. Comment Placement Guidelines
+
+### 13.1 Implementation Comments in `.c` Files
+- Use detailed comments in `.c` files to describe the implementation logic.
+- Include explanations for complex computations, algorithms, or formulas.
+- Focus on "how" the function works.
+
+### 13.2 Interface Comments in `.h` Files
+- Use concise comments in `.h` files to describe the function's purpose, parameters, and return values.
+- Focus on "what" the function does and how other code will interact with it.
+- Avoid including implementation details in `.h` files.
+
+Example:
+```c 
+// .h file
+
+/**
+ * @brief Applies the GELU activation function.
+ * @param input Pointer to the input array.
+ * @param output Pointer to the output array.
+ * @param size Number of elements in the input array.
+ * @return CM_SUCCESS on success, or an error code on failure.
+ */
+int gelu_activation(const float *input, float *output, int size);
+```
+
+```c
+// .c file
+
+/**
+ * @brief Applies the GELU activation function.
+ *
+ * The GELU function is defined as:
+ * GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+ *
+ * This implementation uses an approximation for efficiency.
+ *
+ * @param input Pointer to the input array.
+ * @param output Pointer to the output array.
+ * @param size Number of elements in the input array.
+ * @return CM_SUCCESS on success, or an error code on failure.
+ */
+
+int gelu_activation(const float *input, float *output, int size) {
+    for (int i = 0; i < size; i++) {
+        float x = input[i];
+        output[i] = 0.5 * x * (1 + tanh(sqrt(2 / M_PI) * (x + 0.044715 * pow(x, 3))));
+    }
+    return CM_SUCCESS;
+}
+```
