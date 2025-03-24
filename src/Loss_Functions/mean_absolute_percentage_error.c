@@ -37,7 +37,7 @@ float mean_absolute_percentage_error(float *y, float *yHat, int n)
     }
     if (valid_count == 0)
     {
-        return 0;
+        return CM_SUCCESS;
     }
 #if DEBUG_LOGGING
     printf("[mean_absolute_percentage_error] Computed error: %f\n", sum / valid_count * 100);
