@@ -1,6 +1,5 @@
 # Activations
 
-
 ## ReLU
 - **Description**: Rectified Linear Unit activation function.
 - **Function**: `relu(float x)`
@@ -28,10 +27,15 @@
 
 ## Leaky ReLU
 - **Description**: Leaky version of ReLU to allow small gradients for negative inputs.
-- **Function**: `leakyRelu(float x)`
-- **File**: [`leakyRelu.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Activations/leakyRelu.c)
+- **Function**: `leaky_relu(float x)`
+- **File**: [`leaky_relu.c`](https://github.com/jaywyawhare/C-ML/blob/master/src/Activations/leaky_relu.c)
 
 ## Linear
 - **Description**: Linear activation function (identity function).
 - **Function**: `linear(float x)`
 - **File**: [`linear.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Activations/linear.c)
+
+## GELU
+- **Description**: Gaussian Error Linear Unit activation function.
+- **Function**: `gelu(float x)`
+- **File**: [`gelu.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Activations/gelu.c)
