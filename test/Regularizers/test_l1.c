@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/Regularizers/l1.h"
+#include "../../include/Regularizers/l1.h"
+#include "../../include/Core/error_codes.h"
 
-void test_l1()
+void run_all_tests_l1()
 {
     float x = 1.0, y = 2.0;
     float lr = 0.01;
@@ -16,13 +17,19 @@ void test_l1()
     float threshold = 1e-6;
 
     float loss = l1(x, y, lr, &w, &b, &v_w, &v_b, &s_w, &s_b, beta1, beta2, epsilon);
-    assert(fabs(loss - 1.96 - fabs(0.5)) < threshold); // Include L1 regularization in the expected loss
+    assert(fabs(loss - (pow((0.5 * 1.0 + 0.1 - 2.0), 2) + fabs(0.5))) < threshold);
+
+    loss = l1(x, y, lr, NULL, &b, &v_w, &v_b, &s_w, &s_b, beta1, beta2, epsilon);
+    assert(loss == CM_NULL_POINTER_ERROR);
+
+    loss = l1(x, y, lr, &w, &b, &v_w, &v_b, &s_w, &s_b, beta1, beta2, 0);
+    assert(loss == CM_INVALID_PARAMETER_ERROR);
     printf("l1 test passed\n");
 }
 
 int main()
 {
     printf("Testing l1\n");
-    test_l1();
+    run_all_tests_l1();
     return 0;
 }

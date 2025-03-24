@@ -15,11 +15,11 @@ void test_leakyRelu()
     {
         if (isnan(input[i]) || isinf(input[i]))
         {
-            assert(CM_INVALID_INPUT_ERROR == leakyRelu(input[i]));
+            assert(CM_INVALID_INPUT_ERROR == leaky_relu(input[i]));
         }
         else
         {
-            assert(fabs(leakyRelu(input[i]) - expected_output[i]) < tolerance);
+            assert(fabs(leaky_relu(input[i]) - expected_output[i]) < tolerance);
         }
     }
     printf("leakyRelu activation function test passed\n");

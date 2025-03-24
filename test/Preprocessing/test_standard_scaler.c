@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/Preprocessing/standardScaler.h"
+#include "../../include/Preprocessing/standard_scaler.h"
+#include "../../include/Core/error_codes.h"
 
-void test_standardScaler_normal_case()
+void test_standard_scaler()
 {
     float data[] = {1, 2, 3, 4, 5};
     int size = sizeof(data) / sizeof(data[0]);
-    float *scaled = standardScaler(data, size);
+    float *scaled = standard_scaler(data, size);
     float mean = 0, std = 0;
     for (int i = 0; i < size; i++)
     {
@@ -23,12 +24,20 @@ void test_standardScaler_normal_case()
     assert(fabs(mean) < 1e-6);
     assert(fabs(std - 1) < 1e-6);
     free(scaled);
-    printf("standerdScaler test passed\n");
+
+    scaled = standard_scaler(NULL, 5);
+    assert(scaled == NULL);
+
+    float data2[] = {1, 2, 3, 4, 5};
+    scaled = standard_scaler(data2, 0);
+    assert(scaled == NULL);
+
+    printf("standard_scaler test passed\n");
 }
 
 int main()
 {
-    printf("Testing standardScaler\n");
-    test_standardScaler_normal_case();
+    printf("Testing standard_scaler\n");
+    test_standard_scaler();
     return 0;
 }

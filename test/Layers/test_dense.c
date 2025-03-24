@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "../../src/Layers/dense.h"
+#include "../../include/Layers/dense.h"
 
 void test_dense_layer()
 {

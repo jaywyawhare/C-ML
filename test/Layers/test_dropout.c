@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "../../src/Layers/dropout.h"
+#include "../../include/Layers/dropout.h"
 
 void test_dropout_layer()
 {
