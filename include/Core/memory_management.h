@@ -16,8 +16,8 @@ void *cm_safe_malloc(size_t size, const char *file, int line);
 /**
  * @brief Frees allocated memory safely and sets the pointer to NULL.
  *
- * @param ptr A pointer to the memory to be freed.
+ * @param ptr A double pointer to the memory to be freed.
  */
-void cm_safe_free(void *ptr);
+void cm_safe_free(void **ptr);
 
 #endif

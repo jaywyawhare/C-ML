@@ -1,18 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/error_codes.h"
 
-// #define DEBUG
-
-#ifdef DEBUG
-#define DEBUG_LOG(fmt, ...) \
-    fprintf(stderr, fmt, __VA_ARGS__)
-#else
-#define DEBUG_LOG(fmt, ...) \
-    do                      \
-    {                       \
-    } while (0)
-#endif
+#define DEBUG_LOGGING 0
 
 /**
  * @brief Allocates memory safely and logs the file and line number in case of failure.
@@ -31,10 +22,11 @@ void *cm_safe_malloc(size_t size, const char *file, int line)
     if (ptr == NULL)
     {
         fprintf(stderr, "Memory allocation failed for %zu bytes in %s at line %d\n", size, file, line);
-        exit(EXIT_FAILURE);
+        return (void *)CM_MEMORY_ALLOCATION_ERROR;
     }
-
-    DEBUG_LOG("Allocated %zu bytes at %p in %s at line %d\n", size, ptr, file, line);
+#if DEBUG_LOGGING
+    printf("Allocated %zu bytes at %p in %s at line %d\n", size, ptr, file, line);
+#endif
     return ptr;
 }
 
@@ -43,15 +35,18 @@ void *cm_safe_malloc(size_t size, const char *file, int line)
  *
  * This function frees the memory pointed to by the given pointer. If the pointer is NULL,
  * the function does nothing. It also logs the memory address being freed if debugging is enabled.
+ * After freeing the memory, it sets the pointer to NULL to avoid double-free issues.
  *
  * @param ptr A pointer to the memory to be freed.
  */
-void cm_safe_free(void *ptr)
+void cm_safe_free(void **ptr)
 {
-    if (ptr != NULL)
+    if (ptr != NULL && *ptr != NULL)
     {
-        DEBUG_LOG("Freed memory at %p\n", ptr);
-        free(ptr);
-        ptr = NULL;
+#if DEBUG_LOGGING
+        printf("Freeing memory at %p\n", *ptr);
+#endif
+        free(*ptr);
+        *ptr = NULL;
     }
 }
