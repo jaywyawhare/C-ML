@@ -1,73 +1,123 @@
 #include <stdlib.h>
-#include <stdio.h>            // For error messages
+#include <stdio.h>
 #include "../../include/Layers/pooling.h"
-#include "../../include/Core/error_codes.h" // Include the new error codes
+#include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0 // Set to 1 to enable debug logs
+#define DEBUG_LOGGING 0
 
-PollingLayer *polling_layer_create(int kernel_size, int stride)
+/**
+ * @brief Initializes a Polling Layer.
+ *
+ * @param layer Pointer to the PollingLayer structure.
+ * @param kernel_size Size of the kernel.
+ * @param stride Stride of the kernel.
+ * @return int Error code.
+ */
+int initialize_polling(PollingLayer *layer, int kernel_size, int stride)
 {
-    if (kernel_size <= 0 || stride <= 0)
+    if (layer == NULL)
     {
-        fprintf(stderr, "[polling_layer_create] Error: Invalid kernel size (%d) or stride (%d).\n", kernel_size, stride);
-        return NULL;
+        fprintf(stderr, "[initialize_polling] Error: Layer is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
-    PollingLayer *layer = (PollingLayer *)cm_safe_malloc(sizeof(PollingLayer), __FILE__, __LINE__);
-    if (!layer)
+    if (kernel_size <= 0)
     {
-        fprintf(stderr, "[polling_layer_create] Error: Memory allocation failed for PollingLayer.\n");
-        return NULL;
+        fprintf(stderr, "[initialize_polling] Error: Invalid kernel size.\n");
+        return CM_INVALID_KERNEL_SIZE_ERROR;
     }
+
+    if (stride <= 0)
+    {
+        fprintf(stderr, "[initialize_polling] Error: Invalid stride.\n");
+        return CM_INVALID_STRIDE_ERROR;
+    }
+
     layer->kernel_size = kernel_size;
     layer->stride = stride;
-    return layer;
+    return CM_SUCCESS;
 }
 
-int polling_layer_output_size(int input_size, int kernel_size, int stride)
+/**
+ * @brief Computes the output size for the Polling Layer.
+ *
+ * @param input_size Size of the input data.
+ * @param kernel_size Size of the kernel.
+ * @param stride Stride of the kernel.
+ * @return int Output size, or an error code on invalid input.
+ */
+int compute_polling_output_size(int input_size, int kernel_size, int stride)
 {
-    if (input_size < 0)
+    if (input_size <= 0)
     {
-        fprintf(stderr, "[polling_layer_output_size] Error: Input size (%d) cannot be negative.\n", input_size);
-        return (int)CM_INVALID_PARAMETER_ERROR;
+        fprintf(stderr, "[compute_polling_output_size] Error: Input size must be greater than 0.\n");
+        return CM_INVALID_INPUT_ERROR;
     }
+
+    if (kernel_size <= 0)
+    {
+        fprintf(stderr, "[compute_polling_output_size] Error: Invalid kernel size.\n");
+        return CM_INVALID_KERNEL_SIZE_ERROR;
+    }
+
+    if (stride <= 0)
+    {
+        fprintf(stderr, "[compute_polling_output_size] Error: Invalid stride.\n");
+        return CM_INVALID_STRIDE_ERROR;
+    }
+
+    if (input_size < kernel_size)
+    {
+        fprintf(stderr, "[compute_polling_output_size] Error: Input size is smaller than kernel size.\n");
+        return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
+    }
+
     return (input_size - kernel_size) / stride + 1;
 }
 
-int polling_layer_forward(PollingLayer *layer, const float *input, float *output, int input_size)
+/**
+ * @brief Performs the forward pass for the Polling Layer.
+ *
+ * @param layer Pointer to the PollingLayer structure.
+ * @param input Input data array.
+ * @param output Output data array.
+ * @param input_size Size of the input data.
+ * @return int Number of output elements, or an error code on failure.
+ */
+int forward_polling(PollingLayer *layer, const float *input, float *output, int input_size)
 {
-    if (!layer)
+    if (layer == NULL)
     {
-        fprintf(stderr, "[polling_layer_forward] Error: Null layer pointer.\n");
-        return (int)CM_NULL_POINTER_ERROR;
+        fprintf(stderr, "[forward_polling] Error: Layer is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
-    if (!input || !output)
+    if (input == NULL || output == NULL)
     {
-        fprintf(stderr, "[polling_layer_forward] Error: Null input (%p) or output (%p) pointer.\n", input, output);
-        return (int)CM_NULL_POINTER_ERROR;
-    }
-
-    if (layer->stride <= 0)
-    {
-        fprintf(stderr, "[polling_layer_forward] Error: Stride (%d) must be greater than 0.\n", layer->stride);
-        return (int)CM_INVALID_STRIDE_ERROR;
+        fprintf(stderr, "[forward_polling] Error: Null input or output pointer.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
     if (layer->kernel_size <= 0)
     {
-        fprintf(stderr, "[polling_layer_forward] Error: Kernel size (%d) must be greater than 0.\n", layer->kernel_size);
-        return (int)CM_INVALID_KERNEL_SIZE_ERROR;
+        fprintf(stderr, "[forward_polling] Error: Invalid kernel size.\n");
+        return CM_INVALID_KERNEL_SIZE_ERROR;
+    }
+
+    if (layer->stride <= 0)
+    {
+        fprintf(stderr, "[forward_polling] Error: Invalid stride.\n");
+        return CM_INVALID_STRIDE_ERROR;
     }
 
     if (input_size < layer->kernel_size)
     {
-        fprintf(stderr, "[polling_layer_forward] Error: Input size (%d) is smaller than kernel size (%d).\n", input_size, layer->kernel_size);
-        return (int)CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
+        fprintf(stderr, "[forward_polling] Error: Input size is smaller than kernel size.\n");
+        return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
     }
 
-    float kernel_reciprocal = 1.0f / layer->kernel_size; // Precompute reciprocal
+    float kernel_reciprocal = 1.0f / layer->kernel_size;
     int output_index = 0;
     for (int i = 0; i <= input_size - layer->kernel_size; i += layer->stride)
     {
@@ -76,18 +126,30 @@ int polling_layer_forward(PollingLayer *layer, const float *input, float *output
         {
             sum += input[i + j];
         }
-        output[output_index++] = sum * kernel_reciprocal; // Use multiplication instead of division
+        output[output_index++] = sum * kernel_reciprocal;
+
 #if DEBUG_LOGGING
-        printf("[polling_layer_forward] Output[%d]: %f\n", output_index - 1, output[output_index - 1]);
+        printf("[forward_polling] Output[%d]: %f\n", output_index - 1, output[output_index - 1]);
 #endif
     }
-    return output_index; // Return the number of output elements
+
+    return output_index;
 }
 
-void polling_layer_free(PollingLayer *layer)
+/**
+ * @brief Frees the memory allocated for the Polling Layer.
+ *
+ * @param layer Pointer to the PollingLayer structure.
+ * @return int Error code.
+ */
+int free_polling(PollingLayer *layer)
 {
-    if (layer)
+    if (layer == NULL)
     {
-        cm_safe_free(layer);
+        fprintf(stderr, "[free_polling] Error: Layer is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
+
+    cm_safe_free((void **)&layer);
+    return CM_SUCCESS;
 }

@@ -4,67 +4,117 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0 
+#define DEBUG_LOGGING 0 // Set to 1 to enable debug logs
 
-MaxPoolingLayer *maxpooling_layer_create(int kernel_size, int stride)
+/**
+ * @brief Initializes a MaxPooling Layer.
+ *
+ * @param layer Pointer to the MaxPoolingLayer structure.
+ * @param kernel_size Size of the kernel.
+ * @param stride Stride of the kernel.
+ * @return int Error code.
+ */
+int initialize_maxpooling(MaxPoolingLayer *layer, int kernel_size, int stride)
 {
-    if (kernel_size <= 0 || stride <= 0)
+    if (layer == NULL)
     {
-        fprintf(stderr, "[maxpooling_layer_create] Error: Invalid kernel size (%d) or stride (%d).\n", kernel_size, stride);
-        return NULL;
+        fprintf(stderr, "[initialize_maxpooling] Error: Layer is NULL.\n");
+        return CM_NULL_LAYER_ERROR;
     }
 
-    MaxPoolingLayer *layer = (MaxPoolingLayer *)cm_safe_malloc(sizeof(MaxPoolingLayer), __FILE__, __LINE__);
-    if (!layer)
+    if (kernel_size <= 0)
     {
-        fprintf(stderr, "[maxpooling_layer_create] Error: Memory allocation failed for MaxPoolingLayer.\n");
-        return NULL;
+        fprintf(stderr, "[initialize_maxpooling] Error: Invalid kernel size.\n");
+        return CM_INVALID_KERNEL_SIZE_ERROR;
     }
+
+    if (stride <= 0)
+    {
+        fprintf(stderr, "[initialize_maxpooling] Error: Invalid stride.\n");
+        return CM_INVALID_STRIDE_ERROR;
+    }
+
     layer->kernel_size = kernel_size;
     layer->stride = stride;
-    return layer;
+    return CM_SUCCESS;
 }
 
-int maxpooling_layer_output_size(int input_size, int kernel_size, int stride)
+/**
+ * @brief Computes the output size for the MaxPooling Layer.
+ *
+ * @param input_size Size of the input data.
+ * @param kernel_size Size of the kernel.
+ * @param stride Stride of the kernel.
+ * @return int Output size, or an error code on invalid input.
+ */
+int compute_maxpooling_output_size(int input_size, int kernel_size, int stride)
 {
-    if (input_size < 0)
+    if (input_size <= 0)
     {
-        fprintf(stderr, "[maxpooling_layer_output_size] Error: Input size (%d) cannot be negative.\n", input_size);
-        return (int)CM_INVALID_PARAMETER_ERROR;
+        fprintf(stderr, "[compute_maxpooling_output_size] Error: Input size must be greater than 0.\n");
+        return CM_INVALID_INPUT_ERROR;
     }
+
+    if (kernel_size <= 0)
+    {
+        fprintf(stderr, "[compute_maxpooling_output_size] Error: Invalid kernel size.\n");
+        return CM_INVALID_KERNEL_SIZE_ERROR;
+    }
+
+    if (stride <= 0)
+    {
+        fprintf(stderr, "[compute_maxpooling_output_size] Error: Invalid stride.\n");
+        return CM_INVALID_STRIDE_ERROR;
+    }
+
+    if (input_size < kernel_size)
+    {
+        fprintf(stderr, "[compute_maxpooling_output_size] Error: Input size is smaller than kernel size.\n");
+        return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
+    }
+
     return (input_size - kernel_size) / stride + 1;
 }
 
-int maxpooling_layer_forward(MaxPoolingLayer *layer, const float *input, float *output, int input_size)
+/**
+ * @brief Performs the forward pass for the MaxPooling Layer.
+ *
+ * @param layer Pointer to the MaxPoolingLayer structure.
+ * @param input Input data array.
+ * @param output Output data array.
+ * @param input_size Size of the input data.
+ * @return int Number of output elements, or an error code on failure.
+ */
+int forward_maxpooling(MaxPoolingLayer *layer, const float *input, float *output, int input_size)
 {
-    if (!layer)
+    if (layer == NULL)
     {
-        fprintf(stderr, "[maxpooling_layer_forward] Error: Null layer pointer.\n");
-        return (int)CM_NULL_POINTER_ERROR;
+        fprintf(stderr, "[forward_maxpooling] Error: Layer is NULL.\n");
+        return CM_NULL_LAYER_ERROR;
     }
 
-    if (!input || !output)
+    if (input == NULL || output == NULL)
     {
-        fprintf(stderr, "[maxpooling_layer_forward] Error: Null input (%p) or output (%p) pointer.\n", input, output);
-        return (int)CM_NULL_POINTER_ERROR;
-    }
-
-    if (layer->stride <= 0)
-    {
-        fprintf(stderr, "[maxpooling_layer_forward] Error: Stride (%d) must be greater than 0.\n", layer->stride);
-        return (int)CM_INVALID_STRIDE_ERROR;
+        fprintf(stderr, "[forward_maxpooling] Error: Null input or output pointer.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
     if (layer->kernel_size <= 0)
     {
-        fprintf(stderr, "[maxpooling_layer_forward] Error: Kernel size (%d) must be greater than 0.\n", layer->kernel_size);
-        return (int)CM_INVALID_KERNEL_SIZE_ERROR;
+        fprintf(stderr, "[forward_maxpooling] Error: Invalid kernel size.\n");
+        return CM_INVALID_KERNEL_SIZE_ERROR;
+    }
+
+    if (layer->stride <= 0)
+    {
+        fprintf(stderr, "[forward_maxpooling] Error: Invalid stride.\n");
+        return CM_INVALID_STRIDE_ERROR;
     }
 
     if (input_size < layer->kernel_size)
     {
-        fprintf(stderr, "[maxpooling_layer_forward] Error: Input size (%d) is smaller than kernel size (%d).\n", input_size, layer->kernel_size);
-        return (int)CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
+        fprintf(stderr, "[forward_maxpooling] Error: Input size is smaller than kernel size.\n");
+        return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
     }
 
     int output_index = 0;
@@ -79,18 +129,34 @@ int maxpooling_layer_forward(MaxPoolingLayer *layer, const float *input, float *
             }
         }
         output[output_index++] = max_value;
+
 #if DEBUG_LOGGING
-        printf("[maxpooling_layer_forward] Output[%d]: %f\n", output_index - 1, max_value);
+        printf("[forward_maxpooling] Output[%d]: %f\n", output_index - 1, max_value);
 #endif
     }
-    return output_index; 
+
+    return output_index;
 }
 
-
-void maxpooling_layer_free(MaxPoolingLayer *layer)
+/**
+ * @brief Frees the memory allocated for the MaxPooling Layer.
+ *
+ * @param layer Pointer to the MaxPoolingLayer structure.
+ * @return int CM_SUCCESS on success.
+ */
+int free_maxpooling(MaxPoolingLayer *layer)
 {
-    if (layer)
+    if (layer == NULL)
     {
-        cm_safe_free(layer);
+        fprintf(stderr, "[free_maxpooling] Error: Layer is NULL.\n");
+        return CM_NULL_LAYER_ERROR;
     }
+
+    if (layer->kernel_size <= 0 || layer->stride <= 0)
+    {
+        fprintf(stderr, "[free_maxpooling] Warning: Layer has invalid dimensions.\n");
+    }
+
+    cm_safe_free((void **)&layer);
+    return CM_SUCCESS;
 }

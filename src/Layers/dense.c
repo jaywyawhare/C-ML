@@ -2,34 +2,45 @@
 #include <stdio.h>
 #include <math.h>
 #include "../../include/Layers/dense.h"
+#include "../../include/Core/error_codes.h"
+#include "../../include/Core/memory_management.h"
 
+#define DEBUG_LOGGING 0
 
-void initializeDense(DenseLayer *layer, int input_size, int output_size)
+/**
+ * @brief Initializes a Dense Layer with random weights and biases.
+ *
+ * @param layer Pointer to the DenseLayer structure.
+ * @param input_size Number of input neurons.
+ * @param output_size Number of output neurons.
+ * @return int Error code.
+ */
+int initializeDense(DenseLayer *layer, int input_size, int output_size)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "Layer is NULL\n");
-        exit(1);
+        fprintf(stderr, "[initializeDense] Error: Layer is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
-    if (layer->weights != NULL)
+    if (input_size <= 0 || output_size <= 0)
     {
-        free(layer->weights);
+        fprintf(stderr, "[initializeDense] Error: Invalid input size (%d) or output size (%d).\n", input_size, output_size);
+        return CM_INVALID_PARAMETER_ERROR;
     }
-    if (layer->biases != NULL)
-    {
-        free(layer->biases);
-    }
+
+    cm_safe_free((void **)&layer->weights);
+    cm_safe_free((void **)&layer->biases);
 
     layer->input_size = input_size;
     layer->output_size = output_size;
-    layer->weights = (float *)malloc(input_size * output_size * sizeof(float));
-    layer->biases = (float *)malloc(output_size * sizeof(float));
+    layer->weights = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
+    layer->biases = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
 
-    if (layer->weights == NULL || layer->biases == NULL)
+    if (layer->weights == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->biases == (void *)CM_MEMORY_ALLOCATION_ERROR)
     {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(1);
+        fprintf(stderr, "[initializeDense] Error: Memory allocation failed.\n");
+        return CM_MEMORY_ALLOCATION_ERROR;
     }
 
     for (int i = 0; i < input_size * output_size; i++)
@@ -41,14 +52,24 @@ void initializeDense(DenseLayer *layer, int input_size, int output_size)
     {
         layer->biases[i] = ((float)rand() / RAND_MAX) - 0.5;
     }
+
+    return CM_SUCCESS;
 }
 
-void forwardDense(DenseLayer *layer, float *input, float *output)
+/**
+ * @brief Performs the forward pass for the Dense Layer.
+ *
+ * @param layer Pointer to the DenseLayer structure.
+ * @param input Input data array.
+ * @param output Output data array.
+ * @return int Error code.
+ */
+int forwardDense(DenseLayer *layer, float *input, float *output)
 {
     if (layer == NULL || input == NULL || output == NULL)
     {
-        fprintf(stderr, "Layer, input, or output is NULL\n");
-        exit(1);
+        fprintf(stderr, "[forwardDense] Error: Layer, input, or output is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
     for (int i = 0; i < layer->output_size; i++)
@@ -59,15 +80,32 @@ void forwardDense(DenseLayer *layer, float *input, float *output)
             output[i] += input[j] * layer->weights[j + i * layer->input_size];
         }
         output[i] += layer->biases[i];
+#if DEBUG_LOGGING
+        printf("[forwardDense] Output[%d]: %f\n", i, output[i]);
+#endif
     }
+
+    return CM_SUCCESS;
 }
 
-void backwardDense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input, float *d_weights, float *d_biases)
+/**
+ * @brief Performs the backward pass for the Dense Layer.
+ *
+ * @param layer Pointer to the DenseLayer structure.
+ * @param input Input data array.
+ * @param output Output data array.
+ * @param d_output Gradient of the output.
+ * @param d_input Gradient of the input.
+ * @param d_weights Gradient of the weights.
+ * @param d_biases Gradient of the biases.
+ * @return int Error code.
+ */
+int backwardDense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input, float *d_weights, float *d_biases)
 {
     if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL || d_weights == NULL || d_biases == NULL)
     {
-        fprintf(stderr, "One or more arguments are NULL\n");
-        exit(1);
+        fprintf(stderr, "[backwardDense] Error: One or more arguments are NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
     for (int i = 0; i < layer->input_size; i++)
@@ -87,14 +125,25 @@ void backwardDense(DenseLayer *layer, float *input, float *output, float *d_outp
             d_weights[j + i * layer->input_size] = input[j] * d_output[i];
         }
     }
+
+    return CM_SUCCESS;
 }
 
-void updateDense(DenseLayer *layer, float *d_weights, float *d_biases, float learning_rate)
+/**
+ * @brief Updates the weights and biases of the Dense Layer.
+ *
+ * @param layer Pointer to the DenseLayer structure.
+ * @param d_weights Gradient of the weights.
+ * @param d_biases Gradient of the biases.
+ * @param learning_rate Learning rate for the update.
+ * @return int Error code.
+ */
+int updateDense(DenseLayer *layer, float *d_weights, float *d_biases, float learning_rate)
 {
     if (layer == NULL || d_weights == NULL || d_biases == NULL)
     {
-        fprintf(stderr, "Layer or gradients are NULL\n");
-        exit(1);
+        fprintf(stderr, "[updateDense] Error: Layer or gradients are NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
     for (int i = 0; i < layer->input_size * layer->output_size; i++)
@@ -106,23 +155,30 @@ void updateDense(DenseLayer *layer, float *d_weights, float *d_biases, float lea
     {
         layer->biases[i] -= learning_rate * d_biases[i];
     }
+
+    return CM_SUCCESS;
 }
 
-void freeDense(DenseLayer *layer)
+/**
+ * @brief Frees the memory allocated for the Dense Layer.
+ *
+ * @param layer Pointer to the DenseLayer structure.
+ * @return int Error code.
+ */
+int freeDense(DenseLayer *layer)
 {
     if (layer == NULL)
     {
-        return;
+        return CM_NULL_POINTER_ERROR;
     }
 
     if (layer->weights != NULL)
     {
-        free(layer->weights);
-        layer->weights = NULL; 
+        cm_safe_free((void **)&layer->weights);
     }
     if (layer->biases != NULL)
     {
-        free(layer->biases);
-        layer->biases = NULL; 
+        cm_safe_free((void **)&layer->biases);
     }
+    return CM_SUCCESS;
 }

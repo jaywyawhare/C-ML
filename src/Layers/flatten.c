@@ -2,72 +2,84 @@
 #include <stdio.h>
 #include <math.h>
 #include "../../include/Layers/flatten.h"
+#include "../../include/Core/error_codes.h"
+#include "../../include/Core/memory_management.h"
 
+#define DEBUG_LOGGING 0 // Set to 1 to enable debug logs
 
-int initializeFlatten(FlattenLayer *layer, int input_size)
+int initialize_flatten(FlattenLayer *layer, int input_size)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "Layer is NULL\n");
-        return -1;
+        fprintf(stderr, "[initialize_flatten] Error: Layer is NULL.\n");
+        return CM_NULL_LAYER_ERROR; // Updated error code
     }
 
     if (input_size <= 0)
     {
-        fprintf(stderr, "Invalid input size\n");
-        return -1; 
+        fprintf(stderr, "[initialize_flatten] Error: Invalid input size (%d).\n", input_size);
+        return CM_INVALID_LAYER_DIMENSIONS_ERROR; // Updated error code
     }
 
     layer->input_size = input_size;
     layer->output_size = input_size;
-    return 0; 
+    return CM_SUCCESS;
 }
 
-void forwardFlatten(FlattenLayer *layer, float *input, float *output)
+int forward_flatten(FlattenLayer *layer, float *input, float *output)
 {
     if (layer == NULL || input == NULL || output == NULL)
     {
-        fprintf(stderr, "Layer, input, or output is NULL\n");
-        exit(1);
+        fprintf(stderr, "[forward_flatten] Error: Layer, input, or output is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
-    if (layer->input_size <= 0)
+    if (layer->input_size <= 0 || layer->output_size <= 0)
     {
-        fprintf(stderr, "Invalid input size\n");
-        exit(1);
+        fprintf(stderr, "[forward_flatten] Error: Invalid layer dimensions.\n");
+        return CM_INVALID_LAYER_DIMENSIONS_ERROR; // Updated error code
     }
 
     for (int i = 0; i < layer->input_size; i++)
     {
         output[i] = input[i];
+#if DEBUG_LOGGING
+        printf("[forward_flatten] Output[%d]: %f\n", i, output[i]);
+#endif
     }
+
+    return CM_SUCCESS;
 }
 
-void backwardFlatten(FlattenLayer *layer, float *input, float *output, float *d_output, float *d_input)
+int backward_flatten(FlattenLayer *layer, float *input, float *output, float *d_output, float *d_input)
 {
     if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL)
     {
-        fprintf(stderr, "One or more arguments are NULL\n");
-        exit(1);
+        fprintf(stderr, "[backward_flatten] Error: One or more arguments are NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
 
-    if (layer->input_size <= 0)
+    if (layer->input_size <= 0 || layer->output_size <= 0)
     {
-        fprintf(stderr, "Invalid input size\n");
-        exit(1);
+        fprintf(stderr, "[backward_flatten] Error: Invalid layer dimensions.\n");
+        return CM_INVALID_LAYER_DIMENSIONS_ERROR; // Updated error code
     }
 
     for (int i = 0; i < layer->input_size; i++)
     {
         d_input[i] = d_output[i];
     }
+
+    return CM_SUCCESS;
 }
 
-void freeFlatten(FlattenLayer *layer)
+int free_flatten(FlattenLayer *layer)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "Layer is NULL\n");
-        exit(1);
+        fprintf(stderr, "[free_flatten] Error: Layer is NULL.\n");
+        return CM_NULL_POINTER_ERROR;
     }
+
+    return CM_SUCCESS;
 }
