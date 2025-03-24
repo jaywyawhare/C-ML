@@ -46,6 +46,7 @@ nav:
       - Regularizers: modules/regularizers.md
   - Testing: testing.md
   - Development Guidelines: development_guidelines.md
+  - Design Guide: DesignGuide.md
   - Contributing: contributing.md
   - License: license.md
 
