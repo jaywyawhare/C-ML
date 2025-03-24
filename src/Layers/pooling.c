@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include "../../include/Layers/pooling.h"
 #include "../../include/Core/error_codes.h"
-#include "../../include/Core/memory_management.h"
 
 #define DEBUG_LOGGING 0
 
@@ -149,7 +148,5 @@ int free_polling(PollingLayer *layer)
         fprintf(stderr, "[free_polling] Error: Layer is NULL.\n");
         return CM_NULL_POINTER_ERROR;
     }
-
-    cm_safe_free((void **)&layer);
     return CM_SUCCESS;
 }

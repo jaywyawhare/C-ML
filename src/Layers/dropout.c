@@ -5,9 +5,9 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0 
+#define DEBUG_LOGGING 0
 
-static int is_seed_initialized = 0; 
+static int is_seed_initialized = 0;
 
 /**
  * @brief Initializes a Dropout Layer with a given dropout rate.
@@ -16,7 +16,7 @@ static int is_seed_initialized = 0;
  * @param dropout_rate Dropout rate (0.0 to 1.0).
  * @return int Error code (0 for success, non-zero for error).
  */
-int initializeDropout(DropoutLayer *layer, float dropout_rate)
+int initialize_dropout(DropoutLayer *layer, float dropout_rate)
 {
     if (layer == NULL)
     {
@@ -48,7 +48,7 @@ int initializeDropout(DropoutLayer *layer, float dropout_rate)
  * @param size Size of the input/output arrays.
  * @return int Error code (0 for success, non-zero for error).
  */
-int forwardDropout(DropoutLayer *layer, float *input, float *output, int size)
+int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
 {
     if (layer == NULL || input == NULL || output == NULL)
     {
@@ -84,7 +84,7 @@ int forwardDropout(DropoutLayer *layer, float *input, float *output, int size)
  * @param size Size of the input/output arrays.
  * @return int Error code (0 for success, non-zero for error).
  */
-int backwardDropout(DropoutLayer *layer, float *input, float *output, float *d_output, float *d_input, int size)
+int backward_dropout(DropoutLayer *layer, float *input, float *output, float *d_output, float *d_input, int size)
 {
     if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL)
     {

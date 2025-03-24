@@ -15,7 +15,7 @@
  * @param output_size Number of output neurons.
  * @return int Error code.
  */
-int initializeDense(DenseLayer *layer, int input_size, int output_size)
+int initialize_dense(DenseLayer *layer, int input_size, int output_size)
 {
     if (layer == NULL)
     {
@@ -64,7 +64,7 @@ int initializeDense(DenseLayer *layer, int input_size, int output_size)
  * @param output Output data array.
  * @return int Error code.
  */
-int forwardDense(DenseLayer *layer, float *input, float *output)
+int forward_dense(DenseLayer *layer, float *input, float *output)
 {
     if (layer == NULL || input == NULL || output == NULL)
     {
@@ -100,7 +100,7 @@ int forwardDense(DenseLayer *layer, float *input, float *output)
  * @param d_biases Gradient of the biases.
  * @return int Error code.
  */
-int backwardDense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input, float *d_weights, float *d_biases)
+int backward_dense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input, float *d_weights, float *d_biases)
 {
     if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL || d_weights == NULL || d_biases == NULL)
     {
@@ -138,7 +138,7 @@ int backwardDense(DenseLayer *layer, float *input, float *output, float *d_outpu
  * @param learning_rate Learning rate for the update.
  * @return int Error code.
  */
-int updateDense(DenseLayer *layer, float *d_weights, float *d_biases, float learning_rate)
+int update_dense(DenseLayer *layer, float *d_weights, float *d_biases, float learning_rate)
 {
     if (layer == NULL || d_weights == NULL || d_biases == NULL)
     {
@@ -165,7 +165,7 @@ int updateDense(DenseLayer *layer, float *d_weights, float *d_biases, float lear
  * @param layer Pointer to the DenseLayer structure.
  * @return int Error code.
  */
-int freeDense(DenseLayer *layer)
+int free_dense(DenseLayer *layer)
 {
     if (layer == NULL)
     {

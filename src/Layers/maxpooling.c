@@ -2,9 +2,8 @@
 #include <stdio.h>
 #include "../../include/Layers/maxpooling.h"
 #include "../../include/Core/error_codes.h"
-#include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0 // Set to 1 to enable debug logs
+#define DEBUG_LOGGING 0
 
 /**
  * @brief Initializes a MaxPooling Layer.
@@ -157,6 +156,5 @@ int free_maxpooling(MaxPoolingLayer *layer)
         fprintf(stderr, "[free_maxpooling] Warning: Layer has invalid dimensions.\n");
     }
 
-    cm_safe_free((void **)&layer);
     return CM_SUCCESS;
 }

@@ -5,20 +5,20 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0 // Set to 1 to enable debug logs
+#define DEBUG_LOGGING 0 
 
 int initialize_flatten(FlattenLayer *layer, int input_size)
 {
     if (layer == NULL)
     {
         fprintf(stderr, "[initialize_flatten] Error: Layer is NULL.\n");
-        return CM_NULL_LAYER_ERROR; // Updated error code
+        return CM_NULL_LAYER_ERROR; 
     }
 
     if (input_size <= 0)
     {
         fprintf(stderr, "[initialize_flatten] Error: Invalid input size (%d).\n", input_size);
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR; // Updated error code
+        return CM_INVALID_LAYER_DIMENSIONS_ERROR; 
     }
 
     layer->input_size = input_size;
@@ -37,7 +37,7 @@ int forward_flatten(FlattenLayer *layer, float *input, float *output)
     if (layer->input_size <= 0 || layer->output_size <= 0)
     {
         fprintf(stderr, "[forward_flatten] Error: Invalid layer dimensions.\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR; // Updated error code
+        return CM_INVALID_LAYER_DIMENSIONS_ERROR; 
     }
 
     for (int i = 0; i < layer->input_size; i++)
@@ -62,7 +62,7 @@ int backward_flatten(FlattenLayer *layer, float *input, float *output, float *d_
     if (layer->input_size <= 0 || layer->output_size <= 0)
     {
         fprintf(stderr, "[backward_flatten] Error: Invalid layer dimensions.\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR; // Updated error code
+        return CM_INVALID_LAYER_DIMENSIONS_ERROR; 
     }
 
     for (int i = 0; i < layer->input_size; i++)
