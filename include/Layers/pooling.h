@@ -4,9 +4,10 @@
 #include "../../include/Core/memory_management.h"
 
 /**
- * Structure representing a polling layer.
- * kernel_size: Size of the pooling kernel.
- * stride: Stride of the pooling operation.
+ * @brief Structure representing a Polling Layer.
+ *
+ * @param kernel_size Size of the pooling kernel.
+ * @param stride Stride of the pooling operation.
  */
 typedef struct
 {
@@ -15,40 +16,42 @@ typedef struct
 } PollingLayer;
 
 /**
- * Creates a new polling layer.
- * @param kernel_size Size of the pooling kernel (must be > 0).
- * @param stride Stride of the pooling operation (must be > 0).
- * @return Pointer to the created PollingLayer, or NULL if invalid parameters are provided.
+ * @brief Initializes a Polling Layer.
+ *
+ * @param layer Pointer to the PollingLayer structure.
+ * @param kernel_size Size of the kernel (must be > 0).
+ * @param stride Stride of the kernel (must be > 0).
+ * @return int Error code.
  */
-PollingLayer *polling_layer_create(int kernel_size, int stride);
+int initialize_polling(PollingLayer *layer, int kernel_size, int stride);
 
 /**
- * Calculates the output size of the polling layer.
- * @param input_size Size of the input.
- * @param kernel_size Size of the pooling kernel.
- * @param stride Stride of the pooling operation.
- * @return The calculated output size.
- */
-int polling_layer_output_size(int input_size, int kernel_size, int stride);
-
-/**
- * Performs the forward pass of the polling layer.
- * @param layer Pointer to the PollingLayer.
- * @param input Pointer to the input data.
- * @param output Pointer to the output data.
+ * @brief Computes the output size for the Polling Layer.
+ *
  * @param input_size Size of the input data.
- * @return The number of output elements written, or a CM_Error code:
- *         CM_NULL_POINTER_ERROR: Null input or output pointer.
- *         CM_INVALID_STRIDE_ERROR: Stride is less than or equal to 0.
- *         CM_INVALID_KERNEL_SIZE_ERROR: Kernel size is less than or equal to 0.
- *         CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR: Input size is smaller than kernel size.
+ * @param kernel_size Size of the kernel.
+ * @param stride Stride of the kernel.
+ * @return int Output size, or an error code on invalid input.
  */
-int polling_layer_forward(PollingLayer *layer, const float *input, float *output, int input_size);
+int compute_polling_output_size(int input_size, int kernel_size, int stride);
 
 /**
- * Frees the memory allocated for the polling layer.
- * @param layer Pointer to the PollingLayer to be freed.
+ * @brief Performs the forward pass for the Polling Layer.
+ *
+ * @param layer Pointer to the PollingLayer structure.
+ * @param input Input data array.
+ * @param output Output data array.
+ * @param input_size Size of the input data.
+ * @return int Number of output elements, or an error code on failure.
  */
-void polling_layer_free(PollingLayer *layer);
+int forward_polling(PollingLayer *layer, const float *input, float *output, int input_size);
 
-#endif // POLLING_H
+/**
+ * @brief Frees the memory allocated for the Polling Layer.
+ *
+ * @param layer Pointer to the PollingLayer structure.
+ * @return int Error code.
+ */
+int free_polling(PollingLayer *layer);
+
+#endif

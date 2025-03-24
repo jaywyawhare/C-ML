@@ -4,9 +4,10 @@
 #include "../../include/Core/memory_management.h"
 
 /**
- * Structure representing a max pooling layer.
- * kernel_size: Size of the pooling kernel.
- * stride: Stride of the pooling operation.
+ * @brief Structure representing a MaxPooling Layer.
+ *
+ * @param kernel_size Size of the pooling kernel.
+ * @param stride Stride of the pooling operation.
  */
 typedef struct
 {
@@ -15,40 +16,42 @@ typedef struct
 } MaxPoolingLayer;
 
 /**
- * Creates a new max pooling layer.
- * @param kernel_size Size of the pooling kernel (must be > 0).
- * @param stride Stride of the pooling operation (must be > 0).
- * @return Pointer to the created MaxPoolingLayer, or NULL if invalid parameters are provided.
+ * @brief Initializes a MaxPooling Layer.
+ *
+ * @param layer Pointer to the MaxPoolingLayer structure.
+ * @param kernel_size Size of the kernel (must be > 0).
+ * @param stride Stride of the kernel (must be > 0).
+ * @return int Error code.
  */
-MaxPoolingLayer *maxpooling_layer_create(int kernel_size, int stride);
+int initialize_maxpooling(MaxPoolingLayer *layer, int kernel_size, int stride);
 
 /**
- * Calculates the output size of the max pooling layer.
- * @param input_size Size of the input.
- * @param kernel_size Size of the pooling kernel.
- * @param stride Stride of the pooling operation.
- * @return The calculated output size.
- */
-int maxpooling_layer_output_size(int input_size, int kernel_size, int stride);
-
-/**
- * Performs the forward pass of the max pooling layer.
- * @param layer Pointer to the MaxPoolingLayer.
- * @param input Pointer to the input data.
- * @param output Pointer to the output data.
+ * @brief Computes the output size for the MaxPooling Layer.
+ *
  * @param input_size Size of the input data.
- * @return The number of output elements written, or a CM_Error code:
- *         CM_NULL_POINTER_ERROR: Null input or output pointer.
- *         CM_INVALID_STRIDE_ERROR: Stride is less than or equal to 0.
- *         CM_INVALID_KERNEL_SIZE_ERROR: Kernel size is less than or equal to 0.
- *         CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR: Input size is smaller than kernel size.
+ * @param kernel_size Size of the kernel.
+ * @param stride Stride of the kernel.
+ * @return int Output size, or an error code on invalid input.
  */
-int maxpooling_layer_forward(MaxPoolingLayer *layer, const float *input, float *output, int input_size);
+int compute_maxpooling_output_size(int input_size, int kernel_size, int stride);
 
 /**
- * Frees the memory allocated for the max pooling layer.
- * @param layer Pointer to the MaxPoolingLayer to be freed.
+ * @brief Performs the forward pass for the MaxPooling Layer.
+ *
+ * @param layer Pointer to the MaxPoolingLayer structure.
+ * @param input Input data array.
+ * @param output Output data array.
+ * @param input_size Size of the input data.
+ * @return int Number of output elements, or an error code on failure.
  */
-void maxpooling_layer_free(MaxPoolingLayer *layer);
+int forward_maxpooling(MaxPoolingLayer *layer, const float *input, float *output, int input_size);
 
-#endif // MAXPOOLING_H
+/**
+ * @brief Frees the memory allocated for the MaxPooling Layer.
+ *
+ * @param layer Pointer to the MaxPoolingLayer structure.
+ * @return int Error code.
+ */
+int free_maxpooling(MaxPoolingLayer *layer);
+
+#endif
