@@ -29,5 +29,5 @@ int main()
 {
     printf("Testing leakyRelu activation function\n");
     test_leakyRelu();
-    return 0;
+    return CM_SUCCESS;
 }

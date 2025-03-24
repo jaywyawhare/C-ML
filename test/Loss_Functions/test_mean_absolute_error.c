@@ -28,5 +28,5 @@ int main()
 {
     printf("Testing mean_absolute_error\n");
     test_mean_absolute_error();
-    return 0;
+    return CM_SUCCESS;
 }

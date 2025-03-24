@@ -30,5 +30,5 @@ int main()
 {
     printf("Testing GELU activation function\n");
     test_gelu();
-    return 0;
+    return CM_SUCCESS;
 }

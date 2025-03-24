@@ -37,5 +37,5 @@ int main()
 {
     printf("Testing root_mean_squared_error\n");
     test_root_mean_squared_error();
-    return 0;
+    return CM_SUCCESS;
 }

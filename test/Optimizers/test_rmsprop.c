@@ -108,5 +108,5 @@ int main()
     printf("Testing RMSprop\n");
     test_rmsprop();
     printf("RMSprop test passed\n");
-    return 0;
+    return CM_SUCCESS;
 }

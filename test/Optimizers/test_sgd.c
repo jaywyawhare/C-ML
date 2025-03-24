@@ -92,5 +92,5 @@ int main()
     printf("Testing SGD\n");
     test_sgd();
     printf("SGD test passed\n");
-    return 0;
+    return CM_SUCCESS;
 }

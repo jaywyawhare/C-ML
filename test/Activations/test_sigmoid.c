@@ -28,5 +28,5 @@ int main()
 {
     printf("Testing sigmoid activation function\n");
     test_sigmoid();
-    return 0;
+    return CM_SUCCESS;
 }

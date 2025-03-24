@@ -32,5 +32,5 @@ int main()
 {
     printf("Testing l2\n");
     run_all_tests_l2();
-    return 0;
+    return CM_SUCCESS;
 }

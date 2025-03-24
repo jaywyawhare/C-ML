@@ -29,5 +29,5 @@ int main()
 {
     printf("Testing linear activation function\n");
     test_linear_activation();
-    return 0;
+    return CM_SUCCESS;
 }

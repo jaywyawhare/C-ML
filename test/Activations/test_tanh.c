@@ -29,5 +29,5 @@ int main()
 {
     printf("Testing tanh activation function\n");
     test_tanh();
-    return 0;
+    return CM_SUCCESS;
 }

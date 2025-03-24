@@ -52,5 +52,5 @@ int main()
     printf("Testing Memory Management\n");
     test_cm_safe_malloc();
     test_cm_safe_free();
-    return 0;
+    return CM_SUCCESS;
 }

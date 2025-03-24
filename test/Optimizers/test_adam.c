@@ -96,5 +96,5 @@ int main()
     printf("Testing adam\n");
     test_adam();
     printf("adam test passed\n");
-    return 0;
+    return CM_SUCCESS;
 }

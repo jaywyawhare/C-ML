@@ -35,5 +35,5 @@ int main()
 {
     printf("Testing label_encoder\n");
     test_label_encoder();
-    return 0;
+    return CM_SUCCESS;
 }

@@ -39,5 +39,5 @@ int main()
 {
     printf("Testing standard_scaler\n");
     test_standard_scaler();
-    return 0;
+    return CM_SUCCESS;
 }

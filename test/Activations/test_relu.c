@@ -29,5 +29,5 @@ int main()
 {
     printf("Testing relu activation function\n");
     test_relu();
-    return 0;
+    return CM_SUCCESS;
 }

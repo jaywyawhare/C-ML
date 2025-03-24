@@ -43,5 +43,5 @@ int main()
 {
     printf("Testing binary_cross_entropy_loss\n");
     test_binary_cross_entropy_loss();
-    return 0;
+    return CM_SUCCESS;
 }

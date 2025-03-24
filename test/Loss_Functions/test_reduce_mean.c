@@ -26,5 +26,5 @@ int main()
 {
     printf("Testing reduce_mean\n");
     test_reduce_mean();
-    return 0;
+    return CM_SUCCESS;
 }

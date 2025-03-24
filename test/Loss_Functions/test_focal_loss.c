@@ -33,5 +33,5 @@ int main()
 {
     printf("Testing focal_loss\n");
     test_focal_loss();
-    return 0;
+    return CM_SUCCESS;
 }

@@ -31,5 +31,5 @@ int main()
 {
     printf("Testing min_max_scaler\n");
     test_min_max_scaler();
-    return 0;
+    return CM_SUCCESS;
 }

@@ -37,5 +37,5 @@ int main()
 {
     printf("Testing mean_squared_error\n");
     test_mean_squared_error();
-    return 0;
+    return CM_SUCCESS;
 }

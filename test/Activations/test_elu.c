@@ -45,5 +45,5 @@ int main()
 {
     printf("Testing ELU activation function\n");
     test_elu();
-    return 0;
+    return CM_SUCCESS;
 }

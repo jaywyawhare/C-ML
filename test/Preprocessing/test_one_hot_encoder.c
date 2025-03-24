@@ -35,5 +35,5 @@ int main()
 {
     printf("Testing one_hot_encoder\n");
     test_one_hot_encoder();
-    return 0;
+    return CM_SUCCESS;
 }
