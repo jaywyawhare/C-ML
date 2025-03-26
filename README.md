@@ -25,6 +25,9 @@ C-ML is a lightweight machine learning library written in C. It provides impleme
 
 ```
 C-ML/
+├── docs/                 # Documentation files
+├── examples/             # Example code and usage
+├── include/              # Header files
 ├── src/                  # Source files
 │   ├── Activations/      # Activation functions
 │   ├── Layers/           # Layer implementations
@@ -32,7 +35,6 @@ C-ML/
 │   ├── Optimizers/       # Optimizer implementations
 │   ├── Preprocessing/    # Preprocessing utilities
 │   ├── Regularizers/     # Regularization techniques
-│   ├── my_functions.h    # Header file with function declarations
 ├── test/                 # Test files
 │   ├── Activations/      # Tests for activation functions
 │   ├── Layers/           # Tests for layers
@@ -40,6 +42,8 @@ C-ML/
 │   ├── Optimizers/       # Tests for optimizers
 │   ├── Preprocessing/    # Tests for preprocessing utilities
 │   ├── Regularizers/     # Tests for regularization techniques
+├── mkdocs.yml            # Documentation configuration
+├── LICENSE.md            # License information
 ├── main.c                # Example usage of the library
 ├── Makefile              # Build system
 └── README.md             # Documentation
@@ -130,7 +134,7 @@ int main()
     freeDense(&dense_layer);
 
     printf("Program completed successfully.\n");
-    return 0;
+    return CM_SUCCESS;
 }
 ```
 
