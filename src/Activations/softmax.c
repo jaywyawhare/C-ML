@@ -80,13 +80,13 @@ float *softmax(float *z, int n)
  *
  * @param output Pointer to the output array to be freed.
  */
-void freeSoftmax(float **output)
+void free_softmax(float **output)
 {
     if (output != NULL && *output != NULL)
     {
         cm_safe_free((void **)output);
 #if DEBUG_LOGGING
-        printf("[freeSoftmax] Memory freed for softmax output.\n");
+        printf("[free_softmax] Memory freed for softmax output.\n");
 #endif
     }
 }
@@ -100,15 +100,14 @@ void freeSoftmax(float **output)
  *
  * @param softmax_output Pointer to the softmax output array.
  * @param n The number of elements in the output array.
- * @param jacobian Pointer to the output Jacobian matrix (n x n).
- * @return Error code indicating success or failure.
+ * @return Pointer to the Jacobian matrix (n x n) or error code.
  */
-int softmax_derivative(float *softmax_output, int n, float *jacobian)
+float *softmax_derivative(float *softmax_output, int n)
 {
-    if (softmax_output == NULL || jacobian == NULL || n <= 0)
+    if (softmax_output == NULL || n <= 0)
     {
         fprintf(stderr, "[softmax_derivative] Error: Null pointer or invalid size.\n");
-        return CM_NULL_POINTER_ERROR;
+        return (float *)CM_NULL_POINTER_ERROR;
     }
 
     for (int i = 0; i < n; i++)
@@ -116,8 +115,15 @@ int softmax_derivative(float *softmax_output, int n, float *jacobian)
         if (isnan(softmax_output[i]) || isinf(softmax_output[i]) || softmax_output[i] < 0.0f || softmax_output[i] > 1.0f)
         {
             fprintf(stderr, "[softmax_derivative] Error: Invalid softmax output at index %d.\n", i);
-            return CM_INVALID_INPUT_ERROR;
+            return (float *)CM_INVALID_INPUT_ERROR;
         }
+    }
+
+    float *jacobian = cm_safe_malloc(n * n * sizeof(float), __FILE__, __LINE__);
+    if (jacobian == NULL)
+    {
+        fprintf(stderr, "[softmax_derivative] Error: Memory allocation failed.\n");
+        return (float *)CM_MEMORY_ALLOCATION_ERROR;
     }
 
     for (int i = 0; i < n; i++)
@@ -135,5 +141,21 @@ int softmax_derivative(float *softmax_output, int n, float *jacobian)
         }
     }
 
-    return CM_SUCCESS;
+    return jacobian;
+}
+
+/**
+ * @brief Frees the memory allocated for the softmax derivative Jacobian.
+ *
+ * @param jacobian Pointer to the Jacobian matrix to be freed.
+ */
+void free_softmax_derivative(float **jacobian)
+{
+    if (jacobian != NULL && *jacobian != NULL)
+    {
+        cm_safe_free((void **)jacobian);
+#if DEBUG_LOGGING
+        printf("[free_softmax_derivative] Memory freed for softmax derivative jacobian.\n");
+#endif
+    }
 }
