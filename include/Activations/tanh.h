@@ -9,4 +9,12 @@
  */
 float tanH(float x);
 
-#endif 
+/**
+ * @brief Computes the derivative of the tanh activation function.
+ *
+ * @param x The input value.
+ * @return The derivative of the tanh function.
+ */
+float tanH_derivative(float x);
+
+#endif

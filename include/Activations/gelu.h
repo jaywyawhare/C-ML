@@ -9,4 +9,11 @@
  */
 float gelu(float x);
 
+/**
+ * @brief Computes the derivative of the GELU activation function.
+ *
+ * @param x The input value.
+ * @return The derivative of the GELU function.
+ */
+float gelu_derivative(float x);
 #endif

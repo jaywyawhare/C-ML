@@ -9,4 +9,12 @@
  */
 float relu(float x);
 
-#endif 
+/**
+ * @brief Computes the derivative of the ReLU activation function.
+ *
+ * @param x The input value.
+ * @return The derivative of the ReLU function.
+ */
+float relu_derivative(float x);
+
+#endif
