@@ -36,7 +36,7 @@ void test_softmax()
             {
                 assert(fabs(output[j] - expected_output[i][j]) < tolerance);
             }
-            freeSoftmax(&output);
+            free_softmax(&output);
         }
     }
     printf("softmax activation function test passed\n");
