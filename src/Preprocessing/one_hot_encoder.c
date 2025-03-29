@@ -67,6 +67,7 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
     {
         fprintf(stderr, "[oneHotEncoding] Memory allocation failed\n");
         free(*map);
+        *map = NULL; 
         return (int *)CM_MEMORY_ALLOCATION_ERROR;
     }
 
