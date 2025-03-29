@@ -3,8 +3,6 @@
 #include "../../include/Loss_Functions/binary_cross_entropy_loss.h"
 #include "../../include/Core/error_codes.h"
 
-#define DEBUG_LOGGING 0
-
 /**
  * @brief Computes the Binary Cross-Entropy Loss.
  *
@@ -35,8 +33,25 @@ float binary_cross_entropy_loss(float *yHat, float *y, int size)
     }
 
     loss /= size;
-#if DEBUG_LOGGING
-    printf("[binary_cross_entropy_loss] Computed loss: %f\n", loss);
-#endif
     return loss;
+}
+
+/**
+ * @brief Computes the derivative of the Binary Cross-Entropy Loss.
+ *
+ * The derivative is defined as:
+ * - d(loss)/dyHat = -(y/yHat) + ((1 - y)/(1 - yHat))
+ *
+ * @param predicted Predicted probability.
+ * @param actual Ground truth label.
+ * @return The derivative value.
+ */
+float binary_cross_entropy_loss_derivative(float predicted, float actual)
+{
+    if (predicted <= 0 || predicted >= 1)
+    {
+        fprintf(stderr, "[binary_cross_entropy_loss_derivative] Error: Predicted value out of bounds.\n");
+        return 0.0f;
+    }
+    return -(actual / predicted) + ((1 - actual) / (1 - predicted));
 }

@@ -3,7 +3,7 @@
 #include "../../include/Loss_Functions/focal_loss.h"
 #include "../../include/Core/error_codes.h"
 
-#define DEBUG_LOGGING 0
+#define EPSILON 1e-8
 
 /**
  * @brief Computes the Focal Loss.
@@ -25,14 +25,38 @@ float focal_loss(float *y, float *yHat, int n, float gamma)
         fprintf(stderr, "[focal_loss] Error: Invalid input parameters.\n");
         return (float)CM_INVALID_INPUT_ERROR;
     }
-
-    float sum = 0;
+    float loss = 0.0f;
     for (int i = 0; i < n; i++)
     {
-        sum += -y[i] * powf(1 - yHat[i], gamma) * logf(fmaxf(yHat[i], 1e-15)) - (1 - y[i]) * powf(yHat[i], gamma) * logf(fmaxf(1 - yHat[i], 1e-15));
+        float yHat_clamped = fmaxf(fminf(yHat[i], 1.0f - EPSILON), EPSILON);
+        if (y[i] == 1)
+        {
+            loss += -powf(1 - yHat_clamped, gamma) * logf(yHat_clamped);
+        }
+        else
+        {
+            loss += -powf(yHat_clamped, gamma) * logf(1 - yHat_clamped);
+        }
     }
-#if DEBUG_LOGGING
-    printf("[focal_loss] Computed loss: %f\n", sum / n);
-#endif
-    return sum / n;
+    return loss / n;
+}
+
+/**
+ * @brief Computes the derivative of the Focal Loss.
+ *
+ * The derivative is defined as:
+ * - d(Focal Loss)/dyHat = -gamma * (1 - yHat)^(gamma - 1) * log(yHat) * y
+ *                         + (1 - y) * gamma * yHat^(gamma - 1) * log(1 - yHat)
+ *
+ * @param y Ground truth value.
+ * @param yHat Predicted value.
+ * @param gamma The focusing parameter.
+ * @return The derivative value.
+ */
+float focal_loss_derivative(float y, float yHat, float gamma)
+{
+    float pt = fmaxf(yHat, 1e-15);
+    float one_minus_pt = fmaxf(1 - yHat, 1e-15);
+
+    return -y * gamma * powf(one_minus_pt, gamma - 1) * logf(pt) + (1 - y) * gamma * powf(pt, gamma - 1) * logf(one_minus_pt);
 }
