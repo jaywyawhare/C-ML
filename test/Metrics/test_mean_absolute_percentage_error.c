@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../include/Loss_Functions/mean_absolute_percentage_error.h"
+#include "../../include/Metrics/mean_absolute_percentage_error.h"
 #include "../../include/Core/error_codes.h"
 
 void test_mean_absolute_percentage_error()

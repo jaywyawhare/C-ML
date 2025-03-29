@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include "../../include/Loss_Functions/root_mean_squared_error.h"
+#include "../../include/Metrics/root_mean_squared_error.h"
 #include "../../include/Core/error_codes.h"
 
 void test_root_mean_squared_error()
