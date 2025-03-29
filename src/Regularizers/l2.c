@@ -39,9 +39,15 @@ float l2(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b,
         return CM_INVALID_PARAMETER_ERROR;
     }
 
+    if (lr <= 0 || beta1 >= 1.0 || beta2 >= 1.0 || beta1 <= 0.0 || beta2 <= 0.0 || isnan(x) || isnan(y) || isinf(x) || isinf(y) || isnan(reg_l2) || isinf(reg_l2))
+    {
+        fprintf(stderr, "[l2] Error: Invalid parameter(s) provided.\n");
+        return CM_INVALID_INPUT_ERROR;
+    }
+
     float y_pred = (*w) * x + (*b);
-    float loss = pow(y_pred - y, 2) + reg_l2 * pow(*w, 2); 
-    float dw = 2 * (y_pred - y) * x + 2 * reg_l2 * (*w);   
+    float loss = pow(y_pred - y, 2) + reg_l2 * pow(*w, 2);
+    float dw = 2 * (y_pred - y) * x + 2 * reg_l2 * (*w);
     float db = 2 * (y_pred - y);
     *v_w = beta1 * (*v_w) + (1 - beta1) * dw;
     *v_b = beta1 * (*v_b) + (1 - beta1) * db;

@@ -34,6 +34,11 @@ float l1_l2(float *w, float *dw, float l1, float l2, int n)
     float loss = 0;
     for (int i = 0; i < n; i++)
     {
+        if (isnan(w[i]) || isinf(w[i]) || isnan(l1) || isinf(l1) || isnan(l2) || isinf(l2))
+        {
+            fprintf(stderr, "[l1_l2] Error: Invalid parameter(s) provided.\n");
+            return CM_INVALID_INPUT_ERROR;
+        }
         loss += l1 * fabs(w[i]) + l2 * pow(w[i], 2);
 
         float l1_grad = (w[i] > 0) ? 1 : (w[i] < 0) ? -1
