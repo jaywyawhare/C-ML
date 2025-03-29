@@ -13,9 +13,10 @@ C-ML is a lightweight machine learning library written in C. It provides impleme
 
 ## Features
 
-- **Layers**: Dense, Dropout
+- **Layers**: Dense, Dropout, Flatten, Pooling, Max-Pooling
 - **Activations**: ReLU, Sigmoid, Tanh, Softmax, ELU, Leaky ReLU, Linear
 - **Loss Functions**: Mean Squared Error, Binary Cross-Entropy, Focal Loss, etc.
+- **Metrics**: Accuracy, Precision, Recall, F1 Score, etc.
 - **Optimizers**: SGD, Adam, RMSprop
 - **Preprocessing**: Label Encoding, One-Hot Encoding, Standard Scaler, Min-Max Scaler
 - **Regularizers**: L1, L2, Combined L1-L2
@@ -29,19 +30,22 @@ C-ML/
 ├── examples/             # Example code and usage
 ├── include/              # Header files
 ├── src/                  # Source files
+│   ├── Core/             # Core library files
 │   ├── Activations/      # Activation functions
 │   ├── Layers/           # Layer implementations
 │   ├── Loss_Functions/   # Loss functions
 │   ├── Optimizers/       # Optimizer implementations
 │   ├── Preprocessing/    # Preprocessing utilities
-│   ├── Regularizers/     # Regularization techniques
+│   ├── Metrics/          # Metric functions
+│   └── Regularizers/     # Regularization techniques
 ├── test/                 # Test files
 │   ├── Activations/      # Tests for activation functions
 │   ├── Layers/           # Tests for layers
 │   ├── Loss_Functions/   # Tests for loss functions
 │   ├── Optimizers/       # Tests for optimizers
 │   ├── Preprocessing/    # Tests for preprocessing utilities
-│   ├── Regularizers/     # Tests for regularization techniques
+│   ├── Metrics/          # Tests for metrics
+│   └── Regularizers/     # Tests for regularization techniques
 ├── mkdocs.yml            # Documentation configuration
 ├── LICENSE.md            # License information
 ├── main.c                # Example usage of the library
@@ -79,7 +83,12 @@ C-ML/
    make test
    ```
 
-5. Clean the build artifacts:
+5. Run the examples:
+   ```bash
+   make nn_example
+   ```
+
+6. Clean the build artifacts:
    ```bash
    make clean
    ```
@@ -92,49 +101,74 @@ The `main.c` file demonstrates how to use the library to create a simple neural 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include "src/Layers/dense.h"
-#include "src/Activations/relu.h"
-#include "src/Loss_Functions/meanSquaredError.h"
+#include <time.h>
+#include "include/Core/training.h"
 
 int main()
 {
-    printf("Starting program...\n");
-    float input[] = {1.0, 2.0, 3.0};
-    int input_size = 3;
+    srand(time(NULL));
+    NeuralNetwork *network = create_neural_network(2);
 
-    float target[] = {0.0, 1.0};
-    int output_size = 2;
+    build_network(network, OPTIMIZER_ADAM, 0.01f, LOSS_MSE, 0.0f, 0.0f);
+    model_add(network, LAYER_DENSE, ACTIVATION_RELU, 2, 4, 0.0f, 0, 0);
+    model_add(network, LAYER_DENSE, ACTIVATION_TANH, 4, 4, 0.0f, 0, 0);
+    model_add(network, LAYER_DENSE, ACTIVATION_SIGMOID, 4, 1, 0.0f, 0, 0);
 
-    DenseLayer dense_layer = {NULL, NULL, 0, 0};
-    initializeDense(&dense_layer, input_size, output_size);
+    int num_samples = 4;
+    float **X_train = (float **)cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
+    float **y_train = (float **)cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
 
-    float dense_output[2];
-    forwardDense(&dense_layer, input, dense_output);
-    printf("Dense Layer Output: [%f, %f]\n", dense_output[0], dense_output[1]);
-
-    for (int i = 0; i < output_size; i++)
+    for (int i = 0; i < num_samples; i++)
     {
-        dense_output[i] = relu(dense_output[i]);
+        X_train[i] = (float *)cm_safe_malloc(2 * sizeof(float), __FILE__, __LINE__);
+        y_train[i] = (float *)cm_safe_malloc(1 * sizeof(float), __FILE__, __LINE__);
     }
-    printf("Activated Output: [%f, %f]\n", dense_output[0], dense_output[1]);
 
-    float loss = meanSquaredError(target, dense_output, output_size);
-    printf("Loss: %f\n", loss);
+    X_train[0][0] = 0.0f;
+    X_train[0][1] = 0.0f;
+    y_train[0][0] = 0.0f;
+    X_train[1][0] = 0.0f;
+    X_train[1][1] = 1.0f;
+    y_train[1][0] = 1.0f;
 
-    float d_output[2] = {dense_output[0] - target[0], dense_output[1] - target[1]};
-    float d_input[3] = {0};
-    float d_weights[6] = {0};
-    float d_biases[2] = {0};
-    backwardDense(&dense_layer, input, dense_output, d_output, d_input, d_weights, d_biases);
+    X_train[2][0] = 1.0f;
+    X_train[2][1] = 0.0f;
+    y_train[2][0] = 1.0f;
 
-    float learning_rate = 0.01;
-    updateDense(&dense_layer, d_weights, d_biases, learning_rate);
+    X_train[3][0] = 1.0f;
+    X_train[3][1] = 1.0f;
+    y_train[3][0] = 1.0f;
 
-    freeDense(&dense_layer);
+    summary(network);
+    train_network(network, X_train, y_train, num_samples, 2, 1, 1, 300);
 
-    printf("Program completed successfully.\n");
-    return CM_SUCCESS;
+    MetricType metrics[] = {METRIC_R2_SCORE};
+
+    int num_metrics = sizeof(metrics) / sizeof(metrics[0]);
+    float results[num_metrics];
+
+    test_network(network, X_train, y_train, num_samples, 2, 1, (int *)metrics, num_metrics, results);
+    printf("R2 Score: %.2f\n", results[0]);
+
+    for (int i = 0; i < num_samples; i++)
+    {
+        float prediction = 0.0f;
+        forward_pass(network, X_train[i], &prediction, 2, 1, 0);
+        printf("Input: [%.0f, %.0f], Expected: %.0f, Predicted: %.4f\n",
+               X_train[i][0], X_train[i][1], y_train[i][0], prediction);
+    }
+
+    free_neural_network(network);
+
+    for (int i = 0; i < num_samples; i++)
+    {
+        cm_safe_free((void **)&X_train[i]);
+        cm_safe_free((void **)&y_train[i]);
+    }
+    cm_safe_free((void **)&X_train);
+    cm_safe_free((void **)&y_train);
+
+    return 0;
 }
 ```
 
