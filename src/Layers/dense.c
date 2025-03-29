@@ -40,6 +40,8 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
     if (layer->weights == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->biases == (void *)CM_MEMORY_ALLOCATION_ERROR)
     {
         fprintf(stderr, "[initializeDense] Error: Memory allocation failed.\n");
+        cm_safe_free((void **)&layer->weights);
+        cm_safe_free((void **)&layer->biases);
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
