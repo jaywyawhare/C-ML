@@ -1,88 +1,89 @@
 # Usage
 
-The `main.c` file demonstrates how to use the library to create a simple neural network. Below is an example:
+This page provides an example of how to use the C-ML library to create and train a simple neural network.
+
+## Neural Network Training Example
+
+The following code demonstrates how to:
+
+- Create a neural network.
+- Add dense layers with ReLU, Tanh, and Sigmoid activations.
+- Train the network using the Adam optimizer and Mean Squared Error loss.
+- Evaluate the network using the R2 score metric.
+- Make predictions with the trained network.
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include "include/Layers/dense.h"
-#include "include/Layers/flatten.h"
-#include "include/Activations/relu.h"
-#include "include/Loss_Functions/mean_squared_error.h"
-#include "include/Core/error_codes.h"
+#include <time.h>
+#include "include/Core/training.h"
 
 int main()
 {
-    float input[] = {1.0, 2.0, 3.0};
-    int input_size = 3;
+    srand(time(NULL));
+    NeuralNetwork *network = create_neural_network(2);
 
-    float target[] = {0.0, 1.0};
-    int output_size = 2;
+    build_network(network, OPTIMIZER_ADAM, 0.01f, LOSS_MSE, 0.0f, 0.0f);
+    model_add(network, LAYER_DENSE, ACTIVATION_RELU, 2, 4, 0.0f, 0, 0);
+    model_add(network, LAYER_DENSE, ACTIVATION_TANH, 4, 4, 0.0f, 0, 0);
+    model_add(network, LAYER_DENSE, ACTIVATION_SIGMOID, 4, 1, 0.0f, 0, 0);
 
-    // Initialize Flatten Layer
-    FlattenLayer flatten_layer = {0, 0};
-    if (initialize_flatten(&flatten_layer, input_size) != CM_SUCCESS)
+    int num_samples = 4;
+    float **X_train = (float **)cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
+    float **y_train = (float **)cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
+
+    for (int i = 0; i < num_samples; i++)
     {
-        fprintf(stderr, "Failed to initialize Flatten Layer\n");
-        return CM_LAYER_NOT_INITIALIZED_ERROR;
+        X_train[i] = (float *)cm_safe_malloc(2 * sizeof(float), __FILE__, __LINE__);
+        y_train[i] = (float *)cm_safe_malloc(1 * sizeof(float), __FILE__, __LINE__);
     }
 
-    float flattened_output[3];
-    if (forward_flatten(&flatten_layer, input, flattened_output) != CM_SUCCESS)
+    X_train[0][0] = 0.0f;
+    X_train[0][1] = 0.0f;
+    y_train[0][0] = 0.0f;
+    X_train[1][0] = 0.0f;
+    X_train[1][1] = 1.0f;
+    y_train[1][0] = 1.0f;
+
+    X_train[2][0] = 1.0f;
+    X_train[2][1] = 0.0f;
+    y_train[2][0] = 1.0f;
+
+    X_train[3][0] = 1.0f;
+    X_train[3][1] = 1.0f;
+    y_train[3][0] = 1.0f;
+
+    summary(network);
+    train_network(network, X_train, y_train, num_samples, 2, 1, 1, 300);
+
+    MetricType metrics[] = {METRIC_R2_SCORE};
+
+    int num_metrics = sizeof(metrics) / sizeof(metrics[0]);
+    float results[num_metrics];
+
+    test_network(network, X_train, y_train, num_samples, 2, 1, (int *)metrics, num_metrics, results);
+    printf("R2 Score: %.2f\n", results[0]);
+
+    for (int i = 0; i < num_samples; i++)
     {
-        fprintf(stderr, "Failed to perform forward pass for Flatten Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
+        float prediction = 0.0f;
+        forward_pass(network, X_train[i], &prediction, 2, 1, 0);
+        printf("Input: [%.0f, %.0f], Expected: %.0f, Predicted: %.4f\n",
+               X_train[i][0], X_train[i][1], y_train[i][0], prediction);
     }
 
-    // Initialize Dense Layer
-    DenseLayer dense_layer = {NULL, NULL, 0, 0};
-    if (initialize_dense(&dense_layer, input_size, output_size) != CM_SUCCESS)
+    free_neural_network(network);
+
+    for (int i = 0; i < num_samples; i++)
     {
-        fprintf(stderr, "Failed to initialize Dense Layer\n");
-        return CM_LAYER_NOT_INITIALIZED_ERROR;
+        cm_safe_free((void **)&X_train[i]);
+        cm_safe_free((void **)&y_train[i]);
     }
+    cm_safe_free((void **)&X_train);
+    cm_safe_free((void **)&y_train);
 
-    float dense_output[2];
-    if (forward_dense(&dense_layer, flattened_output, dense_output) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to perform forward pass for Dense Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
-
-    for (int i = 0; i < output_size; i++)
-    {
-        dense_output[i] = relu(dense_output[i]);
-    }
-
-    float loss = mean_squared_error(target, dense_output, output_size);
-    if (loss == CM_INVALID_INPUT_ERROR)
-    {
-        fprintf(stderr, "Failed to compute Mean Squared Error\n");
-        return CM_INVALID_INPUT_ERROR;
-    }
-
-    float d_output[2] = {dense_output[0] - target[0], dense_output[1] - target[1]};
-    float d_input[3] = {0};
-    float d_weights[6] = {0};
-    float d_biases[2] = {0};
-    if (backward_dense(&dense_layer, flattened_output, dense_output, d_output, d_input, d_weights, d_biases) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to perform backward pass for Dense Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
-
-    float learning_rate = 0.01;
-    if (update_dense(&dense_layer, d_weights, d_biases, learning_rate) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to update Dense Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
-
-    free_dense(&dense_layer);
-    free_flatten(&flatten_layer);
-
-    printf("Program completed successfully.\n");
-    return CM_SUCCESS;
+    return 0;
 }
 ```
+
+This example provides a basic framework for building and training neural networks using the C-ML library. You can modify and extend this example to create more complex models and solve a variety of machine learning problems.

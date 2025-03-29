@@ -38,12 +38,14 @@ nav:
   - Installation: installation.md
   - Usage: usage.md
   - Modules:
+      - Core: modules/core.md
       - Layers: modules/layers.md
       - Activations: modules/activations.md
       - Loss Functions: modules/loss_functions.md
       - Optimizers: modules/optimizers.md
       - Preprocessing: modules/preprocessing.md
       - Regularizers: modules/regularizers.md
+      - Metrics: modules/metrics.md
   - Testing: testing.md
   - Development Guidelines: development_guidelines.md
   - Design Guide: DesignGuide.md

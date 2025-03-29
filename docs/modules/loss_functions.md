@@ -34,3 +34,38 @@
 - **Description**: Computes the mean of an array of values.
 - **Function**: `reduce_mean(float *loss, int size)`
 - **File**: [`reduce_mean.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/reduce_mean.c)
+
+## Huber Loss
+- **Description**: Huber Loss function.
+- **Function**: `huber_loss(float *y, float *yHat, int n)`
+- **File**: [`huber_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/huber_loss.c)
+
+## KLD Loss
+- **Description**: Kullback-Leibler Divergence Loss function.
+- **Function**: `kld_loss(float *p, float *q, int n)`
+- **File**: [`kld_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/kld_loss.c)
+
+## Log-Cosh Loss
+- **Description**: Log-Cosh Loss function.
+- **Function**: `log_cosh_loss(float *y, float *yHat, int n)`
+- **File**: [`log_cosh_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/log_cosh_loss.c)
+
+## Poisson Loss
+- **Description**: Poisson Loss function.
+- **Function**: `poisson_loss(float *y, float *yHat, int n)`
+- **File**: [`poisson_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/poisson_loss.c)
+
+## Smooth L1 Loss
+- **Description**: Smooth L1 Loss function.
+- **Function**: `smooth_l1_loss(float *y, float *yHat, int n)`
+- **File**: [`smooth_l1_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/smooth_l1_loss.c)
+
+## Tversky Loss
+- **Description**: Tversky Loss function.
+- **Function**: `tversky_loss(float *y, float *yHat, int n)`
+- **File**: [`tversky_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/tversky_loss.c)
+
+## Cosine Similarity Loss
+- **Description**: Cosine Similarity Loss function.
+- **Function**: `cosine_similarity_loss(float *y, float *yHat, int n)`
+- **File**: [`cosine_similarity_loss.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Loss_Functions/cosine_similarity_loss.c)
