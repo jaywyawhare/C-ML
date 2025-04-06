@@ -3,7 +3,9 @@
 #include "../../include/Optimizers/rmsprop.h"
 #include "../../include/Core/error_codes.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Performs the RMSProp optimization algorithm.

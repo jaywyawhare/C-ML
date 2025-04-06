@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Applies combined L1 and L2 regularization to update gradients.

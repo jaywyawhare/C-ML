@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Applies L1 regularization to update weights and biases.

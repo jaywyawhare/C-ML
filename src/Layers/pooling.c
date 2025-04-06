@@ -3,7 +3,9 @@
 #include "../../include/Layers/pooling.h"
 #include "../../include/Core/error_codes.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Initializes a Polling Layer.

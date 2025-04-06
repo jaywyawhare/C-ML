@@ -5,7 +5,9 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Applies the softmax activation function.

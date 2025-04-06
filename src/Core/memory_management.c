@@ -3,7 +3,9 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Allocates memory safely and logs the file and line number in case of failure.

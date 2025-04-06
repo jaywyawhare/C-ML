@@ -5,7 +5,9 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Scales an array of floats to a range of [0, 1] using min-max scaling.

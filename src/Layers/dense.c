@@ -5,7 +5,9 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Initializes a Dense Layer with random weights and biases.
@@ -29,8 +31,7 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         return CM_INVALID_PARAMETER_ERROR;
     }
 
-    cm_safe_free((void **)&layer->weights);
-    cm_safe_free((void **)&layer->biases);
+    free_dense(layer);
 
     layer->input_size = input_size;
     layer->output_size = output_size;
@@ -79,6 +80,9 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
         output[i] = 0;
         for (int j = 0; j < layer->input_size; j++)
         {
+            // Breakpoint condition: Check for potential out-of-bounds access
+            // For GDB:
+            // break dense.c:74 if (j + i * layer->input_size) >= (layer->input_size * layer->output_size)
             output[i] += input[j] * layer->weights[j + i * layer->input_size];
         }
         output[i] += layer->biases[i];
@@ -115,6 +119,9 @@ int backward_dense(DenseLayer *layer, float *input, float *output, float *d_outp
         d_input[i] = 0;
         for (int j = 0; j < layer->output_size; j++)
         {
+            // Breakpoint condition: Check for potential out-of-bounds access
+            // For GDB:
+            // break dense.c:108 if (i + j * layer->input_size) >= (layer->input_size * layer->output_size)
             d_input[i] += d_output[j] * layer->weights[i + j * layer->input_size];
         }
     }

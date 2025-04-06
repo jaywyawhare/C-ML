@@ -4,7 +4,9 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Activations/relu.h"
 
+#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
+#endif
 
 /**
  * @brief Applies the Rectified Linear Unit (ReLU) activation function.
