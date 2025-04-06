@@ -69,6 +69,7 @@ NeuralNetwork *create_neural_network(int input_size)
     network->tail = NULL;
     network->num_layers = 0;
     network->input_size = input_size;         
+    network->max_layer_output_size = input_size; /* Initialize with input_size as the default */
     network->optimizer_type = OPTIMIZER_NONE; 
     network->loss_function = LOSS_MSE;        
     network->learning_rate = 0.01f;           
@@ -111,12 +112,136 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
     network->l1_lambda = l1_lambda;
     network->l2_lambda = l2_lambda;
 
-    if (optimizer_type == OPTIMIZER_ADAM)
+    /* 
+     * Note: We don't allocate optimizer parameters here.
+     * They will be allocated in initialize_optimizer_params() which is called at the start of training.
+     * This ensures we allocate the correct amount of memory based on the final network structure.
+     */
+    
+    return CM_SUCCESS;
+}
+
+/**
+ * @brief Calculate the maximum input and output sizes needed for the network.
+ * 
+ * This function traverses the network to find the maximum input and output sizes
+ * across all layers, which can be used to allocate memory safely.
+ *
+ * @param network Pointer to the neural network.
+ * @param max_input_size Pointer to store the maximum input size.
+ * @param max_output_size Pointer to store the maximum output size.
+ * @return CM_Error Error code.
+ */
+CM_Error calculate_max_buffer_sizes(NeuralNetwork *network, int *max_input_size, int *max_output_size)
+{
+    if (network == NULL || max_input_size == NULL || max_output_size == NULL)
     {
-        network->v_w = (float *)cm_safe_malloc(network->input_size * sizeof(float), __FILE__, __LINE__);
-        network->v_b = (float *)cm_safe_malloc(sizeof(float), __FILE__, __LINE__);
-        network->s_w = (float *)cm_safe_malloc(network->input_size * sizeof(float), __FILE__, __LINE__);
-        network->s_b = (float *)cm_safe_malloc(sizeof(float), __FILE__, __LINE__);
+        LOG_ERROR("Null pointer argument");
+        return CM_NULL_POINTER_ERROR;
+    }
+
+    *max_input_size = network->input_size;
+    *max_output_size = 0;
+
+    NeuralNetworkNode *current = network->head;
+    while (current != NULL)
+    {
+        switch (current->type)
+        {
+        case LAYER_DENSE:
+        {
+            DenseLayer *dense = (DenseLayer *)current->layer;
+            if (dense->input_size > *max_input_size)
+            {
+                *max_input_size = dense->input_size;
+            }
+            if (dense->output_size > *max_output_size)
+            {
+                *max_output_size = dense->output_size;
+            }
+            break;
+        }
+        case LAYER_FLATTEN:
+        {
+            FlattenLayer *flatten = (FlattenLayer *)current->layer;
+            if (flatten->output_size > *max_output_size)
+            {
+                *max_output_size = flatten->output_size;
+            }
+            break;
+        }
+        case LAYER_MAXPOOLING:
+        {
+            MaxPoolingLayer *mp = (MaxPoolingLayer *)current->layer;
+            int out_size = compute_maxpooling_output_size(network->input_size, mp->kernel_size, mp->stride);
+            if (out_size > *max_output_size)
+            {
+                *max_output_size = out_size;
+            }
+            break;
+        }
+        case LAYER_POOLING:
+        {
+            PollingLayer *pooling = (PollingLayer *)current->layer;
+            int out_size = compute_polling_output_size(network->input_size, pooling->kernel_size, pooling->stride);
+            if (out_size > *max_output_size)
+            {
+                *max_output_size = out_size;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        current = current->next;
+    }
+
+    /* Ensure max_output_size is at least as large as the network's output size */
+    if (*max_output_size < network->max_layer_output_size)
+    {
+        *max_output_size = network->max_layer_output_size;
+    }
+
+    LOG_DEBUG("Calculated max buffer sizes: input_size=%d, output_size=%d", *max_input_size, *max_output_size);
+    return CM_SUCCESS;
+}
+
+/**
+ * @brief Initialize optimizer parameters based on the current network structure.
+ * 
+ * This function allocates memory for optimizer parameters based on the maximum layer size.
+ * It should be called before training starts, after all layers have been added.
+ *
+ * @param network Pointer to the neural network.
+ * @return CM_Error Error code.
+ */
+CM_Error initialize_optimizer_params(NeuralNetwork *network)
+{
+    if (network == NULL)
+    {
+        LOG_ERROR("Network is NULL");
+        return CM_NULL_POINTER_ERROR;
+    }
+
+    /* Free any previously allocated optimizer parameters */
+    cm_safe_free((void **)&network->v_w);
+    cm_safe_free((void **)&network->v_b);
+    cm_safe_free((void **)&network->s_w);
+    cm_safe_free((void **)&network->s_b);
+    cm_safe_free((void **)&network->cache_w);
+    cm_safe_free((void **)&network->cache_b);
+
+    /* Calculate the maximum parameter size based on the largest layer */
+    int max_param_size = network->max_layer_output_size * network->max_layer_output_size;
+    
+    LOG_DEBUG("Initializing optimizer parameters with max_layer_output_size: %d", network->max_layer_output_size);
+    
+    if (network->optimizer_type == OPTIMIZER_ADAM)
+    {
+        network->v_w = (float *)cm_safe_malloc(max_param_size * sizeof(float), __FILE__, __LINE__);
+        network->v_b = (float *)cm_safe_malloc(network->max_layer_output_size * sizeof(float), __FILE__, __LINE__);
+        network->s_w = (float *)cm_safe_malloc(max_param_size * sizeof(float), __FILE__, __LINE__);
+        network->s_b = (float *)cm_safe_malloc(network->max_layer_output_size * sizeof(float), __FILE__, __LINE__);
 
         if (!network->v_w || !network->v_b || !network->s_w || !network->s_b)
         {
@@ -128,15 +253,15 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
             return CM_MEMORY_ALLOCATION_ERROR;
         }
 
-        memset(network->v_w, 0, network->input_size * sizeof(float));
-        memset(network->v_b, 0, sizeof(float));
-        memset(network->s_w, 0, network->input_size * sizeof(float));
-        memset(network->s_b, 0, sizeof(float));
+        memset(network->v_w, 0, max_param_size * sizeof(float));
+        memset(network->v_b, 0, network->max_layer_output_size * sizeof(float));
+        memset(network->s_w, 0, max_param_size * sizeof(float));
+        memset(network->s_b, 0, network->max_layer_output_size * sizeof(float));
     }
-    else if (optimizer_type == OPTIMIZER_RMSPROP)
+    else if (network->optimizer_type == OPTIMIZER_RMSPROP)
     {
-        network->cache_w = (float *)cm_safe_malloc(network->input_size * sizeof(float), __FILE__, __LINE__);
-        network->cache_b = (float *)cm_safe_malloc(sizeof(float), __FILE__, __LINE__);
+        network->cache_w = (float *)cm_safe_malloc(max_param_size * sizeof(float), __FILE__, __LINE__);
+        network->cache_b = (float *)cm_safe_malloc(network->max_layer_output_size * sizeof(float), __FILE__, __LINE__);
 
         if (!network->cache_w || !network->cache_b)
         {
@@ -146,8 +271,8 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
             return CM_MEMORY_ALLOCATION_ERROR;
         }
 
-        memset(network->cache_w, 0, network->input_size * sizeof(float));
-        memset(network->cache_b, 0, sizeof(float));
+        memset(network->cache_w, 0, max_param_size * sizeof(float));
+        memset(network->cache_b, 0, network->max_layer_output_size * sizeof(float));
     }
 
     return CM_SUCCESS;
@@ -357,6 +482,12 @@ CM_Error add_layer(NeuralNetwork *network, LayerConfig config)
 CM_Error model_add(NeuralNetwork *network, LayerType type, ActivationType activation,
                    int input_size, int output_size, float rate, int kernel_size, int stride)
 {
+    if (network == NULL)
+    {
+        LOG_ERROR("Network is NULL");
+        return CM_NULL_POINTER_ERROR;
+    }
+
     LayerConfig config;
     config.type = type;
     config.activation = activation;
@@ -366,6 +497,13 @@ CM_Error model_add(NeuralNetwork *network, LayerType type, ActivationType activa
     case LAYER_DENSE:
         config.params.dense.input_size = input_size;
         config.params.dense.output_size = output_size;
+        
+        /* Update max_layer_output_size if this layer's output is larger */
+        if (output_size > network->max_layer_output_size)
+        {
+            network->max_layer_output_size = output_size;
+            LOG_DEBUG("Updated max_layer_output_size to %d", network->max_layer_output_size);
+        }
         break;
     case LAYER_DROPOUT:
         config.params.dropout.rate = rate;
@@ -406,16 +544,38 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
         return CM_LAYER_NOT_INITIALIZED_ERROR;
     }
 
-    float *layer_input = (float *)cm_safe_malloc(input_size * sizeof(float), __FILE__, __LINE__);
+    /* Calculate the maximum buffer sizes needed for this network */
+    int max_input_size, max_output_size;
+    CM_Error size_error = calculate_max_buffer_sizes(network, &max_input_size, &max_output_size);
+    if (size_error != CM_SUCCESS)
+    {
+        return size_error;
+    }
+
+    /* Ensure max_input_size is at least as large as the provided input_size */
+    if (max_input_size < input_size)
+    {
+        max_input_size = input_size;
+    }
+
+    /* Ensure max_output_size is at least as large as the provided output_size */
+    if (max_output_size < output_size)
+    {
+        max_output_size = output_size;
+    }
+
+    /* Allocate memory for layer_input */
+    float *layer_input = (float *)cm_safe_malloc(max_input_size * sizeof(float), __FILE__, __LINE__);
     if (layer_input == NULL)
     {
         LOG_ERROR("Unable to allocate memory for layer_input");
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
-    int max_size = (input_size > output_size) ? input_size : output_size;
-    LOG_DEBUG("Allocating memory for layer_output. Input Size: %d Output Size: %d Max Size: %d", input_size, output_size, max_size);
-    float *layer_output = (float *)cm_safe_malloc(max_size * sizeof(float), __FILE__, __LINE__);
+    /* Allocate memory for layer_output */
+    LOG_DEBUG("Allocating memory for layer_output. Input Size: %d, Output Size: %d, Max Input Size: %d, Max Output Size: %d", 
+              input_size, output_size, max_input_size, max_output_size);
+    float *layer_output = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (layer_output == NULL)
     {
         LOG_ERROR("Unable to allocate memory for layer_output");
@@ -699,14 +859,38 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
         LOG_ERROR("Optimizer is not set. Call build_network first");
         return CM_OPTIMIZER_NOT_INITIALIZED_ERROR;
     }
+    
+    /* Initialize optimizer parameters based on the final network structure */
+    CM_Error error = initialize_optimizer_params(network);
+    if (error != CM_SUCCESS)
+    {
+        LOG_ERROR("Failed to initialize optimizer parameters");
+        return error;
+    }
 
-    float *predictions = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
+    /* Calculate the maximum buffer sizes needed for this network */
+    int max_input_size, max_output_size;
+    CM_Error size_error = calculate_max_buffer_sizes(network, &max_input_size, &max_output_size);
+    if (size_error != CM_SUCCESS)
+    {
+        return size_error;
+    }
+
+    /* Ensure max_output_size is at least as large as the provided output_size */
+    if (max_output_size < output_size)
+    {
+        max_output_size = output_size;
+    }
+
+    /* Allocate memory for predictions */
+    float *predictions = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (predictions == NULL)
     {
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
-    float *loss_gradient = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
+    /* Allocate memory for loss_gradient */
+    float *loss_gradient = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (loss_gradient == NULL)
     {
         cm_safe_free((void **)&predictions);
@@ -756,7 +940,8 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
                         {
                             for (int j = 0; j < dense->input_size; j++)
                             {
-                                float x = X_train[idx][j]; 
+                                /* Only access X_train[idx][j] if j is within the bounds of input_size */
+                                float x = (j < input_size) ? X_train[idx][j] : 0.0f;
                                 float *w = &dense->weights[i * dense->input_size + j];
                                 float *b = &dense->biases[i];
                                 float lr = network->learning_rate;
@@ -856,7 +1041,22 @@ CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test
         return CM_LAYER_NOT_INITIALIZED_ERROR;
     }
 
-    float *predictions = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
+    /* Calculate the maximum buffer sizes needed for this network */
+    int max_input_size, max_output_size;
+    CM_Error size_error = calculate_max_buffer_sizes(network, &max_input_size, &max_output_size);
+    if (size_error != CM_SUCCESS)
+    {
+        return size_error;
+    }
+
+    /* Ensure max_output_size is at least as large as the provided output_size */
+    if (max_output_size < output_size)
+    {
+        max_output_size = output_size;
+    }
+
+    /* Allocate memory for predictions */
+    float *predictions = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (predictions == NULL)
     {
         return CM_MEMORY_ALLOCATION_ERROR;

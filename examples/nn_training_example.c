@@ -6,7 +6,7 @@
 
 int main()
 {
-    set_log_level(LOG_LEVEL_DEBUG);
+    set_log_level(LOG_LEVEL_INFO);
     srand(time(NULL));
     NeuralNetwork *network = create_neural_network(2);
 

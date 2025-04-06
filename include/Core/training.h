@@ -164,6 +164,7 @@ typedef struct
     NeuralNetworkNode *tail;
     int num_layers;
     int input_size;
+    int max_layer_output_size;  /* Maximum output size of any layer in the network */
     OptimizerType optimizer_type;
     int loss_function;
     float learning_rate;
@@ -200,6 +201,30 @@ NeuralNetwork *create_neural_network(int input_size);
  * @return CM_Error Error code.
  */
 CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, float learning_rate, int loss_function, float l1_lambda, float l2_lambda);
+
+/**
+ * @brief Calculate the maximum input and output sizes needed for the network.
+ * 
+ * This function traverses the network to find the maximum input and output sizes
+ * across all layers, which can be used to allocate memory safely.
+ *
+ * @param network Pointer to the neural network.
+ * @param max_input_size Pointer to store the maximum input size.
+ * @param max_output_size Pointer to store the maximum output size.
+ * @return CM_Error Error code.
+ */
+CM_Error calculate_max_buffer_sizes(NeuralNetwork *network, int *max_input_size, int *max_output_size);
+
+/**
+ * @brief Initialize optimizer parameters based on the current network structure.
+ * 
+ * This function allocates memory for optimizer parameters based on the maximum layer size.
+ * It should be called before training starts, after all layers have been added.
+ *
+ * @param network Pointer to the neural network.
+ * @return CM_Error Error code.
+ */
+CM_Error initialize_optimizer_params(NeuralNetwork *network);
 
 /**
  * @brief Add a layer to the neural network based on configuration
