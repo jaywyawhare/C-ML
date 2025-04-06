@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include "../../include/Layers/dense.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
@@ -31,6 +32,10 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
 
     cm_safe_free((void **)&layer->weights);
     cm_safe_free((void **)&layer->biases);
+    cm_safe_free((void **)&layer->adam_v_w);
+    cm_safe_free((void **)&layer->adam_v_b);
+    cm_safe_free((void **)&layer->adam_s_w);
+    cm_safe_free((void **)&layer->adam_s_b);
 
     layer->input_size = input_size;
     layer->output_size = output_size;
@@ -54,6 +59,28 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
     {
         layer->biases[i] = ((float)rand() / RAND_MAX) - 0.5;
     }
+
+    // Allocate and initialize Adam optimizer's moment vectors
+    layer->adam_v_w = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
+    layer->adam_v_b = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
+    layer->adam_s_w = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
+    layer->adam_s_b = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
+
+    if (layer->adam_v_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_v_b == (void *)CM_MEMORY_ALLOCATION_ERROR ||
+        layer->adam_s_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_s_b == (void *)CM_MEMORY_ALLOCATION_ERROR)
+    {
+        fprintf(stderr, "[initializeDense] Error: Memory allocation failed for Adam optimizer's moment vectors.\n");
+        cm_safe_free((void **)&layer->adam_v_w);
+        cm_safe_free((void **)&layer->adam_v_b);
+        cm_safe_free((void **)&layer->adam_s_w);
+        cm_safe_free((void **)&layer->adam_s_b);
+        return CM_MEMORY_ALLOCATION_ERROR;
+    }
+
+    memset(layer->adam_v_w, 0, input_size * output_size * sizeof(float));
+    memset(layer->adam_v_b, 0, output_size * sizeof(float));
+    memset(layer->adam_s_w, 0, input_size * output_size * sizeof(float));
+    memset(layer->adam_s_b, 0, output_size * sizeof(float));
 
     return CM_SUCCESS;
 }
@@ -181,6 +208,22 @@ int free_dense(DenseLayer *layer)
     if (layer->biases != NULL)
     {
         cm_safe_free((void **)&layer->biases);
+    }
+    if (layer->adam_v_w != NULL)
+    {
+        cm_safe_free((void **)&layer->adam_v_w);
+    }
+    if (layer->adam_v_b != NULL)
+    {
+        cm_safe_free((void **)&layer->adam_v_b);
+    }
+    if (layer->adam_s_w != NULL)
+    {
+        cm_safe_free((void **)&layer->adam_s_w);
+    }
+    if (layer->adam_s_b != NULL)
+    {
+        cm_safe_free((void **)&layer->adam_s_b);
     }
     return CM_SUCCESS;
 }
