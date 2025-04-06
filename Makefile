@@ -4,7 +4,8 @@ SRC     = src
 OBJ     = obj
 BINDIR  = bin
 LIBDIR  = lib
-LIB     = lib_c_ml
+LIB_NAME = c_ml
+LIB     = lib$(LIB_NAME).a
 TEST_BIN_DIR = test_bin
 EXAMPLES_DIR = examples
 EXAMPLES_BIN_DIR = examples_bin
@@ -48,7 +49,7 @@ examples: $(LIBDIR)/$(LIB) $(EXAMPLES)
 
 $(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_DIR)/%.c
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $< -L$(LIBDIR) $(LIBDIR)/$(LIB) -o $@ -fsanitize=address -fsanitize=undefined
+	$(CC) $(CFLAGS) $< -L$(LIBDIR) -l$(LIB_NAME) -o $@
 
 .PHONY: test
 test: $(LIBDIR)/$(LIB)
@@ -58,7 +59,7 @@ test: $(LIBDIR)/$(LIB)
 		test_bin=$$(basename $$test_src .c); \
 		src_file=$$(echo $$test_src | sed 's|^test/|src/|; s|test_||'); \
 		echo "\nCompiling and running $$test_bin..."; \
-		$(CC) $(CFLAGS) $$test_src $$src_file -L$(LIBDIR) $(LIBDIR)/$(LIB) \
+		$(CC) $(CFLAGS) $$test_src $$src_file -L$(LIBDIR) -l$(LIB_NAME) \
 		-o $(TEST_BIN_DIR)/$$test_bin -fsanitize=address -fsanitize=undefined && \
 		ASAN_OPTIONS=allocator_may_return_null=1 ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
 	done
@@ -67,7 +68,7 @@ test: $(LIBDIR)/$(LIB)
 .PHONY: nn_example
 nn_example: $(LIBDIR)/$(LIB)
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L$(LIBDIR) $(LIBDIR)/$(LIB) -o $(EXAMPLES_BIN_DIR)/nn_training_example -fsanitize=address -fsanitize=undefined
+	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L$(LIBDIR) -l$(LIB_NAME) -o $(EXAMPLES_BIN_DIR)/nn_training_example -fsanitize=address -fsanitize=undefined
 	./$(EXAMPLES_BIN_DIR)/nn_training_example
 
 clean:
