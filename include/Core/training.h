@@ -39,6 +39,8 @@
 #include "../Loss_Functions/smooth_l1_loss.h"
 #include "../Loss_Functions/tversky_loss.h"
 
+#include "../Core/dataset.h" 
+
 /**
  * @brief Enumeration for evaluation metrics
  */
@@ -57,7 +59,7 @@ typedef enum
     METRIC_R2_SCORE,
     METRIC_RECALL,
     METRIC_ROOT_MEAN_SQUARED_ERROR,
-    METRIC_SPECIFICITY 
+    METRIC_SPECIFICITY
 } MetricType;
 
 /**
@@ -138,7 +140,7 @@ typedef struct
         } dropout;
         struct
         {
-            int kernel_size; 
+            int kernel_size;
             int stride;
         } pooling;
     } params;
@@ -240,21 +242,15 @@ CM_Error model_add(NeuralNetwork *network, LayerType type, ActivationType activa
 CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int input_size, int output_size, int is_training);
 
 /**
- * @brief Train the neural network
+ * @brief Train the neural network.
  *
- * @param network Pointer to the neural network
- * @param X_train Training data
- * @param y_train Training labels
- * @param num_samples Number of training samples
- * @param input_size Size of each input sample
- * @param output_size Size of each output sample
- * @param batch_size Batch size for training
- * @param epochs Number of training epochs
- * @return CM_Error Error code
+ * @param network Pointer to the neural network.
+ * @param dataset Pointer to the dataset structure.
+ * @param epochs Number of training epochs.
+ * @param ... Optional argument for batch size (default is 1).
+ * @return CM_Error Error code.
  */
-CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
-                       int num_samples, int input_size, int output_size,
-                       int batch_size, int epochs);
+CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...);
 
 /**
  * @brief Test the neural network
@@ -263,16 +259,9 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
  * @param X_test Test data
  * @param y_test Test labels
  * @param num_samples Number of test samples
- * @param input_size Size of each input sample
- * @param output_size Size of each output sample
- * @param metrics Array of evaluation metrics to calculate.
- * @param num_metrics Number of evaluation metrics to calculate.
- * @param results Array to store the results of the evaluation metrics.
- * @return CM_Error Error code
+ * @param ... Optional arguments: metrics (const char**, terminated by NULL)
  */
-CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test,
-                      int num_samples, int input_size, int output_size,
-                      int *metrics, int num_metrics, float *results);
+void test_network(NeuralNetwork *network, float **X_test, float **y_test, int num_samples, ...);
 
 /**
  * @brief Free memory allocated for the neural network
@@ -310,5 +299,13 @@ void calculate_loss_gradient(float *predicted, float *actual, float *gradient, i
  * @param network Pointer to the neural network
  */
 void summary(NeuralNetwork *network);
+
+/**
+ * @brief Get the name of a metric type
+ *
+ * @param metric The metric type
+ * @return const char* The name of the metric
+ */
+const char *get_metric_name(MetricType metric);
 
 #endif
