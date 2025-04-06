@@ -8,6 +8,12 @@
  * @param biases Pointer to the biases vector.
  * @param input_size Number of input neurons.
  * @param output_size Number of output neurons.
+ * @param rmsprop_cache_w Cache for RMSProp weights.
+ * @param rmsprop_cache_b Cache for RMSProp biases.
+ * @param adam_v_w Adam first moment vector for weights.
+ * @param adam_v_b Adam first moment vector for biases.
+ * @param adam_s_w Adam second moment vector for weights.
+ * @param adam_s_b Adam second moment vector for biases.
  */
 typedef struct
 {
@@ -15,6 +21,14 @@ typedef struct
     float *biases;
     int input_size;
     int output_size;
+
+    // Add members for optimizers
+    float *rmsprop_cache_w; // Cache for RMSProp weights
+    float *rmsprop_cache_b; // Cache for RMSProp biases
+    float *adam_v_w;        // Adam first moment vector for weights
+    float *adam_v_b;        // Adam first moment vector for biases
+    float *adam_s_w;        // Adam second moment vector for weights
+    float *adam_s_b;        // Adam second moment vector for biases
 } DenseLayer;
 
 /**

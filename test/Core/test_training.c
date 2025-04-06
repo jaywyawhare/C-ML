@@ -20,7 +20,7 @@ void test_large_layer_sizes() {
     // Fill input with test data
     for (int i = 0; i < 1000; i++) input[i] = 0.1f;
     
-    // This would segfault without your fixes
+    // This would segfault without the bug fixes
     CM_Error error = forward_pass(network, input, output, 1000, 500, 0);
     
     // Assert no error
