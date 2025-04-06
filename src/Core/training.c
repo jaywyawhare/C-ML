@@ -18,14 +18,14 @@
 #include "../../include/Loss_Functions/binary_cross_entropy_loss.h"
 #include "../../include/Loss_Functions/cosine_similarity_loss.h"
 #include "../../include/Loss_Functions/focal_loss.h"
-#include "../../include/Loss_Functions/huber_loss.h"    
-#include "../../include/Loss_Functions/kld_loss.h"      
-#include "../../include/Loss_Functions/log_cosh_loss.h" 
+#include "../../include/Loss_Functions/huber_loss.h"
+#include "../../include/Loss_Functions/kld_loss.h"
+#include "../../include/Loss_Functions/log_cosh_loss.h"
 #include "../../include/Loss_Functions/mean_squared_error.h"
-#include "../../include/Loss_Functions/poisson_loss.h"   
-#include "../../include/Loss_Functions/smooth_l1_loss.h" 
-#include "../../include/Loss_Functions/tversky_loss.h"   
-#include "../../include/Metrics/accuracy.h" 
+#include "../../include/Loss_Functions/poisson_loss.h"
+#include "../../include/Loss_Functions/smooth_l1_loss.h"
+#include "../../include/Loss_Functions/tversky_loss.h"
+#include "../../include/Metrics/accuracy.h"
 #include "../../include/Metrics/balanced_accuracy.h"
 #include "../../include/Metrics/cohens_kappa.h"
 #include "../../include/Metrics/f1_score.h"
@@ -36,21 +36,23 @@
 #include "../../include/Metrics/precision.h"
 #include "../../include/Metrics/recall.h"
 #include "../../include/Metrics/reduce_mean.h"
-#include "../../include/Metrics/root_mean_squared_error.h" 
-#include "../../include/Metrics/r2_score.h"                
+#include "../../include/Metrics/root_mean_squared_error.h"
+#include "../../include/Metrics/r2_score.h"
 #include "../../include/Metrics/specificity.h"
-#include "../../include/Regularizers/l1.h"    
-#include "../../include/Regularizers/l2.h"    
-#include "../../include/Regularizers/l1_l2.h" 
-#include "../../include/Optimizers/adam.h"    
-#include "../../include/Optimizers/rmsprop.h" 
-#include "../../include/Optimizers/sgd.h"     
+#include "../../include/Regularizers/l1.h"
+#include "../../include/Regularizers/l2.h"
+#include "../../include/Regularizers/l1_l2.h"
+#include "../../include/Optimizers/adam.h"
+#include "../../include/Optimizers/rmsprop.h"
+#include "../../include/Optimizers/sgd.h"
+#include "../../include/Core/dataset.h" 
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <stdarg.h>
 
 /**
  * @brief Create a new neural network
@@ -68,22 +70,22 @@ NeuralNetwork *create_neural_network(int input_size)
     network->head = NULL;
     network->tail = NULL;
     network->num_layers = 0;
-    network->input_size = input_size;         
+    network->input_size = input_size;
     network->max_layer_output_size = input_size; /* Initialize with input_size as the default */
-    network->optimizer_type = OPTIMIZER_NONE; 
-    network->loss_function = LOSS_MSE;        
-    network->learning_rate = 0.01f;           
-    network->l1_lambda = 0.0f;                
-    network->l2_lambda = 0.0f;                
-    network->beta1 = 0.9f;                    
-    network->beta2 = 0.999f;                  
-    network->epsilon = 1e-7f;                 
-    network->cache_w = NULL;                  
-    network->cache_b = NULL;                  
-    network->v_w = NULL;                      
-    network->v_b = NULL;                      
-    network->s_w = NULL;                      
-    network->s_b = NULL;                      
+    network->optimizer_type = OPTIMIZER_NONE;
+    network->loss_function = LOSS_MSE;
+    network->learning_rate = 0.01f;
+    network->l1_lambda = 0.0f;
+    network->l2_lambda = 0.0f;
+    network->beta1 = 0.9f;
+    network->beta2 = 0.999f;
+    network->epsilon = 1e-7f;
+    network->cache_w = NULL;
+    network->cache_b = NULL;
+    network->v_w = NULL;
+    network->v_b = NULL;
+    network->s_w = NULL;
+    network->s_b = NULL;
     return network;
 }
 
@@ -294,11 +296,11 @@ float apply_activation(float value, ActivationType activation)
     case ACTIVATION_SIGMOID:
         return sigmoid(value);
     case ACTIVATION_TANH:
-        return tanH(value); 
+        return tanH(value);
     case ACTIVATION_LEAKY_RELU:
-        return leaky_relu(value); 
+        return leaky_relu(value);
     case ACTIVATION_ELU:
-        return elu(value, 1.0); 
+        return elu(value, 1.0);
     case ACTIVATION_GELU:
         return gelu(value);
     case ACTIVATION_LINEAR:
@@ -831,26 +833,21 @@ void calculate_loss_gradient(float *predicted, float *actual, float *gradient, i
  * @brief Train the neural network
  *
  * @param network Pointer to the neural network
- * @param X_train Training data
- * @param y_train Training labels
- * @param num_samples Number of training samples
- * @param input_size Size of each input sample
- * @param output_size Size of each output sample
- * @param batch_size Batch size for training
+ * @param dataset Pointer to the dataset
  * @param epochs Number of training epochs
  * @return CM_Error Error code
  */
-CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
-                       int num_samples, int input_size, int output_size,
-                       int batch_size, int epochs)
+CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...)
 {
-    if (network == NULL || X_train == NULL || y_train == NULL)
+    if (network == NULL || dataset == NULL)
     {
+        fprintf(stderr, "[train_network] Error: Null pointer argument.\n");
         return CM_NULL_POINTER_ERROR;
     }
 
     if (network->head == NULL)
     {
+        fprintf(stderr, "[train_network] Error: Neural network has no layers.\n");
         return CM_LAYER_NOT_INITIALIZED_ERROR;
     }
 
@@ -859,6 +856,32 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
         LOG_ERROR("Optimizer is not set. Call build_network first");
         return CM_OPTIMIZER_NOT_INITIALIZED_ERROR;
     }
+
+    int num_samples = dataset->num_samples;
+    int input_size = dataset->input_dim;
+    int output_size = dataset->output_dim;
+
+    if (num_samples <= 0 || input_size <= 0 || output_size <= 0)
+    {
+        fprintf(stderr, "[train_network] Error: Invalid dataset dimensions.\n");
+        return CM_INVALID_PARAMETER_ERROR;
+    }
+
+    // Set default batch size
+    int batch_size = 32;
+
+    // Parse optional batch size argument
+    va_list args;
+    va_start(args, epochs);
+    if (epochs > 0) // Ensure optional arguments exist
+    {
+        int provided_batch_size = va_arg(args, int);
+        if (provided_batch_size > 0) // Validate the provided batch size
+        {
+            batch_size = provided_batch_size;
+        }
+    }
+    va_end(args);
     
     /* Initialize optimizer parameters based on the final network structure */
     CM_Error error = initialize_optimizer_params(network);
@@ -886,6 +909,7 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
     float *predictions = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (predictions == NULL)
     {
+        fprintf(stderr, "[train_network] Error: Memory allocation failed for predictions.\n");
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
@@ -893,6 +917,7 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
     float *loss_gradient = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (loss_gradient == NULL)
     {
+        fprintf(stderr, "[train_network] Error: Memory allocation failed for loss_gradient.\n");
         cm_safe_free((void **)&predictions);
         return CM_MEMORY_ALLOCATION_ERROR;
     }
@@ -909,27 +934,44 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
             {
                 int idx = sample + b;
 
-                CM_Error error = forward_pass(network, X_train[idx], predictions, input_size, output_size, 1);
+                if (dataset->X[idx] == NULL || dataset->y[idx] == NULL)
+                {
+                    fprintf(stderr, "[train_network] Error: Null pointer in dataset at index %d.\n", idx);
+                    cm_safe_free((void **)&predictions);
+                    cm_safe_free((void **)&loss_gradient);
+                    return CM_NULL_POINTER_ERROR;
+                }
+
+                CM_Error error = forward_pass(network, dataset->X[idx], predictions, input_size, output_size, 1);
                 if (error != CM_SUCCESS)
                 {
+                    fprintf(stderr, "[train_network] Error: Forward pass failed at index %d.\n", idx);
                     cm_safe_free((void **)&predictions);
                     cm_safe_free((void **)&loss_gradient);
                     return error;
                 }
 
-                float loss = calculate_loss(predictions, y_train[idx], output_size, network->loss_function);
+                float loss = calculate_loss(predictions, dataset->y[idx], output_size, network->loss_function);
                 total_loss += loss;
 
-                calculate_loss_gradient(predictions, y_train[idx], loss_gradient, output_size, network->loss_function);
+                calculate_loss_gradient(predictions, dataset->y[idx], loss_gradient, output_size, network->loss_function);
 
                 NeuralNetworkNode *current = network->head;
-                int layer_index = 0; // compiler warning:  warning: variable 'layer_index' set but not used
+                int layer_index = 0;
 
                 while (current != NULL)
                 {
                     if (current->type == LAYER_DENSE)
                     {
                         DenseLayer *dense = (DenseLayer *)current->layer;
+
+                        if (dense == NULL || dense->weights == NULL || dense->biases == NULL)
+                        {
+                            fprintf(stderr, "[train_network] Error: Null pointer in DenseLayer.\n");
+                            cm_safe_free((void **)&predictions);
+                            cm_safe_free((void **)&loss_gradient);
+                            return CM_NULL_POINTER_ERROR;
+                        }
 
                         if (network->l1_lambda > 0.0f || network->l2_lambda > 0.0f)
                         {
@@ -940,8 +982,7 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
                         {
                             for (int j = 0; j < dense->input_size; j++)
                             {
-                                /* Only access X_train[idx][j] if j is within the bounds of input_size */
-                                float x = (j < input_size) ? X_train[idx][j] : 0.0f;
+                                float x = (j < input_size) ? dataset->X[idx][j]  : 0.0f;
                                 float *w = &dense->weights[i * dense->input_size + j];
                                 float *b = &dense->biases[i];
                                 float lr = network->learning_rate;
@@ -949,46 +990,25 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
                                 switch (network->optimizer_type)
                                 {
                                 case OPTIMIZER_SGD:
-                                    *w -= lr * loss_gradient[i] * x;
-                                    *b -= lr * loss_gradient[i];
+                                    update_sgd(w, b, loss_gradient[i], x, lr);
                                     break;
                                 case OPTIMIZER_RMSPROP:
-                                {
-                                    float *cache_w = &network->cache_w[i * dense->input_size + j];
-                                    float *cache_b = &network->cache_b[i];
-
-                                    *cache_w = network->beta1 * (*cache_w) +
-                                               (1 - network->beta1) * pow(loss_gradient[i] * x, 2);
-                                    *cache_b = network->beta1 * (*cache_b) +
-                                               (1 - network->beta1) * pow(loss_gradient[i], 2);
-
-                                    *w -= lr * (loss_gradient[i] * x) / (sqrt(*cache_w) + network->epsilon);
-                                    *b -= lr * loss_gradient[i] / (sqrt(*cache_b) + network->epsilon);
+                                    update_rmsprop(w, b,
+                                                   &dense->rmsprop_cache_w[i * dense->input_size + j],
+                                                   &dense->rmsprop_cache_b[i],
+                                                   loss_gradient[i], x, lr,
+                                                   0.9f, network->epsilon);
                                     break;
-                                }
                                 case OPTIMIZER_ADAM:
-                                {
-                                    float *v_w = &network->v_w[i * dense->input_size + j];
-                                    float *v_b = &network->v_b[i];
-                                    float *s_w = &network->s_w[i * dense->input_size + j];
-                                    float *s_b = &network->s_b[i];
-
-                                    *v_w = network->beta1 * (*v_w) + (1 - network->beta1) * (loss_gradient[i] * x);
-                                    *v_b = network->beta1 * (*v_b) + (1 - network->beta1) * loss_gradient[i];
-
-                                    *s_w = network->beta2 * (*s_w) + (1 - network->beta2) * pow(loss_gradient[i] * x, 2);
-                                    *s_b = network->beta2 * (*s_b) + (1 - network->beta2) * pow(loss_gradient[i], 2);
-
-                                    float v_w_corrected = *v_w / (1 - pow(network->beta1, epoch + 1));
-                                    float v_b_corrected = *v_b / (1 - pow(network->beta1, epoch + 1));
-
-                                    float s_w_corrected = *s_w / (1 - pow(network->beta2, epoch + 1));
-                                    float s_b_corrected = *s_b / (1 - pow(network->beta2, epoch + 1));
-
-                                    *w -= lr * v_w_corrected / (sqrt(s_w_corrected) + network->epsilon);
-                                    *b -= lr * v_b_corrected / (sqrt(s_b_corrected) + network->epsilon);
+                                    update_adam(w, b,
+                                                &dense->adam_v_w[i * dense->input_size + j],
+                                                &dense->adam_v_b[i],
+                                                &dense->adam_s_w[i * dense->input_size + j],
+                                                &dense->adam_s_b[i],
+                                                loss_gradient[i], x, lr,
+                                                network->beta1, network->beta2,
+                                                network->epsilon, epoch);
                                     break;
-                                }
                                 default:
                                     LOG_ERROR("Unknown optimizer type: %d", network->optimizer_type);
                                     cm_safe_free((void **)&predictions);
@@ -999,12 +1019,11 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
                         }
                     }
                     current = current->next;
-                    layer_index++;
                 }
             }
         }
 
-        LOG_INFO("Epoch %d/%d - Loss: %.4f", epoch + 1, epochs, total_loss / num_samples);
+        printf("Epoch %d/%d - Loss: %.4f\n", epoch + 1, epochs, total_loss / num_samples);
     }
 
     cm_safe_free((void **)&predictions);
@@ -1062,14 +1081,6 @@ CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
-    float *total_loss = (float *)cm_safe_malloc(sizeof(float), __FILE__, __LINE__);
-    if (total_loss == NULL)
-    {
-        cm_safe_free((void **)&predictions);
-        return CM_MEMORY_ALLOCATION_ERROR;
-    }
-    *total_loss = 0.0f;
-
     for (int i = 0; i < num_metrics; i++)
     {
         results[i] = 0.0f;
@@ -1081,7 +1092,6 @@ CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test
     if (y_true == NULL || y_pred == NULL)
     {
         cm_safe_free((void **)&predictions);
-        cm_safe_free((void **)&total_loss);
         cm_safe_free((void **)&y_true);
         cm_safe_free((void **)&y_pred);
         return CM_MEMORY_ALLOCATION_ERROR;
@@ -1093,58 +1103,153 @@ CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test
         if (error != CM_SUCCESS)
         {
             cm_safe_free((void **)&predictions);
-            cm_safe_free((void **)&total_loss);
             cm_safe_free((void **)&y_true);
             cm_safe_free((void **)&y_pred);
             return error;
         }
 
-        float loss = calculate_loss(predictions, y_test[i], output_size, network->loss_function);
-        *total_loss += loss;
-
         y_true[i] = y_test[i][0];
         y_pred[i] = predictions[0];
     }
+
+    float threshold = 0.5f;
 
     for (int i = 0; i < num_metrics; i++)
     {
         switch (metrics[i])
         {
         case METRIC_ACCURACY:
-        {
-            float threshold = 0.1f;
-            int correct_predictions = 0;
-            for (int j = 0; j < num_samples; j++)
-            {
-                if (fabs(y_pred[j] - y_true[j]) < threshold)
-                {
-                    correct_predictions++;
-                }
-            }
-            results[i] = (float)correct_predictions / num_samples;
+            results[i] = accuracy(y_true, y_pred, num_samples, threshold);
             break;
-        }
         case METRIC_R2_SCORE:
             results[i] = r2_score(y_true, y_pred, num_samples);
+            break;
+        case METRIC_PRECISION:
+            results[i] = precision(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_RECALL:
+            results[i] = recall(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_F1_SCORE:
+            results[i] = f1_score(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_BALANCED_ACCURACY:
+            results[i] = balanced_accuracy(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_COHENS_KAPPA:
+            results[i] = cohens_kappa(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_IOU:
+            results[i] = iou(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_MCC:
+            results[i] = mcc(y_true, y_pred, num_samples, threshold);
+            break;
+        case METRIC_MEAN_ABSOLUTE_ERROR:
+            results[i] = mean_absolute_error(y_true, y_pred, num_samples);
+            break;
+        case METRIC_MEAN_ABSOLUTE_PERCENTAGE_ERROR:
+            results[i] = mean_absolute_percentage_error(y_true, y_pred, num_samples);
+            break;
+        case METRIC_ROOT_MEAN_SQUARED_ERROR:
+            results[i] = root_mean_squared_error(y_true, y_pred, num_samples);
+            break;
+        case METRIC_SPECIFICITY:
+            results[i] = specificity(y_true, y_pred, num_samples, threshold);
             break;
         default:
             LOG_ERROR("Unknown metric type: %d", metrics[i]);
             cm_safe_free((void **)&predictions);
-            cm_safe_free((void **)&total_loss);
             cm_safe_free((void **)&y_true);
             cm_safe_free((void **)&y_pred);
             return CM_INVALID_PARAMETER_ERROR;
         }
     }
 
-    *total_loss /= num_samples;
-
     cm_safe_free((void **)&predictions);
-    cm_safe_free((void **)&total_loss);
     cm_safe_free((void **)&y_true);
     cm_safe_free((void **)&y_pred);
 
     return CM_SUCCESS;
+}
+
+/**
+ * @brief Get the name of a metric type.
+ *
+ * @param metric Metric type.
+ * @return const char* Name of the metric.
+ */
+const char *get_metric_name(MetricType metric)
+{
+    switch (metric)
+    {
+    case METRIC_ACCURACY:
+        return "Accuracy";
+    case METRIC_BALANCED_ACCURACY:
+        return "Balanced Accuracy";
+    case METRIC_COHENS_KAPPA:
+        return "Cohen's Kappa";
+    case METRIC_F1_SCORE:
+        return "F1 Score";
+    case METRIC_IOU:
+        return "Intersection over Union (IoU)";
+    case METRIC_MCC:
+        return "Matthews Correlation Coefficient (MCC)";
+    case METRIC_MEAN_ABSOLUTE_ERROR:
+        return "Mean Absolute Error";
+    case METRIC_MEAN_ABSOLUTE_PERCENTAGE_ERROR:
+        return "Mean Absolute Percentage Error";
+    case METRIC_PRECISION:
+        return "Precision";
+    case METRIC_R2_SCORE:
+        return "R2 Score";
+    case METRIC_RECALL:
+        return "Recall";
+    case METRIC_ROOT_MEAN_SQUARED_ERROR:
+        return "Root Mean Squared Error";
+    case METRIC_SPECIFICITY:
+        return "Specificity";
+    default:
+        return "Unknown Metric";
+    }
+}
+
+/**
+ * @brief Get the name of a metric type.
+ *
+ * @param metric Metric type.
+ * @return const char* Name of the metric.
+ */
+MetricType get_metric_type_from_name(const char *metric_name)
+{
+    if (strcmp(metric_name, "Accuracy") == 0)
+        return METRIC_ACCURACY;
+    if (strcmp(metric_name, "R2 Score") == 0)
+        return METRIC_R2_SCORE;
+    if (strcmp(metric_name, "Precision") == 0)
+        return METRIC_PRECISION;
+    if (strcmp(metric_name, "Recall") == 0)
+        return METRIC_RECALL;
+    if (strcmp(metric_name, "F1 Score") == 0)
+        return METRIC_F1_SCORE;
+    if (strcmp(metric_name, "Balanced Accuracy") == 0)
+        return METRIC_BALANCED_ACCURACY;
+    if (strcmp(metric_name, "Cohen's Kappa") == 0)
+        return METRIC_COHENS_KAPPA;
+    if (strcmp(metric_name, "IoU") == 0)
+        return METRIC_IOU;
+    if (strcmp(metric_name, "MCC") == 0)
+        return METRIC_MCC;
+    if (strcmp(metric_name, "Mean Absolute Error") == 0)
+        return METRIC_MEAN_ABSOLUTE_ERROR;
+    if (strcmp(metric_name, "Mean Absolute Percentage Error") == 0)
+        return METRIC_MEAN_ABSOLUTE_PERCENTAGE_ERROR;
+    if (strcmp(metric_name, "Root Mean Squared Error") == 0)
+        return METRIC_ROOT_MEAN_SQUARED_ERROR;
+    if (strcmp(metric_name, "Specificity") == 0)
+        return METRIC_SPECIFICITY;
+
+    return METRIC_NONE; // Unknown metric
 }
 
 /**
@@ -1154,18 +1259,75 @@ CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test
  * @param X_test Test data
  * @param y_test Test labels
  * @param num_samples Number of test samples
- * @param input_size Size of each input sample
- * @param output_size Size of each output sample
- * @param metrics Array of evaluation metrics to calculate.
- * @param num_metrics Number of evaluation metrics to calculate.
- * @param results Array to store the results of the evaluation metrics.
- * @return CM_Error Error code
  */
-CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test,
-                      int num_samples, int input_size, int output_size,
-                      int *metrics, int num_metrics, float *results)
+void test_network(NeuralNetwork *network, float **X_test, float **y_test, int num_samples, ...)
 {
-    return evaluate_network(network, X_test, y_test, num_samples, input_size, output_size, metrics, num_metrics, results);
+    if (network == NULL || X_test == NULL || y_test == NULL)
+    {
+        printf("Error: Null pointer argument.\n");
+        return;
+    }
+
+    int output_size = 0;
+    if (network->tail != NULL)
+    {
+        switch (network->tail->type)
+        {
+        case LAYER_DENSE:
+            output_size = ((DenseLayer *)network->tail->layer)->output_size;
+            break;
+        case LAYER_FLATTEN:
+            output_size = ((FlattenLayer *)network->tail->layer)->output_size;
+            break;
+        default:
+            printf("Error: Unsupported layer type in the tail.\n");
+            return;
+        }
+    }
+
+    // Parse optional arguments for metrics
+    va_list args;
+    va_start(args, num_samples);
+    const char **metrics = va_arg(args, const char **);
+    va_end(args);
+
+    // Use default metrics if none are provided
+    static const char *default_metrics[] = {"R2 Score", NULL};
+    if (metrics == NULL)
+    {
+        metrics = default_metrics;
+    }
+
+    // Count the number of metrics
+    int num_metrics = 0;
+    while (metrics[num_metrics] != NULL)
+    {
+        num_metrics++;
+    }
+
+    int metric_types[num_metrics];
+    for (int i = 0; i < num_metrics; i++)
+    {
+        metric_types[i] = get_metric_type_from_name(metrics[i]);
+        if (metric_types[i] == METRIC_NONE)
+        {
+            printf("Error: Unknown metric '%s'.\n", metrics[i]);
+            return;
+        }
+    }
+
+    float results[num_metrics];
+    CM_Error error = evaluate_network(network, X_test, y_test, num_samples, network->input_size, output_size, metric_types, num_metrics, results);
+    if (error != CM_SUCCESS)
+    {
+        printf("Error: Failed to evaluate the network. Error code: %d\n", error);
+        return;
+    }
+
+    for (int i = 0; i < num_metrics; i++)
+    {
+        printf("%s: %.4f\n", metrics[i], results[i]);
+    }
 }
 
 /**
