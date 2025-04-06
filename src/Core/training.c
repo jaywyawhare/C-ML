@@ -431,7 +431,20 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
         {
         case LAYER_DENSE:
         {
+            // current size is 2, input_size is 2 output_size is 1
+            // dense input_size is 2 output_size is 4
             DenseLayer *dense = (DenseLayer *)current->layer;
+            if (dense->input_size != current_size)
+            {
+                fprintf(stderr, "[forward_pass] Error: Input Size mismatch - current: %d layer: %d\n", current_size, dense->input_size);
+                dense->input_size = current_size;
+            }
+            if (dense->output_size != output_size)
+            {
+                fprintf(stderr, "[forward_pass] Error: Output Size mismatch - current: %d layer: %d\n", output_size, dense->output_size);
+                dense->output_size = output_size;
+            }
+
             error = forward_dense(dense, layer_input, layer_output);
             if (error != CM_SUCCESS)
             {

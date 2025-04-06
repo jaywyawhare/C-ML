@@ -31,7 +31,9 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         return CM_INVALID_PARAMETER_ERROR;
     }
 
-    free_dense(layer);
+    // commented out to figure out what's really going on.
+    // TODO: Ensure cleaned up properly
+    // free_dense(layer);
 
     layer->input_size = input_size;
     layer->output_size = output_size;
