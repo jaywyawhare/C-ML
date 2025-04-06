@@ -69,3 +69,52 @@ float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_
 
     return loss;
 }
+
+/**
+ * @brief Update weights and biases using Adam optimizer.
+ *
+ * Updates the weights and biases of a neural network using the Adam optimization algorithm.
+ *
+ * @param w Pointer to the weight.
+ * @param b Pointer to the bias.
+ * @param v_w Pointer to the weight momentum.
+ * @param v_b Pointer to the bias momentum.
+ * @param s_w Pointer to the weight second moment.
+ * @param s_b Pointer to the bias second moment.
+ * @param gradient Gradient value.
+ * @param input Input value.
+ * @param learning_rate Learning rate.
+ * @param beta1 Momentum decay rate.
+ * @param beta2 Second moment decay rate.
+ * @param epsilon Small value to prevent division by zero.
+ * @param epoch Current epoch (used for bias correction).
+ */
+void update_adam(float *w, float *b, float *v_w, float *v_b, float *s_w, float *s_b, float gradient, float input, float learning_rate, float beta1, float beta2, float epsilon, int epoch)
+{
+    if (!w || !b || !v_w || !v_b || !s_w || !s_b)
+    {
+        fprintf(stderr, "[update_adam] Error: Null pointer input.\n");
+        return;
+    }
+
+    if (epsilon <= 0 || beta1 <= 0 || beta1 >= 1 || beta2 <= 0 || beta2 >= 1 || learning_rate <= 0)
+    {
+        fprintf(stderr, "[update_adam] Error: Invalid parameters.\n");
+        return;
+    }
+
+    *v_w = beta1 * (*v_w) + (1 - beta1) * (gradient * input);
+    *v_b = beta1 * (*v_b) + (1 - beta1) * gradient;
+
+    *s_w = beta2 * (*s_w) + (1 - beta2) * pow(gradient * input, 2);
+    *s_b = beta2 * (*s_b) + (1 - beta2) * pow(gradient, 2);
+
+    float v_w_corrected = *v_w / (1 - pow(beta1, epoch + 1));
+    float v_b_corrected = *v_b / (1 - pow(beta1, epoch + 1));
+
+    float s_w_corrected = *s_w / (1 - pow(beta2, epoch + 1));
+    float s_b_corrected = *s_b / (1 - pow(beta2, epoch + 1));
+
+    *w -= learning_rate * v_w_corrected / (sqrt(s_w_corrected) + epsilon);
+    *b -= learning_rate * v_b_corrected / (sqrt(s_b_corrected) + epsilon);
+}

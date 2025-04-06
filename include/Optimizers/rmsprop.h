@@ -17,4 +17,19 @@
  */
 float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, float *cache_b, float epsilon, float beta);
 
+/**
+ * @brief Update weights and biases using RMSProp optimizer.
+ *
+ * @param w Pointer to the weight.
+ * @param b Pointer to the bias.
+ * @param cache_w Pointer to the weight cache.
+ * @param cache_b Pointer to the bias cache.
+ * @param gradient Gradient value.
+ * @param input Input value.
+ * @param learning_rate Learning rate.
+ * @param beta Decay rate for RMSProp.
+ * @param epsilon Small value to prevent division by zero.
+ */
+void update_rmsprop(float *w, float *b, float *cache_w, float *cache_b, float gradient, float input, float learning_rate, float beta, float epsilon);
+
 #endif
