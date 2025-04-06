@@ -50,3 +50,20 @@ float sgd(float x, float y, float lr, float *w, float *b)
 
     return loss;
 }
+
+/**
+ * @brief Update weights and biases using SGD optimizer.
+ *
+ * Updates the weights and biases of a neural network using the SGD optimization algorithm.
+ *
+ * @param w Pointer to the weight.
+ * @param b Pointer to the bias.
+ * @param gradient Gradient value.
+ * @param input Input value.
+ * @param learning_rate Learning rate.
+ */
+void update_sgd(float *w, float *b, float gradient, float input, float learning_rate)
+{
+    *w -= learning_rate * gradient * input;
+    *b -= learning_rate * gradient;
+}
