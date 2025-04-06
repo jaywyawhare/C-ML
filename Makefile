@@ -23,6 +23,9 @@ all: $(BINDIR)/main
 release: CFLAGS = -Wall -O2 -DNDEBUG -MMD
 release: clean all
 
+debug: CFLAGS += -DDEBUG_LOGGING -fsanitize=address,undefined
+debug: all
+
 $(BINDIR)/main: $(OBJS)
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ -lm
@@ -43,7 +46,7 @@ examples: $(LIB) $(EXAMPLES)
 
 $(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_DIR)/%.c
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $< -L. -lmylib -lm -o $@
+	$(CC) $(CFLAGS) $< -L. -lmylib -lm -o $@ -fsanitize=address,undefined
 
 .PHONY: test
 test: $(LIB)
@@ -53,14 +56,16 @@ test: $(LIB)
 		test_bin=$$(basename $$test_src .c); \
 		src_file=$$(echo $$test_src | sed 's|^test/|src/|; s|test_||'); \
 		echo "\nCompiling and running $$test_bin..."; \
-		$(CC) $(CFLAGS) $$test_src $$src_file -L. -lmylib -lm -o $(TEST_BIN_DIR)/$$test_bin && ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
+		$(CC) $(CFLAGS) $$test_src $$src_file -L. -lmylib -lm \
+		-o $(TEST_BIN_DIR)/$$test_bin -fsanitize=address,undefined && \
+		ASAN_OPTIONS=allocator_may_return_null=1 ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
 	done
 	@echo "\nALL TESTS PASSED"
 
 .PHONY: nn_example
 nn_example: $(LIB)
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L. -lmylib -lm -o $(EXAMPLES_BIN_DIR)/nn_training_example
+	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L. -lmylib -lm -o $(EXAMPLES_BIN_DIR)/nn_training_example -fsanitize=address,undefined
 	./$(EXAMPLES_BIN_DIR)/nn_training_example
 
 clean:

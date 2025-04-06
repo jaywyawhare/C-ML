@@ -42,5 +42,10 @@
 *.idb
 *.pdb
 
+# VSCode
+.VSCode
+
 # Project-specific Artefacts
 examples_bin/**
+test_bin/**
+bin/**
