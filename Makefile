@@ -1,9 +1,10 @@
 CC      = gcc
-CFLAGS  = -g -Wall -MMD -lm -Iinclude
+CFLAGS  = -g -Wall -MMD -Iinclude
 SRC     = src
 OBJ     = obj
 BINDIR  = bin
-LIB     = libmylib.a
+LIBDIR  = lib
+LIB     = lib_c_ml
 TEST_BIN_DIR = test_bin
 EXAMPLES_DIR = examples
 EXAMPLES_BIN_DIR = examples_bin
@@ -19,16 +20,16 @@ EXAMPLES_SRCS = $(wildcard $(EXAMPLES_DIR)/*.c)
 EXAMPLES = $(patsubst $(EXAMPLES_DIR)/%.c, $(EXAMPLES_BIN_DIR)/%, $(EXAMPLES_SRCS))
 
 all: $(BINDIR)/main
-
+lib: $(LIBDIR)/$(LIB)
 release: CFLAGS = -Wall -O2 -DNDEBUG -MMD
 release: clean all
 
-debug: CFLAGS += -DDEBUG_LOGGING -fsanitize=address,undefined
+debug: CFLAGS += -DDEBUG_LOGGING -fsanitize=address -fsanitize=undefined
 debug: all
 
 $(BINDIR)/main: $(OBJS)
 	@mkdir -p $(BINDIR)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ -lm
+	$(CC) $(CFLAGS) $(OBJS) -o $@ 
 
 $(OBJ)/%.o: $(SRC)/%.c
 	@mkdir -p $(@D)
@@ -38,37 +39,38 @@ $(OBJ)/main.o: main.c
 	@mkdir -p $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(LIB): $(LIB_OBJS)
+$(LIBDIR)/$(LIB): $(LIB_OBJS)
+	@mkdir -p $(LIBDIR)
 	ar rcs $@ $^
 
 .PHONY: examples
-examples: $(LIB) $(EXAMPLES)
+examples: $(LIBDIR)/$(LIB) $(EXAMPLES)
 
 $(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_DIR)/%.c
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $< -L. -lmylib -lm -o $@ -fsanitize=address,undefined
+	$(CC) $(CFLAGS) $< -L$(LIBDIR) $(LIBDIR)/$(LIB) -o $@ -fsanitize=address -fsanitize=undefined
 
 .PHONY: test
-test: $(LIB)
+test: $(LIBDIR)/$(LIB)
 	@mkdir -p $(TEST_BIN_DIR)
 	@echo "Running tests..."
 	@for test_src in $(TEST_SRCS); do \
 		test_bin=$$(basename $$test_src .c); \
 		src_file=$$(echo $$test_src | sed 's|^test/|src/|; s|test_||'); \
 		echo "\nCompiling and running $$test_bin..."; \
-		$(CC) $(CFLAGS) $$test_src $$src_file -L. -lmylib -lm \
-		-o $(TEST_BIN_DIR)/$$test_bin -fsanitize=address,undefined && \
+		$(CC) $(CFLAGS) $$test_src $$src_file -L$(LIBDIR) $(LIBDIR)/$(LIB) \
+		-o $(TEST_BIN_DIR)/$$test_bin -fsanitize=address -fsanitize=undefined && \
 		ASAN_OPTIONS=allocator_may_return_null=1 ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
 	done
 	@echo "\nALL TESTS PASSED"
 
 .PHONY: nn_example
-nn_example: $(LIB)
+nn_example: $(LIBDIR)/$(LIB)
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L. -lmylib -lm -o $(EXAMPLES_BIN_DIR)/nn_training_example -fsanitize=address,undefined
+	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L$(LIBDIR) $(LIBDIR)/$(LIB) -o $(EXAMPLES_BIN_DIR)/nn_training_example -fsanitize=address -fsanitize=undefined
 	./$(EXAMPLES_BIN_DIR)/nn_training_example
 
 clean:
-	rm -rf $(BINDIR) $(OBJ) $(TEST_BIN_DIR) $(EXAMPLES_BIN_DIR) $(LIB) a.out
+	rm -rf $(BINDIR) $(OBJ) $(TEST_BIN_DIR) $(EXAMPLES_BIN_DIR) $(LIBDIR) a.out
 
 -include $(DEPS)
