@@ -152,6 +152,14 @@ test: $(STATIC_LIB)
 	done
 	@echo "\nALL TESTS PASSED"
 
+# Test logging system specifically
+.PHONY: test_logging
+test_logging: $(STATIC_LIB)
+	@mkdir -p $(TEST_BIN_DIR)
+	@echo "Running logging tests..."
+	$(CC) $(CFLAGS) test/Core/test_logging.c src/Core/logging.c -o $(TEST_BIN_DIR)/test_logging
+	./$(TEST_BIN_DIR)/test_logging
+
 ################################################################################
 # Utility targets
 ################################################################################

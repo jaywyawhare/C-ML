@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <time.h>
 #include "../include/Core/training.h"
+#include "../include/Core/logging.h"
 
 int main()
 {
+    set_log_level(LOG_LEVEL_DEBUG);
     srand(time(NULL));
     NeuralNetwork *network = create_neural_network(2);
 
@@ -47,13 +49,13 @@ int main()
     float results[num_metrics];
 
     test_network(network, X_train, y_train, num_samples, 2, 1, (int *)metrics, num_metrics, results);
-    printf("[main] Info: R2 Score: %.2f\n", results[0]);
+    LOG_INFO("R2 Score: %.2f\n", results[0]);
 
     for (int i = 0; i < num_samples; i++)
     {
         float prediction = 0.0f;
         forward_pass(network, X_train[i], &prediction, 2, 1, 0);
-        printf("[main] Info: Input: [%.0f, %.0f], Expected: %.0f, Predicted: %.4f\n",
+        LOG_INFO("Input: [%.0f, %.0f], Expected: %.0f, Predicted: %.4f\n",
                X_train[i][0], X_train[i][1], y_train[i][0], prediction);
     }
 

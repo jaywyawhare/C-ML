@@ -1,6 +1,7 @@
 #include "../../include/Core/training.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/logging.h"
 #include "../../include/Layers/dense.h"
 #include "../../include/Layers/flatten.h"
 #include "../../include/Layers/dropout.h"
@@ -100,7 +101,7 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
 {
     if (network == NULL)
     {
-        fprintf(stderr, "[build_network] Error: Null pointer argument.\n");
+        LOG_ERROR("Null pointer argument");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -119,7 +120,7 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
 
         if (!network->v_w || !network->v_b || !network->s_w || !network->s_b)
         {
-            fprintf(stderr, "[build_network] Error: Memory allocation failed for Adam optimizer parameters.\n");
+            LOG_ERROR("Memory allocation failed for Adam optimizer parameters");
             cm_safe_free((void **)&network->v_w);
             cm_safe_free((void **)&network->v_b);
             cm_safe_free((void **)&network->s_w);
@@ -139,7 +140,7 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
 
         if (!network->cache_w || !network->cache_b)
         {
-            fprintf(stderr, "[build_network] Error: Memory allocation failed for RMSProp optimizer parameters.\n");
+            LOG_ERROR("Memory allocation failed for RMSProp optimizer parameters");
             cm_safe_free((void **)&network->cache_w);
             cm_safe_free((void **)&network->cache_b);
             return CM_MEMORY_ALLOCATION_ERROR;
@@ -197,7 +198,7 @@ void apply_activation_array(float *values, int size, ActivationType activation)
         float *softmax_output = softmax(values, size);
         if (softmax_output == (float *)CM_NULL_POINTER_ERROR || softmax_output == (float *)CM_MEMORY_ALLOCATION_ERROR || softmax_output == (float *)CM_DIVISION_BY_ZERO_ERROR)
         {
-            fprintf(stderr, "[apply_activation_array] Error: Softmax activation failed.\n");
+            LOG_ERROR("Softmax activation failed");
             return;
         }
         for (int i = 0; i < size; i++)
@@ -375,7 +376,7 @@ CM_Error model_add(NeuralNetwork *network, LayerType type, ActivationType activa
         config.params.pooling.stride = stride;
         break;
     default:
-        fprintf(stderr, "[model_add] Error: Unsupported layer type.\n");
+        LOG_ERROR("Unsupported layer type: %d", type);
         return CM_INVALID_PARAMETER_ERROR;
     }
 
@@ -408,13 +409,16 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
     float *layer_input = (float *)cm_safe_malloc(input_size * sizeof(float), __FILE__, __LINE__);
     if (layer_input == NULL)
     {
+        LOG_ERROR("Unable to allocate memory for layer_input");
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
     int max_size = (input_size > output_size) ? input_size : output_size;
+    LOG_DEBUG("Allocating memory for layer_output. Input Size: %d Output Size: %d Max Size: %d", input_size, output_size, max_size);
     float *layer_output = (float *)cm_safe_malloc(max_size * sizeof(float), __FILE__, __LINE__);
     if (layer_output == NULL)
     {
+        LOG_ERROR("Unable to allocate memory for layer_output");
         cm_safe_free((void **)&layer_input);
         return CM_MEMORY_ALLOCATION_ERROR;
     }
@@ -434,13 +438,10 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
             DenseLayer *dense = (DenseLayer *)current->layer;
             if (dense->input_size != current_size)
             {
-                fprintf(stderr, "[forward_pass] Error: Input Size mismatch - current: %d layer: %d\n", current_size, dense->input_size);
-                dense->input_size = current_size;
-            }
-            if (dense->output_size != output_size)
-            {
-                fprintf(stderr, "[forward_pass] Error: Output Size mismatch - current: %d layer: %d\n", output_size, dense->output_size);
-                dense->output_size = output_size;
+                LOG_ERROR("Input Size mismatch - current: %d layer input size: %d", current_size, dense->input_size);
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_INVALID_LAYER_DIMENSIONS_ERROR;
             }
 
             error = forward_dense(dense, layer_input, layer_output);
@@ -575,7 +576,7 @@ float calculate_loss(float *predicted, float *actual, int size, LossType loss_ty
     case LOSS_COSINE_SIMILARITY:
         return cosine_similarity_loss(predicted, actual, size);
     default:
-        fprintf(stderr, "[calculate_loss] Error: Unknown loss type.\n");
+        LOG_ERROR("Unknown loss type: %d", loss_type);
         return -1.0f;
     }
 }
@@ -661,7 +662,7 @@ void calculate_loss_gradient(float *predicted, float *actual, float *gradient, i
         break;
     }
     default:
-        fprintf(stderr, "[calculate_loss_gradient] Error: Unknown loss type.\n");
+        LOG_ERROR("Unknown loss type: %d", loss_type);
         break;
     }
 }
@@ -695,7 +696,7 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
 
     if (network->optimizer_type == OPTIMIZER_NONE)
     {
-        fprintf(stderr, "[train_network] Error: Optimizer is not set. Call build_network first.\n");
+        LOG_ERROR("Optimizer is not set. Call build_network first");
         return CM_OPTIMIZER_NOT_INITIALIZED_ERROR;
     }
 
@@ -804,7 +805,7 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
                                     break;
                                 }
                                 default:
-                                    fprintf(stderr, "[train_network] Error: Unknown optimizer type.\n");
+                                    LOG_ERROR("Unknown optimizer type: %d", network->optimizer_type);
                                     cm_safe_free((void **)&predictions);
                                     cm_safe_free((void **)&loss_gradient);
                                     return CM_INVALID_PARAMETER_ERROR;
@@ -818,7 +819,7 @@ CM_Error train_network(NeuralNetwork *network, float **X_train, float **y_train,
             }
         }
 
-        printf("[train_network] Info: Epoch %d/%d - Loss: %.4f\n", epoch + 1, epochs, total_loss / num_samples);
+        LOG_INFO("Epoch %d/%d - Loss: %.4f", epoch + 1, epochs, total_loss / num_samples);
     }
 
     cm_safe_free((void **)&predictions);
@@ -927,7 +928,7 @@ CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test
             results[i] = r2_score(y_true, y_pred, num_samples);
             break;
         default:
-            fprintf(stderr, "[evaluate_network] Error: Unknown metric type.\n");
+            LOG_ERROR("Unknown metric type: %d", metrics[i]);
             cm_safe_free((void **)&predictions);
             cm_safe_free((void **)&total_loss);
             cm_safe_free((void **)&y_true);
@@ -1006,7 +1007,7 @@ CM_Error free_neural_network(NeuralNetwork *network)
         default:
             cm_safe_free(&(temp->layer));
         }
-
+        temp->layer = NULL;
         cm_safe_free((void **)&temp);
     }
 
@@ -1024,7 +1025,7 @@ void summary(NeuralNetwork *network)
 {
     if (network == NULL)
     {
-        printf("[summary] Error: Network is NULL.\n");
+        LOG_ERROR("Network is NULL");
         return;
     }
 
