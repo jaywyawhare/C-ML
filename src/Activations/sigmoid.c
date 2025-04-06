@@ -38,7 +38,7 @@ float sigmoid(float x)
         result = exp_pos_x / (1 + exp_pos_x);
     }
 #if DEBUG_LOGGING
-    printf("[sigmoid] Input: x=%f, Output: %f\n", x, result);
+    printf("[sigmoid] Debug: Input: x=%f, Output: %f\n", x, result);
 #endif
     return result;
 }

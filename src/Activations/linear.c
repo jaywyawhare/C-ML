@@ -27,7 +27,7 @@ float linear(float x)
 
     float result = x;
 #if DEBUG_LOGGING
-    printf("[linear] Input: x=%f, Output: %f\n", x, result);
+    printf("[linear] Debug: Input: x=%f, Output: %f\n", x, result);
 #endif
     return result;
 }

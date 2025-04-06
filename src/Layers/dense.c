@@ -31,6 +31,11 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         return CM_INVALID_PARAMETER_ERROR;
     }
 
+    #ifndef DEBUG_LOGGING
+        fprintf(stderr, "[initializeDense] Info: Initialized DenseLayer with input size (%d) and output size (%d)\n, input_size, output_size);
+    #endif
+
+
     // commented out to figure out what's really going on.
     // TODO: Ensure cleaned up properly
     // free_dense(layer);
@@ -89,7 +94,7 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
         }
         output[i] += layer->biases[i];
 #if DEBUG_LOGGING
-        printf("[forwardDense] Output[%d]: %f\n", i, output[i]);
+        printf("[forwardDense] Debug: Output[%d]: %f\n", i, output[i]);
 #endif
     }
 

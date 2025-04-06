@@ -47,7 +47,7 @@ float sgd(float x, float y, float lr, float *w, float *b)
     (*b) -= lr * db;
 
 #if DEBUG_LOGGING
-    printf("[sgd] w: %f, b: %f, loss: %f\n", *w, *b, loss);
+    printf("[sgd] Debug: w: %f, b: %f, loss: %f\n", *w, *b, loss);
 #endif
 
     return loss;

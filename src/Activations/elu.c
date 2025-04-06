@@ -30,7 +30,7 @@ float elu(float x, float alpha)
 
     float result = x >= 0 ? x : alpha * (expf(x) - 1);
 #if DEBUG_LOGGING
-    printf("[elu] Input: x=%f, alpha=%f, Output: %f\n", x, alpha, result);
+    printf("[elu] Debug: Input: x=%f, alpha=%f, Output: %f\n", x, alpha, result);
 #endif
     return result;
 }

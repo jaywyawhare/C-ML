@@ -80,7 +80,7 @@ int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
         }
     }
 #if DEBUG_LOGGING
-    printf("[labelEncoder] Encoding complete.\n");
+    printf("[labelEncoder] Debug: Encoding complete.\n");
 #endif
     return encoded;
 }
@@ -129,7 +129,7 @@ char *label_decoder(int *x, int size, CharMap *map, int mapSize)
     }
     decoded[size] = '\0';
 #if DEBUG_LOGGING
-    printf("[labelDecoder] Decoding complete.\n");
+    printf("[labelDecoder] Debug: Decoding complete.\n");
 #endif
     return decoded;
 }

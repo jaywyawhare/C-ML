@@ -69,7 +69,7 @@ int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
             output[i] = input[i] / (1 - layer->dropout_rate);
         }
 #if DEBUG_LOGGING
-        printf("[forwardDropout] Output[%d]: %f\n", i, output[i]);
+        printf("[forwardDropout] Debug: Output[%d]: %f\n", i, output[i]);
 #endif
     }
     return CM_SUCCESS;

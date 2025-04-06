@@ -58,7 +58,7 @@ float l1(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b,
     *b -= lr * ((*v_b) / (sqrt(*s_b) + epsilon));
 
 #if DEBUG_LOGGING
-    printf("[l1] w: %f, b: %f, loss: %f\n", *w, *b, loss);
+    printf("[l1] Debug: w: %f, b: %f, loss: %f\n", *w, *b, loss);
 #endif
 
     return loss;

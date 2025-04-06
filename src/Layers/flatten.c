@@ -46,7 +46,7 @@ int forward_flatten(FlattenLayer *layer, float *input, float *output)
     {
         output[i] = input[i];
 #if DEBUG_LOGGING
-        printf("[forward_flatten] Output[%d]: %f\n", i, output[i]);
+        printf("[forward_flatten] Debug: Output[%d]: %f\n", i, output[i]);
 #endif
     }
 

@@ -17,28 +17,28 @@ int main()
     FlattenLayer flatten_layer = {0, 0};
     if (initialize_flatten(&flatten_layer, input_size) != CM_SUCCESS)
     {
-        fprintf(stderr, "Failed to initialize Flatten Layer\n");
+        fprintf(stderr, "[main] Error: Failed to initialize Flatten Layer\n");
         return CM_LAYER_NOT_INITIALIZED_ERROR;
     }
 
     float flattened_output[3];
     if (forward_flatten(&flatten_layer, input, flattened_output) != CM_SUCCESS)
     {
-        fprintf(stderr, "Failed to perform forward pass for Flatten Layer\n");
+        fprintf(stderr, "[main] Error: Failed to perform forward pass for Flatten Layer\n");
         return CM_INVALID_LAYER_DIMENSIONS_ERROR;
     }
 
     DenseLayer dense_layer = {NULL, NULL, 0, 0};
     if (initialize_dense(&dense_layer, input_size, output_size) != CM_SUCCESS)
     {
-        fprintf(stderr, "Failed to initialize Dense Layer\n");
+        fprintf(stderr, "[main] Error: Failed to initialize Dense Layer\n");
         return CM_LAYER_NOT_INITIALIZED_ERROR;
     }
 
     float dense_output[2];
     if (forward_dense(&dense_layer, flattened_output, dense_output) != CM_SUCCESS)
     {
-        fprintf(stderr, "Failed to perform forward pass for Dense Layer\n");
+        fprintf(stderr, "[main] Error: Failed to perform forward pass for Dense Layer\n");
         return CM_INVALID_LAYER_DIMENSIONS_ERROR;
     }
 
@@ -50,7 +50,7 @@ int main()
     float loss = mean_squared_error(target, dense_output, output_size);
     if (loss == CM_INVALID_INPUT_ERROR)
     {
-        fprintf(stderr, "Failed to compute Mean Squared Error\n");
+        fprintf(stderr, "[main] Error: Failed to compute Mean Squared Error\n");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -60,19 +60,19 @@ int main()
     float d_biases[2] = {0};
     if (backward_dense(&dense_layer, flattened_output, dense_output, d_output, d_input, d_weights, d_biases) != CM_SUCCESS)
     {
-        fprintf(stderr, "Failed to perform backward pass for Dense Layer\n");
+        fprintf(stderr, "[main] Error: Failed to perform backward pass for Dense Layer\n");
         return CM_INVALID_LAYER_DIMENSIONS_ERROR;
     }
 
     float learning_rate = 0.01;
     if (update_dense(&dense_layer, d_weights, d_biases, learning_rate) != CM_SUCCESS)
     {
-        fprintf(stderr, "Failed to update Dense Layer\n");
+        fprintf(stderr, "[main] Error: Failed to update Dense Layer\n");
         return CM_INVALID_LAYER_DIMENSIONS_ERROR;
     }
 
     free_dense(&dense_layer);
     free_flatten(&flatten_layer);
-    printf("Program completed successfully.\n");
+    printf("[main] Info: Program completed successfully.\n");
     return CM_SUCCESS;
 }

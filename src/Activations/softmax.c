@@ -70,7 +70,7 @@ float *softmax(float *z, int n)
     {
         output[i] /= sum;
 #if DEBUG_LOGGING
-        printf("[softmax] Output[%d]: %f\n", i, output[i]);
+        printf("[softmax] Debug: Output[%d]: %f\n", i, output[i]);
 #endif
     }
 
@@ -88,7 +88,7 @@ void free_softmax(float **output)
     {
         cm_safe_free((void **)output);
 #if DEBUG_LOGGING
-        printf("[free_softmax] Memory freed for softmax output.\n");
+        printf("[free_softmax] Debug: Memory freed for softmax output.\n");
 #endif
     }
 }
@@ -157,7 +157,7 @@ void free_softmax_derivative(float **jacobian)
     {
         cm_safe_free((void **)jacobian);
 #if DEBUG_LOGGING
-        printf("[free_softmax_derivative] Memory freed for softmax derivative jacobian.\n");
+        printf("[free_softmax_derivative] Debug: Memory freed for softmax derivative jacobian.\n");
 #endif
     }
 }

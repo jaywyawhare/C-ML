@@ -28,7 +28,7 @@ float relu(float x)
 
     float result = x > 0 ? x : 0;
 #if DEBUG_LOGGING
-    printf("[relu] Input: x=%f, Output: %f\n", x, result);
+    printf("[relu] Debug: Input: x=%f, Output: %f\n", x, result);
 #endif
     return result;
 }

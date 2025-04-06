@@ -49,7 +49,7 @@ float l1_l2(float *w, float *dw, float l1, float l2, int n)
         dw[i] += l1 * l1_grad + 2 * l2 * w[i];
 
 #if DEBUG_LOGGING
-        printf("[l1_l2] i: %d, w[i]: %f, dw[i]: %f, loss: %f\n", i, w[i], dw[i], loss);
+        printf("[l1_l2] Debug: i: %d, w[i]: %f, dw[i]: %f, loss: %f\n", i, w[i], dw[i], loss);
 #endif
     }
     return loss;

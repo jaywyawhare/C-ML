@@ -202,7 +202,7 @@ int main() {
 
     // Print output
     for (int i = 0; i < output_size; i++) {
-        printf("Output[%d]: %f\n", i, output[i]);
+        printf("[main]] Info: Output[%d]: %f\n", i, output[i]);
     }
 
     // Free resources
