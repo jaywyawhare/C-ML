@@ -1,78 +1,38 @@
+#include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include "include/Layers/dense.h"
-#include "include/Layers/flatten.h"
-#include "include/Activations/relu.h"
-#include "include/Loss_Functions/mean_squared_error.h"
-#include "include/Core/error_codes.h"
+#include "include/Core/training.h"
+#include "include/Core/dataset.h"
 
 int main()
 {
-    float input[] = {1.0, 2.0, 3.0};
-    int input_size = 3;
+    NeuralNetwork *network = create_neural_network(2);
+    build_network(network, OPTIMIZER_ADAM, 0.1f, LOSS_MSE, 0.0f, 0.0f);
+    model_add(network, LAYER_DENSE, ACTIVATION_RELU, 2, 4, 0.0f, 0, 0);
+    model_add(network, LAYER_DENSE, ACTIVATION_TANH, 4, 4, 0.0f, 0, 0);
+    model_add(network, LAYER_DENSE, ACTIVATION_SIGMOID, 4, 1, 0.0f, 0, 0);
 
-    float target[] = {0.0, 1.0};
-    int output_size = 2;
+    float X_data[4][2] = {
+        {0.0f, 0.0f},
+        {0.0f, 1.0f},
+        {1.0f, 0.0f},
+        {1.0f, 1.0f}};
 
-    FlattenLayer flatten_layer = {0, 0};
-    if (initialize_flatten(&flatten_layer, input_size) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to initialize Flatten Layer\n");
-        return CM_LAYER_NOT_INITIALIZED_ERROR;
-    }
+    float y_data[4][1] = {
+        {0.0f},
+        {1.0f},
+        {1.0f},
+        {1.0f}};
 
-    float flattened_output[3];
-    if (forward_flatten(&flatten_layer, input, flattened_output) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to perform forward pass for Flatten Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
+    Dataset *dataset = dataset_create();
+    dataset_load_arrays(dataset, (float *)X_data, (float *)y_data, 4, 2, 1);
 
-    DenseLayer dense_layer = {NULL, NULL, 0, 0};
-    if (initialize_dense(&dense_layer, input_size, output_size) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to initialize Dense Layer\n");
-        return CM_LAYER_NOT_INITIALIZED_ERROR;
-    }
+    summary(network);
 
-    float dense_output[2];
-    if (forward_dense(&dense_layer, flattened_output, dense_output) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to perform forward pass for Dense Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
+    train_network(network, dataset, 30);
+    test_network(network, dataset->X, dataset->y, dataset->num_samples, NULL);
 
-    for (int i = 0; i < output_size; i++)
-    {
-        dense_output[i] = relu(dense_output[i]);
-    }
+    dataset_free(dataset);
+    free_neural_network(network);
 
-    float loss = mean_squared_error(target, dense_output, output_size);
-    if (loss == CM_INVALID_INPUT_ERROR)
-    {
-        fprintf(stderr, "Failed to compute Mean Squared Error\n");
-        return CM_INVALID_INPUT_ERROR;
-    }
-
-    float d_output[2] = {dense_output[0] - target[0], dense_output[1] - target[1]};
-    float d_input[3] = {0};
-    float d_weights[6] = {0};
-    float d_biases[2] = {0};
-    if (backward_dense(&dense_layer, flattened_output, dense_output, d_output, d_input, d_weights, d_biases) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to perform backward pass for Dense Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
-
-    float learning_rate = 0.01;
-    if (update_dense(&dense_layer, d_weights, d_biases, learning_rate) != CM_SUCCESS)
-    {
-        fprintf(stderr, "Failed to update Dense Layer\n");
-        return CM_INVALID_LAYER_DIMENSIONS_ERROR;
-    }
-
-    free_dense(&dense_layer);
-    free_flatten(&flatten_layer);
-    printf("Program completed successfully.\n");
-    return CM_SUCCESS;
+    return 0;
 }
