@@ -1370,7 +1370,8 @@ CM_Error free_neural_network(NeuralNetwork *network)
         default:
             cm_safe_free(&(temp->layer));
         }
-        temp->layer = NULL;
+        
+        cm_safe_free(&(temp->layer));
         cm_safe_free((void **)&temp);
     }
 
