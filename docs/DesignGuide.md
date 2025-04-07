@@ -64,7 +64,7 @@ This document provides the conventions and best practices for contributing to th
   ```
   <module>_<action>_<specifics>
   ```
-  Example: `polling_layer_forward`, `activation_function_apply`.
+  Example: `pooling_layer_forward`, `activation_function_apply`.
 
 ### 3.2 Return Values
 - **Success**: Return `0` to indicate success.
@@ -78,7 +78,7 @@ This document provides the conventions and best practices for contributing to th
 ## 4. Layer Design Conventions
 
 ### 4.1 Structure Naming
-- **Structure names**: Use **PascalCase** for structure names (e.g., `PollingLayer`, `MaxPoolingLayer`).
+- **Structure names**: Use **PascalCase** for structure names (e.g., `PoolingLayer`, `MaxPoolingLayer`).
 
 ### 4.2 Structure Fields
 - **Structure field names**: Use **snake_case** for structure fields (e.g., `kernel_size`, `stride`).
@@ -92,10 +92,10 @@ This document provides the conventions and best practices for contributing to th
 
 **Example**:
 ```c
-PollingLayer *polling_layer_create(int kernel_size, int stride);
-int polling_layer_forward(PollingLayer *layer, const float *input, float *output, int input_size);
-int polling_layer_output_size(int input_size, int kernel_size, int stride);
-void polling_layer_free(PollingLayer *layer);
+PoolingLayer *pooling_layer_create(int kernel_size, int stride);
+int pooling_layer_forward(PoolingLayer *layer, const float *input, float *output, int input_size);
+int pooling_layer_output_size(int input_size, int kernel_size, int stride);
+void pooling_layer_free(PoolingLayer *layer);
 ```
 
 
@@ -146,7 +146,7 @@ Running logging tests...
 - **Subdirectories**: Use subdirectories for logical groupings, e.g., `Layers/` for layers, `core/` for core functionalities.
 
 ### 6.2 File Naming
-- **File names**: Use **snake_case** for file names (e.g., `polling.c`, `maxpooling.h`).
+- **File names**: Use **snake_case** for file names (e.g., `pooling.c`, `maxpooling.h`).
 
 
 
@@ -175,7 +175,7 @@ Running logging tests...
 - **Test coverage**: Ensure all layers and functions are tested.
   
 ### 8.2 Test Naming
-- **File naming**: Use the format `<module>_test.c` for test files (e.g., `polling_test.c`).
+- **File naming**: Use the format `<module>_test.c` for test files (e.g., `pooling_test.c`).
 
 
 
@@ -192,26 +192,26 @@ Before submitting a pull request:
 
 ## 10. Example Code
 
-### 10.1 Polling Layer Example
+### 10.1 Pooling Layer Example
 ```c
-#include "polling.h"
+#include "pooling.h"
 
 int main() {
-    // Create polling layer
-    PollingLayer *layer = polling_layer_create(2, 2);
+    // Create pooling layer
+    PoolingLayer *layer = pooling_layer_create(2, 2);
     if (!layer) {
-        LOG_ERROR("Failed to create polling layer.\n");
+        LOG_ERROR("Failed to create pooling layer.\n");
         return CM_NULL_POINTER_ERROR;
     }
 
     // Perform forward pass
     float input[] = {1.0, 2.0, 3.0, 4.0};
     float output[2];
-    int output_size = polling_layer_forward(layer, input, output, 4);
+    int output_size = pooling_layer_forward(layer, input, output, 4);
 
     if (output_size < 0) {
         LOG_ERROR("Error during forward pass.\n");
-        polling_layer_free(layer);
+        pooling_layer_free(layer);
         return output_size;
     }
 
@@ -221,7 +221,7 @@ int main() {
     }
 
     // Free resources
-    polling_layer_free(layer);
+    pooling_layer_free(layer);
     return CM_SUCCESS;
 }
 ```

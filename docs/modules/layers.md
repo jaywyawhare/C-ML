@@ -30,10 +30,10 @@
 ## Pooling Layer
 - **Description**: Reduces the spatial size of the input volume.
 - **Function**: 
-    - `initialize_polling(PollingLayer *layer, int kernel_size, int stride)`
-    - `compute_polling_output_size(int input_size, int kernel_size, int stride)`
-    - `forward_polling(PollingLayer *layer, const float *input, float *output, int input_size)`
-    - `free_polling(PollingLayer *layer)`
+    - `initialize_pooling(PoolingLayer *layer, int kernel_size, int stride)`
+    - `compute_pooling_output_size(int input_size, int kernel_size, int stride)`
+    - `forward_pooling(PoolingLayer *layer, const float *input, float *output, int input_size)`
+    - `free_pooling(PoolingLayer *layer)`
 - **File**: [`pooling.c`](https://github.com/jaywyawhare/C-ML/tree/master/src/Layers/pooling.c)
 
 ## Max-Pooling Layer
