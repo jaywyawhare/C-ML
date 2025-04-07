@@ -6,6 +6,16 @@
 #include "../Layers/dense.h"
 #include "../Layers/flatten.h"
 #include "../Layers/dropout.h"
+#include "../Layers/batchnorm.h"
+#include "../Layers/embedding.h"
+#include "../Layers/input.h"
+#include "../Layers/reshape.h"
+#include "../Layers/gru.h"
+#include "../Layers/conv1d.h"
+#include "../Layers/conv2d.h"
+#include "../Layers/conv1d_transpose.h"
+#include "../Layers/conv2d_transpose.h"
+#include "../Layers/lstm.h"
 
 #include "../Core/memory_management.h"
 
@@ -39,7 +49,7 @@
 #include "../Loss_Functions/smooth_l1_loss.h"
 #include "../Loss_Functions/tversky_loss.h"
 
-#include "../Core/dataset.h" 
+#include "../Core/dataset.h"
 
 /**
  * @brief Enumeration for evaluation metrics
@@ -72,7 +82,19 @@ typedef enum
     LAYER_FLATTEN,
     LAYER_DROPOUT,
     LAYER_MAXPOOLING,
-    LAYER_POOLING
+    LAYER_POOLING,
+    LAYER_BATCHNORM,
+    LAYER_EMBEDDING,
+    LAYER_INPUT,
+    LAYER_RESHAPE,
+    LAYER_GRU,
+    LAYER_LSTM,
+    LAYER_CONV1D,
+    LAYER_CONV2D,
+    LAYER_CONV1D_TRANSPOSE,
+    LAYER_CONV2D_TRANSPOSE,
+    LAYER_TRANSFORMER,
+    LAYER_ATTENTION
 } LayerType;
 
 /**
@@ -137,12 +159,106 @@ typedef struct
         struct
         {
             float rate;
+            int is_training;
         } dropout;
         struct
         {
             int kernel_size;
             int stride;
+            int padding;
         } pooling;
+        struct
+        {
+            int num_features;
+            int training_mode;
+        } batchnorm;
+        struct
+        {
+            int vocab_size;
+            int embedding_dim;
+        } embedding;
+        struct
+        {
+            int input_size;
+        } input;
+        struct
+        {
+            int input_size;
+            int output_size;
+        } reshape;
+        struct
+        {
+            int input_size;
+            int hidden_size;
+            int reset_state;
+            float *initial_state;
+        } gru;
+        struct
+        {
+            int input_size;
+            int hidden_size;
+            int num_layers;
+            float dropout;
+            int reset_state;
+            float *initial_state;
+            float *initial_cell_state;
+        } lstm;
+        struct
+        {
+            int input_channels;
+            int output_channels;
+            int kernel_size;
+            int padding;
+            int stride;
+            int input_height;
+            int input_width;
+            int dilation;
+        } conv2d;
+        struct
+        {
+            int input_channels;
+            int output_channels;
+            int kernel_size;
+            int padding;
+            int stride;
+            int dilation;
+            int input_length;
+        } conv1d;
+        struct
+        {
+            int input_channels;
+            int output_channels;
+            int kernel_size;
+            int padding;
+            int stride;
+            int dilation;
+            int input_length;
+        } conv1d_transpose;
+        struct
+        {
+            int input_channels;
+            int output_channels;
+            int kernel_size;
+            int padding;
+            int stride;
+            int dilation;
+            int input_height;
+            int input_width;
+        } conv2d_transpose;
+        struct
+        {
+            int input_dim;
+            int hidden_dim;
+            int num_heads;
+            int num_layers;
+        } transformer;
+        struct
+        {
+            int query_dim;
+            int key_dim;
+            int value_dim;
+            int num_heads;
+        } attention;
     } params;
 } LayerConfig;
 
@@ -166,7 +282,7 @@ typedef struct
     NeuralNetworkNode *tail;
     int num_layers;
     int input_size;
-    int max_layer_output_size;  /* Maximum output size of any layer in the network */
+    int max_layer_output_size; /* Maximum output size of any layer in the network */
     OptimizerType optimizer_type;
     int loss_function;
     float learning_rate;
@@ -206,7 +322,7 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
 
 /**
  * @brief Calculate the maximum input and output sizes needed for the network.
- * 
+ *
  * This function traverses the network to find the maximum input and output sizes
  * across all layers, which can be used to allocate memory safely.
  *
@@ -219,7 +335,7 @@ CM_Error calculate_max_buffer_sizes(NeuralNetwork *network, int *max_input_size,
 
 /**
  * @brief Initialize optimizer parameters based on the current network structure.
- * 
+ *
  * This function allocates memory for optimizer parameters based on the maximum layer size.
  * It should be called before training starts, after all layers have been added.
  *
@@ -286,8 +402,25 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
  * @param num_samples Number of test samples
  * @param ... Optional arguments: metrics (const char**, terminated by NULL)
  */
-
 CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test, int num_samples, ...);
+
+/**
+ * @brief Evaluate the neural network on a given dataset.
+ *
+ * @param network Pointer to the neural network.
+ * @param X_test Test data.
+ * @param y_test Test labels.
+ * @param num_samples Number of test samples.
+ * @param input_size Size of each input sample.
+ * @param output_size Size of each output sample.
+ * @param metrics Array of evaluation metrics to calculate.
+ * @param num_metrics Number of evaluation metrics to calculate.
+ * @param results Array to store the results of the evaluation metrics.
+ * @return CM_Error Error code.
+ */
+CM_Error evaluate_network(NeuralNetwork *network, float **X_test, float **y_test,
+                          int num_samples, int input_size, int output_size,
+                          int *metrics, int num_metrics, float *results);
 
 /**
  * @brief Free memory allocated for the neural network
@@ -334,5 +467,21 @@ void summary(NeuralNetwork *network);
  */
 const char *get_metric_name(MetricType metric);
 
+/**
+ * @brief Reset states for layers in the neural network
+ *
+ * @param network Pointer to the neural network
+ * @return CM_Error Error code
+ */
+CM_Error reset_layer_states(NeuralNetwork *network);
+
+/**
+ * @brief Set training mode for layers in the neural network
+ *
+ * @param network Pointer to the neural network
+ * @param is_training Whether the network is in training mode
+ * @return CM_Error Error code
+ */
+CM_Error set_layer_training_mode(NeuralNetwork *network, int is_training);
 
 #endif

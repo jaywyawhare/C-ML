@@ -7,6 +7,16 @@
 #include "../../include/Layers/dropout.h"
 #include "../../include/Layers/maxpooling.h"
 #include "../../include/Layers/pooling.h"
+#include "../../include/Layers/batchnorm.h"
+#include "../../include/Layers/embedding.h"
+#include "../../include/Layers/input.h"
+#include "../../include/Layers/reshape.h"
+#include "../../include/Layers/gru.h"
+#include "../../include/Layers/conv1d.h"
+#include "../../include/Layers/conv2d.h"
+#include "../../include/Layers/conv1d_transpose.h"
+#include "../../include/Layers/conv2d_transpose.h"
+#include "../../include/Layers/lstm.h"
 #include "../../include/Activations/relu.h"
 #include "../../include/Activations/sigmoid.h"
 #include "../../include/Activations/tanh.h"
@@ -45,7 +55,7 @@
 #include "../../include/Optimizers/adam.h"
 #include "../../include/Optimizers/rmsprop.h"
 #include "../../include/Optimizers/sgd.h"
-#include "../../include/Core/dataset.h" 
+#include "../../include/Core/dataset.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,18 +124,18 @@ CM_Error build_network(NeuralNetwork *network, OptimizerType optimizer_type, flo
     network->l1_lambda = l1_lambda;
     network->l2_lambda = l2_lambda;
 
-    /* 
+    /*
      * Note: We don't allocate optimizer parameters here.
      * They will be allocated in initialize_optimizer_params() which is called at the start of training.
      * This ensures we allocate the correct amount of memory based on the final network structure.
      */
-    
+
     return CM_SUCCESS;
 }
 
 /**
  * @brief Calculate the maximum input and output sizes needed for the network.
- * 
+ *
  * This function traverses the network to find the maximum input and output sizes
  * across all layers, which can be used to allocate memory safely.
  *
@@ -184,11 +194,114 @@ CM_Error calculate_max_buffer_sizes(NeuralNetwork *network, int *max_input_size,
         }
         case LAYER_POOLING:
         {
-            PollingLayer *pooling = (PollingLayer *)current->layer;
-            int out_size = compute_polling_output_size(network->input_size, pooling->kernel_size, pooling->stride);
+            PoolingLayer *pooling = (PoolingLayer *)current->layer;
+            int out_size = compute_pooling_output_size(network->input_size, pooling->kernel_size, pooling->stride);
             if (out_size > *max_output_size)
             {
                 *max_output_size = out_size;
+            }
+            break;
+        }
+        case LAYER_BATCHNORM:
+        {
+            BatchNormLayer *bn = (BatchNormLayer *)current->layer;
+            if (bn->num_features > *max_output_size)
+            {
+                *max_output_size = bn->num_features;
+            }
+            break;
+        }
+        case LAYER_EMBEDDING:
+        {
+            EmbeddingLayer *embedding = (EmbeddingLayer *)current->layer;
+            int out_size = embedding->embedding_dim * network->input_size;
+            if (out_size > *max_output_size)
+            {
+                *max_output_size = out_size;
+            }
+            break;
+        }
+        case LAYER_INPUT:
+        {
+            InputLayer *input_layer = (InputLayer *)current->layer;
+            if (input_layer->input_size > *max_output_size)
+            {
+                *max_output_size = input_layer->input_size;
+            }
+            break;
+        }
+        case LAYER_RESHAPE:
+        {
+            ReshapeLayer *reshape = (ReshapeLayer *)current->layer;
+            if (reshape->output_size > *max_output_size)
+            {
+                *max_output_size = reshape->output_size;
+            }
+            break;
+        }
+        case LAYER_GRU:
+        {
+            GRULayer *gru = (GRULayer *)current->layer;
+            if (gru->hidden_size > *max_output_size)
+            {
+                *max_output_size = gru->hidden_size;
+            }
+            break;
+        }
+        case LAYER_CONV1D:
+        {
+            Conv1DLayer *conv1d = (Conv1DLayer *)current->layer;
+            int out_size = compute_output_length_conv1d(network->input_size, conv1d->kernel_size, conv1d->padding, conv1d->stride, conv1d->dilation) * conv1d->output_channels;
+            if (out_size > *max_output_size)
+            {
+                *max_output_size = out_size;
+            }
+            break;
+        }
+        case LAYER_CONV2D:
+        {
+            Conv2DLayer *conv2d = (Conv2DLayer *)current->layer;
+            if (conv2d->output_height * conv2d->output_width * conv2d->output_channels > *max_output_size)
+            {
+                *max_output_size = conv2d->output_height * conv2d->output_width * conv2d->output_channels;
+            }
+            break;
+        }
+        case LAYER_CONV1D_TRANSPOSE:
+        {
+            Conv1DTransposeLayer *conv1d_t = (Conv1DTransposeLayer *)current->layer;
+            int out_size = compute_output_length_conv1d_transpose(network->input_size,
+                                                                  conv1d_t->kernel_size,
+                                                                  conv1d_t->padding,
+                                                                  conv1d_t->stride,
+                                                                  conv1d_t->dilation) *
+                           conv1d_t->output_channels;
+            if (out_size > *max_output_size)
+            {
+                *max_output_size = out_size;
+            }
+            break;
+        }
+        case LAYER_CONV2D_TRANSPOSE:
+        {
+            Conv2DTransposeLayer *conv2d_t = (Conv2DTransposeLayer *)current->layer;
+            int out_size = compute_output_size_conv2d_transpose(network->input_size,
+                                                                conv2d_t->kernel_size,
+                                                                conv2d_t->padding,
+                                                                conv2d_t->stride,
+                                                                conv2d_t->dilation);
+            if (out_size > *max_output_size)
+            {
+                *max_output_size = out_size;
+            }
+            break;
+        }
+        case LAYER_LSTM:
+        {
+            LSTMLayer *lstm = (LSTMLayer *)current->layer;
+            if (lstm->hidden_size > *max_output_size)
+            {
+                *max_output_size = lstm->hidden_size;
             }
             break;
         }
@@ -210,7 +323,7 @@ CM_Error calculate_max_buffer_sizes(NeuralNetwork *network, int *max_input_size,
 
 /**
  * @brief Initialize optimizer parameters based on the current network structure.
- * 
+ *
  * This function allocates memory for optimizer parameters based on the maximum layer size.
  * It should be called before training starts, after all layers have been added.
  *
@@ -235,9 +348,9 @@ CM_Error initialize_optimizer_params(NeuralNetwork *network)
 
     /* Calculate the maximum parameter size based on the largest layer */
     int max_param_size = network->max_layer_output_size * network->max_layer_output_size;
-    
+
     LOG_DEBUG("Initializing optimizer parameters with max_layer_output_size: %d", network->max_layer_output_size);
-    
+
     if (network->optimizer_type == OPTIMIZER_ADAM)
     {
         network->v_w = (float *)cm_safe_malloc(max_param_size * sizeof(float), __FILE__, __LINE__);
@@ -442,6 +555,219 @@ CM_Error add_layer(NeuralNetwork *network, LayerConfig config)
         new_node->layer = maxpooling;
         break;
     }
+    case LAYER_BATCHNORM:
+    {
+        BatchNormLayer *bn = (BatchNormLayer *)cm_safe_malloc(sizeof(BatchNormLayer), __FILE__, __LINE__);
+        if (bn == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_batchnorm(bn, config.params.batchnorm.num_features);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&bn);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = bn;
+        break;
+    }
+    case LAYER_EMBEDDING:
+    {
+        EmbeddingLayer *embedding = (EmbeddingLayer *)cm_safe_malloc(sizeof(EmbeddingLayer), __FILE__, __LINE__);
+        if (embedding == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_embedding(embedding, config.params.embedding.vocab_size, config.params.embedding.embedding_dim);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&embedding);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = embedding;
+        break;
+    }
+    case LAYER_INPUT:
+    {
+        InputLayer *input_layer = (InputLayer *)cm_safe_malloc(sizeof(InputLayer), __FILE__, __LINE__);
+        if (input_layer == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_input(input_layer, config.params.input.input_size);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&input_layer);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = input_layer;
+        break;
+    }
+    case LAYER_RESHAPE:
+    {
+        ReshapeLayer *reshape = (ReshapeLayer *)cm_safe_malloc(sizeof(ReshapeLayer), __FILE__, __LINE__);
+        if (reshape == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+
+        error = initialize_reshape(reshape, config.params.reshape.input_size, config.params.reshape.output_size);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&reshape);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = reshape;
+        break;
+    }
+    case LAYER_GRU:
+    {
+        GRULayer *gru = (GRULayer *)cm_safe_malloc(sizeof(GRULayer), __FILE__, __LINE__);
+        if (gru == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_gru(gru, config.params.gru.input_size, config.params.gru.hidden_size);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&gru);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = gru;
+        break;
+    }
+    case LAYER_CONV1D:
+    {
+        Conv1DLayer *conv1d = (Conv1DLayer *)cm_safe_malloc(sizeof(Conv1DLayer), __FILE__, __LINE__);
+        if (conv1d == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_conv1d(conv1d,
+                                  config.params.conv1d.input_channels,
+                                  config.params.conv1d.output_channels,
+                                  config.params.conv1d.kernel_size,
+                                  config.params.conv1d.input_length,
+                                  config.params.conv1d.padding,
+                                  config.params.conv1d.stride,
+                                  config.params.conv1d.dilation);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&conv1d);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = conv1d;
+        break;
+    }
+    case LAYER_CONV2D:
+    {
+        Conv2DLayer *conv2d = (Conv2DLayer *)cm_safe_malloc(sizeof(Conv2DLayer), __FILE__, __LINE__);
+        if (conv2d == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_conv2d(conv2d,
+                                  config.params.conv2d.input_channels,
+                                  config.params.conv2d.output_channels,
+                                  config.params.conv2d.kernel_size,
+                                  config.params.conv2d.input_height,
+                                  config.params.conv2d.input_width,
+                                  config.params.conv2d.padding,
+                                  config.params.conv2d.stride,
+                                  config.params.conv2d.dilation);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&conv2d);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = conv2d;
+        break;
+    }
+    case LAYER_CONV1D_TRANSPOSE:
+    {
+        Conv1DTransposeLayer *conv1d_t = (Conv1DTransposeLayer *)cm_safe_malloc(sizeof(Conv1DTransposeLayer), __FILE__, __LINE__);
+        if (conv1d_t == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_conv1d_transpose(conv1d_t,
+                                            config.params.conv1d_transpose.input_channels,
+                                            config.params.conv1d_transpose.output_channels,
+                                            config.params.conv1d_transpose.kernel_size,
+                                            config.params.conv1d_transpose.input_length,
+                                            config.params.conv1d_transpose.padding,
+                                            config.params.conv1d_transpose.stride,
+                                            config.params.conv1d_transpose.dilation);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&conv1d_t);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = conv1d_t;
+        break;
+    }
+    case LAYER_CONV2D_TRANSPOSE:
+    {
+        Conv2DTransposeLayer *conv2d_t = (Conv2DTransposeLayer *)cm_safe_malloc(sizeof(Conv2DTransposeLayer), __FILE__, __LINE__);
+        if (conv2d_t == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_conv2d_transpose(conv2d_t,
+                                            config.params.conv2d_transpose.input_channels,
+                                            config.params.conv2d_transpose.output_channels,
+                                            config.params.conv2d_transpose.kernel_size,
+                                            config.params.conv2d_transpose.input_height,
+                                            config.params.conv2d_transpose.input_width,
+                                            config.params.conv2d_transpose.padding,
+                                            config.params.conv2d_transpose.stride,
+                                            config.params.conv2d_transpose.dilation);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&conv2d_t);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = conv2d_t;
+        break;
+    }
+    case LAYER_LSTM:
+    {
+        LSTMLayer *lstm = (LSTMLayer *)cm_safe_malloc(sizeof(LSTMLayer), __FILE__, __LINE__);
+        if (lstm == NULL)
+        {
+            cm_safe_free((void **)&new_node);
+            return CM_MEMORY_ALLOCATION_ERROR;
+        }
+        error = initialize_lstm(lstm,
+                                config.params.lstm.input_size,
+                                config.params.lstm.hidden_size);
+        if (error != CM_SUCCESS)
+        {
+            cm_safe_free((void **)&lstm);
+            cm_safe_free((void **)&new_node);
+            return error;
+        }
+        new_node->layer = lstm;
+        break;
+    }
     case LAYER_POOLING:
         cm_safe_free((void **)&new_node);
         return CM_INVALID_PARAMETER_ERROR;
@@ -499,7 +825,7 @@ CM_Error model_add(NeuralNetwork *network, LayerType type, ActivationType activa
     case LAYER_DENSE:
         config.params.dense.input_size = input_size;
         config.params.dense.output_size = output_size;
-        
+
         /* Update max_layer_output_size if this layer's output is larger */
         if (output_size > network->max_layer_output_size)
         {
@@ -515,12 +841,158 @@ CM_Error model_add(NeuralNetwork *network, LayerType type, ActivationType activa
         config.params.pooling.kernel_size = kernel_size;
         config.params.pooling.stride = stride;
         break;
+    case LAYER_BATCHNORM:
+        config.params.batchnorm.num_features = input_size;
+        config.params.batchnorm.training_mode = 1;
+        break;
+    case LAYER_EMBEDDING:
+        config.params.embedding.vocab_size = input_size;
+        config.params.embedding.embedding_dim = output_size;
+        break;
+    case LAYER_INPUT:
+        config.params.input.input_size = input_size;
+        break;
+    case LAYER_RESHAPE:
+        config.params.reshape.input_size = input_size;
+        config.params.reshape.output_size = output_size;
+        break;
+    case LAYER_GRU:
+        config.params.gru.input_size = input_size;
+        config.params.gru.hidden_size = output_size;
+        config.params.gru.reset_state = 1;
+        config.params.gru.initial_state = NULL;
+        break;
+    case LAYER_CONV1D:
+        config.params.conv1d.input_channels = input_size;
+        config.params.conv1d.output_channels = output_size;
+        config.params.conv1d.kernel_size = kernel_size;
+        config.params.conv1d.stride = stride;
+        config.params.conv1d.padding = 0;
+        config.params.conv1d.dilation = 1;
+        break;
+    case LAYER_CONV2D:
+        config.params.conv2d.input_channels = input_size;
+        config.params.conv2d.output_channels = output_size;
+        config.params.conv2d.kernel_size = kernel_size;
+        config.params.conv2d.stride = stride;
+        config.params.conv2d.padding = 0;
+        break;
+    case LAYER_CONV1D_TRANSPOSE:
+        config.params.conv1d_transpose.input_channels = input_size;
+        config.params.conv1d_transpose.output_channels = output_size;
+        config.params.conv1d_transpose.kernel_size = kernel_size;
+        config.params.conv1d_transpose.stride = stride;
+        config.params.conv1d_transpose.padding = 0;
+        config.params.conv1d_transpose.dilation = 1;
+        config.params.conv1d_transpose.input_length = network->input_size;
+
+        int out_size = compute_output_length_conv1d_transpose(network->input_size,
+                                                              kernel_size, 0, stride, 1);
+        if (out_size > network->max_layer_output_size)
+        {
+            network->max_layer_output_size = out_size;
+        }
+        break;
+    case LAYER_CONV2D_TRANSPOSE:
+        config.params.conv2d_transpose.input_channels = input_size;
+        config.params.conv2d_transpose.output_channels = output_size;
+        config.params.conv2d_transpose.kernel_size = kernel_size;
+        config.params.conv2d_transpose.stride = stride;
+        config.params.conv2d_transpose.padding = 0;
+        config.params.conv2d_transpose.dilation = 1;
+
+        int input_dim = (int)sqrt((double)network->input_size);
+        config.params.conv2d_transpose.input_height = input_dim;
+        config.params.conv2d_transpose.input_width = input_dim;
+
+        int out_size_2d = compute_output_size_conv2d_transpose(input_dim,
+                                                               kernel_size, 0, stride, 1);
+        if (out_size_2d * out_size_2d * output_size > network->max_layer_output_size)
+        {
+            network->max_layer_output_size = out_size_2d * out_size_2d * output_size;
+        }
+        break;
+    case LAYER_LSTM:
+        config.params.lstm.input_size = input_size;
+        config.params.lstm.hidden_size = output_size;
+        config.params.lstm.reset_state = 1;
+        config.params.lstm.initial_state = NULL;
+        config.params.lstm.initial_cell_state = NULL;
+        config.params.lstm.num_layers = 1;
+        config.params.lstm.dropout = rate > 0.0f ? rate : 0.0f;
+
+        if (output_size > network->max_layer_output_size)
+        {
+            network->max_layer_output_size = output_size;
+        }
+        break;
     default:
         LOG_ERROR("Unsupported layer type: %d", type);
         return CM_INVALID_PARAMETER_ERROR;
     }
 
     return add_layer(network, config);
+}
+
+/**
+ * @brief Reset all stateful layer states in the network.
+ *
+ * @param network Pointer to the neural network.
+ * @return CM_Error Error code.
+ */
+CM_Error reset_layer_states(NeuralNetwork *network)
+{
+    if (network == NULL)
+        return CM_NULL_POINTER_ERROR;
+
+    NeuralNetworkNode *current = network->head;
+    while (current != NULL)
+    {
+        switch (current->type)
+        {
+        case LAYER_GRU:
+            reset_state_gru((GRULayer *)current->layer);
+            break;
+        case LAYER_LSTM:
+            reset_state_lstm((LSTMLayer *)current->layer);
+            break;
+        default:
+            break;
+        }
+        current = current->next;
+    }
+    return CM_SUCCESS;
+}
+
+/**
+ * @brief Set training mode for layers that behave differently during training.
+ *
+ * @param network Pointer to the neural network.
+ * @param is_training Whether in training mode (1 for training, 0 for inference).
+ * @return CM_Error Error code.
+ */
+CM_Error set_layer_training_mode(NeuralNetwork *network, int is_training)
+{
+    if (network == NULL)
+        return CM_NULL_POINTER_ERROR;
+
+    NeuralNetworkNode *current = network->head;
+    while (current != NULL)
+    {
+        switch (current->type)
+        {
+        case LAYER_BATCHNORM:
+            ((BatchNormLayer *)current->layer)->training_mode = is_training;
+            break;
+        case LAYER_DROPOUT:
+            ((DropoutLayer *)current->layer)->is_training = is_training;
+            break;
+        default:
+            break;
+        }
+        current = current->next;
+    }
+    return CM_SUCCESS;
 }
 
 /**
@@ -544,6 +1016,13 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
     if (network->head == NULL)
     {
         return CM_LAYER_NOT_INITIALIZED_ERROR;
+    }
+
+    /* Set training mode for layers */
+    CM_Error error = set_layer_training_mode(network, is_training);
+    if (error != CM_SUCCESS)
+    {
+        return error;
     }
 
     /* Calculate the maximum buffer sizes needed for this network */
@@ -575,7 +1054,7 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
     }
 
     /* Allocate memory for layer_output */
-    LOG_DEBUG("Allocating memory for layer_output. Input Size: %d, Output Size: %d, Max Input Size: %d, Max Output Size: %d", 
+    LOG_DEBUG("Allocating memory for layer_output. Input Size: %d, Output Size: %d, Max Input Size: %d, Max Output Size: %d",
               input_size, output_size, max_input_size, max_output_size);
     float *layer_output = (float *)cm_safe_malloc(max_output_size * sizeof(float), __FILE__, __LINE__);
     if (layer_output == NULL)
@@ -588,7 +1067,7 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
     memcpy(layer_input, input, input_size * sizeof(float));
 
     NeuralNetworkNode *current = network->head;
-    CM_Error error = CM_SUCCESS;
+    error = CM_SUCCESS;
     int current_size = input_size;
 
     while (current != NULL)
@@ -598,6 +1077,14 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
         case LAYER_DENSE:
         {
             DenseLayer *dense = (DenseLayer *)current->layer;
+            if (dense == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+
             if (dense->input_size != current_size)
             {
                 LOG_ERROR("Input Size mismatch - current: %d layer input size: %d", current_size, dense->input_size);
@@ -636,6 +1123,13 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
             if (is_training)
             {
                 DropoutLayer *dropout = (DropoutLayer *)current->layer;
+                if (dropout == NULL)
+                {
+                    LOG_ERROR("Layer is NULL");
+                    cm_safe_free((void **)&layer_input);
+                    cm_safe_free((void **)&layer_output);
+                    return CM_NULL_LAYER_ERROR;
+                }
                 error = forward_dropout(dropout, layer_input, layer_output, current_size);
             }
             else
@@ -653,6 +1147,13 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
         case LAYER_MAXPOOLING:
         {
             MaxPoolingLayer *maxpooling = (MaxPoolingLayer *)current->layer;
+            if (maxpooling == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
             error = forward_maxpooling(maxpooling, layer_input, layer_output, current_size);
             if (error != CM_SUCCESS)
             {
@@ -665,15 +1166,15 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
         }
         case LAYER_POOLING:
         {
-            PollingLayer *pooling = (PollingLayer *)current->layer;
-            int new_size = compute_polling_output_size(current_size, pooling->kernel_size, pooling->stride);
+            PoolingLayer *pooling = (PoolingLayer *)current->layer;
+            int new_size = compute_pooling_output_size(current_size, pooling->kernel_size, pooling->stride);
             if (new_size < 0)
             {
                 cm_safe_free((void **)&layer_input);
                 cm_safe_free((void **)&layer_output);
                 return CM_INVALID_PARAMETER_ERROR;
             }
-            error = forward_polling(pooling, layer_input, layer_output, current_size);
+            error = forward_pooling(pooling, layer_input, layer_output, current_size);
             if (error != CM_SUCCESS)
             {
                 cm_safe_free((void **)&layer_input);
@@ -681,6 +1182,214 @@ CM_Error forward_pass(NeuralNetwork *network, float *input, float *output, int i
                 return error;
             }
             current_size = new_size;
+            break;
+        }
+        case LAYER_BATCHNORM:
+        {
+            BatchNormLayer *bn = (BatchNormLayer *)current->layer;
+            if (bn == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+
+            float mean[bn->num_features];
+            float variance[bn->num_features];
+            memset(mean, 0, bn->num_features * sizeof(float));
+            memset(variance, 0, bn->num_features * sizeof(float));
+
+            error = forward_batchnorm(bn, layer_input, layer_output, mean, variance);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = bn->num_features;
+            break;
+        }
+        case LAYER_EMBEDDING:
+        {
+            EmbeddingLayer *embedding = (EmbeddingLayer *)current->layer;
+            if (embedding == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+
+            int *input_indices = (int *)layer_input;
+            error = forward_embedding(embedding, input_indices, layer_output, current_size);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = embedding->embedding_dim * current_size;
+            break;
+        }
+        case LAYER_INPUT:
+        {
+            InputLayer *input_layer = (InputLayer *)current->layer;
+            if (input_layer == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+
+            error = forward_input(input_layer, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = input_layer->input_size;
+            break;
+        }
+        case LAYER_RESHAPE:
+        {
+            ReshapeLayer *reshape = (ReshapeLayer *)current->layer;
+            if (reshape == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+
+            error = forward_reshape(reshape, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = reshape->output_size;
+            break;
+        }
+        case LAYER_GRU:
+        {
+            GRULayer *gru = (GRULayer *)current->layer;
+            if (gru == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+
+            error = forward_gru(gru, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = gru->hidden_size;
+            break;
+        }
+        case LAYER_CONV1D:
+        {
+            Conv1DLayer *conv1d = (Conv1DLayer *)current->layer;
+            if (conv1d == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+            error = forward_conv1d(conv1d, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = compute_output_length_conv1d(current_size,
+                                                        conv1d->kernel_size,
+                                                        conv1d->padding,
+                                                        conv1d->stride,
+                                                        conv1d->dilation) *
+                           conv1d->output_channels;
+            break;
+        }
+        case LAYER_CONV2D:
+        {
+            Conv2DLayer *conv2d = (Conv2DLayer *)current->layer;
+            if (conv2d == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+            error = forward_conv2d(conv2d, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = conv2d->output_height * conv2d->output_width * conv2d->output_channels;
+            break;
+        }
+        case LAYER_CONV1D_TRANSPOSE:
+        {
+            Conv1DTransposeLayer *conv1d_t = (Conv1DTransposeLayer *)current->layer;
+            if (conv1d_t == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+            error = forward_conv1d_transpose(conv1d_t, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = compute_output_length_conv1d_transpose(current_size,
+                                                                  conv1d_t->kernel_size,
+                                                                  conv1d_t->padding,
+                                                                  conv1d_t->stride,
+                                                                  conv1d_t->dilation) *
+                           conv1d_t->output_channels;
+            break;
+        }
+        case LAYER_CONV2D_TRANSPOSE:
+        {
+            Conv2DTransposeLayer *conv2d_t = (Conv2DTransposeLayer *)current->layer;
+            if (conv2d_t == NULL)
+            {
+                LOG_ERROR("Layer is NULL");
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return CM_NULL_LAYER_ERROR;
+            }
+            error = forward_conv2d_transpose(conv2d_t, layer_input, layer_output);
+            if (error != CM_SUCCESS)
+            {
+                cm_safe_free((void **)&layer_input);
+                cm_safe_free((void **)&layer_output);
+                return error;
+            }
+            current_size = conv2d_t->output_height * conv2d_t->output_width * conv2d_t->output_channels;
+            break;
+        }
+        case LAYER_LSTM:
+        {
+            LSTMLayer *lstm = (LSTMLayer *)current->layer;
+            error = forward_lstm(lstm, layer_input, layer_output);
+            current_size = lstm->hidden_size;
             break;
         }
         default:
@@ -867,22 +1576,20 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
         return CM_INVALID_PARAMETER_ERROR;
     }
 
-    // Set default batch size
     int batch_size = 32;
 
-    // Parse optional batch size argument
     va_list args;
     va_start(args, epochs);
-    if (epochs > 0) // Ensure optional arguments exist
+    if (epochs > 0)
     {
         int provided_batch_size = va_arg(args, int);
-        if (provided_batch_size > 0) // Validate the provided batch size
+        if (provided_batch_size > 0)
         {
             batch_size = provided_batch_size;
         }
     }
     va_end(args);
-    
+
     /* Initialize optimizer parameters based on the final network structure */
     CM_Error error = initialize_optimizer_params(network);
     if (error != CM_SUCCESS)
@@ -924,6 +1631,9 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
 
     for (int epoch = 0; epoch < epochs; epoch++)
     {
+        /* Reset states at start of epoch */
+        reset_layer_states(network);
+
         float total_loss = 0.0f;
 
         for (int sample = 0; sample < num_samples; sample += batch_size)
@@ -969,7 +1679,7 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
                             LOG_ERROR("Null pointer in DenseLayer.");
                             cm_safe_free((void **)&predictions);
                             cm_safe_free((void **)&loss_gradient);
-                            return CM_NULL_POINTER_ERROR;
+                            return CM_NULL_LAYER_ERROR;
                         }
 
                         if (network->l1_lambda > 0.0f || network->l2_lambda > 0.0f)
@@ -982,7 +1692,7 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
                             for (int j = 0; j < dense->input_size; j++)
                             {
                                 /* Only access dataset->X[idx][j] if j is within the bounds of input_size */
-                                float x = (j < input_size) ? dataset->X[idx][j]  : 0.0f;
+                                float x = (j < input_size) ? dataset->X[idx][j] : 0.0f;
                                 float *w = &dense->weights[i * dense->input_size + j];
                                 float *b = &dense->biases[i];
                                 float lr = network->learning_rate;
@@ -1022,7 +1732,7 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
                 }
             }
         }
-       
+
         LOG_INFO("Epoch %d/%d - Loss: %.4f", epoch + 1, epochs, total_loss / num_samples);
     }
 
@@ -1249,7 +1959,7 @@ MetricType get_metric_type_from_name(const char *metric_name)
     if (strcmp(metric_name, "Specificity") == 0)
         return METRIC_SPECIFICITY;
 
-    return METRIC_NONE; // Unknown metric
+    return METRIC_NONE;
 }
 
 /**
@@ -1285,20 +1995,17 @@ CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test, in
         }
     }
 
-    // Parse optional arguments for metrics
     va_list args;
     va_start(args, num_samples);
     const char **metrics = va_arg(args, const char **);
     va_end(args);
 
-    // Use default metrics if none are provided
     static const char *default_metrics[] = {"R2 Score", NULL};
     if (metrics == NULL)
     {
         metrics = default_metrics;
     }
 
-    // Count the number of metrics
     int num_metrics = 0;
     while (metrics[num_metrics] != NULL)
     {
@@ -1328,7 +2035,7 @@ CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test, in
     {
         LOG_INFO("%s: %.4f", metrics[i], results[i]);
     }
-    
+
     return CM_SUCCESS;
 }
 
@@ -1366,12 +2073,42 @@ CM_Error free_neural_network(NeuralNetwork *network)
             free_maxpooling((MaxPoolingLayer *)temp->layer);
             break;
         case LAYER_POOLING:
-            free_polling((PollingLayer *)temp->layer);
+            free_pooling((PoolingLayer *)temp->layer);
+            break;
+        case LAYER_BATCHNORM:
+            free_batchnorm((BatchNormLayer *)temp->layer);
+            break;
+        case LAYER_EMBEDDING:
+            free_embedding((EmbeddingLayer *)temp->layer);
+            break;
+        case LAYER_INPUT:
+            free_input((InputLayer *)temp->layer);
+            break;
+        case LAYER_RESHAPE:
+            free_reshape((ReshapeLayer *)temp->layer);
+            break;
+        case LAYER_GRU:
+            free_gru((GRULayer *)temp->layer);
+            break;
+        case LAYER_CONV1D:
+            free_conv1d((Conv1DLayer *)temp->layer);
+            break;
+        case LAYER_CONV2D:
+            free_conv2d((Conv2DLayer *)temp->layer);
+            break;
+        case LAYER_CONV1D_TRANSPOSE:
+            free_conv1d_transpose((Conv1DTransposeLayer *)temp->layer);
+            break;
+        case LAYER_CONV2D_TRANSPOSE:
+            free_conv2d_transpose((Conv2DTransposeLayer *)temp->layer);
+            break;
+        case LAYER_LSTM:
+            free_lstm((LSTMLayer *)temp->layer);
             break;
         default:
             cm_safe_free(&(temp->layer));
         }
-        
+
         cm_safe_free(&(temp->layer));
         cm_safe_free((void **)&temp);
     }
@@ -1449,6 +2186,96 @@ void summary(NeuralNetwork *network)
             snprintf(layer_name, sizeof(layer_name), "pooling_%d (Pooling)", layer_index);
             snprintf(output_shape, sizeof(output_shape), "(None, ?)");
             params = 0;
+            break;
+        }
+        case LAYER_BATCHNORM:
+        {
+            BatchNormLayer *bn = (BatchNormLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "batchnorm_%d (BatchNorm)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", bn->num_features);
+            params = bn->num_features * 2;
+            break;
+        }
+        case LAYER_EMBEDDING:
+        {
+            EmbeddingLayer *embedding = (EmbeddingLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "embedding_%d (Embedding)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", embedding->embedding_dim * network->input_size);
+            params = embedding->vocab_size * embedding->embedding_dim;
+            break;
+        }
+        case LAYER_INPUT:
+        {
+            InputLayer *input_layer = (InputLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "input_%d (Input)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", input_layer->input_size);
+            params = 0;
+            break;
+        }
+        case LAYER_RESHAPE:
+        {
+            ReshapeLayer *reshape = (ReshapeLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "reshape_%d (Reshape)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", reshape->output_size);
+            params = 0;
+            break;
+        }
+        case LAYER_GRU:
+        {
+            GRULayer *gru = (GRULayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "gru_%d (GRU)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", gru->hidden_size);
+            params = 3 * gru->hidden_size * (gru->input_size + gru->hidden_size + 1);
+            break;
+        }
+        case LAYER_CONV1D:
+        {
+            Conv1DLayer *conv1d = (Conv1DLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "conv1d_%d (Conv1D)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", compute_output_length_conv1d(network->input_size, conv1d->kernel_size, conv1d->padding, conv1d->stride, conv1d->dilation));
+            params = conv1d->input_channels * conv1d->output_channels * conv1d->kernel_size;
+            break;
+        }
+        case LAYER_CONV2D:
+        {
+            Conv2DLayer *conv2d = (Conv2DLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "conv2d_%d (Conv2D)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d, %d, %d)",
+                     conv2d->output_height, conv2d->output_width, conv2d->output_channels);
+            params = conv2d->input_channels * conv2d->output_channels *
+                         conv2d->kernel_size * conv2d->kernel_size +
+                     conv2d->output_channels;
+            break;
+        }
+        case LAYER_CONV1D_TRANSPOSE:
+        {
+            Conv1DTransposeLayer *conv1d_t = (Conv1DTransposeLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "conv1d_transpose_%d (Conv1DTranspose)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d, %d)",
+                     conv1d_t->output_length, conv1d_t->output_channels);
+            params = conv1d_t->input_channels * conv1d_t->output_channels *
+                         conv1d_t->kernel_size +
+                     conv1d_t->output_channels;
+            break;
+        }
+        case LAYER_CONV2D_TRANSPOSE:
+        {
+            Conv2DTransposeLayer *conv2d_t = (Conv2DTransposeLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "conv2d_transpose_%d (Conv2DTranspose)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d, %d, %d)",
+                     conv2d_t->output_height, conv2d_t->output_width, conv2d_t->output_channels);
+            params = conv2d_t->input_channels * conv2d_t->output_channels *
+                         conv2d_t->kernel_size * conv2d_t->kernel_size +
+                     conv2d_t->output_channels;
+            break;
+        }
+        case LAYER_LSTM:
+        {
+            LSTMLayer *lstm = (LSTMLayer *)current->layer;
+            snprintf(layer_name, sizeof(layer_name), "lstm_%d (LSTM)", layer_index);
+            snprintf(output_shape, sizeof(output_shape), "(None, %d)", lstm->hidden_size);
+
+            params = 4 * (lstm->input_size * lstm->hidden_size + lstm->hidden_size * lstm->hidden_size + lstm->hidden_size);
             break;
         }
         default:
