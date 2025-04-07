@@ -33,12 +33,14 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         return CM_INVALID_PARAMETER_ERROR;
     }
 
-    cm_safe_free((void **)&layer->weights);
-    cm_safe_free((void **)&layer->biases);
-    cm_safe_free((void **)&layer->adam_v_w);
-    cm_safe_free((void **)&layer->adam_v_b);
-    cm_safe_free((void **)&layer->adam_s_w);
-    cm_safe_free((void **)&layer->adam_s_b);
+    // initialize struct members to NULL
+    // cm_safe_free can be called - even inadvertently - without crashing
+    layer->weights = NULL;
+    layer->biases = NULL;
+    layer->adam_v_w = NULL;
+    layer->adam_v_b = NULL;
+    layer->adam_s_w = NULL;
+    layer->adam_s_b = NULL;
 
     // if we don't see this Log message, we had a prolem zero-ing out memory
     LOG_DEBUG("Initialized DenseLayer with input size (%d) and output size (%d)", input_size, output_size);
