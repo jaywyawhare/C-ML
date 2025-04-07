@@ -22,13 +22,12 @@ typedef struct
     int input_size;
     int output_size;
 
-    // Add members for optimizers
-    float *rmsprop_cache_w; // Cache for RMSProp weights
-    float *rmsprop_cache_b; // Cache for RMSProp biases
-    float *adam_v_w;        // Adam first moment vector for weights
-    float *adam_v_b;        // Adam first moment vector for biases
-    float *adam_s_w;        // Adam second moment vector for weights
-    float *adam_s_b;        // Adam second moment vector for biases
+    float *rmsprop_cache_w;
+    float *rmsprop_cache_b;
+    float *adam_v_w;
+    float *adam_v_b;
+    float *adam_s_w;
+    float *adam_s_b;
 } DenseLayer;
 
 /**

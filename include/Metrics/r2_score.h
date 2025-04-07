@@ -11,4 +11,4 @@
  */
 float r2_score(const float *y_true, const float *y_pred, int size);
 
-#endif // R2_SCORE_H
+#endif 

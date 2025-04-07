@@ -7,8 +7,6 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-
-
 /**
  * @brief Initializes a Dense Layer with random weights and biases.
  *
@@ -30,9 +28,7 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         LOG_ERROR("Invalid input size (%d) or output size (%d)", input_size, output_size);
         return CM_INVALID_PARAMETER_ERROR;
     }
-    
-    // initialize struct members to NULL
-    // cm_safe_free can be called - even inadvertently - without crashing
+
     layer->weights = NULL;
     layer->biases = NULL;
     layer->adam_v_w = NULL;
@@ -40,7 +36,6 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
     layer->adam_s_w = NULL;
     layer->adam_s_b = NULL;
 
-    // if we don't see this Log message, we had a prolem zero-ing out memory
     LOG_DEBUG("Initialized DenseLayer with input size (%d) and output size (%d)", input_size, output_size);
 
     layer->input_size = input_size;
@@ -66,7 +61,6 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         layer->biases[i] = ((float)rand() / RAND_MAX) - 0.5;
     }
 
-    // Allocate and initialize Adam optimizer's moment vectors
     layer->adam_v_w = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
     layer->adam_v_b = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
     layer->adam_s_w = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
@@ -148,9 +142,7 @@ int backward_dense(DenseLayer *layer, float *input, float *output, float *d_outp
         d_input[i] = 0;
         for (int j = 0; j < layer->output_size; j++)
         {
-            // Breakpoint condition: Check for potential out-of-bounds access
-            // For GDB:
-            // break dense.c:108 if (i + j * layer->input_size) >= (layer->input_size * layer->output_size)
+
             d_input[i] += d_output[j] * layer->weights[i + j * layer->input_size];
         }
     }
