@@ -4,6 +4,7 @@
 #include "../../include/Layers/flatten.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -19,7 +20,7 @@ int initialize_flatten(FlattenLayer *layer, int input_size)
 
     if (input_size <= 0)
     {
-        fprintf(stderr, "[initialize_flatten] Error: Invalid input size (%d).\n", input_size);
+        LOG_ERROR("Invalid input size (%d).", input_size);
         return CM_INVALID_LAYER_DIMENSIONS_ERROR; 
     }
 

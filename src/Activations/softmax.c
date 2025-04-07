@@ -4,10 +4,7 @@
 #include "../../include/Activations/softmax.h"
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
-
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Applies the softmax activation function.
@@ -23,7 +20,7 @@ float *softmax(float *z, int n)
 {
     if (z == NULL || n <= 0)
     {
-        fprintf(stderr, "[softmax] Error: Null input pointer or invalid size (%d).\n", n);
+        LOG_ERROR("Null input pointer or invalid size (%d).", n);
         return (float *)CM_NULL_POINTER_ERROR;
     }
 
@@ -31,7 +28,7 @@ float *softmax(float *z, int n)
     {
         if (isnan(z[i]) || isinf(z[i]))
         {
-            fprintf(stderr, "[softmax] Error: Invalid input value (NaN or Inf) at index %d.\n", i);
+            LOG_ERROR("Invalid input value (NaN or Inf) at index %d.", i);
             return (float *)CM_INVALID_INPUT_ERROR;
         }
     }
@@ -116,7 +113,7 @@ float *softmax_derivative(float *softmax_output, int n)
     {
         if (isnan(softmax_output[i]) || isinf(softmax_output[i]) || softmax_output[i] < 0.0f || softmax_output[i] > 1.0f)
         {
-            fprintf(stderr, "[softmax_derivative] Error: Invalid softmax output at index %d.\n", i);
+            LOG_ERROR("Invalid softmax output at index %d.", i);
             return (float *)CM_INVALID_INPUT_ERROR;
         }
     }

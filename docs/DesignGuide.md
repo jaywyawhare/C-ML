@@ -116,9 +116,9 @@ void polling_layer_free(PollingLayer *layer);
   ```
 
 ### 5.2 Error Messages
-- **Error messages**: Include the function name and relevant parameter values.
+- **Error messages**: Use the `LOG_ERROR` macr. Include relevant parameter values.
   ```c
-  fprintf(stderr, "[function_name] Error: Invalid parameter (%d).\n", param);
+  LOG_ERROR("Invalid parameter (%d).", param);
   ```
 
 

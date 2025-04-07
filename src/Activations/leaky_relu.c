@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
 #include "../../include/Activations/leaky_relu.h"
+#include "../../include/Core/logging.h"
 
 #define LEAKY_RELU_ALPHA 0.01f
 #ifndef DEBUG_LOGGING

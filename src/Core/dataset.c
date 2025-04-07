@@ -67,7 +67,7 @@ CM_Error dataset_load_arrays(Dataset *dataset, float *X_array, float *y_array, i
 
         if (!dataset->X[i] || !dataset->y[i])
         {
-            fprintf(stderr, "[dataset_load_arrays] Error: Memory allocation failed at index %d.\n", i);
+            LOG_ERROR("Memory allocation failed at index %d.", i);
             return CM_MEMORY_ALLOCATION_ERROR;
         }
 

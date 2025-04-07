@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Optimizers/rmsprop.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -43,7 +44,7 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
 
     if (epsilon <= 0)
     {
-        fprintf(stderr, "[rms_prop] Error: Epsilon value (%f) is invalid.\n", epsilon);
+        LOG_ERROR("Epsilon value (%f) is invalid.", epsilon);
         return CM_INVALID_INPUT_ERROR;
     }
 
