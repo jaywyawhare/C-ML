@@ -27,9 +27,7 @@ float linear(float x)
     }
 
     float result = x;
-#if DEBUG_LOGGING
     LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-#endif
     return result;
 }
 

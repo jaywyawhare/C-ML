@@ -67,12 +67,8 @@ float *standard_scaler(float *x, int size)
     for (int i = 0; i < size; i++)
     {
         scaled[i] = (x[i] - mean) / std;
-#if DEBUG_LOGGING
         LOG_DEBUG("Scaled[%d]: %f", i, scaled[i]);
-#endif
     }
-#if DEBUG_LOGGING
     LOG_DEBUG("Scaling complete.");
-#endif
     return scaled;
 }

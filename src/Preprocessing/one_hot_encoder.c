@@ -79,14 +79,10 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
         for (int j = 0; j < uniqueCount; j++)
         {
             encoded[i * uniqueCount + j] = (x[i] == (*map)[j].character) ? 1 : 0;
-#if DEBUG_LOGGING
             LOG_DEBUG("encoded[%d]: %d", i * uniqueCount + j, encoded[i * uniqueCount + j]);
-#endif
         }
     }
-#if DEBUG_LOGGING
     LOG_DEBUG("Encoding complete.");
-#endif
     return encoded;
 }
 
@@ -134,9 +130,7 @@ char *one_hot_decoding(int *x, int size, CharMap *map, int mapSize)
         }
     }
     decoded[size] = '\0';
-#if DEBUG_LOGGING
     LOG_DEBUG("Decoding complete.");
-#endif
     return decoded;
 }
 

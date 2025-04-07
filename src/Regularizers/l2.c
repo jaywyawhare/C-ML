@@ -58,10 +58,7 @@ float l2(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b,
     *s_b = beta2 * (*s_b) + (1 - beta2) * pow(db, 2);
     *w -= lr * ((*v_w) / (sqrt(*s_w) + epsilon));
     *b -= lr * ((*v_b) / (sqrt(*s_b) + epsilon));
-
-#if DEBUG_LOGGING
     LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
-#endif
 
     return loss;
 }

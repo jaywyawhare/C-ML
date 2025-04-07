@@ -131,10 +131,7 @@ int forward_maxpooling(MaxPoolingLayer *layer, const float *input, float *output
             }
         }
         output[output_index++] = max_value;
-
-#if DEBUG_LOGGING
         LOG_DEBUG("Output[%d]: %f", output_index - 1, max_value);
-#endif
     }
 
     return output_index;

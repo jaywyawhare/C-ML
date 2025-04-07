@@ -69,9 +69,7 @@ int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
         {
             output[i] = input[i] / (1 - layer->dropout_rate);
         }
-#if DEBUG_LOGGING
         LOG_DEBUG("Output[%d]: %f", i, output[i]);
-#endif
     }
     return CM_SUCCESS;
 }

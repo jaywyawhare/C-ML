@@ -38,9 +38,7 @@ float sigmoid(float x)
         float exp_pos_x = expf(x);
         result = exp_pos_x / (1 + exp_pos_x);
     }
-#if DEBUG_LOGGING
     LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-#endif
     return result;
 }
 

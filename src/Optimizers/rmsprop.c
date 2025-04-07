@@ -58,10 +58,7 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
 
     *w -= lr * (dw / (sqrt(*cache_w) + epsilon));
     *b -= lr * (db / (sqrt(*cache_b) + epsilon));
-
-#if DEBUG_LOGGING
     LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
-#endif
 
     return loss;
 }

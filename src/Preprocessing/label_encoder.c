@@ -80,9 +80,7 @@ int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
             }
         }
     }
-#if DEBUG_LOGGING
     LOG_DEBUG("Encoding complete.");
-#endif
     return encoded;
 }
 
@@ -129,9 +127,7 @@ char *label_decoder(int *x, int size, CharMap *map, int mapSize)
         }
     }
     decoded[size] = '\0';
-#if DEBUG_LOGGING
     LOG_DEBUG("Decoding complete.");
-#endif
     return decoded;
 }
 

@@ -28,9 +28,7 @@ float relu(float x)
     }
 
     float result = x > 0 ? x : 0;
-#if DEBUG_LOGGING
     LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-#endif
     return result;
 }
 

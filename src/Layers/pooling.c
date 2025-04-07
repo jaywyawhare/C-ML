@@ -129,10 +129,7 @@ int forward_polling(PollingLayer *layer, const float *input, float *output, int 
             sum += input[i + j];
         }
         output[output_index++] = sum * kernel_reciprocal;
-
-#if DEBUG_LOGGING
         LOG_DEBUG("Output[%d]: %f", output_index - 1, output[output_index - 1]);
-#endif
     }
 
     return output_index;

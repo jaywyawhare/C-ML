@@ -62,12 +62,8 @@ float *min_max_scaler(float *x, int size)
     for (int i = 0; i < size; i++)
     {
         scaled[i] = (x[i] - min) / (max - min);
-#if DEBUG_LOGGING
         LOG_DEBUG("Scaled[%d]: %f", i, scaled[i]);
-#endif
     }
-#if DEBUG_LOGGING
     LOG_DEBUG("Scaling complete.");
-#endif
     return scaled;
 }

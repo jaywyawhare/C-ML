@@ -46,9 +46,7 @@ int forward_flatten(FlattenLayer *layer, float *input, float *output)
     for (int i = 0; i < layer->input_size; i++)
     {
         output[i] = input[i];
-#if DEBUG_LOGGING
         LOG_DEBUG("Output[%d]: %f", i, output[i]);
-#endif
     }
 
     return CM_SUCCESS;

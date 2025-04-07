@@ -33,16 +33,12 @@ float tanH(float x)
     }
     if (x > TANH_THRESHOLD)
     {
-#if DEBUG_LOGGING
         LOG_DEBUG("Input: x=%f, Output: 1.0 (clipped)", x);
-#endif
         return 1.0f;
     }
     else if (x < -TANH_THRESHOLD)
     {
-#if DEBUG_LOGGING
         LOG_DEBUG("Input: x=%f, Output: -1.0 (clipped)", x);
-#endif
         return -1.0f;
     }
     else
@@ -50,9 +46,7 @@ float tanH(float x)
         float e_pos = expf(x);
         float e_neg = expf(-x);
         float result = (e_pos - e_neg) / (e_pos + e_neg);
-#if DEBUG_LOGGING
         LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-#endif
         return result;
     }
 }

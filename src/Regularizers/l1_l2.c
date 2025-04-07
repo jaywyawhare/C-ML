@@ -48,10 +48,7 @@ float l1_l2(float *w, float *dw, float l1, float l2, int n)
                                                     : 0;
 
         dw[i] += l1 * l1_grad + 2 * l2 * w[i];
-
-#if DEBUG_LOGGING
         LOG_DEBUG("i: %d, w[i]: %f, dw[i]: %f, loss: %f", i, w[i], dw[i], loss);
-#endif
     }
     return loss;
 }

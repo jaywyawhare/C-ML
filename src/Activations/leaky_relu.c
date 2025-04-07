@@ -29,9 +29,7 @@ float leaky_relu(float x)
    }
 
    float result = x > 0 ? x : LEAKY_RELU_ALPHA * x;
-#if DEBUG_LOGGING
    LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-#endif
    return result;
 }
 

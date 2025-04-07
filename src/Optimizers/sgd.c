@@ -46,10 +46,7 @@ float sgd(float x, float y, float lr, float *w, float *b)
 
     (*w) -= lr * dw;
     (*b) -= lr * db;
-
-#if DEBUG_LOGGING
     LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
-#endif
 
     return loss;
 }

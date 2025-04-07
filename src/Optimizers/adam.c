@@ -63,10 +63,7 @@ float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_
 
     *w -= lr * v_w_corrected / (sqrt(s_w_corrected + epsilon));
     *b -= lr * v_b_corrected / (sqrt(s_b_corrected + epsilon));
-
-#if DEBUG_LOGGING
     LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
-#endif
 
     return loss;
 }
