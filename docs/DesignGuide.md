@@ -189,7 +189,7 @@ int main() {
     // Create polling layer
     PollingLayer *layer = polling_layer_create(2, 2);
     if (!layer) {
-        fprintf(stderr, "Failed to create polling layer.\n");
+        LOG_ERROR("Failed to create polling layer.\n");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -199,7 +199,7 @@ int main() {
     int output_size = polling_layer_forward(layer, input, output, 4);
 
     if (output_size < 0) {
-        fprintf(stderr, "Error during forward pass.\n");
+        LOG_ERROR("Error during forward pass.\n");
         polling_layer_free(layer);
         return output_size;
     }

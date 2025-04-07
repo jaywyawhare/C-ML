@@ -38,7 +38,7 @@ float *standard_scaler(float *x, int size)
     float *scaled = (float *)cm_safe_malloc(sizeof(float) * size, __FILE__, __LINE__);
     if (scaled == NULL)
     {
-        fprintf(stderr, "[standardScaler] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         return NULL;
     }
 
@@ -59,7 +59,7 @@ float *standard_scaler(float *x, int size)
 
     if (std == 0)
     {
-        fprintf(stderr, "[standardScaler] Standard deviation is zero\n");
+        LOG_ERROR("Standard deviation is zero\n");
         free(scaled);
         return NULL;
     }

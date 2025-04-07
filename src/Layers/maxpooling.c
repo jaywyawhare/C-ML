@@ -156,7 +156,7 @@ int free_maxpooling(MaxPoolingLayer *layer)
 
     if (layer->kernel_size <= 0 || layer->stride <= 0)
     {
-        fprintf(stderr, "[free_maxpooling] Warning: Layer has invalid dimensions.\n");
+        LOG_ERROR("[free_maxpooling] Warning: Layer has invalid dimensions.\n");
     }
 
     return CM_SUCCESS;

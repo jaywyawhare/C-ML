@@ -37,7 +37,7 @@ float *min_max_scaler(float *x, int size)
     float *scaled = (float *)cm_safe_malloc(sizeof(float) * size, __FILE__, __LINE__);
     if (scaled == NULL)
     {
-        fprintf(stderr, "[minMaxScaler] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         return NULL;
     }
     float min = x[0];
@@ -55,7 +55,7 @@ float *min_max_scaler(float *x, int size)
     }
     if (max == min)
     {
-        fprintf(stderr, "[minMaxScaler] Max and min are equal\n");
+        LOG_ERROR("Max and min are equal\n");
         free(scaled);
         return NULL;
     }
