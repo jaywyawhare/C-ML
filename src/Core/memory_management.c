@@ -27,9 +27,8 @@ void *cm_safe_malloc(size_t size, const char *file, int line)
         LOG_ERROR("Memory allocation failed for %zu bytes in %s at line %d.", size, file, line);
         return (void *)CM_MEMORY_ALLOCATION_ERROR;
     }
-#if DEBUG_LOGGING
+    
     LOG_DEBUG("Allocated %zu bytes at %p in %s at line %d.", size, ptr, file, line);
-#endif
     return ptr;
 }
 
@@ -46,9 +45,7 @@ void cm_safe_free(void **ptr)
 {
     if (ptr != NULL && *ptr != NULL)
     {
-#if DEBUG_LOGGING
         LOG_DEBUG("Freeing memory at %p", *ptr);
-#endif
         free(*ptr);
         *ptr = NULL;
     }

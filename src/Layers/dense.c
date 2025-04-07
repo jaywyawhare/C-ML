@@ -75,7 +75,7 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
     if (layer->adam_v_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_v_b == (void *)CM_MEMORY_ALLOCATION_ERROR ||
         layer->adam_s_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_s_b == (void *)CM_MEMORY_ALLOCATION_ERROR)
     {
-        fprintf(stderr, "[initializeDense] Error: Memory allocation failed for Adam optimizer's moment vectors.\n");
+        LOG_ERROR("Error: Memory allocation failed for Adam optimizer's moment vectors.\n");
         cm_safe_free((void **)&layer->adam_v_w);
         cm_safe_free((void **)&layer->adam_v_b);
         cm_safe_free((void **)&layer->adam_s_w);
@@ -111,11 +111,9 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
 
     for (int i = 0; i < layer->output_size; i++)
     {
-        LOG_DEBUG("for(i: %d, layer->output_size: %d)", i, layer->output_size);
         output[i] = 0;
         for (int j = 0; j < layer->input_size; j++)
         {
-            LOG_DEBUG("for(j: %d, layer->input_size: %d)", j, layer->input_size);
             output[i] += input[j] * layer->weights[j + i * layer->input_size];
         }
         output[i] += layer->biases[i];

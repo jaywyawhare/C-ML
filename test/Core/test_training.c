@@ -4,8 +4,10 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/training.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 void test_large_layer_sizes() {
+    set_log_level(LOG_LEVEL_DEBUG);
     // Create a network with very large layer sizes
     NeuralNetwork *network = create_neural_network(1000);
     
