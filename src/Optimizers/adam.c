@@ -65,7 +65,7 @@ float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_
     *b -= lr * v_b_corrected / (sqrt(s_b_corrected + epsilon));
 
 #if DEBUG_LOGGING
-    printf("[adam] Debug: w: %f, b: %f, loss: %f\n", *w, *b, loss);
+    LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
 #endif
 
     return loss;

@@ -63,7 +63,7 @@ float *min_max_scaler(float *x, int size)
     {
         scaled[i] = (x[i] - min) / (max - min);
 #if DEBUG_LOGGING
-        printf("[minMaxScaler] Debug: Scaled[%d]: %f\n", i, scaled[i]);
+        LOG_DEBUG("Scaled[%d]: %f", i, scaled[i]);
 #endif
     }
 #if DEBUG_LOGGING

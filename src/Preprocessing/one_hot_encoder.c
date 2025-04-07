@@ -80,7 +80,7 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
         {
             encoded[i * uniqueCount + j] = (x[i] == (*map)[j].character) ? 1 : 0;
 #if DEBUG_LOGGING
-            printf("[oneHotEncoding] Debug: encoded[%d]: %d\n", i * uniqueCount + j, encoded[i * uniqueCount + j]);
+            LOG_DEBUG("encoded[%d]: %d", i * uniqueCount + j, encoded[i * uniqueCount + j]);
 #endif
         }
     }

@@ -67,7 +67,7 @@ float *softmax(float *z, int n)
     {
         output[i] /= sum;
 #if DEBUG_LOGGING
-        printf("[softmax] Debug: Output[%d]: %f\n", i, output[i]);
+        LOG_DEBUG("Output[%d]: %f", i, output[i]);
 #endif
     }
 

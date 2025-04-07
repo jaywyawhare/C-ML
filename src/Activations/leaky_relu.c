@@ -30,7 +30,7 @@ float leaky_relu(float x)
 
    float result = x > 0 ? x : LEAKY_RELU_ALPHA * x;
 #if DEBUG_LOGGING
-   printf("[leaky_relu] Debug: Input: x=%f, Output: %f\n", x, result);
+   LOG_DEBUG("Input: x=%f, Output: %f", x, result);
 #endif
    return result;
 }

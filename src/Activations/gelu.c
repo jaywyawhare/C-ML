@@ -29,7 +29,7 @@ float gelu(float x)
     const float sqrt_2_over_pi = 0.7978845608f;
     float result = 0.5f * x * (1.0f + tanhf(sqrt_2_over_pi * (x + 0.044715f * x * x * x)));
 #if DEBUG_LOGGING
-    printf("[gelu] Debug: Input: x=%f, Output: %f\n", x, result);
+    LOG_DEBUG("Input: x=%f, Output: %f", x, result);
 #endif
     return result;
 }

@@ -131,7 +131,7 @@ int forward_polling(PollingLayer *layer, const float *input, float *output, int 
         output[output_index++] = sum * kernel_reciprocal;
 
 #if DEBUG_LOGGING
-        printf("[forward_polling] Debug: Output[%d]: %f\n", output_index - 1, output[output_index - 1]);
+        LOG_DEBUG("Output[%d]: %f", output_index - 1, output[output_index - 1]);
 #endif
     }
 
