@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/mean_absolute_error.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Implements the Mean Absolute Error metric.
@@ -18,7 +19,7 @@ float mean_absolute_error(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[mean_absolute_error] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float sum = 0;

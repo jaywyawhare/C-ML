@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/f1_score.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the F1 Score metric.
@@ -21,7 +22,7 @@ float f1_score(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[f1_score] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     int true_positive = 0, false_positive = 0, false_negative = 0;

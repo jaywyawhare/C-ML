@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
 #include "../../include/Activations/linear.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -21,7 +22,7 @@ float linear(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        fprintf(stderr, "[linear] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -45,7 +46,7 @@ float linear_derivative(float x)
 {
     if (isnan(x) || isinf(x))
     {
-        fprintf(stderr, "[linear_derivative] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../../include/Activations/sigmoid.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -22,7 +23,7 @@ float sigmoid(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        fprintf(stderr, "[sigmoid] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -56,7 +57,7 @@ float sigmoid_derivative(float sigmoid_output)
 {
     if (isnan(sigmoid_output) || isinf(sigmoid_output) || sigmoid_output < 0.0f || sigmoid_output > 1.0f)
     {
-        fprintf(stderr, "[sigmoid_derivative] Error: Invalid sigmoid output (NaN, Inf, or out of range)\n");
+        LOG_ERROR("Invalid sigmoid output (NaN, Inf, or out of range)");
         return CM_INVALID_INPUT_ERROR;
     }
 

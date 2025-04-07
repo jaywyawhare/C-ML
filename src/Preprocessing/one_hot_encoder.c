@@ -5,6 +5,7 @@
 #include "../../include/Preprocessing/one_hot_encoder.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -26,13 +27,13 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
 {
     if (x == NULL || map == NULL || mapSize == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return (int *)CM_NULL_POINTER_ERROR;
     }
 
     if (size <= 0)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return (int *)CM_INVALID_PARAMETER_ERROR;
     }
 
@@ -105,13 +106,13 @@ char *one_hot_decoding(int *x, int size, CharMap *map, int mapSize)
 {
     if (x == NULL || map == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return NULL;
     }
 
     if (size <= 0 || mapSize <= 0)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return NULL;
     }
     char *decoded = (char *)cm_safe_malloc(sizeof(char) * (size + 1), __FILE__, __LINE__);

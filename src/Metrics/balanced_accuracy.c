@@ -3,6 +3,7 @@
 #include "../../include/Metrics/specificity.h"
 #include "../../include/Metrics/recall.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Balanced Accuracy metric.
@@ -19,7 +20,7 @@ float balanced_accuracy(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[balanced_accuracy] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
 

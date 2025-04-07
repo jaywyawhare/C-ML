@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -24,12 +25,12 @@ float l1_l2(float *w, float *dw, float l1, float l2, int n)
 {
     if (w == NULL || dw == NULL)
     {
-        fprintf(stderr, "[l1_l2] Error: Null pointer argument.\n");
+        LOG_ERROR("Null pointer argument.");
         return CM_NULL_POINTER_ERROR;
     }
     if (n <= 0)
     {
-        fprintf(stderr, "[l1_l2] Error: length of weights must be positive.\n");
+        LOG_ERROR("length of weights must be positive.");
         return CM_INVALID_PARAMETER_ERROR;
     }
 
@@ -38,7 +39,7 @@ float l1_l2(float *w, float *dw, float l1, float l2, int n)
     {
         if (isnan(w[i]) || isinf(w[i]) || isnan(l1) || isinf(l1) || isnan(l2) || isinf(l2))
         {
-            fprintf(stderr, "[l1_l2] Error: Invalid parameter(s) provided.\n");
+            LOG_ERROR("Invalid parameter(s) provided.");
             return CM_INVALID_INPUT_ERROR;
         }
         loss += l1 * fabs(w[i]) + l2 * pow(w[i], 2);

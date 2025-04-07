@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Layers/maxpooling.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -19,19 +20,19 @@ int initialize_maxpooling(MaxPoolingLayer *layer, int kernel_size, int stride)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "[initialize_maxpooling] Error: Layer is NULL.\n");
+        LOG_ERROR("Layer is NULL.");
         return CM_NULL_LAYER_ERROR;
     }
 
     if (kernel_size <= 0)
     {
-        fprintf(stderr, "[initialize_maxpooling] Error: Invalid kernel size.\n");
+        LOG_ERROR("Invalid kernel size.");
         return CM_INVALID_KERNEL_SIZE_ERROR;
     }
 
     if (stride <= 0)
     {
-        fprintf(stderr, "[initialize_maxpooling] Error: Invalid stride.\n");
+        LOG_ERROR("Invalid stride.");
         return CM_INVALID_STRIDE_ERROR;
     }
 
@@ -52,25 +53,25 @@ int compute_maxpooling_output_size(int input_size, int kernel_size, int stride)
 {
     if (input_size <= 0)
     {
-        fprintf(stderr, "[compute_maxpooling_output_size] Error: Input size must be greater than 0.\n");
+        LOG_ERROR("Input size must be greater than 0.");
         return CM_INVALID_INPUT_ERROR;
     }
 
     if (kernel_size <= 0)
     {
-        fprintf(stderr, "[compute_maxpooling_output_size] Error: Invalid kernel size.\n");
+        LOG_ERROR("Invalid kernel size.");
         return CM_INVALID_KERNEL_SIZE_ERROR;
     }
 
     if (stride <= 0)
     {
-        fprintf(stderr, "[compute_maxpooling_output_size] Error: Invalid stride.\n");
+        LOG_ERROR("Invalid stride.");
         return CM_INVALID_STRIDE_ERROR;
     }
 
     if (input_size < kernel_size)
     {
-        fprintf(stderr, "[compute_maxpooling_output_size] Error: Input size is smaller than kernel size.\n");
+        LOG_ERROR("Input size is smaller than kernel size.");
         return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
     }
 
@@ -90,31 +91,31 @@ int forward_maxpooling(MaxPoolingLayer *layer, const float *input, float *output
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "[forward_maxpooling] Error: Layer is NULL.\n");
+        LOG_ERROR("Layer is NULL.");
         return CM_NULL_LAYER_ERROR;
     }
 
     if (input == NULL || output == NULL)
     {
-        fprintf(stderr, "[forward_maxpooling] Error: Null input or output pointer.\n");
+        LOG_ERROR("Null input or output pointer.");
         return CM_NULL_POINTER_ERROR;
     }
 
     if (layer->kernel_size <= 0)
     {
-        fprintf(stderr, "[forward_maxpooling] Error: Invalid kernel size.\n");
+        LOG_ERROR("Invalid kernel size.");
         return CM_INVALID_KERNEL_SIZE_ERROR;
     }
 
     if (layer->stride <= 0)
     {
-        fprintf(stderr, "[forward_maxpooling] Error: Invalid stride.\n");
+        LOG_ERROR("Invalid stride.");
         return CM_INVALID_STRIDE_ERROR;
     }
 
     if (input_size < layer->kernel_size)
     {
-        fprintf(stderr, "[forward_maxpooling] Error: Input size is smaller than kernel size.\n");
+        LOG_ERROR("Input size is smaller than kernel size.");
         return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
     }
 
@@ -149,7 +150,7 @@ int free_maxpooling(MaxPoolingLayer *layer)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "[free_maxpooling] Error: Layer is NULL.\n");
+        LOG_ERROR("Layer is NULL.");
         return CM_NULL_LAYER_ERROR;
     }
 

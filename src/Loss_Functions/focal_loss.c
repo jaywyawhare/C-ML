@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/focal_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define EPSILON 1e-8
 
@@ -22,7 +23,7 @@ float focal_loss(float *y, float *yHat, int n, float gamma)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[focal_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float loss = 0.0f;

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../../include/Activations/gelu.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -21,7 +22,7 @@ float gelu(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        fprintf(stderr, "[gelu] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -48,7 +49,7 @@ float gelu_derivative(float x)
 {
     if (isnan(x) || isinf(x))
     {
-        fprintf(stderr, "[gelu_derivative] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 

@@ -3,6 +3,7 @@
 #include "../../include/Metrics/root_mean_squared_error.h"
 #include "../../include/Loss_Functions/mean_squared_error.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Root Mean Squared Error (RMSE).
@@ -19,7 +20,7 @@ float root_mean_squared_error(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[root_mean_squared_error] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
 

@@ -28,7 +28,7 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
 {
     if (!w || !b || !cache_w || !cache_b)
     {
-        fprintf(stderr, "[rms_prop] Error: Null pointer input.\n");
+        LOG_ERROR("Null pointer input.");
         return CM_NULL_POINTER_ERROR;
     }
 

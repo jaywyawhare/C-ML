@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/huber_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define DELTA 1.0f
 
@@ -21,7 +22,7 @@ float huber_loss(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[huber_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float loss = 0;

@@ -4,6 +4,7 @@
 #include "../../include/Preprocessing/standard_scaler.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -24,13 +25,13 @@ float *standard_scaler(float *x, int size)
 {
     if (x == NULL)
     {
-        fprintf(stderr, "[standardScaler] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return NULL;
     }
 
     if (size <= 0)
     {
-        fprintf(stderr, "[standardScaler] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return NULL;
     }
 

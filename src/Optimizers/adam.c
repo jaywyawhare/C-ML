@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Optimizers/adam.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
@@ -31,13 +32,13 @@ float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_
 
     if (!w || !b || !v_w || !v_b || !s_w || !s_b)
     {
-        fprintf(stderr, "[adam] Error: Null pointer input.\n");
+        LOG_ERROR("Null pointer input.");
         return CM_NULL_POINTER_ERROR;
     }
 
     if (epsilon <= 0 || beta1 >= 1.0 || beta2 >= 1.0 || beta1 <= 0.0 || beta2 <= 0.0 || lr <= 0 || isnan(x) || isnan(y) || isinf(x) || isinf(y))
     {
-        fprintf(stderr, "[adam] Error: Invalid parameter(s) provided.\n");
+        LOG_ERROR("Invalid parameter(s) provided.");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -93,13 +94,13 @@ void update_adam(float *w, float *b, float *v_w, float *v_b, float *s_w, float *
 {
     if (!w || !b || !v_w || !v_b || !s_w || !s_b)
     {
-        fprintf(stderr, "[update_adam] Error: Null pointer input.\n");
+        LOG_ERROR("Null pointer input.");
         return;
     }
 
     if (epsilon <= 0 || beta1 <= 0 || beta1 >= 1 || beta2 <= 0 || beta2 >= 1 || learning_rate <= 0)
     {
-        fprintf(stderr, "[update_adam] Error: Invalid parameters.\n");
+        LOG_ERROR("Invalid parameters.");
         return;
     }
 

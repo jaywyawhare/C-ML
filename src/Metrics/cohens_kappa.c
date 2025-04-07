@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/cohens_kappa.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes Cohen's Kappa statistic.
@@ -19,7 +20,7 @@ float cohens_kappa(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[cohens_kappa] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     int tp = 0, tn = 0, fp = 0, fn = 0;

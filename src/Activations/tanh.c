@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../../include/Activations/tanh.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define TANH_THRESHOLD 20.0f
 #ifndef DEBUG_LOGGING
@@ -27,7 +28,7 @@ float tanH(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        fprintf(stderr, "[tanh] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
     if (x > TANH_THRESHOLD)
@@ -69,7 +70,7 @@ float tanh_derivative(float tanh_output)
 {
     if (isnan(tanh_output) || isinf(tanh_output) || tanh_output < -1.0f || tanh_output > 1.0f)
     {
-        fprintf(stderr, "[tanh_derivative] Error: Invalid tanh output (NaN, Inf, or out of range)\n");
+        LOG_ERROR("Invalid tanh output (NaN, Inf, or out of range)");
         return CM_INVALID_INPUT_ERROR;
     }
 

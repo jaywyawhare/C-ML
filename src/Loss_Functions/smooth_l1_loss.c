@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/smooth_l1_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define BETA 1.0f
 
@@ -21,7 +22,7 @@ float smooth_l1_loss(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[smooth_l1_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float loss = 0.0f;

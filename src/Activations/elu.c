@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "../../include/Activations/elu.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define EPSILON 1e-6f
 #ifndef DEBUG_LOGGING
@@ -24,7 +25,7 @@ float elu(float x, float alpha)
 {
     if (isnan(x) || isnan(alpha) || isinf(x) || isinf(alpha) || x == -INFINITY || alpha == -INFINITY)
     {
-        fprintf(stderr, "[elu] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -50,7 +51,7 @@ float elu_derivative(float x, float alpha)
 {
     if (isnan(x) || isnan(alpha) || isinf(x) || isinf(alpha))
     {
-        fprintf(stderr, "[elu_derivative] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 

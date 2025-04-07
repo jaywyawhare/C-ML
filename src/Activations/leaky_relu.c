@@ -24,7 +24,7 @@ float leaky_relu(float x)
 {
    if (isnan(x) || isinf(x) || x == -INFINITY)
    {
-      fprintf(stderr, "[leaky_relu] Error: Invalid input (NaN or Inf)\n");
+      LOG_ERROR("Invalid input (NaN or Inf)");
       return CM_INVALID_INPUT_ERROR;
    }
 
@@ -49,7 +49,7 @@ float leaky_relu_derivative(float x)
 {
    if (isnan(x) || isinf(x))
    {
-      fprintf(stderr, "[leaky_relu_derivative] Error: Invalid input (NaN or Inf)\n");
+      LOG_ERROR("Invalid input (NaN or Inf)");
       return CM_INVALID_INPUT_ERROR;
    }
 

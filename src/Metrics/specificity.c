@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/specificity.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the specificity metric.
@@ -17,7 +18,7 @@ float specificity(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[specificity] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     int true_negative = 0, false_positive = 0;

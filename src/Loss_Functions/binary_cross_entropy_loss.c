@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/binary_cross_entropy_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Binary Cross-Entropy Loss.
@@ -18,7 +19,7 @@ float binary_cross_entropy_loss(float *yHat, float *y, int size)
 {
     if (!yHat || !y || size <= 0)
     {
-        fprintf(stderr, "[binary_cross_entropy_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
 
@@ -50,7 +51,7 @@ float binary_cross_entropy_loss_derivative(float predicted, float actual)
 {
     if (predicted <= 0 || predicted >= 1)
     {
-        fprintf(stderr, "[binary_cross_entropy_loss_derivative] Error: Predicted value out of bounds.\n");
+        LOG_ERROR("Predicted value out of bounds.");
         return 0.0f;
     }
     return -(actual / predicted) + ((1 - actual) / (1 - predicted));

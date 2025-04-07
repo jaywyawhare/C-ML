@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/mean_squared_error.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Mean Squared Error (MSE).

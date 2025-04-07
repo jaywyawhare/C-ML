@@ -5,6 +5,7 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
+#include "../../include/Core/logging.h"
 #ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
 #endif
@@ -24,13 +25,13 @@ int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
 {
     if (x == NULL || map == NULL || mapSize == NULL)
     {
-        fprintf(stderr, "[labelEncoder] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return (int *)CM_NULL_POINTER_ERROR;
     }
 
     if (size <= 0)
     {
-        fprintf(stderr, "[labelEncoder] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return (int *)CM_INVALID_PARAMETER_ERROR;
     }
 
@@ -101,13 +102,13 @@ char *label_decoder(int *x, int size, CharMap *map, int mapSize)
 {
     if (x == NULL || map == NULL)
     {
-        fprintf(stderr, "[labelDecoder] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return NULL;
     }
 
     if (size <= 0 || mapSize <= 0)
     {
-        fprintf(stderr, "[labelDecoder] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return NULL;
     }
     char *decoded = (char *)cm_safe_malloc(sizeof(char) * (size + 1), __FILE__, __LINE__);

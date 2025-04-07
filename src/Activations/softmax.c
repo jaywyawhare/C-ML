@@ -46,7 +46,7 @@ float *softmax(float *z, int n)
     float *output = cm_safe_malloc(n * sizeof(float), __FILE__, __LINE__);
     if (output == NULL)
     {
-        fprintf(stderr, "[softmax] Error: Memory allocation failed.\n");
+        LOG_ERROR("Memory allocation failed.");
         return (float *)CM_MEMORY_ALLOCATION_ERROR;
     }
 
@@ -58,7 +58,7 @@ float *softmax(float *z, int n)
 
     if (sum == 0.0f)
     {
-        fprintf(stderr, "[softmax] Error: Division by zero (sum of exponentials is zero).\n");
+        LOG_ERROR("Division by zero (sum of exponentials is zero).");
         cm_safe_free((void **)&output);
         return (float *)CM_DIVISION_BY_ZERO_ERROR;
     }
@@ -105,7 +105,7 @@ float *softmax_derivative(float *softmax_output, int n)
 {
     if (softmax_output == NULL || n <= 0)
     {
-        fprintf(stderr, "[softmax_derivative] Error: Null pointer or invalid size.\n");
+        LOG_ERROR("Null pointer or invalid size.");
         return (float *)CM_NULL_POINTER_ERROR;
     }
 
@@ -121,7 +121,7 @@ float *softmax_derivative(float *softmax_output, int n)
     float *jacobian = cm_safe_malloc(n * n * sizeof(float), __FILE__, __LINE__);
     if (jacobian == NULL)
     {
-        fprintf(stderr, "[softmax_derivative] Error: Memory allocation failed.\n");
+        LOG_ERROR("Memory allocation failed.");
         return (float *)CM_MEMORY_ALLOCATION_ERROR;
     }
 

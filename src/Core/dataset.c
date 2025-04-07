@@ -1,6 +1,7 @@
 #include "../../include/Core/dataset.h"
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,7 +44,7 @@ CM_Error dataset_load_arrays(Dataset *dataset, float *X_array, float *y_array, i
 {
     if (!dataset || !X_array || !y_array)
     {
-        fprintf(stderr, "[dataset_load_arrays] Error: Null pointer argument.\n");
+        LOG_ERROR("Null pointer argument.");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -56,7 +57,7 @@ CM_Error dataset_load_arrays(Dataset *dataset, float *X_array, float *y_array, i
 
     if (!dataset->X || !dataset->y)
     {
-        fprintf(stderr, "[dataset_load_arrays] Error: Memory allocation failed for X or y.\n");
+        LOG_ERROR("Memory allocation failed for X or y.");
         return CM_MEMORY_ALLOCATION_ERROR;
     }
 
