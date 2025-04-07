@@ -103,25 +103,29 @@ void polling_layer_free(PollingLayer *layer);
 ## 5. Debugging Conventions
 
 ### 5.1 Debug Logging
-- **Enable/disable logs**: Use the `DEBUG_LOGGING` macro to toggle debug logs.
+- **Enable/disable logs**: Use the `set_log_level(LOG_LEVEL_)` macro to configure the global log level.
   ```c
-  #define DEBUG_LOGGING 1  // Set to 0 to disable debug logs
+  #include "include/logging.h"
+
+  set_log_level(LOG_LEVEL_DEBUG);
+  set_log_level(LOG_LEVEL_INFO);
+  set_log_level(LOG_LEVEL_WARNING);
+  set_log_level(LOG_LEVEL_ERROR);
   ```
 
-- **Wrap debug logs**: Use `#if DEBUG_LOGGING` to conditionally compile debug messages.
+- **Log appropriately**: Use the `#LOG_level` macros to conditionally log messages.
   ```c
-  #if DEBUG_LOGGING
-  printf("[function_name] Debug: %s\n", message);
-  #endif
+  LOG_DEBUG("%s is a debug message.", message);
+  LOG_INFO("Count is %d.", count);
+  LOG_WARNING("Tensor Bloat is %d unreasonable.", bloat_factor);
+  LOG_ERROR("NeuralNetwork is NULL.");
   ```
 
 ### 5.2 Error Messages
-- **Error messages**: Use the `LOG_ERROR` macr. Include relevant parameter values.
+- **Error messages**: Use the `LOG_ERROR` macro. Include relevant parameter values.
   ```c
   LOG_ERROR("Invalid parameter (%d).", param);
   ```
-
-
 
 ## 6. File Organization
 
