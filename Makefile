@@ -5,7 +5,7 @@
 # Compiler and flags
 CC      := gcc
 CFLAGS  := -g -Wall -MMD -Iinclude
-LDFLAGS :=
+LDFLAGS := -lm
 
 # Project structure
 SRC_DIR     := src
@@ -55,7 +55,7 @@ all: $(BIN_DIR)/main
 # Build the main executable
 $(BIN_DIR)/main: $(ALL_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
 	@echo "Built main executable: $@"
 
 # Build the static library
@@ -103,7 +103,7 @@ examples: $(STATIC_LIB) $(EXAMPLES)
 
 $(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_DIR)/%.c $(STATIC_LIB)
 	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $< -L$(LIB_DIR) -l$(LIB_NAME) -o $@
+	$(CC) $(CFLAGS) $< -L$(LIB_DIR) -l$(LIB_NAME) $(LDFLAGS) -lm -o $@
 	@echo "Built example: $@"
 
 # Debug version of examples with sanitizers
@@ -114,25 +114,10 @@ debug_examples: $(STATIC_LIB)
 	@for example_src in $(EXAMPLE_FILES); do \
 		example_bin=$$(basename $$example_src .c); \
 		echo "Compiling $$example_bin with debug flags..."; \
-		$(CC) $(CFLAGS) $(EXAMPLE_FLAGS) $$example_src -L$(LIB_DIR) -l$(LIB_NAME) \
+		$(CC) $(CFLAGS) $(EXAMPLE_FLAGS) $$example_src -L$(LIB_DIR) -l$(LIB_NAME) -lm $(LDFLAGS) \
 		-o $(EXAMPLES_BIN_DIR)/$$example_bin; \
 	done
 	@echo "Built all examples with debug flags"
-
-# Neural network training example (special case)
-.PHONY: nn_example
-nn_example: $(STATIC_LIB)
-	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L$(LIB_DIR) -l$(LIB_NAME) -o $(EXAMPLES_BIN_DIR)/nn_training_example
-	./$(EXAMPLES_BIN_DIR)/nn_training_example
-
-# Debug version of neural network example
-.PHONY: debug_nn_example
-debug_nn_example: EXAMPLE_FLAGS :=  -fsanitize=address -fsanitize=undefined
-debug_nn_example: $(STATIC_LIB)
-	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $(EXAMPLE_FLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L$(LIB_DIR) -l$(LIB_NAME) -o $(EXAMPLES_BIN_DIR)/nn_training_example
-	./$(EXAMPLES_BIN_DIR)/nn_training_example
 
 ################################################################################
 # Tests
@@ -146,7 +131,7 @@ test: $(STATIC_LIB)
 		test_bin=$$(basename $$test_src .c); \
 		src_file=$$(echo $$test_src | sed 's|^test/|src/|; s|test_||'); \
 		echo "\nCompiling and running $$test_bin..."; \
-		$(CC) $(CFLAGS) $$test_src $$src_file -L$(LIB_DIR) -l$(LIB_NAME) \
+		$(CC) $(CFLAGS) $$test_src $$src_file -L$(LIB_DIR) -l$(LIB_NAME) $(LDFLAGS) \
 		-o $(TEST_BIN_DIR)/$$test_bin -fsanitize=address -fsanitize=undefined && \
 		ASAN_OPTIONS=allocator_may_return_null=1 ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
 	done
