@@ -13,7 +13,6 @@ typedef enum {
     LOG_LEVEL_ERROR    // Due to a more serious problem, the program has not been able to perform a function
 } LogLevel;
 
-// Global log level (can be set at runtime)
 extern LogLevel g_log_level;
 
 /**
@@ -35,7 +34,6 @@ void set_log_level(LogLevel level);
  */
 void log_message(LogLevel level, const char *file, int line, const char *func, const char *format, ...);
 
-// Logging macros
 #define LOG_DEBUG(format, ...) \
     log_message(LOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
 
@@ -48,4 +46,4 @@ void log_message(LogLevel level, const char *file, int line, const char *func, c
 #define LOG_ERROR(format, ...) \
     log_message(LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, format, ##__VA_ARGS__)
 
-#endif // C_ML_LOGGING_H
+#endif 
