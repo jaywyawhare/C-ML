@@ -5,9 +5,7 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 /**
  * @brief Applies the sigmoid activation function.

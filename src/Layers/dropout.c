@@ -6,9 +6,7 @@
 #include "../../include/Core/logging.h"
 #include "../../include/Core/memory_management.h"
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 static int is_seed_initialized = 0;
 

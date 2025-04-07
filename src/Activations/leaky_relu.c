@@ -6,9 +6,7 @@
 #include "../../include/Core/logging.h"
 
 #define LEAKY_RELU_ALPHA 0.01f
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 /**
  * @brief Applies the Leaky Rectified Linear Unit (Leaky ReLU) activation function.

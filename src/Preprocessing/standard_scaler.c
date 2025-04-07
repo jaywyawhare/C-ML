@@ -6,9 +6,7 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 /**
  * @brief Scales an array of floats to have a mean of 0 and a standard deviation of 1.

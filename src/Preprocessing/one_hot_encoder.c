@@ -7,9 +7,7 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 /**
  * @brief Encodes a character array into a one-hot encoded integer array.

@@ -6,9 +6,7 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif 
+ 
 
 int initialize_flatten(FlattenLayer *layer, int input_size)
 {

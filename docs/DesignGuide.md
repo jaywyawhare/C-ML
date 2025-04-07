@@ -173,7 +173,7 @@ void polling_layer_free(PollingLayer *layer);
 Before submitting a pull request:
 1. Code follows the naming and formatting conventions.
 2. Functions are properly documented with Doxygen-style comments.
-3. Debug logs are wrapped in `#if DEBUG_LOGGING` blocks.
+3. Logs use `LOG_DEBUG`, `LOG_INFO`, `LOG_WARNING` or `LOG_ERROR` appropriately.
 4. Error handling is implemented and tested.
 5. Unit tests are written and pass successfully.
 

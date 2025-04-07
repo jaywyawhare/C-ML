@@ -5,9 +5,7 @@
 #include "../../include/Activations/linear.h"
 #include "../../include/Core/logging.h"
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 /**
  * @brief Applies the Linear (identity) activation function.

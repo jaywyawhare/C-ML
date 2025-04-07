@@ -6,9 +6,6 @@
 #include "../../include/Core/logging.h"
 
 #define EPSILON 1e-6f
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
 
 /**
  * @brief Applies the Exponential Linear Unit (ELU) activation function.

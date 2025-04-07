@@ -6,9 +6,7 @@
 #include "../../include/Core/logging.h"
 
 #define TANH_THRESHOLD 20.0f
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
+
 
 /**
  * @brief Applies the hyperbolic tangent (tanh) activation function.
