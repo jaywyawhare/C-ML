@@ -5,6 +5,7 @@
 #include "../include/Activations/sigmoid.h"
 #include "../include/Loss_Functions/mean_squared_error.h"
 #include "../include/Core/error_codes.h"
+#include "../include/Core/logging.h"
 
 #define INPUT_SIZE 2
 #define HIDDEN_SIZE 1
