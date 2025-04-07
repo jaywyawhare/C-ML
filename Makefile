@@ -108,7 +108,7 @@ $(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_DIR)/%.c $(STATIC_LIB)
 
 # Debug version of examples with sanitizers
 .PHONY: debug_examples
-debug_examples: EXAMPLE_FLAGS := -DDEBUG_LOGGING -fsanitize=address -fsanitize=undefined
+debug_examples: EXAMPLE_FLAGS :=  -fsanitize=address -fsanitize=undefined
 debug_examples: $(STATIC_LIB)
 	@mkdir -p $(EXAMPLES_BIN_DIR)
 	@for example_src in $(EXAMPLE_FILES); do \
@@ -128,7 +128,7 @@ nn_example: $(STATIC_LIB)
 
 # Debug version of neural network example
 .PHONY: debug_nn_example
-debug_nn_example: EXAMPLE_FLAGS := -DDEBUG_LOGGING -fsanitize=address -fsanitize=undefined
+debug_nn_example: EXAMPLE_FLAGS :=  -fsanitize=address -fsanitize=undefined
 debug_nn_example: $(STATIC_LIB)
 	@mkdir -p $(EXAMPLES_BIN_DIR)
 	$(CC) $(CFLAGS) $(EXAMPLE_FLAGS) $(EXAMPLES_DIR)/nn_training_example.c -L$(LIB_DIR) -l$(LIB_NAME) -o $(EXAMPLES_BIN_DIR)/nn_training_example
