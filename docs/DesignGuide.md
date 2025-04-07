@@ -103,7 +103,7 @@ void polling_layer_free(PollingLayer *layer);
 ## 5. Debugging Conventions
 
 ### 5.1 Debug Logging
-- **Enable/disable logs**: Use the `set_log_level(LOG_LEVEL_)` macro to configure the global log level.
+- **Enable/disable logs**: Use the `set_log_level(LOG_LEVEL_*)` macro to configure the global log level.
   ```c
   #include "include/logging.h"
 
@@ -113,7 +113,7 @@ void polling_layer_free(PollingLayer *layer);
   set_log_level(LOG_LEVEL_ERROR);
   ```
 
-- **Log appropriately**: Use the `#LOG_level` macros to conditionally log messages.
+- **Log appropriately**: Use the `#LOG_*` macros to conditionally log messages.
   ```c
   LOG_DEBUG("%s is a debug message.", message);
   LOG_INFO("Count is %d.", count);
@@ -126,6 +126,17 @@ void polling_layer_free(PollingLayer *layer);
   ```c
   LOG_ERROR("Invalid parameter (%d).", param);
   ```
+
+### 5.3 Log Message Formatting
+- Log messages are automatically formatted for you when you use the `LOG_*` macros.
+```plaintext
+Compiling and running test_logging...
+Running logging tests...
+2025-04-07 03:37:33 [DEBUG] test/Core/test_logging.c:18 main(): This is a debug message: 42
+2025-04-07 03:37:33 [INFO] test/Core/test_logging.c:19 main(): This is an info message: hello
+2025-04-07 03:37:33 [WARNING] test/Core/test_logging.c:20 main(): This is a warning message: 3.14
+2025-04-07 03:37:33 [ERROR] test/Core/test_logging.c:21 main(): This is an error message: X
+```
 
 ## 6. File Organization
 

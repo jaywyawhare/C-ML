@@ -7,7 +7,9 @@
 
 ## Error Handling
 - Check for null pointers and invalid inputs.
-- Use `fprintf` to log errors and exit gracefully.
+- Use `LOG_ERROR` macro to log errors
+- return a `CM_Error` status code if recoverable...
+- or exit gracefully if not.
 
 ## Memory Management
 - Allocate memory dynamically where necessary.
