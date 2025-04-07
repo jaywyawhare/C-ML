@@ -85,7 +85,7 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
         }
     }
 #if DEBUG_LOGGING
-    printf("[oneHotEncoding] Debug: Encoding complete.\n");
+    LOG_DEBUG("Encoding complete.");
 #endif
     return encoded;
 }
@@ -135,7 +135,7 @@ char *one_hot_decoding(int *x, int size, CharMap *map, int mapSize)
     }
     decoded[size] = '\0';
 #if DEBUG_LOGGING
-    printf("[oneHotEncoding] Debug: Decoding complete.\n");
+    LOG_DEBUG("Decoding complete.");
 #endif
     return decoded;
 }

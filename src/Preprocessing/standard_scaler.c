@@ -72,7 +72,7 @@ float *standard_scaler(float *x, int size)
 #endif
     }
 #if DEBUG_LOGGING
-    printf("[standardScaler] Debug: Scaling complete.\n");
+    LOG_DEBUG("Scaling complete.");
 #endif
     return scaled;
 }

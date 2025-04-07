@@ -206,7 +206,7 @@ int main() {
 
     // Print output
     for (int i = 0; i < output_size; i++) {
-        printf("[main]] Info: Output[%d]: %f\n", i, output[i]);
+        LOG_INFO("$2");Output[%d]: %f\n", i, output[i]);
     }
 
     // Free resources

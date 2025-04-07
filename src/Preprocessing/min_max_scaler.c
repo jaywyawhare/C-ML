@@ -67,7 +67,7 @@ float *min_max_scaler(float *x, int size)
 #endif
     }
 #if DEBUG_LOGGING
-    printf("[minMaxScaler] Debug: Scaling complete.\n");
+    LOG_DEBUG("Scaling complete.");
 #endif
     return scaled;
 }

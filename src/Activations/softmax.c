@@ -85,7 +85,7 @@ void free_softmax(float **output)
     {
         cm_safe_free((void **)output);
 #if DEBUG_LOGGING
-        printf("[free_softmax] Debug: Memory freed for softmax output.\n");
+        LOG_DEBUG("Memory freed for softmax output.");
 #endif
     }
 }
@@ -154,7 +154,7 @@ void free_softmax_derivative(float **jacobian)
     {
         cm_safe_free((void **)jacobian);
 #if DEBUG_LOGGING
-        printf("[free_softmax_derivative] Debug: Memory freed for softmax derivative jacobian.\n");
+        LOG_DEBUG("Memory freed for softmax derivative jacobian.");
 #endif
     }
 }
