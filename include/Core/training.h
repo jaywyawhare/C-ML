@@ -286,7 +286,7 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
  * @param num_samples Number of test samples
  * @param ... Optional arguments: metrics (const char**, terminated by NULL)
  */
-void test_network(NeuralNetwork *network, float **X_test, float **y_test, int num_samples, ...);
+CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test, int num_samples, ...);
 
 /**
  * @brief Free memory allocated for the neural network
