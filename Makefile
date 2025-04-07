@@ -75,7 +75,7 @@ release: clean all
 
 # Debug build with sanitizers
 .PHONY: debug
-debug: CFLAGS += -DDEBUG_LOGGING -fsanitize=address -fsanitize=undefined
+debug: CFLAGS += -fsanitize=address -fsanitize=undefined
 debug: all
 	@echo "Built debug version with sanitizers"
 
