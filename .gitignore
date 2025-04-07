@@ -36,6 +36,9 @@
 *.x86_64
 *.hex
 
+# Binary files
+*.bin
+
 # Debug files
 *.dSYM/
 *.su
@@ -44,6 +47,7 @@
 
 # VSCode
 .VSCode
+.vscode/
 
 # Project-specific Artefacts
 examples_bin/**
