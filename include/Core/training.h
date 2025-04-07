@@ -286,6 +286,7 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
  * @param num_samples Number of test samples
  * @param ... Optional arguments: metrics (const char**, terminated by NULL)
  */
+
 CM_Error test_network(NeuralNetwork *network, float **X_test, float **y_test, int num_samples, ...);
 
 /**
@@ -332,5 +333,6 @@ void summary(NeuralNetwork *network);
  * @return const char* The name of the metric
  */
 const char *get_metric_name(MetricType metric);
+
 
 #endif

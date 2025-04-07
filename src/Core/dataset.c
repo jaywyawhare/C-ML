@@ -2,6 +2,7 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

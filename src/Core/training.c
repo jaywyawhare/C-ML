@@ -1022,6 +1022,7 @@ CM_Error train_network(NeuralNetwork *network, Dataset *dataset, int epochs, ...
                 }
             }
         }
+       
         LOG_INFO("Epoch %d/%d - Loss: %.4f", epoch + 1, epochs, total_loss / num_samples);
     }
 

@@ -30,7 +30,7 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         LOG_ERROR("Invalid input size (%d) or output size (%d)", input_size, output_size);
         return CM_INVALID_PARAMETER_ERROR;
     }
-
+    
     // initialize struct members to NULL
     // cm_safe_free can be called - even inadvertently - without crashing
     layer->weights = NULL;
