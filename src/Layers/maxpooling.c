@@ -4,8 +4,6 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
-
-
 /**
  * @brief Initializes a MaxPooling Layer.
  *

@@ -4,11 +4,13 @@
 /**
  * @brief Structure representing a Dropout Layer.
  *
- * @param dropout_rate Dropout rate (0.0 to 1.0).
+ * @param rate Dropout rate (0.0 to 1.0).
+ * @param is_training Flag indicating if the layer is in training mode.
  */
 typedef struct
 {
-    float dropout_rate;
+    float rate;
+    int is_training;
 } DropoutLayer;
 
 /**

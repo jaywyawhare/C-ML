@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include "../../include/Layers/dropout.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 #include "../../include/Core/memory_management.h"
-
-
 
 static int is_seed_initialized = 0;
 
@@ -31,7 +30,8 @@ int initialize_dropout(DropoutLayer *layer, float dropout_rate)
         return CM_INVALID_PARAMETER_ERROR;
     }
 
-    layer->dropout_rate = dropout_rate;
+    layer->rate = dropout_rate;
+    layer->is_training = 1;
     if (!is_seed_initialized)
     {
         srand((unsigned int)time(NULL));
@@ -57,17 +57,30 @@ int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
         return CM_NULL_POINTER_ERROR;
     }
 
-    for (int i = 0; i < size; i++)
+    if (size <= 0)
     {
-        if ((float)rand() / RAND_MAX < layer->dropout_rate)
+        LOG_ERROR("Invalid size. Must be greater than 0.");
+        return CM_INVALID_PARAMETER_ERROR;
+    }
+
+    if (layer->is_training)
+    {
+        for (int i = 0; i < size; i++)
         {
-            output[i] = 0;
+            if ((float)rand() / RAND_MAX < layer->rate)
+            {
+                output[i] = 0.0f;
+            }
+            else
+            {
+                output[i] = input[i] / (1 - layer->rate);
+            }
+            LOG_DEBUG("Output[%d]: %f", i, output[i]);
         }
-        else
-        {
-            output[i] = input[i] / (1 - layer->dropout_rate);
-        }
-        LOG_DEBUG("Output[%d]: %f", i, output[i]);
+    }
+    else
+    {
+        memcpy(output, input, size * sizeof(float));
     }
     return CM_SUCCESS;
 }
@@ -91,6 +104,12 @@ int backward_dropout(DropoutLayer *layer, float *input, float *output, float *d_
         return CM_NULL_POINTER_ERROR;
     }
 
+    if (size <= 0)
+    {
+        LOG_ERROR("Invalid size. Must be greater than 0.");
+        return CM_INVALID_PARAMETER_ERROR;
+    }
+
     for (int i = 0; i < size; i++)
     {
         if (output[i] == 0.0f)
@@ -99,7 +118,7 @@ int backward_dropout(DropoutLayer *layer, float *input, float *output, float *d_
         }
         else
         {
-            d_input[i] = d_output[i] / (1 - layer->dropout_rate);
+            d_input[i] = d_output[i] / (1 - layer->rate);
         }
     }
     return CM_SUCCESS;
