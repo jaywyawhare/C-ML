@@ -21,39 +21,6 @@ C-ML is a lightweight machine learning library written in C. It provides impleme
 - **Preprocessing**: Label Encoding, One-Hot Encoding, Standard Scaler, Min-Max Scaler
 - **Regularizers**: L1, L2, Combined L1-L2
 
-
-## Directory Structure
-
-```
-C-ML/
-├── docs/                 # Documentation files
-├── examples/             # Example code and usage
-├── include/              # Header files
-├── src/                  # Source files
-│   ├── Core/             # Core library files
-│   ├── Activations/      # Activation functions
-│   ├── Layers/           # Layer implementations
-│   ├── Loss_Functions/   # Loss functions
-│   ├── Optimizers/       # Optimizer implementations
-│   ├── Preprocessing/    # Preprocessing utilities
-│   ├── Metrics/          # Metric functions
-│   └── Regularizers/     # Regularization techniques
-├── test/                 # Test files
-│   ├── Activations/      # Tests for activation functions
-│   ├── Layers/           # Tests for layers
-│   ├── Loss_Functions/   # Tests for loss functions
-│   ├── Optimizers/       # Tests for optimizers
-│   ├── Preprocessing/    # Tests for preprocessing utilities
-│   ├── Metrics/          # Tests for metrics
-│   └── Regularizers/     # Tests for regularization techniques
-├── mkdocs.yml            # Documentation configuration
-├── LICENSE.md            # License information
-├── main.c                # Example usage of the library
-├── Makefile              # Build system
-└── README.md             # Documentation
-```
-
-
 ## Prerequisites
 
 - GCC (GNU Compiler Collection)
@@ -85,7 +52,7 @@ C-ML/
 
 5. Run the examples:
    ```bash
-   make nn_example
+   make examples
    ```
 
 6. Clean the build artifacts:
@@ -101,8 +68,8 @@ The `main.c` file demonstrates how to use the library to create a simple neural 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "../include/Core/training.h"
-#include "../include/Core/dataset.h"
+#include "include/Core/training.h"
+#include "include/Core/dataset.h"
 
 int main()
 {
@@ -112,17 +79,8 @@ int main()
     model_add(network, LAYER_DENSE, ACTIVATION_TANH, 4, 4, 0.0f, 0, 0);
     model_add(network, LAYER_DENSE, ACTIVATION_SIGMOID, 4, 1, 0.0f, 0, 0);
 
-    float X_data[4][2] = {
-        {0.0f, 0.0f},
-        {0.0f, 1.0f},
-        {1.0f, 0.0f},
-        {1.0f, 1.0f}};
-
-    float y_data[4][1] = {
-        {0.0f},
-        {1.0f},
-        {1.0f},
-        {1.0f}};
+    float X_data[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
+    float y_data[4][1] = {{0.0f}, {1.0f}, {1.0f}, {1.0f}};
 
     Dataset *dataset = dataset_create();
     dataset_load_arrays(dataset, (float *)X_data, (float *)y_data, 4, 2, 1);

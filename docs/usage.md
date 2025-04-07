@@ -7,8 +7,8 @@ This page provides an example of how to use the C-ML library to create and train
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "../include/Core/training.h"
-#include "../include/Core/dataset.h"
+#include "include/Core/training.h"
+#include "include/Core/dataset.h"
 
 int main()
 {
@@ -18,17 +18,8 @@ int main()
     model_add(network, LAYER_DENSE, ACTIVATION_TANH, 4, 4, 0.0f, 0, 0);
     model_add(network, LAYER_DENSE, ACTIVATION_SIGMOID, 4, 1, 0.0f, 0, 0);
 
-    float X_data[4][2] = {
-        {0.0f, 0.0f},
-        {0.0f, 1.0f},
-        {1.0f, 0.0f},
-        {1.0f, 1.0f}};
-
-    float y_data[4][1] = {
-        {0.0f},
-        {1.0f},
-        {1.0f},
-        {1.0f}};
+    float X_data[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
+    float y_data[4][1] = {{0.0f}, {1.0f}, {1.0f}, {1.0f}};
 
     Dataset *dataset = dataset_create();
     dataset_load_arrays(dataset, (float *)X_data, (float *)y_data, 4, 2, 1);
