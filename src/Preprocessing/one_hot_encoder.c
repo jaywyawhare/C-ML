@@ -5,8 +5,9 @@
 #include "../../include/Preprocessing/one_hot_encoder.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/logging.h"
 
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Encodes a character array into a one-hot encoded integer array.
@@ -24,20 +25,20 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
 {
     if (x == NULL || map == NULL || mapSize == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return (int *)CM_NULL_POINTER_ERROR;
     }
 
     if (size <= 0)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return (int *)CM_INVALID_PARAMETER_ERROR;
     }
 
     *map = (CharMap *)cm_safe_malloc(sizeof(CharMap) * size, __FILE__, __LINE__);
     if (*map == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         return (int *)CM_MEMORY_ALLOCATION_ERROR;
     }
 
@@ -65,7 +66,7 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
     int *encoded = (int *)cm_safe_malloc(sizeof(int) * size * uniqueCount, __FILE__, __LINE__);
     if (encoded == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         free(*map);
         *map = NULL; 
         return (int *)CM_MEMORY_ALLOCATION_ERROR;
@@ -76,14 +77,10 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
         for (int j = 0; j < uniqueCount; j++)
         {
             encoded[i * uniqueCount + j] = (x[i] == (*map)[j].character) ? 1 : 0;
-#if DEBUG_LOGGING
-            printf("[oneHotEncoding] encoded[%d]: %d\n", i * uniqueCount + j, encoded[i * uniqueCount + j]);
-#endif
+            LOG_DEBUG("encoded[%d]: %d", i * uniqueCount + j, encoded[i * uniqueCount + j]);
         }
     }
-#if DEBUG_LOGGING
-    printf("[oneHotEncoding] Encoding complete.\n");
-#endif
+    LOG_DEBUG("Encoding complete.");
     return encoded;
 }
 
@@ -103,19 +100,19 @@ char *one_hot_decoding(int *x, int size, CharMap *map, int mapSize)
 {
     if (x == NULL || map == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return NULL;
     }
 
     if (size <= 0 || mapSize <= 0)
     {
-        fprintf(stderr, "[oneHotEncoding] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return NULL;
     }
     char *decoded = (char *)cm_safe_malloc(sizeof(char) * (size + 1), __FILE__, __LINE__);
     if (decoded == NULL)
     {
-        fprintf(stderr, "[oneHotEncoding] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         return NULL;
     }
     for (int i = 0; i < size; i++)
@@ -131,9 +128,7 @@ char *one_hot_decoding(int *x, int size, CharMap *map, int mapSize)
         }
     }
     decoded[size] = '\0';
-#if DEBUG_LOGGING
-    printf("[oneHotEncoding] Decoding complete.\n");
-#endif
+    LOG_DEBUG("Decoding complete.");
     return decoded;
 }
 

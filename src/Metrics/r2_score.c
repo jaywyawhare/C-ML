@@ -1,4 +1,6 @@
 #include "../../include/Metrics/r2_score.h"
+#include "../../include/Core/logging.h"
+
 #include <math.h>
 #include <stddef.h>
 

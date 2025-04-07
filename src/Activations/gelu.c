@@ -3,8 +3,9 @@
 #include <stdio.h>
 #include "../../include/Activations/gelu.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Applies the Gaussian Error Linear Unit (GELU) activation function.
@@ -19,15 +20,13 @@ float gelu(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        fprintf(stderr, "[gelu] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 
     const float sqrt_2_over_pi = 0.7978845608f;
     float result = 0.5f * x * (1.0f + tanhf(sqrt_2_over_pi * (x + 0.044715f * x * x * x)));
-#if DEBUG_LOGGING
-    printf("[gelu] Input: x=%f, Output: %f\n", x, result);
-#endif
+    LOG_DEBUG("Input: x=%f, Output: %f", x, result);
     return result;
 }
 
@@ -46,7 +45,7 @@ float gelu_derivative(float x)
 {
     if (isnan(x) || isinf(x))
     {
-        fprintf(stderr, "[gelu_derivative] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 

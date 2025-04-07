@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/mean_squared_error.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Mean Squared Error (MSE).
@@ -18,7 +19,7 @@ float mean_squared_error(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[mean_squared_error] Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.\n");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float sum = 0.0f;
@@ -45,17 +46,17 @@ float mean_squared_error_derivative(float predicted, float actual, int n)
 {
     if (n <= 0)
     {
-        fprintf(stderr, "[mean_squared_error_derivative] Invalid size parameter.\n");
+        LOG_ERROR("Invalid size parameter.\n");
         return 0.0f;
     }
     if (predicted < 0 || predicted > 1)
     {
-        fprintf(stderr, "[mean_squared_error_derivative] Predicted value out of bounds.\n");
+        LOG_ERROR("Predicted value out of bounds.\n");
         return 0.0f;
     }
     if (actual < 0 || actual > 1)
     {
-        fprintf(stderr, "[mean_squared_error_derivative] Actual value out of bounds.\n");
+        LOG_ERROR("Actual value out of bounds.\n");
         return 0.0f;
     }
     return (2.0f * (predicted - actual)) / n;

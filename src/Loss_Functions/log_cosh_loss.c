@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/log_cosh_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Log-Cosh Loss.
@@ -18,7 +19,7 @@ float log_cosh_loss(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[log_cosh_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float sum = 0.0f;

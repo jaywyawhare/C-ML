@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/reduce_mean.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the mean of an array of floats.
@@ -15,7 +16,7 @@ float reduce_mean(float *loss, int size)
 {
     if (!loss || size <= 0)
     {
-        fprintf(stderr, "[reduce_mean] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float sum = 0;

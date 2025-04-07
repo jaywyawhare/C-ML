@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include "../../include/Activations/tanh.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define TANH_THRESHOLD 20.0f
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Applies the hyperbolic tangent (tanh) activation function.
@@ -25,21 +26,17 @@ float tanH(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        fprintf(stderr, "[tanh] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
     if (x > TANH_THRESHOLD)
     {
-#if DEBUG_LOGGING
-        printf("[tanh] Input: x=%f, Output: 1.0 (clipped)\n", x);
-#endif
+        LOG_DEBUG("Input: x=%f, Output: 1.0 (clipped)", x);
         return 1.0f;
     }
     else if (x < -TANH_THRESHOLD)
     {
-#if DEBUG_LOGGING
-        printf("[tanh] Input: x=%f, Output: -1.0 (clipped)\n", x);
-#endif
+        LOG_DEBUG("Input: x=%f, Output: -1.0 (clipped)", x);
         return -1.0f;
     }
     else
@@ -47,9 +44,7 @@ float tanH(float x)
         float e_pos = expf(x);
         float e_neg = expf(-x);
         float result = (e_pos - e_neg) / (e_pos + e_neg);
-#if DEBUG_LOGGING
-        printf("[tanh] Input: x=%f, Output: %f\n", x, result);
-#endif
+        LOG_DEBUG("Input: x=%f, Output: %f", x, result);
         return result;
     }
 }
@@ -67,7 +62,7 @@ float tanh_derivative(float tanh_output)
 {
     if (isnan(tanh_output) || isinf(tanh_output) || tanh_output < -1.0f || tanh_output > 1.0f)
     {
-        fprintf(stderr, "[tanh_derivative] Error: Invalid tanh output (NaN, Inf, or out of range)\n");
+        LOG_ERROR("Invalid tanh output (NaN, Inf, or out of range)");
         return CM_INVALID_INPUT_ERROR;
     }
 

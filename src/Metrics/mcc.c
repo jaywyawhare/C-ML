@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/mcc.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Matthews Correlation Coefficient (MCC).
@@ -20,7 +21,7 @@ float mcc(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[mcc] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     int tp = 0, tn = 0, fp = 0, fn = 0;

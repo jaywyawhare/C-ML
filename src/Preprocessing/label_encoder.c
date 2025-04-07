@@ -5,7 +5,8 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0
+#include "../../include/Core/logging.h"
+
 
 /**
  * @brief Encodes a character array into integer labels.
@@ -22,20 +23,20 @@ int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
 {
     if (x == NULL || map == NULL || mapSize == NULL)
     {
-        fprintf(stderr, "[labelEncoder] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return (int *)CM_NULL_POINTER_ERROR;
     }
 
     if (size <= 0)
     {
-        fprintf(stderr, "[labelEncoder] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return (int *)CM_INVALID_PARAMETER_ERROR;
     }
 
     *map = (CharMap *)cm_safe_malloc(sizeof(CharMap) * size, __FILE__, __LINE__);
     if (*map == NULL)
     {
-        fprintf(stderr, "[labelEncoder] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         return (int *)CM_MEMORY_ALLOCATION_ERROR;
     }
     int uniqueCount = 0;
@@ -62,7 +63,7 @@ int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
     int *encoded = (int *)cm_safe_malloc(sizeof(int) * size, __FILE__, __LINE__);
     if (encoded == NULL)
     {
-        fprintf(stderr, "[labelEncoder] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         free(*map);
         return (int *)CM_MEMORY_ALLOCATION_ERROR;
     }
@@ -77,9 +78,7 @@ int *label_encoder(char *x, int size, CharMap **map, int *mapSize)
             }
         }
     }
-#if DEBUG_LOGGING
-    printf("[labelEncoder] Encoding complete.\n");
-#endif
+    LOG_DEBUG("Encoding complete.");
     return encoded;
 }
 
@@ -99,19 +98,19 @@ char *label_decoder(int *x, int size, CharMap *map, int mapSize)
 {
     if (x == NULL || map == NULL)
     {
-        fprintf(stderr, "[labelDecoder] Error: Null pointer argument\n");
+        LOG_ERROR("Null pointer argument");
         return NULL;
     }
 
     if (size <= 0 || mapSize <= 0)
     {
-        fprintf(stderr, "[labelDecoder] Error: Invalid size argument\n");
+        LOG_ERROR("Invalid size argument");
         return NULL;
     }
     char *decoded = (char *)cm_safe_malloc(sizeof(char) * (size + 1), __FILE__, __LINE__);
     if (decoded == NULL)
     {
-        fprintf(stderr, "[labelDecoder] Memory allocation failed\n");
+        LOG_ERROR("Memory allocation failed\n");
         return NULL;
     }
     for (int i = 0; i < size; i++)
@@ -126,9 +125,7 @@ char *label_decoder(int *x, int size, CharMap *map, int mapSize)
         }
     }
     decoded[size] = '\0';
-#if DEBUG_LOGGING
-    printf("[labelDecoder] Decoding complete.\n");
-#endif
+    LOG_DEBUG("Decoding complete.");
     return decoded;
 }
 

@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include "../../include/Optimizers/sgd.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Performs the Stochastic Gradient Descent (SGD) optimization algorithm.
@@ -21,7 +22,7 @@ float sgd(float x, float y, float lr, float *w, float *b)
 {
     if (!w || !b)
     {
-        fprintf(stderr, "[sgd] Error: Null pointer input.\n");
+        LOG_ERROR("Null pointer input.");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -32,7 +33,7 @@ float sgd(float x, float y, float lr, float *w, float *b)
 
     if (isinf(x) || isinf(y))
     {
-        fprintf(stderr, "[sgd] Error: Invalid input (inf).\n");
+        LOG_ERROR("Invalid input (inf).");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -43,10 +44,7 @@ float sgd(float x, float y, float lr, float *w, float *b)
 
     (*w) -= lr * dw;
     (*b) -= lr * db;
-
-#if DEBUG_LOGGING
-    printf("[sgd] w: %f, b: %f, loss: %f\n", *w, *b, loss);
-#endif
+    LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
 
     return loss;
 }

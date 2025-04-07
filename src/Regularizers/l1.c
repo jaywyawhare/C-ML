@@ -1,8 +1,9 @@
 #include <math.h>
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Applies L1 regularization to update weights and biases.
@@ -28,19 +29,19 @@ float l1(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b,
 {
     if (w == NULL || b == NULL || v_w == NULL || v_b == NULL || s_w == NULL || s_b == NULL)
     {
-        fprintf(stderr, "[l1] Error: Null pointer argument.\n");
+        LOG_ERROR("Null pointer argument.");
         return CM_NULL_POINTER_ERROR;
     }
 
     if (epsilon <= 0)
     {
-        fprintf(stderr, "[l1] Error: Epsilon must be positive.\n");
+        LOG_ERROR("Epsilon must be positive.");
         return CM_INVALID_PARAMETER_ERROR;
     }
 
     if (lr <= 0 || beta1 >= 1.0 || beta2 >= 1.0 || beta1 <= 0.0 || beta2 <= 0.0 || isnan(x) || isnan(y) || isinf(x) || isinf(y))
     {
-        fprintf(stderr, "[l1] Error: Invalid parameter(s) provided.\n");
+        LOG_ERROR("Invalid parameter(s) provided.");
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -54,10 +55,7 @@ float l1(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b,
     *s_b = beta2 * (*s_b) + (1 - beta2) * pow(db, 2);
     *w -= lr * ((*v_w) / (sqrt(*s_w) + epsilon));
     *b -= lr * ((*v_b) / (sqrt(*s_b) + epsilon));
-
-#if DEBUG_LOGGING
-    printf("[l1] w: %f, b: %f, loss: %f\n", *w, *b, loss);
-#endif
+    LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
 
     return loss;
 }

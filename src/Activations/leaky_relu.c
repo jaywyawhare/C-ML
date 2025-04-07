@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include "../../include/Core/error_codes.h"
 #include "../../include/Activations/leaky_relu.h"
+#include "../../include/Core/logging.h"
 
 #define LEAKY_RELU_ALPHA 0.01f
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Applies the Leaky Rectified Linear Unit (Leaky ReLU) activation function.
@@ -21,14 +22,12 @@ float leaky_relu(float x)
 {
    if (isnan(x) || isinf(x) || x == -INFINITY)
    {
-      fprintf(stderr, "[leaky_relu] Error: Invalid input (NaN or Inf)\n");
+      LOG_ERROR("Invalid input (NaN or Inf)");
       return CM_INVALID_INPUT_ERROR;
    }
 
    float result = x > 0 ? x : LEAKY_RELU_ALPHA * x;
-#if DEBUG_LOGGING
-   printf("[leaky_relu] Input: x=%f, Output: %f\n", x, result);
-#endif
+   LOG_DEBUG("Input: x=%f, Output: %f", x, result);
    return result;
 }
 
@@ -46,7 +45,7 @@ float leaky_relu_derivative(float x)
 {
    if (isnan(x) || isinf(x))
    {
-      fprintf(stderr, "[leaky_relu_derivative] Error: Invalid input (NaN or Inf)\n");
+      LOG_ERROR("Invalid input (NaN or Inf)");
       return CM_INVALID_INPUT_ERROR;
    }
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/precision.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Precision metric.
@@ -17,7 +18,7 @@ float precision(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[precision] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     int true_positive = 0, false_positive = 0;

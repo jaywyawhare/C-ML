@@ -2,9 +2,14 @@
 #include <stdlib.h>
 #include "../include/Core/training.h"
 #include "../include/Core/dataset.h"
+#include "../include/Core/logging.h"
+#include <time.h>
 
 int main()
 {
+    set_log_level(LOG_LEVEL_INFO);
+    srand(time(NULL));
+
     NeuralNetwork *network = create_neural_network(2);
     build_network(network, OPTIMIZER_ADAM, 0.1f, LOSS_MSE, 0.0f, 0.0f);
     model_add(network, LAYER_DENSE, ACTIVATION_RELU, 2, 4, 0.0f, 0, 0);

@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include "../../include/Activations/elu.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define EPSILON 1e-6f
-#define DEBUG_LOGGING 0
 
 /**
  * @brief Applies the Exponential Linear Unit (ELU) activation function.
@@ -22,14 +22,12 @@ float elu(float x, float alpha)
 {
     if (isnan(x) || isnan(alpha) || isinf(x) || isinf(alpha) || x == -INFINITY || alpha == -INFINITY)
     {
-        fprintf(stderr, "[elu] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 
     float result = x >= 0 ? x : alpha * (expf(x) - 1);
-#if DEBUG_LOGGING
-    printf("[elu] Input: x=%f, alpha=%f, Output: %f\n", x, alpha, result);
-#endif
+    LOG_DEBUG("Input: x=%f, alpha=%f, Output: %f", x, alpha, result);
     return result;
 }
 
@@ -48,7 +46,7 @@ float elu_derivative(float x, float alpha)
 {
     if (isnan(x) || isnan(alpha) || isinf(x) || isinf(alpha))
     {
-        fprintf(stderr, "[elu_derivative] Error: Invalid input (NaN or Inf)\n");
+        LOG_ERROR("Invalid input (NaN or Inf)");
         return CM_INVALID_INPUT_ERROR;
     }
 

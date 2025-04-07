@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/tversky_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define ALPHA 0.5f
 #define BETA 0.5f
@@ -21,7 +22,7 @@ float tversky_loss(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[tversky_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float tp = 0.0f, fp = 0.0f, fn = 0.0f;
@@ -34,7 +35,7 @@ float tversky_loss(float *y, float *yHat, int n)
     float denominator = tp + ALPHA * fp + BETA * fn;
     if (denominator == 0)
     {
-        fprintf(stderr, "[tversky_loss] Error: Division by zero.\n");
+        LOG_ERROR("Division by zero.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     return 1.0f - (tp / denominator);
@@ -55,7 +56,7 @@ float tversky_loss_derivative(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[tversky_loss_derivative] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float tp = 0.0f, fp = 0.0f, fn = 0.0f;
@@ -68,7 +69,7 @@ float tversky_loss_derivative(float *y, float *yHat, int n)
     float denominator = tp + ALPHA * fp + BETA * fn;
     if (denominator == 0)
     {
-        fprintf(stderr, "[tversky_loss_derivative] Error: Division by zero.\n");
+        LOG_ERROR("Division by zero.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     return -tp / (denominator * denominator);

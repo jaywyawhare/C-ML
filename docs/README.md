@@ -6,22 +6,37 @@ Welcome to the comprehensive documentation for **C-ML**, a lightweight machine l
 
 ## Table of Contents
 
-1. [Introduction](#introduction)
-2. [Features](#features)
-3. [Directory Structure](#directory-structure)
-4. [Installation](#installation)
-5. [Usage](#usage)
-6. [Modules](#modules)
-   - [Layers](#layers)
-   - [Activations](#activations)
-   - [Loss Functions](#loss-functions)
-   - [Optimizers](#optimizers)
-   - [Preprocessing](#preprocessing)
-   - [Regularizers](#regularizers)
-7. [Testing](#testing)
-8. [Development Guidelines](#development-guidelines)
-9. [Contributing](#contributing)
-10. [License](#license)
+- [C-ML Documentation](#c-ml-documentation)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [Features](#features)
+  - [Directory Structure](#directory-structure)
+  - [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Steps](#steps)
+  - [Usage](#usage)
+  - [Modules](#modules)
+    - [Layers](#layers)
+      - [Dense Layer](#dense-layer)
+      - [Dropout Layer](#dropout-layer)
+    - [Activations](#activations)
+      - [Supported Functions](#supported-functions)
+    - [Loss Functions](#loss-functions)
+      - [Supported Losses](#supported-losses)
+    - [Optimizers](#optimizers)
+      - [Supported Optimizers](#supported-optimizers)
+    - [Preprocessing](#preprocessing)
+      - [Utilities](#utilities)
+    - [Regularizers](#regularizers)
+      - [Supported Regularizers](#supported-regularizers)
+  - [Testing](#testing)
+  - [Development Guidelines](#development-guidelines)
+    - [Code Style](#code-style)
+    - [Error Handling](#error-handling)
+    - [Memory Management](#memory-management)
+    - [Testing](#testing-1)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
@@ -110,6 +125,7 @@ The `main.c` file demonstrates how to use the library to create a simple neural 
 #include <stdlib.h>
 #include <time.h>
 #include "include/Core/training.h"
+#include "include/Core/logging.h"
 
 int main()
 {
@@ -155,13 +171,13 @@ int main()
     float results[num_metrics];
 
     test_network(network, X_train, y_train, num_samples, 2, 1, (int *)metrics, num_metrics, results);
-    printf("R2 Score: %.2f\n", results[0]);
+    LOG_INFO("R2 Score: %.2f", results[0]);
 
     for (int i = 0; i < num_samples; i++)
     {
         float prediction = 0.0f;
         forward_pass(network, X_train[i], &prediction, 2, 1, 0);
-        printf("Input: [%.0f, %.0f], Expected: %.0f, Predicted: %.4f\n",
+        LOG_INFO(" Input: [%.0f, %.0f], Expected: %.0f, Predicted: %.4f\n",
                X_train[i][0], X_train[i][1], y_train[i][0], prediction);
     }
 

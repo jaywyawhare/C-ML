@@ -47,7 +47,7 @@ void test_dense()
 
         layer.weights = NULL;
         layer.biases = NULL;
-        layer.input_size = 3;
+        layer.input_size = 3; // was already set correctly in initialize_dense
         layer.output_size = 2;
         ret = forward_dense(&layer, NULL, (float[2]){0});
         assert(ret == CM_NULL_POINTER_ERROR);

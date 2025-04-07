@@ -24,9 +24,15 @@
    ./bin/main
    ```
 
-4. Run the tests:
+4. Run all tests:
    ```bash
    make test
    ```
+
+   Run specific tests:
+   ```bash
+   make test TEST_SRCS="test/Layers/test_dense.c"
+   ```
+
 
 > **Note**: Ensure that GCC and `make` are installed and available in your system's PATH.

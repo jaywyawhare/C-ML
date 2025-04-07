@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/accuracy.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the accuracy of predictions.
@@ -17,7 +18,7 @@ float accuracy(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[accuracy] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     int correct = 0;

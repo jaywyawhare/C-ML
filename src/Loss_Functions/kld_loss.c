@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/kld_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 #define EPSILON 1e-8
 
@@ -20,7 +21,7 @@ float kld_loss(float *p, float *q, int n)
 {
     if (!p || !q || n <= 0)
     {
-        fprintf(stderr, "[kld_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float sum = 0.0f;

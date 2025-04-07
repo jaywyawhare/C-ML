@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../../include/Loss_Functions/cosine_similarity_loss.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Cosine Similarity Loss.
@@ -18,7 +19,7 @@ float cosine_similarity_loss(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[cosine_similarity_loss] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float dot_product = 0.0f, norm_y = 0.0f, norm_yHat = 0.0f;
@@ -32,7 +33,7 @@ float cosine_similarity_loss(float *y, float *yHat, int n)
     norm_yHat = sqrtf(norm_yHat);
     if (norm_y == 0 || norm_yHat == 0)
     {
-        fprintf(stderr, "[cosine_similarity_loss] Error: Zero vector norm.\n");
+        LOG_ERROR("Zero vector norm.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
 
@@ -54,7 +55,7 @@ float cosine_similarity_loss_derivative(float *y, float *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[cosine_similarity_loss_derivative] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float dot_product = 0.0f, norm_y = 0.0f, norm_yHat = 0.0f;
@@ -68,7 +69,7 @@ float cosine_similarity_loss_derivative(float *y, float *yHat, int n)
     norm_yHat = sqrtf(norm_yHat);
     if (norm_y == 0 || norm_yHat == 0)
     {
-        fprintf(stderr, "[cosine_similarity_loss_derivative] Error: Zero vector norm.\n");
+        LOG_ERROR("Zero vector norm.");
         return (float)CM_INVALID_INPUT_ERROR;
     }
     float derivative = -y[0] / (norm_y * norm_yHat);

@@ -3,9 +3,10 @@
 #include <time.h>
 #include "../../include/Layers/dropout.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 #include "../../include/Core/memory_management.h"
 
-#define DEBUG_LOGGING 0
+
 
 static int is_seed_initialized = 0;
 
@@ -20,13 +21,13 @@ int initialize_dropout(DropoutLayer *layer, float dropout_rate)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "[initializeDropout] Error: Layer is NULL.\n");
+        LOG_ERROR("Layer is NULL.");
         return CM_NULL_POINTER_ERROR;
     }
 
     if (dropout_rate < 0.0f || dropout_rate > 1.0f)
     {
-        fprintf(stderr, "[initializeDropout] Error: Invalid dropout rate. Must be between 0.0 and 1.0.\n");
+        LOG_ERROR("Invalid dropout rate. Must be between 0.0 and 1.0.");
         return CM_INVALID_PARAMETER_ERROR;
     }
 
@@ -52,7 +53,7 @@ int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
 {
     if (layer == NULL || input == NULL || output == NULL)
     {
-        fprintf(stderr, "[forwardDropout] Error: Layer, input, or output is NULL.\n");
+        LOG_ERROR("Layer, input, or output is NULL.");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -66,9 +67,7 @@ int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
         {
             output[i] = input[i] / (1 - layer->dropout_rate);
         }
-#if DEBUG_LOGGING
-        printf("[forwardDropout] Output[%d]: %f\n", i, output[i]);
-#endif
+        LOG_DEBUG("Output[%d]: %f", i, output[i]);
     }
     return CM_SUCCESS;
 }
@@ -88,7 +87,7 @@ int backward_dropout(DropoutLayer *layer, float *input, float *output, float *d_
 {
     if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL)
     {
-        fprintf(stderr, "[backwardDropout] Error: One or more arguments are NULL.\n");
+        LOG_ERROR("One or more arguments are NULL.");
         return CM_NULL_POINTER_ERROR;
     }
 

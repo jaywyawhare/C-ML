@@ -5,8 +5,9 @@
 #include "../../include/Layers/dense.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/logging.h"
 
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Initializes a Dense Layer with random weights and biases.
@@ -20,22 +21,27 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
 {
     if (layer == NULL)
     {
-        fprintf(stderr, "[initializeDense] Error: Layer is NULL.\n");
+        LOG_ERROR("Layer is NULL");
         return CM_NULL_POINTER_ERROR;
     }
 
     if (input_size <= 0 || output_size <= 0)
     {
-        fprintf(stderr, "[initializeDense] Error: Invalid input size (%d) or output size (%d).\n", input_size, output_size);
+        LOG_ERROR("Invalid input size (%d) or output size (%d)", input_size, output_size);
         return CM_INVALID_PARAMETER_ERROR;
     }
+    
+    // initialize struct members to NULL
+    // cm_safe_free can be called - even inadvertently - without crashing
+    layer->weights = NULL;
+    layer->biases = NULL;
+    layer->adam_v_w = NULL;
+    layer->adam_v_b = NULL;
+    layer->adam_s_w = NULL;
+    layer->adam_s_b = NULL;
 
-    cm_safe_free((void **)&layer->weights);
-    cm_safe_free((void **)&layer->biases);
-    cm_safe_free((void **)&layer->adam_v_w);
-    cm_safe_free((void **)&layer->adam_v_b);
-    cm_safe_free((void **)&layer->adam_s_w);
-    cm_safe_free((void **)&layer->adam_s_b);
+    // if we don't see this Log message, we had a prolem zero-ing out memory
+    LOG_DEBUG("Initialized DenseLayer with input size (%d) and output size (%d)", input_size, output_size);
 
     layer->input_size = input_size;
     layer->output_size = output_size;
@@ -44,7 +50,7 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
 
     if (layer->weights == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->biases == (void *)CM_MEMORY_ALLOCATION_ERROR)
     {
-        fprintf(stderr, "[initializeDense] Error: Memory allocation failed.\n");
+        LOG_ERROR("Memory allocation failed");
         cm_safe_free((void **)&layer->weights);
         cm_safe_free((void **)&layer->biases);
         return CM_MEMORY_ALLOCATION_ERROR;
@@ -69,7 +75,7 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
     if (layer->adam_v_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_v_b == (void *)CM_MEMORY_ALLOCATION_ERROR ||
         layer->adam_s_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_s_b == (void *)CM_MEMORY_ALLOCATION_ERROR)
     {
-        fprintf(stderr, "[initializeDense] Error: Memory allocation failed for Adam optimizer's moment vectors.\n");
+        LOG_ERROR("Error: Memory allocation failed for Adam optimizer's moment vectors.\n");
         cm_safe_free((void **)&layer->adam_v_w);
         cm_safe_free((void **)&layer->adam_v_b);
         cm_safe_free((void **)&layer->adam_s_w);
@@ -97,9 +103,11 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
 {
     if (layer == NULL || input == NULL || output == NULL)
     {
-        fprintf(stderr, "[forwardDense] Error: Layer, input, or output is NULL.\n");
+        LOG_ERROR("Layer, input, or output is NULL");
         return CM_NULL_POINTER_ERROR;
     }
+
+    LOG_DEBUG("forward_dense(layer->input_size: %d, layer->output_size: %d)", layer->input_size, layer->output_size);
 
     for (int i = 0; i < layer->output_size; i++)
     {
@@ -109,9 +117,7 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
             output[i] += input[j] * layer->weights[j + i * layer->input_size];
         }
         output[i] += layer->biases[i];
-#if DEBUG_LOGGING
-        printf("[forwardDense] Output[%d]: %f\n", i, output[i]);
-#endif
+        LOG_DEBUG("Output[%d]: %f", i, output[i]);
     }
 
     return CM_SUCCESS;
@@ -133,7 +139,7 @@ int backward_dense(DenseLayer *layer, float *input, float *output, float *d_outp
 {
     if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL || d_weights == NULL || d_biases == NULL)
     {
-        fprintf(stderr, "[backwardDense] Error: One or more arguments are NULL.\n");
+        LOG_ERROR("One or more arguments are NULL");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -142,6 +148,9 @@ int backward_dense(DenseLayer *layer, float *input, float *output, float *d_outp
         d_input[i] = 0;
         for (int j = 0; j < layer->output_size; j++)
         {
+            // Breakpoint condition: Check for potential out-of-bounds access
+            // For GDB:
+            // break dense.c:108 if (i + j * layer->input_size) >= (layer->input_size * layer->output_size)
             d_input[i] += d_output[j] * layer->weights[i + j * layer->input_size];
         }
     }
@@ -171,7 +180,7 @@ int update_dense(DenseLayer *layer, float *d_weights, float *d_biases, float lea
 {
     if (layer == NULL || d_weights == NULL || d_biases == NULL)
     {
-        fprintf(stderr, "[updateDense] Error: Layer or gradients are NULL.\n");
+        LOG_ERROR("Layer or gradients are NULL");
         return CM_NULL_POINTER_ERROR;
     }
 

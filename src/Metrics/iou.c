@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../../include/Metrics/iou.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the Intersection over Union (IoU) metric.
@@ -17,7 +18,7 @@ float iou(float *y, float *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
-        fprintf(stderr, "[iou] Error: Invalid input parameters.\n");
+        LOG_ERROR("Invalid input parameters.");
         return CM_INVALID_INPUT_ERROR;
     }
     float intersection = 0.0f, union_area = 0.0f;
@@ -30,7 +31,7 @@ float iou(float *y, float *yHat, int n, float threshold)
     }
     if (union_area == 0)
     {
-        fprintf(stderr, "[iou] Error: Division by zero.\n");
+        LOG_ERROR("Division by zero.");
         return 0.0f;
     }
     return intersection / union_area;

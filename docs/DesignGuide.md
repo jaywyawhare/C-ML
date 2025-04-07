@@ -103,25 +103,40 @@ void polling_layer_free(PollingLayer *layer);
 ## 5. Debugging Conventions
 
 ### 5.1 Debug Logging
-- **Enable/disable logs**: Use the `DEBUG_LOGGING` macro to toggle debug logs.
+- **Enable/disable logs**: Use the `set_log_level(LOG_LEVEL_*)` macro to configure the global log level.
   ```c
-  #define DEBUG_LOGGING 1  // Set to 0 to disable debug logs
+  #include "include/logging.h"
+
+  set_log_level(LOG_LEVEL_DEBUG);
+  set_log_level(LOG_LEVEL_INFO);
+  set_log_level(LOG_LEVEL_WARNING);
+  set_log_level(LOG_LEVEL_ERROR);
   ```
 
-- **Wrap debug logs**: Use `#if DEBUG_LOGGING` to conditionally compile debug messages.
+- **Log appropriately**: Use the `#LOG_*` macros to conditionally log messages.
   ```c
-  #if DEBUG_LOGGING
-  printf("[function_name] Debug: %s\n", message);
-  #endif
+  LOG_DEBUG("%s is a debug message.", message);
+  LOG_INFO("Count is %d.", count);
+  LOG_WARNING("Tensor Bloat is %d unreasonable.", bloat_factor);
+  LOG_ERROR("NeuralNetwork is NULL.");
   ```
 
 ### 5.2 Error Messages
-- **Error messages**: Include the function name and relevant parameter values.
+- **Error messages**: Use the `LOG_ERROR` macro. Include relevant parameter values.
   ```c
-  fprintf(stderr, "[function_name] Error: Invalid parameter (%d).\n", param);
+  LOG_ERROR("Invalid parameter (%d).", param);
   ```
 
-
+### 5.3 Log Message Formatting
+- Log messages are automatically formatted for you when you use the `LOG_*` macros.
+```plaintext
+Compiling and running test_logging...
+Running logging tests...
+2025-04-07 03:37:33 [DEBUG] test/Core/test_logging.c:18 main(): This is a debug message: 42
+2025-04-07 03:37:33 [INFO] test/Core/test_logging.c:19 main(): This is an info message: hello
+2025-04-07 03:37:33 [WARNING] test/Core/test_logging.c:20 main(): This is a warning message: 3.14
+2025-04-07 03:37:33 [ERROR] test/Core/test_logging.c:21 main(): This is an error message: X
+```
 
 ## 6. File Organization
 
@@ -169,7 +184,7 @@ void polling_layer_free(PollingLayer *layer);
 Before submitting a pull request:
 1. Code follows the naming and formatting conventions.
 2. Functions are properly documented with Doxygen-style comments.
-3. Debug logs are wrapped in `#if DEBUG_LOGGING` blocks.
+3. Logs use `LOG_DEBUG`, `LOG_INFO`, `LOG_WARNING` or `LOG_ERROR` appropriately.
 4. Error handling is implemented and tested.
 5. Unit tests are written and pass successfully.
 
@@ -185,7 +200,7 @@ int main() {
     // Create polling layer
     PollingLayer *layer = polling_layer_create(2, 2);
     if (!layer) {
-        fprintf(stderr, "Failed to create polling layer.\n");
+        LOG_ERROR("Failed to create polling layer.\n");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -195,14 +210,14 @@ int main() {
     int output_size = polling_layer_forward(layer, input, output, 4);
 
     if (output_size < 0) {
-        fprintf(stderr, "Error during forward pass.\n");
+        LOG_ERROR("Error during forward pass.\n");
         polling_layer_free(layer);
         return output_size;
     }
 
     // Print output
     for (int i = 0; i < output_size; i++) {
-        printf("Output[%d]: %f\n", i, output[i]);
+        LOG_INFO("$2");Output[%d]: %f\n", i, output[i]);
     }
 
     // Free resources

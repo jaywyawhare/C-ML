@@ -5,6 +5,7 @@
 #include "../include/Activations/sigmoid.h"
 #include "../include/Loss_Functions/mean_squared_error.h"
 #include "../include/Core/error_codes.h"
+#include "../include/Core/logging.h"
 
 #define INPUT_SIZE 2
 #define HIDDEN_SIZE 1
@@ -77,7 +78,7 @@ int main() {
             update_dense(&hidden_layer, d_hidden_weights, d_hidden_biases, LEARNING_RATE);
         }
 
-        printf("Epoch %d, Loss: %f\n", epoch, total_loss / TRAINING_SAMPLES);
+        LOG_INFO("Epoch %d, Loss: %f", epoch, total_loss / TRAINING_SAMPLES);
     }
 
     printf("\nTesting the trained network:\n");
@@ -96,7 +97,7 @@ int main() {
             output[j] = sigmoid(output[j]);
         }
 
-        printf("Input: %f %f, Output: %f, Expected: %f\n", input[0], input[1], output[0], training_labels[i][0]);
+        LOG_INFO("Input: %f %f, Output: %f, Expected: %f", input[0], input[1], output[0], training_labels[i][0]);
     }
 
     free_dense(&hidden_layer);

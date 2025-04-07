@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include "../../include/Optimizers/rmsprop.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 
-#define DEBUG_LOGGING 0
+
 
 /**
  * @brief Performs the RMSProp optimization algorithm.
@@ -25,7 +26,7 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
 {
     if (!w || !b || !cache_w || !cache_b)
     {
-        fprintf(stderr, "[rms_prop] Error: Null pointer input.\n");
+        LOG_ERROR("Null pointer input.");
         return CM_NULL_POINTER_ERROR;
     }
 
@@ -41,7 +42,7 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
 
     if (epsilon <= 0)
     {
-        fprintf(stderr, "[rms_prop] Error: Epsilon value (%f) is invalid.\n", epsilon);
+        LOG_ERROR("Epsilon value (%f) is invalid.", epsilon);
         return CM_INVALID_INPUT_ERROR;
     }
 
@@ -55,10 +56,7 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
 
     *w -= lr * (dw / (sqrt(*cache_w) + epsilon));
     *b -= lr * (db / (sqrt(*cache_b) + epsilon));
-
-#if DEBUG_LOGGING
-    printf("[rms_prop] w: %f, b: %f, loss: %f\n", *w, *b, loss);
-#endif
+    LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
 
     return loss;
 }
