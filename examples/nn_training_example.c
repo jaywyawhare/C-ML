@@ -3,6 +3,7 @@
 #include "../include/Core/training.h"
 #include "../include/Core/dataset.h"
 #include "../include/Core/logging.h"
+#include <time.h>
 
 int main()
 {
