@@ -77,7 +77,7 @@ int main() {
             update_dense(&hidden_layer, d_hidden_weights, d_hidden_biases, LEARNING_RATE);
         }
 
-        printf("[main] Info: Epoch %d, Loss: %f\n", epoch, total_loss / TRAINING_SAMPLES);
+        LOG_INFO("Epoch %d, Loss: %f", epoch, total_loss / TRAINING_SAMPLES);
     }
 
     printf("\nTesting the trained network:\n");
@@ -96,7 +96,7 @@ int main() {
             output[j] = sigmoid(output[j]);
         }
 
-        printf("[main] Info: Input: %f %f, Output: %f, Expected: %f\n", input[0], input[1], output[0], training_labels[i][0]);
+        LOG_INFO("Input: %f %f, Output: %f, Expected: %f", input[0], input[1], output[0], training_labels[i][0]);
     }
 
     free_dense(&hidden_layer);
