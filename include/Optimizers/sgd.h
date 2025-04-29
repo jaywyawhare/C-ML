@@ -1,27 +1,25 @@
 #ifndef SGD_H
 #define SGD_H
 
-/**
- * @brief Performs the Stochastic Gradient Descent (SGD) optimization algorithm.
- *
- * @param x The input feature value.
- * @param y The target value.
- * @param lr The learning rate.
- * @param w Pointer to the weight parameter.
- * @param b Pointer to the bias parameter.
- * @return The computed loss value, or an error code.
- */
-float sgd(float x, float y, float lr, float *w, float *b);
+#include <stdbool.h>
+#include "regularization.h"
 
-/**
- * @brief Update weights and biases using SGD optimizer.
- *
- * @param w Pointer to the weight.
- * @param b Pointer to the bias.
- * @param gradient Gradient value.
- * @param input Input value.
- * @param learning_rate Learning rate.
- */
-void update_sgd(float *w, float *b, float gradient, float input, float learning_rate);
+typedef struct
+{
+    float momentum;
+    float dampening;
+    float weight_decay;
+    float max_grad_norm;
+    float clip_value;
+    bool nesterov;
+    bool maximize;
+    RegularizerConfig regularizer;
+    LRSchedulerType lr_scheduler;
+    float lr_gamma;
+    int lr_step_size;
+} SGDConfig;
+
+float sgd(float x, float y, float lr, float *w, float *b,
+          float *v_w, float *v_b, SGDConfig config, int epoch);
 
 #endif

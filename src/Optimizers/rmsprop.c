@@ -1,10 +1,10 @@
 #include <math.h>
 #include <stdio.h>
+#include "../../include/Core/autograd.h"
 #include "../../include/Optimizers/rmsprop.h"
+#include "../../include/Optimizers/regularization.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
-
-
 
 /**
  * @brief Performs the RMSProp optimization algorithm.
@@ -18,11 +18,20 @@
  * @param b Pointer to the bias parameter.
  * @param cache_w Pointer to the cache for the weight parameter.
  * @param cache_b Pointer to the cache for the bias parameter.
- * @param epsilon A small constant to prevent division by zero.
+ * @param v_w Pointer to the velocity for the weight parameter.
+ * @param v_b Pointer to the velocity for the bias parameter.
  * @param beta The decay rate for the moving average of squared gradients.
+ * @param epsilon A small constant to prevent division by zero.
+ * @param momentum The momentum factor.
+ * @param reg_type The type of regularization to use (L1, L2, or none).
+ * @param lambda The regularization strength.
+ * @param l1_ratio The ratio of L1 regularization.
  * @return The computed loss value, or an error code.
  */
-float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, float *cache_b, float epsilon, float beta)
+float rmsprop(float x, float y, float lr, float *w, float *b,
+              float *cache_w, float *cache_b, float *v_w, float *v_b,
+              float *avg_grad_w, float *avg_grad_b, RMSpropConfig config,
+              int epoch)
 {
     if (!w || !b || !cache_w || !cache_b)
     {
@@ -30,57 +39,61 @@ float rms_prop(float x, float y, float lr, float *w, float *b, float *cache_w, f
         return CM_NULL_POINTER_ERROR;
     }
 
-    if (isnan(x) || isnan(y))
+    // Create autograd nodes
+    Node *x_node = tensor(x, 0);
+    Node *y_node = tensor(y, 0);
+    Node *w_node = tensor(*w, 1);
+    Node *b_node = tensor(*b, 1);
+
+    // Forward pass with autograd
+    Node *pred = add(mul(w_node, x_node), b_node);
+    Node *diff = sub(pred, y_node);
+    Node *loss = pow(diff, tensor(2.0f, 0));
+
+    // Add regularization using autograd
+    if (config.regularizer.type != NO_REGULARIZATION)
     {
-        return NAN;
+        Node *reg = compute_regularization_node(w_node, config.regularizer);
+        loss = add(loss, reg);
     }
 
-    if (isinf(x) || isinf(y))
+    // Backward pass - get gradients automatically
+    acc_grad(loss, 1.0f);
+    float dw = w_node->grad;
+    float db = b_node->grad;
+
+    // Update cache
+    *cache_w = config.alpha * (*cache_w) + (1 - config.alpha) * dw * dw;
+    *cache_b = config.alpha * (*cache_b) + (1 - config.alpha) * db * db;
+
+    // Update parameters with centered or standard RMSprop
+    if (config.centered)
     {
-        return CM_INVALID_INPUT_ERROR;
+        *avg_grad_w = config.alpha * (*avg_grad_w) + (1 - config.alpha) * dw;
+        *avg_grad_b = config.alpha * (*avg_grad_b) + (1 - config.alpha) * db;
+
+        float denom_w = sqrtf(*cache_w - (*avg_grad_w) * (*avg_grad_w) + config.eps);
+        float denom_b = sqrtf(*cache_b - (*avg_grad_b) * (*avg_grad_b) + config.eps);
+
+        *w -= lr * dw / denom_w;
+        *b -= lr * db / denom_b;
+    }
+    else
+    {
+        *w -= lr * dw / sqrtf(*cache_w + config.eps);
+        *b -= lr * db / sqrtf(*cache_b + config.eps);
     }
 
-    if (epsilon <= 0)
-    {
-        LOG_ERROR("Epsilon value (%f) is invalid.", epsilon);
-        return CM_INVALID_INPUT_ERROR;
-    }
+    float final_loss = loss->value;
 
-    float y_pred = (*w) * x + (*b);
-    float loss = pow(y_pred - y, 2);
-    float dw = 2 * (y_pred - y) * x;
-    float db = 2 * (y_pred - y);
+    // Cleanup
+    cm_safe_free((void **)&x_node);
+    cm_safe_free((void **)&y_node);
+    cm_safe_free((void **)&w_node);
+    cm_safe_free((void **)&b_node);
+    cm_safe_free((void **)&pred);
+    cm_safe_free((void **)&diff);
+    cm_safe_free((void **)&loss);
 
-    *cache_w = beta * (*cache_w) + (1 - beta) * (dw * dw);
-    *cache_b = beta * (*cache_b) + (1 - beta) * (db * db);
-
-    *w -= lr * (dw / (sqrt(*cache_w) + epsilon));
-    *b -= lr * (db / (sqrt(*cache_b) + epsilon));
-    LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
-
-    return loss;
-}
-
-/**
- * @brief Update weights and biases using RMSProp optimizer.
- *
- * Updates the weights and biases of a neural network using the RMSProp optimization algorithm.
- *
- * @param w Pointer to the weight.
- * @param b Pointer to the bias.
- * @param cache_w Pointer to the weight cache.
- * @param cache_b Pointer to the bias cache.
- * @param gradient Gradient value.
- * @param input Input value.
- * @param learning_rate Learning rate.
- * @param beta Decay rate for RMSProp.
- * @param epsilon Small value to prevent division by zero.
- */
-void update_rmsprop(float *w, float *b, float *cache_w, float *cache_b, float gradient, float input, float learning_rate, float beta, float epsilon)
-{
-    *cache_w = beta * (*cache_w) + (1 - beta) * pow(gradient * input, 2);
-    *cache_b = beta * (*cache_b) + (1 - beta) * pow(gradient, 2);
-
-    *w -= learning_rate * (gradient * input) / (sqrt(*cache_w) + epsilon);
-    *b -= learning_rate * gradient / (sqrt(*cache_b) + epsilon);
+    return final_loss;
 }

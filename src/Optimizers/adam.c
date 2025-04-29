@@ -1,10 +1,10 @@
 #include <math.h>
 #include <stdio.h>
 #include "../../include/Optimizers/adam.h"
+#include "../../include/Optimizers/regularization.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
-
-
+#include "../../include/Core/autograd.h"
 
 /**
  * @brief Performs the Adam optimization algorithm.
@@ -25,92 +25,80 @@
  * @param epsilon A small constant to prevent division by zero.
  * @return The computed loss value, or an error code.
  */
-float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b, float *s_w, float *s_b, float beta1, float beta2, float epsilon)
+float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b,
+           float *s_w, float *s_b, float *max_s_w, float *max_s_b, AdamConfig config,
+           int epoch)
 {
-
     if (!w || !b || !v_w || !v_b || !s_w || !s_b)
     {
         LOG_ERROR("Null pointer input.");
         return CM_NULL_POINTER_ERROR;
     }
 
-    if (epsilon <= 0 || beta1 >= 1.0 || beta2 >= 1.0 || beta1 <= 0.0 || beta2 <= 0.0 || lr <= 0 || isnan(x) || isnan(y) || isinf(x) || isinf(y))
+    // Create autograd nodes
+    Node *lr_node = tensor(lr, 0);
+    Node *x_node = tensor(x, 0);
+    Node *y_node = tensor(y, 0);
+    Node *w_node = tensor(*w, 1);
+    Node *b_node = tensor(*b, 1);
+
+    // Forward pass using autograd operations
+    Node *adjusted_lr = adjust_learning_rate_node(lr_node, epoch, config.lr_scheduler,
+                                                  config.lr_gamma, config.lr_step_size);
+    Node *pred = add(mul(w_node, x_node), b_node);
+    Node *diff = sub(pred, y_node);
+    Node *loss = pow(diff, tensor(2.0f, 0));
+
+    // Add regularization
+    if (config.regularizer.type != NO_REGULARIZATION)
     {
-        LOG_ERROR("Invalid parameter(s) provided.");
-        return CM_INVALID_INPUT_ERROR;
+        Node *reg = apply_regularization_node(w_node, config.regularizer);
+        loss = add(loss, reg);
     }
 
-    static int t = 0;
-    t++;
+    // Backward pass
+    acc_grad(loss, 1.0f);
 
-    float y_pred = *w * x + *b;
-    float loss = pow(y_pred - y, 2);
+    // Get gradients
+    float dw = w_node->grad * (config.maximize ? -1.0f : 1.0f);
+    float db = b_node->grad * (config.maximize ? -1.0f : 1.0f);
 
-    float dw = 2 * (y_pred - y) * x;
-    float db = 2 * (y_pred - y);
+    // Update using Adam
+    float bc1 = 1.0f - powf(config.beta1, epoch + 1);
+    float bc2 = 1.0f - powf(config.beta2, epoch + 1);
 
-    *v_w = beta1 * *v_w + (1 - beta1) * dw;
-    *v_b = beta1 * *v_b + (1 - beta1) * db;
-    *s_w = beta2 * *s_w + (1 - beta2) * dw * dw;
-    *s_b = beta2 * *s_b + (1 - beta2) * db * db;
+    // Update moments
+    *v_w = config.beta1 * (*v_w) + (1 - config.beta1) * dw;
+    *v_b = config.beta1 * (*v_b) + (1 - config.beta1) * db;
+    *s_w = config.beta2 * (*s_w) + (1 - config.beta2) * dw * dw;
+    *s_b = config.beta2 * (*s_b) + (1 - config.beta2) * db * db;
 
-    float v_w_corrected = *v_w / (1 - pow(beta1, t));
-    float v_b_corrected = *v_b / (1 - pow(beta1, t));
-    float s_w_corrected = *s_w / (1 - pow(beta2, t));
-    float s_b_corrected = *s_b / (1 - pow(beta2, t));
-
-    *w -= lr * v_w_corrected / (sqrt(s_w_corrected + epsilon));
-    *b -= lr * v_b_corrected / (sqrt(s_b_corrected + epsilon));
-    LOG_DEBUG("w: %f, b: %f, loss: %f", *w, *b, loss);
-
-    return loss;
-}
-
-/**
- * @brief Update weights and biases using Adam optimizer.
- *
- * Updates the weights and biases of a neural network using the Adam optimization algorithm.
- *
- * @param w Pointer to the weight.
- * @param b Pointer to the bias.
- * @param v_w Pointer to the weight momentum.
- * @param v_b Pointer to the bias momentum.
- * @param s_w Pointer to the weight second moment.
- * @param s_b Pointer to the bias second moment.
- * @param gradient Gradient value.
- * @param input Input value.
- * @param learning_rate Learning rate.
- * @param beta1 Momentum decay rate.
- * @param beta2 Second moment decay rate.
- * @param epsilon Small value to prevent division by zero.
- * @param epoch Current epoch (used for bias correction).
- */
-void update_adam(float *w, float *b, float *v_w, float *v_b, float *s_w, float *s_b, float gradient, float input, float learning_rate, float beta1, float beta2, float epsilon, int epoch)
-{
-    if (!w || !b || !v_w || !v_b || !s_w || !s_b)
+    // Parameter updates
+    if (config.amsgrad)
     {
-        LOG_ERROR("Null pointer input.");
-        return;
+        *max_s_w = fmaxf(*max_s_w, *s_w);
+        *max_s_b = fmaxf(*max_s_b, *s_b);
+        *w -= (*v_w / bc1) / (sqrtf(*max_s_w / bc2) + config.epsilon);
+        *b -= (*v_b / bc1) / (sqrtf(*max_s_b / bc2) + config.epsilon);
+    }
+    else
+    {
+        *w -= (*v_w / bc1) / (sqrtf(*s_w / bc2) + config.epsilon);
+        *b -= (*v_b / bc1) / (sqrtf(*s_b / bc2) + config.epsilon);
     }
 
-    if (epsilon <= 0 || beta1 <= 0 || beta1 >= 1 || beta2 <= 0 || beta2 >= 1 || learning_rate <= 0)
-    {
-        LOG_ERROR("Invalid parameters.");
-        return;
-    }
+    float final_loss = loss->value;
 
-    *v_w = beta1 * (*v_w) + (1 - beta1) * (gradient * input);
-    *v_b = beta1 * (*v_b) + (1 - beta1) * gradient;
+    // Cleanup
+    cm_safe_free((void **)&lr_node);
+    cm_safe_free((void **)&adjusted_lr);
+    cm_safe_free((void **)&x_node);
+    cm_safe_free((void **)&y_node);
+    cm_safe_free((void **)&w_node);
+    cm_safe_free((void **)&b_node);
+    cm_safe_free((void **)&pred);
+    cm_safe_free((void **)&diff);
+    cm_safe_free((void **)&loss);
 
-    *s_w = beta2 * (*s_w) + (1 - beta2) * pow(gradient * input, 2);
-    *s_b = beta2 * (*s_b) + (1 - beta2) * pow(gradient, 2);
-
-    float v_w_corrected = *v_w / (1 - pow(beta1, epoch + 1));
-    float v_b_corrected = *v_b / (1 - pow(beta1, epoch + 1));
-
-    float s_w_corrected = *s_w / (1 - pow(beta2, epoch + 1));
-    float s_b_corrected = *s_b / (1 - pow(beta2, epoch + 1));
-
-    *w -= learning_rate * v_w_corrected / (sqrt(s_w_corrected) + epsilon);
-    *b -= learning_rate * v_b_corrected / (sqrt(s_b_corrected) + epsilon);
+    return final_loss;
 }
