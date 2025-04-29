@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include "../../include/Metrics/recall.h"
+#include "../../include/Core/autograd.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
@@ -14,22 +14,28 @@
  * @param threshold The threshold for binary classification.
  * @return The computed Recall, or an error code if inputs are invalid.
  */
-float recall(float *y, float *yHat, int n, float threshold)
+Node *recall(Node *y, Node *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    int true_positive = 0, false_negative = 0;
+
+    Node *true_positive = tensor(0.0f, 1);
+    Node *false_negative = tensor(0.0f, 1);
+
     for (int i = 0; i < n; i++)
     {
-        int actual = (int)y[i];
-        int pred = yHat[i] > threshold ? 1 : 0;
-        if (actual == 1 && pred == 1)
-            true_positive++;
-        else if (actual == 1 && pred == 0)
-            false_negative++;
+        float actual = y->tensor->storage->data[i];
+        float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
+
+        if (actual == 1.0f && pred == 1.0f)
+            true_positive = add(true_positive, tensor(1.0f, 1));
+        else if (actual == 1.0f && pred == 0.0f)
+            false_negative = add(false_negative, tensor(1.0f, 1));
     }
-    return (true_positive + false_negative) > 0 ? (float)true_positive / (true_positive + false_negative) : 0;
+
+    Node *denominator = add(true_positive, false_negative);
+    return div(true_positive, denominator);
 }

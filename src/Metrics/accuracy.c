@@ -1,32 +1,25 @@
-#include <stdio.h>
+#include "../../include/Core/autograd.h"
 #include "../../include/Metrics/accuracy.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
-/**
- * @brief Computes the accuracy of predictions.
- *
- * The accuracy is defined as the ratio of correct predictions to the total number of predictions.
- *
- * @param y Pointer to the ground truth labels.
- * @param yHat Pointer to the predicted labels.
- * @param n The number of elements in y and yHat.
- * @param threshold The threshold for binary classification.
- * @return The computed accuracy, or an error code if inputs are invalid.
- */
-float accuracy(float *y, float *yHat, int n, float threshold)
+Node *accuracy(Node *y, Node *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    int correct = 0;
+
+    Node *matches = tensor(0.0f, 1);
     for (int i = 0; i < n; i++)
     {
-        int pred = yHat[i] > threshold ? 1 : 0;
-        if (pred == (int)y[i])
-            correct++;
+        Node *y_i = tensor(y->tensor->storage->data[i], 1);
+        Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
+        Node *pred = tensor(yhat_i->value > threshold ? 1.0f : 0.0f, 1);
+        Node *match = tensor(pred->value == y_i->value ? 1.0f : 0.0f, 1);
+        matches = add(matches, match);
     }
-    return (float)correct / n;
+
+    return div(matches, tensor((float)n, 1));
 }

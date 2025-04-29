@@ -1,5 +1,5 @@
 #include "../../include/Metrics/r2_score.h"
-#include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -12,27 +12,37 @@
  * @param size Number of elements in the arrays.
  * @return float The R2 score.
  */
-float r2_score(const float *y_true, const float *y_pred, int size)
+Node *r2_score(Node *y, Node *yHat, int n)
 {
-    if (y_true == NULL || y_pred == NULL || size <= 0)
+    if (!y || !yHat || n <= 0)
     {
-        return NAN; 
+        LOG_ERROR("Invalid input parameters.");
+        return NULL;
     }
 
-    float mean_y_true = 0.0f;
-    for (int i = 0; i < size; i++)
+    // Calculate mean of y
+    Node *sum_y = tensor(0.0f, 1);
+    for (int i = 0; i < n; i++)
     {
-        mean_y_true += y_true[i];
+        sum_y = add(sum_y, tensor(y->tensor->storage->data[i], 1));
     }
-    mean_y_true /= size;
+    Node *mean_y = div(sum_y, tensor((float)n, 1));
 
-    float ss_total = 0.0f;
-    float ss_residual = 0.0f;
-    for (int i = 0; i < size; i++)
+    // Calculate total and residual sum of squares
+    Node *ss_tot = tensor(0.0f, 1);
+    Node *ss_res = tensor(0.0f, 1);
+
+    for (int i = 0; i < n; i++)
     {
-        ss_total += pow(y_true[i] - mean_y_true, 2);
-        ss_residual += pow(y_true[i] - y_pred[i], 2);
+        Node *y_i = tensor(y->tensor->storage->data[i], 1);
+        Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
+
+        Node *diff_tot = sub(y_i, mean_y);
+        Node *diff_res = sub(y_i, yhat_i);
+
+        ss_tot = add(ss_tot, mul(diff_tot, diff_tot));
+        ss_res = add(ss_res, mul(diff_res, diff_res));
     }
 
-    return 1.0f - (ss_residual / ss_total);
+    return sub(tensor(1.0f, 1), div(ss_res, ss_tot));
 }

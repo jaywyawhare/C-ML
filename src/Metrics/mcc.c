@@ -1,6 +1,5 @@
-#include <math.h>
-#include <stdio.h>
 #include "../../include/Metrics/mcc.h"
+#include "../../include/Core/autograd.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
@@ -17,30 +16,40 @@
  * @param threshold The threshold for binary classification.
  * @return The computed MCC, or an error code if inputs are invalid.
  */
-float mcc(float *y, float *yHat, int n, float threshold)
+Node *mcc(Node *y, Node *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    int tp = 0, tn = 0, fp = 0, fn = 0;
+
+    Node *tp = tensor(0.0f, 1);
+    Node *tn = tensor(0.0f, 1);
+    Node *fp = tensor(0.0f, 1);
+    Node *fn = tensor(0.0f, 1);
+
     for (int i = 0; i < n; i++)
     {
-        int actual = (int)y[i];
-        int pred = yHat[i] > threshold ? 1 : 0;
-        if (actual == 1 && pred == 1)
-            tp++;
-        else if (actual == 0 && pred == 0)
-            tn++;
-        else if (actual == 0 && pred == 1)
-            fp++;
-        else if (actual == 1 && pred == 0)
-            fn++;
+        float actual = y->tensor->storage->data[i];
+        float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
+
+        if (actual == 1.0f && pred == 1.0f)
+            tp = add(tp, tensor(1.0f, 1));
+        else if (actual == 0.0f && pred == 0.0f)
+            tn = add(tn, tensor(1.0f, 1));
+        else if (actual == 0.0f && pred == 1.0f)
+            fp = add(fp, tensor(1.0f, 1));
+        else if (actual == 1.0f && pred == 0.0f)
+            fn = add(fn, tensor(1.0f, 1));
     }
-    float numerator = (float)(tp * tn - fp * fn);
-    float denominator = sqrtf((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
-    if (denominator == 0)
-        return 0.0f;
-    return numerator / denominator;
+
+    Node *numerator = sub(mul(tp, tn), mul(fp, fn));
+    Node *denominator = pow(
+        mul(
+            mul(add(tp, fp), add(tp, fn)),
+            mul(add(tn, fp), add(tn, fn))),
+        tensor(0.5f, 1));
+
+    return div(numerator, denominator);
 }

@@ -1,35 +1,41 @@
-#include <stdio.h>
 #include "../../include/Metrics/specificity.h"
+#include "../../include/Core/autograd.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
 /**
  * @brief Computes the specificity metric.
- * 
+ *
  * Specificity is defined as the ratio of true negatives to the sum of true negatives and false positives.
- * 
+ *
  * @param y Pointer to the ground truth labels.
  * @param yHat Pointer to the predicted labels.
  * @param n The number of elements in y and yHat.
  * @param threshold The threshold for binary classification.
  * @return The computed specificity, or an error code if inputs are invalid.
  */
-float specificity(float *y, float *yHat, int n, float threshold)
+Node *specificity(Node *y, Node *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    int true_negative = 0, false_positive = 0;
+
+    Node *true_negative = tensor(0.0f, 1);
+    Node *false_positive = tensor(0.0f, 1);
+
     for (int i = 0; i < n; i++)
     {
-        int actual = (int)y[i];
-        int pred = yHat[i] > threshold ? 1 : 0;
-        if (actual == 0 && pred == 0)
-            true_negative++;
-        else if (actual == 0 && pred == 1)
-            false_positive++;
+        float actual = y->tensor->storage->data[i];
+        float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
+
+        if (actual == 0.0f && pred == 0.0f)
+            true_negative = add(true_negative, tensor(1.0f, 1));
+        else if (actual == 0.0f && pred == 1.0f)
+            false_positive = add(false_positive, tensor(1.0f, 1));
     }
-    return (true_negative + false_positive) > 0 ? (float)true_negative / (true_negative + false_positive) : 0;
+
+    Node *denominator = add(true_negative, false_positive);
+    return div(true_negative, denominator);
 }

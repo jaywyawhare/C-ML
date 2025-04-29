@@ -1,45 +1,37 @@
-#include <stdio.h>
+#include "../../include/Core/autograd.h"
 #include "../../include/Metrics/f1_score.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
-/**
- * @brief Computes the F1 Score metric.
- *
- * The F1 Score is the harmonic mean of precision and recall, defined as:
- * - F1 = 2 * (precision * recall) / (precision + recall)
- *
- * @note Precision is the ratio of true positives to the sum of true positives and false positives.
- * @note Recall is the ratio of true positives to the sum of true positives and false negatives.
- *
- * @param y Pointer to the ground truth labels.
- * @param yHat Pointer to the predicted labels.
- * @param n The number of elements in y and yHat.
- * @param threshold The threshold for binary classification.
- * @return The computed F1 Score, or an error code if inputs are invalid.
- */
-float f1_score(float *y, float *yHat, int n, float threshold)
+Node *f1_score(Node *y, Node *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    int true_positive = 0, false_positive = 0, false_negative = 0;
+
+    Node *tp = tensor(0.0f, 1);
+    Node *fp = tensor(0.0f, 1);
+    Node *fn = tensor(0.0f, 1);
+
     for (int i = 0; i < n; i++)
     {
-        int actual = (int)y[i];
-        int pred = yHat[i] > threshold ? 1 : 0;
-        if (actual == 1 && pred == 1)
-            true_positive++;
-        else if (actual == 0 && pred == 1)
-            false_positive++;
-        else if (actual == 1 && pred == 0)
-            false_negative++;
+        Node *y_i = tensor(y->tensor->storage->data[i], 1);
+        Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
+        Node *pred = tensor(yhat_i->value > threshold ? 1.0f : 0.0f, 1);
+
+        if (y_i->value == 1.0f && pred->value == 1.0f)
+            tp = add(tp, tensor(1.0f, 1));
+        else if (y_i->value == 0.0f && pred->value == 1.0f)
+            fp = add(fp, tensor(1.0f, 1));
+        else if (y_i->value == 1.0f && pred->value == 0.0f)
+            fn = add(fn, tensor(1.0f, 1));
     }
-    float precision = true_positive + false_positive > 0 ? (float)true_positive / (true_positive + false_positive) : 0;
-    float recall = true_positive + false_negative > 0 ? (float)true_positive / (true_positive + false_negative) : 0;
-    if (precision + recall == 0)
-        return 0;
-    return 2 * precision * recall / (precision + recall);
+
+    Node *precision = div(tp, add(tp, fp));
+    Node *recall = div(tp, add(tp, fn));
+
+    return div(mul(mul(tensor(2.0f, 1), precision), recall),
+               add(precision, recall));
 }

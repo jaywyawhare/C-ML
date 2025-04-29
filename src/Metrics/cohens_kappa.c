@@ -1,46 +1,56 @@
-#include <stdio.h>
 #include "../../include/Metrics/cohens_kappa.h"
+#include "../../include/Core/autograd.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 
 /**
  * @brief Computes Cohen's Kappa statistic.
- * 
+ *
  * Cohen's Kappa is a measure of inter-rater agreement for categorical items.
  * It is defined as:
  * - kappa = (observed_accuracy - expected_accuracy) / (1 - expected_accuracy)
- * 
+ *
  * @param y Pointer to the ground truth labels.
  * @param yHat Pointer to the predicted labels.
  * @param n The number of elements in y and yHat.
  * @param threshold The threshold for binary classification.
  * @return The computed Cohen's Kappa, or an error code if inputs are invalid.
  */
-float cohens_kappa(float *y, float *yHat, int n, float threshold)
+Node *cohens_kappa(Node *y, Node *yHat, int n, float threshold)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    int tp = 0, tn = 0, fp = 0, fn = 0;
+
+    Node *tp = tensor(0.0f, 1);
+    Node *tn = tensor(0.0f, 1);
+    Node *fp = tensor(0.0f, 1);
+    Node *fn = tensor(0.0f, 1);
+
     for (int i = 0; i < n; i++)
     {
-        int actual = (int)y[i];
-        int pred = yHat[i] > threshold ? 1 : 0;
-        if (actual == 1 && pred == 1)
-            tp++;
-        else if (actual == 0 && pred == 0)
-            tn++;
-        else if (actual == 0 && pred == 1)
-            fp++;
-        else if (actual == 1 && pred == 0)
-            fn++;
+        float actual = y->tensor->storage->data[i];
+        float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
+
+        if (actual == 1.0f && pred == 1.0f)
+            tp = add(tp, tensor(1.0f, 1));
+        else if (actual == 0.0f && pred == 0.0f)
+            tn = add(tn, tensor(1.0f, 1));
+        else if (actual == 0.0f && pred == 1.0f)
+            fp = add(fp, tensor(1.0f, 1));
+        else if (actual == 1.0f && pred == 0.0f)
+            fn = add(fn, tensor(1.0f, 1));
     }
-    float total = tp + tn + fp + fn;
-    float observed_accuracy = (tp + tn) / total;
-    float expected_accuracy = ((tp + fn) * (tp + fp) + (tn + fp) * (tn + fn)) / (total * total);
-    if (expected_accuracy == 1.0f)
-        return 0.0f;
-    return (observed_accuracy - expected_accuracy) / (1.0f - expected_accuracy);
+
+    Node *total = tensor((float)n, 1);
+    Node *observed_acc = div(add(tp, tn), total);
+    Node *expected_acc = div(
+        mul(add(tp, fn), add(tp, fp)) + mul(add(tn, fp), add(tn, fn)),
+        mul(total, total));
+
+    return div(
+        sub(observed_acc, expected_acc),
+        sub(tensor(1.0f, 1), expected_acc));
 }
