@@ -1,10 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include "../../include/Core/autograd.h"
 #include "../../include/Layers/maxpooling.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
-
-
 
 /**
  * @brief Initializes a MaxPooling Layer.
@@ -40,43 +39,6 @@ int initialize_maxpooling(MaxPoolingLayer *layer, int kernel_size, int stride)
 }
 
 /**
- * @brief Computes the output size for the MaxPooling Layer.
- *
- * @param input_size Size of the input data.
- * @param kernel_size Size of the kernel.
- * @param stride Stride of the kernel.
- * @return int Output size, or an error code on invalid input.
- */
-int compute_maxpooling_output_size(int input_size, int kernel_size, int stride)
-{
-    if (input_size <= 0)
-    {
-        LOG_ERROR("Input size must be greater than 0.");
-        return CM_INVALID_INPUT_ERROR;
-    }
-
-    if (kernel_size <= 0)
-    {
-        LOG_ERROR("Invalid kernel size.");
-        return CM_INVALID_KERNEL_SIZE_ERROR;
-    }
-
-    if (stride <= 0)
-    {
-        LOG_ERROR("Invalid stride.");
-        return CM_INVALID_STRIDE_ERROR;
-    }
-
-    if (input_size < kernel_size)
-    {
-        LOG_ERROR("Input size is smaller than kernel size.");
-        return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
-    }
-
-    return (input_size - kernel_size) / stride + 1;
-}
-
-/**
  * @brief Performs the forward pass for the MaxPooling Layer.
  *
  * @param layer Pointer to the MaxPoolingLayer structure.
@@ -87,52 +49,67 @@ int compute_maxpooling_output_size(int input_size, int kernel_size, int stride)
  */
 int forward_maxpooling(MaxPoolingLayer *layer, const float *input, float *output, int input_size)
 {
-    if (layer == NULL)
-    {
-        LOG_ERROR("Layer is NULL.");
-        return CM_NULL_LAYER_ERROR;
-    }
+    if (!layer || !input || !output)
+        return CM_NULL_POINTER_ERROR;
 
-    if (input == NULL || output == NULL)
+    int output_index = 0;
+    for (int i = 0; i <= input_size - layer->kernel_size; i += layer->stride)
     {
-        LOG_ERROR("Null input or output pointer.");
+        Node *max = tensor(input[i], 1);
+        for (int j = 1; j < layer->kernel_size; j++)
+        {
+            Node *curr = tensor(input[i + j], 1);
+            Node *comp = max->value > curr->value ? max : curr;
+            if (comp != max)
+            {
+                cm_safe_free((void **)&max);
+            }
+            max = comp;
+            cm_safe_free((void **)&curr);
+        }
+        output[output_index++] = max->value;
+        cm_safe_free((void **)&max);
+    }
+    return output_index;
+}
+
+// Remove compute_maxpooling_output_size - handled by autograd graph
+
+// Add backward pass with autograd
+int backward_maxpooling(MaxPoolingLayer *layer, const float *input, const float *output,
+                        float *d_output, float *d_input, int input_size)
+{
+    if (!layer || !input || !output || !d_output || !d_input)
+    {
+        LOG_ERROR("Layer or data pointers are NULL.");
         return CM_NULL_POINTER_ERROR;
     }
 
-    if (layer->kernel_size <= 0)
+    // Initialize gradients to zero
+    for (int i = 0; i < input_size; i++)
     {
-        LOG_ERROR("Invalid kernel size.");
-        return CM_INVALID_KERNEL_SIZE_ERROR;
-    }
-
-    if (layer->stride <= 0)
-    {
-        LOG_ERROR("Invalid stride.");
-        return CM_INVALID_STRIDE_ERROR;
-    }
-
-    if (input_size < layer->kernel_size)
-    {
-        LOG_ERROR("Input size is smaller than kernel size.");
-        return CM_INPUT_SIZE_SMALLER_THAN_KERNEL_ERROR;
+        d_input[i] = 0.0f;
     }
 
     int output_index = 0;
     for (int i = 0; i <= input_size - layer->kernel_size; i += layer->stride)
     {
-        float max_value = input[i];
-        for (int j = 1; j < layer->kernel_size; ++j)
+        // Find max index in window
+        int max_idx = i;
+        float max_val = input[i];
+        for (int j = 1; j < layer->kernel_size; j++)
         {
-            if (input[i + j] > max_value)
+            if (input[i + j] > max_val)
             {
-                max_value = input[i + j];
+                max_val = input[i + j];
+                max_idx = i + j;
             }
         }
-        output[output_index++] = max_value;
-        LOG_DEBUG("Output[%d]: %f", output_index - 1, max_value);
+        // Propagate gradient only to max element
+        d_input[max_idx] += d_output[output_index++];
     }
 
-    return output_index;
+    return CM_SUCCESS;
 }
 
 /**

@@ -1,20 +1,13 @@
 #ifndef DENSE_H
 #define DENSE_H
 
-/**
- * @brief Structure representing a Dense Layer.
- *
- * @param weights Pointer to the weights matrix.
- * @param biases Pointer to the biases vector.
- * @param input_size Number of input neurons.
- * @param output_size Number of output neurons.
- * @param rmsprop_cache_w Cache for RMSProp weights.
- * @param rmsprop_cache_b Cache for RMSProp biases.
- * @param adam_v_w Adam first moment vector for weights.
- * @param adam_v_b Adam first moment vector for biases.
- * @param adam_s_w Adam second moment vector for weights.
- * @param adam_s_b Adam second moment vector for biases.
- */
+#include "../Core/autograd.h"
+#include "../Optimizers/optimizer_types.h"
+#include "../Optimizers/adam.h"
+#include "../Optimizers/rmsprop.h"
+#include "../Optimizers/sgd.h"
+#include <stdlib.h>
+
 typedef struct
 {
     float *weights;
@@ -22,65 +15,26 @@ typedef struct
     int input_size;
     int output_size;
 
-    float *rmsprop_cache_w;
-    float *rmsprop_cache_b;
-    float *adam_v_w;
-    float *adam_v_b;
-    float *adam_s_w;
-    float *adam_s_b;
+    OptimizerType optimizer_type;
+    float learning_rate;
+    int step;
+
+    AdamConfig adam_config;
+    float *adam_m_w; 
+    float *adam_m_b; 
+    float *adam_v_w; 
+    float *adam_v_b; 
+
+    RMSpropConfig rmsprop_config;
+    float *rms_cache_w;
+    float *rms_cache_b;
+
+    SGDConfig sgd_config;
 } DenseLayer;
 
-/**
- * @brief Initializes a Dense Layer with random weights and biases.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @param input_size Number of input neurons.
- * @param output_size Number of output neurons.
- * @return int Error code.
- */
 int initialize_dense(DenseLayer *layer, int input_size, int output_size);
-
-/**
- * @brief Performs the forward pass for the Dense Layer.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @param input Input data array.
- * @param output Output data array.
- * @return int Error code.
- */
 int forward_dense(DenseLayer *layer, float *input, float *output);
-
-/**
- * @brief Performs the backward pass for the Dense Layer.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @param input Input data array.
- * @param output Output data array.
- * @param d_output Gradient of the output.
- * @param d_input Gradient of the input.
- * @param d_weights Gradient of the weights.
- * @param d_biases Gradient of the biases.
- * @return int Error code.
- */
-int backward_dense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input, float *d_weights, float *d_biases);
-
-/**
- * @brief Updates the weights and biases of the Dense Layer.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @param d_weights Gradient of the weights.
- * @param d_biases Gradient of the biases.
- * @param learning_rate Learning rate for the update.
- * @return int Error code.
- */
-int update_dense(DenseLayer *layer, float *d_weights, float *d_biases, float learning_rate);
-
-/**
- * @brief Frees the memory allocated for the Dense Layer.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @return int Error code.
- */
+int backward_dense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input);
 int free_dense(DenseLayer *layer);
 
 #endif

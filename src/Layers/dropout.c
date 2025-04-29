@@ -1,3 +1,4 @@
+#include "../../include/Core/autograd.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -5,8 +6,6 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 #include "../../include/Core/memory_management.h"
-
-
 
 static int is_seed_initialized = 0;
 
@@ -51,24 +50,31 @@ int initialize_dropout(DropoutLayer *layer, float dropout_rate)
  */
 int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
 {
-    if (layer == NULL || input == NULL || output == NULL)
+    if (!layer || !input || !output)
     {
         LOG_ERROR("Layer, input, or output is NULL.");
         return CM_NULL_POINTER_ERROR;
     }
 
+    Node *scale = tensor(1.0f / (1.0f - layer->dropout_rate), 0);
+
     for (int i = 0; i < size; i++)
     {
+        Node *in = tensor(input[i], 1);
         if ((float)rand() / RAND_MAX < layer->dropout_rate)
         {
-            output[i] = 0;
+            output[i] = 0.0f;
         }
         else
         {
-            output[i] = input[i] / (1 - layer->dropout_rate);
+            Node *scaled = mul(in, scale);
+            output[i] = scaled->value;
+            cm_safe_free((void **)&scaled);
         }
-        LOG_DEBUG("Output[%d]: %f", i, output[i]);
+        cm_safe_free((void **)&in);
     }
+
+    cm_safe_free((void **)&scale);
     return CM_SUCCESS;
 }
 

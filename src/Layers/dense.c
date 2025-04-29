@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include "../../include/Core/autograd.h"
+#include "../../include/Optimizers/optimizer_types.h"
+#include "../../include/Optimizers/adam.h"
+#include "../../include/Optimizers/rmsprop.h"
+#include "../../include/Optimizers/sgd.h"
 #include "../../include/Layers/dense.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
@@ -29,27 +34,25 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
         return CM_INVALID_PARAMETER_ERROR;
     }
 
-    layer->weights = NULL;
-    layer->biases = NULL;
-    layer->adam_v_w = NULL;
-    layer->adam_v_b = NULL;
-    layer->adam_s_w = NULL;
-    layer->adam_s_b = NULL;
-
-    LOG_DEBUG("Initialized DenseLayer with input size (%d) and output size (%d)", input_size, output_size);
-
-    layer->input_size = input_size;
-    layer->output_size = output_size;
+    // Initialize weights and biases
     layer->weights = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
     layer->biases = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
 
-    if (layer->weights == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->biases == (void *)CM_MEMORY_ALLOCATION_ERROR)
-    {
-        LOG_ERROR("Memory allocation failed");
-        cm_safe_free((void **)&layer->weights);
-        cm_safe_free((void **)&layer->biases);
-        return CM_MEMORY_ALLOCATION_ERROR;
-    }
+    // Initialize optimizer states
+    layer->adam_m_w = (float *)cm_safe_calloc(input_size * output_size, sizeof(float), __FILE__, __LINE__);
+    layer->adam_m_b = (float *)cm_safe_calloc(output_size, sizeof(float), __FILE__, __LINE__);
+    layer->adam_v_w = (float *)cm_safe_calloc(input_size * output_size, sizeof(float), __FILE__, __LINE__);
+    layer->adam_v_b = (float *)cm_safe_calloc(output_size, sizeof(float), __FILE__, __LINE__);
+
+    layer->rms_cache_w = (float *)cm_safe_calloc(input_size * output_size, sizeof(float), __FILE__, __LINE__);
+    layer->rms_cache_b = (float *)cm_safe_calloc(output_size, sizeof(float), __FILE__, __LINE__);
+
+    // Initialize default optimizer settings
+    layer->optimizer_type = OPTIMIZER_SGD;
+    layer->learning_rate = 0.01f;
+    layer->step = 0;
+
+    LOG_DEBUG("Initialized DenseLayer with input size (%d) and output size (%d)", input_size, output_size);
 
     for (int i = 0; i < input_size * output_size; i++)
     {
@@ -60,27 +63,6 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
     {
         layer->biases[i] = ((float)rand() / RAND_MAX) - 0.5;
     }
-
-    layer->adam_v_w = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
-    layer->adam_v_b = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
-    layer->adam_s_w = (float *)cm_safe_malloc(input_size * output_size * sizeof(float), __FILE__, __LINE__);
-    layer->adam_s_b = (float *)cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
-
-    if (layer->adam_v_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_v_b == (void *)CM_MEMORY_ALLOCATION_ERROR ||
-        layer->adam_s_w == (void *)CM_MEMORY_ALLOCATION_ERROR || layer->adam_s_b == (void *)CM_MEMORY_ALLOCATION_ERROR)
-    {
-        LOG_ERROR("Error: Memory allocation failed for Adam optimizer's moment vectors.\n");
-        cm_safe_free((void **)&layer->adam_v_w);
-        cm_safe_free((void **)&layer->adam_v_b);
-        cm_safe_free((void **)&layer->adam_s_w);
-        cm_safe_free((void **)&layer->adam_s_b);
-        return CM_MEMORY_ALLOCATION_ERROR;
-    }
-
-    memset(layer->adam_v_w, 0, input_size * output_size * sizeof(float));
-    memset(layer->adam_v_b, 0, output_size * sizeof(float));
-    memset(layer->adam_s_w, 0, input_size * output_size * sizeof(float));
-    memset(layer->adam_s_b, 0, output_size * sizeof(float));
 
     return CM_SUCCESS;
 }
@@ -95,97 +77,89 @@ int initialize_dense(DenseLayer *layer, int input_size, int output_size)
  */
 int forward_dense(DenseLayer *layer, float *input, float *output)
 {
-    if (layer == NULL || input == NULL || output == NULL)
+    if (!layer || !input || !output)
     {
         LOG_ERROR("Layer, input, or output is NULL");
         return CM_NULL_POINTER_ERROR;
     }
 
-    LOG_DEBUG("forward_dense(layer->input_size: %d, layer->output_size: %d)", layer->input_size, layer->output_size);
-
     for (int i = 0; i < layer->output_size; i++)
     {
-        output[i] = 0;
+        Node *sum = tensor(0.0f, 1);
         for (int j = 0; j < layer->input_size; j++)
         {
-            output[i] += input[j] * layer->weights[j + i * layer->input_size];
+            Node *x = tensor(input[j], 1);
+            Node *w = tensor(layer->weights[j + i * layer->input_size], 1);
+            sum = add(sum, mul(x, w));
+            cm_safe_free((void **)&x);
+            cm_safe_free((void **)&w);
         }
-        output[i] += layer->biases[i];
-        LOG_DEBUG("Output[%d]: %f", i, output[i]);
+        Node *b = tensor(layer->biases[i], 1);
+        output[i] = add(sum, b)->value;
+        cm_safe_free((void **)&sum);
+        cm_safe_free((void **)&b);
     }
-
     return CM_SUCCESS;
 }
 
-/**
- * @brief Performs the backward pass for the Dense Layer.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @param input Input data array.
- * @param output Output data array.
- * @param d_output Gradient of the output.
- * @param d_input Gradient of the input.
- * @param d_weights Gradient of the weights.
- * @param d_biases Gradient of the biases.
- * @return int Error code.
- */
-int backward_dense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input, float *d_weights, float *d_biases)
+int backward_dense(DenseLayer *layer, float *input, float *output, float *d_output, float *d_input)
 {
-    if (layer == NULL || input == NULL || output == NULL || d_output == NULL || d_input == NULL || d_weights == NULL || d_biases == NULL)
-    {
-        LOG_ERROR("One or more arguments are NULL");
+    if (!layer || !input || !output || !d_output || !d_input)
         return CM_NULL_POINTER_ERROR;
-    }
 
     for (int i = 0; i < layer->input_size; i++)
     {
-        d_input[i] = 0;
+        Node *x = tensor(input[i], 1);
+        d_input[i] = 0.0f;
+
         for (int j = 0; j < layer->output_size; j++)
         {
+            Node *dy = tensor(d_output[j], 1);
+            Node *w = tensor(layer->weights[i * layer->output_size + j], 1);
+            int idx = i * layer->output_size + j;
 
-            d_input[i] += d_output[j] * layer->weights[i + j * layer->input_size];
+            // Compute gradients and apply optimizer updates
+            Node *dw = mul(x, dy);
+            float grad = dw->value;
+
+            switch (layer->optimizer_type)
+            {
+            case OPTIMIZER_ADAM:
+                adam(x->value, output[j], layer->learning_rate,
+                     &layer->weights[idx], &layer->biases[j],
+                     layer->adam_m_w + idx, layer->adam_m_b + j,
+                     layer->adam_v_w + idx, layer->adam_v_b + j,
+                     NULL, NULL, layer->adam_config, layer->step);
+                break;
+
+            case OPTIMIZER_RMSPROP:
+                rmsprop(x->value, output[j], layer->learning_rate,
+                        &layer->weights[idx], &layer->biases[j],
+                        layer->rms_cache_w + idx, layer->rms_cache_b + j,
+                        NULL, NULL, NULL, NULL,
+                        layer->rmsprop_config, layer->step);
+                break;
+
+            case OPTIMIZER_SGD:
+                sgd(x->value, output[j], layer->learning_rate,
+                    &layer->weights[idx], &layer->biases[j],
+                    NULL, NULL, layer->sgd_config, layer->step);
+                break;
+
+            default:
+                LOG_ERROR("Invalid optimizer type: %d", layer->optimizer_type);
+                return CM_INVALID_OPTIMIZER_ERROR;
+            }
+
+            d_input[i] += mul(w, dy)->value;
+            cm_safe_free((void **)&dy);
+            cm_safe_free((void **)&w);
+            cm_safe_free((void **)&dw);
         }
+        cm_safe_free((void **)&x);
     }
 
-    for (int i = 0; i < layer->output_size; i++)
-    {
-        d_biases[i] = d_output[i];
-        for (int j = 0; j < layer->input_size; j++)
-        {
-            d_weights[j + i * layer->input_size] = input[j] * d_output[i];
-        }
-    }
-
-    return CM_SUCCESS;
-}
-
-/**
- * @brief Updates the weights and biases of the Dense Layer.
- *
- * @param layer Pointer to the DenseLayer structure.
- * @param d_weights Gradient of the weights.
- * @param d_biases Gradient of the biases.
- * @param learning_rate Learning rate for the update.
- * @return int Error code.
- */
-int update_dense(DenseLayer *layer, float *d_weights, float *d_biases, float learning_rate)
-{
-    if (layer == NULL || d_weights == NULL || d_biases == NULL)
-    {
-        LOG_ERROR("Layer or gradients are NULL");
-        return CM_NULL_POINTER_ERROR;
-    }
-
-    for (int i = 0; i < layer->input_size * layer->output_size; i++)
-    {
-        layer->weights[i] -= learning_rate * d_weights[i];
-    }
-
-    for (int i = 0; i < layer->output_size; i++)
-    {
-        layer->biases[i] -= learning_rate * d_biases[i];
-    }
-
+    layer->step++;
     return CM_SUCCESS;
 }
 
@@ -210,6 +184,14 @@ int free_dense(DenseLayer *layer)
     {
         cm_safe_free((void **)&layer->biases);
     }
+    if (layer->adam_m_w != NULL)
+    {
+        cm_safe_free((void **)&layer->adam_m_w);
+    }
+    if (layer->adam_m_b != NULL)
+    {
+        cm_safe_free((void **)&layer->adam_m_b);
+    }
     if (layer->adam_v_w != NULL)
     {
         cm_safe_free((void **)&layer->adam_v_w);
@@ -218,13 +200,13 @@ int free_dense(DenseLayer *layer)
     {
         cm_safe_free((void **)&layer->adam_v_b);
     }
-    if (layer->adam_s_w != NULL)
+    if (layer->rms_cache_w != NULL)
     {
-        cm_safe_free((void **)&layer->adam_s_w);
+        cm_safe_free((void **)&layer->rms_cache_w);
     }
-    if (layer->adam_s_b != NULL)
+    if (layer->rms_cache_b != NULL)
     {
-        cm_safe_free((void **)&layer->adam_s_b);
+        cm_safe_free((void **)&layer->rms_cache_b);
     }
     return CM_SUCCESS;
 }
