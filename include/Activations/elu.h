@@ -1,22 +1,10 @@
 #ifndef ELU_H
 #define ELU_H
 
-/**
- * @brief Applies the Exponential Linear Unit (ELU) activation function.
- *
- * @param x The input value.
- * @param alpha The scaling factor for negative values.
- * @return The result of the ELU activation function.
- */
-float elu(float x, float alpha);
+#include "../../include/Core/autograd.h"
 
-/**
- * @brief Computes the derivative of the ELU activation function.
- *
- * @param x The input value.
- * @param alpha The scaling factor for negative values.
- * @return The derivative of the ELU function.
- */
-float elu_derivative(float x, float alpha);
+float elu(float x, float alpha);
+Node *elu_node(Node *x, float alpha);
+void elu_backward(float grad_output, Node **inputs, int ninputs);
 
 #endif

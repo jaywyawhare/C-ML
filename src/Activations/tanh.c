@@ -1,70 +1,42 @@
-#include <math.h>
-#include <float.h>
-#include <stdio.h>
 #include "../../include/Activations/tanh.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
+#include <math.h>
 
 #define TANH_THRESHOLD 20.0f
 
-
-/**
- * @brief Applies the hyperbolic tangent (tanh) activation function.
- *
- * The tanh activation function is defined as:
- * - f(x) = (e^x - e^(-x)) / (e^x + e^(-x))
- *
- * For numerical stability:
- * - Returns 1.0 if x > 20.0
- * - Returns -1.0 if x < -20.0
- *
- * @param x The input value.
- * @return The result of the tanh activation function. Clipped to -1.0 or 1.0
- *         for extreme inputs, ensuring numerical stability.
- */
 float tanH(float x)
 {
-    if (isnan(x) || isinf(x) || x == -INFINITY)
-    {
-        LOG_ERROR("Invalid input (NaN or Inf)");
-        return CM_INVALID_INPUT_ERROR;
-    }
+    if (validate_activation_input(x))
+        return 0.0f;
     if (x > TANH_THRESHOLD)
-    {
-        LOG_DEBUG("Input: x=%f, Output: 1.0 (clipped)", x);
         return 1.0f;
-    }
-    else if (x < -TANH_THRESHOLD)
-    {
-        LOG_DEBUG("Input: x=%f, Output: -1.0 (clipped)", x);
+    if (x < -TANH_THRESHOLD)
         return -1.0f;
-    }
-    else
-    {
-        float e_pos = expf(x);
-        float e_neg = expf(-x);
-        float result = (e_pos - e_neg) / (e_pos + e_neg);
-        LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-        return result;
-    }
+    float e_pos = expf(x);
+    float e_neg = expf(-x);
+    return (e_pos - e_neg) / (e_pos + e_neg);
 }
 
-/**
- * @brief Computes the derivative of the tanh activation function.
- *
- * The derivative of tanh is:
- * - f'(x) = 1 - f(x)^2
- *
- * @param tanh_output The output of the tanh function (f(x)).
- * @return The derivative of the tanh function.
- */
-float tanh_derivative(float tanh_output)
+Node *tanh_node(Node *x)
 {
-    if (isnan(tanh_output) || isinf(tanh_output) || tanh_output < -1.0f || tanh_output > 1.0f)
-    {
-        LOG_ERROR("Invalid tanh output (NaN, Inf, or out of range)");
-        return CM_INVALID_INPUT_ERROR;
-    }
+    if (!x)
+        return NULL;
+    float result = tanH(x->tensor->storage->data[0]);
+    Node *output = tensor(result, x->requires_grad);
+    create_activation_node(output, x, OP_TANH, tensor(result, 0));
+    return output;
+}
 
-    return 1.0f - tanh_output * tanh_output;
+void tanh_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0]->requires_grad)
+        return;
+
+    SavedVariable *saved = get_saved_variable(inputs[0], 0);
+    if (!saved)
+        return;
+
+    float tanh_val = saved->tensor->value;
+    float grad = grad_output * (1.0f - tanh_val * tanh_val);
+    accumulate_grad(inputs[0], grad);
 }

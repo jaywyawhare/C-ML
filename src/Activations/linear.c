@@ -1,50 +1,28 @@
-#include <math.h>
-#include <float.h>
-#include <stdio.h>
-#include "../../include/Core/error_codes.h"
 #include "../../include/Activations/linear.h"
-#include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
 
-
-
-/**
- * @brief Applies the Linear (identity) activation function.
- *
- * The Linear activation function is defined as:
- * - f(x) = x
- *
- * @param x The input value.
- * @return The result of the Linear activation function.
- */
 float linear(float x)
 {
-    if (isnan(x) || isinf(x) || x == -INFINITY)
-    {
-        LOG_ERROR("Invalid input (NaN or Inf)");
-        return CM_INVALID_INPUT_ERROR;
-    }
-
-    float result = x;
-    LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-    return result;
+    if (validate_activation_input(x))
+        return 0.0f;
+    return x;
 }
 
-/**
- * @brief Computes the derivative of the Linear activation function.
- *
- * The derivative of Linear is:
- * - f'(x) = 1
- *
- * @param x The input value.
- * @return The derivative of the Linear function.
- */
-float linear_derivative(float x)
+Node *linear_node(Node *x)
 {
-    if (isnan(x) || isinf(x))
-    {
-        LOG_ERROR("Invalid input (NaN or Inf)");
-        return CM_INVALID_INPUT_ERROR;
-    }
+    if (!x)
+        return NULL;
+    float result = linear(x->tensor->storage->data[0]);
+    Node *output = tensor(result, x->requires_grad);
+    create_activation_node(output, x, OP_LINEAR, NULL);
+    return output;
+}
 
-    return 1.0f;
+void linear_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0]->requires_grad)
+        return;
+
+    // Linear function derivative is 1
+    accumulate_grad(inputs[0], grad_output);
 }

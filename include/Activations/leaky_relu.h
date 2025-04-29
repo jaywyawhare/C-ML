@@ -1,20 +1,10 @@
 #ifndef LEAKY_RELU_H
 #define LEAKY_RELU_H
 
-/**
- * @brief Applies the Leaky Rectified Linear Unit (Leaky ReLU) activation function.
- *
- * @param x The input value.
- * @return The result of the Leaky ReLU activation function.
- */
-float leaky_relu(float x);
+#include "../../include/Core/autograd.h"
 
-/**
- * @brief Computes the derivative of the Leaky ReLU activation function.
- *
- * @param x The input value.
- * @return The derivative of the Leaky ReLU function.
- */
-float leaky_relu_derivative(float x);
+float leaky_relu(float x);
+Node *leaky_relu_node(Node *x);
+void leaky_relu_backward(float grad_output, Node **inputs, int ninputs);
 
 #endif

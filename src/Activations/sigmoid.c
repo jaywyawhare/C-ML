@@ -1,61 +1,34 @@
-#include <math.h>
-#include <float.h>
-#include <stdio.h>
 #include "../../include/Activations/sigmoid.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/logging.h"
-
-
-
-/**
- * @brief Applies the sigmoid activation function.
- *
- * The sigmoid activation function is defined as:
- * - f(x) = 1 / (1 + exp(-x))
- *
- * @param x The input value.
- * @return The result of the sigmoid activation function.
- */
+#include "../../include/Core/autograd.h"
+#include <math.h>
 
 float sigmoid(float x)
 {
-    if (isnan(x) || isinf(x) || x == -INFINITY)
-    {
-        LOG_ERROR("Invalid input (NaN or Inf)");
-        return CM_INVALID_INPUT_ERROR;
-    }
-
-    float result;
-    if (x >= 0)
-    {
-        float exp_neg_x = expf(-x);
-        result = 1 / (1 + exp_neg_x);
-    }
-    else
-    {
-        float exp_pos_x = expf(x);
-        result = exp_pos_x / (1 + exp_pos_x);
-    }
-    LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-    return result;
+    if (validate_activation_input(x))
+        return 0.0f;
+    return x >= 0 ? 1.0f / (1.0f + expf(-x)) : expf(x) / (1.0f + expf(x));
 }
 
-/**
- * @brief Computes the derivative of the sigmoid activation function.
- *
- * The derivative of sigmoid is:
- * - f'(x) = f(x) * (1 - f(x))
- *
- * @param sigmoid_output The output of the sigmoid function (f(x)).
- * @return The derivative of the sigmoid function.
- */
-float sigmoid_derivative(float sigmoid_output)
+Node *sigmoid_node(Node *x)
 {
-    if (isnan(sigmoid_output) || isinf(sigmoid_output) || sigmoid_output < 0.0f || sigmoid_output > 1.0f)
-    {
-        LOG_ERROR("Invalid sigmoid output (NaN, Inf, or out of range)");
-        return CM_INVALID_INPUT_ERROR;
-    }
+    if (!x)
+        return NULL;
+    float result = sigmoid(x->tensor->storage->data[0]);
+    Node *output = tensor(result, x->requires_grad);
+    create_activation_node(output, x, OP_SIGMOID, tensor(result, 0));
+    return output;
+}
 
-    return sigmoid_output * (1.0f - sigmoid_output);
+void sigmoid_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0]->requires_grad)
+        return;
+
+    SavedVariable *saved = get_saved_variable(inputs[0], 0);
+    if (!saved)
+        return;
+
+    float sig = saved->tensor->value;
+    float grad = grad_output * sig * (1.0f - sig);
+    accumulate_grad(inputs[0], grad);
 }

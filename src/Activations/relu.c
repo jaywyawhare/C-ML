@@ -1,52 +1,30 @@
-#include <math.h>
-#include <float.h>
-#include <stdio.h>
-#include "../../include/Core/error_codes.h"
 #include "../../include/Activations/relu.h"
-#include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
 
-
-
-/**
- * @brief Applies the Rectified Linear Unit (ReLU) activation function.
- *
- * The ReLU activation function is defined as:
- * - f(x) = x, if x > 0
- * - f(x) = 0, if x <= 0
- *
- * @param x The input value.
- * @return The result of the ReLU activation function.
- */
 float relu(float x)
 {
-    if (isnan(x) || isinf(x) || x == -INFINITY)
-    {
-        LOG_ERROR("Invalid input (NaN or Inf)");
-        return CM_INVALID_INPUT_ERROR;
-    }
-
-    float result = x > 0 ? x : 0;
-    LOG_DEBUG("Input: x=%f, Output: %f", x, result);
-    return result;
+    if (validate_activation_input(x))
+        return 0.0f;
+    return x > 0 ? x : 0;
 }
 
-/**
- * @brief Computes the derivative of the ReLU activation function.
- *
- * The derivative of ReLU is:
- * - f'(x) = 1, if x > 0
- * - f'(x) = 0, if x <= 0
- *
- * @param x The input value.
- * @return The derivative of the ReLU function.
- */
-float relu_derivative(float x)
+Node *relu_node(Node *x)
 {
-    if (isnan(x) || isinf(x))
-    {
-        LOG_ERROR("Invalid input (NaN or Inf)");
-        return CM_INVALID_INPUT_ERROR;
-    }
+    if (!x)
+        return NULL;
+    float result = relu(x->tensor->storage->data[0]);
+    Node *output = tensor(result, x->requires_grad);
+    create_activation_node(output, x, OP_RELU, x);
+    return output;
+}
 
-    return x > 0 ? 1.0f : 0.0f;
+void relu_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0]->requires_grad)
+        return;
+
+    Node *input = inputs[0];
+    float x = input->tensor->storage->data[0];
+    float grad = x > 0 ? grad_output : 0.0f;
+    accumulate_grad(input, grad);
 }

@@ -1,55 +1,27 @@
-#include <math.h>
-#include <float.h>
-#include <stdio.h>
 #include "../../include/Activations/softmax.h"
-#include "../../include/Core/memory_management.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
+#include <math.h>
 
-/**
- * @brief Applies the softmax activation function.
- *
- * The softmax function is defined as:
- * - softmax(z_i) = exp(z_i) / sum(exp(z_j)) for j = 1 to n
- *
- * @param z Pointer to the input array.
- * @param n The number of elements in the input array.
- * @return Pointer to the output array containing the softmax values.
- */
 float *softmax(float *z, int n)
 {
-    if (z == NULL || n <= 0)
-    {
-        LOG_ERROR("Null input pointer or invalid size (%d).", n);
-        return (float *)CM_NULL_POINTER_ERROR;
-    }
+    if (!z || n <= 0 || validate_activation_input(z[0]))
+        return NULL;
 
-    for (int i = 0; i < n; i++)
-    {
-        if (isnan(z[i]) || isinf(z[i]))
-        {
-            LOG_ERROR("Invalid input value (NaN or Inf) at index %d.", i);
-            return (float *)CM_INVALID_INPUT_ERROR;
-        }
-    }
+    // Allocate output and find max for numerical stability
+    float *output = cm_safe_malloc(n * sizeof(float), __FILE__, __LINE__);
+    if (!output)
+        return NULL;
 
     float max_val = z[0];
+    float sum = 0.0f;
+
+    // Single pass to find max
     for (int i = 1; i < n; i++)
     {
-        if (z[i] > max_val)
-        {
-            max_val = z[i];
-        }
+        max_val = z[i] > max_val ? z[i] : max_val;
     }
 
-    float sum = 0.0f;
-    float *output = cm_safe_malloc(n * sizeof(float), __FILE__, __LINE__);
-    if (output == NULL)
-    {
-        LOG_ERROR("Memory allocation failed.");
-        return (float *)CM_MEMORY_ALLOCATION_ERROR;
-    }
-
+    // Calculate exp(x - max) and sum
     for (int i = 0; i < n; i++)
     {
         output[i] = expf(z[i] - max_val);
@@ -58,97 +30,65 @@ float *softmax(float *z, int n)
 
     if (sum == 0.0f)
     {
-        LOG_ERROR("Division by zero (sum of exponentials is zero).");
         cm_safe_free((void **)&output);
-        return (float *)CM_DIVISION_BY_ZERO_ERROR;
+        return NULL;
     }
 
+    // Normalize
     for (int i = 0; i < n; i++)
     {
         output[i] /= sum;
-        LOG_DEBUG("Output[%d]: %f", i, output[i]);
     }
 
     return output;
 }
 
-/**
- * @brief Frees the memory allocated for the softmax output.
- *
- * @param output Pointer to the output array to be freed.
- */
-void free_softmax(float **output)
+Node *softmax_node(Node *x)
 {
-    if (output != NULL && *output != NULL)
+    if (!x)
+        return NULL;
+
+    float *result = softmax(x->tensor->storage->data, x->tensor->storage->size);
+    if (!result)
+        return NULL;
+
+    Node *output = empty_like(x);
+    if (!output)
     {
-        cm_safe_free((void **)output);
-        LOG_DEBUG("Memory freed for softmax output.");
+        cm_safe_free((void **)&result);
+        return NULL;
     }
+
+    memcpy(output->tensor->storage->data, result, x->tensor->storage->size * sizeof(float));
+    cm_safe_free((void **)&result);
+    create_activation_node(output, x, OP_SOFTMAX, NULL);
+    return output;
 }
 
-/**
- * @brief Computes the derivative of the softmax activation function.
- *
- * The derivative of softmax is:
- * - f'(z_i) = f(z_i) * (1 - f(z_i)) for diagonal elements
- * - f'(z_i, z_j) = -f(z_i) * f(z_j) for off-diagonal elements
- *
- * @param softmax_output Pointer to the softmax output array.
- * @param n The number of elements in the output array.
- * @return Pointer to the Jacobian matrix (n x n) or error code.
- */
-float *softmax_derivative(float *softmax_output, int n)
+void softmax_backward(float grad_output, Node **inputs, int ninputs)
 {
-    if (softmax_output == NULL || n <= 0)
-    {
-        LOG_ERROR("Null pointer or invalid size.");
-        return (float *)CM_NULL_POINTER_ERROR;
-    }
+    if (ninputs != 1 || !inputs[0]->requires_grad)
+        return;
 
-    for (int i = 0; i < n; i++)
+    Node *input = inputs[0];
+    size_t n = input->tensor->storage->size;
+
+    // Recompute softmax for backward pass
+    float *softmax_vals = softmax(input->tensor->storage->data, n);
+    if (!softmax_vals)
+        return;
+
+    // Compute Jacobian-vector product
+    for (size_t i = 0; i < n; i++)
     {
-        if (isnan(softmax_output[i]) || isinf(softmax_output[i]) || softmax_output[i] < 0.0f || softmax_output[i] > 1.0f)
+        float grad_i = 0.0f;
+        for (size_t j = 0; j < n; j++)
         {
-            LOG_ERROR("Invalid softmax output at index %d.", i);
-            return (float *)CM_INVALID_INPUT_ERROR;
+            float kronecker = (i == j) ? 1.0f : 0.0f;
+            grad_i += grad_output * softmax_vals[j] * (kronecker - softmax_vals[i]);
         }
+        accumulate_grad(input, grad_i);
     }
 
-    float *jacobian = cm_safe_malloc(n * n * sizeof(float), __FILE__, __LINE__);
-    if (jacobian == NULL)
-    {
-        LOG_ERROR("Memory allocation failed.");
-        return (float *)CM_MEMORY_ALLOCATION_ERROR;
-    }
-
-    for (int i = 0; i < n; i++)
-    {
-        for (int j = 0; j < n; j++)
-        {
-            if (i == j)
-            {
-                jacobian[i * n + j] = softmax_output[i] * (1.0f - softmax_output[i]);
-            }
-            else
-            {
-                jacobian[i * n + j] = -softmax_output[i] * softmax_output[j];
-            }
-        }
-    }
-
-    return jacobian;
-}
-
-/**
- * @brief Frees the memory allocated for the softmax derivative Jacobian.
- *
- * @param jacobian Pointer to the Jacobian matrix to be freed.
- */
-void free_softmax_derivative(float **jacobian)
-{
-    if (jacobian != NULL && *jacobian != NULL)
-    {
-        cm_safe_free((void **)jacobian);
-        LOG_DEBUG("Memory freed for softmax derivative jacobian.");
-    }
+    cm_safe_free((void **)&softmax_vals);
 }
