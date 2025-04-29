@@ -1,6 +1,15 @@
 #include "../../include/Core/autograd.h"
 #include "../../include/Core/memory_management.h"
+#include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+#include "../../include/Activations/elu.h"
+#include "../../include/Activations/gelu.h"
+#include "../../include/Activations/leaky_relu.h"
+#include "../../include/Activations/linear.h"
+#include "../../include/Activations/relu.h"
+#include "../../include/Activations/sigmoid.h"
+#include "../../include/Activations/softmax.h"
+#include "../../include/Activations/tanh.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -8,7 +17,6 @@
 static void accumulate_grad(Node *node, float grad);
 static Function *create_function(Operation op);
 static void add_edge(Node *from, Node *to);
-static float sigmoid_forward(float x);
 static int *compute_strides(int *sizes, int ndim);
 
 // Forward declarations of backward functions
@@ -19,10 +27,6 @@ static void div_backward(float grad_output, Node **inputs, int ninputs);
 static void pow_backward(float grad_output, Node **inputs, int ninputs);
 static void exp_backward(float grad_output, Node **inputs, int ninputs);
 static void log_backward(float grad_output, Node **inputs, int ninputs);
-static void tanh_backward(float grad_output, Node **inputs, int ninputs);
-static void relu_backward(float grad_output, Node **inputs, int ninputs);
-static void sigmoid_backward(float grad_output, Node **inputs, int ninputs);
-static void softmax_backward(float grad_output, Node **inputs, int ninputs);
 
 static GradContext grad_ctx = {1, {0}, 0};
 
@@ -505,6 +509,7 @@ static Function *create_function(Operation op)
     fn->saved_tensors = NULL;
     fn->num_saved = 0;
 
+    // Map operation to its backward function
     switch (op)
     {
     case OP_ADD:
@@ -540,12 +545,22 @@ static Function *create_function(Operation op)
     case OP_SOFTMAX:
         fn->backward = softmax_backward;
         break;
-    // Add other operations...
+    case OP_ELU:
+        fn->backward = elu_backward;
+        break;
+    case OP_GELU:
+        fn->backward = gelu_backward;
+        break;
+    case OP_LEAKY_RELU:
+        fn->backward = leaky_relu_backward;
+        break;
+    case OP_LINEAR:
+        fn->backward = linear_backward;
+        break;
     default:
         cm_safe_free((void **)&fn);
         return NULL;
     }
-
     return fn;
 }
 
@@ -604,244 +619,25 @@ static Node **build_topo(Node *root, int *size)
     return result;
 }
 
-// Helper for graph operations
-static void add_edge(Node *from, Node *to)
+int validate_activation_input(float x)
 {
-    // Allocate new prev node slot
-    Node **new_prev = (Node **)cm_safe_realloc(from->prev,
-                                               (from->num_prev + 1) * sizeof(Node *),
-                                               __FILE__, __LINE__);
-    if (new_prev)
+    if (isnan(x) || isinf(x) || x == -INFINITY)
     {
-        from->prev = new_prev;
-        from->prev[from->num_prev++] = to;
+        LOG_ERROR("Invalid input (NaN or Inf)");
+        return CM_INVALID_INPUT_ERROR;
     }
+    return 0;
+}
 
-    // Allocate new next node slot
-    Node **new_next = (Node **)cm_safe_realloc(to->next,
-                                               (to->num_next + 1) * sizeof(Node *),
-                                               __FILE__, __LINE__);
-    if (new_next)
+void create_activation_node(Node *output, Node *input, Operation op, Node *saved_var)
+{
+    if (output && output->requires_grad)
     {
-        to->next = new_next;
-        to->next[to->num_next++] = from;
-    }
-}
-
-// Implement all backward functions
-static void add_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 2)
-        return;
-    if (inputs[0]->requires_grad)
-        accumulate_grad(inputs[0], grad_output);
-    if (inputs[1]->requires_grad)
-        accumulate_grad(inputs[1], grad_output);
-}
-
-static void mul_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 2)
-        return;
-    if (inputs[0]->requires_grad)
-        accumulate_grad(inputs[0], grad_output * inputs[1]->value);
-    if (inputs[1]->requires_grad)
-        accumulate_grad(inputs[1], grad_output * inputs[0]->value);
-}
-
-static void sub_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 2)
-        return;
-    if (inputs[0]->requires_grad)
-        accumulate_grad(inputs[0], grad_output);
-    if (inputs[1]->requires_grad)
-        accumulate_grad(inputs[1], -grad_output);
-}
-
-static void div_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 2)
-        return;
-    float a = inputs[0]->value;
-    float b = inputs[1]->value;
-    if (inputs[0]->requires_grad)
-        accumulate_grad(inputs[0], grad_output / b);
-    if (inputs[1]->requires_grad)
-        accumulate_grad(inputs[1], -grad_output * a / (b * b));
-}
-
-static void pow_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 2)
-        return;
-    float a = inputs[0]->value;
-    float b = inputs[1]->value;
-    if (inputs[0]->requires_grad)
-        accumulate_grad(inputs[0], grad_output * b * powf(a, b - 1));
-    if (inputs[1]->requires_grad)
-        accumulate_grad(inputs[1], grad_output * logf(a) * powf(a, b));
-}
-
-static void exp_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 1)
-        return;
-    if (inputs[0]->requires_grad)
-    {
-        SavedVariable *saved = get_saved_variable(inputs[0], 0);
-        if (saved)
-            accumulate_grad(inputs[0], grad_output * saved->tensor->value);
-    }
-}
-
-static void log_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 1)
-        return;
-    if (inputs[0]->requires_grad)
-    {
-        SavedVariable *saved = get_saved_variable(inputs[0], 0);
-        if (saved)
-            accumulate_grad(inputs[0], grad_output * saved->tensor->value);
-    }
-}
-
-static void tanh_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 1)
-        return;
-    if (inputs[0]->requires_grad)
-    {
-        SavedVariable *saved = get_saved_variable(inputs[0], 0);
-        if (saved)
-            accumulate_grad(inputs[0], grad_output * saved->tensor->value);
-    }
-}
-
-static void relu_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 1)
-        return;
-    if (inputs[0]->requires_grad)
-    {
-        SavedVariable *saved = get_saved_variable(inputs[0], 0);
-        if (saved)
-            accumulate_grad(inputs[0], grad_output * (inputs[0]->value > 0 ? 1.0f : 0.0f));
-    }
-}
-
-static void sigmoid_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 1)
-        return;
-    if (inputs[0]->requires_grad)
-    {
-        SavedVariable *saved = get_saved_variable(inputs[0], 0);
-        if (saved)
+        output->grad_fn = create_function(op);
+        add_edge(output, input);
+        if (saved_var)
         {
-            float sig = saved->tensor->value;
-            accumulate_grad(inputs[0], grad_output * sig * (1.0f - sig));
+            save_for_backward(output, saved_var);
         }
     }
-}
-
-static void softmax_backward(float grad_output, Node **inputs, int ninputs)
-{
-    if (ninputs != 1)
-        return;
-    if (inputs[0]->requires_grad)
-    {
-        SavedVariable *saved = get_saved_variable(inputs[0], 0);
-        if (saved)
-        {
-            float *softmax_output = saved->tensor->tensor->storage->data;
-            size_t size = saved->tensor->tensor->storage->size;
-
-            for (size_t i = 0; i < size; i++)
-            {
-                float sum = 0.0f;
-                for (size_t j = 0; j < size; j++)
-                {
-                    float kronecker = (i == j) ? 1.0f : 0.0f;
-                    sum += grad_output * softmax_output[j] * (kronecker - softmax_output[i]);
-                }
-                accumulate_grad(inputs[0], sum);
-            }
-        }
-    }
-}
-
-// Add missing operation implementations
-Node *mul(Node *a, Node *b)
-{
-    Node *result = tensor(a->value * b->value, a->requires_grad || b->requires_grad);
-    if (!result)
-        return NULL;
-
-    if (result->requires_grad)
-    {
-        result->grad_fn = create_function(OP_MUL);
-        add_edge(result, a);
-        add_edge(result, b);
-    }
-    return result;
-}
-
-Node *pow(Node *a, Node *b)
-{
-    float pow_val = powf(a->value, b->value);
-    Node *result = tensor(pow_val, a->requires_grad || b->requires_grad);
-    if (!result)
-        return NULL;
-
-    if (result->requires_grad)
-    {
-        result->grad_fn = create_function(OP_POW);
-        add_edge(result, a);
-        add_edge(result, b);
-        // Save intermediate values needed for backward
-        save_for_backward(result, a);
-        save_for_backward(result, b);
-    }
-    return result;
-}
-
-// Add missing activation function implementations
-Node *tanh(Node *x)
-{
-    float tanh_val = tanhf(x->value);
-    Node *result = tensor(tanh_val, x->requires_grad);
-    if (!result)
-        return NULL;
-
-    if (result->requires_grad)
-    {
-        result->grad_fn = create_function(OP_TANH);
-        add_edge(result, x);
-        save_for_backward(result, tensor(1.0f - tanh_val * tanh_val, 0));
-    }
-    return result;
-}
-
-Node *relu(Node *x)
-{
-    float relu_val = x->value > 0 ? x->value : 0;
-    Node *result = tensor(relu_val, x->requires_grad);
-    if (!result)
-        return NULL;
-
-    if (result->requires_grad)
-    {
-        result->grad_fn = create_function(OP_RELU);
-        add_edge(result, x);
-        save_for_backward(result, tensor(x->value > 0 ? 1.0f : 0.0f, 0));
-    }
-    return result;
-}
-
-// Add helper function implementation
-static float sigmoid_forward(float x)
-{
-    return 1.0f / (1.0f + expf(-x));
 }

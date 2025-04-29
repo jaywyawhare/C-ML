@@ -1,7 +1,6 @@
 #ifndef C_ML_AUTOGRAD_H
 #define C_ML_AUTOGRAD_H
 
-#include "error_codes.h"
 #include <stddef.h>
 
 // Operation types
@@ -18,7 +17,11 @@ typedef enum Operation
     OP_TANH,
     OP_SIGMOID,
     OP_RELU,
-    OP_SOFTMAX
+    OP_SOFTMAX,
+    OP_ELU,
+    OP_GELU,
+    OP_LEAKY_RELU,
+    OP_LINEAR
 } Operation;
 
 // Forward declarations of structs
@@ -44,15 +47,8 @@ Node *pow(Node *a, Node *b);
 Node *exp(Node *x);
 Node *log(Node *x);
 
-// Activation functions
-Node *tanh(Node *x);
-Node *sigmoid(Node *x);
-Node *relu(Node *x);
-Node *softmax(Node *x);
-
 // Matrix operations
-Node *matmul(Node *a, Node *b);
-Node *transpose(Node *x);
+// Remove transpose and cat functions since they are not activation functions
 
 // Tensor creation and manipulation
 Node *empty(int *sizes, int ndim);
@@ -180,5 +176,11 @@ typedef struct GradContext
     int grad_mode_stack[32];
     int stack_size;
 } GradContext;
+
+// Validation helper for activation functions
+int validate_activation_input(float x);
+
+// Activation helper functions
+void create_activation_node(Node *output, Node *input, Operation op, Node *saved_var);
 
 #endif
