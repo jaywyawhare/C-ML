@@ -3,74 +3,30 @@
 #include "../../include/Loss_Functions/tversky_loss.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
 
-#define ALPHA 0.5f
-#define BETA 0.5f
-
-/**
- * @brief Computes the Tversky Loss.
- *
- * The Tversky Loss is a generalization of the Dice Loss and is defined as:
- * - loss = 1 - (TP / (TP + alpha * FP + beta * FN))
- *
- * @param y Pointer to the ground truth values.
- * @param yHat Pointer to the predicted values.
- * @param n The number of elements in y and yHat.
- * @return The computed loss, or an error code if inputs are invalid.
- */
-float tversky_loss(float *y, float *yHat, int n)
+Node *tversky_loss(Node *y, Node *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return (float)CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    float tp = 0.0f, fp = 0.0f, fn = 0.0f;
-    for (int i = 0; i < n; i++)
-    {
-        tp += y[i] * yHat[i];
-        fp += (1 - y[i]) * yHat[i];
-        fn += y[i] * (1 - yHat[i]);
-    }
-    float denominator = tp + ALPHA * fp + BETA * fn;
-    if (denominator == 0)
-    {
-        LOG_ERROR("Division by zero.");
-        return (float)CM_INVALID_INPUT_ERROR;
-    }
-    return 1.0f - (tp / denominator);
-}
 
-/**
- * @brief Computes the derivative of the Tversky Loss.
- *
- * The derivative is defined as:
- * - d(loss)/dyHat = -TP / (TP + alpha * FP + beta * FN)^2
- *
- * @param y Pointer to the ground truth values.
- * @param yHat Pointer to the predicted values.
- * @param n The number of elements in y and yHat.
- * @return The derivative value, or an error code if inputs are invalid.
- */
-float tversky_loss_derivative(float *y, float *yHat, int n)
-{
-    if (!y || !yHat || n <= 0)
-    {
-        LOG_ERROR("Invalid input parameters.");
-        return (float)CM_INVALID_INPUT_ERROR;
-    }
-    float tp = 0.0f, fp = 0.0f, fn = 0.0f;
+    Node *tp = tensor(0.0f, 1);
+    Node *fp = tensor(0.0f, 1);
+    Node *fn = tensor(0.0f, 1);
+    Node *one = tensor(1.0f, 0);
+    Node *alpha = tensor(0.5f, 0);
+    Node *beta = tensor(0.5f, 0);
+
     for (int i = 0; i < n; i++)
     {
-        tp += y[i] * yHat[i];
-        fp += (1 - y[i]) * yHat[i];
-        fn += y[i] * (1 - yHat[i]);
+        tp = add(tp, mul(y, yHat));
+        fp = add(fp, mul(sub(one, y), yHat));
+        fn = add(fn, mul(y, sub(one, yHat)));
     }
-    float denominator = tp + ALPHA * fp + BETA * fn;
-    if (denominator == 0)
-    {
-        LOG_ERROR("Division by zero.");
-        return (float)CM_INVALID_INPUT_ERROR;
-    }
-    return -tp / (denominator * denominator);
+
+    Node *denominator = add(tp, add(mul(alpha, fp), mul(beta, fn)));
+    return sub(one, div(tp, denominator));
 }

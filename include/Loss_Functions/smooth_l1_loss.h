@@ -1,23 +1,16 @@
 #ifndef SMOOTH_L1_LOSS_H
 #define SMOOTH_L1_LOSS_H
 
+#include "../Core/autograd.h"
+
 /**
  * @brief Computes the Smooth L1 Loss.
  *
- * @param y Pointer to the ground truth values.
- * @param yHat Pointer to the predicted values.
+ * @param y Pointer to the ground truth Node.
+ * @param yHat Pointer to the predicted Node.
  * @param n The number of elements in y and yHat.
- * @return The computed loss, or an error code if inputs are invalid.
+ * @return The computed loss Node, or NULL if inputs are invalid.
  */
-float smooth_l1_loss(float *y, float *yHat, int n);
-
-/**
- * @brief Computes the derivative of the Smooth L1 Loss.
- *
- * @param y Ground truth value.
- * @param yHat Predicted value.
- * @return The derivative value.
- */
-float smooth_l1_loss_derivative(float y, float yHat);
+Node *smooth_l1_loss(Node *y, Node *yHat, int n);
 
 #endif

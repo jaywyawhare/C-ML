@@ -3,79 +3,29 @@
 #include "../../include/Loss_Functions/cosine_similarity_loss.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
 
-/**
- * @brief Computes the Cosine Similarity Loss.
- *
- * The Cosine Similarity Loss is defined as:
- * - loss = 1 - (y . yHat) / (||y|| * ||yHat||)
- *
- * @param y Pointer to the ground truth values.
- * @param yHat Pointer to the predicted values.
- * @param n The number of elements in y and yHat.
- * @return The computed loss, or an error code if inputs are invalid.
- */
-float cosine_similarity_loss(float *y, float *yHat, int n)
+Node *cosine_similarity_loss(Node *y, Node *yHat, int n)
 {
     if (!y || !yHat || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return (float)CM_INVALID_INPUT_ERROR;
-    }
-    float dot_product = 0.0f, norm_y = 0.0f, norm_yHat = 0.0f;
-    for (int i = 0; i < n; i++)
-    {
-        dot_product += y[i] * yHat[i];
-        norm_y += y[i] * y[i];
-        norm_yHat += yHat[i] * yHat[i];
-    }
-    norm_y = sqrtf(norm_y);
-    norm_yHat = sqrtf(norm_yHat);
-    if (norm_y == 0 || norm_yHat == 0)
-    {
-        LOG_ERROR("Zero vector norm.");
-        return (float)CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
 
-    return 1.0f - (dot_product / (norm_y * norm_yHat));
-}
+    Node *dot_product = tensor(0.0f, 1);
+    Node *norm_y = tensor(0.0f, 1);
+    Node *norm_yHat = tensor(0.0f, 1);
 
-/**
- * @brief Computes the derivative of the Cosine Similarity Loss.
- *
- * The derivative is defined as:
- * - d(loss)/dyHat = -y / (||y|| * ||yHat||) + (y . yHat) * yHat / (||yHat||^3)
- *
- * @param y Pointer to the ground truth values.
- * @param yHat Pointer to the predicted values.
- * @param n The number of elements in y and yHat.
- * @return The derivative value, or an error code if inputs are invalid.
- */
-float cosine_similarity_loss_derivative(float *y, float *yHat, int n)
-{
-    if (!y || !yHat || n <= 0)
-    {
-        LOG_ERROR("Invalid input parameters.");
-        return (float)CM_INVALID_INPUT_ERROR;
-    }
-    float dot_product = 0.0f, norm_y = 0.0f, norm_yHat = 0.0f;
     for (int i = 0; i < n; i++)
     {
-        dot_product += y[i] * yHat[i];
-        norm_y += y[i] * y[i];
-        norm_yHat += yHat[i] * yHat[i];
+        dot_product = add(dot_product, mul(y, yHat));
+        norm_y = add(norm_y, mul(y, y));
+        norm_yHat = add(norm_yHat, mul(yHat, yHat));
     }
-    norm_y = sqrtf(norm_y);
-    norm_yHat = sqrtf(norm_yHat);
-    if (norm_y == 0 || norm_yHat == 0)
-    {
-        LOG_ERROR("Zero vector norm.");
-        return (float)CM_INVALID_INPUT_ERROR;
-    }
-    float derivative = -y[0] / (norm_y * norm_yHat);
-    for (int i = 1; i < n; i++)
-    {
-        derivative += (dot_product / (norm_yHat * norm_yHat * norm_yHat)) * yHat[i];
-    }
-    return derivative;
+
+    norm_y = pow(norm_y, tensor(0.5f, 0));
+    norm_yHat = pow(norm_yHat, tensor(0.5f, 0));
+
+    return sub(tensor(1.0f, 0), div(dot_product, mul(norm_y, norm_yHat)));
 }

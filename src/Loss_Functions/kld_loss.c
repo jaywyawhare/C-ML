@@ -3,48 +3,25 @@
 #include "../../include/Loss_Functions/kld_loss.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+#include "../../include/Core/autograd.h"
 
-#define EPSILON 1e-8
-
-/**
- * @brief Computes the Kullback-Leibler Divergence Loss.
- *
- * The KLD loss is defined as:
- * - loss = 1/n * Σ [p * log(p / q)]
- *
- * @param p Pointer to the true distribution.
- * @param q Pointer to the predicted distribution.
- * @param n The number of elements in p and q.
- * @return The computed loss, or an error code if inputs are invalid.
- */
-float kld_loss(float *p, float *q, int n)
+Node *kld_loss(Node *p, Node *q, int n)
 {
     if (!p || !q || n <= 0)
     {
         LOG_ERROR("Invalid input parameters.");
-        return (float)CM_INVALID_INPUT_ERROR;
+        return NULL;
     }
-    float sum = 0.0f;
+
+    Node *epsilon = tensor(1e-8, 0);
+    Node *loss = tensor(0.0f, 1);
+
     for (int i = 0; i < n; i++)
     {
-        float p_val = fmaxf(p[i], EPSILON);
-        float q_val = fmaxf(q[i], EPSILON);
-        sum += p_val * logf(p_val / q_val);
+        Node *p_val = max(p, epsilon);
+        Node *q_val = max(q, epsilon);
+        loss = add(loss, mul(p_val, log(div(p_val, q_val))));
     }
-    return sum / n;
-}
 
-/**
- * @brief Computes the derivative of the Kullback-Leibler Divergence Loss.
- *
- * The derivative is defined as:
- * - d(loss)/dq = -p / q
- *
- * @param p True distribution value.
- * @param q Predicted distribution value.
- * @return The derivative value.
- */
-float kld_loss_derivative(float p, float q)
-{
-    return -p / fmaxf(q, EPSILON);
+    return div(loss, tensor((float)n, 0));
 }
