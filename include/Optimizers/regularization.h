@@ -1,6 +1,7 @@
 #ifndef REGULARIZATION_H
 #define REGULARIZATION_H
 
+#include <stdbool.h>
 #include "../Core/autograd.h"
 
 #ifndef M_PI
