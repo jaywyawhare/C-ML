@@ -1,67 +1,37 @@
 #include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include "../../include/Preprocessing/min_max_scaler.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-
-
-/**
- * @brief Scales an array of floats to a range of [0, 1] using min-max scaling.
- *
- * The function finds the minimum and maximum values in the input array and scales 
- * the values to the range [0, 1] using the formula:
- * scaled_value = (value - min) / (max - min)
- * 
- * @param x The input array of floats.
- * @param size The size of the input array.
- * @return A pointer to the scaled array, or NULL if an error occurs.
- */
-float *min_max_scaler(float *x, int size)
+Node *min_max_scaler_tensor(Node *x)
 {
-    if (x == NULL)
+    if (!x)
     {
-        LOG_ERROR("Null pointer argument");
+        LOG_ERROR("Null input tensor");
         return NULL;
     }
 
-    if (size <= 0)
+    Node *min_val = tensor(x->tensor->storage->data[0], 0);
+    Node *max_val = tensor(x->tensor->storage->data[0], 0);
+
+    for (int i = 1; i < x->tensor->storage->size; i++)
     {
-        LOG_ERROR("Invalid size argument");
+        float val = x->tensor->storage->data[i];
+        if (val < min_val->value)
+            min_val->value = val;
+        if (val > max_val->value)
+            max_val->value = val;
+    }
+
+    if (max_val->value == min_val->value)
+    {
+        LOG_ERROR("Max and min are equal");
         return NULL;
     }
-    float *scaled = (float *)cm_safe_malloc(sizeof(float) * size, __FILE__, __LINE__);
-    if (scaled == NULL)
-    {
-        LOG_ERROR("Memory allocation failed\n");
-        return NULL;
-    }
-    float min = x[0];
-    float max = x[0];
-    for (int i = 0; i < size; i++)
-    {
-        if (x[i] < min)
-        {
-            min = x[i];
-        }
-        if (x[i] > max)
-        {
-            max = x[i];
-        }
-    }
-    if (max == min)
-    {
-        LOG_ERROR("Max and min are equal\n");
-        free(scaled);
-        return NULL;
-    }
-    for (int i = 0; i < size; i++)
-    {
-        scaled[i] = (x[i] - min) / (max - min);
-        LOG_DEBUG("Scaled[%d]: %f", i, scaled[i]);
-    }
-    LOG_DEBUG("Scaling complete.");
-    return scaled;
+
+    // (x - min) / (max - min)
+    Node *range = sub(max_val, min_val);
+    Node *normalized = div(sub(x, min_val), range);
+    normalized->requires_grad = x->requires_grad;
+
+    return normalized;
 }

@@ -1,72 +1,36 @@
 #include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include "../../include/Preprocessing/standard_scaler.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-
-
-/**
- * @brief Scales an array of floats to have a mean of 0 and a standard deviation of 1.
- *
- * The function calculates the mean and standard deviation of the input array and
- * scales the values using the formula:
- * scaled_value = (value - mean) / std
- *
- * @param x The input array of floats.
- * @param size The size of the input array.
- * @return A pointer to the scaled array, or NULL if an error occurs.
- */
-float *standard_scaler(float *x, int size)
+Node *standard_scaler_tensor(Node *x)
 {
-    if (x == NULL)
+    if (!x)
     {
-        LOG_ERROR("Null pointer argument");
+        LOG_ERROR("Null input tensor");
         return NULL;
     }
 
-    if (size <= 0)
+    // Calculate mean
+    Node *sum = tensor(0.0f, 1);
+    for (int i = 0; i < x->tensor->storage->size; i++)
     {
-        LOG_ERROR("Invalid size argument");
-        return NULL;
+        sum = add(sum, tensor(x->tensor->storage->data[i], 0));
     }
+    Node *mean = div(sum, tensor((float)x->tensor->storage->size, 0));
 
-    float *scaled = (float *)cm_safe_malloc(sizeof(float) * size, __FILE__, __LINE__);
-    if (scaled == NULL)
+    // Calculate variance
+    Node *var_sum = tensor(0.0f, 1);
+    for (int i = 0; i < x->tensor->storage->size; i++)
     {
-        LOG_ERROR("Memory allocation failed\n");
-        return NULL;
+        Node *diff = sub(tensor(x->tensor->storage->data[i], 0), mean);
+        var_sum = add(var_sum, mul(diff, diff));
     }
+    Node *std = tensor(sqrt(var_sum->value / x->tensor->storage->size), 1);
 
-    float mean = 0;
-    for (int i = 0; i < size; i++)
-    {
-        mean += x[i];
-    }
-    mean /= size;
+    // (x - mean) / std
+    Node *centered = sub(x, mean);
+    Node *scaled = div(centered, std);
+    scaled->requires_grad = x->requires_grad;
 
-    float std = 0;
-    for (int i = 0; i < size; i++)
-    {
-        std += pow(x[i] - mean, 2);
-    }
-    std /= size;
-    std = sqrt(std);
-
-    if (std == 0)
-    {
-        LOG_ERROR("Standard deviation is zero\n");
-        free(scaled);
-        return NULL;
-    }
-
-    for (int i = 0; i < size; i++)
-    {
-        scaled[i] = (x[i] - mean) / std;
-        LOG_DEBUG("Scaled[%d]: %f", i, scaled[i]);
-    }
-    LOG_DEBUG("Scaling complete.");
     return scaled;
 }

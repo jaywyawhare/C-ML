@@ -1,46 +1,21 @@
-#include <stdbool.h>
 #include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include "../../include/Preprocessing/one_hot_encoder.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
-
-
-/**
- * @brief Encodes a character array into a one-hot encoded integer array.
- *
- * The function maps each unique character in the input array to a unique integer label
- * and creates a one-hot encoded representation of the input array.
- *
- * @param x The input character array.
- * @param size The size of the input array.
- * @param map A pointer to the character-to-integer mapping.
- * @param mapSize A pointer to store the size of the mapping.
- * @return A pointer to the one-hot encoded array, or an error code.
- */
-int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
+Node *one_hot_encoding_tensor(char *x, int size, CharMap **map, int *mapSize)
 {
-    if (x == NULL || map == NULL || mapSize == NULL)
+    if (!x || !map || !mapSize)
     {
         LOG_ERROR("Null pointer argument");
-        return (int *)CM_NULL_POINTER_ERROR;
+        return NULL;
     }
 
-    if (size <= 0)
-    {
-        LOG_ERROR("Invalid size argument");
-        return (int *)CM_INVALID_PARAMETER_ERROR;
-    }
-
+    // Create and build character map
     *map = (CharMap *)cm_safe_malloc(sizeof(CharMap) * size, __FILE__, __LINE__);
-    if (*map == NULL)
-    {
-        LOG_ERROR("Memory allocation failed\n");
-        return (int *)CM_MEMORY_ALLOCATION_ERROR;
-    }
+    if (!*map)
+        return NULL;
 
     int uniqueCount = 0;
     for (int i = 0; i < size; i++)
@@ -63,88 +38,58 @@ int *one_hot_encoding(char *x, int size, CharMap **map, int *mapSize)
     }
     *mapSize = uniqueCount;
 
-    int *encoded = (int *)cm_safe_malloc(sizeof(int) * size * uniqueCount, __FILE__, __LINE__);
-    if (encoded == NULL)
+    // Create output tensor
+    int out_sizes[2] = {size, uniqueCount};
+    Node *encoded = empty(out_sizes, 2);
+    if (!encoded)
     {
-        LOG_ERROR("Memory allocation failed\n");
-        free(*map);
-        *map = NULL; 
-        return (int *)CM_MEMORY_ALLOCATION_ERROR;
+        cm_safe_free((void **)map);
+        return NULL;
     }
 
+    // Perform one-hot encoding
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < uniqueCount; j++)
         {
-            encoded[i * uniqueCount + j] = (x[i] == (*map)[j].character) ? 1 : 0;
-            LOG_DEBUG("encoded[%d]: %d", i * uniqueCount + j, encoded[i * uniqueCount + j]);
+            encoded->tensor->storage->data[i * uniqueCount + j] =
+                (x[i] == (*map)[j].character) ? 1.0f : 0.0f;
         }
     }
-    LOG_DEBUG("Encoding complete.");
+
+    encoded->requires_grad = 1;
     return encoded;
 }
 
-/**
- * @brief Decodes a one-hot encoded integer array back into a character array.
- *
- * The function converts a one-hot encoded representation back into the original
- * character array using the provided mapping.
- *
- * @param x The one-hot encoded integer array.
- * @param size The size of the input array.
- * @param map The character-to-integer mapping.
- * @param mapSize The size of the mapping.
- * @return A pointer to the decoded character array, or NULL if an error occurs.
- */
-char *one_hot_decoding(int *x, int size, CharMap *map, int mapSize)
+Node *one_hot_decoding_tensor(Node *x, int size, CharMap *map, int mapSize)
 {
-    if (x == NULL || map == NULL)
+    if (!x || !map)
     {
         LOG_ERROR("Null pointer argument");
         return NULL;
     }
 
-    if (size <= 0 || mapSize <= 0)
-    {
-        LOG_ERROR("Invalid size argument");
+    int sizes[1] = {size};
+    Node *decoded = empty(sizes, 1);
+    if (!decoded)
         return NULL;
-    }
-    char *decoded = (char *)cm_safe_malloc(sizeof(char) * (size + 1), __FILE__, __LINE__);
-    if (decoded == NULL)
-    {
-        LOG_ERROR("Memory allocation failed\n");
-        return NULL;
-    }
+
     for (int i = 0; i < size; i++)
     {
-        decoded[i] = '\0';
         for (int j = 0; j < mapSize; j++)
         {
-            if (x[i * mapSize + j] == 1)
+            if (x->tensor->storage->data[i * mapSize + j] > 0.5f)
             {
-                decoded[i] = map[j].character;
+                decoded->tensor->storage->data[i] = (float)map[j].character;
                 break;
             }
         }
     }
-    decoded[size] = '\0';
-    LOG_DEBUG("Decoding complete.");
+
     return decoded;
 }
 
-/**
- * @brief Frees the memory allocated for one-hot encoding and decoding.
- *
- * This function releases the memory allocated for the one-hot encoded array,
- * the decoded character array, and the character-to-integer mapping.
- *
- * @param x The one-hot encoded integer array.
- * @param y The decoded character array.
- * @param map The character-to-integer mapping.
- */
-void free_one_hot_memory(int *x, char *y, CharMap *map)
+void free_one_hot_memory(CharMap *map)
 {
-    cm_safe_free((void **)&x);
-    cm_safe_free((void **)&y);
     cm_safe_free((void **)&map);
 }
