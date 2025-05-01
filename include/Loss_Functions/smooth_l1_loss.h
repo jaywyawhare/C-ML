@@ -9,8 +9,9 @@
  * @param y Pointer to the ground truth Node.
  * @param yHat Pointer to the predicted Node.
  * @param n The number of elements in y and yHat.
+ * @param beta_val The beta value for smooth l1 loss
  * @return The computed loss Node, or NULL if inputs are invalid.
  */
-Node *smooth_l1_loss(Node *y, Node *yHat, int n);
+Node *smooth_l1_loss(Node *y, Node *yHat, int n, float beta_val);
 
 #endif

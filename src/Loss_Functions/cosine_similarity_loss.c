@@ -19,13 +19,13 @@ Node *cosine_similarity_loss(Node *y, Node *yHat, int n)
 
     for (int i = 0; i < n; i++)
     {
-        dot_product = add(dot_product, mul(y, yHat));
-        norm_y = add(norm_y, mul(y, y));
-        norm_yHat = add(norm_yHat, mul(yHat, yHat));
+        dot_product = tensor_add(dot_product, tensor_mul(y, yHat));
+        norm_y = tensor_add(norm_y, tensor_mul(y, y));
+        norm_yHat = tensor_add(norm_yHat, tensor_mul(yHat, yHat));
     }
 
-    norm_y = pow(norm_y, tensor(0.5f, 0));
-    norm_yHat = pow(norm_yHat, tensor(0.5f, 0));
+    norm_y = tensor_pow(norm_y, tensor(0.5f, 0));
+    norm_yHat = tensor_pow(norm_yHat, tensor(0.5f, 0));
 
-    return sub(tensor(1.0f, 0), div(dot_product, mul(norm_y, norm_yHat)));
+    return tensor_sub(tensor(1.0f, 0), tensor_div(dot_product, tensor_mul(norm_y, norm_yHat)));
 }

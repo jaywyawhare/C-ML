@@ -38,14 +38,22 @@ typedef struct GradContext GradContext;
 Node *tensor(float value, int requires_grad);
 Node *tensor_with_options(float value, TensorOptions options);
 
+// Tensor creation functions
+Node *tensor_randn(int m, int n); // Add this
+Node *tensor_zeros(int size);     // Add this
+
 // Basic arithmetic operations
-Node *add(Node *a, Node *b);
-Node *sub(Node *a, Node *b);
-Node *mul(Node *a, Node *b);
-Node *div(Node *a, Node *b);
-Node *pow(Node *a, Node *b);
-Node *exp(Node *x);
-Node *log(Node *x);
+Node *tensor_add(Node *a, Node *b);
+Node *tensor_mul(Node *a, Node *b);
+Node *tensor_sub(Node *a, Node *b);
+Node *tensor_div(Node *a, Node *b);
+Node *tensor_pow(Node *a, Node *b);
+Node *tensor_exp(Node *a);
+Node *tensor_log(Node *a);
+Node *tensor_abs(Node *a);
+Node *tensor_neg(Node *a);
+Node *tensor_max(Node *a, Node *b);
+Node *tensor_min(Node *a, Node *b);
 
 // Matrix operations
 // Remove transpose and cat functions since they are not activation functions
@@ -109,8 +117,8 @@ typedef struct Node
     int retain_grad;   // Keep gradients for non-leaf nodes
 
     // Graph tracking
-    struct Node **next; // Forward edges
-    struct Node **prev; // Backward edges
+    struct Node ***next; // Changed from Node** to Node***
+    struct Node **prev;  // Backward edges
     int num_next;
     int num_prev;
     int ref_count;
@@ -182,5 +190,16 @@ int validate_activation_input(float x);
 
 // Activation helper functions
 void create_activation_node(Node *output, Node *input, Operation op, Node *saved_var);
+
+// Gradient accumulation helpers
+void accumulate_grad(Node *node, float grad);
+
+// Node creation helper
+Node *create_node(void);
+
+// Add these declarations
+void backward(Node *root);
+Node **build_topo(Node *root, int *size);
+void execute_backward_function(Node *node);
 
 #endif

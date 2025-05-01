@@ -5,6 +5,7 @@
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
 #include "../../include/Core/autograd.h"
+#include "../../include/Core/memory_management.h"
 
 /**
  * @brief Performs the Adam optimization algorithm.
@@ -45,15 +46,15 @@ float adam(float x, float y, float lr, float *w, float *b, float *v_w, float *v_
     // Forward pass using autograd operations
     Node *adjusted_lr = adjust_learning_rate_node(lr_node, epoch, config.lr_scheduler,
                                                   config.lr_gamma, config.lr_step_size);
-    Node *pred = add(mul(w_node, x_node), b_node);
-    Node *diff = sub(pred, y_node);
-    Node *loss = pow(diff, tensor(2.0f, 0));
+    Node *pred = tensor_add(tensor_mul(w_node, x_node), b_node);
+    Node *diff = tensor_sub(pred, y_node);
+    Node *loss = tensor_pow(diff, tensor(2.0f, 0));
 
     // Add regularization
     if (config.regularizer.type != NO_REGULARIZATION)
     {
-        Node *reg = apply_regularization_node(w_node, config.regularizer);
-        loss = add(loss, reg);
+        Node *reg = compute_regularization_node(w_node, config.regularizer);
+        loss = tensor_add(loss, reg);
     }
 
     // Backward pass

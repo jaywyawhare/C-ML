@@ -5,7 +5,7 @@
 #include "../../include/Core/logging.h"
 #include "../../include/Core/autograd.h"
 
-Node *huber_loss(Node *y, Node *yHat, int n)
+Node *huber_loss(Node *y, Node *yHat, int n, float delta_val)
 {
     if (!y || !yHat || n <= 0)
     {
@@ -13,24 +13,27 @@ Node *huber_loss(Node *y, Node *yHat, int n)
         return NULL;
     }
 
-    Node *delta = tensor(1.0f, 0);
     Node *loss = tensor(0.0f, 1);
+    Node *delta = tensor(delta_val, 0);
     Node *half = tensor(0.5f, 0);
 
     for (int i = 0; i < n; i++)
     {
-        Node *diff = sub(yHat, y);
-        Node *abs_diff = abs(diff);
+        Node *diff = tensor_sub(yHat, y);
+        Node *abs_diff = tensor_abs(diff);
 
-        if (abs_diff->value <= delta->value)
+        Node *condition = tensor_sub(abs_diff, delta);
+
+        if (condition->tensor->storage->data[0] < 0)
         {
-            loss = add(loss, mul(half, mul(diff, diff)));
+            Node *diff_squared = tensor_mul(diff, diff);
+            loss = tensor_add(loss, tensor_mul(half, diff_squared));
         }
         else
         {
-            loss = add(loss, sub(mul(delta, abs_diff), mul(half, mul(delta, delta))));
+            loss = tensor_add(loss, tensor_sub(tensor_mul(delta, abs_diff), tensor_mul(half, tensor_mul(delta, delta))));
         }
     }
 
-    return div(loss, tensor((float)n, 0));
+    return tensor_div(loss, tensor((float)n, 0));
 }

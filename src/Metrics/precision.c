@@ -1,4 +1,7 @@
+#include <stdio.h>
 #include "../../include/Metrics/precision.h"
+#include "../../include/Core/error_codes.h"
+#include "../../include/Core/logging.h"
 #include "../../include/Core/autograd.h"
 
 /**
@@ -29,11 +32,11 @@ Node *precision(Node *y, Node *yHat, int n, float threshold)
         float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
 
         if (actual == 1.0f && pred == 1.0f)
-            true_positive = add(true_positive, tensor(1.0f, 1));
+            true_positive = tensor_add(true_positive, tensor(1.0f, 1));
         else if (actual == 0.0f && pred == 1.0f)
-            false_positive = add(false_positive, tensor(1.0f, 1));
+            false_positive = tensor_add(false_positive, tensor(1.0f, 1));
     }
 
-    Node *denominator = add(true_positive, false_positive);
-    return div(true_positive, denominator);
+    Node *denominator = tensor_add(true_positive, false_positive);
+    return tensor_div(true_positive, denominator);
 }

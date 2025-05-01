@@ -22,11 +22,11 @@ Node *tversky_loss(Node *y, Node *yHat, int n)
 
     for (int i = 0; i < n; i++)
     {
-        tp = add(tp, mul(y, yHat));
-        fp = add(fp, mul(sub(one, y), yHat));
-        fn = add(fn, mul(y, sub(one, yHat)));
+        tp = tensor_add(tp, tensor_mul(y, yHat));
+        fp = tensor_add(fp, tensor_mul(tensor_sub(one, y), yHat));
+        fn = tensor_add(fn, tensor_mul(y, tensor_sub(one, yHat)));
     }
 
-    Node *denominator = add(tp, add(mul(alpha, fp), mul(beta, fn)));
-    return sub(one, div(tp, denominator));
+    Node *denominator = tensor_add(tp, tensor_add(tensor_mul(alpha, fp), tensor_mul(beta, fn)));
+    return tensor_sub(one, tensor_div(tp, denominator));
 }

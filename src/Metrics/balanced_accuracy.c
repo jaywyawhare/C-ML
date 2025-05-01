@@ -17,6 +17,6 @@ Node *balanced_accuracy(Node *y, Node *yHat, int n, float threshold)
     Node *sens = recall(y, yHat, n, threshold);
     Node *spec = specificity(y, yHat, n, threshold);
 
-    Node *sum = add(sens, spec);
-    return div(sum, tensor(2.0f, 0));
+    Node *sum = tensor_add(sens, spec);
+    return tensor_div(sum, tensor(2.0f, 0));
 }

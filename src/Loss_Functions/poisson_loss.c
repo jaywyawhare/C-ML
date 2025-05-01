@@ -18,11 +18,11 @@ Node *poisson_loss(Node *y, Node *yHat, int n)
 
     for (int i = 0; i < n; i++)
     {
-        Node *yhat_safe = add(yHat, epsilon);
+        Node *yhat_safe = tensor_add(yHat, epsilon);
         Node *term1 = yhat_safe;
-        Node *term2 = mul(y, log(yhat_safe));
-        sum = add(sum, sub(term1, term2));
+        Node *term2 = tensor_mul(y, tensor_log(yhat_safe)); // Use tensor_log instead of log
+        sum = tensor_add(sum, tensor_sub(term1, term2));
     }
 
-    return div(sum, tensor((float)n, 0));
+    return tensor_div(sum, tensor((float)n, 0));
 }

@@ -1,113 +1,50 @@
 #include "../../include/Core/dataset.h"
 #include "../../include/Core/memory_management.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/logging.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-/**
- * @brief Create a new dataset.
- *
- * Allocates memory for a new dataset structure and initializes its fields.
- *
- * @return Dataset* Pointer to the newly created dataset, or NULL on failure.
- */
-Dataset *dataset_create(void)
+Dataset *create_dataset(int num_samples, int input_size, int output_size)
 {
-    Dataset *dataset = (Dataset *)cm_safe_malloc(sizeof(Dataset), __FILE__, __LINE__);
-    if (dataset)
+    Dataset *dataset = cm_safe_malloc(sizeof(Dataset), __FILE__, __LINE__);
+
+    dataset->num_samples = num_samples;
+    dataset->input_size = input_size;
+    dataset->output_size = output_size;
+
+    // Allocate memory for input data
+    dataset->X = cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
+    for (int i = 0; i < num_samples; i++)
     {
-        dataset->X = NULL;
-        dataset->y = NULL;
-        dataset->num_samples = 0;
-        dataset->input_dim = 0;
-        dataset->output_dim = 0;
+        dataset->X[i] = cm_safe_malloc(input_size * sizeof(float), __FILE__, __LINE__);
     }
+
+    // Allocate memory for target data
+    dataset->y = cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
+    for (int i = 0; i < num_samples; i++)
+    {
+        dataset->y[i] = cm_safe_malloc(output_size * sizeof(float), __FILE__, __LINE__);
+    }
+
     return dataset;
 }
 
-/**
- * @brief Load dataset from arrays.
- *
- * Copies input and output data arrays into the dataset structure.
- *
- * @param dataset Pointer to the dataset structure.
- * @param X_array Pointer to the input data array.
- * @param y_array Pointer to the output data array.
- * @param num_samples Number of samples.
- * @param input_dim Dimension of input features.
- * @param output_dim Dimension of output features.
- * @return CM_Error Error code indicating success or failure.
- */
-CM_Error dataset_load_arrays(Dataset *dataset, float *X_array, float *y_array, int num_samples, int input_dim, int output_dim)
-{
-    if (!dataset || !X_array || !y_array)
-    {
-        LOG_ERROR("Null pointer argument.");
-        return CM_NULL_POINTER_ERROR;
-    }
-
-    dataset->num_samples = num_samples;
-    dataset->input_dim = input_dim;
-    dataset->output_dim = output_dim;
-
-    dataset->X = (float **)cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
-    dataset->y = (float **)cm_safe_malloc(num_samples * sizeof(float *), __FILE__, __LINE__);
-
-    if (!dataset->X || !dataset->y)
-    {
-        LOG_ERROR("Memory allocation failed for X or y.");
-        return CM_MEMORY_ALLOCATION_ERROR;
-    }
-
-    for (int i = 0; i < num_samples; i++)
-    {
-        dataset->X[i] = (float *)cm_safe_malloc(input_dim * sizeof(float), __FILE__, __LINE__);
-        dataset->y[i] = (float *)cm_safe_malloc(output_dim * sizeof(float), __FILE__, __LINE__);
-
-        if (!dataset->X[i] || !dataset->y[i])
-        {
-            LOG_ERROR("Memory allocation failed at index %d.", i);
-            return CM_MEMORY_ALLOCATION_ERROR;
-        }
-
-        memcpy(dataset->X[i], X_array + i * input_dim, input_dim * sizeof(float));
-        memcpy(dataset->y[i], y_array + i * output_dim, output_dim * sizeof(float));
-    }
-    return CM_SUCCESS;
-}
-
-/**
- * @brief Free memory allocated for the dataset.
- *
- * Releases all memory associated with the dataset, including input and output arrays.
- *
- * @param dataset Pointer to the dataset to free.
- */
-void dataset_free(Dataset *dataset)
+void free_dataset(Dataset *dataset)
 {
     if (!dataset)
         return;
 
-    if (dataset->X)
+    // Free input data
+    for (int i = 0; i < dataset->num_samples; i++)
     {
-        for (int i = 0; i < dataset->num_samples; i++)
-        {
-            cm_safe_free((void **)&dataset->X[i]);
-        }
-        cm_safe_free((void **)&dataset->X);
+        cm_safe_free((void **)&dataset->X[i]);
     }
+    cm_safe_free((void **)&dataset->X);
 
-    if (dataset->y)
+    // Free target data
+    for (int i = 0; i < dataset->num_samples; i++)
     {
-        for (int i = 0; i < dataset->num_samples; i++)
-        {
-            cm_safe_free((void **)&dataset->y[i]);
-        }
-        cm_safe_free((void **)&dataset->y);
+        cm_safe_free((void **)&dataset->y[i]);
     }
+    cm_safe_free((void **)&dataset->y);
 
+    // Free dataset structure
     cm_safe_free((void **)&dataset);
 }

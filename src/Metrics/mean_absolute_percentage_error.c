@@ -1,3 +1,4 @@
+#include <math.h>
 #include "../../include/Metrics/mean_absolute_percentage_error.h"
 #include "../../include/Core/autograd.h"
 #include "../../include/Core/error_codes.h"
@@ -29,13 +30,17 @@ Node *mean_absolute_percentage_error(Node *y, Node *yHat, int n)
     {
         Node *y_val = tensor(y->tensor->storage->data[i], 1);
         if (fabsf(y_val->value) < 1e-15)
+        {
             continue;
+        }
 
-        Node *diff = sub(y_val, tensor(yHat->tensor->storage->data[i], 1));
-        Node *abs_pct = div(abs(diff), abs(y_val));
-        sum = add(sum, abs_pct);
-        valid_count = add(valid_count, tensor(1.0f, 1));
+        Node *diff = tensor_sub(yHat, y);
+        Node *abs_diff = tensor_abs(diff);
+        Node *abs_y = tensor_abs(y_val);
+        Node *abs_pct = tensor_div(abs_diff, abs_y);
+        sum = tensor_add(sum, abs_pct);
+        valid_count = tensor_add(valid_count, tensor(1.0f, 1));
     }
 
-    return mul(div(sum, valid_count), tensor(100.0f, 1));
+    return tensor_mul(tensor_div(sum, valid_count), tensor(100.0f, 1));
 }

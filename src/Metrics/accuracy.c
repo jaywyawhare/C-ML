@@ -18,8 +18,8 @@ Node *accuracy(Node *y, Node *yHat, int n, float threshold)
         Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
         Node *pred = tensor(yhat_i->value > threshold ? 1.0f : 0.0f, 1);
         Node *match = tensor(pred->value == y_i->value ? 1.0f : 0.0f, 1);
-        matches = add(matches, match);
+        matches = tensor_add(matches, match);
     }
 
-    return div(matches, tensor((float)n, 1));
+    return tensor_div(matches, tensor((float)n, 1));
 }

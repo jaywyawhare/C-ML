@@ -1,6 +1,8 @@
+#include <math.h>
+#include <string.h>
 #include "../../include/Activations/softmax.h"
 #include "../../include/Core/autograd.h"
-#include <math.h>
+#include "../../include/Core/memory_management.h"
 
 float *softmax(float *z, int n)
 {
@@ -87,7 +89,10 @@ void softmax_backward(float grad_output, Node **inputs, int ninputs)
             float kronecker = (i == j) ? 1.0f : 0.0f;
             grad_i += grad_output * softmax_vals[j] * (kronecker - softmax_vals[i]);
         }
-        accumulate_grad(input, grad_i);
+
+        // Check if this is backward and needs gradient
+        if (input->requires_grad && grad_output != 0)
+            accumulate_grad(input, grad_i);
     }
 
     cm_safe_free((void **)&softmax_vals);

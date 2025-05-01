@@ -31,11 +31,11 @@ Node *recall(Node *y, Node *yHat, int n, float threshold)
         float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
 
         if (actual == 1.0f && pred == 1.0f)
-            true_positive = add(true_positive, tensor(1.0f, 1));
+            true_positive = tensor_add(true_positive, tensor(1.0f, 1));
         else if (actual == 1.0f && pred == 0.0f)
-            false_negative = add(false_negative, tensor(1.0f, 1));
+            false_negative = tensor_add(false_negative, tensor(1.0f, 1));
     }
 
-    Node *denominator = add(true_positive, false_negative);
-    return div(true_positive, denominator);
+    Node *denominator = tensor_add(true_positive, false_negative);
+    return tensor_div(true_positive, denominator);
 }

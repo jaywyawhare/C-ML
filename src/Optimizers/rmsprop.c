@@ -5,6 +5,7 @@
 #include "../../include/Optimizers/regularization.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+#include "../../include/Core/memory_management.h"
 
 /**
  * @brief Performs the RMSProp optimization algorithm.
@@ -46,15 +47,15 @@ float rmsprop(float x, float y, float lr, float *w, float *b,
     Node *b_node = tensor(*b, 1);
 
     // Forward pass with autograd
-    Node *pred = add(mul(w_node, x_node), b_node);
-    Node *diff = sub(pred, y_node);
-    Node *loss = pow(diff, tensor(2.0f, 0));
+    Node *pred = tensor_add(tensor_mul(w_node, x_node), b_node);
+    Node *diff = tensor_sub(pred, y_node);
+    Node *loss = tensor_pow(diff, tensor(2.0f, 0));
 
     // Add regularization using autograd
     if (config.regularizer.type != NO_REGULARIZATION)
     {
         Node *reg = compute_regularization_node(w_node, config.regularizer);
-        loss = add(loss, reg);
+        loss = tensor_add(loss, reg);
     }
 
     // Backward pass - get gradients automatically

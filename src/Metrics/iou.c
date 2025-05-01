@@ -30,11 +30,11 @@ Node *iou(Node *y, Node *yHat, int n, float threshold)
         float actual = y->tensor->storage->data[i];
         float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
 
-        intersection = add(intersection, mul(tensor(actual, 1), tensor(pred, 1)));
-        union_area = add(union_area,
-                         sub(add(tensor(actual, 1), tensor(pred, 1)),
-                             mul(tensor(actual, 1), tensor(pred, 1))));
+        intersection = tensor_add(intersection, tensor_mul(tensor(actual, 1), tensor(pred, 1)));
+        union_area = tensor_add(union_area,
+                                tensor_sub(tensor_add(tensor(actual, 1), tensor(pred, 1)),
+                                           tensor_mul(tensor(actual, 1), tensor(pred, 1))));
     }
 
-    return div(intersection, union_area);
+    return tensor_div(intersection, union_area);
 }

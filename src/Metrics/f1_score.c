@@ -1,6 +1,7 @@
 #include "../../include/Core/autograd.h"
 #include "../../include/Metrics/f1_score.h"
 #include "../../include/Core/error_codes.h"
+#include "../../include/Core/memory_management.h"
 #include "../../include/Core/logging.h"
 
 Node *f1_score(Node *y, Node *yHat, int n, float threshold)
@@ -17,21 +18,23 @@ Node *f1_score(Node *y, Node *yHat, int n, float threshold)
 
     for (int i = 0; i < n; i++)
     {
-        Node *y_i = tensor(y->tensor->storage->data[i], 1);
-        Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
-        Node *pred = tensor(yhat_i->value > threshold ? 1.0f : 0.0f, 1);
+        float actual = y->tensor->storage->data[i];
+        float pred_val = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
+        Node *pred = tensor(pred_val, 1);
 
-        if (y_i->value == 1.0f && pred->value == 1.0f)
-            tp = add(tp, tensor(1.0f, 1));
-        else if (y_i->value == 0.0f && pred->value == 1.0f)
-            fp = add(fp, tensor(1.0f, 1));
-        else if (y_i->value == 1.0f && pred->value == 0.0f)
-            fn = add(fn, tensor(1.0f, 1));
+        if (actual == 1.0f && pred_val == 1.0f)
+            tp = tensor_add(tp, tensor(1.0f, 1));
+        else if (actual == 0.0f && pred_val == 1.0f)
+            fp = tensor_add(fp, tensor(1.0f, 1));
+        else if (actual == 1.0f && pred_val == 0.0f)
+            fn = tensor_add(fn, tensor(1.0f, 1));
+
+        cm_safe_free((void **)&pred);
     }
 
-    Node *precision = div(tp, add(tp, fp));
-    Node *recall = div(tp, add(tp, fn));
+    Node *precision = tensor_div(tp, tensor_add(tp, fp));
+    Node *recall = tensor_div(tp, tensor_add(tp, fn));
 
-    return div(mul(mul(tensor(2.0f, 1), precision), recall),
-               add(precision, recall));
+    return tensor_div(tensor_mul(tensor_mul(tensor(2.0f, 1), precision), recall),
+                      tensor_add(precision, recall));
 }

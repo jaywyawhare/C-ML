@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include "../../include/Metrics/root_mean_squared_error.h"
 #include "../../include/Core/error_codes.h"
@@ -17,11 +18,9 @@ Node *root_mean_squared_error(Node *y, Node *yHat, int n)
 
     for (int i = 0; i < n; i++)
     {
-        Node *diff = sub(
-            tensor(y->tensor->storage->data[i], 1),
-            tensor(yHat->tensor->storage->data[i], 1));
-        sum = add(sum, mul(diff, diff));
+        Node *diff = tensor_sub(y, yHat);
+        sum = tensor_add(sum, tensor_mul(diff, diff));
     }
 
-    return pow(div(sum, n_tensor), tensor(0.5f, 1));
+    return tensor_pow(tensor_div(sum, n_tensor), tensor(0.5f, 1));
 }

@@ -1,3 +1,7 @@
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "../../include/Core/autograd.h"
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
@@ -10,16 +14,18 @@
 #include "../../include/Activations/sigmoid.h"
 #include "../../include/Activations/softmax.h"
 #include "../../include/Activations/tanh.h"
-#include <math.h>
-#include <stdio.h>
 
-// Forward declarations for helper functions
-static void accumulate_grad(Node *node, float grad);
-static Function *create_function(Operation op);
+// Forward declarations of static functions
 static void add_edge(Node *from, Node *to);
 static int *compute_strides(int *sizes, int ndim);
+static int *compute_broadcast_strides(int *src_sizes, int *src_strides,
+                                      int src_ndim, int *dst_sizes, int dst_ndim);
+static StorageImpl *create_storage(size_t size);
+static int *copy_sizes(int *sizes, int ndim);
+static size_t compute_index(size_t linear_idx, TensorImpl *tensor);
+static void dfs_topo_sort(Node *node, int *visited, Node **result, int *size, int max_size);
 
-// Forward declarations of backward functions
+// Backward pass function declarations
 static void add_backward(float grad_output, Node **inputs, int ninputs);
 static void mul_backward(float grad_output, Node **inputs, int ninputs);
 static void sub_backward(float grad_output, Node **inputs, int ninputs);
@@ -338,6 +344,32 @@ static StorageImpl *create_storage(size_t size)
 }
 
 // Tensor creation functions
+Node *tensor_randn(int m, int n)
+{
+    int sizes[2] = {m, n};
+    Node *result = empty(sizes, 2);
+    if (!result)
+        return NULL;
+
+    for (size_t i = 0; i < result->tensor->storage->size; i++)
+    {
+        // Simple random initialization between -1 and 1
+        result->tensor->storage->data[i] = 2.0f * ((float)rand() / RAND_MAX) - 1.0f;
+    }
+    return result;
+}
+
+Node *tensor_zeros(int size)
+{
+    Node *result = empty(&size, 1);
+    if (!result)
+        return NULL;
+
+    memset(result->tensor->storage->data, 0,
+           result->tensor->storage->size * sizeof(float));
+    return result;
+}
+
 Node *zeros_like(Node *other)
 {
     Node *result = empty(other->tensor->sizes, other->tensor->ndim);
@@ -490,7 +522,7 @@ static size_t compute_index(size_t linear_idx, TensorImpl *tensor)
 }
 
 // Gradient accumulation helpers
-static void accumulate_grad(Node *node, float grad)
+void accumulate_grad(Node *node, float grad)
 {
     if (!node->grad_acc)
     {
@@ -564,35 +596,28 @@ static Function *create_function(Operation op)
     return fn;
 }
 
-static void execute_backward_function(Node *node)
+void execute_backward_function(Node *node)
 {
     if (!node->grad_fn)
         return;
     node->grad_fn->backward(node->grad_acc->value, node->prev, node->num_prev);
 }
 
-// Build topological sort for backward pass
-static void dfs_topo_sort(Node *node, int *visited, Node **result, int *size, int max_size)
+void backward(Node *root)
 {
-    if (!node || *size >= max_size)
+    int size;
+    Node **topo = build_topo(root, &size);
+    if (!topo)
         return;
 
-    visited[node->version_counter] = 1;
-
-    // Visit all children first
-    for (int i = 0; i < node->num_prev; i++)
+    for (int i = size - 1; i >= 0; i--)
     {
-        if (!visited[node->prev[i]->version_counter])
-        {
-            dfs_topo_sort(node->prev[i], visited, result, size, max_size);
-        }
+        execute_backward_function(topo[i]);
     }
-
-    // Add current node after all children
-    result[(*size)++] = node;
+    cm_safe_free((void **)&topo);
 }
 
-static Node **build_topo(Node *root, int *size)
+Node **build_topo(Node *root, int *size)
 {
     if (!root || !size)
         return NULL;
@@ -619,6 +644,26 @@ static Node **build_topo(Node *root, int *size)
     return result;
 }
 
+static void dfs_topo_sort(Node *node, int *visited, Node **result, int *size, int max_size)
+{
+    if (!node || *size >= max_size)
+        return;
+
+    visited[node->version_counter] = 1;
+
+    // Visit all children first
+    for (int i = 0; i < node->num_prev; i++)
+    {
+        if (!visited[node->prev[i]->version_counter])
+        {
+            dfs_topo_sort(node->prev[i], visited, result, size, max_size);
+        }
+    }
+
+    // Add current node after all children
+    result[(*size)++] = node;
+}
+
 int validate_activation_input(float x)
 {
     if (isnan(x) || isinf(x) || x == -INFINITY)
@@ -640,4 +685,162 @@ void create_activation_node(Node *output, Node *input, Operation op, Node *saved
             save_for_backward(output, saved_var);
         }
     }
+}
+
+Node *create_node(void)
+{
+    Node *node = (Node *)cm_safe_malloc(sizeof(Node), __FILE__, __LINE__);
+    if (!node)
+        return NULL;
+
+    node->tensor = create_tensor_impl(&(int){1}, 1);
+    node->requires_grad = 0;
+    node->grad_fn = NULL;
+    node->is_leaf = 1;
+    node->version_counter = 0;
+
+    return node;
+}
+
+// Add implementation of static functions
+static void add_edge(Node *from, Node *to)
+{
+    if (!from || !to)
+        return;
+
+    // Allocate or resize next array
+    if (!from->next)
+    {
+        from->next = cm_safe_malloc(sizeof(Node **), __FILE__, __LINE__);
+        from->num_next = 0;
+    }
+    else
+    {
+        from->next = cm_safe_realloc(from->next, (from->num_next + 1) * sizeof(Node **),
+                                     __FILE__, __LINE__);
+    }
+
+    from->next[from->num_next++] = &to;
+    to->prev[to->num_prev++] = from;
+}
+
+static int *compute_strides(int *sizes, int ndim)
+{
+    int *strides = cm_safe_malloc(ndim * sizeof(int), __FILE__, __LINE__);
+    if (!strides)
+        return NULL;
+
+    int stride = 1;
+    for (int i = ndim - 1; i >= 0; i--)
+    {
+        strides[i] = stride;
+        stride *= sizes[i];
+    }
+    return strides;
+}
+
+static int *compute_broadcast_strides(int *src_sizes, int *src_strides,
+                                      int src_ndim, int *dst_sizes, int dst_ndim)
+{
+    int *strides = cm_safe_malloc(dst_ndim * sizeof(int), __FILE__, __LINE__);
+    if (!strides)
+        return NULL;
+
+    int offset = dst_ndim - src_ndim;
+    for (int i = 0; i < dst_ndim; i++)
+    {
+        if (i < offset)
+        {
+            strides[i] = 0;
+        }
+        else
+        {
+            int src_i = i - offset;
+            strides[i] = (src_sizes[src_i] == 1) ? 0 : src_strides[src_i];
+        }
+    }
+    return strides;
+}
+
+// Implement backward functions
+static void add_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 2)
+        return;
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output);
+    if (inputs[1] && inputs[1]->requires_grad)
+        accumulate_grad(inputs[1], grad_output);
+}
+
+static void mul_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 2)
+        return;
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output * inputs[1]->tensor->storage->data[0]);
+    if (inputs[1] && inputs[1]->requires_grad)
+        accumulate_grad(inputs[1], grad_output * inputs[0]->tensor->storage->data[0]);
+}
+
+static void sub_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 2)
+        return;
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output);
+    if (inputs[1] && inputs[1]->requires_grad)
+        accumulate_grad(inputs[1], -grad_output);
+}
+
+static void div_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 2)
+        return;
+    float b = inputs[1]->tensor->storage->data[0];
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output / b);
+    if (inputs[1] && inputs[1]->requires_grad)
+        accumulate_grad(inputs[1], -grad_output * inputs[0]->tensor->storage->data[0] / (b * b));
+}
+
+static void pow_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 2)
+        return;
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output * inputs[1]->tensor->storage->data[0] * logf(inputs[0]->tensor->storage->data[0]));
+    if (inputs[1] && inputs[1]->requires_grad)
+        accumulate_grad(inputs[1], grad_output * inputs[0]->tensor->storage->data[0] * logf(inputs[1]->tensor->storage->data[0]));
+}
+
+static void exp_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1)
+        return;
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output * expf(inputs[0]->tensor->storage->data[0]));
+}
+
+static void log_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1)
+        return;
+    if (inputs[0] && inputs[0]->requires_grad)
+        accumulate_grad(inputs[0], grad_output / inputs[0]->tensor->storage->data[0]);
+}
+
+Node *tensor_div(Node *a, Node *b)
+{
+    if (!a || !b)
+        return NULL;
+    Node *result = create_node();
+    result->grad_fn = create_function(OP_DIV);
+    result->requires_grad = a->requires_grad || b->requires_grad;
+    add_edge(result, a);
+    add_edge(result, b);
+
+    result->tensor->storage->data[0] = a->tensor->storage->data[0] / b->tensor->storage->data[0];
+
+    return result;
 }

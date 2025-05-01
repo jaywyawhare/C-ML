@@ -83,22 +83,36 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
         return CM_NULL_POINTER_ERROR;
     }
 
+    float *output_temp = (float *)cm_safe_malloc(layer->output_size * sizeof(float), __FILE__, __LINE__);
+    if (!output_temp)
+        return CM_MEMORY_ALLOCATION_ERROR;
+
     for (int i = 0; i < layer->output_size; i++)
     {
         Node *sum = tensor(0.0f, 1);
         for (int j = 0; j < layer->input_size; j++)
         {
-            Node *x = tensor(input[j], 1);
-            Node *w = tensor(layer->weights[j + i * layer->input_size], 1);
-            sum = add(sum, mul(x, w));
+            Node *x = tensor(input[j], 0);
+            Node *w = tensor(layer->weights[i * layer->input_size + j], 0);
+            Node *prod = tensor_mul(x, w);
+            Node *new_sum = tensor_add(sum, prod);
             cm_safe_free((void **)&x);
             cm_safe_free((void **)&w);
+            cm_safe_free((void **)&prod);
+            cm_safe_free((void **)&sum);
+            sum = new_sum;
         }
-        Node *b = tensor(layer->biases[i], 1);
-        output[i] = add(sum, b)->value;
+        Node *b = tensor(layer->biases[i], 0);
+        Node *sum_b = tensor_add(sum, b);
+        output_temp[i] = sum_b->tensor->storage->data[0];
         cm_safe_free((void **)&sum);
         cm_safe_free((void **)&b);
+        cm_safe_free((void **)&sum_b);
     }
+
+    memcpy(output, output_temp, layer->output_size * sizeof(float));
+    cm_safe_free((void **)&output_temp);
+
     return CM_SUCCESS;
 }
 
@@ -107,59 +121,59 @@ int backward_dense(DenseLayer *layer, float *input, float *output, float *d_outp
     if (!layer || !input || !output || !d_output || !d_input)
         return CM_NULL_POINTER_ERROR;
 
+    memset(d_input, 0, layer->input_size * sizeof(float));
+
     for (int i = 0; i < layer->input_size; i++)
     {
-        Node *x = tensor(input[i], 1);
-        d_input[i] = 0.0f;
-
         for (int j = 0; j < layer->output_size; j++)
         {
-            Node *dy = tensor(d_output[j], 1);
-            Node *w = tensor(layer->weights[i * layer->output_size + j], 1);
-            int idx = i * layer->output_size + j;
-
-            // Compute gradients and apply optimizer updates
-            Node *dw = mul(x, dy);
-            float grad = dw->value;
+            float x_val = input[i];
+            float dy_val = d_output[j];
+            int weight_idx = j * layer->input_size + i;
 
             switch (layer->optimizer_type)
             {
             case OPTIMIZER_ADAM:
-                adam(x->value, output[j], layer->learning_rate,
-                     &layer->weights[idx], &layer->biases[j],
-                     layer->adam_m_w + idx, layer->adam_m_b + j,
-                     layer->adam_v_w + idx, layer->adam_v_b + j,
-                     NULL, NULL, layer->adam_config, layer->step);
+                adam(x_val, output[j], layer->learning_rate,
+                     &layer->weights[weight_idx], &layer->biases[j],
+                     &layer->adam_m_w[weight_idx], &layer->adam_m_b[j],
+                     &layer->adam_v_w[weight_idx], &layer->adam_v_b[j],
+                     NULL, NULL,
+                     layer->adam_config, layer->step);
                 break;
 
             case OPTIMIZER_RMSPROP:
-                rmsprop(x->value, output[j], layer->learning_rate,
-                        &layer->weights[idx], &layer->biases[j],
-                        layer->rms_cache_w + idx, layer->rms_cache_b + j,
-                        NULL, NULL, NULL, NULL,
-                        layer->rmsprop_config, layer->step);
+                rmsprop(x_val, output[j], layer->learning_rate,
+                        &layer->weights[weight_idx], &layer->biases[j],
+                        &layer->rms_cache_w[weight_idx], &layer->rms_cache_b[j],
+                        NULL, NULL, // v_w, v_b not used
+                        NULL, NULL, // avg_grad_w, avg_grad_b not used
+                        layer->rmsprop_config,
+                        layer->step);
                 break;
 
             case OPTIMIZER_SGD:
-                sgd(x->value, output[j], layer->learning_rate,
-                    &layer->weights[idx], &layer->biases[j],
-                    NULL, NULL, layer->sgd_config, layer->step);
+                sgd(x_val, output[j], layer->learning_rate,
+                    &layer->weights[weight_idx], &layer->biases[j],
+                    NULL, NULL,
+                    layer->sgd_config, layer->step);
                 break;
 
             default:
-                LOG_ERROR("Invalid optimizer type: %d", layer->optimizer_type);
                 return CM_INVALID_OPTIMIZER_ERROR;
             }
 
-            d_input[i] += mul(w, dy)->value;
-            cm_safe_free((void **)&dy);
-            cm_safe_free((void **)&w);
-            cm_safe_free((void **)&dw);
+            Node *w_node = tensor(layer->weights[weight_idx], 1);
+            Node *dy_node = tensor(dy_val, 1);
+            Node *grad = tensor_mul(w_node, dy_node);
+            d_input[i] += grad->tensor->storage->data[0];
+
+            cm_safe_free((void **)&w_node);
+            cm_safe_free((void **)&dy_node);
+            cm_safe_free((void **)&grad);
         }
-        cm_safe_free((void **)&x);
     }
 
-    layer->step++;
     return CM_SUCCESS;
 }
 
@@ -177,36 +191,21 @@ int free_dense(DenseLayer *layer)
     }
 
     if (layer->weights != NULL)
-    {
         cm_safe_free((void **)&layer->weights);
-    }
     if (layer->biases != NULL)
-    {
         cm_safe_free((void **)&layer->biases);
-    }
     if (layer->adam_m_w != NULL)
-    {
         cm_safe_free((void **)&layer->adam_m_w);
-    }
     if (layer->adam_m_b != NULL)
-    {
         cm_safe_free((void **)&layer->adam_m_b);
-    }
     if (layer->adam_v_w != NULL)
-    {
         cm_safe_free((void **)&layer->adam_v_w);
-    }
     if (layer->adam_v_b != NULL)
-    {
         cm_safe_free((void **)&layer->adam_v_b);
-    }
     if (layer->rms_cache_w != NULL)
-    {
         cm_safe_free((void **)&layer->rms_cache_w);
-    }
     if (layer->rms_cache_b != NULL)
-    {
         cm_safe_free((void **)&layer->rms_cache_b);
-    }
+
     return CM_SUCCESS;
 }

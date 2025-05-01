@@ -29,8 +29,8 @@ Node *min_max_scaler_tensor(Node *x)
     }
 
     // (x - min) / (max - min)
-    Node *range = sub(max_val, min_val);
-    Node *normalized = div(sub(x, min_val), range);
+    Node *range = tensor_sub(max_val, min_val);
+    Node *normalized = tensor_div(tensor_sub(x, min_val), range);
     normalized->requires_grad = x->requires_grad;
 
     return normalized;

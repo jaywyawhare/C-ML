@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "../../include/Core/autograd.h"
 #include "../../include/Layers/pooling.h"
 #include "../../include/Core/error_codes.h"
@@ -52,12 +53,12 @@ int forward_pooling(PoolingLayer *layer, const float *input, float *output, int 
         for (int j = 0; j < layer->kernel_size; j++)
         {
             Node *val_node = tensor(input[i + j], 1);
-            Node *new_sum = add(sum_node, val_node);
+            Node *new_sum = tensor_add(sum_node, val_node);
             cm_safe_free((void **)&sum_node);
             sum_node = new_sum;
             cm_safe_free((void **)&val_node);
         }
-        Node *result = mul(sum_node, scale_node);
+        Node *result = tensor_mul(sum_node, scale_node);
         output[output_index++] = result->value;
         cm_safe_free((void **)&result);
         cm_safe_free((void **)&sum_node);
@@ -91,7 +92,7 @@ int backward_pooling(PoolingLayer *layer, const float *input, float *output,
     for (int i = 0; i <= input_size - layer->kernel_size; i += layer->stride)
     {
         Node *grad_node = tensor(d_output[output_index++], 1);
-        Node *scaled_grad = mul(grad_node, scale_node);
+        Node *scaled_grad = tensor_mul(grad_node, scale_node);
 
         // Distribute gradient to all inputs in window
         for (int j = 0; j < layer->kernel_size; j++)
