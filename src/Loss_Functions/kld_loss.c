@@ -18,9 +18,9 @@ Node *kld_loss(Node *p, Node *q, int n)
 
     for (int i = 0; i < n; i++)
     {
-        Node *p_val = tensor_max(p, epsilon);
-        Node *q_val = tensor_max(q, epsilon);
-        loss = tensor_add(loss, tensor_mul(p_val, tensor_log(tensor_div(p_val, q_val))));
+        Node *p_val = max_elementwise(p, epsilon);
+        Node *q_val = max_elementwise(q, epsilon);
+        loss = add(loss, mul(p_val, log_tensor(div_tensor(p_val, q_val))));
     }
-    return tensor_div(loss, tensor((float)n, 0));
+    return div_tensor(loss, tensor((float)n, 0));
 }

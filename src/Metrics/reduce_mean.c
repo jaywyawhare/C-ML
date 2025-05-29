@@ -22,8 +22,8 @@ Node *reduce_mean(Node *x, int n)
     Node *sum = tensor(0.0f, 1);
     for (int i = 0; i < n; i++)
     {
-        sum = tensor_add(sum, tensor(x->tensor->storage->data[i], 1));
+        sum = add(sum, tensor(x->tensor->storage->data[i], 1));
     }
 
-    return tensor_div(sum, tensor((float)n, 1));
+    return div_tensor(sum, tensor((float)n, 1));
 }

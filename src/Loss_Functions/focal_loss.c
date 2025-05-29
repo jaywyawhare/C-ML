@@ -19,11 +19,11 @@ Node *focal_loss(Node *y, Node *yHat, int n, Node *gamma)
 
     for (int i = 0; i < n; i++)
     {
-        Node *yHat_clamped = tensor_max(tensor_min(yHat, tensor_sub(one, epsilon)), epsilon);
-        Node *term1 = tensor_mul(tensor_pow(tensor_sub(one, yHat_clamped), gamma), tensor_log(yHat_clamped));
-        Node *term2 = tensor_mul(tensor_pow(yHat_clamped, gamma), tensor_log(tensor_sub(one, yHat_clamped)));
-        loss = tensor_add(loss, tensor_add(tensor_mul(y, term1), tensor_mul(tensor_sub(one, y), term2)));
+        Node *yHat_clamped = max_elementwise(min_elementwise(yHat, sub(one, epsilon)), epsilon);
+        Node *term1 = mul(pow_tensor(sub(one, yHat_clamped), gamma), log_tensor(yHat_clamped));
+        Node *term2 = mul(pow_tensor(yHat_clamped, gamma), log_tensor(sub(one, yHat_clamped)));
+        loss = add(loss, add(mul(y, term1), mul(sub(one, y), term2)));
     }
 
-    return tensor_div(loss, tensor((float)n, 0));
+    return div_tensor(loss, tensor((float)n, 0));
 }

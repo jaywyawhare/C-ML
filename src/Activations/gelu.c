@@ -2,7 +2,7 @@
 #include "../../include/Core/autograd.h"
 #include <math.h>
 
-float gelu(float x)
+float gelu_scalar(float x)
 {
     if (validate_activation_input(x))
         return 0.0f;
@@ -14,7 +14,7 @@ Node *gelu_node(Node *x)
 {
     if (!x)
         return NULL;
-    float result = gelu(x->tensor->storage->data[0]);
+    float result = gelu_scalar(x->tensor->storage->data[0]);
     Node *output = tensor(result, x->requires_grad);
     create_activation_node(output, x, OP_GELU, x);
     return output;

@@ -35,28 +35,28 @@ Node *cohens_kappa(Node *y, Node *yHat, int n, float threshold)
         float pred = yHat->tensor->storage->data[i] > threshold ? 1.0f : 0.0f;
 
         if (actual == 1.0f && pred == 1.0f)
-            tp = tensor_add(tp, tensor(1.0f, 1));
+            tp = add(tp, tensor(1.0f, 1));
         else if (actual == 0.0f && pred == 0.0f)
-            tn = tensor_add(tn, tensor(1.0f, 1));
+            tn = add(tn, tensor(1.0f, 1));
         else if (actual == 0.0f && pred == 1.0f)
-            fp = tensor_add(fp, tensor(1.0f, 1));
+            fp = add(fp, tensor(1.0f, 1));
         else if (actual == 1.0f && pred == 0.0f)
-            fn = tensor_add(fn, tensor(1.0f, 1));
+            fn = add(fn, tensor(1.0f, 1));
     }
 
     Node *total = tensor((float)n, 0);
 
-    Node *numerator = tensor_sub(
-        tensor_mul(tensor_add(tp, tn), total),
-        tensor_add(
-            tensor_mul(tensor_add(tp, fn), tensor_add(tp, fp)),
-            tensor_mul(tensor_add(tn, fp), tensor_add(tn, fn))));
+    Node *numerator = sub(
+        mul(add(tp, tn), total),
+        add(
+            mul(add(tp, fn), add(tp, fp)),
+            mul(add(tn, fp), add(tn, fn))));
 
-    Node *denominator = tensor_sub(
-        tensor_mul(total, total),
-        tensor_add(
-            tensor_mul(tensor_add(tp, fn), tensor_add(tp, fp)),
-            tensor_mul(tensor_add(tn, fp), tensor_add(tn, fn))));
+    Node *denominator = sub(
+        mul(total, total),
+        add(
+            mul(add(tp, fn), add(tp, fp)),
+            mul(add(tn, fp), add(tn, fn))));
 
-    return tensor_div(numerator, denominator);
+    return div_tensor(numerator, denominator);
 }

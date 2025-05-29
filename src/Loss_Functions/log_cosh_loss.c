@@ -17,13 +17,13 @@ Node *log_cosh_loss(Node *y, Node *yHat, int n)
 
     for (int i = 0; i < n; i++)
     {
-        Node *diff = tensor_sub(yHat, y);
-        Node *exp_plus = tensor_exp(diff);
-        Node *exp_minus = tensor_exp(tensor_neg(diff));
-        Node *cosh_val = tensor_mul(tensor(0.5f, 0), tensor_add(exp_plus, exp_minus));
-        Node *log_val = tensor_log(cosh_val);
-        sum = tensor_add(sum, log_val);
+        Node *diff = sub(yHat, y);
+        Node *exp_plus = exp_tensor(diff);
+        Node *exp_minus = exp_tensor(neg(diff));
+        Node *cosh_val = mul(tensor(0.5f, 0), add(exp_plus, exp_minus));
+        Node *log_val = log_tensor(cosh_val);
+        sum = add(sum, log_val);
     }
 
-    return tensor_div(sum, tensor((float)n, 0));
+    return div_tensor(sum, tensor((float)n, 0));
 }

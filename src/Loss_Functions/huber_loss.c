@@ -19,21 +19,21 @@ Node *huber_loss(Node *y, Node *yHat, int n, float delta_val)
 
     for (int i = 0; i < n; i++)
     {
-        Node *diff = tensor_sub(yHat, y);
-        Node *abs_diff = tensor_abs(diff);
+        Node *diff = sub(yHat, y);
+        Node *abs_diff = abs_tensor(diff);
 
-        Node *condition = tensor_sub(abs_diff, delta);
+        Node *condition = sub(abs_diff, delta);
 
         if (condition->tensor->storage->data[0] < 0)
         {
-            Node *diff_squared = tensor_mul(diff, diff);
-            loss = tensor_add(loss, tensor_mul(half, diff_squared));
+            Node *diff_squared = mul(diff, diff);
+            loss = add(loss, mul(half, diff_squared));
         }
         else
         {
-            loss = tensor_add(loss, tensor_sub(tensor_mul(delta, abs_diff), tensor_mul(half, tensor_mul(delta, delta))));
+            loss = add(loss, sub(mul(delta, abs_diff), mul(half, mul(delta, delta))));
         }
     }
 
-    return tensor_div(loss, tensor((float)n, 0));
+    return div_tensor(loss, tensor((float)n, 0));
 }

@@ -23,18 +23,18 @@ Node *f1_score(Node *y, Node *yHat, int n, float threshold)
         Node *pred = tensor(pred_val, 1);
 
         if (actual == 1.0f && pred_val == 1.0f)
-            tp = tensor_add(tp, tensor(1.0f, 1));
+            tp = add(tp, tensor(1.0f, 1));
         else if (actual == 0.0f && pred_val == 1.0f)
-            fp = tensor_add(fp, tensor(1.0f, 1));
+            fp = add(fp, tensor(1.0f, 1));
         else if (actual == 1.0f && pred_val == 0.0f)
-            fn = tensor_add(fn, tensor(1.0f, 1));
+            fn = add(fn, tensor(1.0f, 1));
 
         cm_safe_free((void **)&pred);
     }
 
-    Node *precision = tensor_div(tp, tensor_add(tp, fp));
-    Node *recall = tensor_div(tp, tensor_add(tp, fn));
+    Node *precision = div_tensor(tp, add(tp, fp));
+    Node *recall = div_tensor(tp, add(tp, fn));
 
-    return tensor_div(tensor_mul(tensor_mul(tensor(2.0f, 1), precision), recall),
-                      tensor_add(precision, recall));
+    return div_tensor(mul(mul(tensor(2.0f, 1), precision), recall),
+                      add(precision, recall));
 }

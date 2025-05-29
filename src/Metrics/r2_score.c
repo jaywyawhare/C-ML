@@ -27,9 +27,9 @@ Node *r2_score(Node *y, Node *yHat, int n)
     Node *sum_y = tensor(0.0f, 1);
     for (int i = 0; i < n; i++)
     {
-        sum_y = tensor_add(sum_y, tensor(y->tensor->storage->data[i], 1));
+        sum_y = add(sum_y, tensor(y->tensor->storage->data[i], 1));
     }
-    Node *mean_y = tensor_div(sum_y, tensor((float)n, 1));
+    Node *mean_y = div_tensor(sum_y, tensor((float)n, 1));
 
     // Calculate total and residual sum of squares
     Node *ss_tot = tensor(0.0f, 1);
@@ -40,12 +40,12 @@ Node *r2_score(Node *y, Node *yHat, int n)
         Node *y_i = tensor(y->tensor->storage->data[i], 1);
         Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
 
-        Node *diff_tot = tensor_sub(y_i, mean_y);
-        Node *diff_res = tensor_sub(y_i, yhat_i);
+        Node *diff_tot = sub(y_i, mean_y);
+        Node *diff_res = sub(y_i, yhat_i);
 
-        ss_tot = tensor_add(ss_tot, tensor_mul(diff_tot, diff_tot));
-        ss_res = tensor_add(ss_res, tensor_mul(diff_res, diff_res));
+        ss_tot = add(ss_tot, mul(diff_tot, diff_tot));
+        ss_res = add(ss_res, mul(diff_res, diff_res));
     }
 
-    return tensor_sub(tensor(1.0f, 1), tensor_div(ss_res, ss_tot));
+    return sub(tensor(1.0f, 1), div_tensor(ss_res, ss_tot));
 }

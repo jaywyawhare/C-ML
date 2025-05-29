@@ -19,11 +19,11 @@ Node *binary_cross_entropy_loss(Node *y, Node *yHat, int size)
 
     for (int i = 0; i < size; ++i)
     {
-        Node *predicted = tensor_max(tensor_min(yHat, tensor_sub(one, epsilon)), epsilon);
-        Node *term1 = tensor_mul(y, tensor_log(predicted));
-        Node *term2 = tensor_mul(tensor_sub(one, y), tensor_log(tensor_sub(one, predicted)));
-        loss = tensor_add(loss, tensor_neg(tensor_add(term1, term2)));
+        Node *predicted = max_elementwise(min_elementwise(yHat, sub(one, epsilon)), epsilon);
+        Node *term1 = mul(y, log_tensor(predicted));
+        Node *term2 = mul(sub(one, y), log_tensor(sub(one, predicted)));
+        loss = add(loss, neg(add(term1, term2)));
     }
 
-    return tensor_div(loss, tensor((float)size, 0));
+    return div_tensor(loss, tensor((float)size, 0));
 }

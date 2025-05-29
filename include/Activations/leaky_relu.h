@@ -1,10 +1,10 @@
 #ifndef LEAKY_RELU_H
 #define LEAKY_RELU_H
 
-#include "../../include/Core/autograd.h"
+// Forward declaration
+typedef struct Node Node;
 
-float leaky_relu(float x);
-Node *leaky_relu_node(Node *x);
+float leaky_relu_scalar(float x);
 void leaky_relu_backward(float grad_output, Node **inputs, int ninputs);
 
 #endif

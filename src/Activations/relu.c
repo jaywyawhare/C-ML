@@ -1,7 +1,7 @@
 #include "../../include/Activations/relu.h"
 #include "../../include/Core/autograd.h"
 
-float relu(float x)
+float relu_scalar(float x)
 {
     if (validate_activation_input(x))
         return 0.0f;
@@ -12,7 +12,7 @@ Node *relu_node(Node *x)
 {
     if (!x)
         return NULL;
-    float result = relu(x->tensor->storage->data[0]);
+    float result = relu_scalar(x->tensor->storage->data[0]);
     Node *output = tensor(result, x->requires_grad);
     create_activation_node(output, x, OP_RELU, x);
     return output;

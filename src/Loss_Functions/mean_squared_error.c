@@ -21,13 +21,13 @@ Node *mean_squared_error(Node *y, Node *yHat, int n)
     {
         Node *y_i = tensor(y->tensor->storage->data[i], 1);
         Node *yhat_i = tensor(yHat->tensor->storage->data[i], 1);
-        Node *diff = tensor_sub(y_i, yhat_i);
-        sum = tensor_add(sum, tensor_mul(diff, diff));
+        Node *diff = sub(y_i, yhat_i);
+        sum = add(sum, mul(diff, diff));
 
         cm_safe_free((void **)&y_i);
         cm_safe_free((void **)&yhat_i);
         cm_safe_free((void **)&diff);
     }
 
-    return tensor_div(sum, n_tensor);
+    return div_tensor(sum, n_tensor);
 }

@@ -35,19 +35,19 @@ float sgd(float x, float y, float lr, float *w, float *b, float *v_w, float *v_b
     Node *b_node = tensor(*b, 1);
 
     // Forward pass with autograd
-    Node *pred = tensor_add(tensor_mul(w_node, x_node), b_node);
-    Node *diff = tensor_sub(pred, y_node);
-    Node *loss = tensor_pow(diff, tensor(2.0f, 0));
+    Node *pred = add(mul(w_node, x_node), b_node);
+    Node *diff = sub(pred, y_node);
+    Node *loss = pow_tensor(diff, tensor(2.0f, 0));
 
     // Add regularization using autograd
     if (config.regularizer.type != NO_REGULARIZATION)
     {
         Node *reg = compute_regularization_node(w_node, config.regularizer);
-        loss = tensor_add(loss, reg);
+        loss = add(loss, reg);
     }
 
     // Backward pass - get gradients automatically
-    acc_grad(loss, 1.0f);
+    backward_from_root(loss);
     float dw = w_node->grad * (config.maximize ? -1.0f : 1.0f);
     float db = b_node->grad * (config.maximize ? -1.0f : 1.0f);
 

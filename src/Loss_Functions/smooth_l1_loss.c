@@ -19,16 +19,16 @@ Node *smooth_l1_loss(Node *y, Node *yHat, int n, float beta_val)
 
     for (int i = 0; i < n; i++)
     {
-        Node *diff = tensor_sub(yHat, y);
-        Node *abs_diff = tensor_abs(diff);
-        Node *squared = tensor_mul(diff, diff);
-        Node *condition = tensor_sub(abs_diff, beta);
+        Node *diff = sub(yHat, y);
+        Node *abs_diff = abs_tensor(diff);
+        Node *squared = mul(diff, diff);
+        Node *condition = sub(abs_diff, beta);
 
-        Node *smooth_term = tensor_mul(half, tensor_div(squared, beta));
-        Node *l1_term = tensor_sub(abs_diff, tensor_mul(half, beta));
+        Node *smooth_term = mul(half, div_tensor(squared, beta));
+        Node *l1_term = sub(abs_diff, mul(half, beta));
 
-        loss = tensor_add(loss, condition->tensor->storage->data[0] < 0 ? smooth_term : l1_term);
+        loss = add(loss, condition->tensor->storage->data[0] < 0 ? smooth_term : l1_term);
     }
 
-    return tensor_div(loss, tensor((float)n, 0));
+    return div_tensor(loss, tensor((float)n, 0));
 }

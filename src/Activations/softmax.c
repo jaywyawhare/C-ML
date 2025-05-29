@@ -4,7 +4,7 @@
 #include "../../include/Core/autograd.h"
 #include "../../include/Core/memory_management.h"
 
-float *softmax(float *z, int n)
+float *softmax_array(float *z, int n)
 {
     if (!z || n <= 0 || validate_activation_input(z[0]))
         return NULL;
@@ -50,7 +50,7 @@ Node *softmax_node(Node *x)
     if (!x)
         return NULL;
 
-    float *result = softmax(x->tensor->storage->data, x->tensor->storage->size);
+    float *result = softmax_array(x->tensor->storage->data, x->tensor->storage->size);
     if (!result)
         return NULL;
 
@@ -76,7 +76,7 @@ void softmax_backward(float grad_output, Node **inputs, int ninputs)
     size_t n = input->tensor->storage->size;
 
     // Recompute softmax for backward pass
-    float *softmax_vals = softmax(input->tensor->storage->data, n);
+    float *softmax_vals = softmax_array(input->tensor->storage->data, n);
     if (!softmax_vals)
         return;
 

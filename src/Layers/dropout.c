@@ -71,7 +71,7 @@ int forward_dropout(DropoutLayer *layer, float *input, float *output, int size)
             output[i] = input[i] / (1 - layer->dropout_rate);
             Node *in = tensor(input[i], 0);
             Node *dr = tensor(dropout_mask, 0);
-            Node *new_node = tensor_mul(in, dr);
+            Node *new_node = mul(in, dr);
             output[i] = new_node->tensor->storage->data[0];
             cm_safe_free((void **)&in);
             cm_safe_free((void **)&dr);

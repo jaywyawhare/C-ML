@@ -6,14 +6,7 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
-#include "../../include/Activations/elu.h"
-#include "../../include/Activations/gelu.h"
-#include "../../include/Activations/leaky_relu.h"
-#include "../../include/Activations/linear.h"
-#include "../../include/Activations/relu.h"
-#include "../../include/Activations/sigmoid.h"
-#include "../../include/Activations/softmax.h"
-#include "../../include/Activations/tanh.h"
+// Activation headers removed to avoid conflicts with autograd function declarations
 
 // Forward declarations of static functions
 static void add_edge(Node *from, Node *to);
@@ -24,6 +17,7 @@ static StorageImpl *create_storage(size_t size);
 static int *copy_sizes(int *sizes, int ndim);
 static size_t compute_index(size_t linear_idx, TensorImpl *tensor);
 static void dfs_topo_sort(Node *node, int *visited, Node **result, int *size, int max_size);
+static Node *as_strided(Node *self, int *shape, int *strides, int ndim);
 
 // Backward pass function declarations
 static void add_backward(float grad_output, Node **inputs, int ninputs);
@@ -33,6 +27,19 @@ static void div_backward(float grad_output, Node **inputs, int ninputs);
 static void pow_backward(float grad_output, Node **inputs, int ninputs);
 static void exp_backward(float grad_output, Node **inputs, int ninputs);
 static void log_backward(float grad_output, Node **inputs, int ninputs);
+static void neg_backward(float grad_output, Node **inputs, int ninputs);
+static void abs_backward(float grad_output, Node **inputs, int ninputs);
+static void sqrt_backward(float grad_output, Node **inputs, int ninputs);
+static void max_backward(float grad_output, Node **inputs, int ninputs);
+static void min_backward(float grad_output, Node **inputs, int ninputs);
+static void tanh_backward(float grad_output, Node **inputs, int ninputs);
+static void relu_backward(float grad_output, Node **inputs, int ninputs);
+static void sigmoid_backward(float grad_output, Node **inputs, int ninputs);
+static void softmax_backward(float grad_output, Node **inputs, int ninputs);
+static void elu_backward(float grad_output, Node **inputs, int ninputs);
+static void gelu_backward(float grad_output, Node **inputs, int ninputs);
+static void leaky_relu_backward(float grad_output, Node **inputs, int ninputs);
+static void linear_backward(float grad_output, Node **inputs, int ninputs);
 
 static GradContext grad_ctx = {1, {0}, 0};
 
@@ -117,6 +124,77 @@ Node *empty(int *sizes, int ndim)
 Node *empty_like(Node *other)
 {
     return empty(other->tensor->sizes, other->tensor->ndim);
+}
+
+// Additional tensor creation functions
+Node *zeros(int *sizes, int ndim)
+{
+    Node *result = empty(sizes, ndim);
+    if (!result)
+        return NULL;
+    
+    size_t total_size = 1;
+    for (int i = 0; i < ndim; i++)
+        total_size *= sizes[i];
+    
+    memset(result->tensor->storage->data, 0, total_size * sizeof(float));
+    return result;
+}
+
+Node *ones(int *sizes, int ndim)
+{
+    Node *result = empty(sizes, ndim);
+    if (!result)
+        return NULL;
+    
+    size_t total_size = 1;
+    for (int i = 0; i < ndim; i++)
+        total_size *= sizes[i];
+    
+    for (size_t i = 0; i < total_size; i++)
+        result->tensor->storage->data[i] = 1.0f;
+    
+    return result;
+}
+
+Node *zeros_like(Node *other)
+{
+    return zeros(other->tensor->sizes, other->tensor->ndim);
+}
+
+Node *ones_like(Node *other)
+{
+    return ones(other->tensor->sizes, other->tensor->ndim);
+}
+
+Node *tensor_from_array(float *data, int size, int requires_grad)
+{
+    Node *result = empty(&size, 1);
+    if (!result)
+        return NULL;
+    
+    memcpy(result->tensor->storage->data, data, size * sizeof(float));
+    result->requires_grad = requires_grad && grad_ctx.enabled;
+    result->is_leaf = 1;
+    
+    return result;
+}
+
+Node *tensor_from_data(float *data, int *sizes, int ndim, int requires_grad)
+{
+    Node *result = empty(sizes, ndim);
+    if (!result)
+        return NULL;
+    
+    size_t total_size = 1;
+    for (int i = 0; i < ndim; i++)
+        total_size *= sizes[i];
+    
+    memcpy(result->tensor->storage->data, data, total_size * sizeof(float));
+    result->requires_grad = requires_grad && grad_ctx.enabled;
+    result->is_leaf = 1;
+    
+    return result;
 }
 
 void resize_(Node *self, int *sizes, int ndim)
@@ -370,20 +448,9 @@ Node *tensor_zeros(int size)
     return result;
 }
 
-Node *zeros_like(Node *other)
+Node *tensor_ones(int size)
 {
-    Node *result = empty(other->tensor->sizes, other->tensor->ndim);
-    if (!result)
-        return NULL;
-
-    memset(result->tensor->storage->data, 0,
-           result->tensor->storage->size * sizeof(float));
-    return result;
-}
-
-Node *ones_like(Node *other)
-{
-    Node *result = empty(other->tensor->sizes, other->tensor->ndim);
+    Node *result = empty(&size, 1);
     if (!result)
         return NULL;
 
@@ -431,15 +498,19 @@ Node *matmul(Node *a, Node *b)
     return result;
 }
 
-Node *transpose(Node *x)
+Node *transpose(Node *self, int dim0, int dim1)
 {
-    if (x->tensor->ndim != 2)
+    if (!self || !self->tensor || self->tensor->ndim < 2)
         return NULL;
 
-    int new_sizes[2] = {x->tensor->sizes[1], x->tensor->sizes[0]};
-    int new_strides[2] = {x->tensor->strides[1], x->tensor->strides[0]};
+    // For simplicity, handle 2D case where dim0=0, dim1=1 
+    if (self->tensor->ndim != 2 || dim0 != 0 || dim1 != 1)
+        return NULL;
 
-    Node *result = as_strided(x, new_sizes, new_strides, 2);
+    int new_sizes[2] = {self->tensor->sizes[1], self->tensor->sizes[0]};
+    int new_strides[2] = {self->tensor->strides[1], self->tensor->strides[0]};
+
+    Node *result = as_strided(self, new_sizes, new_strides, 2);
     if (!result)
         return NULL;
 
@@ -486,7 +557,7 @@ Node *cat(Node **tensors, int n, int dim)
 }
 
 // Additional view operations
-Node *as_strided(Node *self, int *shape, int *strides, int ndim)
+static Node *as_strided(Node *self, int *shape, int *strides, int ndim)
 {
     Node *result = empty(shape, ndim);
     if (!result)
@@ -503,6 +574,22 @@ Node *as_strided(Node *self, int *shape, int *strides, int ndim)
     result->base = self;
 
     return result;
+}
+
+// Helper function to set up computational graph dependencies
+void set_graph_dependencies(Node *result, Node **inputs, int ninputs)
+{
+    if (!result || !inputs || ninputs <= 0)
+        return;
+        
+    result->prev = (Node **)cm_safe_malloc(ninputs * sizeof(Node *), __FILE__, __LINE__);
+    if (!result->prev)
+        return;
+        
+    for (int i = 0; i < ninputs; i++) {
+        result->prev[i] = inputs[i];
+    }
+    result->num_prev = ninputs;
 }
 
 // Helper function to compute index in tensor storage
@@ -540,6 +627,9 @@ static Function *create_function(Operation op)
 
     fn->saved_tensors = NULL;
     fn->num_saved = 0;
+    fn->inputs = NULL;
+    fn->ninputs = 0;
+    fn->op_type = op;
 
     // Map operation to its backward function
     switch (op)
@@ -589,11 +679,56 @@ static Function *create_function(Operation op)
     case OP_LINEAR:
         fn->backward = linear_backward;
         break;
+    case OP_NEG:
+        fn->backward = neg_backward;
+        break;
+    case OP_ABS:
+        fn->backward = abs_backward;
+        break;
+    case OP_SQRT:
+        fn->backward = sqrt_backward;
+        break;
+    case OP_MAX:
+        fn->backward = max_backward;
+        break;
+    case OP_MIN:
+        fn->backward = min_backward;
+        break;
     default:
         cm_safe_free((void **)&fn);
         return NULL;
     }
     return fn;
+}
+
+// Helper function to set function inputs
+static void set_function_inputs(Function *fn, Node **inputs, int ninputs)
+{
+    if (!fn || !inputs || ninputs <= 0)
+        return;
+        
+    fn->inputs = (Node **)cm_safe_malloc(ninputs * sizeof(Node *), __FILE__, __LINE__);
+    if (!fn->inputs)
+        return;
+        
+    fn->ninputs = ninputs;
+    for (int i = 0; i < ninputs; i++) {
+        fn->inputs[i] = inputs[i];
+    }
+}
+
+// Helper function to save variables for backward pass
+static void save_for_backward(Node *output, Node *var)
+{
+    if (!output || !output->grad_fn || !var)
+        return;
+        
+    output->grad_fn->saved_tensors = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+    if (!output->grad_fn->saved_tensors)
+        return;
+        
+    output->grad_fn->saved_tensors[0] = var;
+    output->grad_fn->num_saved = 1;
 }
 
 void execute_backward_function(Node *node)
@@ -603,12 +738,17 @@ void execute_backward_function(Node *node)
     node->grad_fn->backward(node->grad_acc->value, node->prev, node->num_prev);
 }
 
-void backward(Node *root)
+void backward_from_root(Node *root)
 {
     int size;
     Node **topo = build_topo(root, &size);
     if (!topo)
         return;
+
+    // Initialize root gradient
+    if (!root->grad_acc) {
+        root->grad_acc = tensor(1.0f, 0);
+    }
 
     for (int i = size - 1; i >= 0; i--)
     {
@@ -687,19 +827,52 @@ void create_activation_node(Node *output, Node *input, Operation op, Node *saved
     }
 }
 
+// Node creation helper
 Node *create_node(void)
 {
     Node *node = (Node *)cm_safe_malloc(sizeof(Node), __FILE__, __LINE__);
     if (!node)
         return NULL;
-
-    node->tensor = create_tensor_impl(&(int){1}, 1);
+    
+    // Initialize with scalar tensor (size 1)
+    int size = 1;
+    node->tensor = create_tensor_impl(&size, 1);
+    if (!node->tensor) {
+        cm_safe_free((void **)&node);
+        return NULL;
+    }
+    
+    // Initialize Node fields
+    node->grad = 0.0f;
     node->requires_grad = 0;
-    node->grad_fn = NULL;
     node->is_leaf = 1;
+    node->retain_grad = 0;
+    node->grad_fn = NULL;
+    node->next = NULL;
+    node->prev = NULL;
+    node->num_next = 0;
+    node->num_prev = 0;
+    node->ref_count = 1;
+    node->backward_hooks = NULL;
+    node->grad_accumulated = 0;
+    node->grad_scale = 1.0f;
+    node->is_variable = 0;
+    node->grad_acc = NULL;
+    node->needs_reset = 0;
     node->version_counter = 0;
-
+    node->autograd_meta = NULL;
+    node->base = NULL;
+    node->in_backward_pass = 0;
+    node->input_nodes = NULL;
+    node->num_inputs = 0;
+    
     return node;
+}
+
+// Helper function to create node with specific value
+Node *create_node_with_value(float value, int requires_grad)
+{
+    return tensor(value, requires_grad);
 }
 
 // Add implementation of static functions
@@ -830,17 +1003,658 @@ static void log_backward(float grad_output, Node **inputs, int ninputs)
         accumulate_grad(inputs[0], grad_output / inputs[0]->tensor->storage->data[0]);
 }
 
-Node *tensor_div(Node *a, Node *b)
+static void relu_backward(float grad_output, Node **inputs, int ninputs)
 {
-    if (!a || !b)
-        return NULL;
-    Node *result = create_node();
-    result->grad_fn = create_function(OP_DIV);
-    result->requires_grad = a->requires_grad || b->requires_grad;
-    add_edge(result, a);
-    add_edge(result, b);
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float grad = input_val > 0.0f ? grad_output : 0.0f;
+        accumulate_grad(inputs[0], grad);
+    }
+}
 
-    result->tensor->storage->data[0] = a->tensor->storage->data[0] / b->tensor->storage->data[0];
+static void sigmoid_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float sigmoid_val = 1.0f / (1.0f + expf(-input_val));
+        float grad = grad_output * sigmoid_val * (1.0f - sigmoid_val);
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void tanh_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float tanh_val = tanhf(input_val);
+        float grad = grad_output * (1.0f - tanh_val * tanh_val);
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void softmax_backward(float grad_output, Node **inputs, int ninputs)
+{
+    // Simplified softmax backward for single element
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        accumulate_grad(inputs[0], grad_output);
+    }
+}
+
+static void elu_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float alpha = 1.0f; // Default alpha
+        float grad = input_val >= 0.0f ? grad_output : grad_output * alpha * expf(input_val);
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void gelu_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float x = inputs[0]->tensor->storage->data[0];
+        const float sqrt_2_over_pi = 0.7978845608f;
+        float term = sqrt_2_over_pi * (x + 0.044715f * x * x * x);
+        float tanh_term = tanhf(term);
+        float grad = grad_output * 0.5f * (1.0f + tanh_term + x * (sqrt_2_over_pi * (1.0f - tanh_term * tanh_term) * (1.0f + 0.134145f * x * x)));
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void leaky_relu_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float negative_slope = 0.01f; // Default slope
+        float grad = input_val > 0.0f ? grad_output : grad_output * negative_slope;
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void linear_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        accumulate_grad(inputs[0], grad_output);
+    }
+}
+
+static void neg_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        accumulate_grad(inputs[0], -grad_output);
+    }
+}
+
+static void abs_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float grad = input_val >= 0.0f ? grad_output : -grad_output;
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void sqrt_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 1 || !inputs[0])
+        return;
+    if (inputs[0]->requires_grad) {
+        float input_val = inputs[0]->tensor->storage->data[0];
+        float grad = grad_output / (2.0f * sqrtf(input_val));
+        accumulate_grad(inputs[0], grad);
+    }
+}
+
+static void max_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs < 1 || !inputs[0])
+        return;
+    
+    if (ninputs == 1) {
+        // For clamp operation
+        if (inputs[0]->requires_grad) {
+            accumulate_grad(inputs[0], grad_output);
+        }
+    } else if (ninputs == 2) {
+        // For max_elementwise
+        if (inputs[0] && inputs[1]) {
+            float a_val = inputs[0]->tensor->storage->data[0];
+            float b_val = inputs[1]->tensor->storage->data[0];
+            
+            if (inputs[0]->requires_grad) {
+                float grad = (a_val >= b_val) ? grad_output : 0.0f;
+                accumulate_grad(inputs[0], grad);
+            }
+            if (inputs[1]->requires_grad) {
+                float grad = (b_val > a_val) ? grad_output : 0.0f;
+                accumulate_grad(inputs[1], grad);
+            }
+        }
+    }
+}
+
+static void min_backward(float grad_output, Node **inputs, int ninputs)
+{
+    if (ninputs != 2 || !inputs[0] || !inputs[1])
+        return;
+        
+    float a_val = inputs[0]->tensor->storage->data[0];
+    float b_val = inputs[1]->tensor->storage->data[0];
+    
+    if (inputs[0]->requires_grad) {
+        float grad = (a_val <= b_val) ? grad_output : 0.0f;
+        accumulate_grad(inputs[0], grad);
+    }
+    if (inputs[1]->requires_grad) {
+        float grad = (b_val < a_val) ? grad_output : 0.0f;
+        accumulate_grad(inputs[1], grad);
+    }
+}
+
+// Basic arithmetic operations (PyTorch-like)
+Node *add(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float result_val = a->tensor->storage->data[0] + b->tensor->storage->data[0];
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_ADD);
+        if (result->grad_fn) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+        // Node *inputs[] = {a, b}; // Original line, replaced by direct assignment
+        // set_graph_dependencies(result, inputs, 2); // Original line, replaced by direct assignment
+    }
+    
+    return result;
+}
+
+Node *sub(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float result_val = a->tensor->storage->data[0] - b->tensor->storage->data[0];
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_SUB);
+        if (result->grad_fn) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+        // Node *inputs[] = {a, b}; // Original line, replaced by direct assignment
+        // set_graph_dependencies(result, inputs, 2); // Original line, replaced by direct assignment
+    }
+    
+    return result;
+}
+
+Node *mul(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float result_val = a->tensor->storage->data[0] * b->tensor->storage->data[0];
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_MUL);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *div_tensor(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float result_val = a->tensor->storage->data[0] / b->tensor->storage->data[0];
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_DIV);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *pow_tensor(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float result_val = powf(a->tensor->storage->data[0], b->tensor->storage->data[0]);
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_POW);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *neg(Node *a)
+{
+    if (!a) return NULL;
+    
+    float result_val = -a->tensor->storage->data[0];
+    Node *result = tensor(result_val, a->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_NEG);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *abs_tensor(Node *a)
+{
+    if (!a) return NULL;
+    
+    float result_val = fabsf(a->tensor->storage->data[0]);
+    Node *result = tensor(result_val, a->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_ABS);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+// Mathematical functions
+Node *exp_tensor(Node *a)
+{
+    if (!a) return NULL;
+    
+    float result_val = expf(a->tensor->storage->data[0]);
+    Node *result = tensor(result_val, a->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_EXP);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *log_tensor(Node *a)
+{
+    if (!a) return NULL;
+    
+    float result_val = logf(a->tensor->storage->data[0]);
+    Node *result = tensor(result_val, a->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_LOG);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *sqrt_tensor(Node *a)
+{
+    if (!a) return NULL;
+    
+    float result_val = sqrtf(a->tensor->storage->data[0]);
+    Node *result = tensor(result_val, a->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_SQRT);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+// Element-wise comparison and clamp functions
+Node *max_elementwise(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float a_val = a->tensor->storage->data[0];
+    float b_val = b->tensor->storage->data[0];
+    float result_val = fmaxf(a_val, b_val);
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_MAX);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *min_elementwise(Node *a, Node *b)
+{
+    if (!a || !b) return NULL;
+    
+    float a_val = a->tensor->storage->data[0];
+    float b_val = b->tensor->storage->data[0];
+    float result_val = fminf(a_val, b_val);
+    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_MIN);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                result->grad_fn->inputs[1] = b;
+                result->grad_fn->ninputs = 2;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *clamp(Node *a, float min_val, float max_val)
+{
+    if (!a) return NULL;
+    
+    float a_val = a->tensor->storage->data[0];
+    float result_val = fmaxf(min_val, fminf(max_val, a_val));
+    Node *result = tensor(result_val, a->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_MAX); // Use MAX op for clamp
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
+            if (result->grad_fn->inputs) { // Added null check
+                result->grad_fn->inputs[0] = a;
+                // Note: min_val and max_val are not Nodes, so they are not added to grad_fn->inputs
+                // The backward pass for clamp (max_backward) needs to handle this.
+                // For simplicity, we are only tracking 'a' as input here.
+                // A more complete solution might involve saving min_val and max_val in grad_fn or handling them differently.
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+// Scalar operations
+Node *add_scalar(Node *a, float scalar)
+{
+    if (!a) return NULL;
+    Node *scalar_node = tensor(scalar, 0);
+    return add(a, scalar_node);
+}
+
+Node *sub_scalar(Node *a, float scalar)
+{
+    if (!a) return NULL;
+    Node *scalar_node = tensor(scalar, 0);
+    return sub(a, scalar_node);
+}
+
+Node *mul_scalar(Node *a, float scalar)
+{
+    if (!a) return NULL;
+    Node *scalar_node = tensor(scalar, 0);
+    return mul(a, scalar_node);
+}
+
+Node *div_scalar(Node *a, float scalar)
+{
+    if (!a) return NULL;
+    Node *scalar_node = tensor(scalar, 0);
+    return div_tensor(a, scalar_node);
+}
+
+// Activation functions
+Node *relu(Node *x)
+{
+    if (!x) return NULL;
+    
+    float result_val = fmaxf(0.0f, x->tensor->storage->data[0]);
+    Node *result = tensor(result_val, x->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_RELU);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
+                result->grad_fn->inputs[0] = x;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *tanh_tensor(Node *x)
+{
+    if (!x) return NULL;
+    
+    float result_val = tanhf(x->tensor->storage->data[0]);
+    Node *result = tensor(result_val, x->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_TANH);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
+                result->grad_fn->inputs[0] = x;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *sigmoid(Node *x)
+{
+    if (!x) return NULL;
+    
+    float result_val = 1.0f / (1.0f + expf(-x->tensor->storage->data[0]));
+    Node *result = tensor(result_val, x->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_SIGMOID);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
+                result->grad_fn->inputs[0] = x;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *softmax(Node *x, int dim)
+{
+    if (!x) return NULL;
+    
+    // Simplified softmax for single element - ignore dim for now
+    (void)dim; // Suppress unused parameter warning
+    float result_val = x->tensor->storage->data[0] > 0 ? 1.0f : 0.0f;
+    Node *result = tensor(result_val, x->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_SOFTMAX);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
+                result->grad_fn->inputs[0] = x;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *elu(Node *x, float alpha)
+{
+    if (!x) return NULL;
+    
+    float x_val = x->tensor->storage->data[0];
+    float result_val = x_val >= 0.0f ? x_val : alpha * (expf(x_val) - 1.0f);
+    Node *result = tensor(result_val, x->requires_grad);
+    
+    if (result->requires_grad) {
+        result->grad_fn = create_function(OP_ELU);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
+                result->grad_fn->inputs[0] = x;
+                result->grad_fn->ninputs = 1;
+            }
+        }
+    }
+    
+    return result;
+}
+
+Node *gelu(Node *x) {
+    // GELU function: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+    // Intermediate computations
+    Node *three_node = tensor(3.0f, 0); // Create a Node for the scalar 3.0f
+    Node *x_cubed = pow_tensor(x, three_node); 
+    Node *term_in_pow = mul_scalar(x_cubed, 0.044715f);
+    Node *sum_x_term = add(x, term_in_pow);
+
+    // sqrt(2/pi) approx 0.7978845608
+    Node *scaled_sum = mul_scalar(sum_x_term, 0.7978845608f);
+    Node *tanh_val = tanh_tensor(scaled_sum);
+    Node *one_plus_tanh = add_scalar(tanh_val, 1.0f);
+    Node *product_x_one_plus_tanh = mul(x, one_plus_tanh);
+    Node *result = mul_scalar(product_x_one_plus_tanh, 0.5f);
+
+    if (x->requires_grad) {
+        result->requires_grad = true;
+        result->grad_fn = create_function(OP_GELU);
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
+                result->grad_fn->inputs[0] = x;
+                result->grad_fn->ninputs = 1;
+            }
+            result->grad_fn->backward = gelu_backward;
+        }
+    }
+
+    // Temporarily removed cleanup of intermediate nodes to focus on segfault
+    // if (x_cubed != result && x_cubed->grad_fn == NULL && !x_cubed->requires_grad) free_node_recursive(x_cubed); 
+    // if (term_in_pow != result && term_in_pow->grad_fn == NULL && !term_in_pow->requires_grad) free_node_recursive(term_in_pow); 
+    // if (sum_x_term != result && sum_x_term->grad_fn == NULL && !sum_x_term->requires_grad) free_node_recursive(sum_x_term); 
+    // if (scaled_sum != result && scaled_sum->grad_fn == NULL && !scaled_sum->requires_grad) free_node_recursive(scaled_sum); 
+    // if (one_plus_tanh != result && one_plus_tanh->grad_fn == NULL && !one_plus_tanh->requires_grad) free_node_recursive(one_plus_tanh); 
+    // if (product_x_one_plus_tanh != result && product_x_one_plus_tanh->grad_fn == NULL && !product_x_one_plus_tanh->requires_grad) free_node_recursive(product_x_one_plus_tanh);
+    // if (three_node) free_node_recursive(three_node); // Also cleanup the temporary node
 
     return result;
+}
+
+// Simple MSE loss implementation
+Node *mse_loss(Node *input, Node *target, int reduction)
+{
+    if (!input || !target) return NULL;
+    
+    // For now, ignore reduction parameter
+    (void)reduction; // Suppress unused parameter warning
+    
+    Node *diff = sub(input, target);
+    Node *squared = mul(diff, diff);
+    return squared;
 }

@@ -18,9 +18,9 @@ Node *root_mean_squared_error(Node *y, Node *yHat, int n)
 
     for (int i = 0; i < n; i++)
     {
-        Node *diff = tensor_sub(y, yHat);
-        sum = tensor_add(sum, tensor_mul(diff, diff));
+        Node *diff = sub(y, yHat);
+        sum = add(sum, mul(diff, diff));
     }
 
-    return tensor_pow(tensor_div(sum, n_tensor), tensor(0.5f, 1));
+    return pow_tensor(div_tensor(sum, n_tensor), tensor(0.5f, 1));
 }

@@ -94,8 +94,8 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
         {
             Node *x = tensor(input[j], 0);
             Node *w = tensor(layer->weights[i * layer->input_size + j], 0);
-            Node *prod = tensor_mul(x, w);
-            Node *new_sum = tensor_add(sum, prod);
+            Node *prod = mul(x, w);
+            Node *new_sum = add(sum, prod);
             cm_safe_free((void **)&x);
             cm_safe_free((void **)&w);
             cm_safe_free((void **)&prod);
@@ -103,7 +103,7 @@ int forward_dense(DenseLayer *layer, float *input, float *output)
             sum = new_sum;
         }
         Node *b = tensor(layer->biases[i], 0);
-        Node *sum_b = tensor_add(sum, b);
+        Node *sum_b = add(sum, b);
         output_temp[i] = sum_b->tensor->storage->data[0];
         cm_safe_free((void **)&sum);
         cm_safe_free((void **)&b);
@@ -165,7 +165,7 @@ int backward_dense(DenseLayer *layer, float *input, float *output, float *d_outp
 
             Node *w_node = tensor(layer->weights[weight_idx], 1);
             Node *dy_node = tensor(dy_val, 1);
-            Node *grad = tensor_mul(w_node, dy_node);
+            Node *grad = mul(w_node, dy_node);
             d_input[i] += grad->tensor->storage->data[0];
 
             cm_safe_free((void **)&w_node);
