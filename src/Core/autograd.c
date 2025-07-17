@@ -6,6 +6,7 @@
 #include "../../include/Core/memory_management.h"
 #include "../../include/Core/error_codes.h"
 #include "../../include/Core/logging.h"
+#include <stdint.h>
 // Activation headers removed to avoid conflicts with autograd function declarations
 
 // Forward declarations of static functions
@@ -60,65 +61,72 @@ void no_grad_pop(void)
     }
 }
 
-static TensorImpl *create_tensor_impl(int *sizes, int ndim)
-{
+// Helper for dtype size
+size_t dtype_size(DType dtype) {
+    switch (dtype) {
+        case DTYPE_FLOAT32: return sizeof(float);
+        case DTYPE_FLOAT64: return sizeof(double);
+        case DTYPE_INT32:   return sizeof(int32_t);
+        case DTYPE_INT64:   return sizeof(int64_t);
+        case DTYPE_BOOL:    return sizeof(uint8_t);
+        default: return sizeof(float);
+    }
+}
+
+// Update StorageImpl, TensorImpl, Node creation
+static StorageImpl *create_storage_typed(size_t size, DType dtype, DeviceType device) {
+    StorageImpl *storage = (StorageImpl *)cm_safe_malloc(sizeof(StorageImpl), __FILE__, __LINE__);
+    if (!storage) return NULL;
+    storage->size = size;
+    storage->dtype = dtype;
+    storage->device = device;
+    storage->data = cm_safe_malloc(size * dtype_size(dtype), __FILE__, __LINE__);
+    storage->ref_count = 1;
+    storage->device_id = 0;
+    return storage;
+}
+
+static TensorImpl *create_tensor_impl_typed(int *sizes, int ndim, DType dtype, DeviceType device) {
     TensorImpl *impl = (TensorImpl *)cm_safe_malloc(sizeof(TensorImpl), __FILE__, __LINE__);
-    if (!impl)
-        return NULL;
-
-    // Setup storage and dimensions
+    if (!impl) return NULL;
     size_t total_size = 1;
-    for (int i = 0; i < ndim; i++)
-        total_size *= sizes[i];
-
-    impl->storage = create_storage(total_size);
+    for (int i = 0; i < ndim; i++) total_size *= sizes[i];
+    impl->storage = create_storage_typed(total_size, dtype, device);
     impl->sizes = copy_sizes(sizes, ndim);
     impl->strides = compute_strides(sizes, ndim);
     impl->ndim = ndim;
     impl->offset = 0;
     impl->is_contiguous = 1;
-
+    impl->dtype = dtype;
+    impl->device = device;
     return impl;
 }
 
-Node *tensor(float value, int requires_grad)
-{
-    int size = 1;
-    Node *result = empty(&size, 1);
-    if (!result)
-        return NULL;
-
-    result->tensor->storage->data[0] = value;
-    result->requires_grad = requires_grad && grad_ctx.enabled;
-    result->is_leaf = 1;
-
-    return result;
+// Update existing functions to use default dtype/device
+Node *tensor(float value, int requires_grad) {
+    TensorOptions options = {requires_grad, 0, 1.0f, DTYPE_FLOAT32, DEVICE_CPU};
+    return tensor_with_options(value, options);
 }
 
 // PyTorch-style tensor creation with options
 Node *tensor_with_options(float value, TensorOptions options)
 {
-    Node *result = tensor(value, options.requires_grad);
-    if (!result)
-        return NULL;
-
+    Node *result = empty_typed(&(int){1}, 1, options.dtype, options.device);
+    if (!result) return NULL;
+    if (options.dtype == DTYPE_FLOAT32) ((float *)result->tensor->storage->data)[0] = value;
+    else if (options.dtype == DTYPE_FLOAT64) ((double *)result->tensor->storage->data)[0] = value;
+    result->requires_grad = options.requires_grad;
     result->retain_grad = options.retain_grad;
     result->grad_scale = options.grad_scale;
+    result->dtype = options.dtype;
+    result->device = options.device;
     result->options = options;
     return result;
 }
 
 Node *empty(int *sizes, int ndim)
 {
-    Node *result = (Node *)cm_safe_malloc(sizeof(Node), __FILE__, __LINE__);
-    if (!result)
-        return NULL;
-
-    result->tensor = create_tensor_impl(sizes, ndim);
-    result->requires_grad = 0;
-    result->is_leaf = 1;
-    result->version_counter = 0;
-    return result;
+    return empty_typed(sizes, ndim, DTYPE_FLOAT32, DEVICE_CPU);
 }
 
 Node *empty_like(Node *other)
@@ -129,7 +137,7 @@ Node *empty_like(Node *other)
 // Additional tensor creation functions
 Node *zeros(int *sizes, int ndim)
 {
-    Node *result = empty(sizes, ndim);
+    Node *result = empty_typed(sizes, ndim, DTYPE_FLOAT32, DEVICE_CPU);
     if (!result)
         return NULL;
     
@@ -143,7 +151,7 @@ Node *zeros(int *sizes, int ndim)
 
 Node *ones(int *sizes, int ndim)
 {
-    Node *result = empty(sizes, ndim);
+    Node *result = empty_typed(sizes, ndim, DTYPE_FLOAT32, DEVICE_CPU);
     if (!result)
         return NULL;
     
@@ -152,7 +160,7 @@ Node *ones(int *sizes, int ndim)
         total_size *= sizes[i];
     
     for (size_t i = 0; i < total_size; i++)
-        result->tensor->storage->data[i] = 1.0f;
+        ((float *)result->tensor->storage->data)[i] = 1.0f;
     
     return result;
 }
@@ -459,6 +467,89 @@ Node *tensor_ones(int size)
         result->tensor->storage->data[i] = 1.0f;
     }
     return result;
+}
+
+Node *zeros_typed(int *sizes, int ndim, DType dtype, DeviceType device) {
+    Node *result = empty_typed(sizes, ndim, dtype, device);
+    if (!result) return NULL;
+    size_t total_size = 1;
+    for (int i = 0; i < ndim; i++) total_size *= sizes[i];
+    memset(result->tensor->storage->data, 0, total_size * dtype_size(dtype));
+    return result;
+}
+
+Node *ones_typed(int *sizes, int ndim, DType dtype, DeviceType device) {
+    Node *result = empty_typed(sizes, ndim, dtype, device);
+    if (!result) return NULL;
+    size_t total_size = 1;
+    for (int i = 0; i < ndim; i++) total_size *= sizes[i];
+    
+    switch (dtype) {
+        case DTYPE_FLOAT32:
+            for (size_t i = 0; i < total_size; i++)
+                ((float *)result->tensor->storage->data)[i] = 1.0f;
+            break;
+        case DTYPE_FLOAT64:
+            for (size_t i = 0; i < total_size; i++)
+                ((double *)result->tensor->storage->data)[i] = 1.0f;
+            break;
+        case DTYPE_INT32:
+            for (size_t i = 0; i < total_size; i++)
+                ((int32_t *)result->tensor->storage->data)[i] = 1;
+            break;
+        case DTYPE_INT64:
+            for (size_t i = 0; i < total_size; i++)
+                ((int64_t *)result->tensor->storage->data)[i] = 1;
+            break;
+        case DTYPE_BOOL:
+            for (size_t i = 0; i < total_size; i++)
+                ((uint8_t *)result->tensor->storage->data)[i] = 1;
+            break;
+    }
+    return result;
+}
+
+Node *tensor_from_data_typed(void *data, int *sizes, int ndim, int requires_grad, DType dtype, DeviceType device) {
+    Node *result = empty_typed(sizes, ndim, dtype, device);
+    if (!result) return NULL;
+    
+    size_t total_size = 1;
+    for (int i = 0; i < ndim; i++) total_size *= sizes[i];
+    
+    memcpy(result->tensor->storage->data, data, total_size * dtype_size(dtype));
+    result->requires_grad = requires_grad && grad_ctx.enabled;
+    result->is_leaf = 1;
+    result->dtype = dtype;
+    result->device = device;
+    
+    return result;
+}
+
+// Helper function to get value as float (for backward compatibility)
+static float get_value_as_float(Node *node) {
+    if (!node || !node->tensor || !node->tensor->storage) return 0.0f;
+    
+    switch (node->dtype) {
+        case DTYPE_FLOAT32: return ((float *)node->tensor->storage->data)[0];
+        case DTYPE_FLOAT64: return (float)((double *)node->tensor->storage->data)[0];
+        case DTYPE_INT32:   return (float)((int32_t *)node->tensor->storage->data)[0];
+        case DTYPE_INT64:   return (float)((int64_t *)node->tensor->storage->data)[0];
+        case DTYPE_BOOL:    return (float)((uint8_t *)node->tensor->storage->data)[0];
+        default: return 0.0f;
+    }
+}
+
+// Helper function to set value from float
+static void set_value_from_float(Node *node, float value) {
+    if (!node || !node->tensor || !node->tensor->storage) return;
+    
+    switch (node->dtype) {
+        case DTYPE_FLOAT32: ((float *)node->tensor->storage->data)[0] = value; break;
+        case DTYPE_FLOAT64: ((double *)node->tensor->storage->data)[0] = (double)value; break;
+        case DTYPE_INT32:  ((int32_t *)node->tensor->storage->data)[0] = (int32_t)value; break;
+        case DTYPE_INT64:  ((int64_t *)node->tensor->storage->data)[0] = (int64_t)value; break;
+        case DTYPE_BOOL:    ((uint8_t *)node->tensor->storage->data)[0] = (uint8_t)(value != 0); break;
+    }
 }
 
 // Matrix operations
@@ -1177,21 +1268,28 @@ Node *add(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float result_val = a->tensor->storage->data[0] + b->tensor->storage->data[0];
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = a_val + b_val;
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_ADD);
-        if (result->grad_fn) { // Added null check
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
             }
         }
-        // Node *inputs[] = {a, b}; // Original line, replaced by direct assignment
-        // set_graph_dependencies(result, inputs, 2); // Original line, replaced by direct assignment
     }
     
     return result;
@@ -1201,21 +1299,28 @@ Node *sub(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float result_val = a->tensor->storage->data[0] - b->tensor->storage->data[0];
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = a_val - b_val;
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_SUB);
-        if (result->grad_fn) { // Added null check
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+        if (result->grad_fn) {
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
             }
         }
-        // Node *inputs[] = {a, b}; // Original line, replaced by direct assignment
-        // set_graph_dependencies(result, inputs, 2); // Original line, replaced by direct assignment
     }
     
     return result;
@@ -1225,14 +1330,23 @@ Node *mul(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float result_val = a->tensor->storage->data[0] * b->tensor->storage->data[0];
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = a_val * b_val;
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_MUL);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
@@ -1247,14 +1361,23 @@ Node *div_tensor(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float result_val = a->tensor->storage->data[0] / b->tensor->storage->data[0];
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = a_val / b_val;
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_DIV);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
@@ -1269,14 +1392,23 @@ Node *pow_tensor(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float result_val = powf(a->tensor->storage->data[0], b->tensor->storage->data[0]);
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = powf(a_val, b_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_POW);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
@@ -1291,14 +1423,22 @@ Node *neg(Node *a)
 {
     if (!a) return NULL;
     
-    float result_val = -a->tensor->storage->data[0];
-    Node *result = tensor(result_val, a->requires_grad);
+    // For now, assume a has the same dtype and device
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float result_val = -a_val;
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_NEG);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->ninputs = 1;
             }
@@ -1312,14 +1452,22 @@ Node *abs_tensor(Node *a)
 {
     if (!a) return NULL;
     
-    float result_val = fabsf(a->tensor->storage->data[0]);
-    Node *result = tensor(result_val, a->requires_grad);
+    // For now, assume a has the same dtype and device
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float result_val = fabsf(a_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_ABS);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->ninputs = 1;
             }
@@ -1334,14 +1482,22 @@ Node *exp_tensor(Node *a)
 {
     if (!a) return NULL;
     
-    float result_val = expf(a->tensor->storage->data[0]);
-    Node *result = tensor(result_val, a->requires_grad);
+    // For now, assume a has the same dtype and device
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float result_val = expf(a_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_EXP);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->ninputs = 1;
             }
@@ -1355,14 +1511,22 @@ Node *log_tensor(Node *a)
 {
     if (!a) return NULL;
     
-    float result_val = logf(a->tensor->storage->data[0]);
-    Node *result = tensor(result_val, a->requires_grad);
+    // For now, assume a has the same dtype and device
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float result_val = logf(a_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_LOG);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->ninputs = 1;
             }
@@ -1376,14 +1540,22 @@ Node *sqrt_tensor(Node *a)
 {
     if (!a) return NULL;
     
-    float result_val = sqrtf(a->tensor->storage->data[0]);
-    Node *result = tensor(result_val, a->requires_grad);
+    // For now, assume a has the same dtype and device
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float result_val = sqrtf(a_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_SQRT);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->ninputs = 1;
             }
@@ -1398,16 +1570,23 @@ Node *max_elementwise(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float a_val = a->tensor->storage->data[0];
-    float b_val = b->tensor->storage->data[0];
-    float result_val = fmaxf(a_val, b_val);
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = fmaxf(a_val, b_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_MAX);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
@@ -1422,16 +1601,23 @@ Node *min_elementwise(Node *a, Node *b)
 {
     if (!a || !b) return NULL;
     
-    float a_val = a->tensor->storage->data[0];
-    float b_val = b->tensor->storage->data[0];
-    float result_val = fminf(a_val, b_val);
-    Node *result = tensor(result_val, a->requires_grad || b->requires_grad);
+    // For now, assume both operands have the same dtype
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float b_val = get_value_as_float(b);
+    float result_val = fminf(a_val, b_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad || b->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_MIN);
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__); // Allocate for 2 inputs
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(2 * sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 result->grad_fn->inputs[1] = b;
                 result->grad_fn->ninputs = 2;
@@ -1446,15 +1632,22 @@ Node *clamp(Node *a, float min_val, float max_val)
 {
     if (!a) return NULL;
     
-    float a_val = a->tensor->storage->data[0];
-    float result_val = fmaxf(min_val, fminf(max_val, a_val));
-    Node *result = tensor(result_val, a->requires_grad);
+    // For now, assume a has the same dtype and device
+    DType result_dtype = a->dtype;
+    DeviceType result_device = a->device;
     
-    if (result->requires_grad) {
+    float a_val = get_value_as_float(a);
+    float result_val = fmaxf(min_val, fminf(max_val, a_val));
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        a->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_MAX); // Use MAX op for clamp
         if (result->grad_fn) {
-            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__); // Allocate for 1 input
-            if (result->grad_fn->inputs) { // Added null check
+            result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
+            if (result->grad_fn->inputs) {
                 result->grad_fn->inputs[0] = a;
                 // Note: min_val and max_val are not Nodes, so they are not added to grad_fn->inputs
                 // The backward pass for clamp (max_backward) needs to handle this.
@@ -1502,10 +1695,18 @@ Node *relu(Node *x)
 {
     if (!x) return NULL;
     
-    float result_val = fmaxf(0.0f, x->tensor->storage->data[0]);
-    Node *result = tensor(result_val, x->requires_grad);
+    // For now, assume x has the same dtype and device
+    DType result_dtype = x->dtype;
+    DeviceType result_device = x->device;
     
-    if (result->requires_grad) {
+    float x_val = get_value_as_float(x);
+    float result_val = fmaxf(0.0f, x_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        x->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_RELU);
         if (result->grad_fn) {
             result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
@@ -1523,10 +1724,18 @@ Node *tanh_tensor(Node *x)
 {
     if (!x) return NULL;
     
-    float result_val = tanhf(x->tensor->storage->data[0]);
-    Node *result = tensor(result_val, x->requires_grad);
+    // For now, assume x has the same dtype and device
+    DType result_dtype = x->dtype;
+    DeviceType result_device = x->device;
     
-    if (result->requires_grad) {
+    float x_val = get_value_as_float(x);
+    float result_val = tanhf(x_val);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        x->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_TANH);
         if (result->grad_fn) {
             result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
@@ -1544,10 +1753,18 @@ Node *sigmoid(Node *x)
 {
     if (!x) return NULL;
     
-    float result_val = 1.0f / (1.0f + expf(-x->tensor->storage->data[0]));
-    Node *result = tensor(result_val, x->requires_grad);
+    // For now, assume x has the same dtype and device
+    DType result_dtype = x->dtype;
+    DeviceType result_device = x->device;
     
-    if (result->requires_grad) {
+    float x_val = get_value_as_float(x);
+    float result_val = 1.0f / (1.0f + expf(-x_val));
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        x->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_SIGMOID);
         if (result->grad_fn) {
             result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
@@ -1567,10 +1784,18 @@ Node *softmax(Node *x, int dim)
     
     // Simplified softmax for single element - ignore dim for now
     (void)dim; // Suppress unused parameter warning
-    float result_val = x->tensor->storage->data[0] > 0 ? 1.0f : 0.0f;
-    Node *result = tensor(result_val, x->requires_grad);
+    // For now, assume x has the same dtype and device
+    DType result_dtype = x->dtype;
+    DeviceType result_device = x->device;
     
-    if (result->requires_grad) {
+    float x_val = get_value_as_float(x);
+    float result_val = x_val > 0 ? 1.0f : 0.0f;
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        x->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_SOFTMAX);
         if (result->grad_fn) {
             result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
@@ -1588,11 +1813,18 @@ Node *elu(Node *x, float alpha)
 {
     if (!x) return NULL;
     
-    float x_val = x->tensor->storage->data[0];
-    float result_val = x_val >= 0.0f ? x_val : alpha * (expf(x_val) - 1.0f);
-    Node *result = tensor(result_val, x->requires_grad);
+    // For now, assume x has the same dtype and device
+    DType result_dtype = x->dtype;
+    DeviceType result_device = x->device;
     
-    if (result->requires_grad) {
+    float x_val = get_value_as_float(x);
+    float result_val = x_val >= 0.0f ? x_val : alpha * (expf(x_val) - 1.0f);
+    
+    Node *result = tensor_with_options(result_val, (TensorOptions){
+        x->requires_grad, 0, result_dtype, result_device
+    });
+    
+    if (result && result->requires_grad) {
         result->grad_fn = create_function(OP_ELU);
         if (result->grad_fn) {
             result->grad_fn->inputs = (Node **)cm_safe_malloc(sizeof(Node *), __FILE__, __LINE__);
@@ -1657,4 +1889,32 @@ Node *mse_loss(Node *input, Node *target, int reduction)
     Node *diff = sub(input, target);
     Node *squared = mul(diff, diff);
     return squared;
+}
+
+void free_node(Node *node) {
+    if (!node || node->is_freed) return;
+    
+    node->is_freed = 1;
+    
+    if (node->tensor) {
+        if (node->tensor->storage) {
+            node->tensor->storage->ref_count--;
+            if (node->tensor->storage->ref_count <= 0) {
+                cm_safe_free((void **)&node->tensor->storage->data);
+                cm_safe_free((void **)&node->tensor->storage);
+            }
+        }
+        cm_safe_free((void **)&node->tensor->sizes);
+        cm_safe_free((void **)&node->tensor->strides);
+        cm_safe_free((void **)&node->tensor);
+    }
+    
+    if (node->grad_fn) {
+        cm_safe_free((void **)&node->grad_fn->inputs);
+        cm_safe_free((void **)&node->grad_fn->saved_tensors);
+        cm_safe_free((void **)&node->grad_fn);
+    }
+    
+    cm_safe_free((void **)&node->input_nodes);
+    cm_safe_free((void **)&node);
 }

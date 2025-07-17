@@ -62,17 +62,21 @@ typedef enum Operation
     OP_REQUIRES_GRAD
 } Operation;
 
-// Forward declarations of structs
-typedef struct Function Function;
-typedef struct Node Node;
-typedef struct Hook Hook;
-typedef struct TensorOptions TensorOptions;
-typedef struct StorageImpl StorageImpl;
-typedef struct TensorImpl TensorImpl;
-typedef struct SavedVariable SavedVariable;
-typedef struct GradContext GradContext;
+// DType and DeviceType enums
+typedef enum {
+    DTYPE_FLOAT32,
+    DTYPE_FLOAT64,
+    DTYPE_INT32,
+    DTYPE_INT64,
+    DTYPE_BOOL
+} DType;
 
-// Forward declarations of structs
+typedef enum {
+    DEVICE_CPU,
+    DEVICE_CUDA
+} DeviceType;
+
+// Forward declarations
 typedef struct Function Function;
 typedef struct Node Node;
 typedef struct Hook Hook;
@@ -93,6 +97,10 @@ Node *ones(int *sizes, int ndim);
 Node *randn(int *sizes, int ndim);
 Node *rand_uniform(int *sizes, int ndim, float low, float high);
 Node *tensor_from_array(float *data, int size, int requires_grad);
+Node *tensor_from_data_typed(void *data, int *sizes, int ndim, int requires_grad, DType dtype, DeviceType device);
+Node *empty_typed(int *sizes, int ndim, DType dtype, DeviceType device);
+Node *zeros_typed(int *sizes, int ndim, DType dtype, DeviceType device);
+Node *ones_typed(int *sizes, int ndim, DType dtype, DeviceType device);
 
 // Tensor manipulation
 Node *empty_like(Node *other);
@@ -194,6 +202,10 @@ void set_detect_anomaly(int enabled);
 void autograd_set_grad_mode(int enabled);
 void grad_set_checkpoint(Node *self, int enabled);
 
+// Memory management
+void free_node(Node *node);
+void free_node_recursive(Node *node);
+
 // Struct definitions
 struct Function
 {
@@ -209,6 +221,10 @@ struct Function
     // Additional parameters for specific operations
     float alpha;      // For ELU, Leaky ReLU, etc.
     Operation op_type; // To track operation type
+    
+    // Graph tracking
+    int executed;     // Whether this function has been executed
+    int grad_fn_id;   // Unique identifier for this function
 };
 
 struct TensorOptions
@@ -216,6 +232,8 @@ struct TensorOptions
     int requires_grad;
     int retain_grad;
     float grad_scale;
+    DType dtype;
+    DeviceType device;
 };
 
 typedef struct Node
@@ -248,7 +266,6 @@ typedef struct Node
     int is_variable;       // PyTorch Variable compatibility
     TensorOptions options; // Tensor options
     struct Node *grad_acc; // Gradient accumulator
-    int needs_reset;       // Flag for zero_grad behavior
 
     // PyTorch view system
     TensorImpl *tensor;         // Replace direct value storage
@@ -264,6 +281,11 @@ typedef struct Node
     // Input nodes for activation functions and other operations
     struct Node **input_nodes;
     int num_inputs;
+    
+    // Memory management
+    int is_freed;
+    DType dtype;
+    DeviceType device;
 } Node;
 
 typedef struct Hook
@@ -274,10 +296,12 @@ typedef struct Hook
 
 typedef struct StorageImpl
 {
-    float *data;
+    void *data;
     size_t size;
     int ref_count;
     int device_id; // For future GPU support
+    DType dtype;
+    DeviceType device;
 } StorageImpl;
 
 typedef struct TensorImpl
@@ -288,6 +312,8 @@ typedef struct TensorImpl
     int ndim;      // Number of dimensions
     size_t offset; // Offset into storage
     int is_contiguous;
+    DType dtype;
+    DeviceType device;
 } TensorImpl;
 
 typedef struct SavedVariable
@@ -301,27 +327,26 @@ typedef struct GradContext
     int enabled;
     int grad_mode_stack[32];
     int stack_size;
+    int detect_anomaly;
 } GradContext;
 
-// Validation helper for activation functions
+// Validation and utility functions
 int validate_activation_input(float x);
-
-// Activation helper functions
 void create_activation_node(Node *output, Node *input, Operation op, Node *saved_var);
-
-// Gradient accumulation helpers
 void accumulate_grad(Node *node, float grad);
-
-// Node creation helper
-Node *create_node(void);
 Node *create_node_with_value(float value, int requires_grad);
-
-// Graph dependency helper
 void set_graph_dependencies(Node *output, Node **inputs, int num_inputs);
-
-// Add these declarations  
 void backward_from_root(Node *root);
-Node **build_topo(Node *root, int *size);
 void execute_backward_function(Node *node);
 
-#endif
+// Graph management
+void add_edge(Node *from, Node *to);
+void remove_edge(Node *from, Node *to);
+Node **topological_sort(Node *root, int *size);
+void clear_graph(Node *root);
+
+// Gradient computation
+void compute_gradients(Node *root);
+void propagate_gradients(Node *node);
+
+#endif // C_ML_AUTOGRAD_H
