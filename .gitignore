@@ -54,3 +54,42 @@ examples_bin/**
 test_bin/**
 bin/**
 lib/**
+
+# Build outputs
+build/
+cmake-build*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+*.pyc
+.python-version
+.tox/
+.hypothesis/
+
+# Caches
+.cache/
+*.log
+tags
+compile_commands.json
+*~
+.*.swp
+.*.swo
+
+# Editors/OS
+.idea/
+.DS_Store
+
+# Coverage / dist
+.coverage
+coverage.xml
+dist/
+
+# MkDocs site
+site/

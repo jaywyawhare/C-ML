@@ -1,21 +1,18 @@
-# Welcome to C-ML
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="dark-mode.svg">
+    <img alt="C-ML" src="image.svg" height="96">
+  </picture>
+</p>
 
-C-ML is a lightweight and modular machine learning library written in C. It is designed for educational purposes and lightweight applications, providing essential components for building and training neural networks.
+# C-ML Documentation
 
-## Why Choose C-ML?
+Welcome to the C-ML docs. Use the sidebar to navigate. Common entry points:
 
-- **Lightweight**: Minimal dependencies and optimized for performance.
-- **Modular**: Use only the components you need.
-- **Educational**: Learn the fundamentals of machine learning by exploring the source code.
+- [Training Guide](TRAINING.md)
+- [Autograd](AUTOGRAD.md)
+- [Layers Reference](NN_LAYERS.md)
+- [Implementation Status](IMPLEMENTATION_STATUS.md)
+- [Integration Summary](INTEGRATION_SUMMARY.md)
 
-## Get Started
-
-- [Installation Guide](installation.md)
-- [Features Overview](features.md)
-- [Usage Examples](usage.md)
-
-## Contribute
-
-We welcome contributions! Check out the [Contributing Guidelines](contributing.md) to get started.
-
-> **Tip**: Use the navigation bar on the left to explore the documentation.
+If you were looking for the older index, see [INDEX.md](INDEX.md).

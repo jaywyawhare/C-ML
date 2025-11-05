@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "../../include/Core/memory_management.h"
-#include "../../include/Core/error_codes.h"
-#include "../../include/Core/logging.h"
+#include "Core/memory_management.h"
+#include "Core/error_codes.h"
+#include "Core/logging.h"
+// Note: free_node_recursive uses old Node structure that doesn't exist in current autograd system
+// Commented out until needed or updated to match current autograd API
 
 /**
  * @brief Safe memory management functions with logging and error handling.
@@ -25,13 +27,11 @@
  * @param line The line number in the file where the allocation is requested.
  * @return A pointer to the allocated memory, or CM_MEMORY_ALLOCATION_ERROR on failure.
  */
-void *cm_safe_malloc(size_t size, const char *file, int line)
-{
-    void *ptr = malloc(size);
-    if (ptr == NULL)
-    {
+void* cm_safe_malloc(size_t size, const char* file, int line) {
+    void* ptr = malloc(size);
+    if (ptr == NULL) {
         LOG_ERROR("Memory allocation failed for %zu bytes in %s at line %d.", size, file, line);
-        return (void *)CM_MEMORY_ALLOCATION_ERROR;
+        return (void*)CM_MEMORY_ALLOCATION_ERROR;
     }
 
     LOG_DEBUG("Allocated %zu bytes at %p in %s at line %d.", size, ptr, file, line);
@@ -47,18 +47,16 @@ void *cm_safe_malloc(size_t size, const char *file, int line)
  * @param line The line number in the file where the allocation is requested.
  * @return A pointer to the allocated memory, or CM_MEMORY_ALLOCATION_ERROR on failure.
  */
-void *cm_safe_calloc(size_t num, size_t size, const char *file, int line)
-{
-    void *ptr = calloc(num, size);
-    if (ptr == NULL)
-    {
+void* cm_safe_calloc(size_t num, size_t size, const char* file, int line) {
+    void* ptr = calloc(num, size);
+    if (ptr == NULL) {
         LOG_ERROR("Memory allocation failed for %zu elements of size %zu bytes in %s at line %d.",
                   num, size, file, line);
-        return (void *)CM_MEMORY_ALLOCATION_ERROR;
+        return (void*)CM_MEMORY_ALLOCATION_ERROR;
     }
 
-    LOG_DEBUG("Allocated and zeroed %zu bytes at %p in %s at line %d.",
-              num * size, ptr, file, line);
+    LOG_DEBUG("Allocated and zeroed %zu bytes at %p in %s at line %d.", num * size, ptr, file,
+              line);
     return ptr;
 }
 
@@ -71,10 +69,8 @@ void *cm_safe_calloc(size_t num, size_t size, const char *file, int line)
  *
  * @param ptr A pointer to the memory to be freed.
  */
-void cm_safe_free(void **ptr)
-{
-    if (ptr != NULL && *ptr != NULL)
-    {
+void cm_safe_free(void** ptr) {
+    if (ptr != NULL && *ptr != NULL) {
         LOG_DEBUG("Freeing memory at %p", *ptr);
         free(*ptr);
         *ptr = NULL;
@@ -90,13 +86,11 @@ void cm_safe_free(void **ptr)
  * @param line The line number in the file where the reallocation is requested.
  * @return A pointer to the reallocated memory, or CM_MEMORY_ALLOCATION_ERROR on failure.
  */
-void *cm_safe_realloc(void *ptr, size_t size, const char *file, int line)
-{
-    void *new_ptr = realloc(ptr, size);
-    if (new_ptr == NULL)
-    {
+void* cm_safe_realloc(void* ptr, size_t size, const char* file, int line) {
+    void* new_ptr = realloc(ptr, size);
+    if (new_ptr == NULL) {
         LOG_ERROR("Memory reallocation failed for %zu bytes in %s at line %d.", size, file, line);
-        return (void *)CM_MEMORY_ALLOCATION_ERROR;
+        return (void*)CM_MEMORY_ALLOCATION_ERROR;
     }
 
     LOG_DEBUG("Reallocated memory to %zu bytes at %p in %s at line %d.", size, new_ptr, file, line);

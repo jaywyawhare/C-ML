@@ -1,108 +1,140 @@
-<div align="center">
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/dark-mode.svg">
+    <img alt="C-ML" src="docs/img.svg" height="96">
+  </picture>
+</p>
 
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="./docs/dark-mode.svg">
-  <img alt="C-ML logo" src="./docs/light-mode.svg" width="50%" height="50%">
-</picture>
+# C-ML: C Machine Learning Library
 
-</div>
-
----
-
-C-ML is a lightweight machine learning library written in C. It provides implementations for various neural network components.
+A comprehensive machine learning library written in pure C, providing automatic differentiation, neural network layers, optimizers, and training utilities.
 
 ## Features
 
-- **Layers**: Dense, Dropout, Flatten, Pooling, Max-Pooling
-- **Activations**: ReLU, Sigmoid, Tanh, Softmax, ELU, Leaky ReLU, Linear
-- **Loss Functions**: Mean Squared Error, Binary Cross-Entropy, Focal Loss, etc.
-- **Metrics**: Accuracy, Precision, Recall, F1 Score, etc.
-- **Optimizers**: SGD, Adam, RMSprop
-- **Preprocessing**: Label Encoding, One-Hot Encoding, Standard Scaler, Min-Max Scaler
-- **Regularizers**: L1, L2, Combined L1-L2
+- **Automatic Differentiation (Autograd)**: Dynamic computation graphs with automatic gradient computation
+- **Neural Network Layers**: Complete set of layers including Linear, Conv2d, BatchNorm2d, Pooling, Activations, and more
+- **Optimizers**: SGD and Adam optimizers with momentum, weight decay, and learning rate scheduling
+- **Tensor Operations**: Comprehensive tensor operations with broadcasting support
+- **Loss Functions**: MSE, MAE, BCE, Cross Entropy, and more
+- **Memory Management**: Safe memory management with automatic cleanup
+- **Logging System**: Configurable logging levels for debugging
 
-## Prerequisites
+## Quick Start
 
-- GCC (GNU Compiler Collection)
-- `make` build tool
+### Requirements
 
+- C11 compatible compiler (GCC, Clang)
+- CMake 3.16+ (for CMake build)
+- Make (for Makefile build)
 
-## Build Instructions
+### Building the Library
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/jaywyawhare/C-ML.git
-   cd C-ML
-   ```
+```bash
+# Using Make (builds main and examples)
+make clean && make
 
-2. Build the project:
-   ```bash
-   make
-   ```
+# Using CMake (enable examples)
+mkdir build && cd build
+cmake -DBUILD_EXAMPLES=ON ..
+make -j$(nproc)
+```
 
-3. Run the example program:
-   ```bash
-   ./bin/main
-   ```
+The build will create:
 
-4. Run the tests:
-   ```bash
-   make test
-   ```
+- `build/main` - Example executable (Makefile)
+- `build/examples/*` - Example binaries (Makefile)
+- `build/bin/*` - Binaries when using CMake
+- `build/libcml.a` - Static library
+- `build/libcml.so` - Shared library (if enabled)
 
-5. Run the examples:
-   ```bash
-   make examples
-   ```
-
-6. Clean the build artifacts:
-   ```bash
-   make clean
-   ```
-
-
-## Example Usage
-
-The `main.c` file demonstrates how to use the library to create a simple neural network with a dense layer, ReLU activation, and mean squared error loss.
+### Basic Usage
 
 ```c
+#include "cml.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include "include/Core/training.h"
-#include "include/Core/dataset.h"
 
-int main()
-{
-    NeuralNetwork *network = create_neural_network(2);
-    build_network(network, OPTIMIZER_ADAM, 0.1f, LOSS_MSE, 0.0f, 0.0f);
-    model_add(network, LAYER_DENSE, ACTIVATION_RELU, 2, 4, 0.0f, 0, 0);
-    model_add(network, LAYER_DENSE, ACTIVATION_TANH, 4, 4, 0.0f, 0, 0);
-    model_add(network, LAYER_DENSE, ACTIVATION_SIGMOID, 4, 1, 0.0f, 0, 0);
+int main(void) {
+    cml_init();
 
-    float X_data[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
-    float y_data[4][1] = {{0.0f}, {1.0f}, {1.0f}, {1.0f}};
+    Sequential *model = nn_sequential();
+    sequential_add(model, (Module*)nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
+    sequential_add(model, (Module*)nn_relu(false));
+    sequential_add(model, (Module*)nn_linear(4, 1, DTYPE_FLOAT32, DEVICE_CPU, true));
+    sequential_add(model, (Module*)nn_sigmoid());
 
-    Dataset *dataset = dataset_create();
-    dataset_load_arrays(dataset, (float *)X_data, (float *)y_data, 4, 2, 1);
+    summary((Module*)model);
 
-    summary(network);
+    Parameter **params;
+    int num_params;
+    module_collect_parameters((Module*)model, &params, &num_params, true);
 
-    train_network(network, dataset, 30);
-    test_network(network, dataset->X, dataset->y, dataset->num_samples, NULL);
+    Optimizer *optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
-    dataset_free(dataset);
-    free_neural_network(network);
+    for (int epoch = 0; epoch < 100; epoch++) {
+        optimizer_zero_grad(optimizer);
+
+        Tensor *outputs = module_forward((Module*)model, inputs);
+
+        Tensor *loss = tensor_mse_loss(outputs, targets);
+
+        tensor_backward(loss, NULL, false, false);
+
+        optimizer_step(optimizer);
+
+        tensor_free(loss);
+        tensor_free(outputs);
+    }
+
+    optimizer_free(optimizer);
+    CM_FREE(params);
+    module_free((Module*)model);
+    cml_cleanup();
 
     return 0;
 }
 ```
 
+## Documentation
 
-## Contributing
-
-Contributions are welcome! Feel free to open issues or submit pull requests.
-
+- **[Autograd System](docs/AUTOGRAD.md)** - Complete guide to automatic differentiation
+- **[Neural Network Layers](docs/NN_LAYERS.md)** - Available layers and their usage
+- **[Training Guide](docs/TRAINING.md)** - Comprehensive guide to training neural networks (manual LR scheduling and early stopping)
+- **[Autograd Implementation](docs/AUTOGRAD_IMPLEMENTATION.md)** - Technical implementation details
+- **[Layers Implementation](docs/LAYERS_COMPLETE.md)** - Layer implementation details
+- **[Integration Summary](docs/INTEGRATION_SUMMARY.md)** - Library integration overview
 
 ## License
 
-This project is licensed under the DBaJ-NC-CFL [License](./LICENCE.md).
+See [LICENCE.md](LICENCE.md) for license information.
+
+## Contributing
+
+Contributions are welcome! Please ensure your code:
+
+- Follows the existing code style
+- Includes appropriate documentation
+- Passes all existing tests
+- Updates relevant documentation
+
+## Documentation
+
+For comprehensive documentation, see:
+
+- **[Documentation Index](docs/INDEX.md)** - Complete documentation index
+- **[Training Guide](docs/TRAINING.md)** - Start here for training examples
+- **[Autograd System](docs/AUTOGRAD.md)** - Automatic differentiation guide
+- **[Neural Network Layers](docs/NN_LAYERS.md)** - Available layers reference
+
+## Examples
+
+Example programs are available in the `examples/` directory and in `main.c`. These demonstrate:
+
+- Complete training loops
+- Model creation and parameter management
+- Optimizer usage
+- Loss function usage
+- Autograd system usage
+
+## Support
+
+For issues, questions, or contributions, please refer to the project repository.

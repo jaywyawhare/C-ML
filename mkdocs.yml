@@ -3,10 +3,14 @@ site_description: Lightweight Machine Learning Library in C
 repo_url: https://github.com/jaywyawhare/C-ML
 site_author: Arrry
 
+# Explicitly select Pygments styles for syntax highlighting
+pygments_style: monokai
+pygments_dark_style: native
+
 theme:
   name: material
-  logo: light-mode.svg
-  favicon: light-mode.svg
+  logo: image.svg
+  favicon: image.svg
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
@@ -34,23 +38,14 @@ theme:
 
 nav:
   - Home: index.md
-  - Features: features.md
-  - Installation: installation.md
-  - Usage: usage.md
-  - Modules:
-      - Core: modules/core.md
-      - Layers: modules/layers.md
-      - Activations: modules/activations.md
-      - Loss Functions: modules/loss_functions.md
-      - Optimizers: modules/optimizers.md
-      - Preprocessing: modules/preprocessing.md
-      - Regularizers: modules/regularizers.md
-      - Metrics: modules/metrics.md
-  - Testing: testing.md
-  - Development Guidelines: development_guidelines.md
-  - Design Guide: DesignGuide.md
-  - Contributing: contributing.md
-  - License: license.md
+  - Autograd: AUTOGRAD.md
+  - Autograd Implementation: AUTOGRAD_IMPLEMENTATION.md
+  - Layers Reference: NN_LAYERS.md
+  - Layers Implementation: LAYERS_COMPLETE.md
+  - Training Guide: TRAINING.md
+  - Integration Summary: INTEGRATION_SUMMARY.md
+  - Implementation Status: IMPLEMENTATION_STATUS.md
+  - TODO / Roadmap: TODO_IMPLEMENTATIONS.md
 
 extra:
   social:
@@ -61,7 +56,14 @@ markdown_extensions:
   - toc
   - tables
   - admonition
-  - pymdownx.highlight
+  - codehilite:
+      guess_lang: false
+      linenums: false
+  - pymdownx.highlight:
+      use_pygments: true
+      linenums: false
+      anchor_linenums: false
+      default_lang: c
   - pymdownx.superfences
   - pymdownx.inlinehilite
   - pymdownx.emoji
