@@ -11,6 +11,7 @@
 #include "autograd/autograd.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/error_stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -120,11 +121,15 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     Linear* linear = CM_MALLOC(sizeof(Linear));
     if (!linear) {
         LOG_ERROR("Failed to allocate memory for Linear layer");
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Linear layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
     }
 
     // Initialize base module
     if (module_init((Module*)linear, "Linear", linear_forward_fn, linear_free_fn) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Linear module", __FILE__,
+                         __LINE__, __func__);
         CM_FREE(linear);
         return NULL;
     }
@@ -135,9 +140,11 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     linear->transpose_weight = false;
 
     // Create weight tensor [out_features, in_features]
-    int weight_shape[] = {out_features, in_features};
-    Tensor* weight     = tensor_empty(weight_shape, 2, dtype, device);
+    int weight_shape[]  = {out_features, in_features};
+    TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+    Tensor* weight      = tensor_empty(weight_shape, 2, &config);
     if (!weight) {
+        // Error already pushed by tensor_empty
         module_free((Module*)linear);
         return NULL;
     }
@@ -160,9 +167,11 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
 
     // Create bias tensor [out_features] if needed
     if (use_bias) {
-        int bias_shape[] = {out_features};
-        Tensor* bias     = tensor_zeros(bias_shape, 1, dtype, device);
+        int bias_shape[]    = {out_features};
+        TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+        Tensor* bias        = tensor_zeros(bias_shape, 1, &config);
         if (!bias) {
+            // Error already pushed by tensor_zeros
             module_free((Module*)linear);
             return NULL;
         }

@@ -64,8 +64,9 @@ void training_example(void) {
     int batch_size  = 32;
     int num_samples = 100;
 
-    int input_shape[] = {batch_size, input_size};
-    Tensor* inputs    = tensor_empty(input_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    int input_shape[]   = {batch_size, input_size};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* inputs      = tensor_empty(input_shape, 2, &config);
     if (!inputs) {
         LOG_ERROR("Failed to create input tensor");
         goto cleanup;
@@ -73,7 +74,7 @@ void training_example(void) {
     cleanup_register_tensor(cleanup, inputs);
 
     int target_shape[] = {batch_size, output_size};
-    Tensor* targets    = tensor_zeros(target_shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* targets    = tensor_zeros(target_shape, 1, &config);
     if (!targets) {
         LOG_ERROR("Failed to create target tensor");
         goto cleanup;

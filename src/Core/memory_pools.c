@@ -143,8 +143,9 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
     }
 
     // Pre-allocate all tensors
+    TensorConfig config = tensor_config_with_dtype_device(dtype, device);
     for (size_t i = 0; i < num_tensors; i++) {
-        pool->tensors[i] = tensor_empty(shape, ndim, dtype, device);
+        pool->tensors[i] = tensor_empty(shape, ndim, &config);
         if (!pool->tensors[i]) {
             // Free already allocated tensors
             for (size_t j = 0; j < i; j++) {

@@ -10,6 +10,7 @@
 #include "tensor/ops.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/error_stack.h"
 #include <math.h>
 
 // ReLU Forward
@@ -22,10 +23,15 @@ static void relu_free(Module* module) { CM_FREE(module); }
 
 ReLU* nn_relu(bool inplace) {
     ReLU* relu = CM_MALLOC(sizeof(ReLU));
-    if (!relu)
+    if (!relu) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for ReLU layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)relu, "ReLU", relu_forward, relu_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize ReLU module", __FILE__,
+                         __LINE__, __func__);
         CM_FREE(relu);
         return NULL;
     }
@@ -67,10 +73,15 @@ static void sigmoid_free(Module* module) { CM_FREE(module); }
 
 Sigmoid* nn_sigmoid(void) {
     Sigmoid* sigmoid = CM_MALLOC(sizeof(Sigmoid));
-    if (!sigmoid)
+    if (!sigmoid) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Sigmoid layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)sigmoid, "Sigmoid", sigmoid_forward, sigmoid_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Sigmoid module", __FILE__,
+                         __LINE__, __func__);
         CM_FREE(sigmoid);
         return NULL;
     }
@@ -88,10 +99,15 @@ static void tanh_free(Module* module) { CM_FREE(module); }
 
 Tanh* nn_tanh(void) {
     Tanh* tanh = CM_MALLOC(sizeof(Tanh));
-    if (!tanh)
+    if (!tanh) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Tanh layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)tanh, "Tanh", tanh_forward, tanh_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Tanh module", __FILE__,
+                         __LINE__, __func__);
         CM_FREE(tanh);
         return NULL;
     }
@@ -115,13 +131,14 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
     Tensor* half          = NULL;
     Tensor* output        = NULL;
 
-    int* input_shape = input->shape;
-    int input_ndim   = input->ndim;
-    Tensor* ones     = tensor_ones(input_shape, input_ndim, input->dtype, input->device);
+    int* input_shape    = input->shape;
+    int input_ndim      = input->ndim;
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* ones        = tensor_ones(input_shape, input_ndim, &config);
     if (!ones)
         return NULL;
 
-    Tensor* half_const = tensor_ones(input_shape, input_ndim, input->dtype, input->device);
+    Tensor* half_const = tensor_ones(input_shape, input_ndim, &config);
     if (!half_const) {
         tensor_free(ones);
         return NULL;
@@ -133,7 +150,7 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
         }
     }
 
-    Tensor* sqrt_const = tensor_ones(input_shape, input_ndim, input->dtype, input->device);
+    Tensor* sqrt_const = tensor_ones(input_shape, input_ndim, &config);
     if (!sqrt_const) {
         tensor_free(ones);
         tensor_free(half_const);

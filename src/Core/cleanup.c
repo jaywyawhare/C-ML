@@ -4,6 +4,7 @@
  */
 
 #include "Core/cleanup.h"
+#include "cml.h"
 #include "nn/module.h"
 #include "optim/optimizer.h"
 #include "tensor/tensor.h"
@@ -35,6 +36,10 @@ CleanupContext* cleanup_context_create(void) {
     ctx->memory_ptrs     = NULL;
     ctx->num_memory_ptrs = 0;
     ctx->memory_capacity = 0;
+
+    // Automatically register with global cleanup system
+    extern void cml_register_cleanup_context(CleanupContext*);
+    cml_register_cleanup_context(ctx);
 
     return ctx;
 }

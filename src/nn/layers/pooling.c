@@ -57,8 +57,9 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
     }
 
     // Create output tensor [batch, channels, out_h, out_w]
-    int output_shape[] = {batch, channels, out_height, out_width};
-    Tensor* output     = tensor_empty(output_shape, 4, input->dtype, input->device);
+    int output_shape[]  = {batch, channels, out_height, out_width};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(output_shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -188,8 +189,9 @@ static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
     }
 
     // Create output tensor [batch, channels, out_h, out_w]
-    int output_shape[] = {batch, channels, out_height, out_width};
-    Tensor* output     = tensor_empty(output_shape, 4, input->dtype, input->device);
+    int output_shape[]  = {batch, channels, out_height, out_width};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(output_shape, 4, &config);
     if (!output)
         return NULL;
 

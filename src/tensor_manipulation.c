@@ -59,8 +59,8 @@ Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
     out_shape[normalized_dim] = total_size;
 
     // Create output tensor
-    Tensor* output =
-        tensor_empty(out_shape, tensors[0]->ndim, tensors[0]->dtype, tensors[0]->device);
+    TensorConfig config = tensor_config_with_dtype_device(tensors[0]->dtype, tensors[0]->device);
+    Tensor* output      = tensor_empty(out_shape, tensors[0]->ndim, &config);
     CM_FREE(out_shape);
     if (!output)
         return NULL;
@@ -145,7 +145,8 @@ Tensor* tensor_stack(Tensor** tensors, int num_tensors, int dim) {
     }
 
     // Create output tensor
-    Tensor* output = tensor_empty(out_shape, out_ndim, tensors[0]->dtype, tensors[0]->device);
+    TensorConfig config = tensor_config_with_dtype_device(tensors[0]->dtype, tensors[0]->device);
+    Tensor* output      = tensor_empty(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!output)
         return NULL;
@@ -220,7 +221,8 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
         }
         out_shape[normalized_dim] = sizes[i];
 
-        Tensor* split = tensor_empty(out_shape, tensor->ndim, tensor->dtype, tensor->device);
+        TensorConfig config = tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+        Tensor* split       = tensor_empty(out_shape, tensor->ndim, &config);
         CM_FREE(out_shape);
         if (!split) {
             for (int j = 0; j < i; j++)
@@ -296,7 +298,8 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     }
 
     // Create output tensor with indices shape
-    Tensor* output = tensor_empty(indices->shape, indices->ndim, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(indices->shape, indices->ndim, &config);
     if (!output)
         return NULL;
 

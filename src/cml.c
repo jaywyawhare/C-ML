@@ -11,6 +11,9 @@
 #include "Core/logging.h"
 #include "Core/memory_management.h"
 #include "Core/training_metrics.h"
+#include "Core/error_stack.h"
+#include "Core/cleanup.h"
+#include "Core/device.h"
 #include "nn/module.h"
 #include "nn/layers.h"
 #include "nn/layers/sequential.h"
@@ -22,8 +25,80 @@
 #include <unistd.h>
 #include <limits.h>
 
-static bool g_cml_initialized = false;
-static int g_cml_init_count   = 0;
+static bool g_cml_initialized       = false;
+static int g_cml_init_count         = 0;
+static bool g_cml_atexit_registered = false;
+
+// Global cleanup context list for automatic cleanup
+static CleanupContext** g_cleanup_contexts = NULL;
+static size_t g_num_cleanup_contexts       = 0;
+static size_t g_cleanup_contexts_capacity  = 0;
+
+// Automatic cleanup function registered with atexit
+static void cml_auto_cleanup(void) {
+    // Only cleanup if not already cleaned up
+    if (!g_cml_initialized) {
+        return;
+    }
+
+    // Cleanup all registered cleanup contexts
+    if (g_cleanup_contexts) {
+        for (size_t i = 0; i < g_num_cleanup_contexts; i++) {
+            if (g_cleanup_contexts[i]) {
+                cleanup_context_free(g_cleanup_contexts[i]);
+            }
+        }
+        CM_FREE(g_cleanup_contexts);
+        g_cleanup_contexts          = NULL;
+        g_num_cleanup_contexts      = 0;
+        g_cleanup_contexts_capacity = 0;
+    }
+
+    // Call device_cleanup
+    device_cleanup();
+
+    // Call cml_cleanup which handles error printing
+    // Note: We call it directly here, bypassing reference counting for atexit
+    training_metrics_cleanup_global();
+
+    extern void autograd_shutdown(void);
+    autograd_shutdown();
+
+    // Check and print errors
+    if (CML_HAS_ERRORS()) {
+        printf("\n=== Errors occurred during execution ===\n");
+        error_stack_print_all();
+        printf("Last error: %s (code: %d)\n", CML_LAST_ERROR(), CML_LAST_ERROR_CODE());
+    } else {
+        printf("\n=== Execution completed successfully ===\n");
+    }
+
+    // Cleanup error stack
+    error_stack_cleanup();
+
+    g_cml_initialized = false;
+    g_cml_init_count  = 0;
+}
+
+// Function to register cleanup context for automatic cleanup
+void cml_register_cleanup_context(CleanupContext* ctx) {
+    if (!ctx)
+        return;
+
+    // Resize array if needed
+    if (g_num_cleanup_contexts >= g_cleanup_contexts_capacity) {
+        size_t new_capacity =
+            g_cleanup_contexts_capacity == 0 ? 16 : g_cleanup_contexts_capacity * 2;
+        CleanupContext** new_contexts =
+            CM_REALLOC(g_cleanup_contexts, new_capacity * sizeof(CleanupContext*));
+        if (!new_contexts)
+            return;
+        g_cleanup_contexts          = new_contexts;
+        g_cleanup_contexts_capacity = new_capacity;
+    }
+
+    g_cleanup_contexts[g_num_cleanup_contexts++] = ctx;
+}
 
 static void check_and_launch_viz(void) __attribute__((constructor));
 static void check_and_launch_viz(void) {
@@ -101,6 +176,9 @@ int cml_init(void) {
 
     int result = 0;
 
+    // Initialize error stack first
+    error_stack_init();
+
     set_log_level(LOG_LEVEL_ERROR);
 
     srand((unsigned int)time(NULL));
@@ -109,6 +187,12 @@ int cml_init(void) {
     autograd_init();
 
     training_metrics_init_global();
+
+    // Register automatic cleanup with atexit (only once)
+    if (!g_cml_atexit_registered) {
+        atexit(cml_auto_cleanup);
+        g_cml_atexit_registered = true;
+    }
 
     if (result == 0) {
         g_cml_initialized = true;
@@ -144,10 +228,26 @@ int cml_cleanup(void) {
 
     LOG_INFO("Cleaning up C-ML Library");
 
+    // Note: device_cleanup is called automatically by cml_auto_cleanup via atexit
+    // But we can also call it here if cleanup is done manually
+    device_cleanup();
+
     training_metrics_cleanup_global();
 
     extern void autograd_shutdown(void);
     autograd_shutdown();
+
+    // Check and print errors before cleanup
+    if (CML_HAS_ERRORS()) {
+        printf("\n=== Errors occurred during execution ===\n");
+        error_stack_print_all();
+        printf("Last error: %s (code: %d)\n", CML_LAST_ERROR(), CML_LAST_ERROR_CODE());
+    } else {
+        printf("\n=== Execution completed successfully ===\n");
+    }
+
+    // Cleanup error stack last
+    error_stack_cleanup();
 
     g_cml_initialized = false;
     g_cml_init_count  = 0;

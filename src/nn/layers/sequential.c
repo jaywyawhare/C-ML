@@ -8,6 +8,7 @@
 #include "tensor/tensor.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/error_stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,10 +68,16 @@ static void sequential_free(Module* module) {
 
 Sequential* nn_sequential(void) {
     Sequential* seq = CM_MALLOC(sizeof(Sequential));
-    if (!seq)
+    if (!seq) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
+                         "Failed to allocate memory for Sequential module", __FILE__, __LINE__,
+                         __func__);
         return NULL;
+    }
 
     if (module_init((Module*)seq, "Sequential", sequential_forward, sequential_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Sequential module", __FILE__,
+                         __LINE__, __func__);
         CM_FREE(seq);
         return NULL;
     }

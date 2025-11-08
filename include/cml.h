@@ -52,6 +52,7 @@
 #include "Core/logging.h"
 #include "Core/memory_management.h"
 #include "Core/error_codes.h"
+#include "Core/error_stack.h"
 #include "Core/dataset.h"
 #include "Core/training_metrics.h"
 #include "Core/cleanup.h"
@@ -96,10 +97,22 @@ int cml_init(void);
  *
  * This function should be called when the library is no longer needed.
  * It cleans up internal resources and ensures proper shutdown.
+ * Note: This is automatically called on program exit via atexit().
  *
  * @return 0 on success, negative value on failure
  */
 int cml_cleanup(void);
+
+/**
+ * @brief Register a cleanup context for automatic cleanup
+ *
+ * This function registers a cleanup context to be automatically freed
+ * when the program exits. Cleanup contexts created with cleanup_context_create()
+ * are automatically registered.
+ *
+ * @param ctx Cleanup context to register
+ */
+void cml_register_cleanup_context(CleanupContext* ctx);
 
 /**
  * @brief Get library version information

@@ -66,8 +66,9 @@ void sub_backward(Function* fn, Tensor* grad_output) {
     // Gradient for second input: -grad_output (unbroadcast if needed)
     if (input1 && fn->needs_input_grad[1]) {
         // Create negative gradient
-        Tensor* neg_grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                        grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* neg_grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (neg_grad) {
             float* neg_data  = (float*)neg_grad->data;
             float* grad_data = (float*)grad_output->data;
@@ -197,7 +198,8 @@ void pow_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for base: df/dx = y * x^(y-1) * grad_output
     if (fn->needs_input_grad[0]) {
-        Tensor* one = tensor_ones(input1->shape, input1->ndim, input1->dtype, input1->device);
+        TensorConfig config = tensor_config_with_dtype_device(input1->dtype, input1->device);
+        Tensor* one         = tensor_ones(input1->shape, input1->ndim, &config);
         if (one) {
             Tensor* y_minus_1 = tensor_sub(input1, one);
             if (y_minus_1) {
@@ -264,8 +266,9 @@ void neg_backward(Function* fn, Tensor* grad_output) {
     LOG_DEBUG("Computing backward for Neg operation");
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 tensor_set_float(grad, i, -tensor_get_float(grad_output, i));
@@ -286,8 +289,9 @@ void exp_backward(Function* fn, Tensor* grad_output) {
     Tensor* output = fn->ctx->saved_tensors[0]; // We saved the output exp(x)
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val   = tensor_get_float(grad_output, i);
@@ -310,8 +314,9 @@ void log_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -334,8 +339,9 @@ void sqrt_backward(Function* fn, Tensor* grad_output) {
     Tensor* output = fn->ctx->saved_tensors[0]; // We saved sqrt(x)
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val   = tensor_get_float(grad_output, i);
@@ -358,8 +364,9 @@ void sin_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -382,8 +389,9 @@ void cos_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -406,8 +414,9 @@ void tan_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -431,8 +440,9 @@ void tanh_backward(Function* fn, Tensor* grad_output) {
     Tensor* output = fn->ctx->saved_tensors[0]; // We saved tanh(x)
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val   = tensor_get_float(grad_output, i);
@@ -457,8 +467,9 @@ void relu_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -481,8 +492,9 @@ void sigmoid_backward(Function* fn, Tensor* grad_output) {
     Tensor* output = fn->ctx->saved_tensors[0]; // We saved sigmoid(x)
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val   = tensor_get_float(grad_output, i);
@@ -507,8 +519,9 @@ void leaky_relu_backward(Function* fn, Tensor* grad_output) {
     float alpha      = alpha_ptr ? *alpha_ptr : 0.01f;
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -533,8 +546,9 @@ void elu_backward(Function* fn, Tensor* grad_output) {
     float alpha      = alpha_ptr ? *alpha_ptr : 1.0f;
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val   = tensor_get_float(grad_output, i);
@@ -560,8 +574,9 @@ void selu_backward(Function* fn, Tensor* grad_output) {
     const float alpha = 1.6732632423543772848170429916717f;
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val   = tensor_get_float(grad_output, i);
@@ -586,8 +601,9 @@ void swish_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val    = tensor_get_float(grad_output, i);
@@ -613,8 +629,9 @@ void mish_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val       = tensor_get_float(grad_output, i);
@@ -644,8 +661,9 @@ void hard_swish_backward(Function* fn, Tensor* grad_output) {
     Tensor* input = fn->ctx->saved_tensors[0];
 
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, grad_output->dtype,
-                                    grad_output->device);
+        TensorConfig config =
+            tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+        Tensor* grad = tensor_empty(grad_output->shape, grad_output->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < grad_output->numel; i++) {
                 float grad_val  = tensor_get_float(grad_output, i);
@@ -689,7 +707,8 @@ void sum_backward(Function* fn, Tensor* grad_output) {
     }
 
     // Create gradient with same shape as input
-    Tensor* grad = tensor_empty(input_shape, input_ndim, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* grad        = tensor_empty(input_shape, input_ndim, &config);
     if (!grad)
         return;
 
@@ -733,7 +752,8 @@ void mean_backward(Function* fn, Tensor* grad_output) {
     }
 
     // Create gradient with same shape as input
-    Tensor* grad = tensor_empty(input_shape, input_ndim, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* grad        = tensor_empty(input_shape, input_ndim, &config);
     if (!grad)
         return;
 

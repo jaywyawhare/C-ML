@@ -95,8 +95,9 @@ Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
     int w_offset = (int)(rand_float() * (width - crop_width));
 
     // Create output tensor
-    int output_shape[] = {batch, channels, crop_height, crop_width};
-    Tensor* output     = tensor_empty(output_shape, 4, input->dtype, input->device);
+    int output_shape[]  = {batch, channels, crop_height, crop_width};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(output_shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -148,7 +149,8 @@ Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
     int width    = input->shape[3];
 
     // Create output tensor
-    Tensor* output = tensor_empty(input->shape, 4, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(input->shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -199,7 +201,8 @@ Tensor* augment_random_vertical_flip(Tensor* input, float prob) {
     int width    = input->shape[3];
 
     // Create output tensor
-    Tensor* output = tensor_empty(input->shape, 4, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(input->shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -249,7 +252,8 @@ Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max)
     int width    = input->shape[3];
 
     // Create output tensor
-    Tensor* output = tensor_empty(input->shape, 4, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(input->shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -313,7 +317,8 @@ Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, fl
     float contrast_factor = 1.0f + (rand_float() * 2.0f - 1.0f) * contrast;
 
     // Create output tensor
-    Tensor* output = tensor_empty(input->shape, 4, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(input->shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -356,7 +361,8 @@ Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channe
     }
 
     // Create output tensor
-    Tensor* output = tensor_empty(input->shape, 4, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(input->shape, 4, &config);
     if (!output)
         return NULL;
 

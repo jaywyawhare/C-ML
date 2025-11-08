@@ -20,9 +20,10 @@ void example_simple_gradients() {
     printf("\n=== Example 1: Simple Gradients ===\n");
     printf("Computing gradients for: z = x^2 + y^2\n\n");
 
-    int shape[] = {1};
-    Tensor* x   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* y   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x           = tensor_ones(shape, 1, &config);
+    Tensor* y           = tensor_ones(shape, 1, &config);
 
     tensor_set_float(x, 0, 3.0f);
     tensor_set_float(y, 0, 4.0f);
@@ -30,7 +31,7 @@ void example_simple_gradients() {
     x->requires_grad = true;
     y->requires_grad = true;
 
-    Tensor* exp = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* exp = tensor_ones(shape, 1, &config);
     tensor_set_float(exp, 0, 2.0f);
 
     Tensor* x_squared = tensor_pow(x, exp);
@@ -66,10 +67,11 @@ void example_neural_network() {
     printf("\n=== Example 2: Neural Network ===\n");
     printf("Simple 1-layer network: y = sigmoid(w*x + b)\n\n");
 
-    int shape[] = {1};
-    Tensor* w   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* b   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* x   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* w           = tensor_ones(shape, 1, &config);
+    Tensor* b           = tensor_ones(shape, 1, &config);
+    Tensor* x           = tensor_ones(shape, 1, &config);
 
     tensor_set_float(w, 0, 0.5f);
     tensor_set_float(b, 0, 0.1f);
@@ -112,9 +114,10 @@ void example_loss_function() {
     printf("\n=== Example 3: Loss Function ===\n");
     printf("Training with MSE loss\n\n");
 
-    int shape[]        = {3};
-    Tensor* prediction = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* target     = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    int shape[]         = {3};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* prediction  = tensor_empty(shape, 1, &config);
+    Tensor* target      = tensor_empty(shape, 1, &config);
 
     tensor_set_float(prediction, 0, 1.0f);
     tensor_set_float(prediction, 1, 2.0f);
@@ -163,12 +166,13 @@ void example_gradient_accumulation() {
     printf("\n=== Example 4: Gradient Accumulation ===\n");
     printf("Accumulating gradients from multiple losses\n\n");
 
-    int shape[] = {1};
-    Tensor* x   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x           = tensor_ones(shape, 1, &config);
     tensor_set_float(x, 0, 2.0f);
     x->requires_grad = true;
 
-    Tensor* exp1 = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* exp1 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp1, 0, 2.0f);
     Tensor* y1 = tensor_pow(x, exp1);
 
@@ -179,7 +183,7 @@ void example_gradient_accumulation() {
     tensor_backward(y1, NULL, false, false);
     printf("  Gradient after y1.backward(): %.2f\n", tensor_get_float(x->grad, 0));
 
-    Tensor* exp2 = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* exp2 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp2, 0, 3.0f);
     Tensor* y2 = tensor_pow(x, exp2);
 
@@ -209,13 +213,14 @@ void example_no_grad_mode() {
     printf("\n=== Example 5: No Gradient Mode ===\n");
     printf("Disabling gradient computation\n\n");
 
-    int shape[] = {1};
-    Tensor* x   = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x           = tensor_ones(shape, 1, &config);
     tensor_set_float(x, 0, 3.0f);
     x->requires_grad = true;
 
     printf("With gradients enabled:\n");
-    Tensor* exp1 = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* exp1 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp1, 0, 2.0f);
     Tensor* y1 = tensor_pow(x, exp1);
     printf("  y = x^2 = %.2f\n", tensor_get_float(y1, 0));
@@ -224,7 +229,7 @@ void example_no_grad_mode() {
     autograd_no_grad_enter();
 
     printf("\nWith gradients disabled (no_grad mode):\n");
-    Tensor* exp2 = tensor_ones(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* exp2 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp2, 0, 2.0f);
     Tensor* y2 = tensor_pow(x, exp2);
     printf("  y = x^2 = %.2f\n", tensor_get_float(y2, 0));

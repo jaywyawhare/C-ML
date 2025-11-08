@@ -21,7 +21,8 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
     // In training mode, apply dropout
     if (module_is_training(module)) {
         // Create mask with dropout probability
-        Tensor* mask = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* mask        = tensor_empty(input->shape, input->ndim, &config);
         if (!mask)
             return NULL;
 

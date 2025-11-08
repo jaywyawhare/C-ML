@@ -22,9 +22,10 @@ static void print_tensor_csv(Tensor* t) {
 int main(void) {
     // Test 1: elementwise add/mul
     {
-        int shape[] = {4};
-        Tensor* a   = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* b   = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+        int shape[]         = {4};
+        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* a           = tensor_empty(shape, 1, &config);
+        Tensor* b           = tensor_empty(shape, 1, &config);
         for (int i = 0; i < 4; i++) {
             tensor_set_float(a, i, (float)(i + 1)); // [1,2,3,4]
             tensor_set_float(b, i, (float)(i + 5)); // [5,6,7,8]
@@ -34,7 +35,7 @@ int main(void) {
         Tensor* sub = tensor_sub(b, a);
         Tensor* div = tensor_div(b, a);
         // pow: a^(b mod 3 + 1) to keep small exponents
-        Tensor* bexp = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* bexp = tensor_empty(shape, 1, &config);
         for (int i = 0; i < 4; i++)
             tensor_set_float(bexp, i, (float)((i % 3) + 1));
         Tensor* powv = tensor_pow(a, bexp);
@@ -60,8 +61,9 @@ int main(void) {
 
     // Test 2: linear layer forward (batch=2, in=3, out=2) with fixed weights/bias
     {
-        int in_shape[] = {2, 3};
-        Tensor* inp    = tensor_empty(in_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+        int in_shape[]      = {2, 3};
+        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* inp         = tensor_empty(in_shape, 2, &config);
         // inp = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
         float in_vals[] = {1, 2, 3, 4, 5, 6};
         for (int i = 0; i < 6; i++)
@@ -71,7 +73,7 @@ int main(void) {
         Linear* fc = nn_linear(3, 2, DTYPE_FLOAT32, DEVICE_CPU, true);
         // Set weight (out=2, in=3): [[0.1, 0.2, 0.3], [ -0.2, 0.0, 0.4]]
         int w_shape[]  = {2, 3};
-        Tensor* W      = tensor_empty(w_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* W      = tensor_empty(w_shape, 2, &config);
         float w_vals[] = {0.1f, 0.2f, 0.3f, -0.2f, 0.0f, 0.4f};
         for (int i = 0; i < 6; i++)
             tensor_set_float(W, i, w_vals[i]);
@@ -79,7 +81,7 @@ int main(void) {
 
         // Set bias: [0.01, -0.03]
         int b_shape[] = {2};
-        Tensor* B     = tensor_empty(b_shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* B     = tensor_empty(b_shape, 1, &config);
         tensor_set_float(B, 0, 0.01f);
         tensor_set_float(B, 1, -0.03f);
         linear_set_bias(fc, B);
@@ -94,9 +96,10 @@ int main(void) {
     }
 
     {
-        int shape[] = {4};
-        Tensor* x   = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-        float xv[]  = {0.1f, 1.0f, 2.0f, 4.0f};
+        int shape[]         = {4};
+        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* x           = tensor_empty(shape, 1, &config);
+        float xv[]          = {0.1f, 1.0f, 2.0f, 4.0f};
         for (int i = 0; i < 4; i++)
             tensor_set_float(x, i, xv[i]);
         Tensor* expv  = tensor_exp(x);
@@ -137,12 +140,13 @@ int main(void) {
 
     // Test 4: Tensor ops: matmul/transpose
     {
-        int a_shape[] = {2, 3};
-        int b_shape[] = {3, 2};
-        Tensor* A     = tensor_empty(a_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* B     = tensor_empty(b_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-        float av[]    = {1, 2, 3, 4, 5, 6};
-        float bv[]    = {7, 8, 9, 10, 11, 12};
+        int a_shape[]       = {2, 3};
+        int b_shape[]       = {3, 2};
+        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* A           = tensor_empty(a_shape, 2, &config);
+        Tensor* B           = tensor_empty(b_shape, 2, &config);
+        float av[]          = {1, 2, 3, 4, 5, 6};
+        float bv[]          = {7, 8, 9, 10, 11, 12};
         for (int i = 0; i < 6; i++)
             tensor_set_float(A, i, av[i]);
         for (int i = 0; i < 6; i++)
@@ -161,9 +165,10 @@ int main(void) {
 
     // Test 5: Activations and losses on fixed vectors
     {
-        int shape[] = {4};
-        Tensor* x   = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-        float xv[]  = {-1.0f, -0.5f, 0.25f, 2.0f};
+        int shape[]         = {4};
+        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* x           = tensor_empty(shape, 1, &config);
+        float xv[]          = {-1.0f, -0.5f, 0.25f, 2.0f};
         for (int i = 0; i < 4; i++)
             tensor_set_float(x, i, xv[i]);
         Tensor* relu = tensor_relu(x);
@@ -176,7 +181,7 @@ int main(void) {
         printf("TANH,");
         print_tensor_csv(th);
 
-        Tensor* tgt = tensor_empty(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* tgt = tensor_empty(shape, 1, &config);
         float tv[]  = {0.0f, 0.0f, 0.5f, 1.5f};
         for (int i = 0; i < 4; i++)
             tensor_set_float(tgt, i, tv[i]);

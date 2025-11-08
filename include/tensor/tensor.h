@@ -4,12 +4,12 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "Core/device.h"
 
 // Minimal DType enum
 typedef enum { DTYPE_FLOAT32, DTYPE_FLOAT64, DTYPE_INT32, DTYPE_INT64, DTYPE_BOOL } DType;
 
-// Minimal Device enum
-typedef enum { DEVICE_CPU, DEVICE_CUDA } DeviceType;
+// DeviceType is now defined in Core/device.h
 
 // Forward declaration for autograd
 struct Function;
@@ -51,11 +51,104 @@ size_t* compute_contiguous_strides(int* shape, int ndim);
 bool check_is_contiguous(int* shape, size_t* strides, int ndim);
 size_t compute_storage_size(int* shape, size_t* strides, int ndim);
 
-// Tensor creation (minimal API)
-Tensor* tensor_empty(int* shape, int ndim, DType dtype, DeviceType device);
-Tensor* tensor_zeros(int* shape, int ndim, DType dtype, DeviceType device);
-Tensor* tensor_ones(int* shape, int ndim, DType dtype, DeviceType device);
-Tensor* tensor_from_data(void* data, int* shape, int ndim, DType dtype, DeviceType device);
+// ============================================================================
+// Tensor Configuration (Options Struct Pattern)
+// ============================================================================
+
+/**
+ * @brief Tensor creation configuration options
+ *
+ * All fields are optional. Use NULL to use defaults, or set specific fields.
+ * Defaults: dtype=DTYPE_FLOAT32, device=DEVICE_AUTO (auto-detected)
+ */
+typedef struct TensorConfig {
+    DType dtype;       // Data type (use -1 or DTYPE_FLOAT32 for default)
+    DeviceType device; // Device (use DEVICE_AUTO for auto-detection)
+    bool has_dtype;    // Set to true if dtype is explicitly set
+    bool has_device;   // Set to true if device is explicitly set
+} TensorConfig;
+
+/**
+ * @brief Initialize TensorConfig with default values
+ *
+ * @param config Pointer to TensorConfig to initialize (can be NULL)
+ * @return TensorConfig with defaults: dtype=DTYPE_FLOAT32, device=DEVICE_AUTO
+ */
+TensorConfig tensor_config_default(void);
+
+/**
+ * @brief Create TensorConfig with specific dtype
+ *
+ * @param dtype Data type
+ * @return TensorConfig with dtype set, device=DEVICE_AUTO
+ */
+TensorConfig tensor_config_with_dtype(DType dtype);
+
+/**
+ * @brief Create TensorConfig with specific device
+ *
+ * @param device Device type
+ * @return TensorConfig with device set, dtype=DTYPE_FLOAT32
+ */
+TensorConfig tensor_config_with_device(DeviceType device);
+
+/**
+ * @brief Create TensorConfig with both dtype and device
+ *
+ * @param dtype Data type
+ * @param device Device type
+ * @return TensorConfig with both dtype and device set
+ */
+TensorConfig tensor_config_with_dtype_device(DType dtype, DeviceType device);
+
+// ============================================================================
+// Tensor creation (with optional config)
+// ============================================================================
+
+/**
+ * @brief Create empty tensor
+ *
+ * @param shape Shape array
+ * @param ndim Number of dimensions
+ * @param config Configuration options (NULL for defaults: dtype=DTYPE_FLOAT32,
+ * device=auto-detected) Can also pass NULL to use all defaults
+ * @return New tensor, or NULL on failure
+ */
+Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config);
+
+/**
+ * @brief Create zeros tensor
+ *
+ * @param shape Shape array
+ * @param ndim Number of dimensions
+ * @param config Configuration options (NULL for defaults: dtype=DTYPE_FLOAT32,
+ * device=auto-detected)
+ * @return New tensor, or NULL on failure
+ */
+Tensor* tensor_zeros(int* shape, int ndim, const TensorConfig* config);
+
+/**
+ * @brief Create ones tensor
+ *
+ * @param shape Shape array
+ * @param ndim Number of dimensions
+ * @param config Configuration options (NULL for defaults: dtype=DTYPE_FLOAT32,
+ * device=auto-detected)
+ * @return New tensor, or NULL on failure
+ */
+Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config);
+
+/**
+ * @brief Create tensor from data
+ *
+ * @param data Source data pointer (assumed to be on CPU)
+ * @param shape Shape array
+ * @param ndim Number of dimensions
+ * @param config Configuration options (NULL for defaults: dtype=DTYPE_FLOAT32,
+ * device=auto-detected)
+ * @return New tensor, or NULL on failure
+ */
+Tensor* tensor_from_data(void* data, int* shape, int ndim, const TensorConfig* config);
 
 // View operations
 Tensor* tensor_view(Tensor* t, int* new_shape, int new_ndim);

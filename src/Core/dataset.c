@@ -91,8 +91,9 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
               output_size);
 
     // Create input tensor
-    int X_shape[2] = {num_samples, input_size};
-    dataset->X     = tensor_from_data(X, X_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    int X_shape[2]      = {num_samples, input_size};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    dataset->X          = tensor_from_data(X, X_shape, 2, &config);
     if (!dataset->X) {
         LOG_ERROR("Failed to create input tensor");
         return -1;
@@ -100,7 +101,7 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
 
     // Create target tensor
     int y_shape[2] = {num_samples, output_size};
-    dataset->y     = tensor_from_data(y, y_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    dataset->y     = tensor_from_data(y, y_shape, 2, &config);
     if (!dataset->y) {
         LOG_ERROR("Failed to create target tensor");
         tensor_free(dataset->X);
@@ -318,10 +319,10 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
             train_y[i] = train_y_data[i];
         }
 
-        (*train_dataset)->X =
-            tensor_from_data(train_X, train_input_shape, 2, dataset->dtype, dataset->device);
-        (*train_dataset)->y =
-            tensor_from_data(train_y, train_target_shape, 2, dataset->dtype, dataset->device);
+        TensorConfig train_config =
+            tensor_config_with_dtype_device(dataset->dtype, dataset->device);
+        (*train_dataset)->X = tensor_from_data(train_X, train_input_shape, 2, &train_config);
+        (*train_dataset)->y = tensor_from_data(train_y, train_target_shape, 2, &train_config);
         CM_FREE(train_X);
         CM_FREE(train_y);
 
@@ -352,10 +353,9 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
             val_y[i] = train_y_data[src_idx];
         }
 
-        (*val_dataset)->X =
-            tensor_from_data(val_X, val_input_shape, 2, dataset->dtype, dataset->device);
-        (*val_dataset)->y =
-            tensor_from_data(val_y, val_target_shape, 2, dataset->dtype, dataset->device);
+        TensorConfig val_config = tensor_config_with_dtype_device(dataset->dtype, dataset->device);
+        (*val_dataset)->X       = tensor_from_data(val_X, val_input_shape, 2, &val_config);
+        (*val_dataset)->y       = tensor_from_data(val_y, val_target_shape, 2, &val_config);
         CM_FREE(val_X);
         CM_FREE(val_y);
 
@@ -386,10 +386,9 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
             test_y[i] = train_y_data[src_idx];
         }
 
-        (*test_dataset)->X =
-            tensor_from_data(test_X, test_input_shape, 2, dataset->dtype, dataset->device);
-        (*test_dataset)->y =
-            tensor_from_data(test_y, test_target_shape, 2, dataset->dtype, dataset->device);
+        TensorConfig test_config = tensor_config_with_dtype_device(dataset->dtype, dataset->device);
+        (*test_dataset)->X       = tensor_from_data(test_X, test_input_shape, 2, &test_config);
+        (*test_dataset)->y       = tensor_from_data(test_y, test_target_shape, 2, &test_config);
         CM_FREE(test_X);
         CM_FREE(test_y);
     }
@@ -734,8 +733,10 @@ Batch* dataloader_next_batch(DataLoader* loader) {
     int batch_X_shape[] = {actual_batch_size, loader->dataset->input_size};
     int batch_y_shape[] = {actual_batch_size, loader->dataset->output_size};
 
-    batch->X = tensor_empty(batch_X_shape, 2, loader->dataset->dtype, loader->dataset->device);
-    batch->y = tensor_empty(batch_y_shape, 2, loader->dataset->dtype, loader->dataset->device);
+    TensorConfig config =
+        tensor_config_with_dtype_device(loader->dataset->dtype, loader->dataset->device);
+    batch->X = tensor_empty(batch_X_shape, 2, &config);
+    batch->y = tensor_empty(batch_y_shape, 2, &config);
 
     if (!batch->X || !batch->y) {
         if (batch->X)

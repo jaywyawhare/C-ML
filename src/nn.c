@@ -27,6 +27,7 @@
 #include "nn/module.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/error_stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -211,8 +212,9 @@ void module_zero_grad(Module* module) {
             }
 
             if (tensor->requires_grad) {
-                tensor->grad =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
+                TensorConfig config =
+                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+                tensor->grad = tensor_zeros(tensor->shape, tensor->ndim, &config);
             }
         }
     }

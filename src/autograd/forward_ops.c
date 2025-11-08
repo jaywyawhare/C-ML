@@ -92,7 +92,8 @@ Tensor* tensor_add(Tensor* a, Tensor* b) {
         return NULL;
 
     // Create result tensor
-    Tensor* result = tensor_empty(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -165,7 +166,8 @@ Tensor* tensor_sub(Tensor* a, Tensor* b) {
         return NULL;
 
     // Create result tensor
-    Tensor* result = tensor_empty(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -234,7 +236,8 @@ Tensor* tensor_mul(Tensor* a, Tensor* b) {
         return NULL;
 
     // Create result tensor
-    Tensor* result = tensor_empty(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -306,7 +309,8 @@ Tensor* tensor_div(Tensor* a, Tensor* b) {
         return NULL;
 
     // Create result tensor
-    Tensor* result = tensor_empty(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -383,7 +387,8 @@ Tensor* tensor_pow(Tensor* a, Tensor* b) {
         return NULL;
 
     // Create result tensor
-    Tensor* result = tensor_empty(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -443,7 +448,8 @@ Tensor* tensor_neg(Tensor* a) {
 
     LOG_DEBUG("Computing Neg: -tensor %p", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -469,7 +475,8 @@ Tensor* tensor_exp(Tensor* a) {
 
     LOG_DEBUG("Computing Exp: exp(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -498,7 +505,8 @@ Tensor* tensor_log(Tensor* a) {
 
     LOG_DEBUG("Computing Log: log(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -532,7 +540,8 @@ Tensor* tensor_sqrt(Tensor* a) {
 
     LOG_DEBUG("Computing Sqrt: sqrt(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -562,7 +571,8 @@ Tensor* tensor_sin(Tensor* a) {
     if (!a)
         return NULL;
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -586,7 +596,8 @@ Tensor* tensor_cos(Tensor* a) {
     if (!a)
         return NULL;
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -610,7 +621,8 @@ Tensor* tensor_tan(Tensor* a) {
     if (!a)
         return NULL;
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -634,7 +646,8 @@ Tensor* tensor_tanh(Tensor* a) {
     if (!a)
         return NULL;
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -662,7 +675,8 @@ Tensor* tensor_relu(Tensor* a) {
 
     LOG_DEBUG("Computing ReLU: relu(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -689,7 +703,8 @@ Tensor* tensor_sigmoid(Tensor* a) {
 
     LOG_DEBUG("Computing Sigmoid: sigmoid(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -716,7 +731,8 @@ Tensor* tensor_leaky_relu(Tensor* a, float negative_slope) {
 
     LOG_DEBUG("Computing Leaky ReLU: leaky_relu(tensor %p, alpha=%.3f)", (void*)a, negative_slope);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -749,7 +765,8 @@ Tensor* tensor_elu(Tensor* a, float alpha) {
 
     LOG_DEBUG("Computing ELU: elu(tensor %p, alpha=%.3f)", (void*)a, alpha);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -789,7 +806,8 @@ Tensor* tensor_selu(Tensor* a) {
 
     LOG_DEBUG("Computing SELU: selu(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -820,7 +838,8 @@ Tensor* tensor_swish(Tensor* a) {
 
     LOG_DEBUG("Computing Swish: swish(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -851,7 +870,8 @@ Tensor* tensor_mish(Tensor* a) {
 
     LOG_DEBUG("Computing Mish: mish(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -883,7 +903,8 @@ Tensor* tensor_hard_swish(Tensor* a) {
 
     LOG_DEBUG("Computing Hard Swish: hard_swish(tensor %p)", (void*)a);
 
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -928,7 +949,8 @@ Tensor* tensor_softmax(Tensor* a, int dim) {
     LOG_DEBUG("Computing Softmax: softmax(tensor %p, dim=%d)", (void*)a, normalized_dim);
 
     // Create output tensor with same shape
-    Tensor* result = tensor_empty(a->shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(a->shape, a->ndim, &config);
     if (!result)
         return NULL;
 
@@ -1010,8 +1032,9 @@ Tensor* tensor_sum(Tensor* a, int dim, bool keepdim) {
 
     // If dim is -1 or invalid, sum all elements
     if (dim < 0 || dim >= a->ndim) {
-        int shape[]    = {1};
-        Tensor* result = tensor_empty(shape, 1, a->dtype, a->device);
+        int shape[]         = {1};
+        TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+        Tensor* result      = tensor_empty(shape, 1, &config);
         if (!result)
             return NULL;
 
@@ -1059,7 +1082,8 @@ Tensor* tensor_sum(Tensor* a, int dim, bool keepdim) {
     }
 
     // Create output tensor
-    Tensor* result = tensor_zeros(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_zeros(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -1115,8 +1139,9 @@ Tensor* tensor_mean(Tensor* a, int dim, bool keepdim) {
 
     // If dim is -1 or invalid, mean all elements
     if (dim < 0 || dim >= a->ndim) {
-        int shape[]    = {1};
-        Tensor* result = tensor_empty(shape, 1, a->dtype, a->device);
+        int shape[]         = {1};
+        TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+        Tensor* result      = tensor_empty(shape, 1, &config);
         if (!result)
             return NULL;
 
@@ -1164,7 +1189,8 @@ Tensor* tensor_mean(Tensor* a, int dim, bool keepdim) {
     }
 
     // Create output tensor
-    Tensor* result = tensor_zeros(out_shape, out_ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_zeros(out_shape, out_ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -1248,7 +1274,8 @@ Tensor* tensor_transpose(Tensor* a, int dim0, int dim1) {
     out_shape[dim1] = temp;
 
     // Create result tensor
-    Tensor* result = tensor_empty(out_shape, a->ndim, a->dtype, a->device);
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_empty(out_shape, a->ndim, &config);
     CM_FREE(out_shape);
     if (!result)
         return NULL;
@@ -1365,8 +1392,9 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     LOG_DEBUG("Computing MatMul: (%d, %d) @ (%d, %d) = (%d, %d)", M, K_a, K_b, N, M, N);
 
     // Create output shape
-    int out_shape[2] = {M, N};
-    Tensor* result   = tensor_zeros(out_shape, 2, a->dtype, a->device);
+    int out_shape[2]    = {M, N};
+    TensorConfig config = tensor_config_with_dtype_device(a->dtype, a->device);
+    Tensor* result      = tensor_zeros(out_shape, 2, &config);
     if (!result)
         return NULL;
 

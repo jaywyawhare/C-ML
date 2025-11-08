@@ -636,7 +636,8 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     // Initialize gradient if not provided
     if (!gradient) {
         // For scalar tensors, initialize gradient to ones
-        gradient = tensor_ones(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
+        TensorConfig config = tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+        gradient            = tensor_ones(tensor->shape, tensor->ndim, &config);
         if (!gradient) {
             LOG_ERROR("Failed to initialize gradient");
             return;
@@ -870,7 +871,8 @@ void compute_grad_for_broadcast(Tensor* grad_output, int* original_shape, int nd
     }
 
     // Create gradient tensor with original shape
-    *grad_input = tensor_zeros(original_shape, ndim, grad_output->dtype, grad_output->device);
+    TensorConfig config = tensor_config_with_dtype_device(grad_output->dtype, grad_output->device);
+    *grad_input         = tensor_zeros(original_shape, ndim, &config);
     if (!*grad_input) {
         LOG_ERROR("Failed to create gradient tensor for broadcast");
         return;

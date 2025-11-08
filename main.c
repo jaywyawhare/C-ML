@@ -6,6 +6,7 @@
  */
 
 #include "cml.h"
+#include "Core/device.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,24 +26,25 @@ int main() {
         return 1;
     }
 
+    device_init();
+    device_print_info();
+
+    DeviceType best_device    = device_get_best_available();
+    DeviceType default_device = device_get_default();
+
+    printf("Using device: %s (auto-detected)\n", device_get_name(default_device));
+    printf("Best available device: %s\n\n", device_get_name(best_device));
+
+    DeviceType device = device_get_default();
     Sequential* model = nn_sequential();
-    if (!model) {
-        printf("Error: Failed to create Sequential model\n");
-        goto cleanup;
-    }
     cleanup_register_model(cleanup, (Module*)model);
 
-    Linear* linear1   = nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Linear* linear1   = nn_linear(2, 4, DTYPE_FLOAT32, device, true);
     ReLU* relu1       = nn_relu(false);
-    Linear* linear2   = nn_linear(4, 4, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Linear* linear2   = nn_linear(4, 4, DTYPE_FLOAT32, device, true);
     Tanh* tanh1       = nn_tanh();
-    Linear* linear3   = nn_linear(4, 1, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Linear* linear3   = nn_linear(4, 1, DTYPE_FLOAT32, device, true);
     Sigmoid* sigmoid1 = nn_sigmoid();
-
-    if (!linear1 || !relu1 || !linear2 || !tanh1 || !linear3 || !sigmoid1) {
-        printf("Error: Failed to create layers\n");
-        goto cleanup;
-    }
 
     sequential_add(model, (Module*)linear1);
     sequential_add(model, (Module*)relu1);
@@ -51,8 +53,6 @@ int main() {
     sequential_add(model, (Module*)linear3);
     sequential_add(model, (Module*)sigmoid1);
 
-    printf("Model: Sequential(Linear(2->4), ReLU, Linear(4->4), Tanh, Linear(4->1), Sigmoid)\n\n");
-
     summary((Module*)model);
     training_metrics_register_model((Module*)model);
 
@@ -60,40 +60,28 @@ int main() {
 
     Parameter** params = NULL;
     int num_params     = 0;
-    if (module_collect_parameters((Module*)model, &params, &num_params, true) != 0) {
-        printf("Error: Failed to collect model parameters\n");
-        goto cleanup;
-    }
+    module_collect_parameters((Module*)model, &params, &num_params, true);
     cleanup_register_params(cleanup, params);
 
     printf("Trainable parameters: %d\n", num_params);
     printf("Optimizer: Adam (lr=0.01)\n\n");
 
     Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
-    if (!optimizer) {
-        printf("Error: Failed to create optimizer\n");
-        goto cleanup;
-    }
     cleanup_register_optimizer(cleanup, optimizer);
 
     int num_samples = 4;
     int input_size  = 2;
     int output_size = 1;
 
+    TensorConfig config = tensor_config_with_device(device);
+    printf("Using config struct: dtype=auto, device=%s\n\n", device_get_name(device));
+
     int input_shape[] = {num_samples, input_size};
-    Tensor* X         = tensor_empty(input_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!X) {
-        printf("Error: Failed to create input tensor\n");
-        goto cleanup;
-    }
+    Tensor* X         = tensor_empty(input_shape, 2, &config);
     cleanup_register_tensor(cleanup, X);
 
     int target_shape[] = {num_samples, output_size};
-    Tensor* y          = tensor_empty(target_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!y) {
-        printf("Error: Failed to create target tensor\n");
-        goto cleanup;
-    }
+    Tensor* y          = tensor_empty(target_shape, 2, &config);
     cleanup_register_tensor(cleanup, y);
 
     float* X_data = (float*)tensor_data_ptr(X);
@@ -188,7 +176,7 @@ int main() {
 
     for (int i = 0; i < num_samples; i++) {
         int sample_shape[]   = {1, input_size};
-        Tensor* sample_input = tensor_empty(sample_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+        Tensor* sample_input = tensor_empty(sample_shape, 2, &config);
         if (!sample_input)
             continue;
 
@@ -213,8 +201,5 @@ int main() {
     printf("\n");
 
 cleanup:
-    cleanup_context_free(cleanup);
-    cml_cleanup();
-
-    return 0;
+    return CML_HAS_ERRORS() ? 1 : 0;
 }

@@ -12,12 +12,13 @@ int main(void) {
 
     // Build a tiny compute graph: y = ReLU((X @ W^T) + b)
     int in = 4, out = 3, batch = 2;
-    int x_shape[] = {batch, in};
-    int w_shape[] = {out, in};
-    int b_shape[] = {out};
-    Tensor* X     = tensor_empty(x_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* W     = tensor_empty(w_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* b     = tensor_empty(b_shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    int x_shape[]       = {batch, in};
+    int w_shape[]       = {out, in};
+    int b_shape[]       = {out};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* X           = tensor_empty(x_shape, 2, &config);
+    Tensor* W           = tensor_empty(w_shape, 2, &config);
+    Tensor* b           = tensor_empty(b_shape, 1, &config);
 
     tensor_set_requires_grad(X, true);
     tensor_set_requires_grad(W, true);
@@ -38,7 +39,7 @@ int main(void) {
     Tensor* Zb     = tensor_add(Z, b2);
     Tensor* Y      = tensor_relu(Zb);
 
-    Tensor* target = tensor_zeros(b2_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* target = tensor_zeros(b2_shape, 2, &config);
     Tensor* loss   = tensor_mse_loss(Y, target);
     tensor_backward(loss, NULL, false, false);
 

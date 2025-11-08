@@ -114,14 +114,15 @@ int main() {
     int X_shape[] = {num_samples, input_size};
     int y_shape[] = {num_samples, output_size};
 
-    X = tensor_empty(X_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    X                   = tensor_empty(X_shape, 2, &config);
     if (!X) {
         printf("Error: Failed to create input tensor\n");
         goto cleanup;
     }
     cleanup_register_tensor(cleanup, X);
 
-    y = tensor_empty(y_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    y = tensor_empty(y_shape, 2, &config);
     if (!y) {
         printf("Error: Failed to create target tensor\n");
         goto cleanup;

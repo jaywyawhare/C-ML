@@ -1,9 +1,59 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "tensor/tensor.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/device.h"
+#include "Core/error_stack.h"
+
+// ============================================================================
+// Tensor Configuration Implementation
+// ============================================================================
+
+TensorConfig tensor_config_default(void) {
+    TensorConfig config = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_AUTO, .has_dtype = false, .has_device = false};
+    return config;
+}
+
+TensorConfig tensor_config_with_dtype(DType dtype) {
+    TensorConfig config = {
+        .dtype = dtype, .device = DEVICE_AUTO, .has_dtype = true, .has_device = false};
+    return config;
+}
+
+TensorConfig tensor_config_with_device(DeviceType device) {
+    TensorConfig config = {
+        .dtype = DTYPE_FLOAT32, .device = device, .has_dtype = false, .has_device = true};
+    return config;
+}
+
+TensorConfig tensor_config_with_dtype_device(DType dtype, DeviceType device) {
+    TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    return config;
+}
+
+// Helper function to resolve config to actual values
+static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType* device) {
+    if (config && config->has_dtype) {
+        *dtype = config->dtype;
+    } else {
+        *dtype = DTYPE_FLOAT32; // Default dtype
+    }
+
+    if (config && config->has_device) {
+        *device = config->device;
+    } else {
+        *device = device_get_default(); // Auto-detect device
+    }
+
+    // Handle DEVICE_AUTO
+    if (*device == DEVICE_AUTO) {
+        *device = device_get_best_available();
+    }
+}
 
 size_t dtype_size(DType dtype) {
     switch (dtype) {
@@ -163,17 +213,32 @@ bool tensor_is_contiguous(Tensor* t) {
     return t->is_contiguous;
 }
 
-Tensor* tensor_empty(int* shape, int ndim, DType dtype, DeviceType device) {
-    if (!shape || ndim < 0)
+Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
+    if (!shape || ndim < 0) {
+        error_stack_push(CM_INVALID_ARGUMENT,
+                         "Invalid arguments to tensor_empty: shape is NULL or ndim < 0", __FILE__,
+                         __LINE__, __func__);
         return NULL;
+    }
+
+    // Resolve config to actual values
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
 
     Tensor* t = CM_MALLOC(sizeof(Tensor));
-    if (!t)
+    if (!t) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
+                         "Failed to allocate memory for Tensor structure", __FILE__, __LINE__,
+                         __func__);
         return NULL;
+    }
 
     t->shape = tensor_shape_copy(shape, ndim);
     if (!t->shape) {
         LOG_ERROR("Failed to allocate memory for tensor shape copy in tensor_empty");
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for tensor shape",
+                         __FILE__, __LINE__, __func__);
         CM_FREE(t);
         return NULL;
     }
@@ -181,6 +246,8 @@ Tensor* tensor_empty(int* shape, int ndim, DType dtype, DeviceType device) {
     t->strides = compute_contiguous_strides(shape, ndim);
     if (!t->strides) {
         LOG_ERROR("Failed to allocate memory for tensor strides in tensor_empty");
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for tensor strides",
+                         __FILE__, __LINE__, __func__);
         CM_FREE(t->shape);
         CM_FREE(t);
         return NULL;
@@ -196,9 +263,16 @@ Tensor* tensor_empty(int* shape, int ndim, DType dtype, DeviceType device) {
     t->owns_data     = true;
 
     size_t data_size = t->numel * dtype_size(dtype);
-    t->data          = CM_MALLOC(data_size);
+    // Use device-specific allocation
+    t->data = device_alloc(data_size, device);
     if (!t->data) {
-        LOG_ERROR("Failed to allocate memory for tensor data in tensor_empty");
+        LOG_ERROR("Failed to allocate memory for tensor data on device %s",
+                  device_get_name(device));
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg),
+                 "Failed to allocate %zu bytes for tensor data on device %s", data_size,
+                 device_get_name(device));
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, error_msg, __FILE__, __LINE__, __func__);
         CM_FREE(t->strides);
         CM_FREE(t->shape);
         CM_FREE(t);
@@ -214,19 +288,26 @@ Tensor* tensor_empty(int* shape, int ndim, DType dtype, DeviceType device) {
     return t;
 }
 
-Tensor* tensor_zeros(int* shape, int ndim, DType dtype, DeviceType device) {
-    Tensor* t = tensor_empty(shape, ndim, dtype, device);
+Tensor* tensor_zeros(int* shape, int ndim, const TensorConfig* config) {
+    Tensor* t = tensor_empty(shape, ndim, config);
     if (!t)
         return NULL;
 
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
     memset(t->data, 0, t->numel * dtype_size(dtype));
     return t;
 }
 
-Tensor* tensor_ones(int* shape, int ndim, DType dtype, DeviceType device) {
-    Tensor* t = tensor_empty(shape, ndim, dtype, device);
+Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
+    Tensor* t = tensor_empty(shape, ndim, config);
     if (!t)
         return NULL;
+
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
 
     for (size_t i = 0; i < t->numel; i++) {
         switch (dtype) {
@@ -250,15 +331,33 @@ Tensor* tensor_ones(int* shape, int ndim, DType dtype, DeviceType device) {
     return t;
 }
 
-Tensor* tensor_from_data(void* data, int* shape, int ndim, DType dtype, DeviceType device) {
-    if (!data)
+Tensor* tensor_from_data(void* data, int* shape, int ndim, const TensorConfig* config) {
+    if (!data) {
+        error_stack_push(CM_INVALID_ARGUMENT, "Invalid argument to tensor_from_data: data is NULL",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
-    Tensor* t = tensor_empty(shape, ndim, dtype, device);
+    Tensor* t = tensor_empty(shape, ndim, config);
     if (!t)
         return NULL;
 
-    memcpy(t->data, data, t->numel * dtype_size(dtype));
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    // Use device-specific copy (assumes source data is on CPU)
+    size_t data_size = t->numel * dtype_size(dtype);
+    int result       = device_copy_to_device(t->data, data, data_size, device);
+    if (result != 0) {
+        LOG_ERROR("Failed to copy data to device %s", device_get_name(device));
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg), "Failed to copy data to device %s",
+                 device_get_name(device));
+        error_stack_push(CM_OPERATION_FAILED, error_msg, __FILE__, __LINE__, __func__);
+        tensor_free(t);
+        return NULL;
+    }
     return t;
 }
 
@@ -271,7 +370,8 @@ void tensor_free(Tensor* t) {
         return;
 
     if (t->owns_data && t->data) {
-        CM_FREE(t->data);
+        // Use device-specific deallocation
+        device_free(t->data, t->device);
     }
 
     if (t->shape)
@@ -295,7 +395,8 @@ Tensor* tensor_clone(Tensor* t) {
     if (!t)
         return NULL;
 
-    Tensor* clone = tensor_empty(t->shape, t->ndim, t->dtype, t->device);
+    TensorConfig config = tensor_config_with_dtype_device(t->dtype, t->device);
+    Tensor* clone       = tensor_empty(t->shape, t->ndim, &config);
     if (!clone)
         return NULL;
 

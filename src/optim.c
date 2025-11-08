@@ -23,6 +23,7 @@
 #include "Core/logging.h"
 #include "Core/memory_management.h"
 #include "Core/training_metrics.h"
+#include "Core/error_stack.h"
 #include "tensor/tensor.h"
 #include "autograd/autograd.h"
 #include <stdio.h>
@@ -55,10 +56,15 @@ int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGrad
 
 Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad) {
     Optimizer* optimizer = CM_MALLOC(sizeof(Optimizer));
-    if (!optimizer)
+    if (!optimizer) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Optimizer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (optimizer_init(optimizer, name, step, zero_grad) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Optimizer", __FILE__, __LINE__,
+                         __func__);
         CM_FREE(optimizer);
         return NULL;
     }
@@ -399,9 +405,10 @@ static void sgd_step(Optimizer* optimizer) {
                     continue;
 
                 // Initialize momentum buffer to zeros
-                state->momentum_buffer =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
-                states[i] = state;
+                TensorConfig config =
+                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+                state->momentum_buffer = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]              = state;
             }
 
             group->state = states;
@@ -516,14 +523,12 @@ static void adam_step(Optimizer* optimizer) {
                     continue;
 
                 // Initialize moment estimates
-                state->exp_avg =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
-                state->exp_avg_sq =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
+                TensorConfig config =
+                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+                state->exp_avg    = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                state->exp_avg_sq = tensor_zeros(tensor->shape, tensor->ndim, &config);
                 state->max_exp_avg_sq =
-                    optimizer->amsgrad
-                        ? tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device)
-                        : NULL;
+                    optimizer->amsgrad ? tensor_zeros(tensor->shape, tensor->ndim, &config) : NULL;
 
                 states[i] = state;
             }
@@ -646,9 +651,10 @@ static void rmsprop_step(Optimizer* optimizer) {
                     continue;
 
                 // Initialize square average to zeros
-                state->square_avg =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
-                states[i] = state;
+                TensorConfig config =
+                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+                state->square_avg = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]         = state;
             }
 
             group->state = states;
@@ -746,9 +752,10 @@ static void adagrad_step(Optimizer* optimizer) {
                     continue;
 
                 // Initialize sum of squared gradients to zeros
-                state->sum_sq_grad =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
-                states[i] = state;
+                TensorConfig config =
+                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+                state->sum_sq_grad = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]          = state;
             }
 
             group->state = states;
@@ -845,10 +852,14 @@ Optimizer* optim_sgd(Parameter** parameters, int num_parameters, float lr, float
 Optimizer* optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                       float beta1, float beta2, float epsilon) {
     Optimizer* optimizer = optimizer_create("Adam", adam_step, adam_zero_grad);
-    if (!optimizer)
+    if (!optimizer) {
+        // Error already pushed by optimizer_create
         return NULL;
+    }
 
     if (optimizer_add_param_group(optimizer, parameters, num_parameters, lr, weight_decay) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to add parameter group to Adam optimizer",
+                         __FILE__, __LINE__, __func__);
         optimizer_free(optimizer);
         return NULL;
     }

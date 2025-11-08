@@ -79,8 +79,9 @@ Tensor* tensor_mse_loss(Tensor* input, Tensor* target) {
         return NULL;
     }
 
-    int shape[]    = {1};
-    Tensor* result = tensor_empty(shape, 1, input->dtype, input->device);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* result      = tensor_empty(shape, 1, &config);
     if (!result) {
         LOG_ERROR("MSE Loss: failed to create output tensor");
         return NULL;
@@ -140,7 +141,8 @@ static void mse_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for input: df/dx = 2(x - y) * grad_output / n
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* grad        = tensor_empty(input->shape, input->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < input->numel; i++) {
                 float input_val  = tensor_get_float(input, i);
@@ -155,7 +157,8 @@ static void mse_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for target: df/dy = -2(x - y) * grad_output / n
     if (fn->needs_input_grad[1]) {
-        Tensor* grad = tensor_empty(target->shape, target->ndim, target->dtype, target->device);
+        TensorConfig config = tensor_config_with_dtype_device(target->dtype, target->device);
+        Tensor* grad        = tensor_empty(target->shape, target->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < target->numel; i++) {
                 float input_val  = tensor_get_float(input, i < input->numel ? i : 0);
@@ -186,8 +189,9 @@ Tensor* tensor_mae_loss(Tensor* input, Tensor* target) {
         return NULL;
     }
 
-    int shape[]    = {1};
-    Tensor* result = tensor_empty(shape, 1, input->dtype, input->device);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* result      = tensor_empty(shape, 1, &config);
     if (!result) {
         LOG_ERROR("MAE Loss: failed to create output tensor");
         return NULL;
@@ -245,7 +249,8 @@ static void mae_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for input: df/dx = sign(x - y) * grad_output / n
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* grad        = tensor_empty(input->shape, input->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < input->numel; i++) {
                 float input_val  = tensor_get_float(input, i);
@@ -261,7 +266,8 @@ static void mae_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for target: df/dy = -sign(x - y) * grad_output / n
     if (fn->needs_input_grad[1]) {
-        Tensor* grad = tensor_empty(target->shape, target->ndim, target->dtype, target->device);
+        TensorConfig config = tensor_config_with_dtype_device(target->dtype, target->device);
+        Tensor* grad        = tensor_empty(target->shape, target->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < target->numel; i++) {
                 float input_val  = tensor_get_float(input, i < input->numel ? i : 0);
@@ -293,8 +299,9 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
         return NULL;
     }
 
-    int shape[]    = {1};
-    Tensor* result = tensor_empty(shape, 1, input->dtype, input->device);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* result      = tensor_empty(shape, 1, &config);
     if (!result) {
         LOG_ERROR("BCE Loss: failed to create output tensor");
         return NULL;
@@ -365,7 +372,8 @@ static void bce_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for input: df/dx = (input - target) / (input * (1 - input)) * grad_output / n
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* grad        = tensor_empty(input->shape, input->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < input->numel; i++) {
                 float input_val  = tensor_get_float(input, i);
@@ -391,7 +399,8 @@ static void bce_loss_backward(Function* fn, Tensor* grad_output) {
     // Target gradients are typically not needed (targets are constants)
     if (fn->needs_input_grad[1]) {
         // For completeness, but usually not used
-        Tensor* grad = tensor_empty(target->shape, target->ndim, target->dtype, target->device);
+        TensorConfig config = tensor_config_with_dtype_device(target->dtype, target->device);
+        Tensor* grad        = tensor_empty(target->shape, target->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < target->numel; i++) {
                 float input_val     = tensor_get_float(input, i < input->numel ? i : 0);
@@ -441,8 +450,9 @@ Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
         return NULL;
     }
 
-    int shape[]    = {1};
-    Tensor* result = tensor_empty(shape, 1, input->dtype, input->device);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* result      = tensor_empty(shape, 1, &config);
     if (!result) {
         LOG_ERROR("Cross Entropy Loss: failed to create output tensor");
         return NULL;
@@ -527,7 +537,8 @@ static void cross_entropy_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for input: df/dx = (softmax(input) - one_hot(target)) * grad_output / n
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* grad        = tensor_empty(input->shape, input->ndim, &config);
         if (grad) {
             // Initialize gradient with softmax values
             // First compute softmax of input
@@ -603,8 +614,9 @@ Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     }
 
     // Create scalar output tensor
-    int shape[]    = {1};
-    Tensor* result = tensor_empty(shape, 1, input->dtype, input->device);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* result      = tensor_empty(shape, 1, &config);
     if (!result)
         return NULL;
 
@@ -662,7 +674,8 @@ static void huber_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for input: df/dx depends on |x - y| vs delta
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* grad        = tensor_empty(input->shape, input->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < input->numel; i++) {
                 float input_val  = tensor_get_float(input, i);
@@ -718,8 +731,9 @@ Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
     }
 
     // Create scalar output tensor
-    int shape[]    = {1};
-    Tensor* result = tensor_empty(shape, 1, input->dtype, input->device);
+    int shape[]         = {1};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* result      = tensor_empty(shape, 1, &config);
     if (!result)
         return NULL;
 
@@ -761,7 +775,8 @@ static void kl_div_loss_backward(Function* fn, Tensor* grad_output) {
 
     // Gradient for input (Q): d/dQ KL(P||Q) = -P / Q
     if (fn->needs_input_grad[0]) {
-        Tensor* grad = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+        Tensor* grad        = tensor_empty(input->shape, input->ndim, &config);
         if (grad) {
             for (size_t i = 0; i < input->numel; i++) {
                 float p_val = tensor_get_float(target, i);

@@ -16,6 +16,8 @@ TEST_DIR = test
 CORE_SOURCES = $(SRC_DIR)/Core/logging.c \
                $(SRC_DIR)/Core/memory_management.c \
                $(SRC_DIR)/Core/memory_pools.c \
+               $(SRC_DIR)/Core/device.c \
+               $(SRC_DIR)/Core/error_stack.c \
                $(SRC_DIR)/Core/dataset.c \
                $(SRC_DIR)/Core/augmentation.c \
                $(SRC_DIR)/Core/profiling.c \

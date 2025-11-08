@@ -38,7 +38,8 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         num_elements *= input->shape[i];
     }
 
-    Tensor* output = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(input->shape, input->ndim, &config);
     if (!output)
         return NULL;
 
@@ -137,7 +138,8 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         int weight_shape[] = {normalized_shape};
 
         // Create weight (gamma) - initialized to ones
-        Tensor* weight = tensor_ones(weight_shape, 1, dtype, device);
+        TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+        Tensor* weight      = tensor_ones(weight_shape, 1, &config);
         if (!weight) {
             module_free((Module*)ln);
             return NULL;
@@ -153,7 +155,7 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         ln->weight = module_get_parameter((Module*)ln, "weight");
 
         // Create bias (beta) - initialized to zeros
-        Tensor* bias = tensor_zeros(weight_shape, 1, dtype, device);
+        Tensor* bias = tensor_zeros(weight_shape, 1, &config);
         if (!bias) {
             module_free((Module*)ln);
             return NULL;

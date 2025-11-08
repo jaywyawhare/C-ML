@@ -74,8 +74,9 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     int out_width  = (in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
 
     // Create output tensor [batch, out_channels, out_h, out_w]
-    int output_shape[] = {batch, out_channels, out_height, out_width};
-    Tensor* output     = tensor_zeros(output_shape, 4, input->dtype, input->device);
+    int output_shape[]  = {batch, out_channels, out_height, out_width};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_zeros(output_shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -194,8 +195,9 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
     conv2d->use_bias       = use_bias;
 
     // Create weight tensor [out_channels, in_channels, kernel_h, kernel_w]
-    int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size};
-    Tensor* weight     = tensor_empty(weight_shape, 4, dtype, device);
+    int weight_shape[]  = {out_channels, in_channels, kernel_size, kernel_size};
+    TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+    Tensor* weight      = tensor_empty(weight_shape, 4, &config);
     if (!weight) {
         module_free((Module*)conv2d);
         return NULL;
@@ -214,8 +216,9 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
 
     // Create bias if needed
     if (use_bias) {
-        int bias_shape[] = {out_channels};
-        Tensor* bias     = tensor_zeros(bias_shape, 1, dtype, device);
+        int bias_shape[]    = {out_channels};
+        TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+        Tensor* bias        = tensor_zeros(bias_shape, 1, &config);
         if (!bias) {
             module_free((Module*)conv2d);
             return NULL;

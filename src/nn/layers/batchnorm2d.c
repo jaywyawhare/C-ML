@@ -39,8 +39,9 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
     }
 
     // Allocate output tensor
-    int output_shape[] = {batch, channels, height, width};
-    Tensor* output     = tensor_empty(output_shape, 4, input->dtype, input->device);
+    int output_shape[]  = {batch, channels, height, width};
+    TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+    Tensor* output      = tensor_empty(output_shape, 4, &config);
     if (!output)
         return NULL;
 
@@ -58,9 +59,10 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
     if (training) {
         // Allocate current statistics if not already allocated
         if (!bn->current_mean) {
-            int stat_shape[] = {channels};
-            bn->current_mean = tensor_zeros(stat_shape, 1, input->dtype, input->device);
-            bn->current_var  = tensor_zeros(stat_shape, 1, input->dtype, input->device);
+            int stat_shape[]    = {channels};
+            TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
+            bn->current_mean    = tensor_zeros(stat_shape, 1, &config);
+            bn->current_var     = tensor_zeros(stat_shape, 1, &config);
             if (!bn->current_mean || !bn->current_var) {
                 tensor_free(output);
                 return NULL;
@@ -217,7 +219,8 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
         int param_shape[] = {num_features};
 
         // Weight (gamma)
-        Tensor* weight = tensor_ones(param_shape, 1, dtype, device);
+        TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+        Tensor* weight      = tensor_ones(param_shape, 1, &config);
         if (!weight) {
             module_free((Module*)bn);
             return NULL;
@@ -232,7 +235,7 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
         bn->weight = module_get_parameter((Module*)bn, "weight");
 
         // Bias (beta)
-        Tensor* bias = tensor_zeros(param_shape, 1, dtype, device);
+        Tensor* bias = tensor_zeros(param_shape, 1, &config);
         if (!bias) {
             module_free((Module*)bn);
             return NULL;
@@ -252,9 +255,10 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
 
     // Create running statistics if tracking
     if (track_running_stats) {
-        int stat_shape[] = {num_features};
-        bn->running_mean = tensor_zeros(stat_shape, 1, dtype, device);
-        bn->running_var  = tensor_ones(stat_shape, 1, dtype, device);
+        int stat_shape[]    = {num_features};
+        TensorConfig config = tensor_config_with_dtype_device(dtype, device);
+        bn->running_mean    = tensor_zeros(stat_shape, 1, &config);
+        bn->running_var     = tensor_ones(stat_shape, 1, &config);
 
         if (!bn->running_mean || !bn->running_var) {
             if (bn->running_mean)

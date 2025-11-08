@@ -35,10 +35,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    int a_shape[] = {m, k};
-    int b_shape[] = {k, n};
-    Tensor* A     = tensor_empty(a_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* B     = tensor_empty(b_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    int a_shape[]       = {m, k};
+    int b_shape[]       = {k, n};
+    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* A           = tensor_empty(a_shape, 2, &config);
+    Tensor* B           = tensor_empty(b_shape, 2, &config);
     if (!A || !B) {
         fprintf(stderr, "Alloc failure.\n");
         if (A)
