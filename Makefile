@@ -1,159 +1,176 @@
-################################################################################
-# C-ML Machine Learning Library Makefile
-################################################################################
+# C-ML Library Makefile
+# Builds the C-ML machine learning library with high-level API
 
 # Compiler and flags
-CC      := gcc
-CFLAGS  := -g -Wall -MMD -Iinclude
-LDFLAGS := -lm
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11 -O2 -g
+LDFLAGS = -lm
 
-# Project structure
-SRC_DIR     := src
-INCLUDE_DIR := include
-OBJ_DIR     := obj
-BIN_DIR     := bin
-LIB_DIR     := lib
-TEST_DIR    := test
-TEST_BIN_DIR := test_bin
-EXAMPLES_DIR := examples
-EXAMPLES_BIN_DIR := examples_bin
+# Directories
+INCLUDE_DIR = include
+SRC_DIR = src
+BUILD_DIR = build
+TEST_DIR = test
 
-# Library configuration
-LIB_NAME    := c_ml
-LIB_VERSION := 1.0.0
-STATIC_LIB  := $(LIB_DIR)/lib$(LIB_NAME).a
+# Source files
+CORE_SOURCES = $(SRC_DIR)/Core/logging.c \
+               $(SRC_DIR)/Core/memory_management.c \
+               $(SRC_DIR)/Core/memory_pools.c \
+               $(SRC_DIR)/Core/dataset.c \
+               $(SRC_DIR)/Core/augmentation.c \
+               $(SRC_DIR)/Core/profiling.c \
+               $(SRC_DIR)/Core/training_metrics.c \
+               $(SRC_DIR)/Core/model_architecture.c \
+               $(SRC_DIR)/Core/cleanup.c
 
-# Find all source files
-SRC_FILES   := $(shell find $(SRC_DIR) -name "*.c")
-MAIN_FILE   := main.c
-ALL_SRCS    := $(SRC_FILES) $(MAIN_FILE)
+TENSOR_SOURCES = $(SRC_DIR)/tensor.c \
+                 $(SRC_DIR)/tensor_views.c \
+                 $(SRC_DIR)/tensor_manipulation.c
+AUTOGRAD_SOURCES = $(SRC_DIR)/autograd/autograd.c \
+                   $(SRC_DIR)/autograd/backward_ops.c \
+                   $(SRC_DIR)/autograd/forward_ops.c \
+                   $(SRC_DIR)/autograd/loss_functions.c \
+                   $(SRC_DIR)/autograd/checkpointing.c
+NN_SOURCES = $(SRC_DIR)/nn.c \
+            $(SRC_DIR)/nn/layers/linear.c \
+            $(SRC_DIR)/nn/layers/activations.c \
+            $(SRC_DIR)/nn/layers/dropout.c \
+            $(SRC_DIR)/nn/layers/conv2d.c \
+            $(SRC_DIR)/nn/layers/batchnorm2d.c \
+            $(SRC_DIR)/nn/layers/layernorm.c \
+            $(SRC_DIR)/nn/layers/pooling.c \
+            $(SRC_DIR)/nn/layers/sequential.c
+OPTIM_SOURCES = $(SRC_DIR)/optim.c
 
-# Generate object file paths
-OBJ_FILES   := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
-MAIN_OBJ    := $(OBJ_DIR)/main.o
-ALL_OBJS    := $(OBJ_FILES) $(MAIN_OBJ)
-LIB_OBJS    := $(OBJ_FILES)
+# Main library source
+LIBRARY_SOURCES = $(SRC_DIR)/cml.c \
+                  $(CORE_SOURCES) \
+                  $(TENSOR_SOURCES) \
+                  $(AUTOGRAD_SOURCES) \
+                  $(NN_SOURCES) \
+                  $(OPTIM_SOURCES)
 
-# Find all test files
-TEST_FILES  := $(shell find $(TEST_DIR) -name "*.c")
+# Object files
+LIBRARY_OBJECTS = $(LIBRARY_SOURCES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
-# Find all example files
-EXAMPLE_FILES := $(wildcard $(EXAMPLES_DIR)/*.c)
-EXAMPLES      := $(patsubst $(EXAMPLES_DIR)/%.c,$(EXAMPLES_BIN_DIR)/%,$(EXAMPLE_FILES))
+# Main executable
+MAIN_SOURCE = main.c
+MAIN_OBJECT = $(BUILD_DIR)/main.o
 
-# Dependencies
-DEPS := $(ALL_OBJS:.o=.d)
+# Test sources
+TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
+TEST_OBJECTS = $(TEST_SOURCES:$(TEST_DIR)/%.c=$(BUILD_DIR)/test_%.o)
+TEST_EXECUTABLES = $(TEST_SOURCES:$(TEST_DIR)/%.c=$(BUILD_DIR)/test_%)
 
-################################################################################
-# Main targets
-################################################################################
+# Example sources
+EXAMPLES_DIR = examples
+EXAMPLE_SOURCES = $(EXAMPLES_DIR)/autograd_example.c \
+                  $(EXAMPLES_DIR)/training_loop_example.c \
+                  $(EXAMPLES_DIR)/opcheck.c \
+                  $(EXAMPLES_DIR)/bench_gemm.c \
+                  $(EXAMPLES_DIR)/export_graph.c \
+                  $(EXAMPLES_DIR)/test.c \
+                  $(EXAMPLES_DIR)/early_stopping_lr_scheduler.c
+EXAMPLE_EXECUTABLES = $(EXAMPLE_SOURCES:$(EXAMPLES_DIR)/%.c=$(BUILD_DIR)/examples/%)
 
 # Default target
-.PHONY: all
-all: $(BIN_DIR)/main
+all: $(BUILD_DIR)/main $(EXAMPLE_EXECUTABLES)
 
-# Build the main executable
-$(BIN_DIR)/main: $(ALL_OBJS)
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
-	@echo "Built main executable: $@"
+# Create build directories
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+	mkdir -p $(BUILD_DIR)/Core
+	mkdir -p $(BUILD_DIR)/tensor
+	mkdir -p $(BUILD_DIR)/autograd
+	mkdir -p $(BUILD_DIR)/nn
+	mkdir -p $(BUILD_DIR)/nn/layers
+	mkdir -p $(BUILD_DIR)/optim
+	mkdir -p $(BUILD_DIR)/examples
 
-# Build the static library
-.PHONY: lib
-lib: $(STATIC_LIB)
+# Main executable
+$(BUILD_DIR)/main: $(BUILD_DIR) $(MAIN_OBJECT) $(LIBRARY_OBJECTS)
+	$(CC) $(MAIN_OBJECT) $(LIBRARY_OBJECTS) -o $@ $(LDFLAGS)
 
-$(STATIC_LIB): $(LIB_OBJS)
-	@mkdir -p $(LIB_DIR)
-	ar rcs $@ $^
-	@echo "Built static library: $@"
 
-# Release build with optimizations
-.PHONY: release
-release: CFLAGS := -Wall -O2 -DNDEBUG -MMD
-release: clean all
-	@echo "Built release version"
+# Main object file
+$(MAIN_OBJECT): $(MAIN_SOURCE) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
 
-# Debug build with sanitizers
-.PHONY: debug
-debug: CFLAGS += -fsanitize=address -fsanitize=undefined
-debug: all
-	@echo "Built debug version with sanitizers"
+# Library object files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
 
-################################################################################
-# Object file compilation
-################################################################################
-
-# Compile source files
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# Compile main file
-$(OBJ_DIR)/main.o: $(MAIN_FILE)
-	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-################################################################################
-# Examples
-################################################################################
-
-.PHONY: examples
-examples: $(STATIC_LIB) $(EXAMPLES)
-	@echo "Built all examples"
-
-$(EXAMPLES_BIN_DIR)/%: $(EXAMPLES_DIR)/%.c $(STATIC_LIB)
-	@mkdir -p $(EXAMPLES_BIN_DIR)
-	$(CC) $(CFLAGS) $< -L$(LIB_DIR) -l$(LIB_NAME) $(LDFLAGS) -lm -o $@
-	@echo "Built example: $@"
-
-# Debug version of examples with sanitizers
-.PHONY: debug_examples
-debug_examples: EXAMPLE_FLAGS :=  -fsanitize=address -fsanitize=undefined
-debug_examples: $(STATIC_LIB)
-	@mkdir -p $(EXAMPLES_BIN_DIR)
-	@for example_src in $(EXAMPLE_FILES); do \
-		example_bin=$$(basename $$example_src .c); \
-		echo "Compiling $$example_bin with debug flags..."; \
-		$(CC) $(CFLAGS) $(EXAMPLE_FLAGS) $$example_src -L$(LIB_DIR) -l$(LIB_NAME) -lm $(LDFLAGS) \
-		-o $(EXAMPLES_BIN_DIR)/$$example_bin; \
-	done
-	@echo "Built all examples with debug flags"
-
-################################################################################
 # Tests
-################################################################################
-
-.PHONY: test
-test: $(STATIC_LIB)
-	@mkdir -p $(TEST_BIN_DIR)
+test: $(BUILD_DIR) $(TEST_EXECUTABLES)
 	@echo "Running tests..."
-	@for test_src in $(TEST_FILES); do \
-		test_bin=$$(basename $$test_src .c); \
-		src_file=$$(echo $$test_src | sed 's|^test/|src/|; s|test_||'); \
-		echo "\nCompiling and running $$test_bin..."; \
-		$(CC) $(CFLAGS) $$test_src $$src_file -L$(LIB_DIR) -l$(LIB_NAME) $(LDFLAGS) \
-		-o $(TEST_BIN_DIR)/$$test_bin -fsanitize=address -fsanitize=undefined && \
-		ASAN_OPTIONS=allocator_may_return_null=1 ./$(TEST_BIN_DIR)/$$test_bin || exit 1; \
+	@for test in $(TEST_EXECUTABLES); do \
+		echo "Running $$test..."; \
+		$$test; \
 	done
-	@echo "\nALL TESTS PASSED"
 
-# Test logging system specifically
-.PHONY: test_logging
-test_logging: $(STATIC_LIB)
-	@mkdir -p $(TEST_BIN_DIR)
-	@echo "Running logging tests..."
-	$(CC) $(CFLAGS) test/Core/test_logging.c src/Core/logging.c -o $(TEST_BIN_DIR)/test_logging
-	./$(TEST_BIN_DIR)/test_logging
+# Test executables
+$(BUILD_DIR)/test_%: $(BUILD_DIR)/test_%.o $(LIBRARY_OBJECTS)
+	$(CC) $< $(LIBRARY_OBJECTS) -o $@ $(LDFLAGS)
 
-################################################################################
-# Utility targets
-################################################################################
+# Test object files
+$(BUILD_DIR)/test_%.o: $(TEST_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
 
-# Clean build artifacts
-.PHONY: clean
+# Clean
 clean:
-	rm -rf $(BIN_DIR) $(OBJ_DIR) $(TEST_BIN_DIR) $(EXAMPLES_BIN_DIR) $(LIB_DIR) a.out
-	@echo "Cleaned all build artifacts"
+	rm -rf $(BUILD_DIR)
 
-# Include dependency files
--include $(DEPS)
+# Install (optional)
+install: all
+	@echo "Installing C-ML library..."
+	@echo "Note: This is a placeholder. Implement proper installation as needed."
+
+# Debug build
+debug: CFLAGS += -DDEBUG -O0 -g3
+debug: all
+
+# Release build
+release: CFLAGS += -DNDEBUG -O3
+release: all
+
+# Static analysis
+analyze: CFLAGS += -fanalyzer
+analyze: clean all
+
+# Help
+help:
+	@echo "C-ML Library Makefile"
+	@echo "====================="
+	@echo ""
+	@echo "Targets:"
+	@echo "  all        - Build the main executable (default)"
+	@echo "  test       - Build and run tests"
+	@echo "  debug      - Build with debug flags"
+	@echo "  release    - Build with release flags"
+	@echo "  analyze    - Build with static analysis"
+	@echo "  clean      - Remove build artifacts"
+	@echo "  install    - Install the library (placeholder)"
+	@echo ""
+	@echo "Examples: built to $(BUILD_DIR)/examples/"
+	@echo "  help       - Show this help message"
+	@echo ""
+	@echo "Variables:"
+	@echo "  CC         - C compiler (default: gcc)"
+	@echo "  CFLAGS     - C compiler flags"
+	@echo "  LDFLAGS    - Linker flags"
+	@echo "  INCLUDE_DIR - Include directory (default: include)"
+	@echo "  SRC_DIR    - Source directory (default: src)"
+	@echo "  BUILD_DIR  - Build directory (default: build)"
+
+# Phony targets
+.PHONY: all test clean install debug release analyze help
+
+# Dependencies
+-include $(LIBRARY_OBJECTS:.o=.d)
+-include $(MAIN_OBJECT:.o=.d)
+
+# Examples build rules
+$(BUILD_DIR)/examples/%: $(EXAMPLES_DIR)/%.c $(LIBRARY_OBJECTS) | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) $< $(LIBRARY_OBJECTS) -o $@ $(LDFLAGS)
