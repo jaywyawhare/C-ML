@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse, os, subprocess, sys, time, webbrowser
 import socket
 import threading
@@ -46,13 +47,13 @@ def start_viz_server():
     for i in range(20):
         time.sleep(0.5)
         if is_port_open(8001):
-            print(f"Viz server ready at {url}", file=sys.stderr)
+            print(f"✓ Viz server ready at {url}", file=sys.stderr)
             return p, url
         if p.poll() is not None:
-            print("Viz server process exited", file=sys.stderr)
+            print("✗ Viz server process exited", file=sys.stderr)
             return None, None
 
-    print("Viz server failed to start (timeout)", file=sys.stderr)
+    print("✗ Viz server failed to start (timeout)", file=sys.stderr)
     try:
         p.terminate()
         p.wait(timeout=2)
@@ -107,7 +108,7 @@ def start_ui():
 
         time.sleep(0.5)
         if is_port_open(5173):
-            print(f"Server ready at {url}", file=sys.stderr)
+            print(f"✓ Server ready at {url}", file=sys.stderr)
             if output_lines:
                 print("Server output:", file=sys.stderr)
                 for line in output_lines[-3:]:
@@ -115,12 +116,12 @@ def start_ui():
             return p, url
         if p.poll() is not None:
             # Process died, show output
-            print("Server process exited. Output:", file=sys.stderr)
+            print("✗ Server process exited. Output:", file=sys.stderr)
             for line in output_lines[-10:]:
                 print(f"  {line}", file=sys.stderr, end="")
             return None, None
 
-    print("Server failed to start (timeout)", file=sys.stderr)
+    print("✗ Server failed to start (timeout)", file=sys.stderr)
     print("Last output:", file=sys.stderr)
     for line in output_lines[-5:]:
         print(f"  {line}", file=sys.stderr, end="")
@@ -195,12 +196,12 @@ def main():
         print("-" * 50, file=sys.stderr)
 
         if rc == 0:
-            print("\nModel ran successfully", file=sys.stderr)
+            print("\n✓ Model ran successfully", file=sys.stderr)
             graph_path = os.path.join(UI_DIR, "public", "graph.json")
             if os.path.exists(graph_path):
-                print(f"Graph exported to {graph_path}", file=sys.stderr)
+                print(f"✓ Graph exported to {graph_path}", file=sys.stderr)
             else:
-                print(f"Graph file not found at {graph_path}", file=sys.stderr)
+                print(f"⚠ Graph file not found at {graph_path}", file=sys.stderr)
             print("\nServers are running. Press Ctrl-C to stop.", file=sys.stderr)
             try:
                 while True:
@@ -208,7 +209,7 @@ def main():
             except KeyboardInterrupt:
                 print("\nShutting down...", file=sys.stderr)
         else:
-            print(f"\nTarget exited with code {rc}", file=sys.stderr)
+            print(f"\n✗ Target exited with code {rc}", file=sys.stderr)
         return rc
     finally:
         try:
