@@ -34,7 +34,7 @@ repos:
     hooks:
       - id: cml-build
         name: Build C-ML (make)
-        entry: bash -lc 'make -j$(nproc)'
+        entry: bash -lc 'make clean && make'
         language: system
         pass_filenames: false
         stages: [pre-commit]
