@@ -37,8 +37,8 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
         return -1;
 
     module->name                = name;
-    module->forward             = forward; // Can be NULL for base modules
-    module->free                = free;    // Can be NULL for base modules
+    module->forward             = forward;
+    module->free                = free;
     module->parameters          = NULL;
     module->num_parameters      = 0;
     module->parameters_capacity = 0;
@@ -95,7 +95,6 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
         return -1;
     }
 
-    // Resize array if needed
     if (module->num_parameters >= module->parameters_capacity) {
         int new_capacity = module->parameters_capacity == 0 ? 8 : module->parameters_capacity * 2;
         Parameter** new_params = CM_REALLOC(module->parameters, new_capacity * sizeof(Parameter*));
@@ -143,7 +142,6 @@ int module_get_parameters(Module* module, Parameter** params, int* num_parameter
     }
 
     if (params && module->num_parameters > 0) {
-        // Copy all parameter pointers
         for (int i = 0; i < module->num_parameters; i++) {
             params[i] = module->parameters[i];
         }
@@ -156,7 +154,6 @@ Parameter* module_get_parameter(Module* module, const char* name) {
     if (!module || !name)
         return NULL;
 
-    // Linear search through parameters
     for (int i = 0; i < module->num_parameters; i++) {
         if (module->parameters[i] && module->parameters[i]->name) {
             if (strcmp(module->parameters[i]->name, name) == 0) {
@@ -172,7 +169,6 @@ int module_set_parameter(Module* module, const char* name, Tensor* tensor) {
     if (!module || !name || !tensor)
         return -1;
 
-    // Find parameter by name
     Parameter* param = module_get_parameter(module, name);
     if (!param) {
         LOG_WARNING("Parameter '%s' not found in module '%s'", name, module->name);

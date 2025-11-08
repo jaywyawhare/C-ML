@@ -171,6 +171,20 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
                   Dataset** val_dataset);
 
 /**
+ * @brief Split dataset into training, validation, and test sets
+ *
+ * @param dataset Source dataset
+ * @param train_ratio Ratio of training data (0.0 to 1.0)
+ * @param val_ratio Ratio of validation data (0.0 to 1.0)
+ * @param train_dataset Training dataset output
+ * @param val_dataset Validation dataset output
+ * @param test_dataset Test dataset output
+ * @return 0 on success, negative value on failure
+ */
+int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
+                        Dataset** train_dataset, Dataset** val_dataset, Dataset** test_dataset);
+
+/**
  * @brief Normalize dataset features
  *
  * @param dataset Target dataset

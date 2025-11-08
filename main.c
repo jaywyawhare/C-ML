@@ -8,21 +8,29 @@
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <float.h>
 
 int main() {
+    CleanupContext* cleanup = cleanup_context_create();
+    if (!cleanup) {
+        printf("Failed to create cleanup context\n");
+        return 1;
+    }
+
     if (cml_init() != 0) {
         printf("Failed to initialize C-ML library\n");
+        cleanup_context_free(cleanup);
         return 1;
     }
 
     Sequential* model = nn_sequential();
     if (!model) {
         printf("Error: Failed to create Sequential model\n");
-        cml_cleanup();
-        return 1;
+        goto cleanup;
     }
+    cleanup_register_model(cleanup, (Module*)model);
 
     Linear* linear1   = nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true);
     ReLU* relu1       = nn_relu(false);
@@ -33,21 +41,7 @@ int main() {
 
     if (!linear1 || !relu1 || !linear2 || !tanh1 || !linear3 || !sigmoid1) {
         printf("Error: Failed to create layers\n");
-        if (linear1)
-            module_free((Module*)linear1);
-        if (relu1)
-            module_free((Module*)relu1);
-        if (linear2)
-            module_free((Module*)linear2);
-        if (tanh1)
-            module_free((Module*)tanh1);
-        if (linear3)
-            module_free((Module*)linear3);
-        if (sigmoid1)
-            module_free((Module*)sigmoid1);
-        module_free((Module*)model);
-        cml_cleanup();
-        return 1;
+        goto cleanup;
     }
 
     sequential_add(model, (Module*)linear1);
@@ -60,6 +54,7 @@ int main() {
     printf("Model: Sequential(Linear(2->4), ReLU, Linear(4->4), Tanh, Linear(4->1), Sigmoid)\n\n");
 
     summary((Module*)model);
+    training_metrics_register_model((Module*)model);
 
     module_set_training((Module*)model, true);
 
@@ -67,10 +62,9 @@ int main() {
     int num_params     = 0;
     if (module_collect_parameters((Module*)model, &params, &num_params, true) != 0) {
         printf("Error: Failed to collect model parameters\n");
-        module_free((Module*)model);
-        cml_cleanup();
-        return 1;
+        goto cleanup;
     }
+    cleanup_register_params(cleanup, params);
 
     printf("Trainable parameters: %d\n", num_params);
     printf("Optimizer: Adam (lr=0.01)\n\n");
@@ -78,11 +72,9 @@ int main() {
     Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
         printf("Error: Failed to create optimizer\n");
-        CM_FREE(params);
-        module_free((Module*)model);
-        cml_cleanup();
-        return 1;
+        goto cleanup;
     }
+    cleanup_register_optimizer(cleanup, optimizer);
 
     int num_samples = 4;
     int input_size  = 2;
@@ -92,24 +84,17 @@ int main() {
     Tensor* X         = tensor_empty(input_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
     if (!X) {
         printf("Error: Failed to create input tensor\n");
-        optimizer_free(optimizer);
-        CM_FREE(params);
-        module_free((Module*)model);
-        cml_cleanup();
-        return 1;
+        goto cleanup;
     }
+    cleanup_register_tensor(cleanup, X);
 
     int target_shape[] = {num_samples, output_size};
     Tensor* y          = tensor_empty(target_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
     if (!y) {
         printf("Error: Failed to create target tensor\n");
-        tensor_free(X);
-        optimizer_free(optimizer);
-        CM_FREE(params);
-        module_free((Module*)model);
-        cml_cleanup();
-        return 1;
+        goto cleanup;
     }
+    cleanup_register_tensor(cleanup, y);
 
     float* X_data = (float*)tensor_data_ptr(X);
     float* y_data = (float*)tensor_data_ptr(y);
@@ -132,6 +117,8 @@ int main() {
     int num_epochs      = 500;
     float best_loss     = INFINITY;
     float best_accuracy = 0.0f;
+
+    training_metrics_set_expected_epochs(num_epochs);
 
     printf("Training for %d epochs...\n\n", num_epochs);
 
@@ -159,6 +146,8 @@ int main() {
             }
         }
         float accuracy = num_samples > 0 ? (float)correct / num_samples : 0.0f;
+        training_metrics_auto_capture_train_accuracy(accuracy);
+
         if (accuracy > best_accuracy) {
             best_accuracy = accuracy;
         }
@@ -223,12 +212,8 @@ int main() {
 
     printf("\n");
 
-    tensor_free(y);
-    tensor_free(X);
-    optimizer_free(optimizer);
-    CM_FREE(params);
-    module_free((Module*)model);
-
+cleanup:
+    cleanup_context_free(cleanup);
     cml_cleanup();
 
     return 0;

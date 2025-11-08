@@ -265,6 +265,8 @@ const char* op_type_to_string(OpType op);
 void autograd_print_graph(struct Tensor* tensor);
 void autograd_visualize_backward_graph(struct Tensor* tensor);
 
+int autograd_export_json(struct Tensor* root, const char* path);
+
 // Advanced Features
 
 // Double backward (higher-order derivatives)

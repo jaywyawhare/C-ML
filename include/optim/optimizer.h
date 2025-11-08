@@ -82,6 +82,8 @@ typedef struct Optimizer {
     // Optimizer metadata
     const char* version;     // Optimizer version
     const char* description; // Optimizer description
+
+    void* training_metrics; // TrainingMetrics* (void* to avoid circular dependency)
 } Optimizer;
 
 // Optimizer Creation and Management
@@ -156,6 +158,13 @@ ParameterGroup* optimizer_get_param_group(Optimizer* optimizer, int index);
  * @param optimizer Target optimizer
  */
 void optimizer_step(Optimizer* optimizer);
+
+/**
+ * @brief Set training metrics for automatic recording
+ * @param optimizer Optimizer instance
+ * @param metrics Training metrics structure (can be NULL to disable)
+ */
+void optimizer_set_metrics(Optimizer* optimizer, void* metrics);
 
 /**
  * @brief Zero all parameter gradients

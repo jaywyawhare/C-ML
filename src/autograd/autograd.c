@@ -1,4 +1,5 @@
 #include "autograd/autograd.h"
+#include "Core/training_metrics.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -627,6 +628,9 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         return;
     }
 
+    // Auto-capture loss (if this is a scalar loss tensor)
+    training_metrics_auto_capture_loss(tensor);
+
     LOG_INFO("Starting backward pass for tensor %p", (void*)tensor);
 
     // Initialize gradient if not provided
@@ -678,6 +682,19 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     backward_graph_free(graph);
 
     LOG_INFO("Backward pass completed for tensor %p", (void*)tensor);
+
+    const char* viz     = getenv("CML_VIZ");
+    const char* viz_env = getenv("VIZ");
+    if ((viz && viz[0] != '\0') ||
+        (viz_env && (viz_env[0] == '1' || strcmp(viz_env, "true") == 0))) {
+        const char* out_path = "viz-ui/public/graph.json";
+        int rc               = autograd_export_json(tensor, out_path);
+        if (rc != 0) {
+            LOG_WARNING("CML_VIZ export failed rc=%d", rc);
+        } else {
+            LOG_INFO("CML_VIZ exported graph to %s", out_path);
+        }
+    }
 }
 
 /**
@@ -1022,6 +1039,156 @@ void autograd_print_graph(Tensor* tensor) {
     }
 
     printf("=====================\n\n");
+}
+
+#include <inttypes.h>
+static const char* op_color(OpType op) {
+    switch (op) {
+    case OP_ADD:
+    case OP_SUB:
+    case OP_MUL:
+    case OP_DIV:
+    case OP_POW:
+        return "#f6ccff"; // ALU
+    case OP_MATMUL:
+        return "#ffc0c0"; // GEMM-ish
+    case OP_RELU:
+    case OP_SIGMOID:
+    case OP_TANH:
+        return "#cef263"; // activation
+    case OP_SUM:
+    case OP_MEAN:
+        return "#FF5B5B"; // reduce
+    default:
+        return "#e0e0e0";
+    }
+}
+
+// simple map using parallel arrays for small graphs
+typedef struct {
+    void** keys;
+    int* ids;
+    int size;
+    int cap;
+} PtrIdMap;
+
+static void map_init(PtrIdMap* m) {
+    m->keys = NULL;
+    m->ids  = NULL;
+    m->size = 0;
+    m->cap  = 0;
+}
+static void map_free(PtrIdMap* m) {
+    if (m->keys)
+        CM_FREE(m->keys);
+    if (m->ids)
+        CM_FREE(m->ids);
+}
+static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
+    for (int i = 0; i < m->size; i++)
+        if (m->keys[i] == key)
+            return m->ids[i];
+    if (m->size >= m->cap) {
+        int ncap     = m->cap ? m->cap * 2 : 64;
+        void** nkeys = CM_REALLOC(m->keys, ncap * sizeof(void*));
+        int* nids    = CM_REALLOC(m->ids, ncap * sizeof(int));
+        if (!nkeys || !nids)
+            return -1;
+        m->keys = nkeys;
+        m->ids  = nids;
+        m->cap  = ncap;
+    }
+    m->keys[m->size] = (void*)key;
+    m->ids[m->size]  = next_id;
+    m->size++;
+    return next_id;
+}
+
+static void write_json_escaped(FILE* f, const char* s) {
+    if (!s) {
+        fputs("null", f);
+        return;
+    }
+    fputc('"', f);
+    for (const char* p = s; *p; p++) {
+        if (*p == '"' || *p == '\\') {
+            fputc('\\', f);
+            fputc(*p, f);
+        } else if ((unsigned char)*p < 0x20) {
+            fprintf(f, "\\u%04x", (unsigned char)*p);
+        } else
+            fputc(*p, f);
+    }
+    fputc('"', f);
+}
+
+int autograd_export_json(Tensor* root, const char* path) {
+    if (!root || !path)
+        return -1;
+    BackwardGraph* graph = backward_graph_create();
+    if (!graph)
+        return -2;
+    build_backward_graph_recursive(graph, root, 0);
+    FILE* f = fopen(path, "wb");
+    if (!f) {
+        backward_graph_free(graph);
+        return -3;
+    }
+
+    PtrIdMap idmap;
+    map_init(&idmap);
+    // assign ids to each tensor node via its grad_fn (function focus)
+    int next_id = 1;
+    for (int i = 0; i < graph->num_nodes; i++) {
+        BackwardNode* n = graph->nodes[i];
+        if (n && n->tensor && n->tensor->grad_fn) {
+            map_get_or_insert(&idmap, (const void*)n->tensor->grad_fn, next_id++);
+        }
+    }
+
+    fputs("{\n", f);
+    bool first = true;
+    for (int i = 0; i < graph->num_nodes; i++) {
+        BackwardNode* n = graph->nodes[i];
+        if (!n || !n->tensor || !n->tensor->grad_fn)
+            continue;
+        Function* fn = n->tensor->grad_fn;
+        int myid     = map_get_or_insert(&idmap, (const void*)fn, next_id++);
+        if (!first)
+            fputs(",\n", f);
+        first = false;
+        fprintf(f, "  \"%d\": { ", myid);
+        // label
+        fputs("\"label\": ", f);
+        const char* name = fn->op_name ? fn->op_name : op_type_to_string(fn->op_type);
+        write_json_escaped(f, name);
+        // color
+        fprintf(f, ", \"color\": ");
+        write_json_escaped(f, op_color(fn->op_type));
+        // src edges
+        fputs(", \"src\": [", f);
+        bool first_edge = true;
+        for (int j = 0; j < fn->num_inputs; j++) {
+            Tensor* inp = fn->inputs[j];
+            if (!inp)
+                continue;
+            if (!inp->grad_fn)
+                continue; // leaf -> omit for now
+            int srcid = map_get_or_insert(&idmap, (const void*)inp->grad_fn, next_id++);
+            if (!first_edge) {
+                fputs(", ", f);
+            }
+            first_edge = false;
+            fprintf(f, "[%d, \"%d\"]", j, srcid);
+        }
+        fputs("] }", f);
+    }
+    fputs("\n}\n", f);
+
+    fclose(f);
+    map_free(&idmap);
+    backward_graph_free(graph);
+    return 0;
 }
 
 #define MAX_TENSOR_HOOKS 1024

@@ -31,6 +31,9 @@ set(CORE_SOURCES
     src/Core/dataset.c
     src/Core/augmentation.c
     src/Core/profiling.c
+    src/Core/training_metrics.c
+    src/Core/model_architecture.c
+    src/Core/cleanup.c
 )
 
 set(TENSOR_SOURCES
@@ -188,4 +191,10 @@ if(BUILD_EXAMPLES)
 
     add_executable(training_loop_example examples/training_loop_example.c)
     target_link_libraries(training_loop_example cml_static m)
+
+    add_executable(test examples/test.c)
+    target_link_libraries(test cml_static m)
+
+    add_executable(early_stopping_lr_scheduler examples/early_stopping_lr_scheduler.c)
+    target_link_libraries(early_stopping_lr_scheduler cml_static m)
 endif()

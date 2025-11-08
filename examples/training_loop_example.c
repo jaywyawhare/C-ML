@@ -9,8 +9,17 @@
 #include <math.h>
 
 void training_example(void) {
-    autograd_init();
-    autograd_set_grad_mode(true);
+    CleanupContext* cleanup = cleanup_context_create();
+    if (!cleanup) {
+        LOG_ERROR("Failed to create cleanup context");
+        return;
+    }
+
+    if (cml_init() != 0) {
+        LOG_ERROR("Failed to initialize C-ML library");
+        cleanup_context_free(cleanup);
+        return;
+    }
 
     int input_size  = 10;
     int hidden_size = 20;
@@ -25,8 +34,10 @@ void training_example(void) {
 
     if (!model) {
         LOG_ERROR("Failed to create model");
-        return;
+        goto cleanup;
     }
+    cleanup_register_model(cleanup, model);
+    training_metrics_register_model(model);
 
     module_set_training(model, true);
 
@@ -34,9 +45,9 @@ void training_example(void) {
     int num_params     = 0;
     if (module_collect_parameters(model, &params, &num_params, true) != 0) {
         LOG_ERROR("Failed to collect model parameters");
-        module_free(model);
-        return;
+        goto cleanup;
     }
+    cleanup_register_params(cleanup, params);
 
     printf("Model has %d parameters\n", num_params);
 
@@ -44,20 +55,30 @@ void training_example(void) {
 
     if (!optimizer) {
         LOG_ERROR("Failed to create optimizer");
-        CM_FREE(params);
-        module_free(model);
-        return;
+        goto cleanup;
     }
+    cleanup_register_optimizer(cleanup, optimizer);
 
     printf("Created %s optimizer\n", optimizer_get_name(optimizer));
 
     int batch_size  = 32;
     int num_samples = 100;
 
-    int input_shape[]  = {batch_size, input_size};
-    Tensor* inputs     = tensor_empty(input_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    int input_shape[] = {batch_size, input_size};
+    Tensor* inputs    = tensor_empty(input_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!inputs) {
+        LOG_ERROR("Failed to create input tensor");
+        goto cleanup;
+    }
+    cleanup_register_tensor(cleanup, inputs);
+
     int target_shape[] = {batch_size, output_size};
     Tensor* targets    = tensor_zeros(target_shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!targets) {
+        LOG_ERROR("Failed to create target tensor");
+        goto cleanup;
+    }
+    cleanup_register_tensor(cleanup, targets);
 
     float* input_data  = (float*)tensor_data_ptr(inputs);
     float* target_data = (float*)tensor_data_ptr(targets);
@@ -75,6 +96,8 @@ void training_example(void) {
     float improvement_tol = 1e-5f;
     int lr_step_size      = 20;
     float lr_gamma        = 0.5f;
+
+    training_metrics_set_expected_epochs(num_epochs);
 
     printf("\nStarting training for %d epochs...\n\n", num_epochs);
 
@@ -163,13 +186,9 @@ void training_example(void) {
         tensor_free(eval_out);
     }
 
-    tensor_free(targets);
-    tensor_free(inputs);
-    optimizer_free(optimizer);
-    CM_FREE(params);
-    module_free(model);
-
-    autograd_shutdown();
+cleanup:
+    cleanup_context_free(cleanup);
+    cml_cleanup();
 }
 
 int main(void) {

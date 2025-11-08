@@ -3,8 +3,6 @@
 #include "Core/memory_management.h"
 #include "Core/error_codes.h"
 #include "Core/logging.h"
-// Note: free_node_recursive uses old Node structure that doesn't exist in current autograd system
-// Commented out until needed or updated to match current autograd API
 
 /**
  * @brief Safe memory management functions with logging and error handling.

@@ -232,6 +232,195 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
     return 0;
 }
 
+int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
+                        Dataset** train_dataset, Dataset** val_dataset, Dataset** test_dataset) {
+    if (!dataset || !train_dataset || !val_dataset || !test_dataset) {
+        LOG_ERROR("Invalid parameters for dataset_split_three");
+        return -1;
+    }
+
+    if (train_ratio <= 0.0f || train_ratio >= 1.0f) {
+        LOG_ERROR("Invalid train_ratio: %.2f (must be between 0 and 1)", train_ratio);
+        return -1;
+    }
+
+    if (val_ratio <= 0.0f || val_ratio >= 1.0f) {
+        LOG_ERROR("Invalid val_ratio: %.2f (must be between 0 and 1)", val_ratio);
+        return -1;
+    }
+
+    if (train_ratio + val_ratio >= 1.0f) {
+        LOG_ERROR("Invalid ratios: train_ratio + val_ratio (%.2f) must be < 1.0",
+                  train_ratio + val_ratio);
+        return -1;
+    }
+
+    LOG_DEBUG("Splitting dataset with train_ratio %.2f, val_ratio %.2f", train_ratio, val_ratio);
+
+    int train_size = (int)(dataset->num_samples * train_ratio);
+    int val_size   = (int)(dataset->num_samples * val_ratio);
+    int test_size  = dataset->num_samples - train_size - val_size;
+
+    // Create training dataset
+    *train_dataset = dataset_create();
+    if (!*train_dataset) {
+        LOG_ERROR("Failed to create training dataset");
+        return -1;
+    }
+
+    // Create validation dataset
+    *val_dataset = dataset_create();
+    if (!*val_dataset) {
+        LOG_ERROR("Failed to create validation dataset");
+        dataset_free(*train_dataset);
+        *train_dataset = NULL;
+        return -1;
+    }
+
+    // Create test dataset
+    *test_dataset = dataset_create();
+    if (!*test_dataset) {
+        LOG_ERROR("Failed to create test dataset");
+        dataset_free(*train_dataset);
+        dataset_free(*val_dataset);
+        *train_dataset = NULL;
+        *val_dataset   = NULL;
+        return -1;
+    }
+
+    // Copy data from source dataset tensors if available
+    if (dataset->X && dataset->y) {
+        // Copy training data
+        int train_input_shape[]  = {train_size, dataset->input_size};
+        int train_target_shape[] = {train_size, dataset->output_size};
+
+        float* train_X_data = (float*)tensor_data_ptr(dataset->X);
+        float* train_y_data = (float*)tensor_data_ptr(dataset->y);
+
+        float* train_X = CM_MALLOC(train_size * dataset->input_size * sizeof(float));
+        float* train_y = CM_MALLOC(train_size * sizeof(float));
+
+        if (!train_X || !train_y) {
+            LOG_ERROR("Failed to allocate training data");
+            dataset_free(*train_dataset);
+            dataset_free(*val_dataset);
+            dataset_free(*test_dataset);
+            *train_dataset = NULL;
+            *val_dataset   = NULL;
+            *test_dataset  = NULL;
+            return -1;
+        }
+
+        for (int i = 0; i < train_size; i++) {
+            for (int j = 0; j < dataset->input_size; j++) {
+                train_X[i * dataset->input_size + j] = train_X_data[i * dataset->input_size + j];
+            }
+            train_y[i] = train_y_data[i];
+        }
+
+        (*train_dataset)->X =
+            tensor_from_data(train_X, train_input_shape, 2, dataset->dtype, dataset->device);
+        (*train_dataset)->y =
+            tensor_from_data(train_y, train_target_shape, 2, dataset->dtype, dataset->device);
+        CM_FREE(train_X);
+        CM_FREE(train_y);
+
+        // Copy validation data
+        int val_input_shape[]  = {val_size, dataset->input_size};
+        int val_target_shape[] = {val_size, dataset->output_size};
+
+        float* val_X = CM_MALLOC(val_size * dataset->input_size * sizeof(float));
+        float* val_y = CM_MALLOC(val_size * sizeof(float));
+
+        if (!val_X || !val_y) {
+            LOG_ERROR("Failed to allocate validation data");
+            dataset_free(*train_dataset);
+            dataset_free(*val_dataset);
+            dataset_free(*test_dataset);
+            *train_dataset = NULL;
+            *val_dataset   = NULL;
+            *test_dataset  = NULL;
+            return -1;
+        }
+
+        for (int i = 0; i < val_size; i++) {
+            int src_idx = train_size + i;
+            for (int j = 0; j < dataset->input_size; j++) {
+                val_X[i * dataset->input_size + j] =
+                    train_X_data[src_idx * dataset->input_size + j];
+            }
+            val_y[i] = train_y_data[src_idx];
+        }
+
+        (*val_dataset)->X =
+            tensor_from_data(val_X, val_input_shape, 2, dataset->dtype, dataset->device);
+        (*val_dataset)->y =
+            tensor_from_data(val_y, val_target_shape, 2, dataset->dtype, dataset->device);
+        CM_FREE(val_X);
+        CM_FREE(val_y);
+
+        // Copy test data
+        int test_input_shape[]  = {test_size, dataset->input_size};
+        int test_target_shape[] = {test_size, dataset->output_size};
+
+        float* test_X = CM_MALLOC(test_size * dataset->input_size * sizeof(float));
+        float* test_y = CM_MALLOC(test_size * sizeof(float));
+
+        if (!test_X || !test_y) {
+            LOG_ERROR("Failed to allocate test data");
+            dataset_free(*train_dataset);
+            dataset_free(*val_dataset);
+            dataset_free(*test_dataset);
+            *train_dataset = NULL;
+            *val_dataset   = NULL;
+            *test_dataset  = NULL;
+            return -1;
+        }
+
+        for (int i = 0; i < test_size; i++) {
+            int src_idx = train_size + val_size + i;
+            for (int j = 0; j < dataset->input_size; j++) {
+                test_X[i * dataset->input_size + j] =
+                    train_X_data[src_idx * dataset->input_size + j];
+            }
+            test_y[i] = train_y_data[src_idx];
+        }
+
+        (*test_dataset)->X =
+            tensor_from_data(test_X, test_input_shape, 2, dataset->dtype, dataset->device);
+        (*test_dataset)->y =
+            tensor_from_data(test_y, test_target_shape, 2, dataset->dtype, dataset->device);
+        CM_FREE(test_X);
+        CM_FREE(test_y);
+    }
+
+    // Set metadata
+    (*train_dataset)->num_samples = train_size;
+    (*train_dataset)->input_size  = dataset->input_size;
+    (*train_dataset)->output_size = dataset->output_size;
+    (*train_dataset)->dtype       = dataset->dtype;
+    (*train_dataset)->device      = dataset->device;
+    (*train_dataset)->is_loaded   = true;
+
+    (*val_dataset)->num_samples = val_size;
+    (*val_dataset)->input_size  = dataset->input_size;
+    (*val_dataset)->output_size = dataset->output_size;
+    (*val_dataset)->dtype       = dataset->dtype;
+    (*val_dataset)->device      = dataset->device;
+    (*val_dataset)->is_loaded   = true;
+
+    (*test_dataset)->num_samples = test_size;
+    (*test_dataset)->input_size  = dataset->input_size;
+    (*test_dataset)->output_size = dataset->output_size;
+    (*test_dataset)->dtype       = dataset->dtype;
+    (*test_dataset)->device      = dataset->device;
+    (*test_dataset)->is_loaded   = true;
+
+    LOG_DEBUG("Dataset split successfully: train=%d, val=%d, test=%d", train_size, val_size,
+              test_size);
+    return 0;
+}
+
 int dataset_normalize(Dataset* dataset, const char* method) {
     if (!dataset || !method) {
         LOG_ERROR("Invalid parameters for dataset_normalize");

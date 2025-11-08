@@ -6,9 +6,11 @@
  * and utility functions for the C-ML library.
  */
 
+#define _GNU_SOURCE
 #include "cml.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/training_metrics.h"
 #include "nn/module.h"
 #include "nn/layers.h"
 #include "nn/layers/sequential.h"
@@ -17,12 +19,63 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <limits.h>
 
-// Global library state
 static bool g_cml_initialized = false;
 static int g_cml_init_count   = 0;
 
-// Build information
+static void check_and_launch_viz(void) __attribute__((constructor));
+static void check_and_launch_viz(void) {
+    const char* viz = getenv("VIZ");
+    if (!viz || (viz[0] != '1' && strcmp(viz, "true") != 0)) {
+        return;
+    }
+
+    const char* viz_launched = getenv("CML_VIZ_LAUNCHED");
+    if (viz_launched && viz_launched[0] != '\0') {
+        return;
+    }
+
+    const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("CML_VIZ_SCRIPT"),
+                               NULL};
+
+    const char* script_path = NULL;
+    for (int i = 0; try_paths[i]; i++) {
+        if (!try_paths[i])
+            continue;
+        if (access(try_paths[i], F_OK) == 0) {
+            script_path = try_paths[i];
+            break;
+        }
+    }
+
+    if (!script_path) {
+        return;
+    }
+
+    char exe_path[PATH_MAX] = {0};
+    ssize_t len             = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len == -1 || len >= (ssize_t)sizeof(exe_path)) {
+        const char* env_exe = getenv("_");
+        if (env_exe && env_exe[0] != '\0') {
+            strncpy(exe_path, env_exe, sizeof(exe_path) - 1);
+            exe_path[sizeof(exe_path) - 1] = '\0';
+        } else {
+            strncpy(exe_path, "./build/main", sizeof(exe_path) - 1);
+        }
+    } else {
+        exe_path[len] = '\0';
+    }
+
+    setenv("CML_VIZ_LAUNCHED", "1", 1);
+    setenv("CML_VIZ", "1", 1);
+
+    char* viz_argv[] = {"python3", (char*)script_path, exe_path, NULL};
+
+    execvp("python3", viz_argv);
+}
+
 static const char* g_build_info = "C-ML Library v" CML_VERSION_STRING "\n"
                                   "Built with: GCC " __VERSION__ "\n"
                                   "Build date: " __DATE__ " " __TIME__ "\n"
@@ -54,6 +107,8 @@ int cml_init(void) {
 
     extern void autograd_init(void);
     autograd_init();
+
+    training_metrics_init_global();
 
     if (result == 0) {
         g_cml_initialized = true;
@@ -88,6 +143,8 @@ int cml_cleanup(void) {
     }
 
     LOG_INFO("Cleaning up C-ML Library");
+
+    training_metrics_cleanup_global();
 
     extern void autograd_shutdown(void);
     autograd_shutdown();
@@ -170,7 +227,6 @@ static void print_layer_summary(Module* module, int indent, int* layer_num) {
     if (!module)
         return;
 
-    // If Sequential, skip printing it and just recurse into children
     if (strcmp(module->name, "Sequential") == 0) {
         Sequential* seq = (Sequential*)module;
         int num_modules = sequential_get_length(seq);
@@ -183,10 +239,8 @@ static void print_layer_summary(Module* module, int indent, int* layer_num) {
         return;
     }
 
-    // Get layer type name
     const char* layer_type = module->name;
 
-    // Count parameters for this layer
     int layer_params = 0;
     for (int i = 0; i < module->num_parameters; i++) {
         if (module->parameters[i] && module->parameters[i]->tensor) {
@@ -194,10 +248,8 @@ static void print_layer_summary(Module* module, int indent, int* layer_num) {
         }
     }
 
-    // Build layer description
     char layer_desc[64] = {0};
     if (strcmp(module->name, "Linear") == 0) {
-        // Get Linear-specific info
         Linear* linear   = (Linear*)module;
         int in_features  = linear_get_in_features(linear);
         int out_features = linear_get_out_features(linear);
@@ -205,12 +257,9 @@ static void print_layer_summary(Module* module, int indent, int* layer_num) {
         snprintf(layer_desc, sizeof(layer_desc), "%s (%d->%d, bias=%s)", layer_type, in_features,
                  out_features, use_bias ? "True" : "False");
     } else {
-        // Other layers (ReLU, Tanh, Sigmoid, etc.)
         snprintf(layer_desc, sizeof(layer_desc), "%s", layer_type);
     }
 
-    // Print layer info - format: "LayerNum Type Description    Parameters"
-    // Indentation for nested modules (if any)
     if (indent > 0) {
         for (int i = 0; i < indent; i++)
             printf("  ");
@@ -232,7 +281,6 @@ void summary(Module* module) {
         printf("=");
     printf("\n");
 
-    // Count total parameters
     Parameter** params  = NULL;
     int num_params      = 0;
     int total_trainable = 0;
@@ -247,7 +295,6 @@ void summary(Module* module) {
             CM_FREE(params);
     }
 
-    // Print layers header (TensorFlow/Keras style)
     printf("%-5s %-35s %15s\n", "Layer", "Type", "Parameters");
     for (int i = 0; i < 60; i++)
         printf("-");

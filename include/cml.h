@@ -53,6 +53,8 @@
 #include "Core/memory_management.h"
 #include "Core/error_codes.h"
 #include "Core/dataset.h"
+#include "Core/training_metrics.h"
+#include "Core/cleanup.h"
 
 // Tensor operations
 #include "tensor/tensor.h"

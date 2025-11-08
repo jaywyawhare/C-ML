@@ -45,10 +45,6 @@
 *.idb
 *.pdb
 
-# VSCode
-.VSCode
-.vscode/
-
 # Project-specific Artefacts
 examples_bin/**
 test_bin/**
@@ -82,14 +78,51 @@ compile_commands.json
 .*.swp
 .*.swo
 
-# Editors/OS
-.idea/
-.DS_Store
-
-# Coverage / dist
+# Coverage
 .coverage
 coverage.xml
-dist/
 
 # MkDocs site
 site/
+
+# Node.js / JavaScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Frontend build outputs
+dist/
+.vite/
+.vite-cache/
+*.local
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea/
+.VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Generated json
+graph.json
+training.json
+model_architecture.json

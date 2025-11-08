@@ -18,7 +18,10 @@ CORE_SOURCES = $(SRC_DIR)/Core/logging.c \
                $(SRC_DIR)/Core/memory_pools.c \
                $(SRC_DIR)/Core/dataset.c \
                $(SRC_DIR)/Core/augmentation.c \
-               $(SRC_DIR)/Core/profiling.c
+               $(SRC_DIR)/Core/profiling.c \
+               $(SRC_DIR)/Core/training_metrics.c \
+               $(SRC_DIR)/Core/model_architecture.c \
+               $(SRC_DIR)/Core/cleanup.c
 
 TENSOR_SOURCES = $(SRC_DIR)/tensor.c \
                  $(SRC_DIR)/tensor_views.c \
@@ -64,7 +67,10 @@ EXAMPLES_DIR = examples
 EXAMPLE_SOURCES = $(EXAMPLES_DIR)/autograd_example.c \
                   $(EXAMPLES_DIR)/training_loop_example.c \
                   $(EXAMPLES_DIR)/opcheck.c \
-                  $(EXAMPLES_DIR)/bench_gemm.c
+                  $(EXAMPLES_DIR)/bench_gemm.c \
+                  $(EXAMPLES_DIR)/export_graph.c \
+                  $(EXAMPLES_DIR)/test.c \
+                  $(EXAMPLES_DIR)/early_stopping_lr_scheduler.c
 EXAMPLE_EXECUTABLES = $(EXAMPLE_SOURCES:$(EXAMPLES_DIR)/%.c=$(BUILD_DIR)/examples/%)
 
 # Default target
@@ -84,6 +90,7 @@ $(BUILD_DIR):
 # Main executable
 $(BUILD_DIR)/main: $(BUILD_DIR) $(MAIN_OBJECT) $(LIBRARY_OBJECTS)
 	$(CC) $(MAIN_OBJECT) $(LIBRARY_OBJECTS) -o $@ $(LDFLAGS)
+
 
 # Main object file
 $(MAIN_OBJECT): $(MAIN_SOURCE) | $(BUILD_DIR)
@@ -162,7 +169,6 @@ help:
 # Dependencies
 -include $(LIBRARY_OBJECTS:.o=.d)
 -include $(MAIN_OBJECT:.o=.d)
--include $(TEST_OBJECTS:.o=.d)
 
 # Examples build rules
 $(BUILD_DIR)/examples/%: $(EXAMPLES_DIR)/%.c $(LIBRARY_OBJECTS) | $(BUILD_DIR)

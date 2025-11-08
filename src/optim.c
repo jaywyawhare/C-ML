@@ -22,14 +22,13 @@
 #include "optim/optimizer.h"
 #include "Core/logging.h"
 #include "Core/memory_management.h"
+#include "Core/training_metrics.h"
 #include "tensor/tensor.h"
 #include "autograd/autograd.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
-// Optimizer Implementation (Simplified)
 
 int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGradFn zero_grad) {
     if (!optimizer || !name || !step || !zero_grad)
@@ -47,6 +46,7 @@ int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGrad
     optimizer->lr_scheduler_factor    = 1.0f;
     optimizer->lr_scheduler_step_size = 0;
     optimizer->lr_scheduler_gamma     = 1.0f;
+    optimizer->training_metrics       = NULL;
     optimizer->version                = "1.0.0";
     optimizer->description            = "Optimizer";
 
@@ -66,7 +66,6 @@ Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad)
     return optimizer;
 }
 
-// Forward declarations for optimizer state structures
 typedef struct SGDMomentumState {
     Tensor* momentum_buffer;
 } SGDMomentumState;
@@ -89,19 +88,14 @@ void optimizer_free(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    // Free each parameter group
     if (optimizer->param_groups) {
         for (int i = 0; i < optimizer->num_param_groups; i++) {
             ParameterGroup* group = &optimizer->param_groups[i];
-            // Free parameters array (just the array, not the parameters themselves)
             if (group->parameters) {
                 CM_FREE(group->parameters);
             }
-            // Free optimizer-specific state if it exists
             if (group->state) {
-                // Free state based on optimizer type
                 if (strcmp(optimizer->name, "SGD") == 0) {
-                    // Free SGD momentum states
                     SGDMomentumState** states = (SGDMomentumState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
@@ -113,7 +107,6 @@ void optimizer_free(Optimizer* optimizer) {
                     }
                     CM_FREE(states);
                 } else if (strcmp(optimizer->name, "Adam") == 0) {
-                    // Free Adam states
                     AdamState** states = (AdamState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
@@ -128,7 +121,6 @@ void optimizer_free(Optimizer* optimizer) {
                     }
                     CM_FREE(states);
                 } else if (strcmp(optimizer->name, "RMSprop") == 0) {
-                    // Free RMSprop states
                     RMSpropState** states = (RMSpropState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
@@ -139,7 +131,6 @@ void optimizer_free(Optimizer* optimizer) {
                     }
                     CM_FREE(states);
                 } else if (strcmp(optimizer->name, "Adagrad") == 0) {
-                    // Free Adagrad states
                     AdagradState** states = (AdagradState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
@@ -158,7 +149,6 @@ void optimizer_free(Optimizer* optimizer) {
         CM_FREE(optimizer->param_groups);
     }
 
-    // Free the optimizer itself
     CM_FREE(optimizer);
 }
 
@@ -169,7 +159,6 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
         return -1;
     }
 
-    // Resize array if needed
     if (optimizer->num_param_groups >= optimizer->param_groups_capacity) {
         int new_capacity =
             optimizer->param_groups_capacity == 0 ? 4 : optimizer->param_groups_capacity * 2;
@@ -183,23 +172,19 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
         optimizer->param_groups_capacity = new_capacity;
     }
 
-    // Initialize new parameter group
     ParameterGroup* group = &optimizer->param_groups[optimizer->num_param_groups];
 
-    // Allocate parameters array
     group->parameters = CM_MALLOC(num_parameters * sizeof(Parameter*));
     if (!group->parameters) {
         LOG_ERROR("Failed to allocate memory for parameter group parameters");
         return -1;
     }
 
-    // Copy parameter pointers
     for (int i = 0; i < num_parameters; i++) {
         group->parameters[i] = parameters[i];
     }
     group->num_parameters = num_parameters;
 
-    // Set hyperparameters
     group->lr           = lr;
     group->weight_decay = weight_decay;
     group->momentum     = 0.0f;   // Default, can be set later
@@ -246,23 +231,32 @@ void optimizer_step(Optimizer* optimizer) {
     if (!optimizer || !optimizer->step)
         return;
 
-    // Call the step function
     optimizer->step(optimizer);
+    training_metrics_auto_capture_optimizer(optimizer);
+}
+
+void optimizer_set_metrics(Optimizer* optimizer, void* metrics) {
+    if (!optimizer) {
+        LOG_ERROR("Invalid optimizer");
+        return;
+    }
+    optimizer->training_metrics = metrics;
 }
 
 void optimizer_zero_grad(Optimizer* optimizer) {
     if (!optimizer || !optimizer->zero_grad)
         return;
 
-    // Call the zero_grad function
     optimizer->zero_grad(optimizer);
+
+    extern void training_metrics_mark_zero_grad(void);
+    training_metrics_mark_zero_grad();
 }
 
 int optimizer_get_step_count(Optimizer* optimizer) {
     if (!optimizer || optimizer->num_param_groups == 0)
         return 0;
 
-    // Return step count from first parameter group
     return optimizer->param_groups[0].step_count;
 }
 
@@ -270,7 +264,6 @@ void optimizer_set_lr(Optimizer* optimizer, float lr) {
     if (!optimizer)
         return;
 
-    // Set learning rate for all parameter groups
     for (int i = 0; i < optimizer->num_param_groups; i++) {
         optimizer->param_groups[i].lr = lr;
     }
