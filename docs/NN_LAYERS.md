@@ -195,7 +195,31 @@ Tensor *output = module_forward((Module*)maxpool, input);
 
 **Note:** Full pooling implementation is a placeholder. Requires window-based max/average computation.
 
-### 7. Sequential Container
+### 7. LayerNorm Layer
+
+**Usage:** `nn_layernorm(normalized_shape, eps, elementwise_affine, dtype, device)`
+
+```c
+// Create LayerNorm layer
+LayerNorm *ln = nn_layernorm(64,      // normalized_shape (last dimension size)
+                             1e-5,   // eps
+                             true,   // elementwise_affine (learnable scale/shift)
+                             DTYPE_FLOAT32, DEVICE_CPU);
+
+// Forward pass
+Tensor *output = module_forward((Module*)ln, input);
+```
+
+**Features:**
+
+- Normalizes across features (last dimension)
+- Learnable scale (gamma) and shift (beta) parameters
+- No running statistics (stateless normalization)
+- Different behavior from BatchNorm2d (normalizes across different dimensions)
+
+**Note:** Essential for transformer architectures, BERT, GPT models, and modern NLP architectures.
+
+### 8. Sequential Container
 
 **Usage:** `nn_sequential()` with `sequential_add()`
 
@@ -272,7 +296,9 @@ for (int epoch = 0; epoch < num_epochs; epoch++) {
 | Dropout layer        | `nn_dropout(0.5, false)`                                               |
 | Conv2d layer         | `nn_conv2d(3, 16, 3, 1, 1, 1, true, DTYPE_FLOAT32, DEVICE_CPU)`        |
 | BatchNorm2d layer    | `nn_batchnorm2d(16, 1e-5, 0.1, true, true, DTYPE_FLOAT32, DEVICE_CPU)` |
+| LayerNorm layer      | `nn_layernorm(64, 1e-5, true, DTYPE_FLOAT32, DEVICE_CPU)`              |
 | MaxPool2d layer      | `nn_maxpool2d(2, 2, 0, 1, false)`                                      |
+| AvgPool2d layer      | `nn_avgpool2d(2, 2, 0, false, true)`                                   |
 | Sequential container | `nn_sequential()` + `sequential_add()`                                 |
 
 ## Implementation Status
@@ -280,16 +306,20 @@ for (int epoch = 0; epoch < num_epochs; epoch++) {
 ### Fully Implemented
 
 - Linear layer
-- Activation layers (ReLU, Sigmoid, Tanh, LeakyReLU)
+- Activation layers (ReLU, Sigmoid, Tanh, LeakyReLU, GELU, Softmax, LogSoftmax)
 - Dropout layer
+- Conv2d layer
+- BatchNorm2d layer
+- MaxPool2d / AvgPool2d layers
+- LayerNorm layer
 - Sequential container
 
-### Partially Implemented (structure ready, forward pass needs completion)
+### Implementation Notes
 
-- Conv2d (structure and parameter initialization ready)
-- BatchNorm2d (structure and parameter initialization ready)
-- MaxPool2d / AvgPool2d (structure ready)
-- GELU, Softmax, LogSoftmax (structure ready)
+- All layers support automatic differentiation via autograd
+- All layers support training/evaluation mode switching
+- All layers properly manage their own parameters
+- Sequential container automatically collects parameters from submodules
 
 ## Notes
 
@@ -300,9 +330,7 @@ for (int epoch = 0; epoch < num_epochs; epoch++) {
 
 ## Future Enhancements
 
-- Complete Conv2d forward pass implementation
-- Complete BatchNorm2d forward pass implementation
-- Complete pooling layers forward pass
-- Additional layers: LayerNorm, GroupNorm, Conv1d, Conv3d
-- More activation functions: ELU, SELU, Swish
+- Additional layers: GroupNorm, Conv1d, Conv3d
+- More activation functions: ELU, SELU, Swish, Mish
 - Container layers: ModuleList, ModuleDict
+- Performance optimizations: im2col for convolutions, SIMD operations

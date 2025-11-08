@@ -297,97 +297,357 @@ for (int epoch = 0; epoch < num_epochs; epoch++) {
 }
 ```
 
-## Learning Rate Scheduling and Early Stopping
+## Training Metrics
 
-C-ML exposes simple hooks to adjust learning rates at runtime. You can implement schedulers in your loop and perform early stopping with a patience counter.
+C-ML includes built-in training metrics tracking that **automatically records training progress** without any manual tracking code. Metrics are captured by default when you use `cml_init()` and `cml_cleanup()`.
 
-Example: step LR every N epochs and stop if no improvement for P epochs.
+### Automatic Metrics Capture
+
+Metrics are automatically captured during training - no manual tracking needed:
+
+```c
+#include "cml.h"
+#include "Core/cleanup.h"
+
+int main(void) {
+    CleanupContext *cleanup = cleanup_context_create();
+    cml_init(); // Automatically initializes global metrics tracking
+
+    // Create model
+    Sequential *model = nn_sequential();
+    // ... add layers ...
+    cleanup_register_model(cleanup, (Module*)model);
+    training_metrics_register_model((Module*)model); // Register for architecture export
+
+    // Create optimizer
+    Parameter **params;
+    int num_params;
+    module_collect_parameters((Module*)model, &params, &num_params, true);
+    cleanup_register_params(cleanup, params);
+
+    Optimizer *optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    cleanup_register_optimizer(cleanup, optimizer);
+
+    // Set expected epochs for UI
+    training_metrics_set_expected_epochs(100);
+
+    // Training loop - metrics are automatically captured!
+    for (int epoch = 0; epoch < 100; epoch++) {
+        optimizer_zero_grad(optimizer); // Automatically detects new epoch
+
+        Tensor *outputs = module_forward((Module*)model, X);
+        Tensor *loss = tensor_mse_loss(outputs, y);
+        tensor_backward(loss, NULL, false, false); // Automatically captures loss
+        optimizer_step(optimizer); // Automatically captures LR and gradient norm
+
+        // Capture training accuracy
+        float accuracy = calculate_accuracy(outputs, y);
+        training_metrics_auto_capture_train_accuracy(accuracy);
+
+        tensor_free(loss);
+        tensor_free(outputs);
+    }
+
+    // Metrics are automatically exported to training.json on cml_cleanup()
+
+cleanup:
+    cleanup_context_free(cleanup);
+    cml_cleanup(); // Automatically exports final metrics
+    return 0;
+}
+```
+
+### Automatic Validation and Test Evaluation
+
+Use `training_metrics_evaluate_dataset()` to automatically evaluate and record metrics:
+
+```c
+// Split dataset
+Dataset *full_dataset = dataset_from_arrays(X_all, y_all, num_samples, input_size, output_size);
+Dataset *train_dataset, *val_dataset, *test_dataset;
+dataset_split_three(full_dataset, 0.7f, 0.15f, 0.15f,
+                    &train_dataset, &val_dataset, &test_dataset);
+
+// Training loop
+for (int epoch = 0; epoch < num_epochs; epoch++) {
+    // ... training on train_dataset ...
+
+    // Automatically evaluate on validation set and record metrics
+    training_metrics_evaluate_dataset((Module*)model, val_dataset,
+                                      tensor_mse_loss, true);
+}
+
+// Final evaluation on test set
+training_metrics_evaluate_dataset((Module*)model, test_dataset,
+                                  tensor_mse_loss, false);
+```
+
+### Early Stopping Support
+
+C-ML tracks early stopping status automatically:
 
 ```c
 int num_epochs = 100;
-float best = INFINITY;
-int patience = 10, no_improve = 0;
-int step_size = 20;    // decay every 20 epochs
-float gamma = 0.5f;    // lr *= 0.5
+int patience = 15;
+float best_loss = INFINITY;
+int no_improve_epochs = 0;
+
+training_metrics_set_expected_epochs(num_epochs);
 
 for (int epoch = 0; epoch < num_epochs; epoch++) {
-    // ... training over batches, accumulate epoch_loss ...
+    // ... training ...
 
-    // Early stopping
-    if (epoch_loss < best - 1e-5f) {
-        best = epoch_loss;
-        no_improve = 0;
-    } else if (++no_improve >= patience) {
-        printf("Early stopping at epoch %d (best %.6f)\n", epoch + 1, best);
-        break;
-    }
-
-    // Step LR scheduler
-    if ((epoch + 1) % step_size == 0) {
-        float current_lr = optimizer_get_group_lr(optimizer, 0);
-        float new_lr = current_lr * gamma;
-        optimizer_set_lr(optimizer, new_lr);
-        printf("  LR -> %.6f\n", new_lr);
+    // Early stopping logic
+    if (epoch_loss < best_loss - 1e-5f) {
+        best_loss = epoch_loss;
+        no_improve_epochs = 0;
+    } else {
+        no_improve_epochs++;
+        if (no_improve_epochs >= patience) {
+            training_metrics_mark_early_stop(epoch); // Mark early stopping
+            break;
+        }
     }
 }
 ```
 
-See `examples/training_loop_example.c` for a complete usage pattern.
+The UI will display:
 
-## Complete Example
+- Early stopping status badge
+- Actual vs expected epochs
+- Visual indicators on charts
 
-Here's a complete example training a model on the XOR dataset:
+### Learning Rate Scheduling
+
+Track LR scheduler information for visualization:
+
+```c
+TrainingMetrics *metrics = training_metrics_get_global();
+if (metrics) {
+    training_metrics_set_learning_rate(metrics, initial_lr, "StepLR");
+    char params_buf[128];
+    snprintf(params_buf, sizeof(params_buf), "step_size=30,gamma=0.5");
+    training_metrics_set_lr_schedule_params(metrics, params_buf);
+}
+
+// In training loop, adjust LR as needed
+if ((epoch + 1) % lr_step_size == 0) {
+    float current_lr = optimizer_get_group_lr(optimizer, 0);
+    float new_lr = current_lr * lr_gamma;
+    optimizer_set_lr(optimizer, new_lr);
+}
+```
+
+The UI will display:
+
+- Current learning rate
+- Scheduler type (e.g., "StepLR", "Constant")
+- Scheduler parameters (e.g., "step_size=30,gamma=0.5")
+
+### Automatic JSON Export
+
+Metrics are automatically exported to `training.json`:
+
+- **Real-time updates**: JSON is updated after each loss capture and optimizer step (when `VIZ=1` or `CML_VIZ=1`)
+- **Final export**: Complete metrics exported on `cml_cleanup()`
+- **Location**: `viz-ui/public/training.json` (for UI visualization)
+- **Trigger**: Set `VIZ=1` environment variable when running your program to enable automatic export
+
+The exported JSON includes:
+
+- Training, validation, and test losses/accuracies per epoch
+- Epoch times and total training time
+- Learning rates and gradient norms per epoch
+- Loss reduction rate and stability metrics
+- Model architecture summary
+- Early stopping status (if applicable)
+- LR scheduler information
+
+### Metrics API
+
+```c
+// Global metrics (automatically initialized)
+TrainingMetrics *training_metrics_get_global(void);
+
+// Register model for architecture export
+void training_metrics_register_model(Module *model);
+
+// Set expected epochs for UI
+void training_metrics_set_expected_epochs(size_t num_epochs);
+
+// Capture training accuracy
+void training_metrics_auto_capture_train_accuracy(float train_accuracy);
+
+// Evaluate dataset and record metrics
+int training_metrics_evaluate_dataset(Module *model, Dataset *dataset,
+                                      Tensor *(*loss_fn)(Tensor*, Tensor*),
+                                      bool is_validation);
+
+// Early stopping
+void training_metrics_mark_early_stop(size_t actual_epochs);
+
+// Learning rate scheduling
+void training_metrics_set_learning_rate(TrainingMetrics *metrics,
+                                         float lr, const char *schedule);
+void training_metrics_set_lr_schedule_params(TrainingMetrics *metrics,
+                                              const char *params);
+```
+
+## Learning Rate Scheduling and Early Stopping
+
+C-ML provides hooks to adjust learning rates at runtime and track early stopping. The metrics system automatically captures LR changes and early stopping status for visualization.
+
+### Visualization with VIZ=1
+
+To enable automatic graph and metrics export during training, set the `VIZ=1` environment variable:
+
+```bash
+# Automatic visualization launch
+VIZ=1 ./build/main
+VIZ=1 ./build/examples/test
+```
+
+This will:
+
+1. Automatically launch the visualization UI before your program runs
+1. Start FastAPI server (port 8001) and React frontend (port 5173)
+1. Run your program with `CML_VIZ=1` set (enables automatic export)
+1. Export graph and metrics to JSON files during training
+1. Open browser to `http://localhost:5173` for real-time visualization
+
+Alternatively, you can manually launch the visualization:
+
+```bash
+python scripts/viz.py <executable> [args...]
+```
+
+### Complete Example with Early Stopping and LR Scheduling
 
 ```c
 #include "cml.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include "Core/cleanup.h"
 
 int main(void) {
-    // Initialize library
+    CleanupContext *cleanup = cleanup_context_create();
     cml_init();
 
-    // Create XOR dataset
-    float X_data[4][2] = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
-    float y_data[4][1] = {{0}, {1}, {1}, {0}};
+    // ... create model and optimizer ...
 
-    int X_shape[] = {4, 2};
-    int y_shape[] = {4, 1};
+    int num_epochs = 2000;
+    int patience = 15;
+    float improvement_tol = 1e-5f;
+    int lr_step_size = 30;
+    float lr_gamma = 0.5f;
+    float initial_lr = 0.01f;
 
-    Tensor *X = tensor_from_array(X_data, X_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor *y = tensor_from_array(y_data, y_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    float best_loss = INFINITY;
+    int no_improve_epochs = 0;
 
-    // Create model
-    Sequential *model = nn_sequential();
+    // Set expected epochs and LR scheduler info
+    training_metrics_set_expected_epochs(num_epochs);
+    TrainingMetrics *metrics = training_metrics_get_global();
+    if (metrics) {
+        training_metrics_set_learning_rate(metrics, initial_lr, "StepLR");
+        char params_buf[128];
+        snprintf(params_buf, sizeof(params_buf), "step_size=%d,gamma=%.2f",
+                 lr_step_size, lr_gamma);
+        training_metrics_set_lr_schedule_params(metrics, params_buf);
+    }
+
+    for (int epoch = 0; epoch < num_epochs; epoch++) {
+        // ... training loop ...
+
+        // Early stopping
+        if (epoch_loss < best_loss - improvement_tol) {
+            best_loss = epoch_loss;
+            no_improve_epochs = 0;
+        } else {
+            no_improve_epochs++;
+            if (no_improve_epochs >= patience) {
+                printf("Early stopping at epoch %d\n", epoch + 1);
+                training_metrics_mark_early_stop(epoch);
+                break;
+            }
+        }
+
+        // Learning rate scheduling (StepLR)
+        if ((epoch + 1) % lr_step_size == 0) {
+            float current_lr = optimizer_get_group_lr(optimizer, 0);
+            float new_lr = current_lr * lr_gamma;
+            optimizer_set_lr(optimizer, new_lr);
+            printf("  [Epoch %d] LR decayed: %.6f -> %.6f\n",
+                   epoch + 1, current_lr, new_lr);
+        }
+    }
+
+cleanup:
+    cleanup_context_free(cleanup);
+    cml_cleanup();
+    return 0;
+}
+```
+
+See `examples/early_stopping_lr_scheduler.c` for a complete working example.
+
+## Complete Example
+
+Here's a complete example training a model on the XOR dataset using automatic metrics and centralized cleanup:
+
+```c
+#include "cml.h"
+#include "Core/cleanup.h"
+#include <stdio.h>
+
+int main(void) {
+    CleanupContext* cleanup = cleanup_context_create();
+    if (!cleanup) return 1;
+
+    cml_init();
+
+    Sequential* model = nn_sequential();
     sequential_add(model, (Module*)nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
     sequential_add(model, (Module*)nn_relu(false));
     sequential_add(model, (Module*)nn_linear(4, 1, DTYPE_FLOAT32, DEVICE_CPU, true));
     sequential_add(model, (Module*)nn_sigmoid());
 
-    // Print model summary
+    cleanup_register_model(cleanup, (Module*)model);
+    training_metrics_register_model((Module*)model);
+
     summary((Module*)model);
 
-    // Collect parameters
-    Parameter **params;
+    Parameter** params;
     int num_params;
     module_collect_parameters((Module*)model, &params, &num_params, true);
+    cleanup_register_params(cleanup, params);
 
-    // Create optimizer
-    Optimizer *optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    cleanup_register_optimizer(cleanup, optimizer);
 
-    // Training loop
-    int num_epochs = 1000;
-    for (int epoch = 0; epoch < num_epochs; epoch++) {
+    int X_shape[] = {4, 2};
+    int y_shape[] = {4, 1};
+    Tensor* X = tensor_empty(X_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* y = tensor_empty(y_shape, 2, DTYPE_FLOAT32, DEVICE_CPU);
+    cleanup_register_tensor(cleanup, X);
+    cleanup_register_tensor(cleanup, y);
+
+    float* X_data = (float*)tensor_data_ptr(X);
+    float* y_data = (float*)tensor_data_ptr(y);
+    X_data[0] = 0.0f; X_data[1] = 0.0f; y_data[0] = 0.0f;
+    X_data[2] = 0.0f; X_data[3] = 1.0f; y_data[1] = 1.0f;
+    X_data[4] = 1.0f; X_data[5] = 0.0f; y_data[2] = 1.0f;
+    X_data[6] = 1.0f; X_data[7] = 1.0f; y_data[3] = 0.0f;
+
+    training_metrics_set_expected_epochs(1000);
+
+    for (int epoch = 0; epoch < 1000; epoch++) {
         optimizer_zero_grad(optimizer);
-
-        Tensor *outputs = module_forward((Module*)model, X);
-        Tensor *loss = tensor_mse_loss(outputs, y);
+        Tensor* outputs = module_forward((Module*)model, X);
+        Tensor* loss = tensor_mse_loss(outputs, y);
         tensor_backward(loss, NULL, false, false);
         optimizer_step(optimizer);
 
         if ((epoch + 1) % 100 == 0) {
-            float *loss_data = (float*)tensor_data_ptr(loss);
+            float* loss_data = (float*)tensor_data_ptr(loss);
             printf("Epoch %d - Loss: %.6f\n", epoch + 1, loss_data ? loss_data[0] : 0.0f);
         }
 
@@ -395,17 +655,18 @@ int main(void) {
         tensor_free(outputs);
     }
 
-    // Cleanup
-    optimizer_free(optimizer);
-    CM_FREE(params);
-    module_free((Module*)model);
-    tensor_free(y);
-    tensor_free(X);
+cleanup:
+    cleanup_context_free(cleanup);
     cml_cleanup();
-
     return 0;
 }
 ```
+
+For more advanced examples, see:
+
+- `main.c` - Simple XOR example
+- `examples/test.c` - Train/val/test splits with automatic metrics
+- `examples/early_stopping_lr_scheduler.c` - Early stopping and LR scheduling
 
 ## Best Practices
 

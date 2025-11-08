@@ -45,17 +45,16 @@ This document lists planned features, improvements, and enhancements for the C-M
 
 #### LayerNorm - Layer Normalization
 
-- **Status**: Not implemented
+- **Status**: ✅ **IMPLEMENTED**
 - **Priority**: High
 - **File**: `src/nn/layers/layernorm.c`, `include/nn/layers/layernorm.h`
 - **Description**: Layer normalization for transformer architectures and modern NLP models
-- **Implementation Notes**:
+- **Implementation**:
   - Normalizes across features (last dimension)
   - Formula: `(x - mean) / sqrt(var + eps) * gamma + beta`
   - Similar to BatchNorm2d but normalizes across different dimensions
   - No running statistics needed (stateless normalization)
   - Learnable parameters: `gamma` (scale) and `beta` (shift)
-- **Related Files**: `src/nn/layers/batchnorm2d.c` (reference for normalization pattern)
 - **Benefits**: Essential for transformers, BERT, GPT models, and modern NLP architectures
 
 #### GroupNorm - Group Normalization
@@ -199,7 +198,7 @@ This document lists planned features, improvements, and enhancements for the C-M
 
 #### KL Divergence Loss
 
-- **Status**: Not implemented
+- **Status**: ✅ **IMPLEMENTED**
 - **Priority**: High
 - **File**: `src/autograd/loss_functions.c`, `include/autograd/loss_functions.h`
 - **Description**: Kullback-Leibler divergence for probability distributions
@@ -219,7 +218,7 @@ This document lists planned features, improvements, and enhancements for the C-M
 
 #### Huber Loss
 
-- **Status**: Not implemented
+- **Status**: ✅ **IMPLEMENTED**
 - **Priority**: Medium
 - **File**: `src/autograd/loss_functions.c`, `include/autograd/loss_functions.h`
 - **Description**: Robust loss function, less sensitive to outliers than MSE

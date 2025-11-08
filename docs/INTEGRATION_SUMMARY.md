@@ -4,7 +4,7 @@ This document summarizes the integration of neural network layers into the C-ML 
 
 ## Integration Status: Complete
 
-All layers have been properly integrated into the build system and main API.
+All layers, training metrics, and visualization UI have been properly integrated into the build system and main API.
 
 ## Build System Integration
 
@@ -140,6 +140,84 @@ make
 ```
 
 Both build systems should now successfully compile all layers.
+
+## Training Metrics Integration
+
+### Training Metrics API
+
+The training metrics system is fully integrated with automatic capture:
+
+- **Header**: `include/Core/training_metrics.h`
+- **Implementation**: `src/Core/training_metrics.c`
+- **Automatic Initialization**: Global metrics initialized in `cml_init()`
+- **Automatic Capture**: Metrics captured automatically during training
+- **Optimizer Integration**: `optimizer_step()` automatically captures LR and gradient norm
+- **Loss Integration**: `tensor_backward()` automatically captures loss values
+
+### Usage
+
+```c
+#include "cml.h"
+#include "Core/cleanup.h"
+
+int main(void) {
+    CleanupContext *cleanup = cleanup_context_create();
+    cml_init(); // Automatically initializes global metrics tracking
+
+    // Create model and optimizer
+    Sequential *model = nn_sequential();
+    // ... add layers ...
+    cleanup_register_model(cleanup, (Module*)model);
+    training_metrics_register_model((Module*)model);
+
+    Parameter **params;
+    int num_params;
+    module_collect_parameters((Module*)model, &params, &num_params, true);
+    cleanup_register_params(cleanup, params);
+
+    Optimizer *optimizer = optim_adam(params, num_params, 0.01f, ...);
+    cleanup_register_optimizer(cleanup, optimizer);
+
+    training_metrics_set_expected_epochs(100);
+
+    // Training loop - metrics are automatically captured!
+    for (int epoch = 0; epoch < 100; epoch++) {
+        optimizer_zero_grad(optimizer); // Automatically detects new epoch
+        Tensor *outputs = module_forward((Module*)model, X);
+        Tensor *loss = tensor_mse_loss(outputs, y);
+        tensor_backward(loss, NULL, false, false); // Automatically captures loss
+        optimizer_step(optimizer); // Automatically captures LR and gradient norm
+        // ... cleanup ...
+    }
+
+    // Metrics are automatically exported on cml_cleanup()
+    cleanup_context_free(cleanup);
+    cml_cleanup(); // Automatically exports final metrics
+    return 0;
+}
+```
+
+## Visualization UI Integration
+
+### Frontend
+
+- **Location**: `viz-ui/`
+- **Framework**: React with Vite
+- **Components**: TrainingEvalView, GraphView, ModelArchitectureView, CodeGenView
+- **Dependencies**: React, Recharts, Cytoscape, ELK.js
+
+### Backend
+
+- **Location**: `scripts/fastapi_server.py`
+- **Framework**: FastAPI with Uvicorn
+- **Features**: JSON serving, Server-Sent Events (SSE) for real-time updates
+
+### Launcher
+
+- **Location**: `scripts/viz.py`
+- **Features**: Starts FastAPI server and React frontend, opens browser
+- **Automatic Launch**: Set `VIZ=1` environment variable to automatically launch before program runs
+- **Manual Launch**: Run `python scripts/viz.py <executable> [args...]` to manually launch
 
 ## Usage Examples
 

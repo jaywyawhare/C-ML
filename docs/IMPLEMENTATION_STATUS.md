@@ -75,7 +75,48 @@
 
 ## Recently Completed Features
 
-### 1. Broadcasting - Enhanced
+### 1. Training Metrics
+
+- **Status**: ✅ **COMPLETE** - Fully automatic metrics capture
+- **Features**:
+  - **Automatic Metrics Capture**: No manual tracking code needed - metrics captured by default
+  - Automatic epoch timing: Detected via `optimizer_zero_grad()` calls
+  - Training/validation/test metrics tracking: `training_metrics_auto_capture_*()` functions
+  - Gradient norm monitoring: Automatic tracking via `optimizer_step()` integration
+  - Learning rate tracking: Current learning rate per epoch with scheduler information
+  - Loss reduction rate: Percentage reduction in loss
+  - Loss stability: Standard deviation of recent losses
+  - **Early Stopping Support**: Track actual vs expected epochs with `training_metrics_mark_early_stop()`
+  - **LR Scheduler Visualization**: Display scheduler type and parameters in UI
+  - **Real-time JSON Export**: Continuously updates `training.json` during training
+  - **Automatic Dataset Evaluation**: `training_metrics_evaluate_dataset()` for validation/test
+  - **Model Architecture Export**: Automatic export of model structure to JSON
+- **Files**:
+  - `src/Core/training_metrics.c` - Full implementation with global state management
+  - `include/Core/training_metrics.h` - Training metrics API
+  - `src/optim.c` - Optimizer integration for automatic metrics capture
+  - `src/autograd/autograd.c` - Loss capture via `tensor_backward()`
+  - `src/cml.c` - Global metrics initialization/cleanup
+
+### 2. Visualization UI
+
+- **Status**: ✅ **COMPLETE** - Enhanced with early stopping and LR scheduling
+- **Features**:
+  - Interactive training dashboard: Real-time visualization of training metrics
+  - Computational graph visualization: Visual representation of ops topology
+  - Model architecture view: Interactive model structure visualization using Cytoscape
+  - Bias-variance analysis: Plot training, validation, and test metrics together
+  - **Early Stopping Visualization**: Badges and icons showing early stopping status
+  - **Dynamic X-Axis**: Charts adapt to actual epochs when early stopping occurs
+  - **LR Scheduler Display**: Show scheduler type and parameters in metrics panel
+  - Modern web interface: React-based UI with Vite
+  - FastAPI backend: Python server for serving JSON data and SSE streams
+- **Files**:
+  - `viz-ui/src/` - React frontend components
+  - `scripts/fastapi_server.py` - Backend API server
+  - `scripts/viz.py` - Visualization launcher
+
+### 3. Broadcasting - Enhanced
 
 - **Status**: **COMPLETE** - Full NumPy-style implementation
 - **Features**:
@@ -88,7 +129,7 @@
   - `src/autograd/autograd.c` - Enhanced `can_broadcast_shapes()` and `broadcast_shapes()`
   - `include/autograd/autograd.h` - Added `broadcast_multi_shapes()`
 
-### 2. Data Augmentation
+### 4. Data Augmentation
 
 - **Status**: ✅ **COMPLETE**
 - **Features**:
@@ -103,7 +144,7 @@
   - `src/Core/augmentation.c` - Full implementation
   - `include/Core/augmentation.h` - Augmentation API
 
-### 3. Data Loading
+### 5. Data Loading
 
 - **Status**: ✅ **COMPLETE** - Basic implementation with prefetching support
 - **Features**:
@@ -118,7 +159,7 @@
   - `src/Core/dataset.c` - DataLoader implementation
   - `include/Core/dataset.h` - DataLoader API
 
-### 4. Gradient Checkpointing
+### 6. Gradient Checkpointing
 
 - **Status**: ✅ **COMPLETE** - Basic implementation
 - **Features**:
@@ -131,7 +172,7 @@
   - `src/autograd/checkpointing.c` - Checkpointing implementation
   - `include/autograd/checkpointing.h` - Checkpointing API
 
-### 5. Profiling
+### 7. Profiling
 
 - **Status**: ✅ **COMPLETE**
 - **Features**:
@@ -144,17 +185,23 @@
   - `src/Core/profiling.c` - Profiling implementation
   - `include/Core/profiling.h` - Profiling API
 
-### 6. Examples Build and Training Utilities
+### 8. Examples Build and Training Utilities
 
 - **Status**: ✅ COMPLETE
 - **Features**:
   - Makefile builds example binaries under `build/examples/`
-  - CMake option `BUILD_EXAMPLES` builds `autograd_example` and `pytorch_like_training`
-  - Example demonstrates manual learning-rate scheduling and early stopping
+  - CMake option `BUILD_EXAMPLES` builds all examples
+  - Example demonstrates automatic metrics capture, early stopping, and LR scheduling
+  - **Centralized Cleanup**: `CleanupContext` for resource management
+  - **Dataset Splitting**: `dataset_split_three()` for train/val/test splits
 - **Files**:
   - `CMakeLists.txt` - Example targets
   - `Makefile` - Example build rules
-  - `examples/training_loop_example.c` - Training loop with LR decay and early stop
+  - `examples/training_loop_example.c` - Training loop with automatic metrics
+  - `examples/test.c` - Comprehensive training with train/val/test splits
+  - `examples/early_stopping_lr_scheduler.c` - Early stopping and LR scheduling example
+  - `include/Core/cleanup.h` - Centralized cleanup API
+  - `src/Core/cleanup.c` - Cleanup implementation
 
 ## Implementation Notes
 

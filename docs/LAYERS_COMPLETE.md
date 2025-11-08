@@ -98,7 +98,17 @@ All 13 neural network layers are now fully implemented and ready for use!
   - Supports ceil_mode and count_include_pad
   - Proper boundary handling
 
-### 14. Sequential
+### 14. LayerNorm
+
+- **File:** `src/nn/layers/layernorm.c`
+- **Status:** Complete
+- **Features:**
+  - Normalizes across features (last dimension)
+  - Learnable scale (gamma) and shift (beta) parameters
+  - No running statistics (stateless normalization)
+  - Essential for transformer architectures
+
+### 15. Sequential
 
 - **File:** `src/nn/layers/sequential.c`
 - **Status:** Complete
@@ -172,9 +182,17 @@ Tensor *output = module_forward((Module*)model, input);
 
 ## Summary
 
-**All 13 layers fully implemented**
+**All 15 layers fully implemented**
 **All layers integrated into build system**
 **All layers pass linter checks**
 **All layers ready for use**
 
-The C-ML library now has a complete set of neural network layers!
+The C-ML library now has a complete set of neural network layers including:
+
+- Linear layers
+- Convolutional layers (Conv2d)
+- Normalization layers (BatchNorm2d, LayerNorm)
+- Pooling layers (MaxPool2d, AvgPool2d)
+- Activation layers (ReLU, Sigmoid, Tanh, LeakyReLU, GELU, Softmax, LogSoftmax)
+- Regularization layers (Dropout)
+- Container layers (Sequential)
