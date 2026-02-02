@@ -6,17 +6,14 @@
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
-#include <float.h>
 
-// Generate synthetic classification dataset
-void generate_dataset(float* X, float* y, int num_samples, int input_size, int seed) {
-    srand(seed);
+static void generate_dataset(float* X, float* y, int num_samples, int input_size, int seed) {
+    srand((unsigned int)seed);
 
     for (int i = 0; i < num_samples; i++) {
         for (int j = 0; j < input_size; j++) {
-            X[i * input_size + j] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
+            X[i * input_size + j] = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
         }
 
         float sum1 = 0.0f;
@@ -40,7 +37,7 @@ void generate_dataset(float* X, float* y, int num_samples, int input_size, int s
     }
 }
 
-int main() {
+int main(void) {
     Sequential* model    = NULL;
     Parameter** params   = NULL;
     Optimizer* optimizer = NULL;
@@ -89,8 +86,7 @@ int main() {
     sequential_add(model, (Module*)linear4);
     sequential_add(model, (Module*)sigmoid);
 
-    summary((Module*)model);
-    training_metrics_register_model((Module*)model);
+    cml_summary((Module*)model);
 
     int num_params = 0;
     if (module_collect_parameters((Module*)model, &params, &num_params, true) != 0) {
@@ -114,8 +110,9 @@ int main() {
     int X_shape[] = {num_samples, input_size};
     int y_shape[] = {num_samples, output_size};
 
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    X                   = tensor_empty(X_shape, 2, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    X = tensor_empty(X_shape, 2, &config);
     if (!X) {
         printf("Error: Failed to create input tensor\n");
         goto cleanup;
@@ -149,21 +146,22 @@ int main() {
     int no_improve_epochs = 0;
     int early_stopped_at  = -1;
 
-    training_metrics_set_expected_epochs(num_epochs);
+    training_metrics_set_expected_epochs((size_t)num_epochs);
 
     TrainingMetrics* metrics = training_metrics_get_global();
     if (metrics) {
         training_metrics_set_learning_rate(metrics, initial_lr, "StepLR");
         char params_buf[128];
-        snprintf(params_buf, sizeof(params_buf), "step_size=%d,gamma=%.2f", lr_step_size, lr_gamma);
+        snprintf(params_buf, sizeof(params_buf), "step_size=%d,gamma=%.2f", lr_step_size,
+                 (double)lr_gamma);
         training_metrics_set_lr_schedule_params(metrics, params_buf);
     }
 
     printf("\n=== Training Configuration ===\n");
     printf("Max epochs: %d\n", num_epochs);
     printf("Early stopping patience: %d\n", patience);
-    printf("LR scheduler: StepLR (step_size=%d, gamma=%.2f)\n", lr_step_size, lr_gamma);
-    printf("Initial learning rate: %.4f\n", initial_lr);
+    printf("LR scheduler: StepLR (step_size=%d, gamma=%.2f)\n", lr_step_size, (double)lr_gamma);
+    printf("Initial learning rate: %.4f\n", (double)initial_lr);
     printf("\nStarting training...\n\n");
 
     for (int epoch = 0; epoch < num_epochs; epoch++) {
@@ -189,7 +187,7 @@ int main() {
                 }
             }
         }
-        float accuracy = num_samples > 0 ? (float)correct / num_samples : 0.0f;
+        float accuracy = num_samples > 0 ? (float)correct / (float)num_samples : 0.0f;
         training_metrics_auto_capture_train_accuracy(accuracy);
 
         Tensor* loss = tensor_mse_loss(outputs, y);
@@ -211,7 +209,8 @@ int main() {
             float current_lr = optimizer_get_group_lr(optimizer, 0);
             float new_lr     = current_lr * lr_gamma;
             optimizer_set_lr(optimizer, new_lr);
-            printf("  [Epoch %d] LR decayed: %.6f -> %.6f\n", epoch + 1, current_lr, new_lr);
+            printf("  [Epoch %d] LR decayed: %.6f -> %.6f\n", epoch + 1, (double)current_lr,
+                   (double)new_lr);
         }
 
         if (epoch_loss < best_loss - improvement_tol) {
@@ -222,10 +221,11 @@ int main() {
             if (no_improve_epochs >= patience) {
                 early_stopped_at = epoch + 1;
                 printf("\n=== Early Stopping Triggered ===\n");
-                printf("Stopped at epoch %d (best loss: %.6f)\n", early_stopped_at, best_loss);
+                printf("Stopped at epoch %d (best loss: %.6f)\n", early_stopped_at,
+                       (double)best_loss);
                 printf("No improvement for %d epochs\n", patience);
 
-                training_metrics_mark_early_stop(epoch);
+                training_metrics_mark_early_stop((size_t)epoch);
                 break;
             }
         }
@@ -233,8 +233,8 @@ int main() {
         if ((epoch + 1) % 5 == 0 || epoch == 0) {
             float current_lr = optimizer_get_group_lr(optimizer, 0);
             printf("Epoch %3d/%d - Loss: %.6f, Acc: %.2f%%, LR: %.6f, No improve: %d/%d\n",
-                   epoch + 1, num_epochs, epoch_loss, accuracy * 100.0f, current_lr,
-                   no_improve_epochs, patience);
+                   epoch + 1, num_epochs, (double)epoch_loss, (double)(accuracy * 100.0f),
+                   (double)current_lr, no_improve_epochs, patience);
         }
 
         if (loss)
@@ -247,20 +247,20 @@ int main() {
     if (early_stopped_at > 0) {
         printf("Training stopped early at epoch %d (out of %d planned)\n", early_stopped_at,
                num_epochs);
-        printf("Best loss achieved: %.6f\n", best_loss);
+        printf("Best loss achieved: %.6f\n", (double)best_loss);
     } else {
         printf("Training completed all %d epochs\n", num_epochs);
-        printf("Final loss: %.6f\n", best_loss);
+        printf("Final loss: %.6f\n", (double)best_loss);
     }
 
     metrics = training_metrics_get_global();
     if (metrics) {
-        printf("Best accuracy: %.2f%%\n", metrics->best_accuracy * 100.0f);
-        printf("Total training time: %.2f seconds\n", metrics->total_time);
+        printf("Best accuracy: %.2f%%\n", (double)(metrics->best_accuracy * 100.0f));
+        printf("Total training time: %.2f seconds\n", (double)metrics->total_time);
     }
 
 cleanup:
-    cleanup_context_free(cleanup);
+    // cleanup_context_free is called automatically by cml_cleanup()
     cml_cleanup();
     return 0;
 }

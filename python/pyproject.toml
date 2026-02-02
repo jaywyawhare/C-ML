@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "cffi>=1.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c-ml"
+version = "0.1.0"
+description = "C-ML: A lightweight machine learning library with Python bindings"
+readme = "README.md"
+license = {text = "DBaJ-GPL"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Arinjay", email = "jaywyawhare@gmail.com"}
+]
+maintainers = [
+    {name = "Arinjay", email = "jaywyawhare@gmail.com"}
+]
+keywords = ["machine-learning", "deep-learning", "neural-networks", "tensor"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "cffi>=1.0.0",
+    "numpy>=1.20.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jaywyawhare/C-ML"
+Documentation = "https://jaywyawhare.github.io/C-ML"
+Repository = "https://github.com/jaywyawhare/C-ML"
+Issues = "https://github.com/jaywyawhare/C-ML/issues"
+
+[project.scripts]
+cml-viz = "cml.viz:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cml*"]
+
+[tool.setuptools.package-data]
+"cml" = ["py.typed", "*.pyi"]
+"cml.viz" = ["static/**/*"]
+"cml._lib" = ["*.so", "*.dylib", "*.dll"]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "UP"]

@@ -49,6 +49,14 @@ int autograd_checkpoint(Tensor* tensor);
  */
 Tensor* autograd_recompute(Tensor* tensor);
 
+/**
+ * @brief Cleanup checkpointing state
+ *
+ * Frees all checkpointed tensors and resets state.
+ * Should be called during autograd shutdown.
+ */
+void autograd_checkpointing_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

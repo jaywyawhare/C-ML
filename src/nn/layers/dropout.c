@@ -4,11 +4,10 @@
  */
 
 #include "nn/layers/dropout.h"
-#include "nn/module.h"
+#include "nn.h"
 #include "tensor/tensor.h"
-#include "tensor/ops.h"
-#include "Core/logging.h"
-#include "Core/memory_management.h"
+#include "ops/uops.h"
+#include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -21,8 +20,9 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
     // In training mode, apply dropout
     if (module_is_training(module)) {
         // Create mask with dropout probability
-        TensorConfig config = tensor_config_with_dtype_device(input->dtype, input->device);
-        Tensor* mask        = tensor_empty(input->shape, input->ndim, &config);
+        TensorConfig config = (TensorConfig){
+            .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+        Tensor* mask = tensor_empty(input->shape, input->ndim, &config);
         if (!mask)
             return NULL;
 
@@ -35,11 +35,12 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
         }
 
         for (size_t i = 0; i < mask->numel; i++) {
-            mask_data[i] =
-                ((float)rand() / RAND_MAX) > dropout->p ? 1.0f / (1.0f - dropout->p) : 0.0f;
+            mask_data[i] = ((float)rand() / (float)(float)RAND_MAX) > dropout->p
+                               ? 1.0f / (1.0f - dropout->p)
+                               : 0.0f;
         }
 
-        Tensor* output = tensor_mul(input, mask);
+        Tensor* output = uop_mul(input, mask);
         tensor_free(mask);
 
         return output;
@@ -48,15 +49,15 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
     }
 }
 
-static void dropout_free(Module* module) { CM_FREE(module); }
+static void dropout_free(Module* module) { free(module); }
 
 Dropout* nn_dropout(float p, bool inplace) {
-    Dropout* dropout = CM_MALLOC(sizeof(Dropout));
+    Dropout* dropout = malloc(sizeof(Dropout));
     if (!dropout)
         return NULL;
 
     if (module_init((Module*)dropout, "Dropout", dropout_forward, dropout_free) != 0) {
-        CM_FREE(dropout);
+        free(dropout);
         return NULL;
     }
 

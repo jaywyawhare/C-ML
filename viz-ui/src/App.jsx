@@ -1,299 +1,169 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { GitBranch, TrendingUp, Code } from 'lucide-react';
-import GraphView from './components/GraphView.jsx';
-import TrainingEvalView from './components/TrainingEvalView.jsx';
-import CodeGenView from './components/CodeGenView.jsx';
+import React, { useEffect, useState, useCallback, useMemo, lazy, Suspense, memo, useRef } from 'react';
+import { GitBranch, TrendingUp, Code, Activity } from 'lucide-react';
 
-// Use relative paths - Vite will proxy to the HTTP server
-const VIZ_SERVER_URL = '';
+// Lazy load heavy components
+const GraphView = lazy(() => import('./components/GraphView.jsx'));
+const TrainingEvalView = lazy(() => import('./components/TrainingEvalView.jsx'));
+const CodeGenView = lazy(() => import('./components/CodeGenView.jsx'));
 
-function App() {
-  const [activeTab, setActiveTab] = useState('graph');
-  const [graph, setGraph] = useState(null);
-  const [training, setTraining] = useState(null);
-  const [ts, setTs] = useState(null);
-  const [err, setErr] = useState(null);
+// Loading fallback
+const LoadingFallback = memo(() => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: 'var(--text-secondary)',
+    fontSize: 14,
+  }}>
+    Loading...
+  </div>
+));
+
+// Custom hook for data fetching with SSE streaming and caching
+function useDataFetch(endpoint, enabled = true, useStream = false) {
+  const [state, setState] = useState({ data: null, error: null, loading: false });
   const eventSourceRef = useRef(null);
-  const trainingEventSourceRef = useRef(null);
 
+  const fetchData = useCallback(async () => {
+    if (!enabled) return;
+
+    setState(s => ({ ...s, loading: true }));
+    try {
+      const resp = await fetch(endpoint, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      setState({ data: json.error ? null : json, error: json.error || null, loading: false });
+    } catch (e) {
+      setState({ data: null, error: e.message, loading: false });
+    }
+  }, [endpoint, enabled]);
+
+  // SSE streaming for real-time updates
   useEffect(() => {
-    // Fallback fetch function
-    const fetchGraph = async () => {
-      try {
-        setErr(null);
-        const resp = await fetch('/graph', { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json = await resp.json();
-        if (json.error) {
-          setErr(json.error);
-        } else {
-          setGraph(json);
-          setTs(new Date());
-        }
-      } catch (e) {
-        setErr('Waiting for graph data...');
-      }
-    };
-
-    // Use SSE for dynamic updates
-    const connectSSE = () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-
-      try {
-        setErr(null);
-        const eventSource = new EventSource('/graph/stream');
-        eventSourceRef.current = eventSource;
-
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.error) {
-              setErr(data.error);
-            } else {
-              setGraph(data);
-              setTs(new Date());
-              setErr(null);
-            }
-          } catch (e) {
-            console.error('Failed to parse SSE data:', e);
-            setErr('Failed to parse graph data');
-          }
-        };
-
-        eventSource.onerror = (error) => {
-          console.error('SSE connection error:', error);
-          setErr('Waiting for graph data...');
-          // Try to reconnect after a delay
-          setTimeout(() => {
-            if (eventSource.readyState === EventSource.CLOSED) {
-              connectSSE();
-            }
-          }, 2000);
-        };
-      } catch (e) {
-        console.error('Failed to create EventSource:', e);
-        // Fallback to fetch if SSE fails
-        fetchGraph();
-      }
-    };
-
-    // Connect via SSE when graph tab is active
-    if (activeTab === 'graph') {
-      // Seed with a one-shot fetch so the panel shows immediately if data exists
-      (async () => {
-        try {
-          const resp = await fetch('/graph', { cache: 'no-store' });
-          if (resp.ok) {
-            const json = await resp.json();
-            if (!json.error) setGraph(json);
-          }
-        } catch (_) {}
-      })();
-
-      // Also fetch training data for Model Architecture view
-      (async () => {
-        try {
-          const resp = await fetch('/training', { cache: 'no-store' });
-          if (resp.ok) {
-            const json = await resp.json();
-            if (!json.error) setTraining(json);
-          }
-        } catch (_) {}
-      })();
-
-      connectSSE();
-      // Close training SSE if open
-      if (trainingEventSourceRef.current) {
-        trainingEventSourceRef.current.close();
-        trainingEventSourceRef.current = null;
-      }
-    } else if (activeTab === 'training') {
-      // Seed with a one-shot fetch so the panel shows immediately if data exists
-      (async () => {
-        try {
-          const resp = await fetch('/training', { cache: 'no-store' });
-          if (resp.ok) {
-            const json = await resp.json();
-            if (!json.error) setTraining(json);
-          }
-        } catch (_) {}
-      })();
-
-      // Connect to training SSE
-      const connectTrainingSSE = () => {
-        if (trainingEventSourceRef.current) {
-          trainingEventSourceRef.current.close();
-        }
-
-        try {
-          setErr(null);
-          const eventSource = new EventSource('/training/stream');
-          trainingEventSourceRef.current = eventSource;
-
-          eventSource.onmessage = (event) => {
-            try {
-              const data = JSON.parse(event.data);
-              if (data.error) {
-                setErr(data.error);
-              } else {
-                setTraining(data);
-                setTs(new Date());
-                setErr(null);
-              }
-            } catch (e) {
-              console.error('Failed to parse training SSE data:', e);
-              setErr('Failed to parse training data');
-            }
-          };
-
-          eventSource.onerror = (error) => {
-            console.error('Training SSE connection error:', error);
-            setErr('Waiting for training data...');
-            setTimeout(() => {
-              if (eventSource.readyState === EventSource.CLOSED) {
-                connectTrainingSSE();
-              }
-            }, 2000);
-          };
-        } catch (e) {
-          console.error('Failed to create training EventSource:', e);
-          // Fallback to fetch
-          const fetchTraining = async () => {
-            try {
-              const resp = await fetch('/training', { cache: 'no-store' });
-              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-              const json = await resp.json();
-              if (json.error) {
-                setErr(json.error);
-              } else {
-                setTraining(json);
-                setTs(new Date());
-              }
-            } catch (e) {
-              setErr('Waiting for training data...');
-            }
-          };
-          fetchTraining();
-        }
-      };
-
-      connectTrainingSSE();
-      // Close graph SSE if open
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    } else {
-      // For other tabs, close SSE connections
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      if (trainingEventSourceRef.current) {
-        trainingEventSourceRef.current.close();
-        trainingEventSourceRef.current = null;
-      }
+    if (!enabled || !useStream) {
+      fetchData();
+      return;
     }
 
-    // Reconnect when tab becomes visible
-    const onVis = () => {
-      if (document.visibilityState === 'visible') {
-        if (activeTab === 'graph') {
-          connectSSE();
-        } else if (activeTab === 'training' && trainingEventSourceRef.current) {
-          // Reconnect training SSE if needed
-          const connectTrainingSSE = () => {
-            if (trainingEventSourceRef.current) {
-              trainingEventSourceRef.current.close();
-            }
-            try {
-              setErr(null);
-              const eventSource = new EventSource('/training/stream');
-              trainingEventSourceRef.current = eventSource;
-              eventSource.onmessage = (event) => {
-                try {
-                  const data = JSON.parse(event.data);
-                  if (!data.error) {
-                    setTraining(data);
-                    setTs(new Date());
-                  }
-                } catch (e) {
-                  console.error('Failed to parse training SSE data:', e);
-                }
-              };
-              eventSource.onerror = () => {
-                if (eventSource.readyState === EventSource.CLOSED) {
-                  setTimeout(connectTrainingSSE, 2000);
-                }
-              };
-            } catch (e) {
-              console.error('Failed to create training EventSource:', e);
-            }
-          };
-          connectTrainingSSE();
-        }
+    const streamEndpoint = `${endpoint}/stream`;
+    const eventSource = new EventSource(streamEndpoint);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const json = JSON.parse(event.data);
+        setState({ data: json.error ? null : json, error: json.error || null, loading: false });
+      } catch (e) {
+        console.error('Failed to parse SSE data:', e);
       }
     };
-    document.addEventListener('visibilitychange', onVis);
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      // Fallback to regular fetch
+      fetchData();
+    };
 
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      if (trainingEventSourceRef.current) {
-        trainingEventSourceRef.current.close();
-        trainingEventSourceRef.current = null;
-      }
-      document.removeEventListener('visibilitychange', onVis);
     };
-  }, [activeTab]);
+  }, [endpoint, enabled, useStream, fetchData]);
 
-  const renderView = () => {
-    switch (activeTab) {
-      case 'graph':
-        return <GraphView graph={graph} training={training} />;
-      case 'training':
-        return <TrainingEvalView data={training} mode="training" />;
-      case 'codegen':
-        return <CodeGenView data={null} />;
-      default:
-        return <GraphView graph={graph} training={training} />;
-    }
-  };
+  return state;
+}
 
-  const tabs = [
-    { id: 'graph', label: 'Computational Blueprint', icon: GitBranch },
-    { id: 'training', label: 'Training', icon: TrendingUp },
-    { id: 'codegen', label: 'Kernel Studio', icon: Code },
-  ];
+// Tab button component (memoized)
+const TabButton = memo(({ id, label, icon: Icon, active, onClick }) => (
+  <button
+    className={`topbar-button ${active ? 'active' : ''}`}
+    onClick={() => onClick(id)}
+  >
+    <Icon size={16} />
+    <span>{label}</span>
+  </button>
+));
+
+// Tabs configuration
+const TABS = [
+  { id: 'graph', label: 'Computational Blueprint', icon: GitBranch },
+  { id: 'training', label: 'Training', icon: TrendingUp },
+  { id: 'codegen', label: 'Kernel Studio', icon: Code },
+];
+
+function App() {
+  const [activeTab, setActiveTab] = useState('graph');
+
+  // Only fetch data needed for current tab
+  const needsGraph = activeTab === 'graph';
+  const needsTraining = activeTab === 'graph' || activeTab === 'training';
+  const needsKernels = activeTab === 'graph' || activeTab === 'codegen';
+
+  const { data: graph } = useDataFetch('/graph', needsGraph, true);
+  const { data: training } = useDataFetch('/training', needsTraining, true);
+  const { data: modelArch } = useDataFetch('/model_architecture', needsGraph, false);
+  const { data: kernels } = useDataFetch('/kernels', needsKernels, true);
+
+  // Memoize tab click handler
+  const handleTabClick = useCallback((id) => setActiveTab(id), []);
+
+  // Memoize view props
+  const graphProps = useMemo(() => ({
+    graph, training, modelArch, kernels
+  }), [graph, training, modelArch, kernels]);
+
+  const trainingProps = useMemo(() => ({
+    data: training, mode: 'training'
+  }), [training]);
+
+  const codegenProps = useMemo(() => ({
+    data: kernels
+  }), [kernels]);
 
   return (
     <div className="app">
       <div className="main-content">
         <div className="topbar">
-          <div className="title">C-ML Visualizer</div>
-          <div className="topbar-buttons">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  className={`topbar-button ${activeTab === tab.id ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  <Icon size={16} className="topbar-button-icon" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 32,
+              height: 32,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Activity size={18} color="var(--text-primary)" />
+            </div>
+            <div className="title">C-ML Visualizer</div>
           </div>
+
+          <div className="topbar-buttons">
+            {TABS.map(tab => (
+              <TabButton
+                key={tab.id}
+                {...tab}
+                active={activeTab === tab.id}
+                onClick={handleTabClick}
+              />
+            ))}
+          </div>
+
+          <div style={{ width: 140 }} />
         </div>
+
         <div className="panel">
           <div className="panel-body">
-            {renderView()}
+            <Suspense fallback={<LoadingFallback />}>
+              {activeTab === 'graph' && <GraphView {...graphProps} />}
+              {activeTab === 'training' && <TrainingEvalView {...trainingProps} />}
+              {activeTab === 'codegen' && <CodeGenView {...codegenProps} />}
+            </Suspense>
           </div>
         </div>
       </div>

@@ -33,15 +33,15 @@ repos:
   - repo: local
     hooks:
       - id: cml-build
-        name: Build C-ML (make)
-        entry: bash -lc 'make clean && make'
+        name: Build C-ML
+        entry: make -j
         language: system
         pass_filenames: false
         stages: [pre-commit]
         always_run: true
       - id: pytest
         name: Run pytest
-        entry: bash -lc 'pytest -q'
+        entry: bash -c 'pytest -q -p no:asyncio tests/'
         language: system
         pass_filenames: false
         stages: [pre-commit]

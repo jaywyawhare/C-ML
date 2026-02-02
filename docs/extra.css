@@ -1,0 +1,7 @@
+/* Ensure logo is visible and properly sized */
+.md-header__button.md-logo img {
+    height: auto;
+    width: auto;
+    max-height: 2.4rem;
+    transition: opacity 0.2s ease;
+}

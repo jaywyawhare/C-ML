@@ -3,21 +3,16 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-#include "Core/logging.h"
-#include "Core/memory_management.h"
+#include "core/logging.h"
+#include "alloc/memory_management.h"
 #include "tensor/tensor.h"
 #include <stdbool.h>
 #include <stddef.h>
 
-// Autograd System
-
 // Forward declarations
 struct Tensor;
-struct Function;
-struct AutogradContext;
 
-// Operation Types
-
+// Operation Types (used for auto-capture and unified API)
 typedef enum {
     OP_NONE = 0,
 
@@ -82,54 +77,6 @@ typedef enum {
     OP_CUSTOM
 } OpType;
 
-// Backward Context for Saving Tensors
-
-typedef struct AutogradContext {
-    struct Tensor** saved_tensors;
-    int num_saved_tensors;
-    int capacity;
-
-    // Saved values (scalars, etc.)
-    void* saved_data;
-    size_t saved_data_size;
-
-    // For shape operations
-    int* saved_shape;
-    int saved_ndim;
-
-    // For custom operations
-    void* custom_data;
-    void (*custom_free_fn)(void*);
-} AutogradContext;
-
-// Backward function signature
-typedef void (*BackwardFn)(struct Function* fn, struct Tensor* grad_output);
-
-// Function struct: represents an operation in the computation graph
-typedef struct Function {
-    OpType op_type;
-    char* op_name;
-
-    // Parent tensors (inputs to this operation)
-    struct Tensor** inputs;
-    int num_inputs;
-
-    // Context for backward pass
-    AutogradContext* ctx;
-
-    // Backward function
-    BackwardFn backward_fn;
-
-    // For graph traversal
-    int sequence_nr;
-    bool needs_input_grad[8]; // Which inputs need gradients (max 8 inputs)
-
-    // Reference counting
-    int ref_count;
-} Function;
-
-// Autograd Engine (Tape-based)
-
 typedef struct AutogradEngine {
     bool enabled;
     bool grad_mode;         // Global gradient tracking flag
@@ -146,176 +93,222 @@ typedef struct AutogradEngine {
 // Global autograd engine
 extern AutogradEngine* global_autograd_engine;
 
-// Hook System
-
 typedef void (*TensorHookFn)(struct Tensor* grad);
-typedef void (*BackwardHookFn)(struct Function* fn, struct Tensor* grad_input,
-                               struct Tensor* grad_output);
 
-typedef struct TensorHook {
-    TensorHookFn fn;
-    struct TensorHook* next;
-} TensorHook;
-
-// Core Autograd Functions
-
-// Engine management
+/**
+ * @brief Initialize the autograd engine
+ */
 void autograd_init(void);
+
+/**
+ * @brief Shutdown the autograd engine
+ */
 void autograd_shutdown(void);
+
+/**
+ * @brief Get the global autograd engine instance
+ * @return Pointer to AutogradEngine
+ */
 AutogradEngine* autograd_get_engine(void);
 
-// Gradient mode context
+/**
+ * @brief Set gradient calculation mode
+ * @param enabled Whether to enable gradient calculation
+ */
 void autograd_set_grad_mode(bool enabled);
+
+/**
+ * @brief Check if gradient calculation is enabled
+ * @return true if enabled, false otherwise
+ */
 bool autograd_is_grad_enabled(void);
+
+/**
+ * @brief Enter no-grad context (disable gradient calculation)
+ */
 void autograd_no_grad_enter(void);
+
+/**
+ * @brief Exit no-grad context (restore previous state)
+ */
 void autograd_no_grad_exit(void);
 
-// Backward pass
+/**
+ * @brief Perform backward pass from a tensor
+ * @param tensor Tensor to start backward pass from
+ * @param gradient Gradient tensor (optional, defaults to 1.0)
+ * @param retain_graph Whether to retain the graph for multiple backward passes
+ * @param create_graph Whether to create a graph for higher-order derivatives
+ */
 void tensor_backward(struct Tensor* tensor, struct Tensor* gradient, bool retain_graph,
                      bool create_graph);
+
+/**
+ * @brief Zero gradients of a tensor
+ * @param tensor Tensor to zero gradients for
+ */
 void tensor_zero_grad(struct Tensor* tensor);
 
-// Gradient utilities
+/**
+ * @brief Check if tensor requires gradients
+ * @param t Input tensor
+ * @return true if requires gradients, false otherwise
+ */
 bool tensor_requires_grad(struct Tensor* t);
+
+/**
+ * @brief Set whether tensor requires gradients
+ * @param t Input tensor
+ * @param requires_grad Whether to require gradients
+ */
 void tensor_set_requires_grad(struct Tensor* t, bool requires_grad);
+
+/**
+ * @brief Check if tensor is a leaf node
+ * @param t Input tensor
+ * @return true if leaf node, false otherwise
+ */
 bool tensor_is_leaf(struct Tensor* t);
+
+/**
+ * @brief Detach tensor from computation graph
+ * @param t Input tensor
+ * @return New detached tensor
+ */
 struct Tensor* tensor_detach(struct Tensor* t);
-void tensor_detach_(struct Tensor* t);
+
+/**
+ * @brief Detach tensor in-place
+ * @param t Input tensor
+ */
+void tensor_detach_inplace(struct Tensor* t);
+
+/**
+ * @brief Retain gradient for non-leaf tensor
+ * @param t Input tensor
+ */
 void tensor_retain_grad(struct Tensor* t);
 
-// Context Management
+typedef void (*TensorBackwardHook)(struct Tensor* grad);
+// Forward declare Module for hook
+struct Module;
+typedef void (*ModuleBackwardHook)(struct Module* module, struct Tensor* grad);
 
-AutogradContext* autograd_context_create(void);
-void autograd_context_free(AutogradContext* ctx);
-void autograd_context_save_for_backward(AutogradContext* ctx, struct Tensor** tensors,
-                                        int num_tensors);
-void autograd_context_save_shape(AutogradContext* ctx, int* shape, int ndim);
-void autograd_context_save_data(AutogradContext* ctx, void* data, size_t size);
-struct Tensor* autograd_context_get_saved_tensor(AutogradContext* ctx, int index);
+/**
+ * @brief Register backward hook on tensor
+ * @param t Input tensor
+ * @param hook Hook function
+ * @return Hook ID (or negative on failure)
+ */
+int tensor_register_backward_hook(struct Tensor* t, TensorBackwardHook hook);
 
-// Function Management
+/**
+ * @brief Remove all hooks from tensor
+ * @param t Input tensor
+ */
+void tensor_remove_hooks(struct Tensor* t);
 
-Function* autograd_function_create(OpType op_type, const char* name);
-void autograd_function_free(Function* fn);
-void autograd_function_set_backward(Function* fn, BackwardFn backward_fn);
-void autograd_function_set_inputs(Function* fn, struct Tensor** inputs, int num_inputs);
-void autograd_function_mark_dirty(Function* fn, struct Tensor* tensor);
+/**
+ * @brief Register backward hook on module
+ * @param module Input module
+ * @param hook Hook function
+ * @return Hook ID (or negative on failure)
+ */
+int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook);
 
-// Apply function and create computation graph edge
-struct Tensor* autograd_apply_function(Function* fn, struct Tensor** outputs, int num_outputs);
-
-// Backward Pass Implementation
-
-// Topological sort for backward pass
-typedef struct BackwardNode {
-    struct Tensor* tensor;
-    struct Tensor* grad;
-    Function* grad_fn;
-    int depth;
-    bool visited;
-    struct BackwardNode* next;
-} BackwardNode;
-
-typedef struct BackwardGraph {
-    BackwardNode** nodes;
-    int num_nodes;
-    int capacity;
-} BackwardGraph;
-
-BackwardGraph* backward_graph_create(void);
-void backward_graph_free(BackwardGraph* graph);
-void backward_graph_add_node(BackwardGraph* graph, struct Tensor* tensor, struct Tensor* grad);
-void backward_graph_execute(BackwardGraph* graph, bool retain_graph);
-
-// Gradient Accumulation
-
+/**
+ * @brief Accumulate gradient into tensor
+ * @param tensor Target tensor
+ * @param new_grad Gradient to accumulate
+ */
 void tensor_accumulate_grad(struct Tensor* tensor, struct Tensor* new_grad);
+
+/**
+ * @brief Get gradient of tensor
+ * @param tensor Input tensor
+ * @return Gradient tensor (or NULL if none)
+ */
 struct Tensor* tensor_get_grad(struct Tensor* tensor);
 
-// Hook Management
-
+/**
+ * @brief Register hook on tensor (generic)
+ * @param tensor Input tensor
+ * @param hook_fn Hook function
+ */
 void tensor_register_hook(struct Tensor* tensor, TensorHookFn hook_fn);
-void tensor_remove_hooks(struct Tensor* tensor);
-void function_register_hook(Function* fn, BackwardHookFn hook_fn);
+// Note: tensor_remove_hooks is declared above to avoid redundant declaration
 
-// Operation Registration Helpers
-
-// Helper macros for creating operations
 #define DEFINE_UNARY_OP(name, op_type) struct Tensor* tensor_##name(struct Tensor* input);
 
 #define DEFINE_BINARY_OP(name, op_type)                                                            \
     struct Tensor* tensor_##name(struct Tensor* a, struct Tensor* b);
 
-// Broadcasting and Shape Utilities
+/**
+ * @brief Check if shapes can be broadcasted
+ * @param shape1 First shape
+ * @param ndim1 First number of dimensions
+ * @param shape2 Second shape
+ * @param ndim2 Second number of dimensions
+ * @return true if broadcastable, false otherwise
+ */
+bool tensor_can_broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2);
 
-bool can_broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2);
+/**
+ * @brief Compute broadcasted shape for two shapes
+ * @param shape1 First shape
+ * @param ndim1 First number of dimensions
+ * @param shape2 Second shape
+ * @param ndim2 Second number of dimensions
+ * @param out_ndim Pointer to store output number of dimensions
+ * @return Allocated broadcasted shape array (caller must free)
+ */
 int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_ndim);
+
+/**
+ * @brief Compute broadcasted shape for multiple shapes
+ * @param shapes Array of shape arrays
+ * @param ndims Array of dimension counts
+ * @param num_shapes Number of shapes
+ * @param out_ndim Pointer to store output number of dimensions
+ * @return Allocated broadcasted shape array (caller must free)
+ */
 int* broadcast_multi_shapes(int** shapes, int* ndims, int num_shapes, int* out_ndim);
-void compute_grad_for_broadcast(struct Tensor* grad_output, int* original_shape, int ndim,
-                                struct Tensor** grad_input);
 
-// Error Handling
+/**
+ * @brief Compute gradients for broadcasted operation
+ * @param grad_output Output gradient
+ * @param original_shape Original input shape
+ * @param ndim Original input dimensions
+ * @param grad_input Pointer to store computed input gradient
+ */
+void tensor_compute_grad_for_broadcast(struct Tensor* grad_output, int* original_shape, int ndim,
+                                       struct Tensor** grad_input);
 
+/**
+ * @brief Check for anomalies (NaN/Inf) in tensor
+ * @param tensor Tensor to check
+ * @param operation Operation name for reporting
+ */
 void autograd_check_anomaly(struct Tensor* tensor, const char* operation);
+
+/**
+ * @brief Enable/disable anomaly detection
+ * @param enabled Whether to enable anomaly detection
+ */
 void autograd_set_anomaly_detection(bool enabled);
 
-// Utility Functions
-
-const char* op_type_to_string(OpType op);
+/**
+ * @brief Print computation graph
+ * @param tensor Root tensor
+ */
 void autograd_print_graph(struct Tensor* tensor);
-void autograd_visualize_backward_graph(struct Tensor* tensor);
 
+/**
+ * @brief Export computation graph to JSON
+ * @param root Root tensor
+ * @param path File path
+ * @return 0 on success, negative on failure
+ */
 int autograd_export_json(struct Tensor* root, const char* path);
-
-// Advanced Features
-
-// Double backward (higher-order derivatives)
-void tensor_backward_backward(struct Tensor* tensor);
-
-// Gradient checkpointing
-struct Tensor* checkpoint_forward(Function* fn, struct Tensor** inputs, int num_inputs);
-
-// Jacobian-vector product
-struct Tensor* jacobian_vector_product(struct Tensor* output, struct Tensor* input,
-                                       struct Tensor* vector);
-
-// Vector-jacobian product (used in backward pass)
-struct Tensor* vector_jacobian_product(struct Tensor* output, struct Tensor* input,
-                                       struct Tensor* vector);
-
-// Forward Operation Declarations (implemented in forward_ops.c)
-
-// Binary operations
-struct Tensor* tensor_add(struct Tensor* a, struct Tensor* b);
-struct Tensor* tensor_sub(struct Tensor* a, struct Tensor* b);
-struct Tensor* tensor_mul(struct Tensor* a, struct Tensor* b);
-struct Tensor* tensor_div(struct Tensor* a, struct Tensor* b);
-struct Tensor* tensor_pow(struct Tensor* a, struct Tensor* b);
-
-// Unary operations
-struct Tensor* tensor_neg(struct Tensor* a);
-struct Tensor* tensor_exp(struct Tensor* a);
-struct Tensor* tensor_log(struct Tensor* a);
-struct Tensor* tensor_sqrt(struct Tensor* a);
-struct Tensor* tensor_sin(struct Tensor* a);
-struct Tensor* tensor_cos(struct Tensor* a);
-struct Tensor* tensor_tan(struct Tensor* a);
-struct Tensor* tensor_tanh(struct Tensor* a);
-
-// Activation functions
-struct Tensor* tensor_relu(struct Tensor* a);
-struct Tensor* tensor_sigmoid(struct Tensor* a);
-struct Tensor* tensor_leaky_relu(struct Tensor* a, float negative_slope);
-
-// Reduction operations
-struct Tensor* tensor_sum(struct Tensor* a, int dim, bool keepdim);
-struct Tensor* tensor_mean(struct Tensor* a, int dim, bool keepdim);
-
-// Matrix operations
-struct Tensor* tensor_transpose(struct Tensor* a, int dim0, int dim1);
-struct Tensor* tensor_matmul(struct Tensor* a, struct Tensor* b);
-
-// Loss functions have been moved to autograd/loss_functions.h
-// Include that header for loss function declarations
 
 #endif // CML_AUTOGRAD_H

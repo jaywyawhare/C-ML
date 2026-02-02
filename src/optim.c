@@ -19,11 +19,10 @@
  * Additional optimizer variants (RMSprop, AdamW, etc.) can be added as needed.
  */
 
-#include "optim/optimizer.h"
-#include "Core/logging.h"
-#include "Core/memory_management.h"
-#include "Core/training_metrics.h"
-#include "Core/error_stack.h"
+#include "optim.h"
+#include "core/logging.h"
+#include "core/training_metrics.h"
+#include "core/error_stack.h"
 #include "tensor/tensor.h"
 #include "autograd/autograd.h"
 #include <stdio.h>
@@ -55,7 +54,7 @@ int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGrad
 }
 
 Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad) {
-    Optimizer* optimizer = CM_MALLOC(sizeof(Optimizer));
+    Optimizer* optimizer = malloc(sizeof(Optimizer));
     if (!optimizer) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Optimizer",
                          __FILE__, __LINE__, __func__);
@@ -65,7 +64,7 @@ Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad)
     if (optimizer_init(optimizer, name, step, zero_grad) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Optimizer", __FILE__, __LINE__,
                          __func__);
-        CM_FREE(optimizer);
+        free(optimizer);
         return NULL;
     }
 
@@ -94,11 +93,15 @@ void optimizer_free(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
+    // Remove from tracking list to prevent double-free during cleanup
+    extern void cml_untrack_optimizer(Optimizer*);
+    cml_untrack_optimizer(optimizer);
+
     if (optimizer->param_groups) {
         for (int i = 0; i < optimizer->num_param_groups; i++) {
             ParameterGroup* group = &optimizer->param_groups[i];
             if (group->parameters) {
-                CM_FREE(group->parameters);
+                free(group->parameters);
             }
             if (group->state) {
                 if (strcmp(optimizer->name, "SGD") == 0) {
@@ -108,10 +111,10 @@ void optimizer_free(Optimizer* optimizer) {
                             if (states[j]->momentum_buffer) {
                                 tensor_free(states[j]->momentum_buffer);
                             }
-                            CM_FREE(states[j]);
+                            free(states[j]);
                         }
                     }
-                    CM_FREE(states);
+                    free(states);
                 } else if (strcmp(optimizer->name, "Adam") == 0) {
                     AdamState** states = (AdamState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
@@ -122,40 +125,40 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->exp_avg_sq);
                             if (states[j]->max_exp_avg_sq)
                                 tensor_free(states[j]->max_exp_avg_sq);
-                            CM_FREE(states[j]);
+                            free(states[j]);
                         }
                     }
-                    CM_FREE(states);
+                    free(states);
                 } else if (strcmp(optimizer->name, "RMSprop") == 0) {
                     RMSpropState** states = (RMSpropState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
                             if (states[j]->square_avg)
                                 tensor_free(states[j]->square_avg);
-                            CM_FREE(states[j]);
+                            free(states[j]);
                         }
                     }
-                    CM_FREE(states);
+                    free(states);
                 } else if (strcmp(optimizer->name, "Adagrad") == 0) {
                     AdagradState** states = (AdagradState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
                             if (states[j]->sum_sq_grad)
                                 tensor_free(states[j]->sum_sq_grad);
-                            CM_FREE(states[j]);
+                            free(states[j]);
                         }
                     }
-                    CM_FREE(states);
+                    free(states);
                 } else {
                     // Generic state cleanup
-                    CM_FREE(group->state);
+                    free(group->state);
                 }
             }
         }
-        CM_FREE(optimizer->param_groups);
+        free(optimizer->param_groups);
     }
 
-    CM_FREE(optimizer);
+    free(optimizer);
 }
 
 int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int num_parameters,
@@ -169,7 +172,7 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
         int new_capacity =
             optimizer->param_groups_capacity == 0 ? 4 : optimizer->param_groups_capacity * 2;
         ParameterGroup* new_groups =
-            CM_REALLOC(optimizer->param_groups, new_capacity * sizeof(ParameterGroup));
+            realloc(optimizer->param_groups, (size_t)new_capacity * sizeof(ParameterGroup));
         if (!new_groups) {
             LOG_ERROR("Failed to allocate memory for parameter groups");
             return -1;
@@ -180,7 +183,7 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
 
     ParameterGroup* group = &optimizer->param_groups[optimizer->num_param_groups];
 
-    group->parameters = CM_MALLOC(num_parameters * sizeof(Parameter*));
+    group->parameters = malloc((size_t)num_parameters * sizeof(Parameter*));
     if (!group->parameters) {
         LOG_ERROR("Failed to allocate memory for parameter group parameters");
         return -1;
@@ -205,7 +208,7 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
     optimizer->num_param_groups++;
 
     LOG_DEBUG("Added parameter group %d with %d parameters (lr=%.6f, wd=%.6f)",
-              optimizer->num_param_groups - 1, num_parameters, lr, weight_decay);
+              optimizer->num_param_groups - 1, num_parameters, (double)lr, (double)weight_decay);
 
     return 0;
 }
@@ -255,7 +258,6 @@ void optimizer_zero_grad(Optimizer* optimizer) {
 
     optimizer->zero_grad(optimizer);
 
-    extern void training_metrics_mark_zero_grad(void);
     training_metrics_mark_zero_grad();
 }
 
@@ -274,7 +276,7 @@ void optimizer_set_lr(Optimizer* optimizer, float lr) {
         optimizer->param_groups[i].lr = lr;
     }
 
-    LOG_DEBUG("Set learning rate to %.6f for all %d parameter groups", lr,
+    LOG_DEBUG("Set learning rate to %.6f for all %d parameter groups", (double)lr,
               optimizer->num_param_groups);
 }
 
@@ -287,7 +289,7 @@ void optimizer_set_group_lr(Optimizer* optimizer, int group_index, float lr) {
 
     optimizer->param_groups[group_index].lr = lr;
 
-    LOG_DEBUG("Set learning rate to %.6f for parameter group %d", lr, group_index);
+    LOG_DEBUG("Set learning rate to %.6f for parameter group %d", (double)lr, group_index);
 }
 
 float optimizer_get_group_lr(Optimizer* optimizer, int group_index) {
@@ -354,8 +356,8 @@ void optimizer_print_summary(Optimizer* optimizer, int indent) {
         ParameterGroup* group = &optimizer->param_groups[i];
         for (int j = 0; j < indent + 1; j++)
             printf("  ");
-        printf("Group %d: %d parameters, lr=%.6f, wd=%.6f\n", i, group->num_parameters, group->lr,
-               group->weight_decay);
+        printf("Group %d: %d parameters, lr=%.6f, wd=%.6f\n", i, group->num_parameters,
+               (double)group->lr, (double)group->weight_decay);
     }
 }
 
@@ -378,8 +380,8 @@ static void sgd_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
         float lr              = group->lr;
         float weight_decay    = group->weight_decay;
         float momentum        = group->momentum;
@@ -388,7 +390,7 @@ static void sgd_step(Optimizer* optimizer) {
         if (momentum > 0.0f && !group->state) {
             // Allocate state array for all parameters
             SGDMomentumState** states =
-                CM_MALLOC(group->num_parameters * sizeof(SGDMomentumState*));
+                malloc((size_t)group->num_parameters * sizeof(SGDMomentumState*));
             if (!states) {
                 LOG_ERROR("Failed to allocate SGD momentum state");
                 continue;
@@ -400,13 +402,15 @@ static void sgd_step(Optimizer* optimizer) {
                     continue;
 
                 Tensor* tensor          = param->tensor;
-                SGDMomentumState* state = CM_MALLOC(sizeof(SGDMomentumState));
+                SGDMomentumState* state = malloc(sizeof(SGDMomentumState));
                 if (!state)
                     continue;
 
                 // Initialize momentum buffer to zeros
-                TensorConfig config =
-                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
+                TensorConfig config    = (TensorConfig){.dtype      = tensor->dtype,
+                                                        .device     = tensor->device,
+                                                        .has_dtype  = true,
+                                                        .has_device = true};
                 state->momentum_buffer = tensor_zeros(tensor->shape, tensor->ndim, &config);
                 states[i]              = state;
             }
@@ -472,13 +476,13 @@ static void sgd_step(Optimizer* optimizer) {
     }
 }
 
-// SGD Zero Grad Function
-static void sgd_zero_grad(Optimizer* optimizer) {
+// Generic Zero Grad Function
+static void generic_zero_grad(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
 
         for (int i = 0; i < group->num_parameters; i++) {
             Parameter* param = group->parameters[i];
@@ -495,8 +499,8 @@ static void adam_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
         float lr              = group->lr;
         float weight_decay    = group->weight_decay;
         float beta1           = group->beta1;
@@ -506,7 +510,7 @@ static void adam_step(Optimizer* optimizer) {
         // Initialize state if needed
         if (!group->state) {
             // Allocate state array for all parameters
-            AdamState** states = CM_MALLOC(group->num_parameters * sizeof(AdamState*));
+            AdamState** states = malloc((size_t)group->num_parameters * sizeof(AdamState*));
             if (!states) {
                 LOG_ERROR("Failed to allocate Adam state");
                 continue;
@@ -518,15 +522,17 @@ static void adam_step(Optimizer* optimizer) {
                     continue;
 
                 Tensor* tensor   = param->tensor;
-                AdamState* state = CM_MALLOC(sizeof(AdamState));
+                AdamState* state = malloc(sizeof(AdamState));
                 if (!state)
                     continue;
 
                 // Initialize moment estimates
-                TensorConfig config =
-                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
-                state->exp_avg    = tensor_zeros(tensor->shape, tensor->ndim, &config);
-                state->exp_avg_sq = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                     .device     = tensor->device,
+                                                     .has_dtype  = true,
+                                                     .has_device = true};
+                state->exp_avg      = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                state->exp_avg_sq   = tensor_zeros(tensor->shape, tensor->ndim, &config);
                 state->max_exp_avg_sq =
                     optimizer->amsgrad ? tensor_zeros(tensor->shape, tensor->ndim, &config) : NULL;
 
@@ -540,8 +546,8 @@ static void adam_step(Optimizer* optimizer) {
         int step           = group->step_count + 1;
 
         // Bias correction factors
-        float bias_correction1 = 1.0f - powf(beta1, step);
-        float bias_correction2 = 1.0f - powf(beta2, step);
+        float bias_correction1 = 1.0f - powf(beta1, (float)step);
+        float bias_correction2 = 1.0f - powf(beta2, (float)step);
 
         for (int i = 0; i < group->num_parameters; i++) {
             Parameter* param = group->parameters[i];
@@ -566,18 +572,19 @@ static void adam_step(Optimizer* optimizer) {
 
             // Update moment estimates
             for (size_t j = 0; j < numel; j++) {
-                float g = grad_data[j];
+                float grad_val = grad_data[j];
 
                 // Weight decay
                 if (weight_decay > 0.0f) {
-                    g += weight_decay * param_data[j];
+                    grad_val += weight_decay * param_data[j];
                 }
 
                 // Update biased first moment estimate
-                exp_avg_data[j] = beta1 * exp_avg_data[j] + (1.0f - beta1) * g;
+                exp_avg_data[j] = beta1 * exp_avg_data[j] + (1.0f - beta1) * grad_val;
 
                 // Update biased second raw moment estimate
-                exp_avg_sq_data[j] = beta2 * exp_avg_sq_data[j] + (1.0f - beta2) * g * g;
+                exp_avg_sq_data[j] =
+                    beta2 * exp_avg_sq_data[j] + (1.0f - beta2) * grad_val * grad_val;
 
                 // Compute bias-corrected estimates
                 float m = exp_avg_data[j] / bias_correction1;
@@ -601,31 +608,13 @@ static void adam_step(Optimizer* optimizer) {
     }
 }
 
-// Adam Zero Grad Function
-static void adam_zero_grad(Optimizer* optimizer) {
-    if (!optimizer)
-        return;
-
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
-
-        for (int i = 0; i < group->num_parameters; i++) {
-            Parameter* param = group->parameters[i];
-            if (!param || !param->tensor)
-                continue;
-
-            tensor_zero_grad(param->tensor);
-        }
-    }
-}
-
 // RMSprop Step Function
 static void rmsprop_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
         float lr              = group->lr;
         float weight_decay    = group->weight_decay;
         float alpha           = group->beta1; // Reuse beta1 for alpha (decay rate)
@@ -634,7 +623,7 @@ static void rmsprop_step(Optimizer* optimizer) {
         // Initialize state if needed
         if (!group->state) {
             // Allocate state array for all parameters
-            RMSpropState** states = CM_MALLOC(group->num_parameters * sizeof(RMSpropState*));
+            RMSpropState** states = malloc((size_t)group->num_parameters * sizeof(RMSpropState*));
             if (!states) {
                 LOG_ERROR("Failed to allocate RMSprop state");
                 continue;
@@ -646,15 +635,17 @@ static void rmsprop_step(Optimizer* optimizer) {
                     continue;
 
                 Tensor* tensor      = param->tensor;
-                RMSpropState* state = CM_MALLOC(sizeof(RMSpropState));
+                RMSpropState* state = malloc(sizeof(RMSpropState));
                 if (!state)
                     continue;
 
                 // Initialize square average to zeros
-                TensorConfig config =
-                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
-                state->square_avg = tensor_zeros(tensor->shape, tensor->ndim, &config);
-                states[i]         = state;
+                TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                     .device     = tensor->device,
+                                                     .has_dtype  = true,
+                                                     .has_device = true};
+                state->square_avg   = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]           = state;
             }
 
             group->state = states;
@@ -684,40 +675,23 @@ static void rmsprop_step(Optimizer* optimizer) {
 
             // Update square average: square_avg = alpha * square_avg + (1 - alpha) * grad^2
             for (size_t j = 0; j < numel; j++) {
-                float g = grad_data[j];
+                float grad_val = grad_data[j];
 
                 // Weight decay
                 if (weight_decay > 0.0f) {
-                    g += weight_decay * param_data[j];
+                    grad_val += weight_decay * param_data[j];
                 }
 
                 // Update square average
-                square_avg_data[j] = alpha * square_avg_data[j] + (1.0f - alpha) * g * g;
+                square_avg_data[j] =
+                    alpha * square_avg_data[j] + (1.0f - alpha) * grad_val * grad_val;
 
                 // Update parameter: param = param - lr * grad / sqrt(square_avg + epsilon)
-                param_data[j] -= lr * g / (sqrtf(square_avg_data[j]) + epsilon);
+                param_data[j] -= lr * grad_val / (sqrtf(square_avg_data[j]) + epsilon);
             }
         }
 
         group->step_count++;
-    }
-}
-
-// RMSprop Zero Grad Function
-static void rmsprop_zero_grad(Optimizer* optimizer) {
-    if (!optimizer)
-        return;
-
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
-
-        for (int i = 0; i < group->num_parameters; i++) {
-            Parameter* param = group->parameters[i];
-            if (!param || !param->tensor)
-                continue;
-
-            tensor_zero_grad(param->tensor);
-        }
     }
 }
 
@@ -726,8 +700,8 @@ static void adagrad_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
         float lr              = group->lr;
         float weight_decay    = group->weight_decay;
         float epsilon         = group->epsilon;
@@ -735,7 +709,7 @@ static void adagrad_step(Optimizer* optimizer) {
         // Initialize state if needed
         if (!group->state) {
             // Allocate state array for all parameters
-            AdagradState** states = CM_MALLOC(group->num_parameters * sizeof(AdagradState*));
+            AdagradState** states = malloc((size_t)group->num_parameters * sizeof(AdagradState*));
             if (!states) {
                 LOG_ERROR("Failed to allocate Adagrad state");
                 continue;
@@ -747,15 +721,17 @@ static void adagrad_step(Optimizer* optimizer) {
                     continue;
 
                 Tensor* tensor      = param->tensor;
-                AdagradState* state = CM_MALLOC(sizeof(AdagradState));
+                AdagradState* state = malloc(sizeof(AdagradState));
                 if (!state)
                     continue;
 
                 // Initialize sum of squared gradients to zeros
-                TensorConfig config =
-                    tensor_config_with_dtype_device(tensor->dtype, tensor->device);
-                state->sum_sq_grad = tensor_zeros(tensor->shape, tensor->ndim, &config);
-                states[i]          = state;
+                TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                     .device     = tensor->device,
+                                                     .has_dtype  = true,
+                                                     .has_device = true};
+                state->sum_sq_grad  = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]           = state;
             }
 
             group->state = states;
@@ -785,40 +761,22 @@ static void adagrad_step(Optimizer* optimizer) {
 
             // Update sum of squared gradients and parameters
             for (size_t j = 0; j < numel; j++) {
-                float g = grad_data[j];
+                float grad_val = grad_data[j];
 
                 // Weight decay
                 if (weight_decay > 0.0f) {
-                    g += weight_decay * param_data[j];
+                    grad_val += weight_decay * param_data[j];
                 }
 
                 // Accumulate squared gradients: sum_sq_grad += grad^2
-                sum_sq_grad_data[j] += g * g;
+                sum_sq_grad_data[j] += grad_val * grad_val;
 
                 // Update parameter: param = param - lr * grad / sqrt(sum_sq_grad + epsilon)
-                param_data[j] -= lr * g / (sqrtf(sum_sq_grad_data[j]) + epsilon);
+                param_data[j] -= lr * grad_val / (sqrtf(sum_sq_grad_data[j]) + epsilon);
             }
         }
 
         group->step_count++;
-    }
-}
-
-// Adagrad Zero Grad Function
-static void adagrad_zero_grad(Optimizer* optimizer) {
-    if (!optimizer)
-        return;
-
-    for (int g = 0; g < optimizer->num_param_groups; g++) {
-        ParameterGroup* group = &optimizer->param_groups[g];
-
-        for (int i = 0; i < group->num_parameters; i++) {
-            Parameter* param = group->parameters[i];
-            if (!param || !param->tensor)
-                continue;
-
-            tensor_zero_grad(param->tensor);
-        }
     }
 }
 
@@ -829,7 +787,7 @@ static void adagrad_zero_grad(Optimizer* optimizer) {
  */
 Optimizer* optim_sgd(Parameter** parameters, int num_parameters, float lr, float momentum,
                      float weight_decay) {
-    Optimizer* optimizer = optimizer_create("SGD", sgd_step, sgd_zero_grad);
+    Optimizer* optimizer = optimizer_create("SGD", sgd_step, generic_zero_grad);
     if (!optimizer)
         return NULL;
 
@@ -851,7 +809,7 @@ Optimizer* optim_sgd(Parameter** parameters, int num_parameters, float lr, float
  */
 Optimizer* optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                       float beta1, float beta2, float epsilon) {
-    Optimizer* optimizer = optimizer_create("Adam", adam_step, adam_zero_grad);
+    Optimizer* optimizer = optimizer_create("Adam", adam_step, generic_zero_grad);
     if (!optimizer) {
         // Error already pushed by optimizer_create
         return NULL;
@@ -880,7 +838,7 @@ Optimizer* optim_adam(Parameter** parameters, int num_parameters, float lr, floa
  */
 Optimizer* optim_rmsprop(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                          float alpha, float epsilon) {
-    Optimizer* optimizer = optimizer_create("RMSprop", rmsprop_step, rmsprop_zero_grad);
+    Optimizer* optimizer = optimizer_create("RMSprop", rmsprop_step, generic_zero_grad);
     if (!optimizer)
         return NULL;
 
@@ -904,7 +862,7 @@ Optimizer* optim_rmsprop(Parameter** parameters, int num_parameters, float lr, f
  */
 Optimizer* optim_adagrad(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                          float epsilon) {
-    Optimizer* optimizer = optimizer_create("Adagrad", adagrad_step, adagrad_zero_grad);
+    Optimizer* optimizer = optimizer_create("Adagrad", adagrad_step, generic_zero_grad);
     if (!optimizer)
         return NULL;
 
@@ -918,6 +876,49 @@ Optimizer* optim_adagrad(Parameter** parameters, int num_parameters, float lr, f
         ParameterGroup* group = &optimizer->param_groups[0];
         group->epsilon        = epsilon > 0.0f ? epsilon : 1e-8f;
     }
+
+    return optimizer;
+}
+
+Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, float beta1,
+                                float beta2, float eps) {
+    if (!model) {
+        return NULL;
+    }
+
+    Parameter** params = NULL;
+    int num_params     = 0;
+    if (module_collect_parameters(model, &params, &num_params, true) != 0) {
+        return NULL;
+    }
+
+    Optimizer* optimizer = optim_adam(params, num_params, lr, weight_decay, beta1, beta2, eps);
+    // Note: params array is owned by optimizer, don't free here
+
+    // Automatically track for cleanup
+    if (optimizer) {
+        extern void cml_track_optimizer(Optimizer*);
+        cml_track_optimizer(optimizer);
+    }
+
+    return optimizer;
+}
+
+Optimizer* optim_sgd_for_model(Module* model, float lr, float momentum, float weight_decay) {
+    if (!model) {
+        return NULL;
+    }
+
+    Parameter** params = NULL;
+    int num_params     = 0;
+    if (module_collect_parameters(model, &params, &num_params, true) != 0) {
+        return NULL;
+    }
+
+    Optimizer* optimizer = optim_sgd(params, num_params, lr, momentum, weight_decay);
+    // Note: params array is owned by optimizer, don't free here
+
+    // Automatically track for cleanup
 
     return optimizer;
 }

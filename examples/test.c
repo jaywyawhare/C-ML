@@ -1,131 +1,47 @@
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
-#include <float.h>
-#include <time.h>
 
-// Generate synthetic classification dataset with learnable pattern
-void generate_dataset(float* X, float* y, int num_samples, int input_size, int seed) {
-    srand(seed);
-
-    for (int i = 0; i < num_samples; i++) {
-        for (int j = 0; j < input_size; j++) {
-            X[i * input_size + j] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-        }
-
-        float weighted_sum = 0.0f;
-        for (int j = 0; j < input_size; j++) {
-            float weight = (j % 2 == 0) ? 1.0f : -0.5f;
-            weighted_sum += weight * X[i * input_size + j];
-        }
-
-        float threshold = 0.3f;
-        y[i]            = (weighted_sum > threshold) ? 1.0f : 0.0f;
-    }
-}
-
-int main() {
-    Sequential* model    = NULL;
-    Parameter** params   = NULL;
-    Optimizer* optimizer = NULL;
-    float* X_all         = NULL;
-    float* y_all         = NULL;
-
-    CleanupContext* cleanup = cleanup_context_create();
-    if (!cleanup) {
-        printf("Failed to create cleanup context\n");
-        return 1;
-    }
-
-    if (cml_init() != 0) {
-        printf("Failed to initialize C-ML library\n");
-        cleanup_context_free(cleanup);
-        return 1;
-    }
-
-    model = nn_sequential();
-    if (!model) {
-        printf("Error: Failed to create Sequential model\n");
-        goto cleanup;
-    }
-    cleanup_register_model(cleanup, (Module*)model);
+int main(void) {
+    cml_init();
+    cml_seed(42);
 
     int input_size  = 16;
     int num_epochs  = 300;
     int num_samples = 500;
     int output_size = 1;
 
-    Linear* linear1   = nn_linear(input_size, 64, DTYPE_FLOAT32, DEVICE_CPU, true);
-    ReLU* relu1       = nn_relu(false);
-    Linear* linear2   = nn_linear(64, 64, DTYPE_FLOAT32, DEVICE_CPU, true);
-    ReLU* relu2       = nn_relu(false);
-    Linear* linear3   = nn_linear(64, 128, DTYPE_FLOAT32, DEVICE_CPU, true);
-    ReLU* relu3       = nn_relu(false);
-    Linear* linear4   = nn_linear(128, 64, DTYPE_FLOAT32, DEVICE_CPU, true);
-    Tanh* tanh1       = nn_tanh();
-    Linear* linear5   = nn_linear(64, 32, DTYPE_FLOAT32, DEVICE_CPU, true);
-    ReLU* relu4       = nn_relu(false);
-    Linear* linear6   = nn_linear(32, 1, DTYPE_FLOAT32, DEVICE_CPU, true);
-    Sigmoid* sigmoid1 = nn_sigmoid();
+    Sequential* model = nn_sequential();
+    DeviceType device = cml_get_default_device();
+    DType dtype       = cml_get_default_dtype();
+    model = sequential_add_chain(model, (Module*)nn_linear(input_size, 64, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_relu(false));
+    model = sequential_add_chain(model, (Module*)nn_linear(64, 64, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_relu(false));
+    model = sequential_add_chain(model, (Module*)nn_linear(64, 128, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_relu(false));
+    model = sequential_add_chain(model, (Module*)nn_linear(128, 64, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_tanh());
+    model = sequential_add_chain(model, (Module*)nn_linear(64, 32, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_relu(false));
+    model = sequential_add_chain(model, (Module*)nn_linear(32, 1, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_sigmoid());
 
-    if (!linear1 || !relu1 || !linear2 || !relu2 || !linear3 || !relu3 || !linear4 || !tanh1 ||
-        !linear5 || !relu4 || !linear6 || !sigmoid1) {
-        printf("Error: Failed to create layers\n");
-        goto cleanup;
-    }
-
-    sequential_add(model, (Module*)linear1);
-    sequential_add(model, (Module*)relu1);
-    sequential_add(model, (Module*)linear2);
-    sequential_add(model, (Module*)relu2);
-    sequential_add(model, (Module*)linear3);
-    sequential_add(model, (Module*)relu3);
-    sequential_add(model, (Module*)linear4);
-    sequential_add(model, (Module*)tanh1);
-    sequential_add(model, (Module*)linear5);
-    sequential_add(model, (Module*)relu4);
-    sequential_add(model, (Module*)linear6);
-    sequential_add(model, (Module*)sigmoid1);
-
-    summary((Module*)model);
-    training_metrics_register_model((Module*)model);
-
+    cml_summary((Module*)model);
     module_set_training((Module*)model, true);
 
-    int num_params = 0;
-    if (module_collect_parameters((Module*)model, &params, &num_params, true) != 0) {
-        printf("Error: Failed to collect model parameters\n");
-        goto cleanup;
-    }
-    cleanup_register_params(cleanup, params);
-
-    optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* optimizer = optim_adam_for_model((Module*)model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
         printf("Error: Failed to create optimizer\n");
-        goto cleanup;
+        return 1;
     }
-    cleanup_register_optimizer(cleanup, optimizer);
 
-    X_all = CM_MALLOC(num_samples * input_size * sizeof(float));
-    y_all = CM_MALLOC(num_samples * sizeof(float));
-
-    if (!X_all || !y_all) {
-        printf("Error: Failed to allocate dataset memory\n");
-        goto cleanup;
-    }
-    cleanup_register_memory(cleanup, X_all);
-    cleanup_register_memory(cleanup, y_all);
-
-    generate_dataset(X_all, y_all, num_samples, input_size, 42);
-
-    Dataset* full_dataset = dataset_from_arrays(X_all, y_all, num_samples, input_size, output_size);
+    Dataset* full_dataset = dataset_random_classification(num_samples, input_size, output_size);
     if (!full_dataset) {
         printf("Error: Failed to create dataset\n");
-        goto cleanup;
+        return 1;
     }
-    cleanup_register_dataset(cleanup, full_dataset);
 
     float train_ratio      = 0.7f;
     float val_ratio        = 0.15f;
@@ -136,18 +52,15 @@ int main() {
     if (dataset_split_three(full_dataset, train_ratio, val_ratio, &train_dataset, &val_dataset,
                             &test_dataset) != 0) {
         printf("Error: Failed to split dataset\n");
-        goto cleanup;
+        return 1;
     }
-    cleanup_register_dataset(cleanup, train_dataset);
-    cleanup_register_dataset(cleanup, val_dataset);
-    cleanup_register_dataset(cleanup, test_dataset);
 
     printf("Dataset split: Train=%d (%.1f%%), Val=%d (%.1f%%), Test=%d (%.1f%%)\n\n",
-           train_dataset->num_samples, train_ratio * 100.0f, val_dataset->num_samples,
-           val_ratio * 100.0f, test_dataset->num_samples,
-           (1.0f - train_ratio - val_ratio) * 100.0f);
+           train_dataset->num_samples, (double)(train_ratio * 100.0f), val_dataset->num_samples,
+           (double)(val_ratio * 100.0f), test_dataset->num_samples,
+           (double)((1.0f - train_ratio - val_ratio) * 100.0f));
 
-    training_metrics_set_expected_epochs(num_epochs);
+    training_metrics_set_expected_epochs((size_t)num_epochs);
 
     printf("Training for %d epochs...\n\n", num_epochs);
 
@@ -175,8 +88,9 @@ int main() {
                 }
             }
         }
-        float accuracy =
-            train_dataset->num_samples > 0 ? (float)correct / train_dataset->num_samples : 0.0f;
+        float accuracy = train_dataset->num_samples > 0
+                             ? (float)correct / (float)train_dataset->num_samples
+                             : 0.0f;
         training_metrics_auto_capture_train_accuracy(accuracy);
 
         Tensor* loss = tensor_mse_loss(outputs, train_dataset->y);
@@ -215,9 +129,9 @@ int main() {
             }
             printf("Epoch %4d/%d - Train Loss: %.6f, Train Acc: %.2f%%, Val Loss: %.6f, Val Acc: "
                    "%.2f%%\n",
-                   epoch + 1, num_epochs, epoch_loss, accuracy * 100.0f,
-                   val_loss != INFINITY ? val_loss : 0.0f,
-                   val_acc != INFINITY ? val_acc * 100.0f : 0.0f);
+                   epoch + 1, num_epochs, (double)epoch_loss, (double)(accuracy * 100.0f),
+                   !isinf(val_loss) ? (double)val_loss : 0.0,
+                   !isinf(val_acc) ? (double)(val_acc * 100.0f) : 0.0);
         }
 
         tensor_free(loss);
@@ -225,8 +139,8 @@ int main() {
     }
 
     printf("\nTraining completed!\n");
-    printf("Best Training Loss: %.6f\n", best_loss);
-    printf("Best Training Accuracy: %.2f%%\n", best_accuracy * 100.0f);
+    printf("Best Training Loss: %.6f\n", (double)best_loss);
+    printf("Best Training Accuracy: %.2f%%\n", (double)(best_accuracy * 100.0f));
 
     printf("\n=== Final Evaluation ===\n");
 
@@ -234,10 +148,10 @@ int main() {
         0) {
         TrainingMetrics* metrics = training_metrics_get_global();
         if (metrics && metrics->epoch_training_losses && metrics->epoch_training_accuracies) {
-            size_t last_epoch = num_epochs - 1;
+            size_t last_epoch = (size_t)(num_epochs - 1);
             printf("Training Set   - Loss: %.6f, Accuracy: %.2f%%\n",
-                   metrics->epoch_training_losses[last_epoch],
-                   metrics->epoch_training_accuracies[last_epoch] * 100.0f);
+                   (double)metrics->epoch_training_losses[last_epoch],
+                   (double)(metrics->epoch_training_accuracies[last_epoch] * 100.0f));
         }
     }
 
@@ -245,10 +159,10 @@ int main() {
         0) {
         TrainingMetrics* metrics = training_metrics_get_global();
         if (metrics && metrics->epoch_validation_losses && metrics->epoch_validation_accuracies) {
-            size_t last_epoch = num_epochs - 1;
+            size_t last_epoch = (size_t)(num_epochs - 1);
             printf("Validation Set - Loss: %.6f, Accuracy: %.2f%%\n",
-                   metrics->epoch_validation_losses[last_epoch],
-                   metrics->epoch_validation_accuracies[last_epoch] * 100.0f);
+                   (double)metrics->epoch_validation_losses[last_epoch],
+                   (double)(metrics->epoch_validation_accuracies[last_epoch] * 100.0f));
         }
     }
 
@@ -256,15 +170,13 @@ int main() {
         0) {
         TrainingMetrics* metrics = training_metrics_get_global();
         if (metrics && metrics->epoch_testing_losses && metrics->epoch_testing_accuracies) {
-            size_t last_epoch = num_epochs - 1;
+            size_t last_epoch = (size_t)(num_epochs - 1);
             printf("Test Set       - Loss: %.6f, Accuracy: %.2f%%\n",
-                   metrics->epoch_testing_losses[last_epoch],
-                   metrics->epoch_testing_accuracies[last_epoch] * 100.0f);
+                   (double)metrics->epoch_testing_losses[last_epoch],
+                   (double)(metrics->epoch_testing_accuracies[last_epoch] * 100.0f));
         }
     }
 
-cleanup:
-    cleanup_context_free(cleanup);
     cml_cleanup();
     return 0;
 }

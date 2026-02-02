@@ -1,7 +1,9 @@
-site_name: Documentation
-site_description: Lightweight Machine Learning Library in C
+site_name: C-ML Documentation
+site_description: Production-ready Machine Learning Library in C
 repo_url: https://github.com/jaywyawhare/C-ML
+repo_name: jaywyawhare/C-ML
 site_author: Arrry
+copyright: Copyright &copy; 2025 C-ML Contributors
 
 # Explicitly select Pygments styles for syntax highlighting
 pygments_style: monokai
@@ -9,10 +11,13 @@ pygments_dark_style: native
 
 theme:
   name: material
-  logo: image.svg
-  favicon: image.svg
+  logo: light-mode.svg
+  favicon: light-mode.svg
   palette:
     - media: "(prefers-color-scheme)"
+      scheme: default
+      primary: indigo
+      accent: indigo
       toggle:
         icon: material/link
         name: Switch to light mode
@@ -35,17 +40,28 @@ theme:
     code: "Source Code Pro"
   icon:
     logo: logo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+
+extra_css:
+  - docs/extra.css
+
+extra_javascript:
+  - docs/logo-switcher.js
 
 nav:
   - Home: index.md
-  - Autograd: AUTOGRAD.md
-  - Autograd Implementation: AUTOGRAD_IMPLEMENTATION.md
-  - Layers Reference: NN_LAYERS.md
-  - Layers Implementation: LAYERS_COMPLETE.md
-  - Training Guide: TRAINING.md
-  - Integration Summary: INTEGRATION_SUMMARY.md
-  - Implementation Status: IMPLEMENTATION_STATUS.md
-  - TODO / Roadmap: TODO_IMPLEMENTATIONS.md
+  - Getting Started: getting_started.md
+  - API Reference: api_reference.md
+  - Autograd: autograd.md
+  - Neural Network Layers: nn_layers.md
+  - Training: training.md
+  - Graph Mode: graph_mode.md
 
 extra:
   social:

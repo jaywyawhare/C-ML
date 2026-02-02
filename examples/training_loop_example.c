@@ -1,139 +1,219 @@
 /**
  * @file training_loop_example.c
- * @brief Minimal training-loop example using Sequential, Optimizer, and MSE loss.
+ * @brief Minimal training-loop example using new DX features:
+ * - Sensible defaults (device, dtype)
+ * - Fluent/builder API
+ * - Automatic parameter collection (optim_adam_for_model)
+ * - Implicit shape inference (tensor_zeros_2d)
  */
 
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
-void training_example(void) {
-    CleanupContext* cleanup = cleanup_context_create();
-    if (!cleanup) {
-        LOG_ERROR("Failed to create cleanup context");
-        return;
-    }
-
-    if (cml_init() != 0) {
-        LOG_ERROR("Failed to initialize C-ML library");
-        cleanup_context_free(cleanup);
-        return;
-    }
+static void training_example(void) {
+    cml_init();
+    cml_seed(42);
 
     int input_size  = 10;
     int hidden_size = 20;
     int output_size = 1;
-    Sequential* seq = nn_sequential();
-    sequential_add(seq,
-                   (Module*)nn_linear(input_size, hidden_size, DTYPE_FLOAT32, DEVICE_CPU, true));
-    sequential_add(seq, (Module*)nn_relu(false));
-    sequential_add(seq,
-                   (Module*)nn_linear(hidden_size, output_size, DTYPE_FLOAT32, DEVICE_CPU, true));
+
+    Sequential* seq   = nn_sequential();
+    DeviceType device = cml_get_default_device();
+    DType dtype       = cml_get_default_dtype();
+
+    seq           = cml_nn_sequential_add(seq,
+                                          (Module*)nn_linear(input_size, hidden_size, dtype, device, true));
+    seq           = cml_nn_sequential_add(seq, (Module*)nn_relu(false));
+    seq           = cml_nn_sequential_add(seq,
+                                          (Module*)nn_linear(hidden_size, output_size, dtype, device, true));
+    seq           = cml_nn_sequential_add(seq, (Module*)nn_sigmoid());
     Module* model = (Module*)seq;
 
     if (!model) {
         LOG_ERROR("Failed to create model");
-        goto cleanup;
+        return;
     }
-    cleanup_register_model(cleanup, model);
-    training_metrics_register_model(model);
-
     module_set_training(model, true);
 
-    Parameter** params = NULL;
-    int num_params     = 0;
-    if (module_collect_parameters(model, &params, &num_params, true) != 0) {
-        LOG_ERROR("Failed to collect model parameters");
-        goto cleanup;
-    }
-    cleanup_register_params(cleanup, params);
+    // Print model summary (also exports architecture if VIZ=1)
+    cml_summary(model);
 
-    printf("Model has %d parameters\n", num_params);
+    // Register model for automatic architecture export (for visualization)
+    training_metrics_register_model(model);
 
-    Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* optimizer = NULL;
+    Tensor* inputs       = NULL;
+    Tensor* targets      = NULL;
+
+    optimizer = optim_adam_for_model(model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
     if (!optimizer) {
         LOG_ERROR("Failed to create optimizer");
-        goto cleanup;
+        return;
     }
-    cleanup_register_optimizer(cleanup, optimizer);
 
     printf("Created %s optimizer\n", optimizer_get_name(optimizer));
 
     int batch_size  = 32;
     int num_samples = 100;
 
-    int input_shape[]   = {batch_size, input_size};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* inputs      = tensor_empty(input_shape, 2, &config);
+    // Allocate FULL dataset
+    inputs = tensor_zeros_2d(num_samples, input_size);
     if (!inputs) {
         LOG_ERROR("Failed to create input tensor");
-        goto cleanup;
+        return;
     }
-    cleanup_register_tensor(cleanup, inputs);
 
-    int target_shape[] = {batch_size, output_size};
-    Tensor* targets    = tensor_zeros(target_shape, 1, &config);
+    targets = tensor_zeros_2d(num_samples, output_size);
     if (!targets) {
         LOG_ERROR("Failed to create target tensor");
-        goto cleanup;
+        tensor_free(inputs);
+        return;
     }
-    cleanup_register_tensor(cleanup, targets);
 
+    // Generate meaningful training data
     float* input_data  = (float*)tensor_data_ptr(inputs);
     float* target_data = (float*)tensor_data_ptr(targets);
-    for (int i = 0; i < batch_size * input_size; i++) {
-        input_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
-    }
-    for (int i = 0; i < batch_size; i++) {
-        target_data[i] = ((float)rand() / RAND_MAX);
+
+    // Create a simple learnable pattern: target = 1 if sum of first 3 inputs > 0, else 0
+    for (int i = 0; i < num_samples; i++) {
+        // Generate inputs
+        for (int j = 0; j < input_size; j++) {
+            input_data[i * input_size + j] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f;
+        }
+
+        // Create target based on input pattern (learnable)
+        float sum = 0.0f;
+        for (int j = 0; j < 3 && j < input_size; j++) {
+            sum += input_data[i * input_size + j];
+        }
+        target_data[i] = (sum > 0.0f) ? 1.0f : 0.0f;
     }
 
     int num_epochs        = 100;
     float best_loss       = INFINITY;
-    int patience          = 0;
-    int no_improve_epochs = 5;
+    int patience          = 10;
+    int no_improve_epochs = 0;
     float improvement_tol = 1e-5f;
     int lr_step_size      = 20;
     float lr_gamma        = 0.5f;
 
-    training_metrics_set_expected_epochs(num_epochs);
+    training_metrics_set_expected_epochs((size_t)num_epochs);
 
     printf("\nStarting training for %d epochs...\n\n", num_epochs);
 
     for (int epoch = 0; epoch < num_epochs; epoch++) {
         float epoch_loss = 0.0f;
+        float epoch_acc  = 0.0f;
+        int num_batches  = num_samples / batch_size;
+        if (num_batches == 0)
+            num_batches = 1;
 
-        for (int batch = 0; batch < num_samples / batch_size; batch++) {
+        for (int batch = 0; batch < num_batches; batch++) {
             optimizer_zero_grad(optimizer);
 
-            Tensor* outputs = module_forward(model, inputs);
+            // Use different data slices for each batch
+            int batch_start = (batch * batch_size) % num_samples;
+            int batch_end   = batch_start + batch_size;
+            if (batch_end > num_samples)
+                batch_end = num_samples;
+            int current_batch_size = batch_end - batch_start;
+
+            // Create batch tensors by copying data
+            Tensor* batch_inputs  = tensor_zeros_2d(current_batch_size, input_size);
+            Tensor* batch_targets = tensor_zeros_2d(current_batch_size, output_size);
+
+            float* batch_in_data  = (float*)tensor_data_ptr(batch_inputs);
+            float* batch_tgt_data = (float*)tensor_data_ptr(batch_targets);
+            float* all_in_data    = (float*)tensor_data_ptr(inputs);
+            float* all_tgt_data   = (float*)tensor_data_ptr(targets);
+
+            for (int i = 0; i < current_batch_size; i++) {
+                int src_idx = batch_start + i;
+                memcpy(batch_in_data + i * input_size, all_in_data + src_idx * input_size,
+                       (size_t)input_size * sizeof(float));
+                memcpy(batch_tgt_data + i * output_size, all_tgt_data + src_idx * output_size,
+                       (size_t)output_size * sizeof(float));
+            }
+
+            Tensor* outputs = module_forward(model, batch_inputs);
 
             if (!outputs) {
                 LOG_ERROR("Forward pass failed");
+                tensor_free(batch_inputs);
+                tensor_free(batch_targets);
                 continue;
             }
 
-            Tensor* loss = tensor_mse_loss(outputs, targets);
+            Tensor* loss = tensor_mse_loss(outputs, batch_targets);
 
             if (!loss) {
                 LOG_ERROR("Loss computation failed");
+                tensor_free(outputs);
+                tensor_free(batch_inputs);
+                tensor_free(batch_targets);
                 continue;
             }
 
-            if (batch == 0) {
+            // Calculate batch accuracy
+            float* out_data = (float*)tensor_data_ptr(outputs);
+            int correct     = 0;
+            for (int i = 0; i < current_batch_size; i++) {
+                float pred = out_data[i];
+                float tgt  = batch_tgt_data[i]; // reuse pointer
+                // Check if prediction matches target (using 0.5 threshold for 0/1 targets)
+                if ((pred > 0.5f && tgt > 0.5f) || (pred <= 0.5f && tgt <= 0.5f)) {
+                    correct++;
+                }
+            }
+            epoch_acc += (float)correct / (float)current_batch_size;
+
+            if (batch == 0 && epoch == 0) {
                 float p0 = tensor_get_float(outputs, 0);
                 float p1 = tensor_get_float(outputs, 1);
                 float p2 = tensor_get_float(outputs, 2);
-                float t0 = tensor_get_float(targets, 0);
-                float t1 = tensor_get_float(targets, 1);
-                float t2 = tensor_get_float(targets, 2);
-                printf("  sample preds: [%.3f, %.3f, %.3f]  targets: [%.3f, %.3f, %.3f]\n", p0, p1,
-                       p2, t0, t1, t2);
+                float t0 = tensor_get_float(batch_targets, 0);
+                float t1 = tensor_get_float(batch_targets, 1);
+                float t2 = tensor_get_float(batch_targets, 2);
+                printf(
+                    "    Sample predictions: [%.3f, %.3f, %.3f] vs targets: [%.3f, %.3f, %.3f]\n",
+                    (double)p0, (double)p1, (double)p2, (double)t0, (double)t1, (double)t2);
             }
 
             tensor_backward(loss, NULL, false, false);
+
+            // Export graph and kernels on first batch of first epoch for visualization
+            if (batch == 0 && epoch == 0) {
+                autograd_export_json(loss, "graph.json");
+
+                // Export kernel analysis for CodeGenView
+                if (loss->ir_context) {
+                    // Export unoptimized view first
+                    char* unopt = cml_ir_export_kernel_analysis(loss->ir_context, false);
+
+                    // Run optimization to get fused kernels and dead code elimination
+                    cml_ir_optimize(loss->ir_context);
+
+                    // Export optimized view
+                    char* opt = cml_ir_export_kernel_analysis(loss->ir_context, true);
+
+                    if (unopt && opt) {
+                        FILE* f = fopen("kernels.json", "w");
+                        if (f) {
+                            fprintf(f, "{\"unoptimized\":%s,\"optimized\":%s}", unopt, opt);
+                            fclose(f);
+                        }
+                    }
+                    if (unopt)
+                        free(unopt);
+                    if (opt)
+                        free(opt);
+                }
+            }
 
             float* loss_data = (float*)tensor_data_ptr(loss);
             if (loss_data) {
@@ -146,18 +226,29 @@ void training_example(void) {
                 tensor_free(loss);
             if (outputs)
                 tensor_free(outputs);
+            tensor_free(batch_inputs);
+            tensor_free(batch_targets);
         }
 
-        epoch_loss /= (num_samples / batch_size);
-        printf("Epoch %d/%d - Loss: %.6f\n", epoch + 1, num_epochs, epoch_loss);
+        epoch_loss /= (float)num_batches;
+        epoch_acc /= (float)num_batches;
+
+        // Capture metrics for UI if needed
+        training_metrics_auto_capture_train_accuracy(epoch_acc);
+
+        if ((epoch + 1) % 10 == 0 || epoch == 0) {
+            printf("Epoch %d/%d - Loss: %.4f - Acc: %.2f%%\n", epoch + 1, num_epochs,
+                   (double)epoch_loss, (double)(epoch_acc * 100.0f));
+        }
 
         if (epoch_loss + improvement_tol < best_loss) {
             best_loss         = epoch_loss;
             no_improve_epochs = 0;
+            printf("  (New best model! Loss %.6f)\n", (double)best_loss);
         } else {
             no_improve_epochs++;
             if (no_improve_epochs >= patience) {
-                printf("Early stopping at epoch %d (best loss %.6f)\n", epoch + 1, best_loss);
+                printf("  Early stopping triggered (no improvement for %d epochs)\n", patience);
                 break;
             }
         }
@@ -166,11 +257,14 @@ void training_example(void) {
             float current_lr = optimizer_get_group_lr(optimizer, 0);
             float new_lr     = current_lr * lr_gamma;
             optimizer_set_lr(optimizer, new_lr);
-            printf("  LR decayed to %.6f\n", new_lr);
+            printf("  LR decayed to %.6f\n", (double)new_lr);
         }
     }
 
     printf("\nTraining completed!\n");
+
+    // Complete the final epoch and export final metrics
+    training_metrics_complete_epoch();
 
     Tensor* eval_out = module_forward(model, inputs);
     if (eval_out) {
@@ -181,14 +275,14 @@ void training_example(void) {
         if (limit > 5)
             limit = 5;
         for (size_t i = 0; i < limit; i++) {
-            printf("  %zu: pred=%.4f  target=%.4f\n", i, tensor_get_float(eval_out, i),
-                   tensor_get_float(targets, i));
+            printf("  Sample %zu: pred=%.4f  target=%.4f\n", i,
+                   (double)tensor_get_float(eval_out, i), (double)tensor_get_float(targets, i));
         }
         tensor_free(eval_out);
     }
 
-cleanup:
-    cleanup_context_free(cleanup);
+    tensor_free(targets);
+    tensor_free(inputs);
     cml_cleanup();
 }
 

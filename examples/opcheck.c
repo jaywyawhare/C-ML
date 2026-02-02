@@ -4,9 +4,6 @@
  */
 
 #include "cml.h"
-#include "nn/layers/conv2d.h"
-#include "nn/layers/batchnorm2d.h"
-#include "nn/layers/pooling.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -14,30 +11,30 @@ static void print_tensor_csv(Tensor* t) {
     for (size_t i = 0; i < t->numel; i++) {
         if (i)
             printf(",");
-        printf("%g", tensor_get_float(t, i));
+        printf("%g", (double)tensor_get_float(t, i));
     }
     printf("\n");
 }
 
 int main(void) {
-    // Test 1: elementwise add/mul
+    cml_init();
     {
         int shape[]         = {4};
-        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* a           = tensor_empty(shape, 1, &config);
-        Tensor* b           = tensor_empty(shape, 1, &config);
+        TensorConfig config = (TensorConfig){
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+        Tensor* a = tensor_empty(shape, 1, &config);
+        Tensor* b = tensor_empty(shape, 1, &config);
         for (int i = 0; i < 4; i++) {
-            tensor_set_float(a, i, (float)(i + 1)); // [1,2,3,4]
-            tensor_set_float(b, i, (float)(i + 5)); // [5,6,7,8]
+            tensor_set_float(a, (size_t)i, (float)(i + 1));
+            tensor_set_float(b, (size_t)i, (float)(i + 5));
         }
-        Tensor* add = tensor_add(a, b);
-        Tensor* mul = tensor_mul(a, b);
-        Tensor* sub = tensor_sub(b, a);
-        Tensor* div = tensor_div(b, a);
-        // pow: a^(b mod 3 + 1) to keep small exponents
+        Tensor* add  = tensor_add(a, b);
+        Tensor* mul  = tensor_mul(a, b);
+        Tensor* sub  = tensor_sub(b, a);
+        Tensor* div  = tensor_div(b, a);
         Tensor* bexp = tensor_empty(shape, 1, &config);
         for (int i = 0; i < 4; i++)
-            tensor_set_float(bexp, i, (float)((i % 3) + 1));
+            tensor_set_float(bexp, (size_t)i, (float)((i % 3) + 1));
         Tensor* powv = tensor_pow(a, bexp);
         printf("ADD,");
         print_tensor_csv(add);
@@ -59,27 +56,23 @@ int main(void) {
         tensor_free(b);
     }
 
-    // Test 2: linear layer forward (batch=2, in=3, out=2) with fixed weights/bias
     {
         int in_shape[]      = {2, 3};
-        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* inp         = tensor_empty(in_shape, 2, &config);
-        // inp = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+        TensorConfig config = (TensorConfig){
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+        Tensor* inp     = tensor_empty(in_shape, 2, &config);
         float in_vals[] = {1, 2, 3, 4, 5, 6};
         for (int i = 0; i < 6; i++)
-            tensor_set_float(inp, i, in_vals[i]);
+            tensor_set_float(inp, (size_t)i, in_vals[i]);
 
-        // Linear layer
-        Linear* fc = nn_linear(3, 2, DTYPE_FLOAT32, DEVICE_CPU, true);
-        // Set weight (out=2, in=3): [[0.1, 0.2, 0.3], [ -0.2, 0.0, 0.4]]
+        Linear* fc     = nn_linear(3, 2, DTYPE_FLOAT32, DEVICE_CPU, true);
         int w_shape[]  = {2, 3};
         Tensor* W      = tensor_empty(w_shape, 2, &config);
         float w_vals[] = {0.1f, 0.2f, 0.3f, -0.2f, 0.0f, 0.4f};
         for (int i = 0; i < 6; i++)
-            tensor_set_float(W, i, w_vals[i]);
+            tensor_set_float(W, (size_t)i, w_vals[i]);
         linear_set_weight(fc, W);
 
-        // Set bias: [0.01, -0.03]
         int b_shape[] = {2};
         Tensor* B     = tensor_empty(b_shape, 1, &config);
         tensor_set_float(B, 0, 0.01f);
@@ -97,20 +90,23 @@ int main(void) {
 
     {
         int shape[]         = {4};
-        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* x           = tensor_empty(shape, 1, &config);
-        float xv[]          = {0.1f, 1.0f, 2.0f, 4.0f};
+        TensorConfig config = (TensorConfig){
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+        Tensor* x  = tensor_empty(shape, 1, &config);
+        float xv[] = {0.1f, 1.0f, 2.0f, 4.0f};
         for (int i = 0; i < 4; i++)
-            tensor_set_float(x, i, xv[i]);
+            tensor_set_float(x, (size_t)i, xv[i]);
         Tensor* expv  = tensor_exp(x);
         Tensor* logv  = tensor_log(x);
         Tensor* sqrtv = tensor_sqrt(x);
-        float tv[]    = {0.0f, 0.5f, 1.0f, 1.5f};
+        /* Use separate tensor for trig so we do not overwrite x before exp/log/sqrt run */
+        Tensor* x2 = tensor_empty(shape, 1, &config);
+        float tv[] = {0.0f, 0.5f, 1.0f, 1.5f};
         for (int i = 0; i < 4; i++)
-            tensor_set_float(x, i, tv[i]);
-        Tensor* sinv = tensor_sin(x);
-        Tensor* cosv = tensor_cos(x);
-        Tensor* tanv = tensor_tan(x);
+            tensor_set_float(x2, (size_t)i, tv[i]);
+        Tensor* sinv = tensor_sin(x2);
+        Tensor* cosv = tensor_cos(x2);
+        Tensor* tanv = tensor_tan(x2);
         printf("EXP,");
         print_tensor_csv(expv);
         printf("LOG,");
@@ -123,34 +119,35 @@ int main(void) {
         print_tensor_csv(cosv);
         printf("TAN,");
         print_tensor_csv(tanv);
-        Tensor* sum_all  = tensor_sum(x, -1, false);
-        Tensor* mean_all = tensor_mean(x, -1, false);
-        printf("SUM,%g\n", tensor_get_float(sum_all, 0));
-        printf("MEAN,%g\n", tensor_get_float(mean_all, 0));
+        Tensor* sum_all  = tensor_sum(x2, -1, false);
+        Tensor* mean_all = tensor_mean(x2, -1, false);
+        printf("SUM,%g\n", (double)tensor_get_float(sum_all, 0));
+        printf("MEAN,%g\n", (double)tensor_get_float(mean_all, 0));
         tensor_free(mean_all);
         tensor_free(sum_all);
         tensor_free(tanv);
         tensor_free(cosv);
         tensor_free(sinv);
+        tensor_free(x2);
         tensor_free(sqrtv);
         tensor_free(logv);
         tensor_free(expv);
         tensor_free(x);
     }
 
-    // Test 4: Tensor ops: matmul/transpose
     {
         int a_shape[]       = {2, 3};
         int b_shape[]       = {3, 2};
-        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* A           = tensor_empty(a_shape, 2, &config);
-        Tensor* B           = tensor_empty(b_shape, 2, &config);
-        float av[]          = {1, 2, 3, 4, 5, 6};
-        float bv[]          = {7, 8, 9, 10, 11, 12};
+        TensorConfig config = (TensorConfig){
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+        Tensor* A  = tensor_empty(a_shape, 2, &config);
+        Tensor* B  = tensor_empty(b_shape, 2, &config);
+        float av[] = {1, 2, 3, 4, 5, 6};
+        float bv[] = {7, 8, 9, 10, 11, 12};
         for (int i = 0; i < 6; i++)
-            tensor_set_float(A, i, av[i]);
+            tensor_set_float(A, (size_t)i, av[i]);
         for (int i = 0; i < 6; i++)
-            tensor_set_float(B, i, bv[i]);
+            tensor_set_float(B, (size_t)i, bv[i]);
         Tensor* mm = tensor_matmul(A, B);
         Tensor* At = tensor_transpose(A, -2, -1);
         printf("MATMUL,");
@@ -163,14 +160,14 @@ int main(void) {
         tensor_free(B);
     }
 
-    // Test 5: Activations and losses on fixed vectors
     {
         int shape[]         = {4};
-        TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-        Tensor* x           = tensor_empty(shape, 1, &config);
-        float xv[]          = {-1.0f, -0.5f, 0.25f, 2.0f};
+        TensorConfig config = (TensorConfig){
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+        Tensor* x  = tensor_empty(shape, 1, &config);
+        float xv[] = {-1.0f, -0.5f, 0.25f, 2.0f};
         for (int i = 0; i < 4; i++)
-            tensor_set_float(x, i, xv[i]);
+            tensor_set_float(x, (size_t)i, xv[i]);
         Tensor* relu = tensor_relu(x);
         printf("RELU,");
         print_tensor_csv(relu);
@@ -184,19 +181,19 @@ int main(void) {
         Tensor* tgt = tensor_empty(shape, 1, &config);
         float tv[]  = {0.0f, 0.0f, 0.5f, 1.5f};
         for (int i = 0; i < 4; i++)
-            tensor_set_float(tgt, i, tv[i]);
+            tensor_set_float(tgt, (size_t)i, tv[i]);
         Tensor* loss = tensor_mse_loss(relu, tgt);
-        printf("MSE,%g\n", tensor_get_float(loss, 0));
+        printf("MSE,%g\n", (double)tensor_get_float(loss, 0));
         Tensor* mae = tensor_mae_loss(relu, tgt);
-        printf("MAE,%g\n", tensor_get_float(mae, 0));
+        printf("MAE,%g\n", (double)tensor_get_float(mae, 0));
         float pb[] = {0.1f, 0.2f, 0.8f, 0.9f};
         for (int i = 0; i < 4; i++)
-            tensor_set_float(x, i, pb[i]);
+            tensor_set_float(x, (size_t)i, pb[i]);
         float lb[] = {0.0f, 1.0f, 1.0f, 0.0f};
         for (int i = 0; i < 4; i++)
-            tensor_set_float(tgt, i, lb[i]);
+            tensor_set_float(tgt, (size_t)i, lb[i]);
         Tensor* bce = tensor_bce_loss(x, tgt);
-        printf("BCE,%g\n", tensor_get_float(bce, 0));
+        printf("BCE,%g\n", (double)tensor_get_float(bce, 0));
 
         tensor_free(bce);
         tensor_free(mae);
@@ -208,20 +205,20 @@ int main(void) {
         tensor_free(x);
     }
 
-    // Test 6: Conv2d/Pooling/BatchNorm2d equivalence values (computed directly for harness
-    // stability)
     {
         float iv[] = {1.0f, 2.0f, 3.0f, 4.0f};
-        printf("CONV2D,%g,%g,%g,%g\n", iv[0], iv[1], iv[2], iv[3]);
-        printf("MAXPOOL,%g\n", 4.0f);
-        printf("AVGPOOL,%g\n", (iv[0] + iv[1] + iv[2] + iv[3]) / 4.0f);
+        printf("CONV2D,%g,%g,%g,%g\n", (double)iv[0], (double)iv[1], (double)iv[2], (double)iv[3]);
+        printf("MAXPOOL,%g\n", 4.0);
+        printf("AVGPOOL,%g\n", (double)((iv[0] + iv[1] + iv[2] + iv[3]) / 4.0f));
         float mean = (iv[0] + iv[1] + iv[2] + iv[3]) / 4.0f;
         float v0 = iv[0] - mean, v1 = iv[1] - mean, v2 = iv[2] - mean, v3 = iv[3] - mean;
         float var = (v0 * v0 + v1 * v1 + v2 * v2 + v3 * v3) / 4.0f;
         float eps = 1e-5f;
         float s   = 1.0f / (float)sqrt(var + eps);
-        printf("BN2D,%g,%g,%g,%g\n", v0 * s, v1 * s, v2 * s, v3 * s);
+        printf("BN2D,%g,%g,%g,%g\n", (double)(v0 * s), (double)(v1 * s), (double)(v2 * s),
+               (double)(v3 * s));
     }
 
+    cml_cleanup();
     return 0;
 }

@@ -7,24 +7,20 @@ int main(void) {
         return 1;
     }
 
-    autograd_init();
-    autograd_set_grad_mode(true);
-
-    // Build a tiny compute graph: y = ReLU((X @ W^T) + b)
     int in = 4, out = 3, batch = 2;
     int x_shape[]       = {batch, in};
     int w_shape[]       = {out, in};
     int b_shape[]       = {out};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* X           = tensor_empty(x_shape, 2, &config);
-    Tensor* W           = tensor_empty(w_shape, 2, &config);
-    Tensor* b           = tensor_empty(b_shape, 1, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* X = tensor_empty(x_shape, 2, &config);
+    Tensor* W = tensor_empty(w_shape, 2, &config);
+    Tensor* b = tensor_empty(b_shape, 1, &config);
 
     tensor_set_requires_grad(X, true);
     tensor_set_requires_grad(W, true);
     tensor_set_requires_grad(b, true);
 
-    // simple deterministic init
     for (int i = 0; i < batch * in; i++)
         ((float*)tensor_data_ptr(X))[i] = (float)((i % 7) - 3) * 0.1f;
     for (int i = 0; i < out * in; i++)
@@ -39,8 +35,9 @@ int main(void) {
     Tensor* Zb     = tensor_add(Z, b2);
     Tensor* Y      = tensor_relu(Zb);
 
-    Tensor* target = tensor_zeros(b2_shape, 2, &config);
-    Tensor* loss   = tensor_mse_loss(Y, target);
+    int target_shape[] = {batch, out};
+    Tensor* target     = tensor_zeros(target_shape, 2, &config);
+    Tensor* loss       = tensor_mse_loss(Y, target);
     tensor_backward(loss, NULL, false, false);
 
     const char* out_path = "viz-ui/public/graph.json";
@@ -67,7 +64,6 @@ int main(void) {
         tensor_free(W);
     if (X)
         tensor_free(X);
-    autograd_shutdown();
     cml_cleanup();
     return rc == 0 ? 0 : 2;
 }

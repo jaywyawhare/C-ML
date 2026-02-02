@@ -9,7 +9,7 @@
  */
 
 #include "cml.h"
-#include "Core/profiling.h"
+#include "backend/profiling.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -37,9 +37,10 @@ int main(int argc, char** argv) {
 
     int a_shape[]       = {m, k};
     int b_shape[]       = {k, n};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* A           = tensor_empty(a_shape, 2, &config);
-    Tensor* B           = tensor_empty(b_shape, 2, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* A = tensor_empty(a_shape, 2, &config);
+    Tensor* B = tensor_empty(b_shape, 2, &config);
     if (!A || !B) {
         fprintf(stderr, "Alloc failure.\n");
         if (A)

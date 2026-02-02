@@ -7,7 +7,7 @@
 #ifndef CML_NN_LAYERS_POOLING_H
 #define CML_NN_LAYERS_POOLING_H
 
-#include "nn/module.h"
+#include "nn.h"
 
 #ifdef __cplusplus
 extern "C" {

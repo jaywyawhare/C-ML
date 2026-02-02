@@ -6,24 +6,23 @@
  * in C-ML for training a simple neural network.
  */
 
+#include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "autograd/autograd.h"
-#include "autograd/loss_functions.h"
-#include "tensor/tensor.h"
 
 /**
  * Example 1: Simple gradient computation
  * Compute gradients for: z = x^2 + y^2
  */
-void example_simple_gradients() {
+static void example_simple_gradients(void) {
     printf("\n=== Example 1: Simple Gradients ===\n");
     printf("Computing gradients for: z = x^2 + y^2\n\n");
 
     int shape[]         = {1};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* x           = tensor_ones(shape, 1, &config);
-    Tensor* y           = tensor_ones(shape, 1, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* x = tensor_ones(shape, 1, &config);
+    Tensor* y = tensor_ones(shape, 1, &config);
 
     tensor_set_float(x, 0, 3.0f);
     tensor_set_float(y, 0, 4.0f);
@@ -39,17 +38,17 @@ void example_simple_gradients() {
     Tensor* z         = tensor_add(x_squared, y_squared);
 
     printf("Forward pass:\n");
-    printf("  x = %.2f\n", tensor_get_float(x, 0));
-    printf("  y = %.2f\n", tensor_get_float(y, 0));
-    printf("  z = x^2 + y^2 = %.2f\n", tensor_get_float(z, 0));
+    printf("  x = %.2f\n", (double)tensor_get_float(x, 0));
+    printf("  y = %.2f\n", (double)tensor_get_float(y, 0));
+    printf("  z = x^2 + y^2 = %.2f\n", (double)tensor_get_float(z, 0));
 
     tensor_backward(z, NULL, false, false);
 
     printf("\nBackward pass:\n");
-    printf("  dz/dx = 2x = %.2f (expected: %.2f)\n", tensor_get_float(x->grad, 0),
-           2.0f * tensor_get_float(x, 0));
-    printf("  dz/dy = 2y = %.2f (expected: %.2f)\n", tensor_get_float(y->grad, 0),
-           2.0f * tensor_get_float(y, 0));
+    printf("  dz/dx = 2x = %.2f (expected: %.2f)\n", (double)tensor_get_float(x->grad, 0),
+           (double)(2.0f * tensor_get_float(x, 0)));
+    printf("  dz/dy = 2y = %.2f (expected: %.2f)\n", (double)tensor_get_float(y->grad, 0),
+           (double)(2.0f * tensor_get_float(y, 0)));
 
     tensor_free(x);
     tensor_free(y);
@@ -63,15 +62,16 @@ void example_simple_gradients() {
  * Example 2: Neural network forward and backward pass
  * Simple 1-layer network: y = sigmoid(w*x + b)
  */
-void example_neural_network() {
+static void example_neural_network(void) {
     printf("\n=== Example 2: Neural Network ===\n");
     printf("Simple 1-layer network: y = sigmoid(w*x + b)\n\n");
 
     int shape[]         = {1};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* w           = tensor_ones(shape, 1, &config);
-    Tensor* b           = tensor_ones(shape, 1, &config);
-    Tensor* x           = tensor_ones(shape, 1, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* w = tensor_ones(shape, 1, &config);
+    Tensor* b = tensor_ones(shape, 1, &config);
+    Tensor* x = tensor_ones(shape, 1, &config);
 
     tensor_set_float(w, 0, 0.5f);
     tensor_set_float(b, 0, 0.1f);
@@ -85,18 +85,18 @@ void example_neural_network() {
     Tensor* y      = tensor_sigmoid(linear);
 
     printf("Forward pass:\n");
-    printf("  w = %.2f\n", tensor_get_float(w, 0));
-    printf("  b = %.2f\n", tensor_get_float(b, 0));
-    printf("  x = %.2f\n", tensor_get_float(x, 0));
-    printf("  w*x = %.2f\n", tensor_get_float(wx, 0));
-    printf("  w*x + b = %.2f\n", tensor_get_float(linear, 0));
-    printf("  y = sigmoid(w*x + b) = %.4f\n", tensor_get_float(y, 0));
+    printf("  w = %.2f\n", (double)tensor_get_float(w, 0));
+    printf("  b = %.2f\n", (double)tensor_get_float(b, 0));
+    printf("  x = %.2f\n", (double)tensor_get_float(x, 0));
+    printf("  w*x = %.2f\n", (double)tensor_get_float(wx, 0));
+    printf("  w*x + b = %.2f\n", (double)tensor_get_float(linear, 0));
+    printf("  y = sigmoid(w*x + b) = %.4f\n", (double)tensor_get_float(y, 0));
 
     tensor_backward(y, NULL, false, false);
 
     printf("\nBackward pass (gradients):\n");
-    printf("  dy/dw = %.4f\n", tensor_get_float(w->grad, 0));
-    printf("  dy/db = %.4f\n", tensor_get_float(b->grad, 0));
+    printf("  dy/dw = %.4f\n", (double)tensor_get_float(w->grad, 0));
+    printf("  dy/db = %.4f\n", (double)tensor_get_float(b->grad, 0));
 
     tensor_free(w);
     tensor_free(b);
@@ -110,14 +110,15 @@ void example_neural_network() {
  * Example 3: Loss function and optimization step
  * Compute MSE loss and gradients for a simple prediction problem
  */
-void example_loss_function() {
+static void example_loss_function(void) {
     printf("\n=== Example 3: Loss Function ===\n");
     printf("Training with MSE loss\n\n");
 
     int shape[]         = {3};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* prediction  = tensor_empty(shape, 1, &config);
-    Tensor* target      = tensor_empty(shape, 1, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* prediction = tensor_empty(shape, 1, &config);
+    Tensor* target     = tensor_empty(shape, 1, &config);
 
     tensor_set_float(prediction, 0, 1.0f);
     tensor_set_float(prediction, 1, 2.0f);
@@ -132,25 +133,27 @@ void example_loss_function() {
     Tensor* loss = tensor_mse_loss(prediction, target);
 
     printf("Forward pass:\n");
-    printf("  Prediction: [%.1f, %.1f, %.1f]\n", tensor_get_float(prediction, 0),
-           tensor_get_float(prediction, 1), tensor_get_float(prediction, 2));
-    printf("  Target:     [%.1f, %.1f, %.1f]\n", tensor_get_float(target, 0),
-           tensor_get_float(target, 1), tensor_get_float(target, 2));
-    printf("  MSE Loss:   %.4f\n", tensor_get_float(loss, 0));
+    printf("  Prediction: [%.1f, %.1f, %.1f]\n", (double)tensor_get_float(prediction, 0),
+           (double)tensor_get_float(prediction, 1), (double)tensor_get_float(prediction, 2));
+    printf("  Target:     [%.1f, %.1f, %.1f]\n", (double)tensor_get_float(target, 0),
+           (double)tensor_get_float(target, 1), (double)tensor_get_float(target, 2));
+    printf("  MSE Loss:   %.4f\n", (double)tensor_get_float(loss, 0));
 
     tensor_backward(loss, NULL, false, false);
 
     printf("\nBackward pass (gradients for prediction):\n");
-    printf("  Gradient:   [%.4f, %.4f, %.4f]\n", tensor_get_float(prediction->grad, 0),
-           tensor_get_float(prediction->grad, 1), tensor_get_float(prediction->grad, 2));
+    printf("  Gradient:   [%.4f, %.4f, %.4f]\n", (double)tensor_get_float(prediction->grad, 0),
+           (double)tensor_get_float(prediction->grad, 1),
+           (double)tensor_get_float(prediction->grad, 2));
 
     float learning_rate = 0.1f;
-    printf("\nGradient descent step (lr=%.1f):\n", learning_rate);
+    printf("\nGradient descent step (lr=%.1f):\n", (double)learning_rate);
     for (size_t i = 0; i < prediction->numel; i++) {
         float old_val = tensor_get_float(prediction, i);
         float grad    = tensor_get_float(prediction->grad, i);
         float new_val = old_val - learning_rate * grad;
-        printf("  pred[%zu]: %.4f -> %.4f (grad=%.4f)\n", i, old_val, new_val, grad);
+        printf("  pred[%zu]: %.4f -> %.4f (grad=%.4f)\n", i, (double)old_val, (double)new_val,
+               (double)grad);
     }
 
     tensor_free(prediction);
@@ -162,13 +165,14 @@ void example_loss_function() {
  * Example 4: Gradient accumulation
  * Show how gradients accumulate over multiple backward passes
  */
-void example_gradient_accumulation() {
+static void example_gradient_accumulation(void) {
     printf("\n=== Example 4: Gradient Accumulation ===\n");
     printf("Accumulating gradients from multiple losses\n\n");
 
     int shape[]         = {1};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* x           = tensor_ones(shape, 1, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* x = tensor_ones(shape, 1, &config);
     tensor_set_float(x, 0, 2.0f);
     x->requires_grad = true;
 
@@ -177,21 +181,21 @@ void example_gradient_accumulation() {
     Tensor* y1 = tensor_pow(x, exp1);
 
     printf("First computation: y1 = x^2\n");
-    printf("  x = %.2f\n", tensor_get_float(x, 0));
-    printf("  y1 = %.2f\n", tensor_get_float(y1, 0));
+    printf("  x = %.2f\n", (double)tensor_get_float(x, 0));
+    printf("  y1 = %.2f\n", (double)tensor_get_float(y1, 0));
 
     tensor_backward(y1, NULL, false, false);
-    printf("  Gradient after y1.backward(): %.2f\n", tensor_get_float(x->grad, 0));
+    printf("  Gradient after y1.backward(): %.2f\n", (double)tensor_get_float(x->grad, 0));
 
     Tensor* exp2 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp2, 0, 3.0f);
     Tensor* y2 = tensor_pow(x, exp2);
 
     printf("\nSecond computation: y2 = x^3\n");
-    printf("  y2 = %.2f\n", tensor_get_float(y2, 0));
+    printf("  y2 = %.2f\n", (double)tensor_get_float(y2, 0));
 
     tensor_backward(y2, NULL, false, false);
-    printf("  Gradient after y2.backward(): %.2f\n", tensor_get_float(x->grad, 0));
+    printf("  Gradient after y2.backward(): %.2f\n", (double)tensor_get_float(x->grad, 0));
     printf("  (Accumulated from both y1 and y2)\n");
 
     tensor_zero_grad(x);
@@ -209,13 +213,14 @@ void example_gradient_accumulation() {
  * Example 5: No gradient mode
  * Demonstrate disabling gradient computation
  */
-void example_no_grad_mode() {
+static void example_no_grad_mode(void) {
     printf("\n=== Example 5: No Gradient Mode ===\n");
     printf("Disabling gradient computation\n\n");
 
     int shape[]         = {1};
-    TensorConfig config = tensor_config_with_dtype_device(DTYPE_FLOAT32, DEVICE_CPU);
-    Tensor* x           = tensor_ones(shape, 1, &config);
+    TensorConfig config = (TensorConfig){
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* x = tensor_ones(shape, 1, &config);
     tensor_set_float(x, 0, 3.0f);
     x->requires_grad = true;
 
@@ -223,8 +228,8 @@ void example_no_grad_mode() {
     Tensor* exp1 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp1, 0, 2.0f);
     Tensor* y1 = tensor_pow(x, exp1);
-    printf("  y = x^2 = %.2f\n", tensor_get_float(y1, 0));
-    printf("  grad_fn: %s\n", y1->grad_fn ? "exists" : "NULL");
+    printf("  y = x^2 = %.2f\n", (double)tensor_get_float(y1, 0));
+    printf("  ir_node: %s\n", y1->ir_node ? "exists" : "NULL");
 
     autograd_no_grad_enter();
 
@@ -232,8 +237,8 @@ void example_no_grad_mode() {
     Tensor* exp2 = tensor_ones(shape, 1, &config);
     tensor_set_float(exp2, 0, 2.0f);
     Tensor* y2 = tensor_pow(x, exp2);
-    printf("  y = x^2 = %.2f\n", tensor_get_float(y2, 0));
-    printf("  grad_fn: %s\n", y2->grad_fn ? "exists" : "NULL");
+    printf("  y = x^2 = %.2f\n", (double)tensor_get_float(y2, 0));
+    printf("  ir_node: %s\n", y2->ir_node ? "exists" : "NULL");
     printf("  (No computation graph built!)\n");
 
     autograd_no_grad_exit();
@@ -246,14 +251,14 @@ void example_no_grad_mode() {
 }
 
 int main(void) {
-    autograd_init();
+    cml_init();
 
     example_simple_gradients();
     example_neural_network();
     example_loss_function();
     example_gradient_accumulation();
     example_no_grad_mode();
-    autograd_shutdown();
+    cml_cleanup();
 
     return 0;
 }
