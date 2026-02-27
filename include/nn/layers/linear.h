@@ -145,48 +145,6 @@ void linear_set_use_bias(Linear* linear, bool use_bias);
  */
 bool linear_get_use_bias(Linear* linear);
 
-/**
- * @brief Set weight transpose flag
- *
- * @param linear Linear layer
- * @param transpose Whether to transpose weight matrix
- */
-void linear_set_transpose_weight(Linear* linear, bool transpose);
-
-/**
- * @brief Check if weight is transposed
- *
- * @param linear Linear layer
- * @return true if weight is transposed, false otherwise
- */
-bool linear_get_transpose_weight(Linear* linear);
-
-// Linear Layer Utilities
-
-/**
- * @brief Print Linear layer summary
- *
- * @param linear Linear layer
- * @param indent Indentation level
- */
-void linear_print_summary(Linear* linear, int indent);
-
-/**
- * @brief Get Linear layer parameter count
- *
- * @param linear Linear layer
- * @return Number of parameters
- */
-int linear_get_parameter_count(Linear* linear);
-
-/**
- * @brief Get Linear layer total parameter count
- *
- * @param linear Linear layer
- * @return Total number of parameters
- */
-int linear_get_total_parameters(Linear* linear);
-
 #ifdef __cplusplus
 }
 #endif

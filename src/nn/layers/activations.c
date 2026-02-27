@@ -49,7 +49,6 @@ ReLU* nn_relu(bool inplace) {
     return relu;
 }
 
-// LeakyReLU Forward
 static Tensor* leaky_relu_forward(Module* module, Tensor* input) {
     LeakyReLU* leaky_relu = (LeakyReLU*)module;
 
@@ -147,7 +146,6 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
         return NULL;
 
     // GELU approximation: x * 0.5 * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x^3)))
-    // Constants
     const float sqrt_2_pi = 0.7978845608f; // sqrt(2/π)
     Tensor* scaled        = NULL;
     Tensor* tanh_result   = NULL;
@@ -352,5 +350,308 @@ Tensor* f_gelu(Tensor* input) {
     }
     Tensor* output = module_forward(gelu, input);
     module_free(gelu);
+    return output;
+}
+
+// ELU: x if x > 0, alpha * (exp(x) - 1) if x <= 0
+static Tensor* elu_forward(Module* module, Tensor* input) {
+    ELU* elu = (ELU*)module;
+
+    if (!elu || !input)
+        return NULL;
+
+    LOG_DEBUG("ELU forward: Computing ELU with alpha=%f (IR-based)", elu->alpha);
+
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+
+    Tensor* zeros = tensor_zeros(input->shape, input->ndim, &config);
+    if (!zeros)
+        return NULL;
+
+    // condition: input < 0
+    Tensor* cond = uop_cmplt(input, zeros);
+
+    // exp(input) - 1
+    Tensor* exp_x         = uop_exp(input);
+    Tensor* ones          = tensor_ones(input->shape, input->ndim, &config);
+    Tensor* exp_minus_one = uop_sub(exp_x, ones);
+
+    // alpha * (exp(x) - 1)
+    Tensor* alpha_tensor = tensor_full(input->shape, input->ndim, &config, elu->alpha);
+    Tensor* neg_part     = uop_mul(alpha_tensor, exp_minus_one);
+
+    // where(cond, neg_part, input)
+    WhereParams wp = {.cond = cond, .a = neg_part, .b = input};
+    return uop_where(&wp);
+}
+
+static void elu_free(Module* module) { free(module); }
+
+ELU* nn_elu(float alpha, bool inplace) {
+    ELU* elu = malloc(sizeof(ELU));
+    if (!elu) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for ELU layer",
+                         __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    if (module_init((Module*)elu, "ELU", elu_forward, elu_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize ELU module", __FILE__, __LINE__,
+                         __func__);
+        free(elu);
+        return NULL;
+    }
+
+    elu->alpha   = alpha;
+    elu->inplace = inplace;
+    return elu;
+}
+
+// SELU: scale * ELU(x, alpha) with fixed constants
+static Tensor* selu_forward(Module* module, Tensor* input) {
+    (void)module;
+
+    if (!input)
+        return NULL;
+
+    LOG_DEBUG("SELU forward: Computing SELU (IR-based)");
+
+    const float selu_lambda = 1.0507009873554804934f;
+    const float selu_alpha  = 1.6732632423543772848f;
+
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+
+    Tensor* zeros = tensor_zeros(input->shape, input->ndim, &config);
+    if (!zeros)
+        return NULL;
+
+    Tensor* cond = uop_cmplt(input, zeros);
+
+    Tensor* exp_x         = uop_exp(input);
+    Tensor* ones          = tensor_ones(input->shape, input->ndim, &config);
+    Tensor* exp_minus_one = uop_sub(exp_x, ones);
+
+    Tensor* alpha_tensor = tensor_full(input->shape, input->ndim, &config, selu_alpha);
+    Tensor* neg_part     = uop_mul(alpha_tensor, exp_minus_one);
+
+    // where(cond, neg_part, input) gives ELU result
+    WhereParams wp     = {.cond = cond, .a = neg_part, .b = input};
+    Tensor* elu_result = uop_where(&wp);
+
+    // Scale by lambda
+    Tensor* lambda_tensor = tensor_full(input->shape, input->ndim, &config, selu_lambda);
+    return uop_mul(lambda_tensor, elu_result);
+}
+
+static void selu_free(Module* module) { free(module); }
+
+SELU* nn_selu(void) {
+    SELU* selu = malloc(sizeof(SELU));
+    if (!selu) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for SELU layer",
+                         __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    if (module_init((Module*)selu, "SELU", selu_forward, selu_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize SELU module", __FILE__,
+                         __LINE__, __func__);
+        free(selu);
+        return NULL;
+    }
+
+    return selu;
+}
+
+// SiLU (Swish): x * sigmoid(x)
+static Tensor* silu_forward(Module* module, Tensor* input) {
+    (void)module;
+
+    if (!input)
+        return NULL;
+
+    LOG_DEBUG("SiLU forward: Computing x * sigmoid(x) (IR-based)");
+
+    return uop_mul(input, uop_sigmoid(input));
+}
+
+static void silu_free(Module* module) { free(module); }
+
+SiLU* nn_silu(void) {
+    SiLU* silu = malloc(sizeof(SiLU));
+    if (!silu) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for SiLU layer",
+                         __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    if (module_init((Module*)silu, "SiLU", silu_forward, silu_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize SiLU module", __FILE__,
+                         __LINE__, __func__);
+        free(silu);
+        return NULL;
+    }
+
+    return silu;
+}
+
+// Mish: x * tanh(softplus(x)) where softplus(x) = log(1 + exp(x))
+static Tensor* mish_forward(Module* module, Tensor* input) {
+    (void)module;
+
+    if (!input)
+        return NULL;
+
+    LOG_DEBUG("Mish forward: Computing x * tanh(log(1 + exp(x))) (IR-based)");
+
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+
+    Tensor* exp_x         = uop_exp(input);
+    Tensor* ones          = tensor_ones(input->shape, input->ndim, &config);
+    Tensor* ones_plus_exp = uop_add(ones, exp_x);
+    Tensor* softplus      = uop_log(ones_plus_exp);
+    Tensor* tanh_sp       = uop_tanh(softplus);
+    return uop_mul(input, tanh_sp);
+}
+
+static void mish_free(Module* module) { free(module); }
+
+Mish* nn_mish(void) {
+    Mish* mish = malloc(sizeof(Mish));
+    if (!mish) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Mish layer",
+                         __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    if (module_init((Module*)mish, "Mish", mish_forward, mish_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Mish module", __FILE__,
+                         __LINE__, __func__);
+        free(mish);
+        return NULL;
+    }
+
+    return mish;
+}
+
+// HardSwish: x * relu6(x + 3) / 6 where relu6(x) = min(max(x, 0), 6)
+static Tensor* hardswish_forward(Module* module, Tensor* input) {
+    (void)module;
+
+    if (!input)
+        return NULL;
+
+    LOG_DEBUG("HardSwish forward: Computing x * relu6(x + 3) / 6 (IR-based)");
+
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+
+    Tensor* three = tensor_full(input->shape, input->ndim, &config, 3.0f);
+    Tensor* six   = tensor_full(input->shape, input->ndim, &config, 6.0f);
+    Tensor* zeros = tensor_zeros(input->shape, input->ndim, &config);
+
+    // x + 3
+    Tensor* x_plus_3 = uop_add(input, three);
+
+    // clamp to [0, 6]: max(x+3, 0) then min with 6
+    Tensor* clamped_low = uop_max(x_plus_3, zeros);
+    // min(a, 6) = where(a < 6, a, 6)
+    Tensor* cmp_six = uop_cmplt(clamped_low, six);
+    WhereParams wp  = {.cond = cmp_six, .a = clamped_low, .b = six};
+    Tensor* clamped = uop_where(&wp);
+
+    // clamped / 6
+    Tensor* scaled = uop_div(clamped, six);
+
+    // x * scaled
+    return uop_mul(input, scaled);
+}
+
+static void hardswish_free(Module* module) { free(module); }
+
+HardSwish* nn_hardswish(void) {
+    HardSwish* hardswish = malloc(sizeof(HardSwish));
+    if (!hardswish) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
+                         "Failed to allocate memory for HardSwish layer", __FILE__, __LINE__,
+                         __func__);
+        return NULL;
+    }
+
+    if (module_init((Module*)hardswish, "HardSwish", hardswish_forward, hardswish_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize HardSwish module", __FILE__,
+                         __LINE__, __func__);
+        free(hardswish);
+        return NULL;
+    }
+
+    return hardswish;
+}
+
+Tensor* f_elu(Tensor* input, float alpha) {
+    if (!input) {
+        return NULL;
+    }
+    Module* elu = (Module*)nn_elu(alpha, false);
+    if (!elu) {
+        return NULL;
+    }
+    Tensor* output = module_forward(elu, input);
+    module_free(elu);
+    return output;
+}
+
+Tensor* f_selu(Tensor* input) {
+    if (!input) {
+        return NULL;
+    }
+    Module* selu = (Module*)nn_selu();
+    if (!selu) {
+        return NULL;
+    }
+    Tensor* output = module_forward(selu, input);
+    module_free(selu);
+    return output;
+}
+
+Tensor* f_silu(Tensor* input) {
+    if (!input) {
+        return NULL;
+    }
+    Module* silu = (Module*)nn_silu();
+    if (!silu) {
+        return NULL;
+    }
+    Tensor* output = module_forward(silu, input);
+    module_free(silu);
+    return output;
+}
+
+Tensor* f_mish(Tensor* input) {
+    if (!input) {
+        return NULL;
+    }
+    Module* mish = (Module*)nn_mish();
+    if (!mish) {
+        return NULL;
+    }
+    Tensor* output = module_forward(mish, input);
+    module_free(mish);
+    return output;
+}
+
+Tensor* f_hardswish(Tensor* input) {
+    if (!input) {
+        return NULL;
+    }
+    Module* hardswish = (Module*)nn_hardswish();
+    if (!hardswish) {
+        return NULL;
+    }
+    Tensor* output = module_forward(hardswish, input);
+    module_free(hardswish);
     return output;
 }

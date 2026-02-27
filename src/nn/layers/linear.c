@@ -19,7 +19,7 @@
 
 // Forward pass: output = input @ weight.T + bias
 // Uses IR operations for autograd support
-static Tensor* linear_forward_fn(Module* module, Tensor* input) {
+Tensor* linear_forward(Module* module, Tensor* input) {
     Linear* linear = (Linear*)module;
 
     if (!linear || !input)
@@ -67,7 +67,6 @@ static Tensor* linear_forward_fn(Module* module, Tensor* input) {
     return output;
 }
 
-// Free function
 static void linear_free_fn(Module* module) {
     Linear* linear = (Linear*)module;
     if (!linear)
@@ -93,7 +92,6 @@ static void xavier_init(Tensor* tensor, int in_features, int out_features) {
     }
 }
 
-// Initialize bias to zeros
 static void zeros_init(Tensor* tensor, int out_features) {
     (void)out_features;
     if (!tensor || !tensor->data)
@@ -128,7 +126,7 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     }
 
     // Initialize base module
-    if (module_init((Module*)linear, "Linear", linear_forward_fn, linear_free_fn) != 0) {
+    if (module_init((Module*)linear, "Linear", linear_forward, linear_free_fn) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Linear module", __FILE__,
                          __LINE__, __func__);
         free(linear);
@@ -203,7 +201,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     return linear;
 }
 
-// Getter functions
 int linear_get_in_features(Linear* linear) { return linear ? linear->in_features : 0; }
 
 int linear_get_out_features(Linear* linear) { return linear ? linear->out_features : 0; }
@@ -248,42 +245,3 @@ void linear_set_use_bias(Linear* linear, bool use_bias) {
 }
 
 bool linear_get_use_bias(Linear* linear) { return linear ? linear->use_bias : false; }
-
-void linear_set_transpose_weight(Linear* linear, bool transpose) {
-    if (linear) {
-        linear->transpose_weight = transpose;
-    }
-}
-
-bool linear_get_transpose_weight(Linear* linear) {
-    return linear ? linear->transpose_weight : false;
-}
-
-void linear_print_summary(Linear* linear, int indent) {
-    if (!linear)
-        return;
-
-    for (int i = 0; i < indent; i++)
-        printf("  ");
-    printf("Linear(%d, %d, bias=%s)\n", linear->in_features, linear->out_features,
-           linear->use_bias ? "True" : "False");
-}
-
-int linear_get_parameter_count(Linear* linear) {
-    if (!linear)
-        return 0;
-    return module_get_parameter_count((Module*)linear);
-}
-
-int linear_get_total_parameters(Linear* linear) {
-    if (!linear)
-        return 0;
-
-    int weight_params =
-        linear->weight && linear->weight->tensor ? (int)linear->weight->tensor->numel : 0;
-    int bias_params = (linear->use_bias && linear->bias && linear->bias->tensor)
-                          ? (int)linear->bias->tensor->numel
-                          : 0;
-
-    return weight_params + bias_params;
-}

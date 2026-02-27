@@ -20,10 +20,6 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-// ============================================================================
-// Graph Cache Helpers
-// ============================================================================
-
 static void free_cached_graph(CachedModelGraph* cache) {
     if (!cache)
         return;
@@ -56,7 +52,7 @@ static bool shapes_match(CachedModelGraph* cache, Tensor* input) {
     return true;
 }
 
-static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLIR_t ir) {
+static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLGraph_t ir) {
     if (!input || !output || !ir)
         return NULL;
 
@@ -380,10 +376,6 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
     return output;
 }
 
-// ============================================================================
-// Forward Pass
-// ============================================================================
-
 static Tensor* sequential_forward(Module* module, Tensor* input) {
     Sequential* seq = (Sequential*)module;
 
@@ -427,7 +419,7 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
 
     // If graph caching is enabled but we don't have a cache, create one
     if (seq->enable_graph_cache && !seq->cached_graph) {
-        CMLIR_t ir = cml_ir_get_or_create_context();
+        CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
             // Force execution first to ensure graph is complete
             float* out_data = (float*)tensor_data_ptr(output);
@@ -454,7 +446,7 @@ static void sequential_free(Module* module) {
         seq->cached_graph = NULL;
     }
 
-    // Free all modules
+    // Free all child modules (they are NOT tracked by global cleanup individually)
     if (seq->modules) {
         for (int i = 0; i < seq->num_modules; i++) {
             if (seq->modules[i]) {

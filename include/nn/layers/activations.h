@@ -104,6 +104,44 @@ Tensor* f_tanh(Tensor* input);
  */
 Tensor* f_gelu(Tensor* input);
 
+typedef struct ELU {
+    Module base;
+    float alpha;
+    bool inplace;
+} ELU;
+
+ELU* nn_elu(float alpha, bool inplace);
+
+typedef struct SELU {
+    Module base;
+} SELU;
+
+SELU* nn_selu(void);
+
+typedef struct SiLU {
+    Module base;
+} SiLU;
+
+SiLU* nn_silu(void);
+
+typedef struct Mish {
+    Module base;
+} Mish;
+
+Mish* nn_mish(void);
+
+typedef struct HardSwish {
+    Module base;
+} HardSwish;
+
+HardSwish* nn_hardswish(void);
+
+Tensor* f_elu(Tensor* input, float alpha);
+Tensor* f_selu(Tensor* input);
+Tensor* f_silu(Tensor* input);
+Tensor* f_mish(Tensor* input);
+Tensor* f_hardswish(Tensor* input);
+
 #ifdef __cplusplus
 }
 #endif
