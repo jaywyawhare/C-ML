@@ -1,38 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-export default function TrainingEvalView({ data, mode = 'training' }) {
-  // Checkbox states for toggling lines
+const TrainingEvalView = memo(function TrainingEvalView({ data, mode = 'training' }) {
+  // Checkbox states for toggling lines - MUST be called before any conditional returns
   const [showTrainingLoss, setShowTrainingLoss] = useState(true);
   const [showTestingLoss, setShowTestingLoss] = useState(false);
   const [showValidationLoss, setShowValidationLoss] = useState(false);
   const [showTrainingAcc, setShowTrainingAcc] = useState(true);
   const [showTestingAcc, setShowTestingAcc] = useState(false);
   const [showValidationAcc, setShowValidationAcc] = useState(false);
-  if (!data || data.error) {
-    return (
-      <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
-        <h3 style={{ marginTop: 0, color: 'var(--text)' }}>{mode === 'training' ? 'Training Results' : 'Evaluation Results'}</h3>
-        <div style={{ marginTop: 24, padding: 16, background: 'var(--panel)', borderRadius: 8, border: '1px solid var(--border)' }}>
-          <div style={{ color: 'var(--muted)', fontSize: 14 }}>
-            {data?.error ? `Error: ${data.error}` : 'Waiting for training data...'}
-          </div>
-          <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>
-            Run your model with VIZ=1 to export training metrics.
-          </div>
-        </div>
-      </div>
-    );
-  }
 
+  // Extract data properties (safe even if data is null/undefined)
   const { model_summary, total_params, trainable_params, best_loss, best_accuracy, num_epochs, current_epoch, is_training, epoch_losses, epoch_accuracies,
-          train_loss, test_loss, train_accuracy, test_accuracy,
-          training_loss, testing_loss, training_accuracy, testing_accuracy,
-          validation_loss, val_loss, validation_accuracy, val_accuracy,
-          epoch_validation_losses, epoch_val_losses, epoch_validation_accuracies, epoch_val_accuracies,
-          epoch_training_losses, epoch_testing_losses, epoch_train_losses, epoch_test_losses,
-          epoch_training_accuracies, epoch_testing_accuracies, epoch_train_accuracies, epoch_test_accuracies,
-          early_stopped, expected_epochs, actual_epochs } = data;
+    train_loss, test_loss, train_accuracy, test_accuracy,
+    training_loss, testing_loss, training_accuracy, testing_accuracy,
+    validation_loss, val_loss, validation_accuracy, val_accuracy,
+    epoch_validation_losses, epoch_val_losses, epoch_validation_accuracies, epoch_val_accuracies,
+    epoch_training_losses, epoch_testing_losses, epoch_train_losses, epoch_test_losses,
+    epoch_training_accuracies, epoch_testing_accuracies, epoch_train_accuracies, epoch_test_accuracies,
+    early_stopped, expected_epochs, actual_epochs } = data || {};
 
   // Get separate training/testing arrays if available, otherwise use combined arrays
   const trainingLosses = epoch_training_losses || epoch_train_losses || epoch_losses || [];
@@ -71,12 +57,12 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
   // Check if validation data exists (after arrays are processed)
   // Check if arrays exist and have any non-zero values (validation is evaluated periodically)
   const hasValidationData = !!(validation_loss || val_loss ||
-                                (epoch_validation_losses && epoch_validation_losses.length > 0 && epoch_validation_losses.some(v => v > 0)) ||
-                                (epoch_val_losses && epoch_val_losses.length > 0 && epoch_val_losses.some(v => v > 0)) ||
-                                validation_accuracy || val_accuracy ||
-                                (epoch_validation_accuracies && epoch_validation_accuracies.length > 0 && epoch_validation_accuracies.some(v => v > 0)) ||
-                                (epoch_val_accuracies && epoch_val_accuracies.length > 0 && epoch_val_accuracies.some(v => v > 0)) ||
-                                completedValidationLosses.length > 0 || completedValidationAccuracies.length > 0);
+    (epoch_validation_losses && epoch_validation_losses.length > 0 && epoch_validation_losses.some(v => v > 0)) ||
+    (epoch_val_losses && epoch_val_losses.length > 0 && epoch_val_losses.some(v => v > 0)) ||
+    validation_accuracy || val_accuracy ||
+    (epoch_validation_accuracies && epoch_validation_accuracies.length > 0 && epoch_validation_accuracies.some(v => v > 0)) ||
+    (epoch_val_accuracies && epoch_val_accuracies.length > 0 && epoch_val_accuracies.some(v => v > 0)) ||
+    completedValidationLosses.length > 0 || completedValidationAccuracies.length > 0);
 
   // Only show checkboxes if there are multiple data sources (testing or validation)
   const showCheckboxes = hasTestingData || hasValidationData;
@@ -104,13 +90,13 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
   })();
   const latestValidationAccuracy = validation_accuracy ?? val_accuracy ?? (completedValidationAccuracies.length > 0 ? completedValidationAccuracies[completedValidationAccuracies.length - 1] : null);
 
-  // Learning rate data (needed for chart data creation)
-  const learningRate = (data.learning_rate !== undefined && data.learning_rate !== null) ? data.learning_rate :
-                       ((data.lr !== undefined && data.lr !== null) ? data.lr :
-                       ((data.current_lr !== undefined && data.current_lr !== null) ? data.current_lr : null));
-  const lrSchedule = data.lr_schedule || data.learning_rate_schedule || data.scheduler || null;
-  const lrScheduleParams = data.lr_schedule_params || null;
-  const lrHistory = data.epoch_learning_rates || data.lr_history || data.learning_rate_history || null;
+  // Learning rate data (needed for chart data creation) - safe access when data is null
+  const learningRate = (data?.learning_rate !== undefined && data?.learning_rate !== null) ? data.learning_rate :
+    ((data?.lr !== undefined && data?.lr !== null) ? data.lr :
+      ((data?.current_lr !== undefined && data?.current_lr !== null) ? data.current_lr : null));
+  const lrSchedule = data?.lr_schedule || data?.learning_rate_schedule || data?.scheduler || null;
+  const lrScheduleParams = data?.lr_schedule_params || null;
+  const lrHistory = data?.epoch_learning_rates || data?.lr_history || data?.learning_rate_history || null;
 
   // Prepare data for Recharts with all metrics
   // Use actual completed epochs for dynamic x-axis (supports early stopping)
@@ -118,16 +104,16 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
   const effectiveMaxEpochs = early_stopped && actual_epochs
     ? actual_epochs
     : Math.max(
-        completedEpochs,
-        completedValidationLosses.length,
-        completedValidationAccuracies.length,
-        completedTestingLosses.length,
-        completedTestingAccuracies.length,
-        num_epochs || completedEpochs
-      );
+      completedEpochs,
+      completedValidationLosses.length,
+      completedValidationAccuracies.length,
+      completedTestingLosses.length,
+      completedTestingAccuracies.length,
+      num_epochs || completedEpochs
+    );
 
-  // Create chart data array - only include actual data (dynamic x-axis)
-  const chartData = Array.from({ length: effectiveMaxEpochs }, (_, i) => {
+  // Memoized chart data creation - only recalculate when dependencies change
+  const chartData = useMemo(() => Array.from({ length: effectiveMaxEpochs }, (_, i) => {
     // Get test metrics from arrays first, then fall back to single float values at the last epoch
     let testLoss = null;
     let testAcc = null;
@@ -165,7 +151,169 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
       validationAccuracy: completedValidationAccuracies[i] != null ? completedValidationAccuracies[i] * 100 : null,
       learningRate: epochLR
     };
-  });
+  }), [
+    effectiveMaxEpochs,
+    completedTrainingLosses,
+    completedTestingLosses,
+    completedTestingAccuracies,
+    completedTrainingAccuracies,
+    completedValidationLosses,
+    completedValidationAccuracies,
+    testing_loss,
+    test_loss,
+    testing_accuracy,
+    test_accuracy,
+    lrHistory,
+    learningRate
+  ]);
+
+  // Early return AFTER all hooks to comply with React rules of hooks
+  if (!data || data.error) {
+    return (
+      <div style={{
+        padding: 24,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-dark)'
+      }}>
+        {data?.error ? (
+          // Error state
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            padding: 32,
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05))',
+            borderRadius: 16,
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            maxWidth: 400
+          }}>
+            <div style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <div style={{ color: '#ef4444', fontSize: 16, fontWeight: 600 }}>Error Loading Data</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center' }}>
+              {data.error}
+            </div>
+          </div>
+        ) : (
+          // Empty state - no training data
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 20,
+            padding: 40,
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02))',
+            borderRadius: 16,
+            border: '1px solid rgba(99, 102, 241, 0.15)',
+            maxWidth: 450
+          }}>
+            {/* Icon */}
+            <div style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(99, 102, 241, 0.2)'
+            }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+            </div>
+
+            {/* Title */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+                No Training Data
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5 }}>
+                Training metrics will appear here when you run a training example.
+              </div>
+            </div>
+
+            {/* Features list */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 12,
+              width: '100%',
+              marginTop: 8
+            }}>
+              {[
+                { label: 'Loss Curves', color: '#6366f1' },
+                { label: 'Accuracy Charts', color: '#10b981' },
+                { label: 'Time Metrics', color: '#f59e0b' },
+                { label: 'Convergence', color: '#8b5cf6' }
+              ].map((item, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 12px',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: 'var(--text-secondary)'
+                }}>
+                  <span style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: item.color
+                  }}></span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Hint */}
+            <div style={{
+              marginTop: 8,
+              padding: '12px 16px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              borderRadius: 8,
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+              <code style={{
+                fontSize: 12,
+                color: '#10b981',
+                fontFamily: 'monospace'
+              }}>
+                VIZ=1 ./build/bin/training_loop_example
+              </code>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // Show training status with early stopping support
   const effectiveNumEpochs = num_epochs || completedEpochs;
@@ -178,7 +326,9 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
   } else if (early_stopped) {
     trainingStatus = `Early Stopped (${effectiveActualEpochs}/${effectiveExpectedEpochs})`;
   } else {
-    trainingStatus = `Completed (${completedEpochs}/${effectiveNumEpochs})`;
+    // Use current_epoch from backend when available (more accurate than array length)
+    const displayedCompleted = current_epoch || completedEpochs;
+    trainingStatus = `Completed (${displayedCompleted}/${effectiveNumEpochs})`;
   }
 
   // Calculate training metrics with early stopping support
@@ -244,11 +394,11 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
 
   // Time metrics (check for 0 explicitly, as 0 is a valid value)
   const epochTime = (data.epoch_time !== undefined && data.epoch_time !== null) ? data.epoch_time :
-                    ((data.time_per_epoch !== undefined && data.time_per_epoch !== null) ? data.time_per_epoch : null);
+    ((data.time_per_epoch !== undefined && data.time_per_epoch !== null) ? data.time_per_epoch : null);
   const totalTime = (data.total_time !== undefined && data.total_time !== null) ? data.total_time :
-                    ((data.elapsed_time !== undefined && data.elapsed_time !== null) ? data.elapsed_time : null);
+    ((data.elapsed_time !== undefined && data.elapsed_time !== null) ? data.elapsed_time : null);
   const avgEpochTime = (epochTime !== null && epochTime > 0) ? epochTime :
-                       ((totalTime !== null && totalTime > 0 && completedEpochs > 0) ? totalTime / completedEpochs : null);
+    ((totalTime !== null && totalTime > 0 && completedEpochs > 0) ? totalTime / completedEpochs : null);
   const estimatedRemaining = (data.estimated_remaining !== undefined && data.estimated_remaining !== null && data.estimated_remaining > 0)
     ? data.estimated_remaining
     : (avgEpochTime && totalEpochs > currentEpochNum ? avgEpochTime * (totalEpochs - currentEpochNum) : null);
@@ -262,8 +412,8 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
 
   // Gradient health (check for 0 explicitly)
   const gradientNorm = (data.gradient_norm !== undefined && data.gradient_norm !== null) ? data.gradient_norm :
-                       ((data.grad_norm !== undefined && data.grad_norm !== null) ? data.grad_norm :
-                       ((data.gradient_norm_avg !== undefined && data.gradient_norm_avg !== null) ? data.gradient_norm_avg : null));
+    ((data.grad_norm !== undefined && data.grad_norm !== null) ? data.grad_norm :
+      ((data.gradient_norm_avg !== undefined && data.gradient_norm_avg !== null) ? data.gradient_norm_avg : null));
   const getGradientHealth = () => {
     if (!gradientNorm) return null;
     if (gradientNorm > 100) return { status: 'exploding', color: '#ef4444', text: 'Exploding' };
@@ -283,8 +433,8 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
             background: is_training
               ? 'linear-gradient(135deg, #4a90e2, #6366f1)'
               : early_stopped
-              ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-              : 'linear-gradient(135deg, #10b981, #059669)',
+                ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                : 'linear-gradient(135deg, #10b981, #059669)',
             color: 'white',
             borderRadius: 8,
             fontSize: 11,
@@ -292,8 +442,8 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
             boxShadow: is_training
               ? '0 2px 8px rgba(74, 144, 226, 0.3)'
               : early_stopped
-              ? '0 2px 8px rgba(245, 158, 11, 0.3)'
-              : '0 2px 8px rgba(16, 185, 129, 0.3)',
+                ? '0 2px 8px rgba(245, 158, 11, 0.3)'
+                : '0 2px 8px rgba(16, 185, 129, 0.3)',
             transition: 'all 0.2s ease'
           }}>
             {trainingStatus}
@@ -329,82 +479,82 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
         const cardCount = 2 + (hasTestingData ? 2 : 0) + (hasValidationData ? 2 : 0);
         const gridCols = `repeat(${cardCount}, 1fr)`;
         return (
-      <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: gridCols, gap: 12, flexShrink: 0 }}>
-        <div className="card" style={{
-          padding: 14,
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05))',
-          borderRadius: 10,
-          border: '1px solid rgba(99, 102, 241, 0.2)',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-        }}>
-          <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Training Loss</div>
-          <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestTrainingLoss?.toFixed(6) || 'N/A'}</div>
-        </div>
-        {hasTestingData && (
-        <div className="card" style={{
-          padding: 14,
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05))',
-          borderRadius: 10,
-          border: '1px solid rgba(245, 158, 11, 0.2)',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-        }}>
-          <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Testing Loss</div>
-          <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestTestingLoss != null ? latestTestingLoss.toFixed(6) : 'N/A'}</div>
-        </div>
-        )}
-        {hasValidationData && (
-          <div className="card" style={{
-            padding: 14,
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05))',
-            borderRadius: 10,
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-          }}>
-            <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Validation Loss</div>
-            <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestValidationLoss?.toFixed(6) || 'N/A'}</div>
+          <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: gridCols, gap: 12, flexShrink: 0 }}>
+            <div className="card" style={{
+              padding: 14,
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05))',
+              borderRadius: 10,
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+            }}>
+              <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Training Loss</div>
+              <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestTrainingLoss?.toFixed(6) || 'N/A'}</div>
+            </div>
+            {hasTestingData && (
+              <div className="card" style={{
+                padding: 14,
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05))',
+                borderRadius: 10,
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+              }}>
+                <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Testing Loss</div>
+                <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestTestingLoss != null ? latestTestingLoss.toFixed(6) : 'N/A'}</div>
+              </div>
+            )}
+            {hasValidationData && (
+              <div className="card" style={{
+                padding: 14,
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05))',
+                borderRadius: 10,
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+              }}>
+                <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Validation Loss</div>
+                <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestValidationLoss?.toFixed(6) || 'N/A'}</div>
+              </div>
+            )}
+            <div className="card" style={{
+              padding: 14,
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))',
+              borderRadius: 10,
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+            }}>
+              <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Training Accuracy</div>
+              <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{(latestTrainingAccuracy * 100)?.toFixed(2) || 'N/A'}%</div>
+            </div>
+            {hasTestingData && (
+              <div className="card" style={{
+                padding: 14,
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05))',
+                borderRadius: 10,
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+              }}>
+                <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Testing Accuracy</div>
+                <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestTestingAccuracy != null ? (latestTestingAccuracy * 100).toFixed(2) : 'N/A'}%</div>
+              </div>
+            )}
+            {hasValidationData && (
+              <div className="card" style={{
+                padding: 14,
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05))',
+                borderRadius: 10,
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+              }}>
+                <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Validation Accuracy</div>
+                <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{(latestValidationAccuracy * 100)?.toFixed(2) || 'N/A'}%</div>
+              </div>
+            )}
           </div>
-        )}
-        <div className="card" style={{
-          padding: 14,
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))',
-          borderRadius: 10,
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-        }}>
-          <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Training Accuracy</div>
-          <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{(latestTrainingAccuracy * 100)?.toFixed(2) || 'N/A'}%</div>
-        </div>
-        {hasTestingData && (
-        <div className="card" style={{
-          padding: 14,
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05))',
-          borderRadius: 10,
-          border: '1px solid rgba(245, 158, 11, 0.2)',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-        }}>
-          <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Testing Accuracy</div>
-          <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{latestTestingAccuracy != null ? (latestTestingAccuracy * 100).toFixed(2) : 'N/A'}%</div>
-        </div>
-        )}
-        {hasValidationData && (
-          <div className="card" style={{
-            padding: 14,
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05))',
-            borderRadius: 10,
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-          }}>
-            <div style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500, marginBottom: 6 }}>Validation Accuracy</div>
-            <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 'bold', fontFamily: 'monospace' }}>{(latestValidationAccuracy * 100)?.toFixed(2) || 'N/A'}%</div>
-          </div>
-        )}
-      </div>
         );
       })()}
 
@@ -769,16 +919,16 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
               background: lossTrend === 'improving'
                 ? 'rgba(16, 185, 129, 0.15)'
                 : lossTrend === 'degrading'
-                ? 'rgba(239, 68, 68, 0.15)'
-                : 'rgba(245, 158, 11, 0.15)',
+                  ? 'rgba(239, 68, 68, 0.15)'
+                  : 'rgba(245, 158, 11, 0.15)',
               borderRadius: 12,
               border: `1px solid ${lossTrendColor[lossTrend]}60`,
               cursor: 'default',
               position: 'relative'
             }}
-            title={lossTrend === 'improving' ? 'Converging - Loss is improving' :
-                   lossTrend === 'degrading' ? 'Diverging - Loss is increasing' :
-                   lossTrend === 'plateau' ? 'Plateaued - Loss has stabilized' : 'Initializing - Not enough data'}
+              title={lossTrend === 'improving' ? 'Converging - Loss is improving' :
+                lossTrend === 'degrading' ? 'Diverging - Loss is increasing' :
+                  lossTrend === 'plateau' ? 'Plateaued - Loss has stabilized' : 'Initializing - Not enough data'}
             >
               <div style={{
                 width: 8,
@@ -793,8 +943,8 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
                 fontWeight: 600
               }}>
                 {lossTrend === 'improving' ? '↓' :
-                 lossTrend === 'degrading' ? '↑' :
-                 lossTrend === 'plateau' ? '→' : '—'}
+                  lossTrend === 'degrading' ? '↑' :
+                    lossTrend === 'plateau' ? '→' : '—'}
               </span>
               <span style={{
                 color: 'var(--text)',
@@ -803,187 +953,187 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
                 marginLeft: 2
               }}>
                 {lossTrend === 'improving' ? 'Converging' :
-                 lossTrend === 'degrading' ? 'Diverging' :
-                 lossTrend === 'plateau' ? 'Plateau' : 'Init'}
+                  lossTrend === 'degrading' ? 'Diverging' :
+                    lossTrend === 'plateau' ? 'Plateau' : 'Init'}
               </span>
             </div>
           </h4>
 
           <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {/* Progress Bar */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500 }}>Epoch Progress</span>
-              <span style={{ color: 'var(--text)', fontSize: 11, fontFamily: 'monospace' }}>{currentEpochNum}/{totalEpochs}</span>
-            </div>
-            <div style={{
-              width: '100%',
-              height: 8,
-              background: 'rgba(0, 0, 0, 0.2)',
-              borderRadius: 4,
-              overflow: 'hidden'
-            }}>
+            {/* Progress Bar */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 500 }}>Epoch Progress</span>
+                <span style={{ color: 'var(--text)', fontSize: 11, fontFamily: 'monospace' }}>{currentEpochNum}/{totalEpochs}</span>
+              </div>
               <div style={{
-                width: `${epochProgress}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #10b981, #059669)',
-                transition: 'width 0.3s ease',
-                boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)'
-              }}></div>
+                width: '100%',
+                height: 8,
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: 4,
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${epochProgress}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #10b981, #059669)',
+                  transition: 'width 0.3s ease',
+                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)'
+                }}></div>
+              </div>
             </div>
-          </div>
 
-          {/* Combined Metrics */}
-          <div style={{ marginBottom: 16, padding: 12, background: 'rgba(0, 0, 0, 0.2)', borderRadius: 6 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Time/Epoch</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {avgEpochTime ? (() => {
-                    if (avgEpochTime >= 3600) {
-                      return `${(avgEpochTime / 3600).toFixed(2)}hr`;
-                    } else if (avgEpochTime >= 60) {
-                      return `${(avgEpochTime / 60).toFixed(2)}min`;
-                    } else {
-                      return `${avgEpochTime.toFixed(2)}s`;
-                    }
-                  })() : 'N/A'}
+            {/* Combined Metrics */}
+            <div style={{ marginBottom: 16, padding: 12, background: 'rgba(0, 0, 0, 0.2)', borderRadius: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Time/Epoch</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {avgEpochTime ? (() => {
+                      if (avgEpochTime >= 3600) {
+                        return `${(avgEpochTime / 3600).toFixed(2)}hr`;
+                      } else if (avgEpochTime >= 60) {
+                        return `${(avgEpochTime / 60).toFixed(2)}min`;
+                      } else {
+                        return `${avgEpochTime.toFixed(2)}s`;
+                      }
+                    })() : 'N/A'}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Total Time</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {totalTime ? `${(totalTime / 60).toFixed(1)}m` : 'N/A'}
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Total Time</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {totalTime ? `${(totalTime / 60).toFixed(1)}m` : 'N/A'}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Est. Remaining</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {estimatedRemaining ? `${(estimatedRemaining / 60).toFixed(1)}m` : 'N/A'}
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Est. Remaining</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {estimatedRemaining ? `${(estimatedRemaining / 60).toFixed(1)}m` : 'N/A'}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Epochs/Hour</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {epochsPerHour ? (() => {
-                    if (epochsPerHour >= 1) {
-                      return `${epochsPerHour.toFixed(1)}/hr`;
-                    } else if (epochsPerHour * 60 >= 1) {
-                      return `${(epochsPerHour * 60).toFixed(1)}/min`;
-                    } else {
-                      return `${(epochsPerHour * 3600).toFixed(1)}/sec`;
-                    }
-                  })() : 'N/A'}
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Epochs/Hour</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {epochsPerHour ? (() => {
+                      if (epochsPerHour >= 1) {
+                        return `${epochsPerHour.toFixed(1)}/hr`;
+                      } else if (epochsPerHour * 60 >= 1) {
+                        return `${(epochsPerHour * 60).toFixed(1)}/min`;
+                      } else {
+                        return `${(epochsPerHour * 3600).toFixed(1)}/sec`;
+                      }
+                    })() : 'N/A'}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Learning Rate</div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  fontWeight: 600
-                }}>
-                  {learningRate ? (
-                    <>
-                      <span>{learningRate < 0.001 ? learningRate.toExponential(2) : learningRate.toFixed(6)}</span>
-                      {lrSchedule && (
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Learning Rate</div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    fontWeight: 600
+                  }}>
+                    {learningRate ? (
+                      <>
+                        <span>{learningRate < 0.001 ? learningRate.toExponential(2) : learningRate.toFixed(6)}</span>
+                        {lrSchedule && (
+                          <span style={{
+                            fontSize: 9,
+                            color: 'var(--muted)',
+                            marginLeft: 4,
+                            padding: '2px 6px',
+                            background: 'rgba(99, 102, 241, 0.15)',
+                            borderRadius: 4,
+                            border: '1px solid rgba(99, 102, 241, 0.2)'
+                          }} title={lrScheduleParams ? `Scheduler: ${lrSchedule} (${lrScheduleParams})` : `Scheduler: ${lrSchedule}`}>
+                            {lrSchedule}
+                            {lrScheduleParams && (
+                              <span style={{ marginLeft: 3, fontSize: 8, opacity: 0.8 }}>
+                                ({lrScheduleParams})
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {!lrSchedule && (
+                          <span style={{
+                            fontSize: 9,
+                            color: 'var(--muted)',
+                            marginLeft: 4,
+                            padding: '2px 6px',
+                            background: 'rgba(107, 114, 128, 0.15)',
+                            borderRadius: 4,
+                            border: '1px solid rgba(107, 114, 128, 0.2)'
+                          }} title="Constant learning rate">
+                            Constant
+                          </span>
+                        )}
+                      </>
+                    ) : 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Gradient Health</div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: gradientHealth?.color || 'var(--text)'
+                  }}>
+                    {gradientHealth ? (
+                      <>
                         <span style={{
-                          fontSize: 9,
-                          color: 'var(--muted)',
-                          marginLeft: 4,
-                          padding: '2px 6px',
-                          background: 'rgba(99, 102, 241, 0.15)',
-                          borderRadius: 4,
-                          border: '1px solid rgba(99, 102, 241, 0.2)'
-                        }} title={lrScheduleParams ? `Scheduler: ${lrSchedule} (${lrScheduleParams})` : `Scheduler: ${lrSchedule}`}>
-                          {lrSchedule}
-                          {lrScheduleParams && (
-                            <span style={{ marginLeft: 3, fontSize: 8, opacity: 0.8 }}>
-                              ({lrScheduleParams})
-                            </span>
-                          )}
-                        </span>
-                      )}
-                      {!lrSchedule && (
-                        <span style={{
-                          fontSize: 9,
-                          color: 'var(--muted)',
-                          marginLeft: 4,
-                          padding: '2px 6px',
-                          background: 'rgba(107, 114, 128, 0.15)',
-                          borderRadius: 4,
-                          border: '1px solid rgba(107, 114, 128, 0.2)'
-                        }} title="Constant learning rate">
-                          Constant
-                        </span>
-                      )}
-                    </>
-                  ) : 'N/A'}
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: gradientHealth.color,
+                          boxShadow: `0 0 6px ${gradientHealth.color}80`
+                        }}></span>
+                        <span>{gradientHealth.text}</span>
+                        {gradientNorm && (
+                          <span style={{
+                            fontSize: 10,
+                            color: 'var(--muted)',
+                            fontFamily: 'monospace',
+                            marginLeft: 4
+                          }}>
+                            ({gradientNorm.toFixed(4)})
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span>N/A</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Reduction Rate</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {lossReductionRate !== null ? `${lossReductionRate.toFixed(2)}%` : 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Loss Stability (σ)</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {lossStability !== null ? lossStability.toFixed(6) : 'N/A'}
+                  </div>
                 </div>
               </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Gradient Health</div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: gradientHealth?.color || 'var(--text)'
-                }}>
-                  {gradientHealth ? (
-                    <>
-                      <span style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: gradientHealth.color,
-                        boxShadow: `0 0 6px ${gradientHealth.color}80`
-                      }}></span>
-                      <span>{gradientHealth.text}</span>
-                      {gradientNorm && (
-                        <span style={{
-                          fontSize: 10,
-                          color: 'var(--muted)',
-                          fontFamily: 'monospace',
-                          marginLeft: 4
-                        }}>
-                          ({gradientNorm.toFixed(4)})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span>N/A</span>
-                  )}
+              {throughput && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                  <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Throughput</div>
+                  <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
+                    {throughput.toLocaleString()} {data.tokens_per_sec ? 'tokens/s' : 'samples/s'}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Reduction Rate</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {lossReductionRate !== null ? `${lossReductionRate.toFixed(2)}%` : 'N/A'}
-                </div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Loss Stability (σ)</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {lossStability !== null ? lossStability.toFixed(6) : 'N/A'}
-                </div>
-              </div>
+              )}
             </div>
-            {throughput && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 4 }}>Throughput</div>
-                <div style={{ color: 'var(--text)', fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>
-                  {throughput.toLocaleString()} {data.tokens_per_sec ? 'tokens/s' : 'samples/s'}
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Add padding at bottom for scrolling */}
-          <div style={{ height: 8 }}></div>
+            {/* Add padding at bottom for scrolling */}
+            <div style={{ height: 8 }}></div>
           </div>
         </div>
 
@@ -1135,4 +1285,6 @@ export default function TrainingEvalView({ data, mode = 'training' }) {
       </div>
     </div>
   );
-}
+});
+
+export default TrainingEvalView;

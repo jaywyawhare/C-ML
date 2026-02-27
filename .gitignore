@@ -65,9 +65,29 @@ __pycache__/
 .venv/
 venv/
 *.pyc
+*.pyo
+*.pyd
+.Python
 .python-version
 .tox/
 .hypothesis/
+*.egg-info/
+*.egg
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Caches
 .cache/
@@ -122,7 +142,32 @@ dist/
 Thumbs.db
 
 
-# Generated json
+# C-ML visualization output data
+.cml/
+
+# Ideation folder
+ideation/
+
+# data folder
+data/
+
+# Generated visualization/graph JSON files
 graph.json
-training.json
+graph_*.json
+kernels.json
 model_architecture.json
+training.json
+
+# Profiling outputs
+callgrind.out
+*.prof
+*.cachegrind
+
+# Frontend generated static files (from viz-ui build)
+python/cml/viz/static/assets/**
+*.js.map
+*.css.map
+
+# Python egg and build artifacts (specific to python/ directory)
+python/*.egg-info/
+python/*.egg

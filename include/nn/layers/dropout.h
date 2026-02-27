@@ -6,7 +6,7 @@
 #ifndef CML_NN_LAYERS_DROPOUT_H
 #define CML_NN_LAYERS_DROPOUT_H
 
-#include "nn/module.h"
+#include "nn.h"
 
 #ifdef __cplusplus
 extern "C" {

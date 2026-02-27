@@ -24,9 +24,11 @@
  */
 
 #define _POSIX_C_SOURCE 200809L
-#include "nn/module.h"
-#include "Core/logging.h"
-#include "Core/memory_management.h"
+#include "nn.h"
+#include "cml.h"
+#include "core/logging.h"
+#include "core/error_stack.h"
+#include "backend/device.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +38,7 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
     if (!module || !name)
         return -1;
 
-    module->name                = name;
+    module->name                = strdup(name);
     module->forward             = forward;
     module->free                = free;
     module->parameters          = NULL;
@@ -52,12 +54,12 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
 }
 
 Module* module_create(const char* name, ForwardFn forward, FreeFn free) {
-    Module* module = CM_MALLOC(sizeof(Module));
+    Module* module = malloc(sizeof(Module));
     if (!module)
         return NULL;
 
     if (module_init(module, name, forward, free) != 0) {
-        CM_FREE(module);
+        free(module);
         return NULL;
     }
 
@@ -68,20 +70,49 @@ void module_free(Module* module) {
     if (!module)
         return;
 
+    // Remove from tracking list to prevent double-free during cleanup
+    cml_untrack_module(module);
+
+    // Save the specialized free function before clearing
+    // Specialized free functions (e.g., sequential_free) handle their own cleanup
+    // and call free(module) themselves
+    void (*specialized_free)(Module*) = module->free;
+
+    // Clear the free pointer to prevent re-entry if specialized_free calls module_free
+    module->free = NULL;
+
+    // Free module name (we own it via strdup)
+    if (module->name) {
+        free(module->name);
+        module->name = NULL;
+    }
+
+    // Free parameters (but NOT the tensors inside - those are managed separately)
     if (module->parameters) {
         for (int i = 0; i < module->num_parameters; i++) {
             if (module->parameters[i]) {
                 if (module->parameters[i]->name) {
-                    char* name = (char*)module->parameters[i]->name;
-                    CM_FREE(name);
+                    free(module->parameters[i]->name);
+                    module->parameters[i]->name = NULL;
                 }
-                CM_FREE(module->parameters[i]);
+                free(module->parameters[i]);
+                module->parameters[i] = NULL;
             }
         }
-        CM_FREE(module->parameters);
+        free(module->parameters);
+        module->parameters = NULL;
     }
 
-    CM_FREE(module);
+    // Call specialized free function if it exists
+    // The specialized free function is responsible for:
+    // 1. Freeing module-specific resources (child modules, cached data, etc.)
+    // 2. Calling free(module) to free the struct itself
+    if (specialized_free) {
+        specialized_free(module);
+    } else {
+        // No specialized free, just free the base struct
+        free(module);
+    }
 }
 
 int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool requires_grad) {
@@ -97,7 +128,8 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
 
     if (module->num_parameters >= module->parameters_capacity) {
         int new_capacity = module->parameters_capacity == 0 ? 8 : module->parameters_capacity * 2;
-        Parameter** new_params = CM_REALLOC(module->parameters, new_capacity * sizeof(Parameter*));
+        Parameter** new_params =
+            realloc(module->parameters, (size_t)new_capacity * sizeof(Parameter*));
         if (!new_params) {
             LOG_ERROR("Failed to allocate memory for parameters");
             return -1;
@@ -106,7 +138,7 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
         module->parameters_capacity = new_capacity;
     }
 
-    Parameter* param = CM_MALLOC(sizeof(Parameter));
+    Parameter* param = malloc(sizeof(Parameter));
     if (!param) {
         LOG_ERROR("Failed to allocate memory for parameter");
         return -1;
@@ -118,7 +150,7 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
 
     if (!param->name) {
         LOG_ERROR("Failed to duplicate parameter name");
-        CM_FREE(param);
+        free(param);
         return -1;
     }
 
@@ -184,8 +216,12 @@ int module_set_parameter(Module* module, const char* name, Tensor* tensor) {
 }
 
 Tensor* module_forward(Module* module, Tensor* input) {
-    if (!module || !module->forward)
+    if (!module) {
         return NULL;
+    }
+    if (!module->forward) {
+        return NULL;
+    }
     return module->forward(module, input);
 }
 
@@ -211,8 +247,11 @@ void module_zero_grad(Module* module) {
             }
 
             if (tensor->requires_grad) {
-                tensor->grad =
-                    tensor_zeros(tensor->shape, tensor->ndim, tensor->dtype, tensor->device);
+                TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                     .device     = tensor->device,
+                                                     .has_dtype  = true,
+                                                     .has_device = true};
+                tensor->grad        = tensor_zeros(tensor->shape, tensor->ndim, &config);
             }
         }
     }
@@ -235,8 +274,6 @@ void module_print_summary(Module* module, int indent) {
 
 int module_get_total_parameters(Module* module) { return module ? module->num_parameters : 0; }
 
-// Module Composition (Simplified)
-
 int module_chain(Module* first, Module* second) {
     if (!first || !second)
         return -1;
@@ -252,8 +289,6 @@ void module_set_next(Module* module, Module* next) {
         module->next = next;
     }
 }
-
-// Parameter Collection
 
 int module_collect_parameters(Module* module, Parameter*** params_out, int* num_params_out,
                               bool recursive) {
@@ -282,7 +317,7 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
     }
 
     // Allocate output array (with some extra space for safety)
-    Parameter** params = CM_MALLOC(total_params * sizeof(Parameter*));
+    Parameter** params = malloc((size_t)total_params * sizeof(Parameter*));
     if (!params) {
         LOG_ERROR("Failed to allocate memory for parameter collection");
         return -1;
@@ -317,5 +352,31 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
     LOG_DEBUG("Collected %d parameters from module '%s' (recursive=%d)", idx, module->name,
               recursive);
 
+    return 0;
+}
+
+int module_to_device(Module* module, DeviceType device) {
+    if (!module) {
+        return -1;
+    }
+
+    // Collect all parameters
+    Parameter** params = NULL;
+    int num_params     = 0;
+    if (module_collect_parameters(module, &params, &num_params, true) != 0) {
+        return -1;
+    }
+
+    // Move each parameter to device
+    for (int i = 0; i < num_params; i++) {
+        if (params[i] && params[i]->tensor) {
+            if (device_move_tensor(params[i]->tensor, device) != 0) {
+                free(params);
+                return -1;
+            }
+        }
+    }
+
+    free(params);
     return 0;
 }

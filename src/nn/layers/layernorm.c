@@ -1,15 +1,15 @@
 /**
  * @file layernorm.c
- * @brief Layer Normalization layer implementation
+ * @brief Layer Normalization layer implementation using uops
  */
 
 #include "nn/layers/layernorm.h"
-#include "nn/module.h"
+#include "nn.h"
 #include "tensor/tensor.h"
-#include "tensor/ops.h"
+#include "autograd/forward_ops.h"
 #include "autograd/autograd.h"
-#include "Core/logging.h"
-#include "Core/memory_management.h"
+#include "ops/uops.h"
+#include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -33,69 +33,135 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    size_t num_elements = 1;
-    for (int i = 0; i < input->ndim - 1; i++) {
-        num_elements *= input->shape[i];
-    }
+    // Compute mean over last dimension using uops
+    ReduceParams mean_params;
+    int mean_dim         = input->ndim - 1; // Last dimension
+    int mean_dims[]      = {mean_dim};
+    mean_params.dims     = mean_dims;
+    mean_params.num_dims = 1;
+    mean_params.keepdim  = true; // Keep dimension for broadcasting
 
-    Tensor* output = tensor_empty(input->shape, input->ndim, input->dtype, input->device);
-    if (!output)
-        return NULL;
-
-    float* input_data  = (float*)tensor_data_ptr(input);
-    float* output_data = (float*)tensor_data_ptr(output);
-
-    if (!input_data || !output_data) {
-        tensor_free(output);
+    Tensor* mean_reduced = uop_mean(input, &mean_params);
+    if (!mean_reduced) {
         return NULL;
     }
 
-    // Get weight (gamma) and bias (beta) if affine
-    float* weight_data = NULL;
-    float* bias_data   = NULL;
+    // Compute (input - mean)
+    Tensor* centered = uop_sub(input, mean_reduced);
+    tensor_free(mean_reduced);
+    if (!centered) {
+        return NULL;
+    }
+
+    // Compute (input - mean)^2
+    Tensor* diff_sq = uop_mul(centered, centered);
+    if (!diff_sq) {
+        tensor_free(centered);
+        return NULL;
+    }
+
+    // Compute variance: mean((input - mean)^2) over last dimension
+    ReduceParams var_params;
+    int var_dims[]      = {mean_dim};
+    var_params.dims     = var_dims;
+    var_params.num_dims = 1;
+    var_params.keepdim  = true;
+
+    Tensor* var_reduced = uop_mean(diff_sq, &var_params);
+    tensor_free(diff_sq);
+    if (!var_reduced) {
+        tensor_free(centered);
+        return NULL;
+    }
+
+    // Create eps tensor matching var_reduced shape
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    Tensor* eps_tensor = tensor_zeros(var_reduced->shape, var_reduced->ndim, &config);
+    if (!eps_tensor) {
+        tensor_free(centered);
+        tensor_free(var_reduced);
+        return NULL;
+    }
+
+    // Fill eps_tensor with eps value
+    float* eps_data = (float*)tensor_data_ptr(eps_tensor);
+    if (eps_data) {
+        for (size_t i = 0; i < eps_tensor->numel; i++) {
+            eps_data[i] = ln->eps;
+        }
+    }
+
+    // var + eps
+    Tensor* var_eps = uop_add(var_reduced, eps_tensor);
+    tensor_free(var_reduced);
+    tensor_free(eps_tensor);
+    if (!var_eps) {
+        tensor_free(centered);
+        return NULL;
+    }
+
+    // sqrt(var + eps)
+    Tensor* std_tensor = uop_sqrt(var_eps);
+    tensor_free(var_eps);
+    if (!std_tensor) {
+        tensor_free(centered);
+        return NULL;
+    }
+
+    // Normalize: (input - mean) / sqrt(var + eps)
+    Tensor* normalized = uop_div(centered, std_tensor);
+    tensor_free(centered);
+    tensor_free(std_tensor);
+    if (!normalized) {
+        return NULL;
+    }
+
+    // Scale and shift: gamma * normalized + beta
+    Tensor* output = normalized;
 
     if (ln->affine && ln->weight && ln->bias) {
-        weight_data = (float*)tensor_data_ptr(ln->weight->tensor);
-        bias_data   = (float*)tensor_data_ptr(ln->bias->tensor);
-    }
+        // Broadcast weight and bias to input shape
+        ExpandParams expand_weight;
+        expand_weight.new_shape = input->shape;
+        expand_weight.new_ndim  = input->ndim;
 
-    for (size_t i = 0; i < num_elements; i++) {
-        // Compute mean over last dimension
-        float sum = 0.0f;
-        for (int j = 0; j < last_dim; j++) {
-            size_t idx = i * last_dim + j;
-            sum += input_data[idx];
+        Tensor* weight_broadcast = uop_expand(ln->weight->tensor, &expand_weight);
+        if (!weight_broadcast) {
+            tensor_free(output);
+            return NULL;
         }
-        float mean = sum / last_dim;
 
-        // Compute variance over last dimension
-        float sum_sq = 0.0f;
-        for (int j = 0; j < last_dim; j++) {
-            size_t idx = i * last_dim + j;
-            float diff = input_data[idx] - mean;
-            sum_sq += diff * diff;
+        // gamma * normalized
+        Tensor* scaled = uop_mul(weight_broadcast, output);
+        tensor_free(weight_broadcast);
+        tensor_free(output);
+        if (!scaled) {
+            return NULL;
         }
-        float var = sum_sq / last_dim;
-        float std = sqrtf(var + ln->eps);
 
-        // Normalize: (x - mean) / sqrt(var + eps)
-        // Then scale and shift: gamma * normalized + beta
-        for (int j = 0; j < last_dim; j++) {
-            size_t idx       = i * last_dim + j;
-            float normalized = (input_data[idx] - mean) / std;
+        // Broadcast bias
+        ExpandParams expand_bias;
+        expand_bias.new_shape = input->shape;
+        expand_bias.new_ndim  = input->ndim;
 
-            float gamma = ln->affine && weight_data ? weight_data[j] : 1.0f;
-            float beta  = ln->affine && bias_data ? bias_data[j] : 0.0f;
+        Tensor* bias_broadcast = uop_expand(ln->bias->tensor, &expand_bias);
+        if (!bias_broadcast) {
+            tensor_free(scaled);
+            return NULL;
+        }
 
-            output_data[idx] = gamma * normalized + beta;
+        // gamma * normalized + beta
+        output = uop_add(scaled, bias_broadcast);
+        tensor_free(scaled);
+        tensor_free(bias_broadcast);
+        if (!output) {
+            return NULL;
         }
     }
 
     // Setup autograd if needed
     if (autograd_is_grad_enabled() && input->requires_grad) {
-        // TODO
-        // Note: LayerNorm backward pass would need to be implemented
-        // For now, we'll mark output as requiring grad if input requires grad
         output->requires_grad = true;
     }
 
@@ -117,13 +183,13 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         return NULL;
     }
 
-    LayerNorm* ln = CM_MALLOC(sizeof(LayerNorm));
+    LayerNorm* ln = malloc(sizeof(LayerNorm));
     if (!ln)
         return NULL;
 
     // Initialize base module
     if (module_init((Module*)ln, "LayerNorm", layernorm_forward, layernorm_free) != 0) {
-        CM_FREE(ln);
+        free(ln);
         return NULL;
     }
     ln->normalized_shape = normalized_shape;
@@ -137,7 +203,9 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         int weight_shape[] = {normalized_shape};
 
         // Create weight (gamma) - initialized to ones
-        Tensor* weight = tensor_ones(weight_shape, 1, dtype, device);
+        TensorConfig config =
+            (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+        Tensor* weight = tensor_ones(weight_shape, 1, &config);
         if (!weight) {
             module_free((Module*)ln);
             return NULL;
@@ -153,7 +221,7 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         ln->weight = module_get_parameter((Module*)ln, "weight");
 
         // Create bias (beta) - initialized to zeros
-        Tensor* bias = tensor_zeros(weight_shape, 1, dtype, device);
+        Tensor* bias = tensor_zeros(weight_shape, 1, &config);
         if (!bias) {
             module_free((Module*)ln);
             return NULL;
@@ -173,7 +241,7 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
     }
 
     LOG_DEBUG("Created LayerNorm layer: normalized_shape=%d, eps=%.6f, affine=%d", normalized_shape,
-              ln->eps, affine);
+              (double)ln->eps, affine);
 
     return ln;
 }

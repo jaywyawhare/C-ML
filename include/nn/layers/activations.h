@@ -11,7 +11,7 @@
 #ifndef CML_NN_LAYERS_ACTIVATIONS_H
 #define CML_NN_LAYERS_ACTIVATIONS_H
 
-#include "nn/module.h"
+#include "nn.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,7 +72,38 @@ typedef struct LogSoftmax {
 
 LogSoftmax* nn_log_softmax(int dim);
 
-// ELU Layer
+/**
+ * @brief Functional ReLU (no module allocation)
+ *
+ * @param input Input tensor
+ * @return Output tensor, or NULL on failure
+ */
+Tensor* f_relu(Tensor* input);
+
+/**
+ * @brief Functional Sigmoid (no module allocation)
+ *
+ * @param input Input tensor
+ * @return Output tensor, or NULL on failure
+ */
+Tensor* f_sigmoid(Tensor* input);
+
+/**
+ * @brief Functional Tanh (no module allocation)
+ *
+ * @param input Input tensor
+ * @return Output tensor, or NULL on failure
+ */
+Tensor* f_tanh(Tensor* input);
+
+/**
+ * @brief Functional GELU (no module allocation)
+ *
+ * @param input Input tensor
+ * @return Output tensor, or NULL on failure
+ */
+Tensor* f_gelu(Tensor* input);
+
 typedef struct ELU {
     Module base;
     float alpha;
@@ -81,34 +112,35 @@ typedef struct ELU {
 
 ELU* nn_elu(float alpha, bool inplace);
 
-// SELU Layer
 typedef struct SELU {
     Module base;
-    bool inplace;
 } SELU;
 
-SELU* nn_selu(bool inplace);
+SELU* nn_selu(void);
 
-// Swish Layer
-typedef struct Swish {
+typedef struct SiLU {
     Module base;
-} Swish;
+} SiLU;
 
-Swish* nn_swish(void);
+SiLU* nn_silu(void);
 
-// Mish Layer
 typedef struct Mish {
     Module base;
 } Mish;
 
 Mish* nn_mish(void);
 
-// Hard Swish Layer
 typedef struct HardSwish {
     Module base;
 } HardSwish;
 
-HardSwish* nn_hard_swish(void);
+HardSwish* nn_hardswish(void);
+
+Tensor* f_elu(Tensor* input, float alpha);
+Tensor* f_selu(Tensor* input);
+Tensor* f_silu(Tensor* input);
+Tensor* f_mish(Tensor* input);
+Tensor* f_hardswish(Tensor* input);
 
 #ifdef __cplusplus
 }

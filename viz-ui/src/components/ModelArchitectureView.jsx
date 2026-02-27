@@ -101,27 +101,29 @@ function parseLayer(layerStr) {
 
 function getLayerColor(layerName) {
   const name = layerName.toLowerCase();
-  // Match reference image color scheme
-  if (name.includes('relu') || name.includes('relu')) {
-    return '#e74c3c'; // Red for ReLU
-  } else if (name.includes('conv') || name.includes('linear')) {
-    return '#3498db'; // Blue for Conv/Linear
+  // Using consistent, vibrant colors matching Ops Topology
+  if (name.includes('relu')) {
+    return '#ec4899'; // Pink for ReLU
+  } else if (name.includes('linear')) {
+    return '#3b82f6'; // Blue for Linear
+  } else if (name.includes('conv')) {
+    return '#8b5cf6'; // Purple for Conv
   } else if (name.includes('pool') || name.includes('maxpool') || name.includes('avgpool') || name.includes('lrn')) {
-    return '#2ecc71'; // Green for Pooling/LRN
+    return '#14b8a6'; // Teal for Pooling
   } else if (name.includes('concat')) {
-    return '#8b4513'; // Brown for Concat
+    return '#f59e0b'; // Orange for Concat
   } else if (name.includes('tanh')) {
-    return '#9b59b6'; // Purple for Tanh
+    return '#a855f7'; // Purple for Tanh
   } else if (name.includes('sigmoid')) {
-    return '#e67e22'; // Orange for Sigmoid
+    return '#f472b6'; // Pink for Sigmoid
   } else if (name.includes('softmax')) {
-    return '#f39c12'; // Yellow for Softmax
+    return '#eab308'; // Yellow for Softmax
   } else if (name.includes('batchnorm') || name.includes('layernorm')) {
-    return '#16a085'; // Teal for Normalization
+    return '#06b6d4'; // Cyan for Normalization
   } else if (name.includes('dropout')) {
-    return '#e91e63'; // Pink for Dropout
+    return '#f43f5e'; // Rose for Dropout
   }
-  return '#6b7280'; // Default gray
+  return '#64748b'; // Default gray
 }
 
 function toCytoscapeElements(layers) {
@@ -134,7 +136,7 @@ function toCytoscapeElements(layers) {
     data: {
       id: 'input',
       label: 'Input',
-      color: '#3498db',
+      color: '#10b981',
       type: 'io'
     }
   });
@@ -197,7 +199,7 @@ function toCytoscapeElements(layers) {
     data: {
       id: 'output',
       label: 'Output',
-      color: '#2ecc71',
+      color: '#10b981',
       type: 'io'
     }
   });
@@ -235,44 +237,46 @@ export default function ModelArchitectureView({ modelSummary }) {
           selector: 'node[type="layer"]',
           style: {
             'shape': 'round-rectangle',
-            'background-color': 'data(color)',
+            'background-color': 'transparent',
+            'background-opacity': 0,
             'border-color': 'data(color)',
-            'border-width': 1,
+            'border-width': 3,
             'label': 'data(label)',
             'text-wrap': 'wrap',
-            'text-max-width': '300px',
+            'text-max-width': '280px',
             'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            'font-size': 14,
+            'font-size': 26,
             'color': '#fff',
             'text-valign': 'center',
             'text-halign': 'center',
-            'width': 300,
-            'height': 84,
-            'padding': '22px 34px',
-            'min-width': 260,
-            'min-height': 84,
-            'font-weight': 700
+            'width': 320,
+            'height': 90,
+            'padding': '20px 28px',
+            'min-width': 280,
+            'min-height': 80,
+            'font-weight': 'normal'
           }
         },
         {
           selector: 'node[type="io"]',
           style: {
             'shape': 'round-rectangle',
-            'background-color': '#1f2937',
+            'background-color': 'transparent',
+            'background-opacity': 0,
             'border-color': 'data(color)',
-            'border-width': 2,
+            'border-width': 3,
             'label': 'data(label)',
             'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            'font-size': 14,
+            'font-size': 26,
             'color': '#f9fafb',
             'text-valign': 'center',
             'text-halign': 'center',
-            'width': 300,
-            'height': 80,
-            'padding': '22px 38px',
-            'min-width': 260,
+            'width': 320,
+            'height': 90,
+            'padding': '20px 28px',
+            'min-width': 280,
             'min-height': 80,
-            'font-weight': 700
+            'font-weight': 'normal'
           }
         },
         {
@@ -282,7 +286,8 @@ export default function ModelArchitectureView({ modelSummary }) {
             'line-color': '#94a3b8',
             'target-arrow-color': '#94a3b8',
             'target-arrow-shape': 'triangle',
-            'width': 1.5,
+            'width': 2.5,
+            'opacity': 0.7,
             'line-style': 'solid'
           }
         }
@@ -291,24 +296,24 @@ export default function ModelArchitectureView({ modelSummary }) {
         name: 'elk',
         elk: {
           algorithm: 'layered',
-          'elk.direction': 'DOWN',
+          'elk.direction': 'RIGHT',
           'elk.edgeRouting': 'ORTHOGONAL',
-          'spacing.nodeNodeBetweenLayers': '28',
-          'spacing.edgeEdgeBetweenLayers': '12',
-          'spacing.nodeNode': '16',
-          'layered.spacing.nodeNodeBetweenLayers': '28',
-          'layered.spacing.edgeNodeBetweenLayers': '12',
-          'layered.spacing.edgeEdgeBetweenLayers': '8',
+          'spacing.nodeNodeBetweenLayers': '50',
+          'spacing.edgeEdgeBetweenLayers': '20',
+          'spacing.nodeNode': '30',
+          'layered.spacing.nodeNodeBetweenLayers': '50',
+          'layered.spacing.edgeNodeBetweenLayers': '20',
+          'layered.spacing.edgeEdgeBetweenLayers': '15',
           'elk.layered.nodePlacement.strategy': 'SIMPLE',
           'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
           'elk.layered.cycleBreaking.strategy': 'GREEDY',
           'elk.layered.compaction.postCompaction': 'true',
           'elk.layered.nodePlacement.bk.fixedAlignment': 'LEFTUP',
-          'elk.padding': '[top=16,left=16,bottom=16,right=16]'
+          'elk.padding': '[top=40,left=40,bottom=40,right=40]'
         },
         nodeDimensionsIncludeLabels: true,
-        fit: false,
-        padding: 24
+        fit: true,
+        padding: 40
       },
       minZoom: 0.1,
       maxZoom: 3
@@ -317,18 +322,8 @@ export default function ModelArchitectureView({ modelSummary }) {
     const cy = cyRef.current;
 
     cy.once('layoutstop', () => {
-      const container = containerRef.current;
-      if (!container) return;
-      const zoom = cy.zoom();
-      const extent = cy.extent();
-      const graphWidth = extent.x2 - extent.x1;
-      const graphHeight = extent.y2 - extent.y1;
-      const panX = 40 - extent.x1 * zoom;
-      const panY = (container.clientHeight - graphHeight * zoom) / 2 - extent.y1 * zoom;
-      cy.pan({
-        x: panX,
-        y: panY,
-      });
+      // Fit the graph to the container with some padding
+      cy.fit(undefined, 16);
     });
 
     cy.on('tap', 'node', (evt) => {

@@ -1,14 +1,14 @@
 /**
  * @file batchnorm2d.c
- * @brief Batch Normalization 2D layer implementation
+ * @brief Batch Normalization 2D layer implementation using uops
  */
 
 #include "nn/layers/batchnorm2d.h"
-#include "nn/module.h"
+#include "nn.h"
 #include "tensor/tensor.h"
-#include "tensor/ops.h"
-#include "Core/logging.h"
-#include "Core/memory_management.h"
+#include "autograd/forward_ops.h"
+#include "ops/uops.h"
+#include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -38,138 +38,248 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    // Allocate output tensor
-    int output_shape[] = {batch, channels, height, width};
-    Tensor* output     = tensor_empty(output_shape, 4, input->dtype, input->device);
-    if (!output)
-        return NULL;
-
-    float* input_data  = (float*)tensor_data_ptr(input);
-    float* output_data = (float*)tensor_data_ptr(output);
-
-    if (!input_data || !output_data) {
-        tensor_free(output);
-        return NULL;
-    }
-
     bool training = module_is_training(module);
 
-    // Compute mean and variance per channel
+    Tensor* mean_tensor = NULL;
+    Tensor* var_tensor  = NULL;
+
+    // Compute mean and variance per channel using uops
     if (training) {
         // Allocate current statistics if not already allocated
         if (!bn->current_mean) {
-            int stat_shape[] = {channels};
-            bn->current_mean = tensor_zeros(stat_shape, 1, input->dtype, input->device);
-            bn->current_var  = tensor_zeros(stat_shape, 1, input->dtype, input->device);
+            int stat_shape[]    = {channels};
+            TensorConfig config = (TensorConfig){.dtype      = input->dtype,
+                                                 .device     = input->device,
+                                                 .has_dtype  = true,
+                                                 .has_device = true};
+            bn->current_mean    = tensor_zeros(stat_shape, 1, &config);
+            bn->current_var     = tensor_zeros(stat_shape, 1, &config);
             if (!bn->current_mean || !bn->current_var) {
-                tensor_free(output);
                 return NULL;
             }
         }
 
-        float* mean_data = (float*)tensor_data_ptr(bn->current_mean);
-        float* var_data  = (float*)tensor_data_ptr(bn->current_var);
+        // Reshape input to [channels, batch*height*width] for efficient reduction
+        ReshapeParams reshape_params;
+        int reshaped_shape[]     = {channels, batch * height * width};
+        reshape_params.new_shape = reshaped_shape;
+        reshape_params.new_ndim  = 2;
 
-        if (!mean_data || !var_data) {
-            tensor_free(output);
+        Tensor* input_reshaped = uop_reshape(input, &reshape_params);
+        if (!input_reshaped) {
             return NULL;
         }
 
-        // Compute mean per channel: mean over [batch, height, width]
-        size_t spatial_size = batch * height * width;
-        for (int c = 0; c < channels; c++) {
-            float sum = 0.0f;
-            for (int b = 0; b < batch; b++) {
-                for (int h = 0; h < height; h++) {
-                    for (int w = 0; w < width; w++) {
-                        int indices[] = {b, c, h, w};
-                        size_t offset = tensor_compute_offset(input, indices);
-                        sum += input_data[offset];
-                    }
-                }
-            }
-            mean_data[c] = sum / spatial_size;
+        // Compute mean per channel: reduce over dimension 1 (batch*height*width)
+        ReduceParams mean_params;
+        int mean_dims[]      = {1}; // Reduce over second dimension
+        mean_params.dims     = mean_dims;
+        mean_params.num_dims = 1;
+        mean_params.keepdim  = false;
+
+        Tensor* mean_reduced = uop_mean(input_reshaped, &mean_params);
+        if (!mean_reduced) {
+            tensor_free(input_reshaped);
+            return NULL;
         }
 
-        // Compute variance per channel
-        for (int c = 0; c < channels; c++) {
-            float sum_sq = 0.0f;
-            for (int b = 0; b < batch; b++) {
-                for (int h = 0; h < height; h++) {
-                    for (int w = 0; w < width; w++) {
-                        int indices[] = {b, c, h, w};
-                        size_t offset = tensor_compute_offset(input, indices);
-                        float diff    = input_data[offset] - mean_data[c];
-                        sum_sq += diff * diff;
-                    }
-                }
-            }
-            var_data[c] = sum_sq / spatial_size;
+        // mean_reduced should be [channels] after reduction
+        // Store it in current_mean
+        float* mean_reduced_data = (float*)tensor_data_ptr(mean_reduced);
+        float* current_mean_data = (float*)tensor_data_ptr(bn->current_mean);
+        if (mean_reduced_data && current_mean_data) {
+            memcpy(current_mean_data, mean_reduced_data, (size_t)channels * sizeof(float));
         }
+        tensor_free(mean_reduced);
+
+        // Compute variance: mean((x - mean)^2)
+        // First, broadcast mean to reshaped input shape
+        ExpandParams expand_params;
+        int reshaped_shape_expand[] = {channels, batch * height * width};
+        expand_params.new_shape     = reshaped_shape_expand;
+        expand_params.new_ndim      = 2;
+
+        Tensor* mean_broadcast = uop_expand(bn->current_mean, &expand_params);
+        if (!mean_broadcast) {
+            tensor_free(input_reshaped);
+            return NULL;
+        }
+
+        // Compute (x - mean)
+        Tensor* diff = uop_sub(input_reshaped, mean_broadcast);
+        tensor_free(input_reshaped);
+        tensor_free(mean_broadcast);
+        if (!diff) {
+            return NULL;
+        }
+
+        // Compute (x - mean)^2
+        Tensor* diff_sq = uop_mul(diff, diff);
+        tensor_free(diff);
+        if (!diff_sq) {
+            return NULL;
+        }
+
+        // Reduce to get variance over dimension 1
+        ReduceParams var_params;
+        int var_dims[]      = {1};
+        var_params.dims     = var_dims;
+        var_params.num_dims = 1;
+        var_params.keepdim  = false;
+
+        Tensor* var_reduced = uop_mean(diff_sq, &var_params);
+        tensor_free(diff_sq);
+        if (!var_reduced) {
+            return NULL;
+        }
+
+        // Store variance
+        float* var_reduced_data = (float*)tensor_data_ptr(var_reduced);
+        float* current_var_data = (float*)tensor_data_ptr(bn->current_var);
+        if (var_reduced_data && current_var_data) {
+            memcpy(current_var_data, var_reduced_data, (size_t)channels * sizeof(float));
+        }
+        tensor_free(var_reduced);
 
         // Update running statistics
         if (bn->track_running_stats && bn->running_mean && bn->running_var) {
             float* running_mean = (float*)tensor_data_ptr(bn->running_mean);
             float* running_var  = (float*)tensor_data_ptr(bn->running_var);
 
-            if (running_mean && running_var) {
+            if (running_mean && running_var && current_mean_data && current_var_data) {
                 for (int c = 0; c < channels; c++) {
-                    running_mean[c] =
-                        bn->momentum * running_mean[c] + (1.0f - bn->momentum) * mean_data[c];
+                    running_mean[c] = bn->momentum * running_mean[c] +
+                                      (1.0f - bn->momentum) * current_mean_data[c];
                     running_var[c] =
-                        bn->momentum * running_var[c] + (1.0f - bn->momentum) * var_data[c];
+                        bn->momentum * running_var[c] + (1.0f - bn->momentum) * current_var_data[c];
                 }
             }
         }
+
+        mean_tensor = bn->current_mean;
+        var_tensor  = bn->current_var;
+    } else {
+        // Use running statistics in eval mode
+        mean_tensor = bn->running_mean;
+        var_tensor  = bn->running_var;
     }
 
-    // Get mean and variance (use running stats in eval mode)
-    float* mean_data = training ? (float*)tensor_data_ptr(bn->current_mean)
-                                : (float*)tensor_data_ptr(bn->running_mean);
-    float* var_data  = training ? (float*)tensor_data_ptr(bn->current_var)
-                                : (float*)tensor_data_ptr(bn->running_var);
-
-    if (!mean_data || !var_data) {
-        tensor_free(output);
+    if (!mean_tensor || !var_tensor) {
+        LOG_ERROR("BatchNorm2d: missing mean or variance tensor");
         return NULL;
     }
 
-    // Get weight (gamma) and bias (beta) if affine
-    float* weight_data = NULL;
-    float* bias_data   = NULL;
+    // Broadcast mean and variance to input shape
+    ExpandParams expand_mean;
+    int input_shape[]     = {batch, channels, height, width};
+    expand_mean.new_shape = input_shape;
+    expand_mean.new_ndim  = 4;
 
-    if (bn->affine && bn->weight && bn->bias) {
-        weight_data = (float*)tensor_data_ptr(bn->weight->tensor);
-        bias_data   = (float*)tensor_data_ptr(bn->bias->tensor);
+    Tensor* mean_broadcast = uop_expand(mean_tensor, &expand_mean);
+    if (!mean_broadcast) {
+        return NULL;
     }
 
-    // Normalize: (x - mean) / sqrt(var + eps)
-    // Then scale and shift: gamma * normalized + beta
-    for (int b = 0; b < batch; b++) {
+    // Compute (input - mean)
+    Tensor* centered = uop_sub(input, mean_broadcast);
+    tensor_free(mean_broadcast);
+    if (!centered) {
+        return NULL;
+    }
+
+    // Create eps tensor and add to variance, then sqrt
+    int var_shape[]     = {channels};
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    Tensor* eps_tensor = tensor_zeros(var_shape, 1, &config);
+    if (!eps_tensor) {
+        tensor_free(centered);
+        return NULL;
+    }
+
+    // Fill eps_tensor with eps value
+    float* eps_data = (float*)tensor_data_ptr(eps_tensor);
+    if (eps_data) {
         for (int c = 0; c < channels; c++) {
-            float mean = mean_data[c];
-            float var  = var_data[c];
-            float std  = sqrtf(var + bn->eps);
+            eps_data[c] = bn->eps;
+        }
+    }
 
-            float gamma = bn->affine && weight_data ? weight_data[c] : 1.0f;
-            float beta  = bn->affine && bias_data ? bias_data[c] : 0.0f;
+    // var + eps
+    Tensor* var_eps = uop_add(var_tensor, eps_tensor);
+    tensor_free(eps_tensor);
+    if (!var_eps) {
+        tensor_free(centered);
+        return NULL;
+    }
 
-            for (int h = 0; h < height; h++) {
-                for (int w = 0; w < width; w++) {
-                    int indices[] = {b, c, h, w};
-                    size_t offset = tensor_compute_offset(input, indices);
-                    float x       = input_data[offset];
+    // sqrt(var + eps)
+    Tensor* std_tensor = uop_sqrt(var_eps);
+    tensor_free(var_eps);
+    if (!std_tensor) {
+        tensor_free(centered);
+        return NULL;
+    }
 
-                    // Normalize
-                    float normalized = (x - mean) / std;
+    // Broadcast std to input shape
+    ExpandParams expand_std;
+    expand_std.new_shape  = input_shape;
+    expand_std.new_ndim   = 4;
+    Tensor* std_broadcast = uop_expand(std_tensor, &expand_std);
+    tensor_free(std_tensor);
+    if (!std_broadcast) {
+        tensor_free(centered);
+        return NULL;
+    }
 
-                    // Scale and shift
-                    float result = gamma * normalized + beta;
+    // Normalize: (input - mean) / sqrt(var + eps)
+    Tensor* normalized = uop_div(centered, std_broadcast);
+    tensor_free(centered);
+    tensor_free(std_broadcast);
+    if (!normalized) {
+        return NULL;
+    }
 
-                    size_t out_offset       = tensor_compute_offset(output, indices);
-                    output_data[out_offset] = result;
-                }
-            }
+    // Scale and shift: gamma * normalized + beta
+    Tensor* output = normalized;
+
+    if (bn->affine && bn->weight && bn->bias) {
+        // Broadcast weight and bias to input shape
+        ExpandParams expand_weight;
+        expand_weight.new_shape = input_shape;
+        expand_weight.new_ndim  = 4;
+
+        Tensor* weight_broadcast = uop_expand(bn->weight->tensor, &expand_weight);
+        if (!weight_broadcast) {
+            tensor_free(output);
+            return NULL;
+        }
+
+        // gamma * normalized
+        Tensor* scaled = uop_mul(weight_broadcast, output);
+        tensor_free(weight_broadcast);
+        tensor_free(output);
+        if (!scaled) {
+            return NULL;
+        }
+
+        // Broadcast bias
+        ExpandParams expand_bias;
+        expand_bias.new_shape = input_shape;
+        expand_bias.new_ndim  = 4;
+
+        Tensor* bias_broadcast = uop_expand(bn->bias->tensor, &expand_bias);
+        if (!bias_broadcast) {
+            tensor_free(scaled);
+            return NULL;
+        }
+
+        // gamma * normalized + beta
+        output = uop_add(scaled, bias_broadcast);
+        tensor_free(scaled);
+        tensor_free(bias_broadcast);
+        if (!output) {
+            return NULL;
         }
     }
 
@@ -192,17 +302,17 @@ static void batchnorm2d_free(Module* module) {
         tensor_free(bn->current_var);
 
     // Parameters are freed by module system
-    CM_FREE(bn);
+    free(bn);
 }
 
 BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool affine,
                             bool track_running_stats, DType dtype, DeviceType device) {
-    BatchNorm2d* bn = CM_MALLOC(sizeof(BatchNorm2d));
+    BatchNorm2d* bn = malloc(sizeof(BatchNorm2d));
     if (!bn)
         return NULL;
 
     if (module_init((Module*)bn, "BatchNorm2d", batchnorm2d_forward, batchnorm2d_free) != 0) {
-        CM_FREE(bn);
+        free(bn);
         return NULL;
     }
 
@@ -217,7 +327,9 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
         int param_shape[] = {num_features};
 
         // Weight (gamma)
-        Tensor* weight = tensor_ones(param_shape, 1, dtype, device);
+        TensorConfig config =
+            (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+        Tensor* weight = tensor_ones(param_shape, 1, &config);
         if (!weight) {
             module_free((Module*)bn);
             return NULL;
@@ -232,7 +344,7 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
         bn->weight = module_get_parameter((Module*)bn, "weight");
 
         // Bias (beta)
-        Tensor* bias = tensor_zeros(param_shape, 1, dtype, device);
+        Tensor* bias = tensor_zeros(param_shape, 1, &config);
         if (!bias) {
             module_free((Module*)bn);
             return NULL;
@@ -253,8 +365,10 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
     // Create running statistics if tracking
     if (track_running_stats) {
         int stat_shape[] = {num_features};
-        bn->running_mean = tensor_zeros(stat_shape, 1, dtype, device);
-        bn->running_var  = tensor_ones(stat_shape, 1, dtype, device);
+        TensorConfig config =
+            (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+        bn->running_mean = tensor_zeros(stat_shape, 1, &config);
+        bn->running_var  = tensor_ones(stat_shape, 1, &config);
 
         if (!bn->running_mean || !bn->running_var) {
             if (bn->running_mean)
@@ -273,7 +387,7 @@ BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool af
     bn->current_var  = NULL;
 
     LOG_DEBUG("Created BatchNorm2d layer: num_features=%d, eps=%.6f, momentum=%.6f", num_features,
-              eps, momentum);
+              (double)eps, (double)momentum);
 
     return bn;
 }
