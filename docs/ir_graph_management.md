@@ -110,7 +110,7 @@ void cml_ir_reset_global_context(void) {
 Before resetting the IR, all gradients must be materialized:
 
 ```c
-void cml_ir_ensure_gradients_executed(CMLIR_t ir) {
+void cml_ir_ensure_gradients_executed(CMLGraph_t ir) {
     if (!ir || !ir->tensor_refs) return;
 
     for (int i = 0; i < ir->tensor_refs_count; i++) {
@@ -157,7 +157,7 @@ Usage analysis identifies which IR nodes are actually used in the computation gr
 The `analyze_usage()` function performs a backward traversal from the graph's tail (loss):
 
 ```c
-static void analyze_usage(CMLIR_t ir) {
+static void analyze_usage(CMLGraph_t ir) {
     // 1. Reset all nodes to unused
     for (int i = 0; i < node_count; i++) {
         nodes[i]->is_used = false;
@@ -292,7 +292,7 @@ ______________________________________________________________________
 Materializes all gradient tensors in the IR context.
 
 ```c
-void cml_ir_ensure_gradients_executed(CMLIR_t ir);
+void cml_ir_ensure_gradients_executed(CMLGraph_t ir);
 ```
 
 **Parameters:**
@@ -320,7 +320,7 @@ ______________________________________________________________________
 Exports kernel analysis data as JSON.
 
 ```c
-char* cml_ir_export_kernel_analysis(CMLIR_t ir, bool optimized);
+char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized);
 ```
 
 **Parameters:**
@@ -356,7 +356,7 @@ ______________________________________________________________________
 Performs usage analysis on the IR graph (internal, static).
 
 ```c
-static void analyze_usage(CMLIR_t ir);
+static void analyze_usage(CMLGraph_t ir);
 ```
 
 **Called by:** `cml_ir_export_kernel_analysis()`
@@ -407,7 +407,7 @@ Never store pointers to IR nodes or contexts across training iterations:
 
 ```c
 // BAD - IR will be freed!
-CMLIR_t my_context = tensor->ir_context;
+CMLGraph_t my_context = tensor->ir_context;
 cml_backward(loss, NULL, false, false);
 // my_context is now dangling!
 
@@ -441,7 +441,7 @@ for (int epoch = 1; epoch <= num_epochs; epoch++) {
 Monitor IR memory usage:
 
 ```c
-// Before optimization: ~14KB per epoch × 1000 epochs = 14MB
+// Before optimization: ~14KB per epoch x 1000 epochs = 14MB
 // After optimization: ~14KB constant (reset each epoch)
 ```
 
@@ -545,7 +545,7 @@ The IR system is designed to be extensible:
 
 ```c
 // Add new optimization pass
-void my_optimization_pass(CMLIR_t ir) {
+void my_optimization_pass(CMLGraph_t ir) {
     // Traverse graph
     // Apply transformations
     // Update nodes
@@ -579,7 +579,7 @@ ______________________________________________________________________
 
 **Fixed:**
 
-- Memory accumulation across epochs (14MB → 14KB)
+- Memory accumulation across epochs (14MB -> 14KB)
 - Execution result double-free errors
 - Validation metrics off-by-one indexing
 - Loss value corruption after backward pass

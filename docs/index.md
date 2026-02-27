@@ -176,9 +176,9 @@ cml_set_default_device(DEVICE_METAL);          // Use Metal (macOS)
 See the `examples/` directory for complete working examples:
 
 - **Basic Training**: `main.c` - Simple XOR classification
-- **Comprehensive Training**: `examples/test.c` - Full training pipeline with metrics
-- **Autograd**: `examples/autograd_example.c` - Gradient computation examples
-- **Advanced Features**: `examples/early_stopping_lr_scheduler.c` - Early stopping and LR scheduling
+- **Comprehensive Training**: `tests/test_training_loop.c` - Full training pipeline with metrics
+- **Autograd**: `examples/demos/autograd_example.c` - Gradient computation examples
+- **Advanced Features**: `examples/demos/early_stopping_lr_scheduler.c` - Early stopping and LR scheduling
 
 ## Platform Support
 

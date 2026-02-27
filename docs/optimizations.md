@@ -13,7 +13,7 @@ ______________________________________________________________________
 1. [BLAS Integration](#4-blas-integration)
 1. [IR Graph Optimizations](#5-ir-graph-optimizations)
 1. [Operation Fusion](#6-operation-fusion)
-1. [MLIR Optimizations](#7-mlir-optimizations)
+1. [LLVM JIT Backend](#7-llvm-jit-backend)
 1. [Caching](#8-caching)
 1. [GPU Backends](#9-gpu-backends)
 1. [Gradient Checkpointing](#10-gradient-checkpointing)
@@ -29,23 +29,22 @@ C-ML employs a multi-level optimization strategy that operates at different stag
 
 ```
 User Code
-    ↓
+    v
 ┌─────────────────────────────────────────────────────┐
 │  Level 1: C-ML IR Optimizations                     │
 │  - Dead Code Elimination (DCE)                      │
 │  - Operation Fusion (11+ patterns)                  │
 │  - Cache Locality Reordering                        │
 └─────────────────────────────────────────────────────┘
-    ↓
+    v
 ┌─────────────────────────────────────────────────────┐
-│  Level 2: MLIR Optimizations                        │
-│  - Common Subexpression Elimination (CSE)           │
-│  - Constant Folding                                 │
-│  - Linalg/Loop Fusion                               │
-│  - Auto-Vectorization                               │
-│  - Buffer Optimization                              │
+│  Level 2: LLVM JIT Compilation (optional)           │
+│  - IR to LLVM IR lowering                           │
+│  - LLVM optimization passes                         │
+│  - Native machine code generation                   │
+│  - Kernel caching (LRU)                             │
 └─────────────────────────────────────────────────────┘
-    ↓
+    v
 ┌─────────────────────────────────────────────────────┐
 │  Level 3: Runtime Optimizations                     │
 │  - SIMD Vectorization (SSE/AVX/AVX-512/NEON)        │
@@ -54,7 +53,7 @@ User Code
 │  - Kernel Caching (LRU)                             │
 │  - Memory Pooling                                   │
 └─────────────────────────────────────────────────────┘
-    ↓
+    v
 Hardware (CPU/GPU)
 ```
 
@@ -546,7 +545,7 @@ ______________________________________________________________________
 ### 5.1 Optimization Pipeline
 
 ```c
-int cml_ir_optimize(CMLIR_t ir) {
+int cml_ir_optimize(CMLGraph_t ir) {
     // Pass 1: Build dependency graph
     build_dependency_graph(ir);
 
@@ -574,7 +573,7 @@ int cml_ir_optimize(CMLIR_t ir) {
 Uses DFS from outputs to mark reachable nodes:
 
 ```c
-static void mark_reachable_nodes(CMLIR_t ir) {
+static void mark_reachable_nodes(CMLGraph_t ir) {
     // Mark all as unused initially
     struct IRNode* node = ir->head;
     while (node) {
@@ -605,7 +604,7 @@ static void mark_reachable_nodes(CMLIR_t ir) {
     }
 }
 
-static int remove_dead_nodes(CMLIR_t ir) {
+static int remove_dead_nodes(CMLGraph_t ir) {
     struct IRNode* prev = NULL;
     struct IRNode* node = ir->head;
     int removed = 0;
@@ -640,7 +639,7 @@ static int remove_dead_nodes(CMLIR_t ir) {
 ### 5.3 Dependency Graph Construction
 
 ```c
-static int build_dependency_graph(CMLIR_t ir) {
+static int build_dependency_graph(CMLGraph_t ir) {
     // Pass 1: Initialize use counts
     struct IRNode* node = ir->head;
     while (node) {
@@ -674,7 +673,7 @@ static int build_dependency_graph(CMLIR_t ir) {
 Uses Kahn's algorithm for topological sort:
 
 ```c
-static int reorder_for_cache_locality(CMLIR_t ir) {
+static int reorder_for_cache_locality(CMLGraph_t ir) {
     // Calculate in-degrees
     int* in_degree = calloc(ir->node_count, sizeof(int));
     for (int i = 0; i < ir->node_count; i++) {
@@ -740,7 +739,7 @@ C-ML recognizes and fuses 11+ patterns:
 | MUL + ADD               | FMA (Fused Multiply-Add) | Single instruction, better accuracy |
 | NEG + ADD               | SUB                      | Eliminate negation                  |
 | EXP + LOG               | Identity                 | Eliminate both ops                  |
-| MUL + DIV               | Identity                 | (a\*b)/a → b                        |
+| MUL + DIV               | Identity                 | (a\*b)/a -> b                       |
 | SQRT + MUL              | sqrt_mul                 | Combined kernel                     |
 | EXP + RECIP             | exp_recip                | 1/exp(x) kernel                     |
 | NEG + EXP               | exp(-x)                  | Common in sigmoid                   |
@@ -853,78 +852,37 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
 
 ______________________________________________________________________
 
-## 7. MLIR Optimizations
+## 7. LLVM JIT Backend
 
-**Files:** `include/ops/ir/mlir/mlir_fusion.h`, `src/ops/ir/mlir/mlir_fusion.c`
+**Files:** `include/ops/ir/llvm/`, `src/ops/ir/llvm/`
 
-### 7.1 MLIR Fusion Configuration
+The LLVM JIT backend compiles IR graphs to native machine code at runtime using LLVM's ORC JIT engine, providing significant performance improvements over the CPU interpreter for repeated computations.
 
-```c
-typedef struct {
-    bool enable_linalg_fusion;      // Fuse linalg ops
-    bool enable_vectorization;      // Auto-vectorize (SIMD)
-    bool enable_buffer_fusion;      // Fuse buffer allocations
-    bool enable_loop_fusion;        // Fuse loops
-    bool enable_constant_folding;   // Fold constants
-    bool enable_cse;                // Common subexpression elimination
-    int vectorization_size;         // Vector width (0 = auto-detect)
-    int tile_size;                  // Loop tiling size (0 = none)
-} MLIRFusionConfig;
+### 7.1 Compilation Pipeline
 
-// Default configuration
-static MLIRFusionConfig default_fusion_config = {
-    .enable_linalg_fusion    = true,
-    .enable_vectorization    = true,
-    .enable_buffer_fusion    = true,
-    .enable_loop_fusion      = true,
-    .enable_constant_folding = true,
-    .enable_cse              = true,
-    .vectorization_size      = 0,  // Auto-detect
-    .tile_size               = 0   // No tiling by default
-};
+```
+IR Graph -> LLVM IR Generation -> Optimization Passes -> Native Code -> Execution
 ```
 
-### 7.2 MLIR Optimization Pass Order
+### 7.2 Kernel Caching
+
+Compiled kernels are cached with LRU eviction (256 entry limit) to avoid recompilation:
 
 ```c
-int cml_mlir_apply_fusion_passes(void* mlir_module, void* mlir_context,
-                                 const MLIRFusionConfig* config) {
-    // Pass order is critical for optimal results:
-    // 1. Common subexpression elimination (CSE)
-    // 2. Constant folding
-    // 3. Linalg fusion
-    // 4. Loop fusion
-    // 5. Buffer optimization
-    // 6. Vectorization
-    // 7. Canonicalization
-
-    cml_mlir_lower_module_to_llvm(module);
-    return 0;
-}
+void cml_kernel_cache_clear(void);
+void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory);
+double cml_kernel_cache_hit_rate(void);
+void cml_kernel_cache_print_stats(void);
 ```
 
-### 7.3 Two-Level Fusion Pipeline
+### 7.3 Two-Level Optimization Pipeline
 
 ```c
-void* cml_apply_full_fusion_pipeline(CMLIR_t ir, CMLMLIRContext* ctx) {
-    LOG_INFO("=== Full Fusion Pipeline ===");
+// Step 1: C-ML IR-level optimization (pattern matching)
+cml_ir_optimize(ir);  // DCE, fusion, reordering
 
-    // Step 1: C-ML IR-level fusion (pattern matching)
-    LOG_INFO("Step 1: Applying C-ML IR fusion patterns...");
-    cml_ir_optimize(ir);  // DCE, fusion, reordering
-    LOG_INFO("C-ML IR fusion complete (11 patterns applied)");
-
-    // Step 2: Convert to MLIR
-    LOG_INFO("Step 2: Converting to MLIR...");
-    void* mlir_module = cml_ir_to_mlir(ctx, ir);
-
-    // Step 3: MLIR-level optimization (polyhedral)
-    LOG_INFO("Step 3: Applying MLIR optimization passes...");
-    cml_mlir_optimize(mlir_module, ctx->context.ptr);
-
-    LOG_INFO("=== Fusion Pipeline Complete ===");
-    return mlir_module;
-}
+// Step 2: LLVM-level optimization (machine code generation)
+// Happens automatically during execution
 ```
 
 ______________________________________________________________________
@@ -961,7 +919,7 @@ typedef struct CMLGraphCache {
 #### Graph Signature Hashing (FNV-1a)
 
 ```c
-uint64_t cml_graph_compute_signature(CMLIR_t ir) {
+uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
     uint64_t hash = FNV_OFFSET;  // 0xcbf29ce484222325ULL
 
     struct IRNode* node = ir->head;
@@ -1021,7 +979,7 @@ static void evict_lru_entry(CMLGraphCache* cache) {
 
 ### 8.2 Kernel Cache
 
-**Files:** `include/ops/ir/mlir/mlir_kernel_cache.h`, `src/ops/ir/mlir/mlir_kernel_cache.c`
+**Files:** `include/ops/ir/kernel_cache.h`, `src/ops/ir/kernel_cache.c`
 
 Caches compiled JIT kernels:
 
@@ -1055,7 +1013,7 @@ typedef struct CMLKernelCache {
 #### Kernel Hash Computation
 
 ```c
-uint64_t cml_kernel_cache_compute_hash(CMLIR_t ir, Tensor** inputs,
+uint64_t cml_kernel_cache_compute_hash(CMLGraph_t ir, Tensor** inputs,
                                         int num_inputs, CMLKernelBackend backend) {
     uint64_t hash = fnv1a_hash_init();
 
@@ -1138,7 +1096,7 @@ typedef enum {
 
 ### 9.2 CUDA Backend
 
-**Files:** `src/ops/ir/mlir/backends/cuda_backend.c`
+**Files:** `include/ops/ir/gpu/`, `src/ops/ir/gpu/`
 
 - PTX code compilation via `cuModuleLoadData`
 - Kernel execution via `cuLaunchKernel`
@@ -1149,22 +1107,16 @@ typedef enum {
 
 ### 9.3 ROCm/HIP Backend
 
-**Files:** `src/ops/ir/mlir/backends/rocm_backend.c`
-
 - HIP module loading and kernel functions
 - Multi-device support
 - Stream synchronization
 
 ### 9.4 Metal Backend (macOS)
 
-**Files:** `src/ops/ir/mlir/backends/metal_backend.m`
-
 - Metal framework integration (Objective-C)
 - Metal Shading Language (MSL) kernels
 
 ### 9.5 Vulkan Backend
-
-**Files:** `src/ops/ir/mlir/backends/vulkan_backend.c`
 
 - Cross-platform GPU support
 - SPIR-V code generation
@@ -1200,7 +1152,7 @@ void autograd_checkpointing_cleanup(void);
 typedef struct CheckpointedTensor {
     Tensor* tensor;
     struct IRNode* saved_ir_node;    // Save computation graph
-    CMLIR_t saved_ir_context;
+    CMLGraph_t saved_ir_context;
     Tensor** saved_inputs;           // Save input tensors
     int num_inputs;
 } CheckpointedTensor;
@@ -1417,35 +1369,29 @@ ______________________________________________________________________
 
 ### LLVM JIT Memory Growth
 
-When using MLIR JIT execution, memory grows over time because:
-
-1. Each forward/backward pass creates a new LLVM execution engine
-1. LLVM's internal memory pools don't release memory back to the OS
-1. Memory accumulates even after `mlirExecutionEngineDestroy` is called
+When using LLVM JIT execution, memory can grow over time because LLVM's internal memory pools don't always release memory back to the OS.
 
 **Workarounds:**
 
-- Call `cml_reset_ir_context()` after each batch to limit growth per epoch
+- Call `cml_reset_ir_context()` after each batch to limit IR node growth per epoch
 - Use larger batch sizes to reduce total JIT compilations
-- Set `MALLOC_TRIM_THRESHOLD_=0` environment variable
-
-**Long-term Solution:** Implement proper kernel caching in `mlir_execute.c` to reuse compiled kernels for repeated computation graphs.
+- The kernel cache (LRU, 256 entries) automatically limits compiled kernel accumulation
 
 ______________________________________________________________________
 
 ## Summary Table
 
-| Optimization     | Location              | Speedup Factor | Memory Impact         |
-| ---------------- | --------------------- | -------------- | --------------------- |
-| AVX-512 SIMD     | `simd_math.c`         | 8-16x          | None                  |
-| AVX2 SIMD        | `simd_math.c`         | 4-8x           | None                  |
-| BLAS GEMM        | `blas.c`              | 10-100x        | None                  |
-| Operation Fusion | `optimization.c`      | 1.5-3x         | Reduced               |
-| Graph Caching    | `graph_cache.c`       | 2-10x          | Increased             |
-| Kernel Caching   | `mlir_kernel_cache.c` | 2-5x           | Increased             |
-| Memory Pooling   | `memory_pools.c`      | 1.2-2x         | Reduced fragmentation |
-| Checkpointing    | `checkpointing.c`     | 1x             | 50-80% reduction      |
-| Thread Pool      | `threadpool.c`        | Nx (N = cores) | Minimal               |
+| Optimization     | Location          | Speedup Factor | Memory Impact         |
+| ---------------- | ----------------- | -------------- | --------------------- |
+| AVX-512 SIMD     | `simd_math.c`     | 8-16x          | None                  |
+| AVX2 SIMD        | `simd_math.c`     | 4-8x           | None                  |
+| BLAS GEMM        | `blas.c`          | 10-100x        | None                  |
+| Operation Fusion | `optimization.c`  | 1.5-3x         | Reduced               |
+| Graph Caching    | `graph_cache.c`   | 2-10x          | Increased             |
+| Kernel Caching   | `kernel_cache.c`  | 2-5x           | Increased             |
+| Memory Pooling   | `memory_pools.c`  | 1.2-2x         | Reduced fragmentation |
+| Checkpointing    | `checkpointing.c` | 1x             | 50-80% reduction      |
+| Thread Pool      | `threadpool.c`    | Nx (N = cores) | Minimal               |
 
 ______________________________________________________________________
 
@@ -1454,4 +1400,4 @@ ______________________________________________________________________
 - [Intel Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/)
 - [SLEEF Library](https://sleef.org/)
 - [OpenBLAS](https://www.openblas.net/)
-- [MLIR Documentation](https://mlir.llvm.org/)
+- [LLVM Documentation](https://llvm.org/docs/)

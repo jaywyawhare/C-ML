@@ -6,8 +6,9 @@ Complete guide to training neural networks with C-ML.
 
 - [Basic Training Loop](#basic-training-loop)
 - [Optimizers](#optimizers)
+- [LR Schedulers](#lr-schedulers)
 - [Loss Functions](#loss-functions)
-- [Data Loading](#data-loading)
+- [Dataset Hub](#dataset-hub)
 - [Training Mode](#training-mode)
 - [Metrics](#metrics)
 - [Cleanup Context](#cleanup-context)
@@ -21,160 +22,230 @@ Complete guide to training neural networks with C-ML.
 cml_init();
 cml_seed(42);
 
-Sequential* model = nn_sequential();
-model = sequential_add_chain(model, (Module*)nn_linear(784, 128, dtype, device, true));
-model = sequential_add_chain(model, (Module*)nn_relu(false));
-model = sequential_add_chain(model, (Module*)nn_linear(128, 10, dtype, device, true));
+DeviceType device = cml_get_default_device();
+DType dtype = cml_get_default_dtype();
 
-Optimizer* optimizer = optim_adam_for_model((Module*)model, lr, weight_decay, beta1, beta2, eps);
+Sequential* model = cml_nn_sequential();
+model = cml_nn_sequential_add(model, (Module*)cml_nn_linear(4, 16, dtype, device, true));
+model = cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
+model = cml_nn_sequential_add(model, (Module*)cml_nn_linear(16, 3, dtype, device, true));
 
-Dataset* dataset = dataset_xor();
-Tensor* inputs = dataset->X;
-Tensor* targets = dataset->y;
+Optimizer* optimizer = cml_optim_adam_for_model((Module*)model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
-for (int epoch = 0; epoch < num_epochs; epoch++) {
-    optimizer_zero_grad(optimizer);
-    Tensor* outputs = module_forward((Module*)model, inputs);
-    Tensor* loss = tensor_mse_loss(outputs, targets);
-    tensor_backward(loss, NULL, false, false);
-    optimizer_step(optimizer);
+Dataset* ds = cml_dataset_load("iris");
+dataset_normalize(ds, "minmax");
+Dataset *train, *test;
+dataset_split(ds, 0.8f, &train, &test);
+
+cml_nn_module_set_training((Module*)model, true);
+for (int epoch = 0; epoch < 100; epoch++) {
+    cml_optim_zero_grad(optimizer);
+    Tensor* outputs = cml_nn_module_forward((Module*)model, train->X);
+    Tensor* loss = cml_nn_mse_loss(outputs, train->y);
+    cml_backward(loss, NULL, false, false);
+    cml_optim_step(optimizer);
+
+    if ((epoch + 1) % 10 == 0) {
+        float* loss_data = (float*)tensor_data_ptr(loss);
+        printf("Epoch %d: Loss = %.6f\n", epoch + 1, loss_data ? loss_data[0] : 0.0f);
+    }
+
     tensor_free(loss);
     tensor_free(outputs);
 }
 
+optimizer_free(optimizer);
+module_free((Module*)model);
+dataset_free(train);
+dataset_free(test);
+dataset_free(ds);
 cml_cleanup();
 ```
 
 ## Optimizers
 
-```c
-// Automatic parameter collection
-Optimizer* optimizer = optim_adam_for_model((Module*)model, lr, weight_decay, beta1, beta2, eps);
-Optimizer* sgd = optim_sgd_for_model((Module*)model, lr, momentum, weight_decay);
+### Available Optimizers
 
-// Manual
+| Optimizer | Constructor        | Key Parameters                      |
+| --------- | ------------------ | ----------------------------------- |
+| SGD       | `optim_sgd()`      | lr, momentum, weight_decay          |
+| Adam      | `optim_adam()`     | lr, weight_decay, beta1, beta2, eps |
+| AdamW     | `optim_adamw()`    | lr, weight_decay, beta1, beta2, eps |
+| RMSprop   | `optim_rmsprop()`  | lr, weight_decay, alpha, eps        |
+| Adagrad   | `optim_adagrad()`  | lr, weight_decay, eps               |
+| AdaDelta  | `optim_adadelta()` | rho, weight_decay, eps              |
+
+### Model-based Constructors (Recommended)
+
+Automatically collect parameters from the model:
+
+```c
+Optimizer* opt = cml_optim_adam_for_model((Module*)model, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
+Optimizer* sgd = cml_optim_sgd_for_model((Module*)model, 0.01f, 0.9f, 0.0f);
+```
+
+### Manual Parameter Collection
+
+```c
 Parameter** params;
 int num_params;
-module_collect_parameters(model, &params, &num_params, true);
-Optimizer* optimizer = optim_adam(params, num_params, lr, weight_decay, beta1, beta2, eps);
-Optimizer* sgd = optim_sgd(params, num_params, lr, momentum, weight_decay);
-
-optimizer_zero_grad(optimizer);
-optimizer_step(optimizer);
-optimizer_free(optimizer);
+module_collect_parameters((Module*)model, &params, &num_params, true);
+Optimizer* opt = optim_adam(params, num_params, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
 ```
+
+### Optimizer Operations
+
+```c
+cml_optim_zero_grad(optimizer);     // Zero all gradients
+cml_optim_step(optimizer);          // Update parameters
+optimizer_set_lr(optimizer, 0.01f); // Change learning rate
+optimizer_free(optimizer);          // Free optimizer
+```
+
+## LR Schedulers
+
+Learning rate schedulers adjust the learning rate during training.
+
+### Available Schedulers
+
+```c
+#include "optim/lr_scheduler.h"
+
+// Step decay: lr *= gamma every step_size epochs
+LRScheduler* sched = lr_scheduler_step(optimizer, 30, 0.1f);
+
+// Exponential decay: lr *= gamma every epoch
+LRScheduler* sched = lr_scheduler_exponential(optimizer, 0.95f);
+
+// Cosine annealing: lr oscillates between initial_lr and eta_min
+LRScheduler* sched = lr_scheduler_cosine_annealing(optimizer, 100, 1e-6f);
+
+// Reduce on plateau: lr *= factor when metric stops improving
+LRScheduler* sched = lr_scheduler_reduce_on_plateau(optimizer, 0.1f, 10, 1e-4f, true);
+
+// Multi-step: lr *= gamma at specified milestones
+int milestones[] = {30, 60, 90};
+LRScheduler* sched = lr_scheduler_multi_step(optimizer, milestones, 3, 0.1f);
+```
+
+### Usage
+
+```c
+for (int epoch = 0; epoch < num_epochs; epoch++) {
+    // ... training loop ...
+
+    // Step the scheduler
+    lr_scheduler_step_epoch(sched);
+
+    // For ReduceOnPlateau, pass the metric
+    lr_scheduler_step_metric(sched, val_loss);
+
+    // Check current LR
+    float current_lr = lr_scheduler_get_lr(sched);
+}
+
+lr_scheduler_free(sched);
+```
+
+See `examples/tutorials/ex14_lr_scheduler.c` for a comparison of all schedulers.
 
 ## Loss Functions
 
 ```c
-Tensor* loss = tensor_mse_loss(outputs, targets);
-Tensor* loss = tensor_mae_loss(outputs, targets);
-Tensor* loss = tensor_bce_loss(outputs, targets);
-Tensor* loss = tensor_cross_entropy_loss(outputs, targets);
+Tensor* loss = cml_nn_mse_loss(outputs, targets);           // Mean Squared Error
+Tensor* loss = cml_nn_mae_loss(outputs, targets);           // Mean Absolute Error
+Tensor* loss = cml_nn_bce_loss(outputs, targets);           // Binary Cross Entropy
+Tensor* loss = cml_nn_cross_entropy_loss(outputs, targets); // Cross Entropy
+Tensor* loss = cml_nn_huber_loss(outputs, targets, 1.0f);   // Huber Loss
+Tensor* loss = cml_nn_kl_div_loss(outputs, targets);        // KL Divergence
 ```
 
-## Data Loading
+Additional losses (from `autograd/loss_functions.h`):
 
 ```c
-Dataset* dataset = dataset_from_arrays(X, y, num_samples, input_size, output_size);
-Dataset* xor_data = dataset_xor();
-Dataset* random_data = dataset_random_classification(num_samples, input_size, output_size);
-
-DataLoader* loader = dataloader_create(dataset, batch_size, shuffle);
-while (dataloader_has_next(loader)) {
-    Batch* batch = dataloader_next_batch(loader);
-    // Use batch->X and batch->y
-    batch_free(batch);
-}
-dataloader_reset(loader);
-
-Dataset* train, *val, *test;
-dataset_split_three(full_dataset, train_ratio, val_ratio, &train, &val, &test);
+Tensor* loss = tensor_hinge_loss(outputs, targets);
+Tensor* loss = tensor_focal_loss(outputs, targets, alpha, gamma);
+Tensor* loss = tensor_smooth_l1_loss(outputs, targets, beta);
 ```
+
+## Dataset Hub
+
+Load datasets with one line:
+
+```c
+Dataset* ds = cml_dataset_load("iris");        // Classification
+Dataset* ds = cml_dataset_load("boston");       // Regression
+Dataset* ds = cml_dataset_load("mnist");       // Image classification
+Dataset* ds = cml_dataset_from_csv("data.csv", -1);  // Custom CSV
+
+dataset_normalize(ds, "minmax");  // or "zscore"
+
+Dataset *train, *test;
+dataset_split(ds, 0.8f, &train, &test);
+```
+
+See [docs/datasets.md](datasets.md) for the full list of supported datasets.
 
 ## Training Mode
 
 ```c
-module_set_training((Module*)model, true);   // Training mode
-module_set_training((Module*)model, false);   // Evaluation mode
+cml_nn_module_set_training((Module*)model, true);   // Training mode
+cml_nn_module_eval((Module*)model);                  // Evaluation mode
 ```
+
+Layers that behave differently in training vs evaluation:
+
+- **Dropout**: Drops units during training, passes through during eval
+- **BatchNorm2d**: Uses batch statistics during training, running statistics during eval
 
 ## Metrics
 
 ```c
-// Set expected epochs for UI
 training_metrics_set_expected_epochs(num_epochs);
-
-// Capture training accuracy
 training_metrics_auto_capture_train_accuracy(accuracy);
-
-// Evaluate dataset and record metrics
 training_metrics_evaluate_dataset((Module*)model, dataset, loss_fn, is_validation);
-
-// Early stopping
 training_metrics_mark_early_stop(actual_epochs);
 
-// Learning rate scheduling info
 TrainingMetrics* metrics = training_metrics_get_global();
 training_metrics_set_learning_rate(metrics, lr, "StepLR");
-training_metrics_set_lr_schedule_params(metrics, "step_size=30,gamma=0.5");
-
-// Register model for architecture export
 training_metrics_register_model((Module*)model);
 ```
 
 ## Cleanup Context
 
 ```c
-// Centralized resource management
 CleanupContext* cleanup = cleanup_context_create();
 
-// Register resources
 cleanup_register_model(cleanup, (Module*)model);
 cleanup_register_optimizer(cleanup, optimizer);
 cleanup_register_tensor(cleanup, tensor);
-cleanup_register_params(cleanup, params);
 cleanup_register_dataset(cleanup, dataset);
-cleanup_register_memory(cleanup, ptr);
 
-// Free all registered resources
-cleanup_context_free(cleanup);
-
-// Auto-register with library
-cml_register_cleanup_context(cleanup);  // Auto-freed on cml_cleanup()
+// Auto-freed on cml_cleanup() via atexit
+cml_register_cleanup_context(cleanup);
 ```
 
 ## Best Practices
 
 ### Memory Management
 
-- Always free tensors after use: `tensor_free(tensor)`
+- Free tensors after each iteration: `tensor_free(loss); tensor_free(outputs);`
+- Call `cml_reset_ir_context()` after each batch to prevent IR node accumulation
 - Use `CleanupContext` for centralized resource management
-- Free modules when done: `module_free((Module*)model)`
-- Free optimizer: `optimizer_free(optimizer)`
+- Don't manually free a cleanup context registered with `cml_register_cleanup_context()`
 
 ### Gradient Management
 
 - Always call `cml_optim_zero_grad()` before backward pass
 - Use `cml_backward()` with `retain_graph=false` unless you need multiple backward passes
-- Check for gradient computation: `tensor_has_grad(tensor)`
 
 ### Training Mode
 
-- Set training mode: `cml_nn_module_set_training((Module*)model, true)`
-- Set evaluation mode: `cml_nn_module_eval((Module*)model)`
-- Some layers (Dropout, BatchNorm) behave differently in training vs evaluation
-
-### Error Handling
-
-- Check return values from functions
-- Use `CML_HAS_ERRORS()` after operations
-- Validate tensor shapes before operations
+- Set training mode before training: `cml_nn_module_set_training((Module*)model, true)`
+- Set eval mode before inference: `cml_nn_module_eval((Module*)model)`
 
 ### Performance
 
-- Reuse tensors when possible
-- Avoid unnecessary tensor allocations
-- Use appropriate data types (float32 vs float64)
-- Consider batch size for memory efficiency
+- Use appropriate data types (`DTYPE_FLOAT32` for most cases)
+- Process data in batches for better throughput
 - Use GPU when available for large computations

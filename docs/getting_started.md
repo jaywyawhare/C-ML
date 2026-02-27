@@ -1,243 +1,192 @@
 # Getting Started with C-ML
 
-A quick guide to get you started with C-ML in minutes.
+A practical guide to building, linking, and writing your first programs with C-ML.
 
-## Installation
+## Prerequisites
 
-### Prerequisites
+- **C11 compatible compiler**: GCC 4.9+, Clang 3.5+, or MSVC 2015+
+- **CMake 3.16+** (or GNU Make)
+- **Math library** (libm, included on most systems)
+- **Optional**: OpenBLAS or Intel MKL for BLAS-accelerated matrix operations
+- **Optional**: SLEEF for vectorized transcendental math (exp, log, tanh)
 
-- C11 compatible compiler (GCC 4.9+, Clang 3.5+, MSVC 2015+)
-- CMake 3.16+ (optional) or Make
-- Math library (libm, usually included)
+## Building
 
-### Build from Source
+### CMake (recommended)
 
 ```bash
-# Clone repository
 git clone https://github.com/jaywyawhare/C-ML.git
 cd C-ML
-```
-
-#### Option A: Use the helper script (recommended)
-
-```bash
-./build.sh all     # Builds the C core and the viz frontend
-./build.sh lib     # Library only
-./build.sh test    # Build + run tests
-```
-
-#### Option B: Use Make or CMake directly
-
-```bash
-# Make
-make clean && make
-
-# CMake
 mkdir -p build && cd build
-cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
+cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON ..
 make -j$(nproc)
 ```
 
-### Link Your Program
+This produces `build/lib/libcml_static.a`, all example binaries in `build/bin/`, and test binaries in the build tree.
+
+### Makefile
 
 ```bash
-# Static library
-gcc your_program.c -I./include -L./build/lib -lcml -lm -o your_program
-
-# Shared library
-gcc your_program.c -I./include -L./build/lib -lcml -lm -o your_program
-export LD_LIBRARY_PATH=./build/lib:$LD_LIBRARY_PATH
+make          # Standard build
+make release  # Optimized (-O3, LTO)
+make debug    # Debug build with sanitizers
+make test     # Build + run all tests
 ```
 
 ## Your First Program
 
-### Step 1: Include the Header
-
-```c
-#include "cml.h"
-```
-
-### Step 2: Initialize the Library
-
-```c
-int main(void) {
-    cml_init();
-    cml_seed(42);  // For reproducible results
-
-    // Your code here
-
-    cml_cleanup();
-    return 0;
-}
-```
-
-### Step 3: Create Tensors
-
-```c
-// Create tensors
-int shape[] = {2, 3};
-TensorConfig config = tensor_config_default();
-Tensor* a = cml_zeros(shape, 2, &config);
-Tensor* b = cml_ones(shape, 2, &config);
-```
-
-### Step 4: Perform Operations
-
-```c
-// Elementwise operations
-Tensor* sum = cml_add(a, b);
-Tensor* product = cml_mul(a, b);
-
-// Cleanup
-tensor_free(sum);
-tensor_free(product);
-tensor_free(a);
-tensor_free(b);
-```
-
-## Complete Example
+Create a file called `hello.c`:
 
 ```c
 #include "cml.h"
 #include <stdio.h>
 
 int main(void) {
-    // Initialize
     cml_init();
-    cml_seed(42);
 
-    // Create tensors
-    int shape[] = {2, 2};
-    TensorConfig config = tensor_config_default();
-    Tensor* a = cml_ones(shape, 2, &config);
-    Tensor* b = cml_ones(shape, 2, &config);
+    // Create a simple neural network: 10 -> 5 -> 2
+    Sequential* model = cml_nn_sequential();
+    cml_nn_sequential_add(model, (Module*)cml_nn_linear(10, 5, DTYPE_FLOAT32, DEVICE_CPU, true));
+    cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
+    cml_nn_sequential_add(model, (Module*)cml_nn_linear(5, 2, DTYPE_FLOAT32, DEVICE_CPU, true));
 
-    // Perform operation
-    Tensor* result = cml_add(a, b);
+    // Print model summary
+    cml_summary((Module*)model);
 
-    // Print result
-    float* data = (float*)tensor_data_ptr(result);
-    if (data) {
-        printf("Result:\n");
-        printf("  [%.1f, %.1f]\n", data[0], data[1]);
-        printf("  [%.1f, %.1f]\n", data[2], data[3]);
-    }
+    // Create an input tensor and run forward pass
+    float input_data[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    int shape[] = {1, 10};
+    Tensor* input = cml_tensor(input_data, shape, 2, NULL);
+    Tensor* output = cml_nn_sequential_forward(model, input);
 
-    // Cleanup
-    tensor_free(result);
-    tensor_free(a);
-    tensor_free(b);
+    // Lazy execution -- force evaluation before reading data
+    tensor_ensure_executed(output);
+    printf("Output: [%.4f, %.4f]\n",
+           tensor_get_float(output, 0),
+           tensor_get_float(output, 1));
+
     cml_cleanup();
-
     return 0;
 }
 ```
 
-## Next Steps
+Compile and run:
 
-1. **Learn Tensor Operations**: See [API Reference](api_reference.md#tensor-operations)
-1. **Build Neural Networks**: See [Neural Network Layers](nn_layers.md)
-1. **Train Models**: See [Training Guide](training.md)
-1. **Understand Autograd**: See [Autograd System](autograd.md)
-
-## Common Patterns
-
-### Pattern 1: Model Creation
-
-```c
-Sequential* model = cml_nn_sequential();
-DeviceType device = cml_get_default_device();
-DType dtype = cml_get_default_dtype();
-
-model = sequential_add_chain(model,
-    (Module*)cml_nn_linear(784, 128, dtype, device, true),
-    (Module*)cml_nn_relu(false),
-    (Module*)cml_nn_linear(128, 10, dtype, device, true),
-    NULL
-);
+```bash
+gcc -std=c11 -O2 hello.c -I./include -L./build/lib -lcml_static -lm -ldl -o hello
+./hello
 ```
 
-### Pattern 2: Training Loop
+## Training a Model
+
+This example trains a 3-class MLP classifier on the built-in Iris dataset:
 
 ```c
-for (int epoch = 0; epoch < num_epochs; epoch++) {
-    cml_optim_zero_grad(optimizer);
-    Tensor* outputs = cml_nn_module_forward((Module*)model, inputs);
-    Tensor* loss = cml_nn_mse_loss(outputs, targets);
-    cml_backward(loss, NULL, false, false);
-    cml_optim_step(optimizer);
+#include "cml.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-    tensor_free(loss);
-    tensor_free(outputs);
-}
-```
+int main(void) {
+    cml_init();
 
-### Pattern 3: Error Handling
+    // Load and prepare data
+    Dataset* ds = cml_dataset_load("iris");
+    dataset_normalize(ds, "minmax");
+    Dataset *train, *test;
+    dataset_split(ds, 0.8f, &train, &test);
 
-```c
-Tensor* t = tensor_empty(shape, ndim, NULL);
-if (!t) {
-    if (CML_HAS_ERRORS()) {
-        printf("Error: %s\n", CML_LAST_ERROR());
-        error_stack_print_all();
+    int nc = ds->num_classes;  // 3
+
+    // Build one-hot targets (BCE training avoids cross-entropy gather issues)
+    int n_train = train->num_samples;
+    float* train_y = (float*)tensor_data_ptr(train->y);
+    float* onehot = calloc(n_train * nc, sizeof(float));
+    for (int i = 0; i < n_train; i++) {
+        int cls = (int)train_y[i];
+        if (cls >= 0 && cls < nc)
+            onehot[i * nc + cls] = 1.0f;
     }
-    return -1;
+    int y_shape[] = {n_train, nc};
+    Tensor* y_oh = cml_tensor(onehot, y_shape, 2, NULL);
+
+    // Build model: 4 -> 16 -> ReLU -> 8 -> ReLU -> 3 -> Sigmoid
+    Sequential* model = cml_nn_sequential();
+    cml_nn_sequential_add(model, (Module*)cml_nn_linear(train->input_size, 16,
+                          DTYPE_FLOAT32, DEVICE_CPU, true));
+    cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
+    cml_nn_sequential_add(model, (Module*)cml_nn_linear(16, 8, DTYPE_FLOAT32, DEVICE_CPU, true));
+    cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
+    cml_nn_sequential_add(model, (Module*)cml_nn_linear(8, nc, DTYPE_FLOAT32, DEVICE_CPU, true));
+    cml_nn_sequential_add(model, (Module*)cml_nn_sigmoid());
+
+    // Adam optimizer
+    Optimizer* opt = cml_optim_adam_for_model((Module*)model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+
+    // Training loop
+    for (int epoch = 1; epoch <= 100; epoch++) {
+        Tensor* pred = cml_nn_sequential_forward(model, train->X);
+        Tensor* loss = cml_nn_bce_loss(pred, y_oh);
+
+        cml_optim_zero_grad(opt);
+        cml_backward(loss, NULL, false, false);
+        cml_optim_step(opt);
+
+        if (epoch % 20 == 0)
+            printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
+    }
+
+    // Evaluate on test set
+    Tensor* test_pred = cml_nn_sequential_forward(model, test->X);
+    tensor_ensure_executed(test_pred);
+    float* test_y = (float*)tensor_data_ptr(test->y);
+    int correct = 0;
+    for (int i = 0; i < test->num_samples; i++) {
+        float best = -1e9f;
+        int pred_cls = 0;
+        for (int c = 0; c < nc; c++) {
+            float v = tensor_get_float(test_pred, i * nc + c);
+            if (v > best) { best = v; pred_cls = c; }
+        }
+        correct += (pred_cls == (int)test_y[i]);
+    }
+    printf("Test accuracy: %d/%d (%.1f%%)\n",
+           correct, test->num_samples,
+           correct / (float)test->num_samples * 100);
+
+    free(onehot);
+    cml_cleanup();
+    return 0;
 }
 ```
 
-## Troubleshooting
+## Running Examples
 
-### Build Issues
+After building with `-DBUILD_EXAMPLES=ON`, all example binaries are in `build/bin/`:
 
-**Problem**: Compiler not found
+```bash
+./build/bin/ex01_tensor_ops      # Basic tensor operations
+./build/bin/ex04_mlp_classifier  # Iris classification
+./build/bin/hello_cml            # Smoke test
+```
 
-- **Solution**: Install GCC or Clang: `sudo apt-get install gcc` (Linux) or `brew install gcc` (macOS)
-
-**Problem**: CMake version too old
-
-- **Solution**: Update CMake or use Make instead
-
-### Runtime Issues
-
-**Problem**: Library not found
-
-- **Solution**: Set `LD_LIBRARY_PATH` or install library system-wide
-
-**Problem**: Segmentation fault
-
-- **Solution**: Ensure `cml_init()` is called before any operations
+See [examples/README.md](../examples/README.md) for the full list of 15+ examples covering linear regression, autoencoders, CNNs, RNNs, LSTMs, transformers, GANs, and more.
 
 ## Python Bindings
 
-CML provides Python bindings via CFFI for using the library from Python:
+C-ML includes Python bindings via CFFI. After building the C library:
 
 ```bash
-# Build the C library first
-cd build && cmake .. && make -j4
-
-# Install Python bindings
-cd ../python
+cd python
 pip install cffi
-python setup.py install
-
-# Test
+python cml/build_cffi.py
 python -c "import cml; cml.init(); print('OK'); cml.cleanup()"
 ```
 
-See `python/README.md` for full documentation including:
+See [python/INSTALLATION.md](../python/INSTALLATION.md) for full setup instructions and usage examples.
 
-- 63 comprehensive CFFI tests
-- Neural network examples
-- Memory management details
-- Lazy evaluation support
+## Next Steps
 
-## Resources
-
-- [Quick Start commands](../QUICKSTART.md) - OS-specific build script usage
-- Run tests: `./build.sh test` or `make test`
-- Run examples: `./build/examples/hello_cml` (after building)
-- Visualization: `VIZ=1 ./build/examples/training_loop_example`
-- [API Reference](api_reference.md) - Complete API documentation
-- [Examples](../examples/) - Working code examples
-- [Python Bindings](../python/README.md) - Python CFFI bindings
-- [GitHub Issues](https://github.com/jaywyawhare/C-ML/issues) - Report bugs or ask questions
+- [API Reference](api_reference.md) -- complete function and type documentation
+- [Neural Network Layers](nn_layers.md) -- available layers (Linear, Conv, RNN, Transformer, etc.)
+- [Training Guide](training.md) -- optimizers, loss functions, learning rate schedulers
+- [Datasets](datasets.md) -- built-in datasets and data loading utilities

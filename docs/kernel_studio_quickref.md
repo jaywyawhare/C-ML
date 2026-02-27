@@ -1,10 +1,10 @@
 # Kernel Studio - Quick Reference Card
 
-## 🚀 Quick Start
+## Quick Start
 
 ```c
 // 1. Create IR context
-CMLIR_t ir = cml_ir_new(IR_TARGET_CUDA);
+CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
 
 // 2. Enable auto-capture
 cml_ir_enable_auto_capture(ir);
@@ -25,7 +25,7 @@ cml_ir_disable_auto_capture();
 cml_ir_free(ir);
 ```
 
-## 📊 Optimization Passes
+## Optimization Passes
 
 | Pass                      | What It Does                            | Impact                |
 | ------------------------- | --------------------------------------- | --------------------- |
@@ -33,7 +33,7 @@ cml_ir_free(ir);
 | **Kernel Fusion**         | Combines operations into single kernels | 1.5-5x speedup        |
 | **Cache Reordering**      | Improves memory access patterns         | 15-25% less bandwidth |
 
-## 🔥 Fusion Patterns
+## Fusion Patterns
 
 ### Pattern 1: FMA (Fused Multiply-Add)
 
@@ -77,17 +77,17 @@ t2 = log(t1);  // exp(log(x)) = x
 t2 = a;
 ```
 
-## 🎯 Common Patterns
+## Common Patterns
 
-| Pattern | Before      | After      | Speedup        |
-| ------- | ----------- | ---------- | -------------- |
-| FMA     | `MUL + ADD` | `fmaf()`   | 1.8x           |
-| NEG-ADD | `NEG + ADD` | `SUB`      | 1.5x           |
-| EXP-LOG | `EXP + LOG` | `identity` | ∞ (eliminated) |
-| MUL-DIV | `MUL + DIV` | `identity` | ∞ (eliminated) |
-| Chain   | `n ops`     | `1 kernel` | 2-5x           |
+| Pattern | Before      | After      | Speedup          |
+| ------- | ----------- | ---------- | ---------------- |
+| FMA     | `MUL + ADD` | `fmaf()`   | 1.8x             |
+| NEG-ADD | `NEG + ADD` | `SUB`      | 1.5x             |
+| EXP-LOG | `EXP + LOG` | `identity` | inf (eliminated) |
+| MUL-DIV | `MUL + DIV` | `identity` | inf (eliminated) |
+| Chain   | `n ops`     | `1 kernel` | 2-5x             |
 
-## 🔍 Debugging
+## Debugging
 
 ### Enable Debug Logging
 
@@ -120,23 +120,23 @@ printf("Used: %d\n", node->is_used);
 printf("Fused: %d\n", node->is_fused);
 ```
 
-## 📈 Performance Tips
+## Performance Tips
 
-### ✅ DO:
+### DO:
 
 - Use auto-capture for automatic optimization
 - Chain elementwise operations (they fuse well)
 - Let the optimizer eliminate dead code
 - Use `fmaf()` patterns (MUL + ADD)
 
-### ❌ DON'T:
+### DON'T:
 
 - Mix different data types unnecessarily
 - Create intermediate results you don't need
 - Manually optimize before profiling
 - Assume fusion always happens (check the output!)
 
-## 🎨 Kernel Studio UI
+## Kernel Studio UI
 
 ### View Toggle
 
@@ -145,15 +145,15 @@ printf("Fused: %d\n", node->is_fused);
 
 ### Status Badges
 
-- 🔴 **DEAD**: Will be eliminated
-- 🟢 **FUSED**: Part of optimized kernel
+- **DEAD**: Will be eliminated
+- **FUSED**: Part of optimized kernel
 
 ### Tabs
 
 - **Kernels**: Browse and inspect individual kernels
 - **Optimizations**: View optimization insights and statistics
 
-## 🎓 Learning Path
+## Learning Path
 
 1. **Start Simple**: Run `comprehensive_fusion_example.c`
 1. **Understand Basics**: Read `docs/kernel_studio.md`
@@ -161,14 +161,14 @@ printf("Fused: %d\n", node->is_fused);
 1. **Optimize**: Use Kernel Studio to verify optimizations
 1. **Profile**: Measure actual performance gains
 
-## 📚 Resources
+## Resources
 
 - **Full Docs**: `docs/kernel_studio.md`
-- **Example**: `examples/comprehensive_fusion_example.c`
+- **Example**: `examples/demos/comprehensive_fusion_example.c`
 - **API Reference**: `REFERENCE.md`
 - **Implementation**: `src/ops/ir.c`
 
-## 🔧 Supported Targets
+## Supported Targets
 
 ```c
 IR_TARGET_C          // Plain C (scalar)
@@ -179,7 +179,7 @@ IR_TARGET_OPENCL     // OpenCL (portable)
 IR_TARGET_WGSL       // WebGPU
 ```
 
-## 💡 Pro Tips
+## Pro Tips
 
 1. **Chain Operations**: More chained ops = better fusion opportunities
 1. **Check Generated Code**: Always verify what code is generated
@@ -187,7 +187,7 @@ IR_TARGET_WGSL       // WebGPU
 1. **Use Debug Mode**: See what the optimizer is doing
 1. **Read the Logs**: Optimization passes log their actions
 
-## 🐛 Common Issues
+## Common Issues
 
 ### Issue: Operations not fusing
 
@@ -201,14 +201,14 @@ IR_TARGET_WGSL       // WebGPU
 
 **Solution**: Profile on actual hardware, not just theory
 
-## 📞 Getting Help
+## Getting Help
 
 1. Enable debug logging: `cml_set_log_level(LOG_LEVEL_DEBUG)`
 1. Check IR output: `cml_ir_to_string(ir)`
 1. View generated code: `cml_ir_compile(ir, NULL)`
 1. Use Kernel Studio UI to visualize
 
-## 🎯 Quick Checklist
+## Quick Checklist
 
 - [ ] Created IR context
 - [ ] Enabled auto-capture

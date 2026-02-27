@@ -80,10 +80,10 @@ t2 = a;  // Optimized to identity
 
 **Other Fusion Patterns:**
 
-- `NEG + ADD → SUB`
-- `SQRT + MUL → sqrt_mul`
-- `EXP + RECIP → exp_recip`
-- `MUL + DIV → identity` (if same operand)
+- `NEG + ADD -> SUB`
+- `SQRT + MUL -> sqrt_mul`
+- `EXP + RECIP -> exp_recip`
+- `MUL + DIV -> identity` (if same operand)
 
 ### 4. **Cache Locality Optimization**
 
@@ -101,8 +101,8 @@ Operations are reordered using topological sort to improve cache utilization:
 1. **Browse Kernels**: Click on kernels in the left panel to view details
 1. **Inspect Code**: See generated C/CUDA code with syntax highlighting
 1. **Check Status**: Look for badges:
-   - 🔴 **DEAD** - Will be eliminated
-   - 🟢 **FUSED** - Part of optimized kernel
+   - **DEAD** - Will be eliminated
+   - **FUSED** - Part of optimized kernel
 
 ### Understanding Statistics
 
@@ -134,7 +134,7 @@ View detailed information about:
 
 ```c
 // Create IR context
-CMLIR_t ir = cml_ir_new(IR_TARGET_CUDA);
+CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
 
 // Enable automatic operation capture
 cml_ir_enable_auto_capture(ir);
@@ -165,7 +165,7 @@ cml_ir_free(ir);
 ### Manual IR Construction
 
 ```c
-CMLIR_t ir = cml_ir_new(IR_TARGET_C_SIMD);
+CMLGraph_t ir = cml_ir_new(IR_TARGET_C_SIMD);
 
 Tensor* inputs[] = {a, b};
 cml_ir_add_uop(ir, UOP_MUL, inputs, 2, NULL);
@@ -197,7 +197,7 @@ Typical improvements from optimization:
 
 ## Example: Comprehensive Fusion
 
-See `examples/comprehensive_fusion_example.c` for a complete demonstration of all fusion types and optimizations.
+See `examples/demos/comprehensive_fusion_example.c` for a complete demonstration of all fusion types and optimizations.
 
 ```bash
 # Compile and run the example
@@ -311,4 +311,4 @@ To add new fusion patterns:
 
 - [USAGE.md](USAGE.md) - General C-ML usage guide
 - [REFERENCE.md](REFERENCE.md) - API reference
-- [examples/comprehensive_fusion_example.c](examples/comprehensive_fusion_example.c) - Complete example
+- [examples/demos/comprehensive_fusion_example.c](examples/demos/comprehensive_fusion_example.c) - Complete example

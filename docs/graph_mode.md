@@ -20,7 +20,7 @@ cml_cleanup();
 ## Explicit Graph Building
 
 ```c
-CMLIR_t ir = cml_ir_new(IR_TARGET_CUDA);
+CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
 Tensor* inputs[] = {a, b};
 cml_ir_add_uop(ir, UOP_ADD, inputs, 2, NULL);
 cml_ir_execute(ir);
