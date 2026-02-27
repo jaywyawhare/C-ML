@@ -13,14 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Global checkpointing state
 static bool checkpointing_enabled = false;
 
-// Checkpointed tensor structure
 typedef struct CheckpointedTensor {
     Tensor* tensor;
     struct IRNode* saved_ir_node; // Save IR node to recompute
-    CMLIR_t saved_ir_context;     // Save IR context
+    CMLGraph_t saved_ir_context;  // Save IR context
     Tensor** saved_inputs;        // Save inputs for recomputation
     int num_inputs;
 } CheckpointedTensor;
@@ -66,10 +64,12 @@ int autograd_checkpoint(Tensor* tensor) {
     if (tensor->ir_node && tensor->ir_node->inputs) {
         checkpoint->num_inputs   = tensor->ir_node->num_inputs;
         checkpoint->saved_inputs = malloc((size_t)checkpoint->num_inputs * sizeof(Tensor*));
-        if (checkpoint->saved_inputs) {
-            for (int i = 0; i < checkpoint->num_inputs; i++) {
-                checkpoint->saved_inputs[i] = tensor->ir_node->inputs[i];
-            }
+        if (!checkpoint->saved_inputs) {
+            free(checkpoint);
+            return -1;
+        }
+        for (int i = 0; i < checkpoint->num_inputs; i++) {
+            checkpoint->saved_inputs[i] = tensor->ir_node->inputs[i];
         }
     } else {
         checkpoint->num_inputs   = 0;

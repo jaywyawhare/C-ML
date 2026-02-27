@@ -119,7 +119,6 @@ void tensor_retain_grad(Tensor* t) {
     t->requires_grad = true;
 }
 
-// Autograd hooks implementation
 #define MAX_HOOKS 16
 
 typedef struct {
@@ -300,9 +299,9 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
 
     // Execute backward pass
     if (cml_ir_execute_backward(tensor->ir_context) != 0) {
-        LOG_ERROR("Failed to execute backward pass (MLIR execution error)");
-        LOG_ERROR("Aborting training run to avoid repeated failing MLIR executions");
-        // Hard fail so main/training_loop don't keep looping on the same MLIR error.
+        LOG_ERROR("Failed to execute backward pass");
+        LOG_ERROR("Aborting training run to avoid repeated failing executions");
+        // Hard fail so main/training_loop don't keep looping on the same error.
         exit(1);
     }
     LOG_INFO("Backward pass completed using IR for tensor %p", (void*)tensor);
@@ -350,14 +349,10 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             // Ensure gradients are materialized before resetting IR
             cml_ir_ensure_gradients_executed(tensor->ir_context);
 
-            // Reset IR context to prevent accumulation
-            // cml_ir_reset_global_context();
             tensor->ir_context = NULL;
         }
     } else {
-        // Always reset IR context if not visualizing, to prevent memory leaks and graph growth
         if (tensor->ir_context) {
-            // cml_ir_reset_global_context();
             tensor->ir_context = NULL;
         }
     }

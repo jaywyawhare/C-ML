@@ -219,6 +219,48 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b);
  */
 Tensor* tensor_transpose(Tensor* a, int dim1, int dim2);
 
+// Advanced Reduction Operations
+
+/**
+ * @brief Standard deviation of tensor elements along specified dimension
+ *
+ * @param a Input tensor
+ * @param dim Dimension to reduce (use -1 for all dimensions)
+ * @param unbiased If true, use Bessel's correction (divide by N-1)
+ * @param keepdim Whether to keep the reduced dimension
+ * @return New tensor with result, or NULL on failure
+ */
+Tensor* tensor_std(Tensor* a, int dim, bool unbiased, bool keepdim);
+
+/**
+ * @brief Variance of tensor elements along specified dimension
+ *
+ * @param a Input tensor
+ * @param dim Dimension to reduce (use -1 for all dimensions)
+ * @param unbiased If true, use Bessel's correction (divide by N-1)
+ * @param keepdim Whether to keep the reduced dimension
+ * @return New tensor with result, or NULL on failure
+ */
+Tensor* tensor_var(Tensor* a, int dim, bool unbiased, bool keepdim);
+
+/**
+ * @brief Index of maximum element along specified dimension
+ *
+ * @param a Input tensor
+ * @param dim Dimension to reduce (use -1 for all dimensions)
+ * @return New INT32 tensor with argmax indices, or NULL on failure
+ */
+Tensor* tensor_argmax(Tensor* a, int dim);
+
+/**
+ * @brief Index of minimum element along specified dimension
+ *
+ * @param a Input tensor
+ * @param dim Dimension to reduce (use -1 for all dimensions)
+ * @return New INT32 tensor with argmin indices, or NULL on failure
+ */
+Tensor* tensor_argmin(Tensor* a, int dim);
+
 // Note: tensor_reshape and tensor_clone are declared in tensor/tensor.h
 // Note: tensor_detach is declared in autograd/autograd.h
 // and autograd/autograd.h respectively

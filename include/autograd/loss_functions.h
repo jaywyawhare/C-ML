@@ -118,6 +118,53 @@ struct Tensor* tensor_huber_loss(struct Tensor* input, struct Tensor* target, fl
  */
 struct Tensor* tensor_kl_div_loss(struct Tensor* input, struct Tensor* target);
 
+/**
+ * @brief Hinge Loss
+ *
+ * Computes the hinge loss for binary classification with SVM-style margins.
+ *
+ * Formula: loss = mean(max(0, 1 - target * input))
+ *
+ * @param input Predicted values tensor
+ * @param target Target labels tensor (values should be +1 or -1)
+ * @return Loss tensor (scalar) with autograd support, or NULL on failure
+ */
+struct Tensor* tensor_hinge_loss(struct Tensor* input, struct Tensor* target);
+
+/**
+ * @brief Focal Loss
+ *
+ * Computes the focal loss for handling class imbalance in binary classification.
+ *
+ * Formula: loss = -mean(alpha * (1 - p_t)^gamma * log(p_t))
+ * where p_t = target * sigmoid(input) + (1 - target) * (1 - sigmoid(input))
+ *
+ * @param input Predicted logits tensor (before sigmoid)
+ * @param target Target binary labels tensor (0 or 1)
+ * @param alpha Balancing factor (default: 0.25)
+ * @param gamma Focusing parameter (default: 2.0)
+ * @return Loss tensor (scalar) with autograd support, or NULL on failure
+ */
+struct Tensor* tensor_focal_loss(struct Tensor* input, struct Tensor* target, float alpha,
+                                 float gamma);
+
+/**
+ * @brief Smooth L1 Loss
+ *
+ * Computes the smooth L1 loss between input and target tensors.
+ *
+ * Formula:
+ *   If |x| < beta: loss = 0.5 * x^2 / beta
+ *   Else: loss = |x| - 0.5 * beta
+ *   where x = input - target
+ *
+ * @param input Predicted values tensor
+ * @param target Target values tensor
+ * @param beta Threshold parameter (default: 1.0)
+ * @return Loss tensor (scalar) with autograd support, or NULL on failure
+ */
+struct Tensor* tensor_smooth_l1_loss(struct Tensor* input, struct Tensor* target, float beta);
+
 #ifdef __cplusplus
 }
 #endif

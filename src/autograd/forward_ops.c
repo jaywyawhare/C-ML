@@ -20,7 +20,7 @@ Tensor* tensor_add(Tensor* a, Tensor* b) {
               b->ndim > 0 ? b->shape[0] : 0, b->ndim > 1 ? b->shape[1] : 0);
 
     // 1. Get or create IR context (global lazy graph)
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {
         LOG_ERROR("Failed to get or create IR context");
         return NULL;
@@ -67,7 +67,7 @@ Tensor* tensor_sub(Tensor* a, Tensor* b) {
     }
 
     // Lazy: create IR node only
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -91,7 +91,7 @@ Tensor* tensor_sub(Tensor* a, Tensor* b) {
 Tensor* tensor_mul(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -111,7 +111,7 @@ Tensor* tensor_mul(Tensor* a, Tensor* b) {
 Tensor* tensor_div(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -137,7 +137,7 @@ Tensor* tensor_pow(Tensor* a, Tensor* b) {
 Tensor* tensor_neg(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -157,7 +157,7 @@ Tensor* tensor_neg(Tensor* a) {
 Tensor* tensor_exp(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -176,7 +176,7 @@ Tensor* tensor_exp(Tensor* a) {
 Tensor* tensor_log(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -195,7 +195,7 @@ Tensor* tensor_log(Tensor* a) {
 Tensor* tensor_sqrt(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -452,7 +452,7 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
         LOG_ERROR("MatMul requires at least 2D tensors");
         return NULL;
     }
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -473,3 +473,289 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     }
     return tensor_from_ir_node(node, ir);
 }
+
+Tensor* tensor_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
+    if (!a)
+        return NULL;
+
+    // Step 1: Compute mean with keepdim=true for broadcasting
+    Tensor* mean_val = tensor_mean(a, dim, true);
+    if (!mean_val)
+        return NULL;
+
+    // Step 2: diff = a - mean
+    Tensor* diff = uop_sub(a, mean_val);
+    if (!diff) {
+        tensor_free(mean_val);
+        return NULL;
+    }
+
+    // Step 3: sq_diff = diff * diff
+    Tensor* sq_diff = uop_mul(diff, diff);
+    if (!sq_diff) {
+        tensor_free(diff);
+        tensor_free(mean_val);
+        return NULL;
+    }
+
+    Tensor* result = NULL;
+
+    if (!unbiased) {
+        // Biased variance: mean of squared differences
+        result = tensor_mean(sq_diff, dim, keepdim);
+    } else {
+        // Unbiased variance: sum of squared differences / (N - 1)
+        Tensor* sum_sq = tensor_sum(sq_diff, dim, keepdim);
+        if (!sum_sq) {
+            tensor_free(sq_diff);
+            tensor_free(diff);
+            tensor_free(mean_val);
+            return NULL;
+        }
+
+        // Compute N (number of elements along the reduction dimension)
+        size_t N;
+        if (dim < 0) {
+            N = a->numel;
+        } else {
+            N = (size_t)a->shape[dim];
+        }
+
+        // Create scalar tensor with value (N - 1)
+        float n_minus_1 = (float)(N - 1);
+        if (n_minus_1 <= 0.0f)
+            n_minus_1 = 1.0f; // Guard against division by zero
+
+        int scalar_shape[] = {1};
+        Tensor* divisor    = tensor_full(scalar_shape, 1, NULL, n_minus_1);
+        if (!divisor) {
+            tensor_free(sum_sq);
+            tensor_free(sq_diff);
+            tensor_free(diff);
+            tensor_free(mean_val);
+            return NULL;
+        }
+
+        result = uop_div(sum_sq, divisor);
+
+        tensor_free(divisor);
+        tensor_free(sum_sq);
+    }
+
+    tensor_free(sq_diff);
+    tensor_free(diff);
+    tensor_free(mean_val);
+    return result;
+}
+
+Tensor* tensor_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
+    if (!a)
+        return NULL;
+
+    // std = sqrt(var)
+    Tensor* var_tensor = tensor_var(a, dim, unbiased, keepdim);
+    if (!var_tensor)
+        return NULL;
+
+    Tensor* result = uop_sqrt(var_tensor);
+    tensor_free(var_tensor);
+    return result;
+}
+
+Tensor* tensor_argmax(Tensor* a, int dim) {
+    if (!a)
+        return NULL;
+
+    // Eager execution: we need actual data
+    tensor_ensure_executed(a);
+    float* data = (float*)tensor_data_ptr(a);
+    if (!data)
+        return NULL;
+
+    TensorConfig config = {
+        .dtype = DTYPE_INT32, .has_dtype = true, .device = a->device, .has_device = true};
+
+    if (dim < 0) {
+        // Reduce all dimensions: find flat index of maximum
+        float max_val = -FLT_MAX;
+        int max_idx   = 0;
+        for (size_t i = 0; i < a->numel; i++) {
+            if (data[i] > max_val) {
+                max_val = data[i];
+                max_idx = (int)i;
+            }
+        }
+
+        int shape[]    = {1};
+        Tensor* result = tensor_empty(shape, 1, &config);
+        if (!result)
+            return NULL;
+        tensor_ensure_executed(result);
+        int* result_data = (int*)tensor_data_ptr(result);
+        result_data[0]   = max_idx;
+        return result;
+    }
+
+    // Reduce along a specific dimension
+    if (dim >= a->ndim) {
+        LOG_ERROR("tensor_argmax: dimension %d out of range for %dD tensor", dim, a->ndim);
+        return NULL;
+    }
+
+    // Compute output shape (input shape with dim removed)
+    int out_ndim = a->ndim - 1;
+    if (out_ndim == 0)
+        out_ndim = 1;
+
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape)
+        return NULL;
+
+    if (a->ndim == 1) {
+        out_shape[0] = 1;
+    } else {
+        int j = 0;
+        for (int i = 0; i < a->ndim; i++) {
+            if (i != dim)
+                out_shape[j++] = a->shape[i];
+        }
+    }
+
+    Tensor* result = tensor_empty(out_shape, out_ndim, &config);
+    if (!result) {
+        free(out_shape);
+        return NULL;
+    }
+    tensor_ensure_executed(result);
+    int* result_data = (int*)tensor_data_ptr(result);
+
+    // Compute strides for iterating
+    size_t outer_size = 1;
+    for (int i = 0; i < dim; i++)
+        outer_size *= (size_t)a->shape[i];
+
+    size_t dim_size = (size_t)a->shape[dim];
+
+    size_t inner_size = 1;
+    for (int i = dim + 1; i < a->ndim; i++)
+        inner_size *= (size_t)a->shape[i];
+
+    // Iterate over outer and inner dimensions
+    for (size_t o = 0; o < outer_size; o++) {
+        for (size_t in = 0; in < inner_size; in++) {
+            float max_val = -FLT_MAX;
+            int max_idx   = 0;
+            for (size_t d = 0; d < dim_size; d++) {
+                size_t idx = o * dim_size * inner_size + d * inner_size + in;
+                if (data[idx] > max_val) {
+                    max_val = data[idx];
+                    max_idx = (int)d;
+                }
+            }
+            result_data[o * inner_size + in] = max_idx;
+        }
+    }
+
+    free(out_shape);
+    return result;
+}
+
+Tensor* tensor_argmin(Tensor* a, int dim) {
+    if (!a)
+        return NULL;
+
+    // Eager execution: we need actual data
+    tensor_ensure_executed(a);
+    float* data = (float*)tensor_data_ptr(a);
+    if (!data)
+        return NULL;
+
+    TensorConfig config = {
+        .dtype = DTYPE_INT32, .has_dtype = true, .device = a->device, .has_device = true};
+
+    if (dim < 0) {
+        // Reduce all dimensions: find flat index of minimum
+        float min_val = FLT_MAX;
+        int min_idx   = 0;
+        for (size_t i = 0; i < a->numel; i++) {
+            if (data[i] < min_val) {
+                min_val = data[i];
+                min_idx = (int)i;
+            }
+        }
+
+        int shape[]    = {1};
+        Tensor* result = tensor_empty(shape, 1, &config);
+        if (!result)
+            return NULL;
+        tensor_ensure_executed(result);
+        int* result_data = (int*)tensor_data_ptr(result);
+        result_data[0]   = min_idx;
+        return result;
+    }
+
+    // Reduce along a specific dimension
+    if (dim >= a->ndim) {
+        LOG_ERROR("tensor_argmin: dimension %d out of range for %dD tensor", dim, a->ndim);
+        return NULL;
+    }
+
+    // Compute output shape (input shape with dim removed)
+    int out_ndim = a->ndim - 1;
+    if (out_ndim == 0)
+        out_ndim = 1;
+
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape)
+        return NULL;
+
+    if (a->ndim == 1) {
+        out_shape[0] = 1;
+    } else {
+        int j = 0;
+        for (int i = 0; i < a->ndim; i++) {
+            if (i != dim)
+                out_shape[j++] = a->shape[i];
+        }
+    }
+
+    Tensor* result = tensor_empty(out_shape, out_ndim, &config);
+    if (!result) {
+        free(out_shape);
+        return NULL;
+    }
+    tensor_ensure_executed(result);
+    int* result_data = (int*)tensor_data_ptr(result);
+
+    // Compute strides for iterating
+    size_t outer_size = 1;
+    for (int i = 0; i < dim; i++)
+        outer_size *= (size_t)a->shape[i];
+
+    size_t dim_size = (size_t)a->shape[dim];
+
+    size_t inner_size = 1;
+    for (int i = dim + 1; i < a->ndim; i++)
+        inner_size *= (size_t)a->shape[i];
+
+    // Iterate over outer and inner dimensions
+    for (size_t o = 0; o < outer_size; o++) {
+        for (size_t in = 0; in < inner_size; in++) {
+            float min_val = FLT_MAX;
+            int min_idx   = 0;
+            for (size_t d = 0; d < dim_size; d++) {
+                size_t idx = o * dim_size * inner_size + d * inner_size + in;
+                if (data[idx] < min_val) {
+                    min_val = data[idx];
+                    min_idx = (int)d;
+                }
+            }
+            result_data[o * inner_size + in] = min_idx;
+        }
+    }
+
+    free(out_shape);
+    return result;
+}
+
+bool tensor_has_grad(Tensor* a) { return a && a->grad != NULL; }
