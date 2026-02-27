@@ -34,11 +34,12 @@ extern "C" {
  * @brief Device types supported by C-ML
  */
 typedef enum {
-    DEVICE_CPU,   // CPU (always available)
-    DEVICE_CUDA,  // NVIDIA CUDA GPUs
-    DEVICE_METAL, // Apple Metal GPUs
-    DEVICE_ROCM,  // AMD ROCm GPUs
-    DEVICE_AUTO   // Auto-select best available device
+    DEVICE_CPU,     // CPU (always available)
+    DEVICE_CUDA,    // NVIDIA CUDA GPUs
+    DEVICE_METAL,   // Apple Metal GPUs
+    DEVICE_ROCM,    // AMD ROCm GPUs
+    DEVICE_SIM_GPU, // Simulated GPU (CPU-backed, for testing multi-GPU without hardware)
+    DEVICE_AUTO     // Auto-select best available device
 } DeviceType;
 
 // Forward declaration
@@ -272,6 +273,55 @@ struct Tensor* tensor_zeros_auto(int* shape, int ndim, int dtype);
  * @return New tensor on default device, or NULL on failure
  */
 struct Tensor* tensor_ones_auto(int* shape, int ndim, int dtype);
+
+/**
+ * @brief Enable simulated multi-GPU mode for testing
+ *
+ * Creates N virtual GPU devices backed by CPU memory.
+ * Allows testing multi-GPU code paths without real hardware.
+ *
+ * @param num_devices Number of simulated GPUs (1-16)
+ * @param memory_per_device Simulated memory per device in bytes (0 = 4GB default)
+ * @return 0 on success, -1 on failure
+ */
+int device_sim_gpu_enable(int num_devices, size_t memory_per_device);
+
+/**
+ * @brief Disable simulated GPU mode and free resources
+ */
+void device_sim_gpu_disable(void);
+
+/**
+ * @brief Check if simulated GPU mode is active
+ */
+bool device_sim_gpu_available(void);
+
+/**
+ * @brief Get number of simulated GPU devices
+ */
+int device_sim_gpu_get_count(void);
+
+/**
+ * @brief Set the active simulated GPU device ID
+ *
+ * @param device_id Device ID (0 to num_devices-1)
+ * @return 0 on success, -1 on invalid ID
+ */
+int device_sim_gpu_set_device(int device_id);
+
+/**
+ * @brief Get the active simulated GPU device ID
+ */
+int device_sim_gpu_get_device(void);
+
+/**
+ * @brief Get simulated device info
+ *
+ * @param device_id Device ID
+ * @param info Output device info
+ * @return 0 on success
+ */
+int device_sim_gpu_get_info(int device_id, DeviceInfo* info);
 
 #ifdef __cplusplus
 }
