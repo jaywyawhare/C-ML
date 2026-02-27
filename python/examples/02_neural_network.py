@@ -27,9 +27,9 @@ def main():
     # Build model
     print("Building model...")
     model = cml.Sequential()
-    model.add(cml.Linear(10, 20))  # Input: 10 → Hidden: 20
+    model.add(cml.Linear(10, 20))  # Input: 10 -> Hidden: 20
     model.add(cml.ReLU())  # ReLU activation
-    model.add(cml.Linear(20, 10))  # Hidden: 20 → 10
+    model.add(cml.Linear(20, 10))  # Hidden: 20 -> 10
     model.add(cml.ReLU())  # ReLU activation
     model.add(cml.Linear(10, 1))  # Output: 1
 

@@ -30,8 +30,8 @@ ffi.cdef(
 
     // Forward declarations for opaque types used in Tensor
     struct IRNode;
-    struct CMLIR;
-    typedef struct CMLIR* CMLIR_t;
+    struct CMLGraph;
+    typedef struct CMLGraph* CMLGraph_t;
     struct CMLBackendBuffer;
     typedef struct CMLBackendBuffer* CMLBackendBuffer_t;
 
@@ -43,7 +43,7 @@ ffi.cdef(
         DType dtype;                  // Data type
         DeviceType device;            // Device
         struct IRNode* ir_node;       // IR node (opaque)
-        CMLIR_t ir_context;           // IR context (opaque)
+        CMLGraph_t ir_context;           // IR context (opaque)
         bool is_executed;             // Has this been executed?
         void* data;                   // Data pointer (NULL until executed)
         bool owns_data;               // Owns data flag

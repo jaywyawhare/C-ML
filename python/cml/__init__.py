@@ -163,6 +163,10 @@ from cml.functional import (
     LearningRateScheduler,
 )
 
+# Distributed training (lazy import - only loads if distributed is used)
+from cml import distributed
+from cml import zoo
+
 __all__ = [
     # Core
     "init",

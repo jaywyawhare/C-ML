@@ -6,12 +6,12 @@ Guide for developers extending CML's CFFI bindings.
 
 ```
 CML C Library (include/, src/)
-    ↓
+    v
 CFFI Layer
     ├─ _cml_cffi.py      (C function declarations)
     ├─ _cml_lib.so       (Compiled CFFI library)
     └─ build_cffi.py     (Build script)
-    ↓
+    v
 Python Wrapper Layer
     ├─ core.py           (Tensor, initialization)
     ├─ tensor_ops.py     (Tensor creation)
@@ -20,7 +20,7 @@ Python Wrapper Layer
     ├─ losses.py         (Loss functions)
     ├─ optim.py          (Optimizers)
     └─ utils.py          (Utilities)
-    ↓
+    v
 User Code
     └─ example.py        (Python applications)
 ```

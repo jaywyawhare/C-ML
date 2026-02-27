@@ -386,8 +386,7 @@ pytest tests/
 ### Build Documentation
 
 ```bash
-cd ../new_docs
-# See new_docs/README.md for documentation
+# See docs/ directory for CML documentation
 ```
 
 ## Building from Source
@@ -646,6 +645,5 @@ TL;DR: Use it, modify it, share it. Just don't be a jerk about it.
 
 ## References
 
-- C-ML Documentation: `../new_docs/README.md`
+- C-ML Documentation: `../docs/`
 - CFFI Documentation: https://cffi.readthedocs.io/
-- MLIR Documentation: https://mlir.llvm.org/

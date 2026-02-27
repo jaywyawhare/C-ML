@@ -114,17 +114,17 @@ python3 << 'EOF'
 import cml
 
 cml.init()
-print("✓ CML initialized")
+print("CML initialized")
 
 x = cml.randn([10, 10])
-print(f"✓ Created tensor with {x.size} elements")
+print(f"Created tensor with {x.size} elements")
 
 y = cml.zeros([10, 10])
 z = x + y
-print("✓ Tensor operations work")
+print("Tensor operations work")
 
 cml.cleanup()
-print("✓ CML Python bindings working!")
+print("CML Python bindings working!")
 EOF
 ```
 
@@ -416,11 +416,11 @@ python3 02_neural_network.py
 
 - Read [README.md](README.md) for API documentation
 - Check [examples/](examples/) for usage examples
-- See [../new_docs/](../new_docs/) for CML documentation
+- See [../docs/](../docs/) for CML documentation
 
 ## Support
 
-- **Build issues**: Check build logs, ensure MLIR is installed
+- **Build issues**: Check build logs, ensure dependencies are installed
 - **Runtime issues**: Set `export LD_LIBRARY_PATH=../../build/lib:$LD_LIBRARY_PATH`
 - **API questions**: See API_GUIDE.md
 - **Examples**: Check examples/ folder

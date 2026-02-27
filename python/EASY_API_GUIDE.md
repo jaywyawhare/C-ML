@@ -8,11 +8,11 @@ CML provides a layered API design:
 
 ```
 Easy API (Quickest)
-    ↓
+    v
 Convenience API (Common tasks)
-    ↓
+    v
 Standard API (Full control)
-    ↓
+    v
 Low-level API (Advanced)
 ```
 
@@ -44,7 +44,7 @@ predictions = cml.predict(model, X_test)
 cml.cleanup()
 ```
 
-Done! 🎉
+Done!
 
 ## Easy API Functions
 
@@ -571,7 +571,7 @@ if cml.has_error():
 
 ```python
 # Try:
-- Reduce learning rate (0.001 → 0.0001)
+- Reduce learning rate (0.001 -> 0.0001)
 - Add dropout (dropout=0.5)
 - Normalize data (cml.normalize(X))
 - Increase epochs (epochs=20)
@@ -605,12 +605,12 @@ model = cml.build_model([10, 16, 5])  # Smaller hidden layer
 
 CML's Easy API provides:
 
-- ✅ **One-line model building**: `cml.build_model()`
-- ✅ **One-line training**: `cml.train_model()`
-- ✅ **Data utilities**: Loaders, splitting, normalization
-- ✅ **Training helpers**: Metrics, early stopping, scheduling
-- ✅ **Device management**: Easy GPU/CPU switching
-- ✅ **Full control**: Drop to standard API anytime
+- **One-line model building**: `cml.build_model()`
+- **One-line training**: `cml.train_model()`
+- **Data utilities**: Loaders, splitting, normalization
+- **Training helpers**: Metrics, early stopping, scheduling
+- **Device management**: Easy GPU/CPU switching
+- **Full control**: Drop to standard API anytime
 
 Perfect for beginners and rapid prototyping!
 

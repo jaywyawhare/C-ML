@@ -11,7 +11,6 @@ Usage:
 Requirements:
     - cffi package: pip install cffi
     - C-ML library must be built first (make or cmake)
-    - MLIR libraries must be available
 """
 
 import os
@@ -55,9 +54,9 @@ def check_dependencies():
     try:
         import cffi
 
-        print(f"✓ cffi {cffi.__version__} found")
+        print(f"cffi {cffi.__version__} found")
     except ImportError:
-        print("✗ cffi not found. Install it with: pip install cffi")
+        print("cffi not found. Install it with: pip install cffi")
         sys.exit(1)
 
 
@@ -76,10 +75,10 @@ def build_bindings():
         # Compile the bindings
         print("Compiling CFFI module...")
         ffi.compile(verbose=True)
-        print("✓ CFFI bindings compiled successfully")
+        print("CFFI bindings compiled successfully")
 
     except Exception as e:
-        print(f"✗ Error compiling CFFI bindings: {e}")
+        print(f"Error compiling CFFI bindings: {e}")
         sys.exit(1)
 
 
@@ -95,11 +94,11 @@ def verify_installation():
         seed(42)
         cleanup()
 
-        print("✓ Bindings verified successfully")
+        print("Bindings verified successfully")
         return True
 
     except Exception as e:
-        print(f"✗ Verification failed: {e}")
+        print(f"Verification failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -118,9 +117,9 @@ if __name__ == "__main__":
     print("\nLocating CML library...")
     try:
         lib_path = find_cml_lib()
-        print(f"✓ CML library found at: {lib_path}")
+        print(f"CML library found at: {lib_path}")
     except RuntimeError as e:
-        print(f"✗ {e}")
+        print(f"{e}")
         sys.exit(1)
 
     # Build bindings
@@ -128,7 +127,7 @@ if __name__ == "__main__":
     try:
         build_bindings()
     except Exception as e:
-        print(f"✗ Build failed: {e}")
+        print(f"Build failed: {e}")
         import traceback
 
         traceback.print_exc()
