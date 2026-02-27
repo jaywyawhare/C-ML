@@ -16,7 +16,7 @@
 // Forward declarations
 struct IRNode;
 struct Tensor;
-typedef struct CMLIR* CMLIR_t;
+typedef struct CMLGraph* CMLGraph_t;
 
 // Cached execution plan - pre-ordered nodes with pre-allocated buffers
 typedef struct CMLExecutionPlan {
@@ -52,7 +52,7 @@ CMLGraphCache* cml_graph_cache_create(size_t max_entries);
 void cml_graph_cache_destroy(CMLGraphCache* cache);
 
 // Compute graph signature (hash of structure, not data)
-uint64_t cml_graph_compute_signature(CMLIR_t ir);
+uint64_t cml_graph_compute_signature(CMLGraph_t ir);
 
 // Look up cached plan
 CMLExecutionPlan* cml_graph_cache_lookup(CMLGraphCache* cache, uint64_t signature);
@@ -61,7 +61,7 @@ CMLExecutionPlan* cml_graph_cache_lookup(CMLGraphCache* cache, uint64_t signatur
 int cml_graph_cache_insert(CMLGraphCache* cache, uint64_t signature, CMLExecutionPlan* plan);
 
 // Create execution plan from IR
-CMLExecutionPlan* cml_create_execution_plan(CMLIR_t ir);
+CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir);
 
 // Execute using cached plan (fast path)
 int cml_execute_plan(CMLExecutionPlan* plan, struct Tensor** inputs, size_t num_inputs);

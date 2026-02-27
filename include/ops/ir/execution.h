@@ -16,18 +16,18 @@ extern "C" {
 /**
  * @brief Execute compiled IR
  */
-int cml_ir_execute(CMLIR_t ir);
+int cml_ir_execute(CMLGraph_t ir);
 
 /**
  * @brief Execute IR using CPU fallback interpreter
  *
- * This is a simple scalar interpreter used when MLIR is not available
- * or as a fallback when other backends fail.
+ * This is a simple scalar interpreter used as a fallback when other
+ * backends are not available or fail.
  *
  * @param ir IR context
  * @return 0 on success, negative on failure
  */
-int cpu_execute_ir(CMLIR_t ir);
+int cpu_execute_ir(CMLGraph_t ir);
 
 /**
  * @brief Execute IR graph up to target node (lazy evaluation)
@@ -39,7 +39,7 @@ int cpu_execute_ir(CMLIR_t ir);
  * @param target_node Target node to execute up to
  * @return 0 on success, negative on failure
  */
-int cml_ir_execute_up_to(CMLIR_t ir, struct IRNode* target_node);
+int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node);
 
 /**
  * @brief Print execution statistics (for debugging)

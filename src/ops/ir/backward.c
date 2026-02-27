@@ -2,9 +2,8 @@
  * @file backward.c
  * @brief Backward pass execution with CPU fallback
  *
- * This file implements backward pass for gradient computation.
- * When MLIR is available, uses MLIR automatic differentiation.
- * Otherwise, uses a CPU interpreter for gradient computation.
+ * This file implements backward pass for gradient computation
+ * using a CPU interpreter.
  */
 
 #include <stdlib.h>
@@ -17,7 +16,7 @@
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
 
-int cml_ir_build_backward(CMLIR_t ir, struct IRNode* output_node) {
+int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
     if (!ir || !output_node) {
         LOG_ERROR("Invalid arguments to cml_ir_build_backward");
         return -1;
@@ -35,15 +34,17 @@ int cml_ir_build_backward(CMLIR_t ir, struct IRNode* output_node) {
         node = node->next;
     }
 
-    // The backward graph will be built by MLIR's automatic differentiation
-    // We just need to mark the output node
+    // Mark the output node as used (needed for dead code elimination)
     output_node->is_used = true;
 
-    LOG_DEBUG("Backward graph structure prepared (MLIR will handle AD)");
+    // Backward pass uses CPU interpreter (the symbolic differentiation logic
+    // already creates standard UOps — the LLVM JIT handles those during
+    // forward execution of the backward IR graph)
+
+    LOG_DEBUG("Backward graph structure prepared (CPU fallback will handle gradients)");
     return 0;
 }
 
-// Helper to allocate gradient tensor if needed
 static Tensor* ensure_grad(Tensor* t) {
     if (!t)
         return NULL;
@@ -55,7 +56,6 @@ static Tensor* ensure_grad(Tensor* t) {
     return t->grad;
 }
 
-// Accumulate gradient into tensor
 static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     if (!t || !grad_data)
         return;
@@ -72,7 +72,6 @@ static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     }
 }
 
-// CPU backward pass for a single node
 static int cpu_backward_node(struct IRNode* node) {
     if (!node || !node->output)
         return 0;
@@ -383,6 +382,108 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_EXPAND:
+        // d(expand(a))/da = sum along expanded dimensions
+        // Expand broadcasts input to larger shape; backward sums gradients
+        // back to the original shape.
+        if (in1 && in1->requires_grad) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data && out->data) {
+                float* g1_data = (float*)g1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    g1_data[i % in1->numel] += out_grad[i];
+                }
+            }
+        }
+        break;
+
+    case UOP_CONV2D: {
+        // Backward for 2D convolution: input gradient via "full" correlation
+        // grad_input = conv2d_full(grad_output, rot180(weight))
+        // grad_weight = conv2d(input, grad_output)
+        if (!in1 || !in2)
+            break;
+
+        // in1 = input [N, C_in, H, W], in2 = weight [C_out, C_in, kH, kW]
+        int ndim_in = in1->ndim;
+        int ndim_w  = in2->ndim;
+        if (ndim_in != 4 || ndim_w != 4)
+            break;
+
+        int N = in1->shape[0], C_in = in1->shape[1];
+        int H = in1->shape[2], W = in1->shape[3];
+        int C_out = in2->shape[0], kH = in2->shape[2], kW = in2->shape[3];
+        int oH = out->shape[2], oW = out->shape[3];
+
+        // Gradient w.r.t. input
+        if (in1->requires_grad && in2->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* w_data  = (float*)in2->data;
+                // Full convolution: pad grad_output by (kH-1, kW-1), convolve with rot180(weight)
+                for (int n = 0; n < N; n++) {
+                    for (int ci = 0; ci < C_in; ci++) {
+                        for (int h = 0; h < H; h++) {
+                            for (int w_idx = 0; w_idx < W; w_idx++) {
+                                float sum = 0.0f;
+                                for (int co = 0; co < C_out; co++) {
+                                    for (int kh = 0; kh < kH; kh++) {
+                                        for (int kw = 0; kw < kW; kw++) {
+                                            int oh = h - kh;
+                                            int ow = w_idx - kw;
+                                            if (oh >= 0 && oh < oH && ow >= 0 && ow < oW) {
+                                                float g =
+                                                    out_grad[((n * C_out + co) * oH + oh) * oW +
+                                                             ow];
+                                                float wt =
+                                                    w_data[((co * C_in + ci) * kH + kh) * kW + kw];
+                                                sum += g * wt;
+                                            }
+                                        }
+                                    }
+                                }
+                                g1_data[((n * C_in + ci) * H + h) * W + w_idx] += sum;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Gradient w.r.t. weight
+        if (in2->requires_grad && in1->data) {
+            Tensor* g2 = ensure_grad(in2);
+            if (g2 && g2->data) {
+                float* g2_data = (float*)g2->data;
+                float* in_data = (float*)in1->data;
+                for (int co = 0; co < C_out; co++) {
+                    for (int ci = 0; ci < C_in; ci++) {
+                        for (int kh = 0; kh < kH; kh++) {
+                            for (int kw = 0; kw < kW; kw++) {
+                                float sum = 0.0f;
+                                for (int n = 0; n < N; n++) {
+                                    for (int oh = 0; oh < oH; oh++) {
+                                        for (int ow = 0; ow < oW; ow++) {
+                                            float g =
+                                                out_grad[((n * C_out + co) * oH + oh) * oW + ow];
+                                            float inp =
+                                                in_data[((n * C_in + ci) * H + (oh + kh)) * W +
+                                                        (ow + kw)];
+                                            sum += g * inp;
+                                        }
+                                    }
+                                }
+                                g2_data[((co * C_in + ci) * kH + kh) * kW + kw] += sum;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        break;
+    }
+
     default:
         // Unsupported op - gradients not computed
         LOG_DEBUG("CPU backward: no gradient rule for op type %d", node->type);
@@ -392,8 +493,7 @@ static int cpu_backward_node(struct IRNode* node) {
     return 0;
 }
 
-// Execute backward pass using CPU interpreter
-static int cpu_execute_backward(CMLIR_t ir) {
+static int cpu_execute_backward(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
@@ -450,7 +550,7 @@ static int cpu_execute_backward(CMLIR_t ir) {
     return 0;
 }
 
-int cml_ir_execute_backward(CMLIR_t ir) {
+int cml_ir_execute_backward(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_backward");
         return -1;
@@ -489,7 +589,7 @@ int cml_ir_execute_backward(CMLIR_t ir) {
         }
     }
 
-    // Use CPU fallback for backward pass
-    // (MLIR backward is not fully implemented yet)
+    // Backward pass uses CPU interpreter (each backward op is a standard UOp
+    // that the LLVM JIT handles during forward execution of backward graph)
     return cpu_execute_backward(ir);
 }

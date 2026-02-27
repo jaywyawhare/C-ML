@@ -9,17 +9,12 @@
 #include "autograd/autograd.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
-#ifdef CML_HAS_MLIR
-#include "ops/ir/mlir/mlir_backend.h"
-#include "ops/ir/mlir/mlir_context.h"
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
 #include <math.h>
 
-// Helper function to get uop name
 const char* uop_type_to_string(UOpType type) {
     switch (type) {
     case UOP_ADD:
@@ -87,8 +82,8 @@ const char* uop_type_to_string(UOpType type) {
     }
 }
 
-CMLIR_t cml_ir_new(IRTarget target) {
-    CMLIR_t ir = malloc(sizeof(struct CMLIR));
+CMLGraph_t cml_ir_new(IRTarget target) {
+    CMLGraph_t ir = malloc(sizeof(struct CMLGraph));
     if (!ir)
         return NULL;
 
@@ -113,13 +108,9 @@ CMLIR_t cml_ir_new(IRTarget target) {
     ir->tensor_refs_count    = 0;
     ir->tensor_refs_capacity = 0;
 
-    // MLIR context (lazy initialized)
-    ir->mlir_ctx = NULL;
-
     return ir;
 }
 
-// Helper function to free node params based on operation type
 static void free_node_params(struct IRNode* node) {
     if (!node || !node->params)
         return;
@@ -243,7 +234,6 @@ static void free_node_params(struct IRNode* node) {
     node->params = NULL;
 }
 
-// Helper function to free an IR node and all its internal resources
 static void free_ir_node(struct IRNode* node) {
     if (!node)
         return;
@@ -338,7 +328,7 @@ static void free_ir_node(struct IRNode* node) {
     free(node);
 }
 
-void cml_ir_free(CMLIR_t ir) {
+void cml_ir_free(CMLGraph_t ir) {
     if (!ir)
         return;
 
@@ -461,19 +451,10 @@ void cml_ir_free(CMLIR_t ir) {
         ir->execution_results_count = 0;
     }
 
-    // Free MLIR context if it was allocated
-    // This is CRITICAL for preventing memory leaks during training
-#ifdef CML_HAS_MLIR
-    if (ir->mlir_ctx) {
-        cml_mlir_destroy(ir->mlir_ctx);
-        ir->mlir_ctx = NULL;
-    }
-#endif
-
     free(ir);
 }
 
-int cml_ir_add_uop(CMLIR_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params) {
+int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params) {
     // Allow source nodes (like UOP_FILL) with 0 inputs
     if (!ir || (num_inputs > 0 && !inputs) || num_inputs < 0) {
         LOG_ERROR("Invalid parameters for cml_ir_add_uop");
@@ -660,23 +641,22 @@ int cml_ir_add_uop(CMLIR_t ir, UOpType type, Tensor** inputs, int num_inputs, vo
     return 0;
 }
 
-struct IRNode* cml_ir_get_tail(CMLIR_t ir) {
+struct IRNode* cml_ir_get_tail(CMLGraph_t ir) {
     if (!ir)
         return NULL;
     return ir->tail;
 }
 
-// Generate C code
-char* cml_ir_compile(CMLIR_t ir, const char* output_file) {
+char* cml_ir_compile(CMLGraph_t ir, const char* output_file) {
     if (!ir)
         return NULL;
 
-    LOG_ERROR("Legacy codegen has been removed. Please use MLIR backend.");
+    LOG_ERROR("Legacy codegen has been removed. Please use the LLVM backend.");
     (void)output_file;
     return NULL;
 }
 
-char* cml_ir_to_string(CMLIR_t ir) {
+char* cml_ir_to_string(CMLGraph_t ir) {
     if (!ir)
         return NULL;
 

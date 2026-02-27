@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Helper to escape JSON strings
 static void append_json_string(char** buffer, size_t* offset, size_t* capacity, const char* str) {
     if (!str)
         str = "";
@@ -65,7 +64,6 @@ static void append_json_string(char** buffer, size_t* offset, size_t* capacity, 
     (*buffer)[(*offset)++] = '"';
 }
 
-// Helper to append formatted string
 static void append_format(char** buffer, size_t* offset, size_t* capacity, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -101,7 +99,6 @@ static void append_format(char** buffer, size_t* offset, size_t* capacity, const
     va_end(args);
 }
 
-// Generate code snippet for a kernel
 static char* generate_kernel_code_snippet(struct IRNode* node) {
     if (!node)
         return NULL;
@@ -315,7 +312,6 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
     return code;
 }
 
-// Generate code for fused kernel
 static char* generate_fused_kernel_code(FusedKernel* kernel) {
     if (!kernel || kernel->num_ops == 0)
         return NULL;
@@ -399,7 +395,7 @@ static char* generate_fused_kernel_code(FusedKernel* kernel) {
 }
 
 // Simple usage analysis (DCE)
-static void analyze_usage(CMLIR_t ir) {
+static void analyze_usage(CMLGraph_t ir) {
     if (!ir || !ir->head)
         return;
 
@@ -452,7 +448,7 @@ static void analyze_usage(CMLIR_t ir) {
     free(nodes);
 }
 
-char* cml_ir_export_kernel_analysis(CMLIR_t ir, bool optimized) {
+char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     if (!ir)
         return NULL;
 
@@ -681,7 +677,7 @@ char* cml_ir_export_kernel_analysis(CMLIR_t ir, bool optimized) {
     return buffer;
 }
 
-char* cml_ir_export_graph_json(CMLIR_t ir) {
+char* cml_ir_export_graph_json(CMLGraph_t ir) {
     if (!ir)
         return NULL;
 

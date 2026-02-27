@@ -23,7 +23,7 @@ extern "C" {
  * @param optimized Whether to export optimized or unoptimized view
  * @return JSON string (caller must free) or NULL on failure
  */
-char* cml_ir_export_kernel_analysis(CMLIR_t ir, bool optimized);
+char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized);
 
 /**
  * @brief Export graph topology as JSON
@@ -35,7 +35,7 @@ char* cml_ir_export_kernel_analysis(CMLIR_t ir, bool optimized);
  * @param ir IR context
  * @return JSON string (caller must free) or NULL on failure
  */
-char* cml_ir_export_graph_json(CMLIR_t ir);
+char* cml_ir_export_graph_json(CMLGraph_t ir);
 
 #ifdef __cplusplus
 }

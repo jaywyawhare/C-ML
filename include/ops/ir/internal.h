@@ -2,7 +2,7 @@
  * @file ir_internal.h
  * @brief Internal IR structure definitions (for ops module only)
  *
- * This header exposes the internal structure of IRNode and CMLIR
+ * This header exposes the internal structure of IRNode and CMLGraph
  * for use within the ops module (ir.c and uops.c).
  * External code should use the opaque types and accessor functions.
  */
@@ -91,7 +91,7 @@ struct IRNode {
 /**
  * @brief IR Structure (internal)
  */
-struct CMLIR {
+struct CMLGraph {
     IRTarget target;
     struct IRNode* head; // Forward graph (lazy)
     struct IRNode* tail;
@@ -113,8 +113,7 @@ struct CMLIR {
     int tensor_refs_count;
     int tensor_refs_capacity;
 
-    // MLIR Context (lazy initialized)
-    void* mlir_ctx;
+    // (Using LLVM backend directly)
 };
 
 /**
@@ -125,21 +124,16 @@ struct CMLIR {
 const char* uop_type_to_string(UOpType type);
 
 /**
- * @brief Find the "other" input in a binary operation
- *
- * When fusing operations like MUL+ADD into FMA, we need to identify which
- * input of the ADD comes from outside the fusion (the "other" input).
- *
- * @param producer The producer node (e.g., MUL)
- * @param consumer The consumer node (e.g., ADD)
- * @return The name of the external input, or NULL if not found
- */
-char* find_other_input(struct IRNode* producer, struct IRNode* consumer);
-
-/**
  * @brief Free a fused kernel structure
  * @param kernel The fused kernel to free
  */
 void free_fused_kernel(FusedKernel* kernel);
+
+/**
+ * @brief Execute a single IR node on CPU
+ * @param node The IR node to execute
+ * @return 0 on success, -1 on failure
+ */
+int cpu_execute_node(struct IRNode* node);
 
 #endif // CML_OPS_IR_INTERNAL_H

@@ -3,7 +3,7 @@
  * @brief CUDA backend implementation via dynamic loading
  */
 
-#include "ops/ir/mlir/backends/cuda_backend.h"
+#include "ops/ir/gpu/cuda_backend.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 
@@ -25,18 +25,12 @@
 #define NVRTC_LIB_NAME "nvrtc64_*.dll"
 #endif
 
-// CUDA device attributes
 #define CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK 1
 #define CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT 16
 #define CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR 75
 #define CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR 76
 
-// CUDA success code
 #define CUDA_SUCCESS 0
-
-// ============================================================================
-// Dynamic Library Loading
-// ============================================================================
 
 #ifdef __linux__
 static void* load_library(const char* name) {
@@ -71,7 +65,6 @@ static void unload_library(void* lib) {
         FreeLibrary((HMODULE)lib);
 }
 #else
-// Unsupported platform
 static void* load_library(const char* name) {
     (void)name;
     return NULL;
@@ -83,10 +76,6 @@ static void* get_symbol(void* lib, const char* name) {
 }
 static void unload_library(void* lib) { (void)lib; }
 #endif
-
-// ============================================================================
-// Backend Lifecycle
-// ============================================================================
 
 bool cml_cuda_available(void) {
 #if defined(__APPLE__)
@@ -128,7 +117,6 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
         return -1;
     }
 
-// Load required functions
 #define LOAD_FUNC(name)                                                                            \
     backend->name = get_symbol(backend->cuda_lib, #name);                                          \
     if (!backend->name) {                                                                          \
@@ -289,10 +277,6 @@ int cml_cuda_get_device_count(CMLCUDABackend* backend) {
     return (err == CUDA_SUCCESS) ? count : -1;
 }
 
-// ============================================================================
-// Kernel Compilation
-// ============================================================================
-
 CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_code,
                                     const char* kernel_name) {
     if (!backend || !backend->initialized || !ptx_code || !kernel_name) {
@@ -405,10 +389,6 @@ void cml_cuda_kernel_free(CMLCUDABackend* backend, CMLCUDAKernel* kernel) {
     free(kernel);
 }
 
-// ============================================================================
-// Kernel Execution
-// ============================================================================
-
 void cml_cuda_kernel_set_launch_config(CMLCUDAKernel* kernel, int grid_x, int grid_y, int grid_z,
                                        int block_x, int block_y, int block_z) {
     if (!kernel)
@@ -458,10 +438,6 @@ int cml_cuda_synchronize(CMLCUDABackend* backend) {
     return (err == CUDA_SUCCESS) ? 0 : -1;
 }
 
-// ============================================================================
-// Memory Management
-// ============================================================================
-
 CUdeviceptr cml_cuda_malloc(CMLCUDABackend* backend, size_t size) {
     if (!backend || !backend->initialized || size == 0)
         return 0;
@@ -498,10 +474,6 @@ int cml_cuda_memcpy_d2h(CMLCUDABackend* backend, void* dst, CUdeviceptr src, siz
     CUresult err = backend->cuMemcpyDtoH(dst, src, size);
     return (err == CUDA_SUCCESS) ? 0 : -1;
 }
-
-// ============================================================================
-// Tensor Operations
-// ============================================================================
 
 int cml_cuda_upload_tensor(CMLCUDABackend* backend, Tensor* tensor) {
     if (!backend || !backend->initialized || !tensor || !tensor->data) {

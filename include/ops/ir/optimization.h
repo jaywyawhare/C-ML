@@ -15,7 +15,7 @@ extern "C" {
 /**
  * @brief Optimize IR
  */
-int cml_ir_optimize(CMLIR_t ir);
+int cml_ir_optimize(CMLGraph_t ir);
 
 #ifdef __cplusplus
 }

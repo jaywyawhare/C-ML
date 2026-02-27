@@ -3,8 +3,8 @@
  * @brief AMD ROCm backend for JIT kernel execution via HIP
  */
 
-#ifndef CML_MLIR_BACKENDS_ROCM_BACKEND_H
-#define CML_MLIR_BACKENDS_ROCM_BACKEND_H
+#ifndef CML_GPU_ROCM_BACKEND_H
+#define CML_GPU_ROCM_BACKEND_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -111,4 +111,4 @@ int cml_rocm_download_tensor(CMLROCmBackend* backend, Tensor* tensor);
 }
 #endif
 
-#endif // CML_MLIR_BACKENDS_ROCM_BACKEND_H
+#endif // CML_GPU_ROCM_BACKEND_H

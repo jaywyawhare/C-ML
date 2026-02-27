@@ -13,7 +13,7 @@
 #include <stdbool.h>
 
 // Helper: Find node by output name
-static struct IRNode* find_node_by_output(CMLIR_t ir, const char* output_name) {
+static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* output_name) {
     if (!ir || !output_name)
         return NULL;
 
@@ -28,7 +28,7 @@ static struct IRNode* find_node_by_output(CMLIR_t ir, const char* output_name) {
 }
 
 // Helper: Build dependency graph - track which nodes use which outputs
-static int build_dependency_graph(CMLIR_t ir) {
+static int build_dependency_graph(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
@@ -72,7 +72,7 @@ static int build_dependency_graph(CMLIR_t ir) {
 }
 
 // Helper: Mark reachable nodes starting from outputs
-static void mark_reachable_nodes(CMLIR_t ir) {
+static void mark_reachable_nodes(CMLGraph_t ir) {
     if (!ir)
         return;
 
@@ -112,7 +112,7 @@ static void mark_reachable_nodes(CMLIR_t ir) {
 }
 
 // Helper: Remove dead nodes
-static int remove_dead_nodes(CMLIR_t ir) {
+static int remove_dead_nodes(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
@@ -367,7 +367,7 @@ void free_fused_kernel(FusedKernel* kernel) {
 }
 
 // Helper: Find other input (not the producer's output)
-char* find_other_input(struct IRNode* producer, struct IRNode* consumer) {
+static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) {
     if (!producer || !consumer || !producer->output_name)
         return NULL;
 
@@ -581,7 +581,7 @@ static int find_fusable_chain(struct IRNode* start, struct IRNode** chain, int m
 }
 
 // Helper: Fuse operations
-static int fuse_operations(CMLIR_t ir) {
+static int fuse_operations(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
@@ -665,7 +665,7 @@ static int fuse_operations(CMLIR_t ir) {
 }
 
 // Helper: Reorder operations for better cache locality
-static int reorder_for_cache_locality(CMLIR_t ir) {
+static int reorder_for_cache_locality(CMLGraph_t ir) {
     if (!ir || ir->node_count <= 0)
         return -1;
 
@@ -784,7 +784,7 @@ static int reorder_for_cache_locality(CMLIR_t ir) {
     return 0;
 }
 
-int cml_ir_optimize(CMLIR_t ir) {
+int cml_ir_optimize(CMLGraph_t ir) {
     if (!ir)
         return -1;
 

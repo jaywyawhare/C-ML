@@ -17,23 +17,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 #define CACHE_NUM_BUCKETS 64
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
 
-// ============================================================================
-// Global cache
-// ============================================================================
-
 static CMLGraphCache* g_graph_cache = NULL;
-
-// ============================================================================
-// Hash functions
-// ============================================================================
 
 static uint64_t hash_combine(uint64_t h, uint64_t val) {
     h ^= val;
@@ -42,7 +30,7 @@ static uint64_t hash_combine(uint64_t h, uint64_t val) {
 }
 
 // Hash graph structure (NOT data pointers)
-uint64_t cml_graph_compute_signature(CMLIR_t ir) {
+uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
     if (!ir)
         return 0;
 
@@ -70,10 +58,6 @@ uint64_t cml_graph_compute_signature(CMLIR_t ir) {
 
     return hash;
 }
-
-// ============================================================================
-// Cache management
-// ============================================================================
 
 CMLGraphCache* cml_graph_cache_create(size_t max_entries) {
     CMLGraphCache* cache = calloc(1, sizeof(CMLGraphCache));
@@ -134,7 +118,6 @@ CMLExecutionPlan* cml_graph_cache_lookup(CMLGraphCache* cache, uint64_t signatur
     return NULL;
 }
 
-// Find and evict the least recently used entry
 static void evict_lru_entry(CMLGraphCache* cache) {
     if (!cache || cache->count == 0)
         return;
@@ -199,12 +182,7 @@ int cml_graph_cache_insert(CMLGraphCache* cache, uint64_t signature, CMLExecutio
     return 0;
 }
 
-// ============================================================================
-// Execution plan creation
-// ============================================================================
-
-// Count nodes in graph
-static size_t count_nodes(CMLIR_t ir) {
+static size_t count_nodes(CMLGraph_t ir) {
     size_t count        = 0;
     struct IRNode* node = ir->head;
     while (node) {
@@ -214,7 +192,7 @@ static size_t count_nodes(CMLIR_t ir) {
     return count;
 }
 
-CMLExecutionPlan* cml_create_execution_plan(CMLIR_t ir) {
+CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     if (!ir)
         return NULL;
 
@@ -280,10 +258,6 @@ void cml_free_execution_plan(CMLExecutionPlan* plan) {
     free(plan->buffer_sizes);
     free(plan);
 }
-
-// ============================================================================
-// Fast execution using cached plan
-// ============================================================================
 
 // Execute single node using pre-allocated buffer
 static int execute_node_fast(struct IRNode* node, float* out_buf) {
@@ -608,10 +582,6 @@ int cml_execute_plan(CMLExecutionPlan* plan, Tensor** inputs, size_t num_inputs)
 
     return 0;
 }
-
-// ============================================================================
-// Global cache access
-// ============================================================================
 
 CMLGraphCache* cml_get_graph_cache(void) {
     if (!g_graph_cache) {

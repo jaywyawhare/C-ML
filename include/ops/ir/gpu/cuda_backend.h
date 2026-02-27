@@ -10,8 +10,8 @@
  * - Memory management via cuMemAlloc/cuMemFree
  */
 
-#ifndef CML_MLIR_BACKENDS_CUDA_BACKEND_H
-#define CML_MLIR_BACKENDS_CUDA_BACKEND_H
+#ifndef CML_GPU_CUDA_BACKEND_H
+#define CML_GPU_CUDA_BACKEND_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -113,9 +113,7 @@ typedef struct CMLCUDAKernel {
     int block_dim[3];
 } CMLCUDAKernel;
 
-// ============================================================================
 // Backend Lifecycle
-// ============================================================================
 
 /**
  * @brief Check if CUDA is available on the system
@@ -150,9 +148,7 @@ void cml_cuda_backend_free(CMLCUDABackend* backend);
  */
 int cml_cuda_get_device_count(CMLCUDABackend* backend);
 
-// ============================================================================
 // Kernel Compilation
-// ============================================================================
 
 /**
  * @brief Compile PTX code to CUDA kernel
@@ -181,9 +177,7 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
  */
 void cml_cuda_kernel_free(CMLCUDABackend* backend, CMLCUDAKernel* kernel);
 
-// ============================================================================
 // Kernel Execution
-// ============================================================================
 
 /**
  * @brief Set kernel launch configuration
@@ -216,9 +210,7 @@ int cml_cuda_launch_kernel(CMLCUDABackend* backend, CMLCUDAKernel* kernel, void*
  */
 int cml_cuda_synchronize(CMLCUDABackend* backend);
 
-// ============================================================================
 // Memory Management
-// ============================================================================
 
 /**
  * @brief Allocate device memory
@@ -255,9 +247,7 @@ int cml_cuda_memcpy_h2d(CMLCUDABackend* backend, CUdeviceptr dst, const void* sr
  */
 int cml_cuda_memcpy_d2h(CMLCUDABackend* backend, void* dst, CUdeviceptr src, size_t size);
 
-// ============================================================================
 // Tensor Operations
-// ============================================================================
 
 /**
  * @brief Upload tensor data to device
@@ -279,4 +269,4 @@ int cml_cuda_download_tensor(CMLCUDABackend* backend, Tensor* tensor);
 }
 #endif
 
-#endif // CML_MLIR_BACKENDS_CUDA_BACKEND_H
+#endif // CML_GPU_CUDA_BACKEND_H

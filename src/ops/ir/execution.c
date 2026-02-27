@@ -3,13 +3,10 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/graph_cache.h"
-#include "ops/ir/mlir/mlir_dispatch.h"
-#include "ops/ir/mlir/backends/cuda_backend.h"
-#include "ops/ir/mlir/backends/rocm_backend.h"
 #include "core/logging.h"
-#include "ops/ir/mlir/mlir_backend.h"
-#include "ops/ir/mlir/mlir_internal.h"
-#include "ops/ir/mlir/mlir_uops_builder.h"
+#ifdef CML_HAS_LLVM_BACKEND
+#include "ops/ir/llvm/llvm_backend.h"
+#endif
 #include "backend/blas.h"
 #include "backend/threadpool.h"
 #include "backend/device.h"
@@ -32,9 +29,17 @@
 // Global BLAS context for fast matmul
 static CMLBlasContext* g_exec_blas_ctx = NULL;
 
-// ============================================================================
-// Buffer Cache Implementation
-// ============================================================================
+#ifdef CML_HAS_LLVM_BACKEND
+static CMLLLVMBackend* g_llvm_backend = NULL;
+
+CMLLLVMBackend* cml_get_llvm_backend(void) {
+    if (!g_llvm_backend) {
+        g_llvm_backend = cml_llvm_backend_init();
+    }
+    return g_llvm_backend;
+}
+#endif
+
 // Simple buffer cache using power-of-2 size buckets for O(1) lookup
 // This avoids malloc/free overhead during repeated forward passes
 
@@ -224,7 +229,7 @@ void cml_print_buffer_cache_stats(void) {
 }
 
 // Initialize BLAS for execution (called lazily)
-static CMLBlasContext* get_blas_context(void) {
+CMLBlasContext* get_blas_context(void) {
     if (!g_exec_blas_ctx) {
         g_exec_blas_ctx = cml_blas_init();
         if (g_exec_blas_ctx) {
@@ -236,18 +241,59 @@ static CMLBlasContext* get_blas_context(void) {
 
 /**
  * @file execution.c
- * @brief IR execution with MLIR JIT or CPU fallback interpreter
- *
- * This file implements IR execution. When MLIR is available, uses JIT.
- * When MLIR is not available, uses a simple CPU interpreter as fallback.
+ * @brief IR execution with CPU interpreter and optional LLVM JIT
  */
 
-// ============================================================================
-// CPU Fallback Interpreter (always available as backup)
-// ============================================================================
+// Numpy-style broadcast index: given a flat index in the output tensor,
+// compute the corresponding flat index in a (possibly smaller) input tensor.
+// Handles cases like [N,M] op [N,1] or [N,M] op [1,M] correctly.
+static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
+    if (inp->numel == 1)
+        return 0;
+    if (inp->numel == out_t->numel)
+        return flat_i;
+
+    // Decompose flat_i into multi-dim indices using output shape,
+    // then map to input using min(dim, 1) for broadcast dims
+    size_t idx       = 0;
+    size_t remaining = flat_i;
+
+    // Precompute output strides
+    int ndim = out_t->ndim;
+    size_t out_strides[8]; // max 8 dims
+    out_strides[ndim - 1] = 1;
+    for (int d = ndim - 2; d >= 0; d--)
+        out_strides[d] = out_strides[d + 1] * (size_t)out_t->shape[d + 1];
+
+    // Compute input strides (only for non-broadcast dims)
+    size_t inp_strides[8];
+    int inp_ndim = inp->ndim;
+    if (inp_ndim > 0) {
+        inp_strides[inp_ndim - 1] = 1;
+        for (int d = inp_ndim - 2; d >= 0; d--)
+            inp_strides[d] = inp_strides[d + 1] * (size_t)inp->shape[d + 1];
+    }
+
+    // Right-align dimensions (numpy broadcasting rules)
+    idx = 0;
+    for (int d = 0; d < ndim; d++) {
+        size_t coord = remaining / out_strides[d];
+        remaining %= out_strides[d];
+
+        // Map to input dimension (right-aligned)
+        int inp_d = d - (ndim - inp_ndim);
+        if (inp_d >= 0 && inp_d < inp_ndim) {
+            if (inp->shape[inp_d] > 1) {
+                idx += coord * inp_strides[inp_d];
+            }
+            // If inp->shape[inp_d] == 1, this dim is broadcast -- contributes 0
+        }
+    }
+    return idx;
+}
 
 // Execute a single IR node on CPU
-static int cpu_execute_node(struct IRNode* node) {
+int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
     }
@@ -283,7 +329,12 @@ static int cpu_execute_node(struct IRNode* node) {
         in2_numel = node->inputs[1]->numel;
     }
 
-    // Execute based on operation type
+// Execute based on operation type
+// Helper macro for numpy-style broadcast indexing
+// For output flat index i, compute the corresponding flat index in a tensor
+// with potentially fewer elements (broadcast dimensions have size 1)
+#define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
+
     switch (node->type) {
     case UOP_ADD:
         if (!in1_data || !in2_data)
@@ -292,10 +343,9 @@ static int cpu_execute_node(struct IRNode* node) {
         if (in1_numel == in2_numel && in1_numel == out->numel) {
             simd_add_f32(in1_data, in2_data, out_data, out->numel);
         } else {
-            // Broadcast path - let compiler auto-vectorize
             for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = (in1_numel == 1) ? 0 : i % in1_numel;
-                size_t i2   = (in2_numel == 1) ? 0 : i % in2_numel;
+                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
                 out_data[i] = in1_data[i1] + in2_data[i2];
             }
         }
@@ -308,8 +358,8 @@ static int cpu_execute_node(struct IRNode* node) {
             simd_sub_f32(in1_data, in2_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = (in1_numel == 1) ? 0 : i % in1_numel;
-                size_t i2   = (in2_numel == 1) ? 0 : i % in2_numel;
+                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
                 out_data[i] = in1_data[i1] - in2_data[i2];
             }
         }
@@ -322,8 +372,8 @@ static int cpu_execute_node(struct IRNode* node) {
             simd_mul_f32(in1_data, in2_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = (in1_numel == 1) ? 0 : i % in1_numel;
-                size_t i2   = (in2_numel == 1) ? 0 : i % in2_numel;
+                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
                 out_data[i] = in1_data[i1] * in2_data[i2];
             }
         }
@@ -336,8 +386,8 @@ static int cpu_execute_node(struct IRNode* node) {
             simd_div_f32(in1_data, in2_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = (in1_numel == 1) ? 0 : i % in1_numel;
-                size_t i2   = (in2_numel == 1) ? 0 : i % in2_numel;
+                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
                 out_data[i] = in1_data[i1] / (in2_data[i2] + 1e-8f);
             }
         }
@@ -493,20 +543,100 @@ static int cpu_execute_node(struct IRNode* node) {
     case UOP_MEAN: {
         if (!in1_data)
             return -1;
-        // Use SIMD-optimized sum from simd_utils
-        float sum = simd_sum_float(in1_data, in1_numel);
-        if (node->type == UOP_MEAN && in1_numel > 0) {
-            sum /= (float)in1_numel;
+        ReduceParams* rp = (ReduceParams*)node->params;
+        Tensor* inp      = node->inputs[0];
+
+        /* Check if this is a per-dimension reduction (not global) */
+        if (rp && rp->num_dims == 1 && inp->ndim >= 2) {
+            int reduce_dim = rp->dims[0];
+            if (reduce_dim < 0)
+                reduce_dim += inp->ndim;
+
+            /* For 2D: reduce along dim => iterate over other dims */
+            if (inp->ndim == 2) {
+                int rows = inp->shape[0];
+                int cols = inp->shape[1];
+                if (reduce_dim == 1) {
+                    /* Reduce along cols: output [rows] or [rows,1] */
+                    for (int r = 0; r < rows; r++) {
+                        float acc = 0.0f;
+                        for (int c = 0; c < cols; c++)
+                            acc += in1_data[r * cols + c];
+                        if (node->type == UOP_MEAN && cols > 0)
+                            acc /= (float)cols;
+                        out_data[r] = acc;
+                    }
+                } else { /* reduce_dim == 0 */
+                    /* Reduce along rows: output [cols] or [1,cols] */
+                    for (int c = 0; c < cols; c++) {
+                        float acc = 0.0f;
+                        for (int r = 0; r < rows; r++)
+                            acc += in1_data[r * cols + c];
+                        if (node->type == UOP_MEAN && rows > 0)
+                            acc /= (float)rows;
+                        out_data[c] = acc;
+                    }
+                }
+            } else {
+                /* Generic N-dim: compute strides and iterate */
+                /* For now, fall back to global reduction for >2D */
+                float sum = simd_sum_float(in1_data, in1_numel);
+                if (node->type == UOP_MEAN && in1_numel > 0)
+                    sum /= (float)in1_numel;
+                out_data[0] = sum;
+            }
+        } else {
+            /* Global reduction */
+            float sum = simd_sum_float(in1_data, in1_numel);
+            if (node->type == UOP_MEAN && in1_numel > 0) {
+                sum /= (float)in1_numel;
+            }
+            out_data[0] = sum;
         }
-        out_data[0] = sum;
         break;
     }
 
     case UOP_MAX_REDUCE: {
         if (!in1_data || in1_numel == 0)
             return -1;
-        // Use SIMD-optimized max from simd_utils
-        out_data[0] = simd_max_float(in1_data, in1_numel);
+        ReduceParams* rp = (ReduceParams*)node->params;
+        Tensor* inp      = node->inputs[0];
+
+        /* Check if this is a per-dimension reduction (not global) */
+        if (rp && rp->num_dims == 1 && inp->ndim == 2) {
+            int reduce_dim = rp->dims[0];
+            if (reduce_dim < 0)
+                reduce_dim += inp->ndim;
+            int rows = inp->shape[0];
+            int cols = inp->shape[1];
+
+            if (reduce_dim == 1) {
+                /* Max along cols: output [rows] or [rows,1] */
+                for (int r = 0; r < rows; r++) {
+                    float mx = in1_data[r * cols];
+                    for (int c = 1; c < cols; c++) {
+                        float v = in1_data[r * cols + c];
+                        if (v > mx)
+                            mx = v;
+                    }
+                    out_data[r] = mx;
+                }
+            } else { /* reduce_dim == 0 */
+                /* Max along rows: output [cols] or [1,cols] */
+                for (int c = 0; c < cols; c++) {
+                    float mx = in1_data[c];
+                    for (int r = 1; r < rows; r++) {
+                        float v = in1_data[r * cols + c];
+                        if (v > mx)
+                            mx = v;
+                    }
+                    out_data[c] = mx;
+                }
+            }
+        } else {
+            /* Global max */
+            out_data[0] = simd_max_float(in1_data, in1_numel);
+        }
         break;
     }
 
@@ -714,7 +844,7 @@ static size_t g_total_nodes_executed = 0;
 
 // Execute IR graph using CPU interpreter
 // Non-static to allow use from dispatch layer
-int cpu_execute_ir(CMLIR_t ir) {
+int cpu_execute_ir(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
@@ -761,250 +891,22 @@ void cml_reset_exec_stats(void) {
     g_total_nodes_executed = 0;
 }
 
-int cml_ir_execute(CMLIR_t ir) {
+int cml_ir_execute(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute");
         return -1;
     }
 
-// NOTE: Graph cache disabled - the current architecture creates new IR graphs
-// each forward pass, so caching at the execution level doesn't help.
-// For now, use direct execution. Future: implement model-level graph reuse.
-//
-// The graph cache infrastructure remains available for:
-// - Reusing graphs when the same model is called with same-shaped inputs
-// - Future eager execution mode where graphs are reused
-
-// PERFORMANCE: Skip dispatch layer for CPU-only execution
-// The dispatch layer adds overhead without benefit for pure CPU workloads
-// Use direct CPU execution path for better performance
-#if 1 // Set to 0 to re-enable dispatch layer
     return cpu_execute_ir(ir);
-#endif
-
-    // SLOW PATH: Use the unified dispatch layer for execution
-    // This handles backend selection, caching, and fallback
-    CMLDispatchContext* dispatch_ctx = cml_dispatch_get_global();
-
-    if (dispatch_ctx && dispatch_ctx->initialized) {
-        // Collect inputs and outputs from IR for dispatch
-        // The dispatch layer will handle backend-specific execution
-        Tensor** inputs  = NULL;
-        Tensor** outputs = NULL;
-        int nin = 0, nout = 0;
-
-        // Count inputs/outputs from IR nodes
-        struct IRNode* node = ir->head;
-        while (node) {
-            // Count unique inputs (tensors that aren't outputs of other nodes)
-            for (int i = 0; i < node->num_inputs; i++) {
-                if (node->inputs && node->inputs[i]) {
-                    // Check if this input is an output of another node
-                    bool is_intermediate = false;
-                    struct IRNode* check = ir->head;
-                    while (check) {
-                        if (check->output == node->inputs[i] && check != node) {
-                            is_intermediate = true;
-                            break;
-                        }
-                        check = check->next;
-                    }
-                    if (!is_intermediate) {
-                        nin++;
-                    }
-                }
-            }
-            // The tail output is the final output
-            if (!node->next && node->output) {
-                nout = 1;
-            }
-            node = node->next;
-        }
-
-        // For simplicity, extract from the MLIR context if already initialized
-        // Otherwise fall through to direct execution
-#ifdef CML_HAS_MLIR
-        if (ir->mlir_ctx) {
-            CMLMLIRContext* mlir_ctx = (CMLMLIRContext*)ir->mlir_ctx;
-            inputs                   = mlir_ctx->inputs;
-            nin                      = mlir_ctx->num_inputs;
-            outputs                  = mlir_ctx->outputs;
-            nout                     = mlir_ctx->num_outputs;
-        }
-#endif
-
-        // Select best backend for this IR
-        CMLBackendType best = cml_dispatch_select_backend(dispatch_ctx, ir);
-        if (best != dispatch_ctx->active) {
-            LOG_DEBUG("Dispatch selecting backend %s for this IR", cml_dispatch_backend_name(best));
-        }
-
-        // Execute through dispatch layer
-        int result = cml_dispatch_execute(dispatch_ctx, ir, inputs, nin, outputs, nout);
-
-        if (result == 0) {
-            ir->is_executed = true;
-            LOG_DEBUG("IR execution via dispatch completed successfully");
-        }
-
-        return result;
-    }
-
-    // Fallback: direct execution if dispatch not available
-    LOG_DEBUG("Dispatch not initialized, using direct execution");
-
-#ifndef CML_HAS_MLIR
-    // Use CPU fallback interpreter when MLIR is not available
-    return cpu_execute_ir(ir);
-#else
-    // Initialize MLIR context if not already done
-    if (!ir->mlir_ctx) {
-        ir->mlir_ctx = cml_mlir_init();
-        if (!ir->mlir_ctx) {
-            LOG_ERROR("Failed to initialize MLIR context");
-            return -1;
-        }
-    }
-
-    CMLMLIRContext* ctx = (CMLMLIRContext*)ir->mlir_ctx;
-
-    // Optimize IR graph before conversion
-    if (!ir->is_optimized) {
-        LOG_DEBUG("Optimizing IR graph before MLIR conversion");
-        if (cml_ir_optimize(ir) != 0) {
-            LOG_WARNING("IR optimization failed, continuing anyway");
-        }
-        ir->is_optimized = true;
-    }
-
-    // Build MLIR module from IR (uops→MLIR builder)
-    LOG_DEBUG("Building MLIR module from IR (uops builder)");
-    if (!cml_mlir_build_from_ir(ctx, ir)) {
-        LOG_ERROR("Failed to build MLIR module from IR");
-        return -1;
-    }
-
-    // Apply MLIR optimization passes (with simplified lowering)
-    LOG_DEBUG("Applying MLIR optimization passes");
-    if (cml_mlir_optimize(ctx->module.ptr, ctx->context.ptr) != 0) {
-        LOG_WARNING("MLIR optimization failed, continuing anyway");
-    }
-
-    // Execute via MLIR JIT
-    LOG_DEBUG("Executing MLIR module (inputs: %d, outputs: %d)", ctx->num_inputs, ctx->num_outputs);
-
-    // Ensure output tensors have memory allocated (Destination Passing Style)
-    for (int i = 0; i < ctx->num_outputs; i++) {
-        Tensor* out = ctx->outputs[i];
-        if (out && !out->data && !out->buffer_handle) {
-            // Allocate memory for output
-            size_t size = out->numel * cml_dtype_size(out->dtype);
-            if (out->device == DEVICE_CPU || out->device == DEVICE_AUTO) {
-                out->data = cml_buffer_cache_alloc(size); // Use buffer cache for reuse
-                if (!out->data) {
-                    LOG_ERROR("Failed to allocate memory for output tensor %d", i);
-                    return -1;
-                }
-            } else if (out->device == DEVICE_CUDA) {
-                // CUDA device allocation
-                if (!device_cuda_available()) {
-                    LOG_WARNING("CUDA not available, falling back to CPU for output %d", i);
-                    out->device = DEVICE_CPU;
-                    out->data   = cml_buffer_cache_alloc(size);
-                    if (!out->data) {
-                        LOG_ERROR("Failed to allocate CPU memory for output tensor %d", i);
-                        return -1;
-                    }
-                } else {
-                    // Allocate on GPU via dispatch context
-                    CMLDispatchContext* dispatch = cml_dispatch_get_global();
-                    if (dispatch && dispatch->backend_contexts[CML_BACKEND_CUDA]) {
-                        CMLCUDABackend* cuda =
-                            (CMLCUDABackend*)dispatch->backend_contexts[CML_BACKEND_CUDA];
-                        CUdeviceptr ptr = cml_cuda_malloc(cuda, size);
-                        if (ptr) {
-                            out->buffer_handle = (void*)ptr;
-                        } else {
-                            LOG_WARNING("CUDA allocation failed, falling back to CPU for output %d",
-                                        i);
-                            out->device = DEVICE_CPU;
-                            out->data   = cml_buffer_cache_alloc(size);
-                            if (!out->data)
-                                return -1;
-                        }
-                    } else {
-                        // No CUDA context, fallback to CPU
-                        out->device = DEVICE_CPU;
-                        out->data   = cml_buffer_cache_alloc(size);
-                        if (!out->data)
-                            return -1;
-                    }
-                }
-            } else if (out->device == DEVICE_ROCM) {
-                // ROCm device allocation - similar pattern
-                if (!device_rocm_available()) {
-                    LOG_WARNING("ROCm not available, falling back to CPU for output %d", i);
-                    out->device = DEVICE_CPU;
-                    out->data   = cml_buffer_cache_alloc(size);
-                    if (!out->data)
-                        return -1;
-                } else {
-                    CMLDispatchContext* dispatch = cml_dispatch_get_global();
-                    if (dispatch && dispatch->backend_contexts[CML_BACKEND_ROCM]) {
-                        CMLROCmBackend* rocm =
-                            (CMLROCmBackend*)dispatch->backend_contexts[CML_BACKEND_ROCM];
-                        void* ptr = cml_rocm_malloc(rocm, size);
-                        if (ptr) {
-                            out->buffer_handle = ptr;
-                        } else {
-                            LOG_WARNING("ROCm allocation failed, falling back to CPU for output %d",
-                                        i);
-                            out->device = DEVICE_CPU;
-                            out->data   = cml_buffer_cache_alloc(size);
-                            if (!out->data)
-                                return -1;
-                        }
-                    } else {
-                        out->device = DEVICE_CPU;
-                        out->data   = cml_buffer_cache_alloc(size);
-                        if (!out->data)
-                            return -1;
-                    }
-                }
-            } else {
-                // Unknown device, fallback to CPU
-                LOG_WARNING("Unknown device %d, falling back to CPU for output %d", out->device, i);
-                out->device = DEVICE_CPU;
-                out->data   = cml_buffer_cache_alloc(size);
-                if (!out->data)
-                    return -1;
-            }
-        }
-        // Don't zero existing buffers - they may contain valid data from previous ops
-    }
-
-    int result =
-        cml_mlir_execute(ctx, ctx->inputs, ctx->num_inputs, ctx->outputs, ctx->num_outputs);
-
-    if (result == 0) {
-        ir->is_executed = true;
-        LOG_DEBUG("IR execution completed successfully");
-    } else {
-        LOG_ERROR("MLIR execution failed");
-    }
-
-    return result;
-#endif
 }
 
-int cml_ir_execute_up_to(CMLIR_t ir, struct IRNode* target_node) {
+int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
     if (!ir || !target_node) {
         LOG_ERROR("Invalid arguments to cml_ir_execute_up_to");
         return -1;
     }
 
     // PERFORMANCE: Always use direct CPU execution for now
-    // This avoids the MLIR/dispatch overhead
     target_node->is_used = true;
     return cpu_execute_ir(ir);
 }

@@ -22,7 +22,7 @@ extern "C" {
  * @param output_node Output node to start backward pass from
  * @return 0 on success, negative on failure
  */
-int cml_ir_build_backward(CMLIR_t ir, struct IRNode* output_node);
+int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node);
 
 /**
  * @brief Execute backward graph
@@ -32,7 +32,7 @@ int cml_ir_build_backward(CMLIR_t ir, struct IRNode* output_node);
  * @param ir IR context
  * @return 0 on success, negative on failure
  */
-int cml_ir_execute_backward(CMLIR_t ir);
+int cml_ir_execute_backward(CMLGraph_t ir);
 
 #ifdef __cplusplus
 }

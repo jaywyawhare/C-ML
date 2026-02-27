@@ -23,7 +23,7 @@ extern "C" {
  * @param ir IR context to capture operations to (NULL to disable)
  * @return 0 on success, negative on failure
  */
-int cml_ir_enable_auto_capture(CMLIR_t ir);
+int cml_ir_enable_auto_capture(CMLGraph_t ir);
 
 /**
  * @brief Disable automatic IR capture
@@ -34,7 +34,7 @@ void cml_ir_disable_auto_capture(void);
  * @brief Get current IR context for auto-capture (if enabled)
  * @return Current IR context or NULL if disabled
  */
-CMLIR_t cml_ir_get_auto_capture_context(void);
+CMLGraph_t cml_ir_get_auto_capture_context(void);
 
 /**
  * @brief Convert OpType (from autograd) to UOpType (for IR)
@@ -69,7 +69,7 @@ int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_input
  *
  * @return Global IR context
  */
-CMLIR_t cml_ir_get_or_create_context(void);
+CMLGraph_t cml_ir_get_or_create_context(void);
 
 /**
  * @brief Set global lazy IR context
@@ -78,7 +78,7 @@ CMLIR_t cml_ir_get_or_create_context(void);
  *
  * @param ir IR context to set (can be NULL to clear)
  */
-void cml_ir_set_global_context(CMLIR_t ir);
+void cml_ir_set_global_context(CMLGraph_t ir);
 
 /**
  * @brief Reset global lazy IR context
@@ -94,7 +94,7 @@ void cml_ir_reset_global_context(void);
  * This is necessary before resetting the IR context, to ensure that
  * lazy gradient tensors have their data computed and stored.
  */
-void cml_ir_ensure_gradients_executed(CMLIR_t ir);
+void cml_ir_ensure_gradients_executed(CMLGraph_t ir);
 
 #ifdef __cplusplus
 }

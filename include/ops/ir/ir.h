@@ -32,7 +32,7 @@ typedef enum {
 /**
  * @brief IR structure (opaque)
  */
-typedef struct CMLIR* CMLIR_t;
+typedef struct CMLGraph* CMLGraph_t;
 
 /**
  * @brief IR Node structure (forward declaration)
@@ -42,23 +42,23 @@ struct IRNode;
 /**
  * @brief Create new IR for target
  */
-CMLIR_t cml_ir_new(IRTarget target);
+CMLGraph_t cml_ir_new(IRTarget target);
 
 /**
  * @brief Free IR
  */
-void cml_ir_free(CMLIR_t ir);
+void cml_ir_free(CMLGraph_t ir);
 
 /**
  * @brief Add uop to IR
  */
-int cml_ir_add_uop(CMLIR_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params);
+int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params);
 
 /**
  * @brief Get the last (tail) node added to IR
  * @return IRNode pointer (opaque, use with cml_ir_node_* functions) or NULL
  */
-struct IRNode* cml_ir_get_tail(CMLIR_t ir);
+struct IRNode* cml_ir_get_tail(CMLGraph_t ir);
 
 /**
  * @brief Convert UOpType to string for debugging/visualization
@@ -74,7 +74,7 @@ const char* uop_type_to_string(UOpType type);
  * @param output_file Output file path (NULL = return string)
  * @return Generated code string (caller must free) or NULL on failure
  */
-char* cml_ir_compile(CMLIR_t ir, const char* output_file);
+char* cml_ir_compile(CMLGraph_t ir, const char* output_file);
 
 /**
  * @brief Convert IR to string representation (for debugging)
@@ -82,7 +82,7 @@ char* cml_ir_compile(CMLIR_t ir, const char* output_file);
  * @param ir IR context
  * @return String representation of IR (caller must free)
  */
-char* cml_ir_to_string(CMLIR_t ir);
+char* cml_ir_to_string(CMLGraph_t ir);
 
 /**
  * @brief Compute broadcast shape for IR node (semantic rule, not execution)

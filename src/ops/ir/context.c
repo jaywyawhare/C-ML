@@ -12,13 +12,11 @@
 #include <stdlib.h>
 #include <stdatomic.h>
 
-// Global IR context for auto-capture (thread-safe)
-static _Atomic(CMLIR_t) g_auto_capture_ir = NULL;
+static _Atomic(CMLGraph_t) g_auto_capture_ir = NULL;
 
-// Global IR context for lazy evaluation
-static CMLIR_t g_global_ir_context = NULL;
+static CMLGraph_t g_global_ir_context = NULL;
 
-int cml_ir_enable_auto_capture(CMLIR_t ir) {
+int cml_ir_enable_auto_capture(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("Cannot enable auto-capture with NULL IR");
         return -1;
@@ -34,7 +32,7 @@ void cml_ir_disable_auto_capture(void) {
     LOG_DEBUG("Auto-capture disabled");
 }
 
-CMLIR_t cml_ir_get_auto_capture_context(void) { return atomic_load(&g_auto_capture_ir); }
+CMLGraph_t cml_ir_get_auto_capture_context(void) { return atomic_load(&g_auto_capture_ir); }
 
 // Convert OpType (from autograd) to UOpType (for IR)
 UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
@@ -121,7 +119,7 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
 // Helper function to automatically capture tensor operations to IR
 // This is called from tensor_* functions when auto-capture is enabled
 int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_inputs, void* params) {
-    CMLIR_t ir = cml_ir_get_auto_capture_context();
+    CMLGraph_t ir = cml_ir_get_auto_capture_context();
     if (!ir) {
         // Auto-capture not enabled, silently skip
         return 0;
@@ -146,9 +144,9 @@ int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_input
     return result;
 }
 
-CMLIR_t cml_ir_get_or_create_context(void) {
+CMLGraph_t cml_ir_get_or_create_context(void) {
     // First check if auto-capture is enabled
-    CMLIR_t auto_capture_ir = cml_ir_get_auto_capture_context();
+    CMLGraph_t auto_capture_ir = cml_ir_get_auto_capture_context();
     if (auto_capture_ir) {
         return auto_capture_ir;
     }
@@ -165,7 +163,7 @@ CMLIR_t cml_ir_get_or_create_context(void) {
     return g_global_ir_context;
 }
 
-void cml_ir_set_global_context(CMLIR_t ir) { g_global_ir_context = ir; }
+void cml_ir_set_global_context(CMLGraph_t ir) { g_global_ir_context = ir; }
 
 void cml_ir_reset_global_context(void) {
     if (g_global_ir_context) {
@@ -174,7 +172,7 @@ void cml_ir_reset_global_context(void) {
     }
 }
 
-void cml_ir_ensure_gradients_executed(CMLIR_t ir) {
+void cml_ir_ensure_gradients_executed(CMLGraph_t ir) {
     if (!ir || !ir->tensor_refs)
         return;
 

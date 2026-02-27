@@ -3,7 +3,7 @@
  * @brief AMD ROCm/HIP backend implementation via dynamic loading
  */
 
-#include "ops/ir/mlir/backends/rocm_backend.h"
+#include "ops/ir/gpu/rocm_backend.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 
@@ -24,7 +24,6 @@
 #define hipMemcpyHostToDevice 1
 #define hipMemcpyDeviceToHost 2
 
-// Dynamic library functions
 #ifdef __linux__
 static void* load_library(const char* name) {
     void* lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
