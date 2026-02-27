@@ -51,6 +51,22 @@ static bool g_metal_available      = false;
 static bool g_rocm_available       = false;
 static bool g_device_initialized   = false;
 
+/* Simulated GPU state */
+#define SIM_GPU_MAX_DEVICES 16
+#define SIM_GPU_DEFAULT_MEMORY (4ULL * 1024 * 1024 * 1024) /* 4GB */
+
+typedef struct {
+    bool active;
+    size_t total_memory;
+    size_t allocated;
+    char name[64];
+} SimGPUDevice;
+
+static bool g_sim_gpu_enabled = false;
+static int g_sim_gpu_count = 0;
+static int g_sim_gpu_current = 0;
+static SimGPUDevice g_sim_gpus[SIM_GPU_MAX_DEVICES];
+
 // CUDA detection function pointers (loaded dynamically)
 typedef int (*cudaRuntimeGetVersion_fn)(int*);
 typedef int (*cudaGetDeviceCount_fn)(int*);
@@ -365,6 +381,8 @@ const char* device_get_name(DeviceType device) {
         return "Metal";
     case DEVICE_ROCM:
         return "ROCm";
+    case DEVICE_SIM_GPU:
+        return "SimGPU";
     case DEVICE_AUTO:
         return "Auto";
     default:
@@ -382,6 +400,12 @@ void device_print_info(void) {
     printf("  Metal: %s\n", g_metal_available ? "Yes" : "No");
     printf("  ROCm: %s\n", g_rocm_available ? "Yes" : "No");
 
+    printf("  SimGPU: %s", g_sim_gpu_enabled ? "Yes" : "No");
+    if (g_sim_gpu_enabled) {
+        printf(" (%d device(s))", g_sim_gpu_count);
+    }
+    printf("\n");
+
     if (g_cuda_available) {
         int device_count = 0;
         if (cudaGetDeviceCount) {
@@ -389,6 +413,17 @@ void device_print_info(void) {
             printf("\nCUDA devices: %d\n", device_count);
         }
     }
+
+    if (g_sim_gpu_enabled) {
+        printf("\nSimulated GPU devices: %d\n", g_sim_gpu_count);
+        for (int i = 0; i < g_sim_gpu_count; i++) {
+            printf("  [%d] %s: %zuMB total, %zuMB used\n", i,
+                   g_sim_gpus[i].name,
+                   g_sim_gpus[i].total_memory / (1024 * 1024),
+                   g_sim_gpus[i].allocated / (1024 * 1024));
+        }
+    }
+
     printf("========================\n\n");
 }
 
@@ -496,6 +531,26 @@ void* device_alloc(size_t size, DeviceType device) {
         }
         break;
 
+    case DEVICE_SIM_GPU:
+        if (g_sim_gpu_enabled && g_sim_gpu_current < g_sim_gpu_count) {
+            SimGPUDevice* dev = &g_sim_gpus[g_sim_gpu_current];
+            if (dev->allocated + size > dev->total_memory) {
+                LOG_ERROR("SimGPU[%d]: out of memory (alloc %zu, used %zu/%zu)",
+                          g_sim_gpu_current, size, dev->allocated, dev->total_memory);
+                return NULL;
+            }
+            ptr = malloc(size);
+            if (ptr) {
+                dev->allocated += size;
+                LOG_DEBUG("SimGPU[%d]: allocated %zu bytes (%zu/%zu used)",
+                          g_sim_gpu_current, size, dev->allocated, dev->total_memory);
+            }
+        } else {
+            LOG_WARNING("SimGPU not available, falling back to CPU");
+            ptr = malloc(size);
+        }
+        break;
+
     case DEVICE_AUTO:
         return device_alloc(size, device_get_best_available());
 
@@ -555,6 +610,10 @@ void device_free(void* ptr, DeviceType device) {
         }
         break;
 
+    case DEVICE_SIM_GPU:
+        free(ptr);
+        break;
+
     case DEVICE_AUTO:
         device_free(ptr, device_get_best_available());
         break;
@@ -589,6 +648,10 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
             return (result == 0) ? 0 : -1;
         } else if (dst_device == DEVICE_METAL) {
             // Metal uses unified memory, so we can use memcpy
+            memcpy(dst, src, size);
+            return 0;
+        } else if (dst_device == DEVICE_SIM_GPU) {
+            // SimGPU uses CPU memory
             memcpy(dst, src, size);
             return 0;
         }
@@ -634,6 +697,15 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
         return 0;
     } else if (src_device == DEVICE_METAL && dst_device == DEVICE_CPU) {
         // Metal uses unified memory, so we can use memcpy
+        memcpy(dst, src, size);
+        return 0;
+    } else if (src_device == DEVICE_CPU && dst_device == DEVICE_SIM_GPU) {
+        memcpy(dst, src, size);
+        return 0;
+    } else if (src_device == DEVICE_SIM_GPU && dst_device == DEVICE_CPU) {
+        memcpy(dst, src, size);
+        return 0;
+    } else if (src_device == DEVICE_SIM_GPU && dst_device == DEVICE_SIM_GPU) {
         memcpy(dst, src, size);
         return 0;
     } else if (src_device == DEVICE_CPU) {
@@ -721,4 +793,85 @@ int device_move_tensor(Tensor* tensor, DeviceType device) {
 
 int device_move_tensor_to_default(Tensor* tensor) {
     return device_move_tensor(tensor, device_get_default());
+}
+
+/* ===== Simulated Multi-GPU Implementation ===== */
+
+int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
+    if (num_devices <= 0 || num_devices > SIM_GPU_MAX_DEVICES) {
+        LOG_ERROR("SimGPU: invalid device count %d (must be 1-%d)", num_devices, SIM_GPU_MAX_DEVICES);
+        return -1;
+    }
+
+    if (g_sim_gpu_enabled) {
+        device_sim_gpu_disable();
+    }
+
+    size_t mem = memory_per_device > 0 ? memory_per_device : SIM_GPU_DEFAULT_MEMORY;
+
+    for (int i = 0; i < num_devices; i++) {
+        g_sim_gpus[i].active = true;
+        g_sim_gpus[i].total_memory = mem;
+        g_sim_gpus[i].allocated = 0;
+        snprintf(g_sim_gpus[i].name, sizeof(g_sim_gpus[i].name),
+                 "CML Simulated GPU %d", i);
+    }
+
+    g_sim_gpu_count = num_devices;
+    g_sim_gpu_current = 0;
+    g_sim_gpu_enabled = true;
+
+    LOG_INFO("SimGPU: enabled %d simulated GPU(s), %zuMB each",
+             num_devices, mem / (1024 * 1024));
+
+    return 0;
+}
+
+void device_sim_gpu_disable(void) {
+    for (int i = 0; i < g_sim_gpu_count; i++) {
+        g_sim_gpus[i].active = false;
+        g_sim_gpus[i].allocated = 0;
+    }
+    g_sim_gpu_count = 0;
+    g_sim_gpu_current = 0;
+    g_sim_gpu_enabled = false;
+    LOG_INFO("SimGPU: disabled");
+}
+
+bool device_sim_gpu_available(void) {
+    return g_sim_gpu_enabled && g_sim_gpu_count > 0;
+}
+
+int device_sim_gpu_get_count(void) {
+    return g_sim_gpu_enabled ? g_sim_gpu_count : 0;
+}
+
+int device_sim_gpu_set_device(int device_id) {
+    if (!g_sim_gpu_enabled || device_id < 0 || device_id >= g_sim_gpu_count) {
+        LOG_ERROR("SimGPU: invalid device ID %d (have %d devices)", device_id, g_sim_gpu_count);
+        return -1;
+    }
+    g_sim_gpu_current = device_id;
+    LOG_DEBUG("SimGPU: set active device to %d", device_id);
+    return 0;
+}
+
+int device_sim_gpu_get_device(void) {
+    return g_sim_gpu_current;
+}
+
+int device_sim_gpu_get_info(int device_id, DeviceInfo* info) {
+    if (!info || !g_sim_gpu_enabled || device_id < 0 || device_id >= g_sim_gpu_count) {
+        return -1;
+    }
+
+    SimGPUDevice* dev = &g_sim_gpus[device_id];
+    info->type = DEVICE_SIM_GPU;
+    info->device_id = device_id;
+    info->total_memory = dev->total_memory;
+    info->free_memory = dev->total_memory - dev->allocated;
+    info->name = dev->name;
+    info->available = dev->active;
+
+    return 0;
 }
