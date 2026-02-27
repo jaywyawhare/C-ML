@@ -7,6 +7,7 @@
 #include "distributed/distributed.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
 
 typedef void* ncclComm_t;
