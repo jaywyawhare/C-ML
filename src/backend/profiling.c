@@ -18,8 +18,6 @@ static double timespec_to_ms(struct timespec* ts) {
     return (double)ts->tv_sec * 1000.0 + (double)ts->tv_nsec / 1000000.0;
 }
 
-// Timer Implementation
-
 Timer* profiler_timer_create(const char* name) {
     Timer* timer = malloc(sizeof(Timer));
     if (!timer)
@@ -114,8 +112,6 @@ void profiler_timer_reset(Timer* timer) {
     timer->elapsed_ms         = 0.0;
     timer->is_running         = false;
 }
-
-// Profiler Implementation
 
 Profiler* profiler_create(void) {
     Profiler* profiler = malloc(sizeof(Profiler));

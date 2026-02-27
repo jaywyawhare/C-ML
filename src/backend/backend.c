@@ -685,7 +685,6 @@ void backend_cleanup(void) {
     }
 }
 
-// Check CPU features using CPUID
 static bool check_cpu_feature_sse(void) {
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
     unsigned int eax, ebx, ecx, edx;
@@ -719,7 +718,6 @@ static bool check_cpu_feature_avx(void) {
     return false;
 }
 
-// Check if BLAS is available
 static bool check_blas_available(void) {
     const char* blas_symbols[] = {"cblas_sgemm", "cblas_dgemm", "sgemm_", "dgemm_", NULL};
 

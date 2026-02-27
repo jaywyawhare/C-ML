@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <math.h>
 
-// Dynamic library loading
 #ifdef __linux__
 #include <dlfcn.h>
 #define LIB_LOAD(path) dlopen(path, RTLD_LAZY | RTLD_LOCAL)
@@ -33,7 +32,6 @@
 #define LIB_CLOSE(handle) ((void)0)
 #endif
 
-// Global BLAS context
 static CMLBlasContext* g_blas_ctx = NULL;
 
 // List of BLAS libraries to try loading
@@ -59,10 +57,6 @@ static const char* blas_library_paths[] = {
     "openblas.dll", "libopenblas.dll", "mkl_rt.dll", "blas.dll",
 #endif
     NULL};
-
-// ============================================================================
-// Initialization
-// ============================================================================
 
 bool cml_blas_available(void) {
     // Try to load any BLAS library
@@ -171,10 +165,6 @@ CMLBlasContext* cml_blas_get_context(void) {
     }
     return g_blas_ctx;
 }
-
-// ============================================================================
-// Matrix Operations
-// ============================================================================
 
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                    int K, float alpha, float beta) {
@@ -331,35 +321,9 @@ float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n) {
     return sqrtf(sum);
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
 const char* cml_blas_get_library_name(CMLBlasContext* ctx) {
     if (!ctx || !ctx->initialized) {
         return "None";
     }
     return ctx->lib_name;
-}
-
-void cml_blas_print_status(CMLBlasContext* ctx) {
-    if (!ctx)
-        ctx = cml_blas_get_context();
-
-    printf("\n=== BLAS Status ===\n");
-    if (!ctx || !ctx->initialized) {
-        printf("BLAS: Not available\n");
-    } else {
-        printf("BLAS: Available\n");
-        printf("Library: %s\n", ctx->lib_name);
-        printf("Functions available:\n");
-        printf("  cblas_sgemm: %s\n", ctx->cblas_sgemm ? "Yes" : "No");
-        printf("  cblas_sgemv: %s\n", ctx->cblas_sgemv ? "Yes" : "No");
-        printf("  cblas_saxpy: %s\n", ctx->cblas_saxpy ? "Yes" : "No");
-        printf("  cblas_sscal: %s\n", ctx->cblas_sscal ? "Yes" : "No");
-        printf("  cblas_sdot:  %s\n", ctx->cblas_sdot ? "Yes" : "No");
-        printf("  cblas_snrm2: %s\n", ctx->cblas_snrm2 ? "Yes" : "No");
-        printf("  sgemm_ (F77): %s\n", ctx->sgemm_ ? "Yes" : "No");
-    }
-    printf("===================\n\n");
 }

@@ -12,7 +12,6 @@
 #include <stdint.h>
 #include <limits.h>
 
-// Backend Buffer Type Structure
 struct CMLBackendBufferType {
     const char* name;
     DeviceType device;
@@ -24,7 +23,6 @@ struct CMLBackendBufferType {
     CMLBackendBuffer_t (*alloc_buffer)(struct CMLBackendBufferType* buft, size_t size);
 };
 
-// Backend Buffer Structure
 struct CMLBackendBuffer {
     CMLBackendBufferType_t type;
     void* base;
@@ -34,7 +32,6 @@ struct CMLBackendBuffer {
     bool owns_memory;
 };
 
-// CPU Buffer Type Implementation
 static CMLBackendBuffer_t cpu_buffer_alloc(struct CMLBackendBufferType* buft, size_t size) {
     (void)buft; // Unused
     void* ptr = malloc(size);
@@ -59,7 +56,6 @@ static CMLBackendBuffer_t cpu_buffer_alloc(struct CMLBackendBufferType* buft, si
     return buffer;
 }
 
-// CUDA Buffer Type Implementation
 static CMLBackendBuffer_t cuda_buffer_alloc(struct CMLBackendBufferType* buft, size_t size) {
     (void)buft;
 
@@ -90,7 +86,6 @@ static CMLBackendBuffer_t cuda_buffer_alloc(struct CMLBackendBufferType* buft, s
     return buffer;
 }
 
-// Metal Buffer Type Implementation
 static CMLBackendBuffer_t metal_buffer_alloc(struct CMLBackendBufferType* buft, size_t size) {
     (void)buft;
 
@@ -123,7 +118,6 @@ static CMLBackendBuffer_t metal_buffer_alloc(struct CMLBackendBufferType* buft, 
     return buffer;
 }
 
-// ROCm Buffer Type Implementation
 static CMLBackendBuffer_t rocm_buffer_alloc(struct CMLBackendBufferType* buft, size_t size) {
     (void)buft;
 
@@ -185,7 +179,6 @@ static struct CMLBackendBufferType rocm_buffer_type = {.name   = "ROCm",
                                                        .is_host      = false,
                                                        .alloc_buffer = rocm_buffer_alloc};
 
-// Get buffer type for device
 static CMLBackendBufferType_t get_buffer_type_for_device(DeviceType device) {
     switch (device) {
     case DEVICE_CPU:
@@ -203,7 +196,6 @@ static CMLBackendBufferType_t get_buffer_type_for_device(DeviceType device) {
     }
 }
 
-// Buffer Type API
 const char* cml_backend_buffer_type_name(CMLBackendBufferType_t buft) {
     if (!buft)
         return "Unknown";
@@ -250,7 +242,6 @@ DeviceType cml_backend_buffer_type_get_device(CMLBackendBufferType_t buft) {
     return ((struct CMLBackendBufferType*)buft)->device;
 }
 
-// Buffer API
 const char* cml_backend_buffer_name(CMLBackendBuffer_t buffer) {
     if (!buffer)
         return "NULL";
@@ -365,7 +356,6 @@ void cml_backend_tensor_copy(Tensor* src, Tensor* dst) {
     }
 }
 
-// Convenience function to get buffer type for device
 CMLBackendBufferType_t cml_backend_buffer_type_for_device(DeviceType device) {
     return get_buffer_type_for_device(device);
 }

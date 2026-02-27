@@ -244,69 +244,6 @@ int device_move_tensor(struct Tensor* tensor, DeviceType device);
 int device_move_tensor_to_default(struct Tensor* tensor);
 
 /**
- * @brief Auto-load tensor to best available device
- *
- * Detects best device and moves tensor to it
- *
- * @param tensor Tensor to auto-load
- * @return 0 on success, negative value on failure
- */
-int device_auto_load_tensor(struct Tensor* tensor);
-
-/**
- * @brief Execute computation on a specific device
- *
- * This is a generic dispatch function that routes computations to device-specific
- * implementations. Operations should check tensor->device and dispatch accordingly.
- *
- * @param device Target device for computation
- * @return 0 on success, negative value on failure
- */
-int device_set_compute_device(DeviceType device);
-
-/**
- * @brief Synchronize device operations
- *
- * Waits for all operations on the specified device to complete
- *
- * @param device Device to synchronize
- * @return 0 on success, negative value on failure
- */
-int device_synchronize(DeviceType device);
-
-/**
- * @brief Synchronize default device
- *
- * @return 0 on success, negative value on failure
- */
-int device_synchronize_default(void);
-
-/**
- * @brief Get device information
- *
- * @param device DeviceType to query
- * @param info Output structure to fill with device information
- * @return 0 on success, negative value on failure
- */
-int device_get_info(DeviceType device, DeviceInfo* info);
-
-/**
- * @brief Get total memory on device
- *
- * @param device DeviceType to query
- * @return Total memory in bytes, or 0 on failure
- */
-size_t device_get_total_memory(DeviceType device);
-
-/**
- * @brief Get free memory on device
- *
- * @param device DeviceType to query
- * @return Free memory in bytes, or 0 on failure
- */
-size_t device_get_free_memory(DeviceType device);
-
-/**
  * @brief Create tensor on default device (auto-detected)
  *
  * @param shape Shape array

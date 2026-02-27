@@ -17,14 +17,10 @@ extern "C" {
 #endif
 
 // CBLAS row/column major order
-typedef enum CMLBlasOrder { CML_BLAS_ROW_MAJOR = 101, CML_BLAS_COL_MAJOR = 102 } CMLBlasOrder;
+typedef enum CMLBlasOrder { CML_BLAS_ROW_MAJOR = 101 } CMLBlasOrder;
 
 // CBLAS transpose options
-typedef enum CMLBlasTranspose {
-    CML_BLAS_NO_TRANS   = 111,
-    CML_BLAS_TRANS      = 112,
-    CML_BLAS_CONJ_TRANS = 113
-} CMLBlasTranspose;
+typedef enum CMLBlasTranspose { CML_BLAS_NO_TRANS = 111 } CMLBlasTranspose;
 
 /**
  * @brief BLAS context for managing library state
@@ -58,9 +54,7 @@ typedef struct CMLBlasContext {
                    const int* ldb, const float* beta, float* C, const int* ldc);
 } CMLBlasContext;
 
-// ============================================================================
 // Initialization
-// ============================================================================
 
 /**
  * @brief Check if BLAS is available on the system
@@ -86,9 +80,7 @@ void cml_blas_free(CMLBlasContext* ctx);
  */
 CMLBlasContext* cml_blas_get_context(void);
 
-// ============================================================================
 // Matrix Operations (High-Level API)
-// ============================================================================
 
 /**
  * @brief Matrix multiplication: C = alpha * A @ B + beta * C
@@ -167,9 +159,7 @@ float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n);
  */
 float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n);
 
-// ============================================================================
 // Utility Functions
-// ============================================================================
 
 /**
  * @brief Get name of loaded BLAS library
@@ -177,12 +167,6 @@ float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n);
  * @return Library name string
  */
 const char* cml_blas_get_library_name(CMLBlasContext* ctx);
-
-/**
- * @brief Print BLAS status
- * @param ctx BLAS context
- */
-void cml_blas_print_status(CMLBlasContext* ctx);
 
 #ifdef __cplusplus
 }
