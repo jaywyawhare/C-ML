@@ -15,8 +15,6 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Augmentation Configuration
-
 AugmentationConfig* augmentation_config_create(void) {
     AugmentationConfig* config = malloc(sizeof(AugmentationConfig));
     if (!config)
@@ -69,7 +67,6 @@ static float rand_float(void) {
     return (float)rng_seed / 2147483648.0f;
 }
 
-// Random Crop
 Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("Random crop requires 4D tensor [batch, channels, height, width]");
@@ -126,7 +123,6 @@ Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
     return output;
 }
 
-// Random Horizontal Flip
 Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("Horizontal flip requires 4D tensor [batch, channels, height, width]");
@@ -179,7 +175,6 @@ Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
     return output;
 }
 
-// Random Vertical Flip
 Tensor* augment_random_vertical_flip(Tensor* input, float prob) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("Vertical flip requires 4D tensor [batch, channels, height, width]");
@@ -232,7 +227,6 @@ Tensor* augment_random_vertical_flip(Tensor* input, float prob) {
     return output;
 }
 
-// Random Rotation with arbitrary angle support
 Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("Rotation requires 4D tensor [batch, channels, height, width]");
@@ -518,7 +512,6 @@ Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, fl
     return output;
 }
 
-// Normalize
 Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channels) {
     if (!input || !mean || !std || input->ndim != 4) {
         LOG_ERROR("Normalize requires 4D tensor and valid mean/std arrays");
@@ -565,7 +558,6 @@ Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channe
     return output;
 }
 
-// Apply augmentation pipeline
 Tensor* augment_apply(Tensor* input, AugmentationConfig* config) {
     if (!input || !config)
         return NULL;

@@ -9,16 +9,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-// Global configuration state
 static DeviceType g_default_device = DEVICE_CPU;
 static DType g_default_dtype       = DTYPE_FLOAT32;
 static uint64_t g_rng_seed         = 0;
 static bool g_rng_seeded           = false;
-
-// Custom allocator functions
-static CMLAllocator g_custom_alloc     = NULL;
-static CMLDeallocator g_custom_dealloc = NULL;
-static CMLReallocator g_custom_realloc = NULL;
 
 void cml_set_default_device(DeviceType device) {
     g_default_device = device;
@@ -50,27 +44,4 @@ uint64_t cml_random_seed(void) {
         srand((unsigned int)g_rng_seed);
     }
     return g_rng_seed;
-}
-
-void cml_set_allocator(CMLAllocator alloc, CMLDeallocator dealloc, CMLReallocator realloc) {
-    g_custom_alloc   = alloc;
-    g_custom_dealloc = dealloc;
-    g_custom_realloc = realloc;
-    LOG_DEBUG("Custom allocator set");
-}
-
-void cml_get_allocator(CMLAllocator* alloc, CMLDeallocator* dealloc, CMLReallocator* realloc) {
-    if (alloc)
-        *alloc = g_custom_alloc;
-    if (dealloc)
-        *dealloc = g_custom_dealloc;
-    if (realloc)
-        *realloc = g_custom_realloc;
-}
-
-void cml_reset_allocator(void) {
-    g_custom_alloc   = NULL;
-    g_custom_dealloc = NULL;
-    g_custom_realloc = NULL;
-    LOG_DEBUG("Allocator reset to default");
 }

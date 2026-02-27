@@ -11,7 +11,6 @@
 #include <string.h>
 #include <stdio.h>
 
-// Graph Node Structure
 struct CMLGraphNode {
     CMLOpType op_type;
     Tensor* tensor;
@@ -24,7 +23,6 @@ struct CMLGraphNode {
     int execution_order;
 };
 
-// Computation Graph Structure
 struct CMLComputationGraph {
     CMLGraphNode_t* nodes;
     size_t num_nodes;
@@ -35,16 +33,13 @@ struct CMLComputationGraph {
     bool built;
 };
 
-// Global graph mode
 static CMLGraphMode g_graph_mode = CML_GRAPH_MODE_EAGER;
 
-// Forward declarations
 static void graph_node_free(CMLGraphNode_t node);
 static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params);
 static void graph_topo_sort(CMLComputationGraph_t graph);
 static void graph_mark_reachable(CMLGraphNode_t node);
 
-// Graph Creation
 CMLComputationGraph_t cml_graph_new(void) {
     CMLComputationGraph_t graph = malloc(sizeof(struct CMLComputationGraph));
     if (!graph)
@@ -121,7 +116,6 @@ CMLGraphNode_t cml_graph_get_node_by_index(CMLComputationGraph_t graph, size_t i
     return graph->nodes[index];
 }
 
-// Node Creation
 static CMLGraphNode_t graph_node_create(CMLOpType op_type, Tensor* tensor) {
     CMLGraphNode_t node = malloc(sizeof(struct CMLGraphNode));
     if (!node)
@@ -267,7 +261,6 @@ CMLGraphNode_t cml_graph_node_matmul(CMLComputationGraph_t graph, CMLGraphNode_t
     return cml_graph_node_op(graph, CML_OP_MATMUL, inputs, 2, NULL);
 }
 
-// Graph Building
 void cml_graph_build_forward(CMLComputationGraph_t graph, CMLGraphNode_t output) {
     if (!graph || !output)
         return;
@@ -454,7 +447,6 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     return backward_graph;
 }
 
-// Graph Execution
 static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params) {
     if (!node)
         return -1;
@@ -565,7 +557,6 @@ int cml_graph_compute_with_context(CMLComputationGraph_t graph, void* context,
     return cml_graph_compute(graph, params);
 }
 
-// Node Access
 Tensor* cml_graph_node_get_tensor(CMLGraphNode_t node) {
     if (!node)
         return NULL;
@@ -602,7 +593,6 @@ bool cml_graph_node_is_param(CMLGraphNode_t node) {
     return node->is_param;
 }
 
-// Graph Optimization
 int cml_graph_optimize(CMLComputationGraph_t graph) {
     if (!graph)
         return -1;
@@ -784,7 +774,6 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
     return 0;
 }
 
-// Helper function to mark node and all its inputs as reachable
 static void graph_mark_reachable(CMLGraphNode_t node) {
     if (!node || node->visited)
         return;
@@ -797,7 +786,6 @@ static void graph_mark_reachable(CMLGraphNode_t node) {
     }
 }
 
-// Graph Mode Control
 void cml_set_graph_mode(CMLGraphMode mode) { g_graph_mode = mode; }
 
 CMLGraphMode cml_get_graph_mode(void) { return g_graph_mode; }
@@ -806,7 +794,6 @@ void cml_enable_lazy_mode(void) { g_graph_mode = CML_GRAPH_MODE_LAZY; }
 
 void cml_disable_lazy_mode(void) { g_graph_mode = CML_GRAPH_MODE_EAGER; }
 
-// Graph Visualization
 int cml_graph_export_dot(CMLComputationGraph_t graph, const char* filename) {
     if (!graph || !filename)
         return -1;

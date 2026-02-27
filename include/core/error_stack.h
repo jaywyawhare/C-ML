@@ -51,13 +51,6 @@ void error_stack_push(int code, const char* message, const char* file, int line,
                       const char* function);
 
 /**
- * @brief Pop the last error from the error stack
- *
- * @return Error entry, or NULL if stack is empty
- */
-ErrorEntry* error_stack_pop(void);
-
-/**
  * @brief Get the last error without removing it
  *
  * @return Error entry, or NULL if stack is empty
@@ -65,23 +58,11 @@ ErrorEntry* error_stack_pop(void);
 ErrorEntry* error_stack_peek(void);
 
 /**
- * @brief Clear all errors from the stack
- */
-void error_stack_clear(void);
-
-/**
  * @brief Check if there are any errors
  *
  * @return true if errors exist, false otherwise
  */
 bool error_stack_has_errors(void);
-
-/**
- * @brief Get the number of errors in the stack
- *
- * @return Number of errors
- */
-size_t error_stack_count(void);
 
 /**
  * @brief Print all errors to stderr
@@ -101,16 +82,6 @@ const char* error_stack_get_last_message(void);
  * @return Error code, or CM_SUCCESS if no errors
  */
 int error_stack_get_last_code(void);
-
-/**
- * @brief Check if program should exit with error code
- *
- * This function checks if there are errors and can be used to determine
- * the exit code. The library automatically prints errors on exit.
- *
- * @return true if errors exist (should exit with non-zero code), false otherwise
- */
-bool error_stack_should_exit_with_error(void);
 
 /**
  * @brief Automatically check if a pointer is NULL and push error if so

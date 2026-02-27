@@ -61,43 +61,8 @@ static int ensure_tensor_capacity(CleanupContext* ctx, size_t needed) {
     return 0;
 }
 
-static int ensure_dataset_capacity(CleanupContext* ctx, size_t needed) {
-    if (ctx->num_datasets + needed <= ctx->dataset_capacity) {
-        return 0;
-    }
-
-    size_t new_capacity = ctx->dataset_capacity == 0 ? INITIAL_CAPACITY : ctx->dataset_capacity * 2;
-    while (new_capacity < ctx->num_datasets + needed) {
-        new_capacity *= 2;
-    }
-
-    Dataset** new_datasets = realloc(ctx->datasets, (size_t)new_capacity * sizeof(Dataset*));
-    if (!new_datasets)
-        return -1;
-
-    ctx->datasets         = new_datasets;
-    ctx->dataset_capacity = new_capacity;
-    return 0;
-}
-
-static int ensure_memory_capacity(CleanupContext* ctx, size_t needed) {
-    if (ctx->num_memory_ptrs + needed <= ctx->memory_capacity) {
-        return 0;
-    }
-
-    size_t new_capacity = ctx->memory_capacity == 0 ? INITIAL_CAPACITY : ctx->memory_capacity * 2;
-    while (new_capacity < ctx->num_memory_ptrs + needed) {
-        new_capacity *= 2;
-    }
-
-    void** new_ptrs = realloc(ctx->memory_ptrs, (size_t)new_capacity * sizeof(void*));
-    if (!new_ptrs)
-        return -1;
-
-    ctx->memory_ptrs     = new_ptrs;
-    ctx->memory_capacity = new_capacity;
-    return 0;
-}
+/* ensure_dataset_capacity and ensure_memory_capacity will be added
+   when cleanup_register_dataset/cleanup_register_memory are implemented. */
 
 int cleanup_register_model(CleanupContext* ctx, Module* model) {
     if (!ctx || !model)
@@ -129,30 +94,6 @@ int cleanup_register_tensor(CleanupContext* ctx, Tensor* tensor) {
     }
 
     ctx->tensors[ctx->num_tensors++] = tensor;
-    return 0;
-}
-
-int cleanup_register_dataset(CleanupContext* ctx, Dataset* dataset) {
-    if (!ctx || !dataset)
-        return -1;
-
-    if (ensure_dataset_capacity(ctx, 1) != 0) {
-        return -1;
-    }
-
-    ctx->datasets[ctx->num_datasets++] = dataset;
-    return 0;
-}
-
-int cleanup_register_memory(CleanupContext* ctx, void* ptr) {
-    if (!ctx || !ptr)
-        return -1;
-
-    if (ensure_memory_capacity(ctx, 1) != 0) {
-        return -1;
-    }
-
-    ctx->memory_ptrs[ctx->num_memory_ptrs++] = ptr;
     return 0;
 }
 

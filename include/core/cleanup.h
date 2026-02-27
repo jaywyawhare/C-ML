@@ -93,22 +93,6 @@ int cleanup_register_optimizer(CleanupContext* ctx, Optimizer* optimizer);
 int cleanup_register_tensor(CleanupContext* ctx, Tensor* tensor);
 
 /**
- * @brief Register a dataset for cleanup
- * @param ctx Cleanup context
- * @param dataset Dataset to register
- * @return 0 on success, negative value on failure
- */
-int cleanup_register_dataset(CleanupContext* ctx, Dataset* dataset);
-
-/**
- * @brief Register raw memory pointer for cleanup
- * @param ctx Cleanup context
- * @param ptr Memory pointer to register
- * @return 0 on success, negative value on failure
- */
-int cleanup_register_memory(CleanupContext* ctx, void* ptr);
-
-/**
  * @brief Clear all registered resources (free them)
  * @param ctx Cleanup context
  */

@@ -15,13 +15,11 @@
 #define MAX_ERROR_STACK_SIZE 256
 #define MAX_ERROR_MESSAGE_LEN 512
 
-// Global error stack
 static ErrorEntry* g_error_stack      = NULL;
 static size_t g_error_stack_size      = 0;
 static size_t g_error_stack_capacity  = 0;
 static bool g_error_stack_initialized = false;
 
-// Internal storage for error messages
 static char g_error_message_buffer[MAX_ERROR_STACK_SIZE][MAX_ERROR_MESSAGE_LEN];
 static char g_error_file_buffer[MAX_ERROR_STACK_SIZE][256];
 static char g_error_function_buffer[MAX_ERROR_STACK_SIZE][128];
@@ -128,15 +126,6 @@ void error_stack_push(int code, const char* message, const char* file, int line,
               entry->file, entry->line, entry->function);
 }
 
-ErrorEntry* error_stack_pop(void) {
-    if (!g_error_stack_initialized || !g_error_stack || g_error_stack_size == 0) {
-        return NULL;
-    }
-
-    g_error_stack_size--;
-    return &g_error_stack[g_error_stack_size];
-}
-
 ErrorEntry* error_stack_peek(void) {
     if (!g_error_stack_initialized || !g_error_stack || g_error_stack_size == 0) {
         return NULL;
@@ -145,30 +134,12 @@ ErrorEntry* error_stack_peek(void) {
     return &g_error_stack[g_error_stack_size - 1];
 }
 
-void error_stack_clear(void) {
-    if (!g_error_stack_initialized) {
-        return;
-    }
-
-    g_error_stack_size     = 0;
-    g_message_buffer_index = 0;
-    LOG_DEBUG("Error stack cleared");
-}
-
 bool error_stack_has_errors(void) {
     if (!g_error_stack_initialized) {
         return false;
     }
 
     return g_error_stack_size > 0;
-}
-
-size_t error_stack_count(void) {
-    if (!g_error_stack_initialized) {
-        return 0;
-    }
-
-    return g_error_stack_size;
 }
 
 void error_stack_print_all(void) {
@@ -194,5 +165,3 @@ int error_stack_get_last_code(void) {
     ErrorEntry* entry = error_stack_peek();
     return entry ? entry->code : CM_SUCCESS;
 }
-
-bool error_stack_should_exit_with_error(void) { return error_stack_has_errors(); }

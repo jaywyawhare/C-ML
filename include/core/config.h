@@ -70,56 +70,6 @@ void cml_seed(uint64_t seed);
  */
 uint64_t cml_random_seed(void);
 
-/**
- * @brief Allocator function pointer type
- *
- * @param size Size in bytes to allocate
- * @return Pointer to allocated memory, or NULL on failure
- */
-typedef void* (*CMLAllocator)(size_t size);
-
-/**
- * @brief Deallocator function pointer type
- *
- * @param ptr Pointer to memory to free
- */
-typedef void (*CMLDeallocator)(void* ptr);
-
-/**
- * @brief Reallocator function pointer type
- *
- * @param ptr Pointer to existing memory
- * @param size New size in bytes
- * @return Pointer to reallocated memory, or NULL on failure
- */
-typedef void* (*CMLReallocator)(void* ptr, size_t size);
-
-/**
- * @brief Set custom allocator functions
- *
- * Allows users to provide custom memory allocation functions.
- * This is useful for memory pools, arenas, or custom allocators.
- *
- * @param alloc Allocator function (NULL to use default)
- * @param dealloc Deallocator function (NULL to use default)
- * @param realloc Reallocator function (NULL to use default)
- */
-void cml_set_allocator(CMLAllocator alloc, CMLDeallocator dealloc, CMLReallocator realloc);
-
-/**
- * @brief Get current allocator functions
- *
- * @param alloc Output pointer for allocator function
- * @param dealloc Output pointer for deallocator function
- * @param realloc Output pointer for reallocator function
- */
-void cml_get_allocator(CMLAllocator* alloc, CMLDeallocator* dealloc, CMLReallocator* realloc);
-
-/**
- * @brief Reset allocator to default (malloc/free/realloc)
- */
-void cml_reset_allocator(void);
-
 #ifdef __cplusplus
 }
 #endif

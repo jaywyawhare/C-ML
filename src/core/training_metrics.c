@@ -16,7 +16,6 @@
 #include <math.h>
 #include <time.h>
 
-// Global metrics instance for automatic capture
 static TrainingMetrics* g_global_metrics = NULL;
 static size_t g_current_epoch            = 0;
 static int g_optimizer_step_count        = 0;
@@ -36,7 +35,6 @@ static double get_time_sec(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-// Get global metrics instance
 TrainingMetrics* training_metrics_get_global(void) { return g_global_metrics; }
 
 // Ensure metrics arrays can hold at least num_epochs
@@ -434,10 +432,6 @@ int training_metrics_export_json(const TrainingMetrics* metrics, const char* pat
     fprintf(f, "  \"trainable_params\": %d,\n", metrics->trainable_params);
     fprintf(f, "  \"best_loss\": %.6f,\n", (double)metrics->best_loss);
     fprintf(f, "  \"best_accuracy\": %.6f,\n", (double)metrics->best_accuracy);
-
-    // Export epoch information with early stopping support
-    // num_epochs reflects actual completed epochs (may be less than expected if early stopped)
-    // Removed duplicate print here, handled below with display logic
 
     // Calculate current epoch first
     size_t current_epoch = 0;
@@ -1081,7 +1075,6 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
     training_metrics_export_json(g_global_metrics, metrics_path, true);
 }
 
-// Mark that training was stopped early
 void training_metrics_mark_early_stop(size_t actual_epochs) {
     if (!g_global_metrics)
         return;
@@ -1101,7 +1094,6 @@ void training_metrics_mark_early_stop(size_t actual_epochs) {
     training_metrics_export_json(g_global_metrics, metrics_path, false); // Final export
 }
 
-// Register model for automatic architecture export
 void training_metrics_register_model(Module* model) {
     if (!model)
         return;
@@ -1370,7 +1362,6 @@ void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
     }
 }
 
-// Evaluate model on dataset and automatically record metrics
 int training_metrics_evaluate_dataset(Module* model, Dataset* dataset,
                                       Tensor* (*loss_fn)(Tensor*, Tensor*), bool is_validation) {
     if (!model || !dataset || !loss_fn || !dataset->X || !dataset->y) {

@@ -36,7 +36,6 @@ typedef struct PrefetchQueue {
     bool shutdown;
 } PrefetchQueue;
 
-// Worker context for batch loading
 typedef struct WorkerContext {
     DataLoader* loader;
     PrefetchQueue* queue;
@@ -276,8 +275,6 @@ static void* worker_prefetch_batches(void* arg) {
     return NULL;
 }
 
-// Dataset Implementation
-
 Dataset* dataset_create(void) {
     LOG_DEBUG("Creating new dataset");
 
@@ -445,8 +442,6 @@ void dataset_free(Dataset* dataset) {
     LOG_DEBUG("Dataset freed successfully");
 }
 
-// Dataset Operations
-
 int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
                   Dataset** val_dataset) {
     if (!dataset || !train_dataset || !val_dataset) {
@@ -481,17 +476,55 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
     }
 
     // Set metadata
-    (*train_dataset)->num_samples = train_size;
-    (*train_dataset)->input_size  = dataset->input_size;
-    (*train_dataset)->output_size = dataset->output_size;
-    (*train_dataset)->dtype       = dataset->dtype;
-    (*train_dataset)->device      = dataset->device;
+    (*train_dataset)->num_samples   = train_size;
+    (*train_dataset)->input_size    = dataset->input_size;
+    (*train_dataset)->output_size   = dataset->output_size;
+    (*train_dataset)->dtype         = dataset->dtype;
+    (*train_dataset)->device        = dataset->device;
+    (*train_dataset)->num_classes   = dataset->num_classes;
+    (*train_dataset)->is_normalized = dataset->is_normalized;
+    (*train_dataset)->class_names   = dataset->class_names;
 
-    (*val_dataset)->num_samples = val_size;
-    (*val_dataset)->input_size  = dataset->input_size;
-    (*val_dataset)->output_size = dataset->output_size;
-    (*val_dataset)->dtype       = dataset->dtype;
-    (*val_dataset)->device      = dataset->device;
+    (*val_dataset)->num_samples   = val_size;
+    (*val_dataset)->input_size    = dataset->input_size;
+    (*val_dataset)->output_size   = dataset->output_size;
+    (*val_dataset)->dtype         = dataset->dtype;
+    (*val_dataset)->device        = dataset->device;
+    (*val_dataset)->num_classes   = dataset->num_classes;
+    (*val_dataset)->is_normalized = dataset->is_normalized;
+    (*val_dataset)->class_names   = dataset->class_names;
+
+    /* Copy normalization statistics if present */
+    if (dataset->feature_mins && dataset->feature_maxs) {
+        size_t stat_sz                 = (size_t)dataset->input_size * sizeof(float);
+        (*train_dataset)->feature_mins = malloc(stat_sz);
+        (*train_dataset)->feature_maxs = malloc(stat_sz);
+        (*val_dataset)->feature_mins   = malloc(stat_sz);
+        (*val_dataset)->feature_maxs   = malloc(stat_sz);
+        if ((*train_dataset)->feature_mins && (*train_dataset)->feature_maxs) {
+            memcpy((*train_dataset)->feature_mins, dataset->feature_mins, stat_sz);
+            memcpy((*train_dataset)->feature_maxs, dataset->feature_maxs, stat_sz);
+        }
+        if ((*val_dataset)->feature_mins && (*val_dataset)->feature_maxs) {
+            memcpy((*val_dataset)->feature_mins, dataset->feature_mins, stat_sz);
+            memcpy((*val_dataset)->feature_maxs, dataset->feature_maxs, stat_sz);
+        }
+    }
+    if (dataset->feature_means && dataset->feature_stds) {
+        size_t stat_sz                  = (size_t)dataset->input_size * sizeof(float);
+        (*train_dataset)->feature_means = malloc(stat_sz);
+        (*train_dataset)->feature_stds  = malloc(stat_sz);
+        (*val_dataset)->feature_means   = malloc(stat_sz);
+        (*val_dataset)->feature_stds    = malloc(stat_sz);
+        if ((*train_dataset)->feature_means && (*train_dataset)->feature_stds) {
+            memcpy((*train_dataset)->feature_means, dataset->feature_means, stat_sz);
+            memcpy((*train_dataset)->feature_stds, dataset->feature_stds, stat_sz);
+        }
+        if ((*val_dataset)->feature_means && (*val_dataset)->feature_stds) {
+            memcpy((*val_dataset)->feature_means, dataset->feature_means, stat_sz);
+            memcpy((*val_dataset)->feature_stds, dataset->feature_stds, stat_sz);
+        }
+    }
 
     // Copy data from source dataset tensors if available
     if (dataset->X && dataset->y) {
@@ -912,8 +945,6 @@ int dataset_shuffle(Dataset* dataset, unsigned int seed) {
     return 0;
 }
 
-// Utility Functions
-
 void dataset_print_summary(Dataset* dataset) {
     if (!dataset)
         return;
@@ -1056,8 +1087,6 @@ Dataset* dataset_copy(Dataset* dataset) {
     LOG_DEBUG("Dataset copied successfully");
     return copy;
 }
-
-// DataLoader Implementation
 
 DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     if (!dataset || batch_size <= 0) {
@@ -1234,8 +1263,6 @@ int dataloader_get_current_batch(DataLoader* loader) {
         return -1;
     return loader->current_batch;
 }
-
-// Batch Operations
 
 void batch_free(Batch* batch) {
     if (!batch)
