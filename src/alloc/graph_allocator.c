@@ -16,7 +16,6 @@
 #include <stdint.h>
 #include <limits.h>
 
-// Graph Allocator Structure
 struct CMLGraphAllocator {
     CMLBackendBufferType_t* buffer_types;
     CMLBackendBuffer_t* buffers;
@@ -157,7 +156,6 @@ static size_t calculate_tensor_size(Tensor* tensor) {
     return tensor->numel * dtype_size;
 }
 
-// Forward declaration
 static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph);
 
 // Helper: Perform full liveness analysis to find peak memory usage
@@ -684,7 +682,6 @@ bool cml_graph_allocator_init_pool(CMLGraphAllocator_t galloc, int buffer_id, si
     return true;
 }
 
-// Tensor Allocator
 void cml_tensor_allocator_new(CMLTensorAllocator* talloc, CMLBackendBuffer_t buffer) {
     if (!talloc)
         return;

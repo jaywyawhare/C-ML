@@ -274,9 +274,6 @@ void module_print_summary(Module* module, int indent) {
 
 int module_get_total_parameters(Module* module) { return module ? module->num_parameters : 0; }
 
-// Module Composition
-// Simple chaining mechanism for sequential module composition
-
 int module_chain(Module* first, Module* second) {
     if (!first || !second)
         return -1;
@@ -292,8 +289,6 @@ void module_set_next(Module* module, Module* next) {
         module->next = next;
     }
 }
-
-// Parameter Collection
 
 int module_collect_parameters(Module* module, Parameter*** params_out, int* num_params_out,
                               bool recursive) {

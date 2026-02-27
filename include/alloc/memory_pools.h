@@ -98,45 +98,6 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
  */
 void tensor_pool_free(TensorPool* pool);
 
-/**
- * @brief Get tensor from pool
- *
- * @param pool Tensor pool
- * @return Tensor from pool, or NULL if pool exhausted
- */
-Tensor* tensor_pool_get(TensorPool* pool);
-
-/**
- * @brief Return tensor to pool
- *
- * @param pool Tensor pool
- * @param tensor Tensor to return
- * @return 0 on success, negative value on failure
- */
-int tensor_pool_return(TensorPool* pool, Tensor* tensor);
-
-// Tensor Reuse Utilities
-
-/**
- * @brief Reuse tensor memory if possible
- *
- * @param tensor Tensor to reuse
- * @param new_shape New shape
- * @param new_ndim Number of dimensions
- * @return Reused tensor, or NULL if reuse not possible
- */
-Tensor* tensor_reuse(Tensor* tensor, int* new_shape, int new_ndim);
-
-/**
- * @brief Check if tensor can be reused for new shape
- *
- * @param tensor Tensor to check
- * @param new_shape New shape
- * @param new_ndim Number of dimensions
- * @return true if reuse possible, false otherwise
- */
-bool tensor_can_reuse(Tensor* tensor, int* new_shape, int new_ndim);
-
 #ifdef __cplusplus
 }
 #endif

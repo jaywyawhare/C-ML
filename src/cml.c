@@ -46,12 +46,10 @@ static bool g_cml_initialized       = false;
 static int g_cml_init_count         = 0;
 static bool g_cml_atexit_registered = false;
 
-// Global cleanup context list for automatic cleanup
 static CleanupContext** g_cleanup_contexts = NULL;
 static size_t g_num_cleanup_contexts       = 0;
 static size_t g_cleanup_contexts_capacity  = 0;
 
-// Global resource tracking for automatic cleanup
 static Module** g_tracked_modules = NULL;
 static size_t g_num_modules       = 0;
 static size_t g_modules_capacity  = 0;
@@ -230,7 +228,6 @@ static void cml_auto_cleanup(void) {
     g_cml_init_count  = 0;
 }
 
-// Function to register cleanup context for automatic cleanup
 void cml_register_cleanup_context(CleanupContext* ctx) {
     if (!ctx)
         return;
@@ -329,14 +326,6 @@ static void check_and_launch_viz(void) {
     // Fork and exec to avoid blocking the main process if possible,
     // or just use execvp if we want to replace (but we are in a constructor...)
     // Wait, this is a constructor. We shouldn't replace the process!
-    // The original code used execvp which REPLACES the current process.
-    // That means the actual model code wouldn't run!
-    // Ah, the original code was:
-    // char* viz_argv[] = {"python3", (char*)script_path, exe_path, NULL};
-    // execvp("python3", viz_argv);
-
-    // If we execvp, the C program is gone. The python script runs the C program as a subprocess.
-    // So yes, we DO want to replace the current process with the python wrapper.
     execvp("python3", viz_argv);
 
 #else
@@ -794,7 +783,6 @@ Tensor* cml_tensor_1d(const float* data, int size) {
     return tensor_from_data(data, shape, 1, NULL);
 }
 
-// Tensor Operations
 Tensor* cml_add(Tensor* a, Tensor* b) { return tensor_add(a, b); }
 Tensor* cml_sub(Tensor* a, Tensor* b) { return tensor_sub(a, b); }
 Tensor* cml_mul(Tensor* a, Tensor* b) { return tensor_mul(a, b); }
@@ -828,7 +816,6 @@ Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim) {
     return tensor_stack(tensors, num_tensors, dim);
 }
 
-// Neural Network Layers
 Sequential* cml_nn_sequential(void) { return nn_sequential(); }
 Sequential* cml_nn_sequential_add(Sequential* seq, Module* layer) {
     return sequential_add_chain(seq, layer);
@@ -869,7 +856,48 @@ AvgPool2d* cml_nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_
     return nn_avgpool2d(kernel_size, stride, padding, ceil_mode, count_include_pad);
 }
 
-// Optimizers
+Conv1d* cml_nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool use_bias, DType dtype, DeviceType device) {
+    return nn_conv1d(in_channels, out_channels, kernel_size, stride, padding, dilation, use_bias,
+                     dtype, device);
+}
+Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool use_bias, DType dtype, DeviceType device) {
+    return nn_conv3d(in_channels, out_channels, kernel_size, stride, padding, dilation, use_bias,
+                     dtype, device);
+}
+Embedding* cml_nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
+                            DeviceType device) {
+    return nn_embedding(num_embeddings, embedding_dim, padding_idx, dtype, device);
+}
+GroupNorm* cml_nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
+                            DeviceType device) {
+    return nn_groupnorm(num_groups, num_channels, eps, affine, dtype, device);
+}
+RNNCell* cml_nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                         DeviceType device) {
+    return nn_rnn_cell(input_size, hidden_size, use_bias, dtype, device);
+}
+LSTMCell* cml_nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                           DeviceType device) {
+    return nn_lstm_cell(input_size, hidden_size, use_bias, dtype, device);
+}
+GRUCell* cml_nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                         DeviceType device) {
+    return nn_gru_cell(input_size, hidden_size, use_bias, dtype, device);
+}
+MultiHeadAttention* cml_nn_multihead_attention(int embed_dim, int num_heads, float dropout,
+                                               DType dtype, DeviceType device) {
+    return nn_multihead_attention(embed_dim, num_heads, dropout, dtype, device);
+}
+TransformerEncoderLayer* cml_nn_transformer_encoder_layer(int d_model, int nhead,
+                                                          int dim_feedforward, float dropout,
+                                                          DType dtype, DeviceType device) {
+    return nn_transformer_encoder_layer(d_model, nhead, dim_feedforward, dropout, dtype, device);
+}
+ModuleList* cml_nn_module_list(void) { return nn_module_list(); }
+ModuleDict* cml_nn_module_dict(void) { return nn_module_dict(); }
+
 Optimizer* cml_optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                           float beta1, float beta2, float eps) {
     return optim_adam(parameters, num_parameters, lr, weight_decay, beta1, beta2, eps);
@@ -896,7 +924,6 @@ Optimizer* cml_optim_sgd_for_model(Module* model, float lr, float momentum, floa
 void cml_optim_zero_grad(Optimizer* optimizer) { optimizer_zero_grad(optimizer); }
 void cml_optim_step(Optimizer* optimizer) { optimizer_step(optimizer); }
 
-// Loss Functions
 Tensor* cml_nn_mse_loss(Tensor* input, Tensor* target) { return tensor_mse_loss(input, target); }
 Tensor* cml_nn_mae_loss(Tensor* input, Tensor* target) { return tensor_mae_loss(input, target); }
 Tensor* cml_nn_bce_loss(Tensor* input, Tensor* target) { return tensor_bce_loss(input, target); }
@@ -910,7 +937,6 @@ Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target) {
     return tensor_kl_div_loss(input, target);
 }
 
-// Autograd
 void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
     tensor_backward(tensor, gradient, retain_graph, create_graph);
 }
@@ -925,12 +951,7 @@ void cml_set_requires_grad(Tensor* t, bool requires_grad) {
 bool cml_is_leaf(Tensor* t) { return tensor_is_leaf(t); }
 void cml_reset_ir_context(void) { cml_ir_reset_global_context(); }
 
-// ============================================================================
-// JIT Kernel Cache Management
-// ============================================================================
-
-// Forward declarations for kernel cache functions (defined in mlir_kernel_cache.h)
-#ifdef CML_HAS_MLIR
+// Forward declarations for kernel cache functions (defined in kernel_cache.h)
 struct CMLKernelCache;
 struct CMLKernelCache* cml_kernel_cache_get_default(void);
 void cml_kernel_cache_clear_impl(struct CMLKernelCache* cache);
@@ -938,19 +959,15 @@ void cml_kernel_cache_stats_impl(struct CMLKernelCache* cache, size_t* hits, siz
                                  size_t* count, size_t* memory);
 double cml_kernel_cache_hit_rate_impl(struct CMLKernelCache* cache);
 void cml_kernel_cache_print_stats_impl(struct CMLKernelCache* cache);
-#endif
 
 void cml_kernel_cache_clear(void) {
-#ifdef CML_HAS_MLIR
     struct CMLKernelCache* cache = cml_kernel_cache_get_default();
     if (cache) {
         cml_kernel_cache_clear_impl(cache);
     }
-#endif
 }
 
 void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory) {
-#ifdef CML_HAS_MLIR
     struct CMLKernelCache* cache = cml_kernel_cache_get_default();
     if (cache) {
         cml_kernel_cache_stats_impl(cache, hits, misses, count, memory);
@@ -964,42 +981,25 @@ void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t*
         if (memory)
             *memory = 0;
     }
-#else
-    if (hits)
-        *hits = 0;
-    if (misses)
-        *misses = 0;
-    if (count)
-        *count = 0;
-    if (memory)
-        *memory = 0;
-#endif
 }
 
 double cml_kernel_cache_hit_rate(void) {
-#ifdef CML_HAS_MLIR
     struct CMLKernelCache* cache = cml_kernel_cache_get_default();
     if (cache) {
         return cml_kernel_cache_hit_rate_impl(cache);
     }
-#endif
     return 0.0;
 }
 
 void cml_kernel_cache_print_stats(void) {
-#ifdef CML_HAS_MLIR
     struct CMLKernelCache* cache = cml_kernel_cache_get_default();
     if (cache) {
         cml_kernel_cache_print_stats_impl(cache);
     } else {
         printf("Kernel Cache: not initialized\n");
     }
-#else
-    printf("Kernel Cache: MLIR not compiled in\n");
-#endif
 }
 
-// Module Operations
 Tensor* cml_nn_module_forward(Module* module, Tensor* input) {
     return module_forward(module, input);
 }

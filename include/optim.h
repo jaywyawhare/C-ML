@@ -327,6 +327,37 @@ Optimizer* optim_adagrad(Parameter** parameters, int num_parameters, float lr, f
                          float epsilon);
 
 /**
+ * @brief Create AdamW optimizer (Adam with decoupled weight decay)
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param lr Learning rate
+ * @param weight_decay Decoupled weight decay (default: 0.01)
+ * @param beta1 First moment decay rate (default: 0.9)
+ * @param beta2 Second moment decay rate (default: 0.999)
+ * @param epsilon Numerical stability constant (default: 1e-8)
+ * @return New AdamW optimizer, or NULL on failure
+ */
+Optimizer* optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                       float beta1, float beta2, float epsilon);
+
+/**
+ * @brief Create AdaDelta optimizer
+ *
+ * AdaDelta adapts learning rates based on a running window of gradient updates.
+ * It does not require an initial learning rate setting.
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param rho Decay rate for running averages (default: 0.9)
+ * @param weight_decay Weight decay (L2 regularization, default: 0.0)
+ * @param epsilon Numerical stability constant (default: 1e-6)
+ * @return New AdaDelta optimizer, or NULL on failure
+ */
+Optimizer* optim_adadelta(Parameter** parameters, int num_parameters, float rho, float weight_decay,
+                          float epsilon);
+
+/**
  * @brief Create Adam optimizer for a model
  *
  * Automatically collects parameters from the model.

@@ -31,10 +31,6 @@ Tensor* tensor_contiguous(Tensor* t) {
     if (!t)
         return NULL;
 
-    if (t->is_contiguous) {
-        return tensor_clone(t);
-    }
-
     return tensor_clone(t);
 }
 
@@ -51,7 +47,7 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
     }
 
     if (can_reshape_as_view(t, new_shape, new_ndim)) {
-        Tensor* view = malloc(sizeof(Tensor));
+        Tensor* view = calloc(1, sizeof(Tensor));
         if (!view) {
             LOG_ERROR("Failed to allocate memory for tensor view");
             return NULL;
@@ -114,62 +110,6 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
  * @param new_ndim Number of dimensions in new shape
  * @return 0 on success, -1 on failure (will fail via error handler)
  */
-int tensor_reshape_inplace(Tensor* t, int* new_shape, int new_ndim) {
-    if (!t || !new_shape || new_ndim <= 0) {
-        LOG_ERROR("Invalid arguments to tensor_reshape_inplace");
-        return -1;
-    }
-
-    size_t new_numel = tensor_numel(new_shape, new_ndim);
-    if (new_numel != t->numel) {
-        LOG_ERROR("Cannot reshape tensor in-place: numel mismatch (%zu vs %zu). "
-                  "Use tensor_reshape() to create a new tensor.",
-                  new_numel, t->numel);
-        return -1;
-    }
-
-    if (!t->is_contiguous) {
-        LOG_ERROR("Cannot reshape non-contiguous tensor in-place. "
-                  "Use tensor_reshape() to create a contiguous copy first.");
-        return -1;
-    }
-
-    if (!t->owns_data) {
-        LOG_ERROR("Cannot reshape tensor view in-place. "
-                  "Use tensor_reshape() to create a new tensor.");
-        return -1;
-    }
-
-    // Update shape
-    if (t->ndim != new_ndim) {
-        free(t->shape);
-        t->shape = tensor_shape_copy(new_shape, new_ndim);
-        if (!t->shape) {
-            LOG_ERROR("Failed to allocate memory for new shape");
-            return -1;
-        }
-    } else {
-        memcpy(t->shape, new_shape, (size_t)new_ndim * sizeof(int));
-    }
-
-    // Update strides
-    if (t->strides) {
-        free(t->strides);
-    }
-    t->strides = compute_contiguous_strides(new_shape, new_ndim);
-    if (!t->strides) {
-        LOG_ERROR("Failed to compute strides for new shape");
-        return -1;
-    }
-
-    t->ndim          = new_ndim;
-    t->is_contiguous = true;
-
-    LOG_DEBUG("Reshaped tensor in-place: (%d, ...) -> (%d, ...)", t->ndim, new_ndim);
-
-    return 0;
-}
-
 // Create view with custom shape (must have same numel)
 Tensor* tensor_view(Tensor* t, int* new_shape, int new_ndim) {
     // tensor_view is an alias for tensor_reshape with view-only semantics
@@ -183,7 +123,7 @@ Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size
         return NULL;
     }
 
-    Tensor* view = malloc(sizeof(Tensor));
+    Tensor* view = calloc(1, sizeof(Tensor));
     if (!view) {
         LOG_ERROR("Failed to allocate memory for strided view");
         return NULL;

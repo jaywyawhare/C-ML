@@ -12,7 +12,6 @@
 #include <string.h>
 #include <math.h>
 
-// Concatenate tensors along specified dimension
 Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
     if (!tensors || num_tensors <= 0) {
         LOG_ERROR("tensor_concat: invalid input");
@@ -103,7 +102,6 @@ Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
     return output;
 }
 
-// Stack tensors along new dimension
 Tensor* tensor_stack(Tensor** tensors, int num_tensors, int dim) {
     if (!tensors || num_tensors <= 0) {
         LOG_ERROR("tensor_stack: invalid input");
@@ -171,7 +169,6 @@ Tensor* tensor_stack(Tensor** tensors, int num_tensors, int dim) {
     return output;
 }
 
-// Split tensor into multiple tensors
 Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes) {
     if (!tensor || num_splits <= 0) {
         LOG_ERROR("tensor_split: invalid input");
@@ -276,7 +273,6 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
     return results;
 }
 
-// Gather values from tensor using indices
 Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     if (!input || !indices) {
         LOG_ERROR("tensor_gather: invalid input");
@@ -381,7 +377,6 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     return output;
 }
 
-// Scatter values into tensor at specified indices
 Tensor* tensor_scatter(Tensor* input, int dim, Tensor* index, Tensor* src) {
     if (!input || !index || !src) {
         LOG_ERROR("tensor_scatter: invalid input");

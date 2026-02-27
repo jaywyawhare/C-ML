@@ -58,6 +58,10 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/export.h"
 #include "ops/ir/optimization.h"
+#include "ops/ir/aot.h"
+#include "ops/simd_views.h"
+
+#include "ops/ir/fusion_patterns.h"
 
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
@@ -69,6 +73,16 @@
 #include "nn/layers.h"
 
 #include "optim.h"
+#include "nn/model_io.h"
+
+#ifdef CML_HAS_DISTRIBUTED
+#include "distributed/distributed.h"
+#include "distributed/data_parallel.h"
+#include "distributed/pipeline_parallel.h"
+#endif
+
+#include "zoo/zoo.h"
+#include "datasets/datasets.h"
 
 // Global utility functions
 void cml_summary(struct Module* module);
@@ -526,6 +540,29 @@ MaxPool2d* cml_nn_maxpool2d(int kernel_size, int stride, int padding, int dilati
 AvgPool2d* cml_nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode,
                             bool count_include_pad);
 
+// New layer wrappers
+Conv1d* cml_nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool use_bias, DType dtype, DeviceType device);
+Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool use_bias, DType dtype, DeviceType device);
+Embedding* cml_nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
+                            DeviceType device);
+GroupNorm* cml_nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
+                            DeviceType device);
+RNNCell* cml_nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                         DeviceType device);
+LSTMCell* cml_nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                           DeviceType device);
+GRUCell* cml_nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                         DeviceType device);
+MultiHeadAttention* cml_nn_multihead_attention(int embed_dim, int num_heads, float dropout,
+                                               DType dtype, DeviceType device);
+TransformerEncoderLayer* cml_nn_transformer_encoder_layer(int d_model, int nhead,
+                                                          int dim_feedforward, float dropout,
+                                                          DType dtype, DeviceType device);
+ModuleList* cml_nn_module_list(void);
+ModuleDict* cml_nn_module_dict(void);
+
 /**
  * @brief Create an Adam optimizer
  * @param parameters Array of parameters
@@ -723,9 +760,7 @@ bool cml_is_leaf(Tensor* t);
  */
 void cml_reset_ir_context(void);
 
-// ============================================================================
 // JIT Kernel Cache Management
-// ============================================================================
 
 /**
  * @brief Clear the JIT kernel cache

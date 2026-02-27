@@ -21,8 +21,8 @@ typedef enum { DTYPE_FLOAT32, DTYPE_FLOAT64, DTYPE_INT32, DTYPE_INT64, DTYPE_BOO
 
 // Forward declaration for IR (to avoid circular dependency)
 struct IRNode;
-struct CMLIR;
-typedef struct CMLIR* CMLIR_t;
+struct CMLGraph;
+typedef struct CMLGraph* CMLGraph_t;
 
 typedef struct Tensor {
     // Shape info (computed from IR, not execution)
@@ -34,7 +34,7 @@ typedef struct Tensor {
 
     // IR node reference (THE KEY!)
     struct IRNode* ir_node; // Points to IR node in graph
-    CMLIR_t ir_context;     // Which IR graph this belongs to
+    CMLGraph_t ir_context;  // Which IR graph this belongs to
 
     // Execution state (lazy)
     bool is_executed; // Has this been executed?
@@ -232,7 +232,7 @@ int tensor_ensure_executed(Tensor* t); // Explicit execution
  * @param t Input tensor
  * @return IR context
  */
-CMLIR_t tensor_get_ir_context(Tensor* t); // Get IR context
+CMLGraph_t tensor_get_ir_context(Tensor* t); // Get IR context
 
 /**
  * @brief Check if tensor is a scalar (0-dim)
@@ -348,7 +348,7 @@ int tensor_to_device(Tensor* tensor, DeviceType device);
  * @param ir_context IR context
  * @return New tensor facade
  */
-Tensor* tensor_from_ir_node(struct IRNode* node, CMLIR_t ir_context);
+Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context);
 
 #ifdef __cplusplus
 }

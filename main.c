@@ -59,7 +59,6 @@ int main(void) {
         cml_optim_zero_grad(optimizer);
 
         // Forward pass
-        // printf("Epoch %d: Forward...\n", epoch); fflush(stdout);
         Tensor* outputs = cml_nn_module_forward((Module*)model, X);
         if (!outputs) {
             printf("Error: Forward pass failed at epoch %d\n", epoch);

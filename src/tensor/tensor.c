@@ -12,7 +12,6 @@
 #include "core/error_stack.h"
 #include "core/config.h"
 
-// Helper function to resolve config to actual values
 static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType* device) {
     if (!config) {
         *dtype  = DTYPE_FLOAT32;
@@ -28,7 +27,6 @@ static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType*
     }
 }
 
-// Tensor creation functions
 Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape,
                       bool requires_grad) {
     Tensor* t = (Tensor*)malloc(sizeof(Tensor));
@@ -219,7 +217,7 @@ void* tensor_data_ptr(Tensor* t) {
         int ret = cml_ir_execute_up_to(t->ir_context, t->ir_node);
         if (ret == 0) {
             t->is_executed = true;
-            // MLIR execution uses destination-passing style, so data is written
+            // JIT execution uses destination-passing style, so data is written
             // directly to t->data by the JIT function. If data is still NULL,
             // allocate it (shouldn't happen, but be safe).
             if (!t->data && t->numel > 0) {
@@ -477,8 +475,7 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
     }
 }
 
-// Helper function to create Tensor facade from IRNode
-Tensor* tensor_from_ir_node(struct IRNode* node, CMLIR_t ir_context) {
+Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     if (!node || !ir_context)
         return NULL;
 
@@ -555,7 +552,7 @@ int tensor_ensure_executed(Tensor* t) {
     return data ? 0 : -1;
 }
 
-CMLIR_t tensor_get_ir_context(Tensor* t) { return t ? t->ir_context : NULL; }
+CMLGraph_t tensor_get_ir_context(Tensor* t) { return t ? t->ir_context : NULL; }
 
 bool tensor_is_scalar(Tensor* t) { return t && t->ndim == 0; }
 
