@@ -14,10 +14,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-// ============================================================================
-// Platform Detection and Intrinsics Headers
-// ============================================================================
-
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #define CML_X86 1
 #ifdef __SSE__
@@ -47,7 +43,6 @@
 #endif
 #endif
 
-// Dynamic library loading for SLEEF
 #if defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
 #define LIB_LOAD(path) dlopen(path, RTLD_LAZY | RTLD_LOCAL)
@@ -64,9 +59,7 @@
 #define LIB_CLOSE(handle) ((void)0)
 #endif
 
-// ============================================================================
 // SLEEF Function Pointers (dynamically loaded)
-// ============================================================================
 
 static void* g_sleef_handle = NULL;
 static int g_sleef_loaded   = 0;
@@ -87,7 +80,6 @@ typedef __m128 (*sleef_f4_t)(__m128);
 typedef __m128 (*sleef_f4f4_t)(__m128, __m128);
 #endif
 
-// SLEEF AVX function pointers
 #ifdef CML_HAS_AVX_COMPILE
 static sleef_f8_t sleef_expf8   = NULL;
 static sleef_f8_t sleef_logf8   = NULL;
@@ -98,7 +90,6 @@ static sleef_f8_t sleef_tanhf8  = NULL;
 static sleef_f8f8_t sleef_powf8 = NULL;
 #endif
 
-// SLEEF AVX-512 function pointers
 #ifdef CML_HAS_AVX512_COMPILE
 static sleef_f16_t sleef_expf16    = NULL;
 static sleef_f16_t sleef_logf16    = NULL;
@@ -108,10 +99,6 @@ static sleef_f16_t sleef_tanf16    = NULL;
 static sleef_f16_t sleef_tanhf16   = NULL;
 static sleef_f16f16_t sleef_powf16 = NULL;
 #endif
-
-// ============================================================================
-// CPUID for Runtime Detection (x86)
-// ============================================================================
 
 #ifdef CML_X86
 static void cpuid(int info[4], int leaf) {
@@ -144,10 +131,6 @@ static unsigned long long xgetbv(unsigned int index) {
 #endif
 }
 #endif
-
-// ============================================================================
-// SLEEF Library Loading
-// ============================================================================
 
 static int try_load_sleef(void) {
     if (g_sleef_tried)
@@ -192,10 +175,6 @@ static int try_load_sleef(void) {
     }
     return 0;
 }
-
-// ============================================================================
-// Runtime SIMD Detection
-// ============================================================================
 
 static CMLSimdCaps g_caps = {0};
 static int g_caps_init    = 0;
@@ -269,10 +248,6 @@ void cml_print_simd_caps(void) {
     printf("=========================\n\n");
 }
 
-// ============================================================================
-// Polynomial Approximations for Transcendentals
-// ============================================================================
-
 // Constants for exp approximation
 #define EXP_LN2 0.6931471805599453f
 #define EXP_INV_LN2 1.4426950408889634f
@@ -284,12 +259,7 @@ void cml_print_simd_caps(void) {
 #define EXP_C5 0.008333333333333333f
 #define EXP_C6 0.001388888888888889f
 
-// Constants for log approximation
 #define LOG_LN2 0.6931471805599453f
-
-// ============================================================================
-// AVX-512 Implementations
-// ============================================================================
 
 #ifdef CML_HAS_AVX512_COMPILE
 
@@ -685,15 +655,11 @@ static void simd_div_f32_avx512(const float* a, const float* b, float* out, size
 
 #endif // CML_HAS_AVX512_COMPILE
 
-// ============================================================================
-// AVX Implementations
-// ============================================================================
-
 #ifdef CML_HAS_AVX_COMPILE
 
 static inline __m256 exp_poly_avx(__m256 x) {
     // Clamp input to prevent overflow/underflow
-    // exp(88.7) ≈ 3.4e38 (max float), exp(-87.3) ≈ 1e-38 (min normal float)
+    // exp(88.7) ~ 3.4e38 (max float), exp(-87.3) ~ 1e-38 (min normal float)
     __m256 max_val = _mm256_set1_ps(88.0f);
     __m256 min_val = _mm256_set1_ps(-88.0f);
     x              = _mm256_max_ps(_mm256_min_ps(x, max_val), min_val);
@@ -1103,10 +1069,6 @@ static void simd_div_f32_avx(const float* a, const float* b, float* out, size_t 
 
 #endif // CML_HAS_AVX_COMPILE
 
-// ============================================================================
-// SSE Implementations
-// ============================================================================
-
 #ifdef CML_HAS_SSE_COMPILE
 
 static void simd_exp_f32_sse(const float* in, float* out, size_t n) {
@@ -1251,10 +1213,6 @@ static void simd_max_f32_sse(const float* a, const float* b, float* out, size_t 
 
 #endif // CML_HAS_SSE_COMPILE
 
-// ============================================================================
-// ARM NEON Implementations
-// ============================================================================
-
 #ifdef CML_HAS_NEON_COMPILE
 
 static void simd_exp_f32_neon(const float* in, float* out, size_t n) {
@@ -1392,10 +1350,6 @@ static void simd_max_f32_neon(const float* a, const float* b, float* out, size_t
 
 #endif // CML_HAS_NEON_COMPILE
 
-// ============================================================================
-// Scalar Fallback Implementations
-// ============================================================================
-
 static void simd_exp_f32_scalar(const float* in, float* out, size_t n) {
     for (size_t i = 0; i < n; i++)
         out[i] = expf(in[i]);
@@ -1506,10 +1460,6 @@ static void simd_div_f32_scalar(const float* a, const float* b, float* out, size
     for (size_t i = 0; i < n; i++)
         out[i] = a[i] / (b[i] + 1e-8f);
 }
-
-// ============================================================================
-// Public API - Runtime Dispatch
-// ============================================================================
 
 void simd_exp_f32(const float* in, float* out, size_t n) {
     if (!in || !out || n == 0)
@@ -2116,9 +2066,7 @@ void simd_div_f32(const float* a, const float* b, float* out, size_t n) {
     simd_div_f32_scalar(a, b, out, n);
 }
 
-// ============================================================================
 // Matrix Transpose (Cache-Blocked)
-// ============================================================================
 
 void simd_transpose_f32(const float* in, float* out, int rows, int cols) {
     if (!in || !out || rows <= 0 || cols <= 0)
@@ -2140,9 +2088,7 @@ void simd_transpose_f32(const float* in, float* out, int rows, int cols) {
     }
 }
 
-// ============================================================================
 // Broadcast Operations (SIMD-accelerated)
-// ============================================================================
 
 void simd_add_scalar_f32(const float* a, float scalar, float* out, size_t n) {
     if (!a || !out || n == 0)
@@ -2329,17 +2275,12 @@ void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
     }
 }
 
-// ============================================================================
-// Parallel Operations
-// ============================================================================
-
 #include "backend/threadpool.h"
 
 static size_t g_parallel_threshold = 10000; // Min elements for parallel execution
 
 void simd_set_parallel_threshold(size_t threshold) { g_parallel_threshold = threshold; }
 
-// Parallel add task data
 typedef struct {
     const float* a;
     const float* b;
@@ -2395,7 +2336,6 @@ void simd_mul_f32_parallel(const float* a, const float* b, float* out, size_t n)
     threadpool_parallel_for(pool, parallel_mul_task, &data, n);
 }
 
-// Parallel exp task data
 typedef struct {
     const float* in;
     float* out;
@@ -2425,7 +2365,6 @@ void simd_exp_f32_parallel(const float* in, float* out, size_t n) {
     threadpool_parallel_for(pool, parallel_exp_task, &data, n);
 }
 
-// Parallel sum reduction
 typedef struct {
     const float* data;
     float* partial_sums;

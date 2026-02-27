@@ -17,9 +17,7 @@
 extern "C" {
 #endif
 
-// ============================================================================
 // Runtime SIMD Capability Detection
-// ============================================================================
 
 /**
  * @brief SIMD capability flags detected at runtime
@@ -51,9 +49,7 @@ const CMLSimdCaps* cml_get_simd_caps(void);
  */
 void cml_print_simd_caps(void);
 
-// ============================================================================
 // Unary Math Operations (Vectorized)
-// ============================================================================
 
 /**
  * @brief Vectorized exponential: out[i] = exp(in[i])
@@ -151,9 +147,7 @@ void simd_sigmoid_f32(const float* in, float* out, size_t n);
  */
 void simd_neg_f32(const float* in, float* out, size_t n);
 
-// ============================================================================
 // Binary Math Operations (Vectorized)
-// ============================================================================
 
 /**
  * @brief Vectorized power: out[i] = a[i]^b[i]
@@ -236,9 +230,7 @@ void simd_mul_f32(const float* a, const float* b, float* out, size_t n);
  */
 void simd_div_f32(const float* a, const float* b, float* out, size_t n);
 
-// ============================================================================
 // Ternary Operations (Vectorized)
-// ============================================================================
 
 /**
  * @brief Vectorized conditional select: out[i] = cond[i] != 0 ? a[i] : b[i]
@@ -250,9 +242,7 @@ void simd_div_f32(const float* a, const float* b, float* out, size_t n);
  */
 void simd_where_f32(const float* cond, const float* a, const float* b, float* out, size_t n);
 
-// ============================================================================
 // Matrix/Tensor Operations
-// ============================================================================
 
 /**
  * @brief Cache-blocked matrix transpose
@@ -263,9 +253,7 @@ void simd_where_f32(const float* cond, const float* a, const float* b, float* ou
  */
 void simd_transpose_f32(const float* in, float* out, int rows, int cols);
 
-// ============================================================================
 // Broadcast Operations (SIMD-accelerated)
-// ============================================================================
 
 /**
  * @brief Broadcast scalar addition: out[i] = a[i] + scalar
@@ -301,9 +289,7 @@ void simd_mul_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
 void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b_n, float* out,
                             size_t out_n);
 
-// ============================================================================
 // Parallel Operations (multi-threaded)
-// ============================================================================
 
 /**
  * @brief Set minimum array size for parallel execution (default: 10000)

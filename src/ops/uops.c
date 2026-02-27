@@ -16,13 +16,11 @@
 #include <math.h>
 #include <stdio.h>
 
-// Forward declaration
-
 Tensor* uop_add(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
     // UOps ONLY create IR nodes, never execute!
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -42,7 +40,7 @@ Tensor* uop_add(Tensor* a, Tensor* b) {
 Tensor* uop_sub(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -62,7 +60,7 @@ Tensor* uop_sub(Tensor* a, Tensor* b) {
 Tensor* uop_mul(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -82,7 +80,7 @@ Tensor* uop_mul(Tensor* a, Tensor* b) {
 Tensor* uop_div(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -118,7 +116,7 @@ Tensor* uop_max(Tensor* a, Tensor* b) {
         return NULL;
 
     // Lazy: use IR
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {
         free(out_shape);
         return NULL;
@@ -162,7 +160,7 @@ Tensor* uop_cmplt(Tensor* a, Tensor* b) {
         return NULL;
 
     // UOps ONLY create IR nodes, never execute! (Lazy evaluation like PyTorch)
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {
         free(out_shape);
         return NULL;
@@ -192,7 +190,7 @@ Tensor* uop_cmplt(Tensor* a, Tensor* b) {
 Tensor* uop_neg(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -211,7 +209,7 @@ Tensor* uop_neg(Tensor* a) {
 Tensor* uop_exp(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -230,7 +228,7 @@ Tensor* uop_exp(Tensor* a) {
 Tensor* uop_log(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -249,7 +247,7 @@ Tensor* uop_log(Tensor* a) {
 Tensor* uop_sqrt(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -285,7 +283,7 @@ Tensor* uop_recip(Tensor* a) {
 Tensor* uop_abs(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -304,7 +302,7 @@ Tensor* uop_abs(Tensor* a) {
 Tensor* uop_sin(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -323,7 +321,7 @@ Tensor* uop_sin(Tensor* a) {
 Tensor* uop_cos(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -342,7 +340,7 @@ Tensor* uop_cos(Tensor* a) {
 Tensor* uop_tan(Tensor* a) {
     if (!a)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a};
@@ -361,7 +359,7 @@ Tensor* uop_tan(Tensor* a) {
 Tensor* uop_pow(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[] = {a, b};
@@ -385,13 +383,34 @@ Tensor* uop_sum(Tensor* a, ReduceParams* params) {
     }
 
     // UOps ONLY create IR nodes, never execute!
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
-    Tensor* inputs[] = {a};
-    if (cml_ir_add_uop(ir, UOP_SUM, inputs, 1, params) != 0)
+    // Deep copy params for IR node ownership (params may be stack-allocated)
+    ReduceParams* new_params = malloc(sizeof(ReduceParams));
+    if (!new_params)
         return NULL;
+    new_params->keepdim  = params ? params->keepdim : false;
+    new_params->num_dims = params ? params->num_dims : 0;
+    if (params && params->dims && params->num_dims > 0) {
+        new_params->dims = malloc((size_t)params->num_dims * sizeof(int));
+        if (!new_params->dims) {
+            free(new_params);
+            return NULL;
+        }
+        memcpy(new_params->dims, params->dims, (size_t)params->num_dims * sizeof(int));
+    } else {
+        new_params->dims     = NULL;
+        new_params->num_dims = 0;
+    }
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_SUM, inputs, 1, new_params) != 0) {
+        free(new_params->dims);
+        free(new_params);
+        return NULL;
+    }
 
     struct IRNode* node = cml_ir_get_tail(ir);
 
@@ -451,7 +470,7 @@ Tensor* uop_max_reduce(Tensor* a, ReduceParams* params) {
     }
 
     // UOps ONLY create IR nodes, never execute! (Lazy evaluation like PyTorch)
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -541,7 +560,7 @@ Tensor* uop_mean(Tensor* a, ReduceParams* params) {
     }
 
     // UOps ONLY create IR nodes, never execute!
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -633,7 +652,7 @@ Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
     Tensor* result = tensor_reshape(a, params->new_shape, params->new_ndim);
 
     if (result) {
-        CMLIR_t ir = cml_ir_get_or_create_context();
+        CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
             // Deep copy params
             ReshapeParams* new_params = malloc(sizeof(ReshapeParams));
@@ -702,7 +721,7 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
     free(used);
 
     // UOps ONLY create IR nodes, never execute!
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -836,7 +855,7 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params) {
     free(new_strides);
 
     if (result) {
-        CMLIR_t ir = cml_ir_get_or_create_context();
+        CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
             // Deep copy params
             ExpandParams* new_params = malloc(sizeof(ExpandParams));
@@ -889,7 +908,7 @@ Tensor* uop_stride(Tensor* a, StrideParams* params) {
         tensor_as_strided(a, a->shape, a->ndim, params->new_strides, a->storage_offset);
 
     if (result) {
-        CMLIR_t ir = cml_ir_get_or_create_context();
+        CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
             // Deep copy params
             StrideParams* new_params = malloc(sizeof(StrideParams));
@@ -1004,7 +1023,7 @@ Tensor* uop_slice(Tensor* a, SliceParams* params) {
         free(strides);
 
     if (result) {
-        CMLIR_t ir = cml_ir_get_or_create_context();
+        CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
             // Deep copy params
             SliceParams* new_params = malloc(sizeof(SliceParams));
@@ -1182,7 +1201,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
     params_copy->dilation[1]    = dilation_w;
     params_copy->groups         = params ? params->groups : 1;
 
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {
         conv2d_params_free_local(params_copy);
         return NULL;
@@ -1215,7 +1234,7 @@ Tensor* uop_fill(int* shape, int ndim, float value) {
     }
 
     // UOps ONLY create IR nodes, never execute! (Lazy evaluation)
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -1280,7 +1299,7 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
     }
 
     // UOps ONLY create IR nodes, never execute! (Lazy evaluation)
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -1379,7 +1398,7 @@ Tensor* uop_sigmoid(Tensor* x) {
         return NULL;
     }
 
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
@@ -1412,7 +1431,7 @@ Tensor* uop_tanh(Tensor* x) {
         return NULL;
     }
 
-    CMLIR_t ir = cml_ir_get_or_create_context();
+    CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
 
