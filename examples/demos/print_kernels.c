@@ -14,15 +14,6 @@
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
-#include "ops/ir/mlir/mlir_codegen.h"
-#include "ops/ir/mlir/mlir_backend.h"
-#include "ops/ir/mlir/mlir_context.h"
-#include "ops/ir/mlir/mlir_convert.h"
-
-// Forward declaration for dump function (implemented in C++ bridge)
-#ifdef CML_HAS_MLIR
-char* cml_mlir_dump_module(void* mlir_module);
-#endif
 
 static void print_separator(const char* title) {
     printf("\n");
@@ -31,184 +22,7 @@ static void print_separator(const char* title) {
     printf("================================================================================\n\n");
 }
 
-static void print_mlir_module(CMLIR_t ir) {
-    print_separator("MLIR Module (High-Level IR)");
-
-#ifdef CML_HAS_MLIR
-    if (ir && ir->mlir_ctx) {
-        // Access the module from the context
-        typedef struct {
-            void* context;
-            void* location;
-            void* module;
-            // ... other fields
-        } MLIRCtxInternal;
-
-        MLIRCtxInternal* ctx = (MLIRCtxInternal*)ir->mlir_ctx;
-        char* mlir_str       = cml_mlir_dump_module(ctx->module);
-        if (mlir_str) {
-            printf("%s\n", mlir_str);
-            free(mlir_str);
-        } else {
-            printf("  (Failed to dump MLIR module)\n");
-        }
-    } else {
-        printf("  (No MLIR context available)\n");
-    }
-#else
-    printf("  (MLIR not compiled in)\n");
-    (void)ir;
-#endif
-}
-
-static void print_llvm_ir(CMLIR_t ir) {
-    print_separator("LLVM IR (CPU Backend)");
-
-#ifdef CML_HAS_MLIR
-    if (ir && ir->mlir_ctx) {
-        typedef struct {
-            void* context;
-            void* location;
-            void* module;
-        } MLIRCtxInternal;
-
-        MLIRCtxInternal* ctx = (MLIRCtxInternal*)ir->mlir_ctx;
-        char* llvm_ir        = cml_mlir_gen_llvm_ir(ctx->module);
-        if (llvm_ir) {
-            printf("%s\n", llvm_ir);
-            free(llvm_ir);
-        } else {
-            printf("  (Failed to generate LLVM IR - lowering may have failed)\n");
-        }
-    } else {
-        printf("  (No MLIR context available)\n");
-    }
-#else
-    printf("  (MLIR not compiled in)\n");
-    (void)ir;
-#endif
-}
-
-static void print_cuda_ptx(CMLIR_t ir) {
-    print_separator("CUDA PTX (NVIDIA GPU Backend)");
-
-#ifdef CML_HAS_MLIR
-    if (ir && ir->mlir_ctx) {
-        typedef struct {
-            void* context;
-            void* location;
-            void* module;
-        } MLIRCtxInternal;
-
-        MLIRCtxInternal* ctx = (MLIRCtxInternal*)ir->mlir_ctx;
-        char* ptx            = cml_mlir_gen_ptx(ctx->module);
-        if (ptx) {
-            printf("%s\n", ptx);
-            free(ptx);
-        } else {
-            printf("  (PTX generation not implemented or GPU dialect not used)\n");
-        }
-    } else {
-        printf("  (No MLIR context available)\n");
-    }
-#else
-    printf("  (MLIR not compiled in)\n");
-    (void)ir;
-#endif
-}
-
-static void print_spirv(CMLIR_t ir) {
-    print_separator("SPIR-V (Vulkan Backend)");
-
-#ifdef CML_HAS_MLIR
-    if (ir && ir->mlir_ctx) {
-        typedef struct {
-            void* context;
-            void* location;
-            void* module;
-        } MLIRCtxInternal;
-
-        MLIRCtxInternal* ctx = (MLIRCtxInternal*)ir->mlir_ctx;
-        size_t size          = 0;
-        uint32_t* spirv      = cml_mlir_gen_spirv(ctx->module, &size);
-        if (spirv && size > 0) {
-            printf("  SPIR-V Binary (%zu bytes, %zu words):\n", size, size / 4);
-            printf("  Magic: 0x%08X\n", spirv[0]);
-            printf("  Version: %d.%d\n", (spirv[1] >> 16) & 0xFF, (spirv[1] >> 8) & 0xFF);
-            printf("  Generator: 0x%08X\n", spirv[2]);
-            printf("  Bound: %u\n", spirv[3]);
-            printf("  ...\n");
-            printf("  (Full binary: %zu words)\n", size / 4);
-            free(spirv);
-        } else {
-            printf("  (SPIR-V generation not implemented or SPIRV dialect not used)\n");
-        }
-    } else {
-        printf("  (No MLIR context available)\n");
-    }
-#else
-    printf("  (MLIR not compiled in)\n");
-    (void)ir;
-#endif
-}
-
-static void print_metal_msl(CMLIR_t ir) {
-    print_separator("Metal Shading Language (Apple GPU Backend)");
-
-#ifdef CML_HAS_MLIR
-    if (ir && ir->mlir_ctx) {
-        typedef struct {
-            void* context;
-            void* location;
-            void* module;
-        } MLIRCtxInternal;
-
-        MLIRCtxInternal* ctx = (MLIRCtxInternal*)ir->mlir_ctx;
-        char* msl            = cml_mlir_gen_metal(ctx->module);
-        if (msl) {
-            printf("%s\n", msl);
-            free(msl);
-        } else {
-            printf("  (MSL generation not implemented)\n");
-        }
-    } else {
-        printf("  (No MLIR context available)\n");
-    }
-#else
-    printf("  (MLIR not compiled in)\n");
-    (void)ir;
-#endif
-}
-
-static void print_wgsl(CMLIR_t ir) {
-    print_separator("WGSL (WebGPU Shading Language)");
-
-#ifdef CML_HAS_MLIR
-    if (ir && ir->mlir_ctx) {
-        typedef struct {
-            void* context;
-            void* location;
-            void* module;
-        } MLIRCtxInternal;
-
-        MLIRCtxInternal* ctx = (MLIRCtxInternal*)ir->mlir_ctx;
-        char* wgsl           = cml_mlir_gen_wgsl(ctx->module);
-        if (wgsl) {
-            printf("%s\n", wgsl);
-            free(wgsl);
-        } else {
-            printf("  (WGSL generation not implemented)\n");
-        }
-    } else {
-        printf("  (No MLIR context available)\n");
-    }
-#else
-    printf("  (MLIR not compiled in)\n");
-    (void)ir;
-#endif
-}
-
-static void print_cpu_fallback_pseudocode(CMLIR_t ir) {
+static void print_cpu_fallback_pseudocode(CMLGraph_t ir) {
     print_separator("CPU Fallback (Interpreter Pseudocode)");
 
     if (!ir || !ir->head) {
@@ -350,36 +164,14 @@ int main(int argc, char* argv[]) {
     }
 
     // Create IR and add matmul operation
-    CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+    CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     cml_ir_set_global_context(ir);
 
     // Add matmul to IR
     tensor_matmul(A, B);
 
-#ifdef CML_HAS_MLIR
-    // Initialize MLIR context and convert IR
-    printf("Initializing MLIR and converting IR...\n");
-    CMLMLIRContext* mlir_ctx = cml_mlir_init();
-    if (mlir_ctx) {
-        ir->mlir_ctx = mlir_ctx;
-        if (cml_ir_to_mlir(mlir_ctx, ir)) {
-            printf("MLIR conversion complete.\n");
-        } else {
-            printf("MLIR conversion failed.\n");
-        }
-    } else {
-        printf("Failed to initialize MLIR context.\n");
-    }
-#endif
-
-    // Print all kernel representations
+    // Print CPU pseudocode representation
     print_cpu_fallback_pseudocode(ir);
-    print_mlir_module(ir);
-    print_llvm_ir(ir);
-    print_cuda_ptx(ir);
-    print_spirv(ir);
-    print_metal_msl(ir);
-    print_wgsl(ir);
 
     // Cleanup
     cml_ir_free(ir);

@@ -14,7 +14,7 @@
  *   VIZ=1 ./simple_xor  (with visualization)
  */
 
-#include <cml/cml.h>
+#include "cml.h"
 #include <stdio.h>
 
 #if defined(_WIN32)
@@ -144,7 +144,7 @@ int main() {
         }
     }
 
-    printf("\n✓ Training complete!\n\n");
+    printf("\nTraining complete!\n\n");
 
     // Test the trained model
     printf("Testing predictions:\n");
@@ -164,7 +164,7 @@ int main() {
         correct += is_correct;
 
         printf("[%.0f, %.0f]\t\t%.4f\t\t%.0f\t\t%s\n", X_data[i * 2], X_data[i * 2 + 1], pred,
-               expected, is_correct ? "✓" : "✗");
+               expected, is_correct ? "PASS" : "FAIL");
     }
 
     float test_accuracy = (float)correct / 4.0f;

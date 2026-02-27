@@ -10,7 +10,7 @@
  *   ./hello_cml
  */
 
-#include <cml/cml.h>
+#include "cml.h"
 #include <stdio.h>
 
 int main() {
@@ -18,20 +18,20 @@ int main() {
 
     // Initialize C-ML
     cml_init();
-    printf("✓ C-ML initialized successfully!\n\n");
+    printf("C-ML initialized successfully!\n\n");
 
     // Create a simple tensor
     float data[] = {1.0f, 2.0f, 3.0f, 4.0f};
     int shape[]  = {2, 2};
-    Tensor* t    = cml_tensor(data, shape, 2, NULL);
-    printf("✓ Created a 2x2 tensor\n\n");
+    cml_tensor(data, shape, 2, NULL);
+    printf("Created a 2x2 tensor\n\n");
 
     // Create a simple neural network
     Sequential* model = cml_nn_sequential();
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(10, 5, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(5, 2, DTYPE_FLOAT32, DEVICE_CPU, true));
-    printf("✓ Created a neural network (10 -> 5 -> 2)\n\n");
+    printf("Created a neural network (10 -> 5 -> 2)\n\n");
 
     // Print model summary
     printf("Model Summary:\n");

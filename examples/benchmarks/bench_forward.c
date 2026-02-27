@@ -5,9 +5,8 @@
 
 #include "cml.h"
 #include "nn/layers/sequential.h"
-#include "ops/ir/mlir/mlir_execute.h"
-#include "ops/ir/graph_cache.h"
 #include "ops/ir/execution.h"
+#include "ops/ir/graph_cache.h"
 #include "ops/ir/context.h"
 #include "ops/simd_math.h"
 #include "backend/blas.h"
@@ -80,10 +79,6 @@ int main(void) {
 
     // Graph caching is available but currently slower than direct execution
     // due to BLAS matmul dominating execution time. Useful when:
-    // - BLAS is not available (interpreter fallback)
-    // - Larger models with more graph overhead
-    // - GPU execution with kernel launch overhead
-    // sequential_enable_graph_cache(model, true);
 
     cml_summary((Module*)model);
 

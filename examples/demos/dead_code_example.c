@@ -34,9 +34,7 @@ int main(void) {
 
     printf("Input shapes: [%d, %d]\n\n", shape[0], shape[1]);
 
-    // ============================================
     // DEAD CODE: These operations are never used
-    // ============================================
     printf("Creating dead code (unused operations)...\n");
 
     // Dead branch 1: computed but never used in final result
@@ -50,10 +48,8 @@ int main(void) {
 
     printf("  - Created 5 dead nodes (will be eliminated)\n");
 
-    // ============================================
     // UNOPTIMIZED: Chain of element-wise ops
     // These can be fused into a single kernel
-    // ============================================
     printf("\nCreating unoptimized element-wise chain...\n");
 
     // Unoptimized chain: x * w2 + bias -> relu -> * 2 -> + 1
@@ -71,9 +67,7 @@ int main(void) {
 
     printf("  - Created chain of 5 element-wise ops (can be fused)\n");
 
-    // ============================================
     // REDUNDANT: Duplicate computations
-    // ============================================
     printf("\nCreating redundant computations...\n");
 
     // These compute the same thing - CSE can eliminate
@@ -83,9 +77,7 @@ int main(void) {
 
     printf("  - Created 2 redundant mul ops (CSE opportunity)\n");
 
-    // ============================================
     // FINAL RESULT: Only this path matters
-    // ============================================
     printf("\nComputing final result...\n");
 
     // Combine the live computation with redundant one
@@ -98,9 +90,7 @@ int main(void) {
     float value = tensor_get_float(output, 0);
     printf("\nFinal output value: %.6f\n", value);
 
-    // ============================================
     // EXPORT IR FOR VISUALIZATION
-    // ============================================
     printf("\n=== Exporting IR Analysis ===\n");
 
     if (output->ir_context) {

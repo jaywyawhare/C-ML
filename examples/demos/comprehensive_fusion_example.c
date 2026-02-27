@@ -18,13 +18,11 @@
 
 int main(void) {
     cml_init();
-    // Enable debug logging to see optimization details
-    // cml_set_log_level(LOG_LEVEL_DEBUG);
 
     printf("=== Comprehensive Fusion Example ===\n\n");
 
     // Create IR context for CUDA generation
-    CMLIR_t ir = cml_ir_new(IR_TARGET_CUDA);
+    CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
     if (!ir) {
         fprintf(stderr, "Failed to create IR context\n");
         cml_cleanup();

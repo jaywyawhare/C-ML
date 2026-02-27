@@ -1,169 +1,217 @@
 # C-ML Examples
 
-This directory contains example programs showing how to use the C-ML library.
+## Building
 
-## Quick Start
-
-After building and installing C-ML:
+All examples are built automatically when using CMake with `-DBUILD_EXAMPLES=ON`:
 
 ```bash
-# Compile an example
-gcc simple_xor.c -I/usr/local/include/cml -lcml -lm -o simple_xor
-
-# Run it
-./simple_xor
-
-# Run with visualization
-VIZ=1 ./simple_xor
+mkdir -p build && cd build
+cmake -DBUILD_EXAMPLES=ON ..
+make -j$(nproc)
 ```
 
-## Examples
+Binaries are placed in `build/`.
 
-### `simple_xor.c` - XOR Neural Network
-**Difficulty:** Beginner
-**Topics:** Basic neural network, training loop, predictions
+## Tutorials
 
-A complete example showing how to:
-- Create a simple feedforward network
-- Train on the XOR problem
-- Make predictions
-- Evaluate accuracy
+Step-by-step examples that progressively introduce CML features.
 
-**Compile:**
-```bash
-gcc simple_xor.c -lcml -lm -o simple_xor
-```
+### hello_cml -- Minimal Example
 
-**Expected output:**
-```
-=== C-ML Simple XOR Example ===
-
-Training data created: 4 samples
-
-Model architecture:
-...
-
-Starting training...
-Epoch           Loss
------           ----
-0               0.250000
-100             0.123456
-...
-1000            0.001234
-
-✓ Training complete!
-
-Testing predictions:
-Input           Prediction      Expected        Correct?
------           ----------      --------        --------
-[0, 0]          0.0123          0               ✓
-[0, 1]          0.9876          1               ✓
-[1, 0]          0.9845          1               ✓
-[1, 1]          0.0234          0               ✓
-
-Accuracy: 4/4 (100%)
-```
-
-### Other Examples
-
-The following examples are also available in this directory:
-
-- **`autograd_example.c`** - Demonstrates automatic differentiation
-- **`training_loop_example.c`** - Advanced training loop with metrics
-- **`bench_gemm.c`** - Matrix multiplication benchmarks
-- **`export_graph.c`** - Export computation graph for visualization
-- **`early_stopping_lr_scheduler.c`** - Training with early stopping and learning rate scheduling
-
-## Building All Examples
-
-You can build all examples at once:
+Minimal forward pass through a linear layer. Good starting point.
 
 ```bash
-# From the C-ML root directory
-make all
-
-# Examples will be in build/examples/
-ls build/examples/
+./build/hello_cml
 ```
 
-Or build them individually:
+### simple_xor -- XOR Training
+
+Classic XOR problem with a full training loop. Demonstrates the complete train-evaluate cycle.
 
 ```bash
-# From the examples directory
-gcc simple_xor.c -I../include -L../build -lcml -lm -o simple_xor
+./build/simple_xor
 ```
 
-## Using Examples as Templates
+### ex01 -- Tensor Operations
 
-These examples are designed to be used as templates for your own projects:
+Basic tensor creation, element-wise arithmetic, reductions, and shape manipulation. No dataset required.
 
-1. **Copy the example** to your project directory
-2. **Modify** the network architecture and training data
-3. **Compile** using the same command
-4. **Run** and iterate
-
-## Common Patterns
-
-### Creating a Model
-```c
-Sequential* model = cml_nn_sequential();
-cml_nn_sequential_add(model, (Module*)cml_nn_linear(input_size, hidden_size, DTYPE_FLOAT32, DEVICE_CPU, true));
-cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
-cml_nn_sequential_add(model, (Module*)cml_nn_linear(hidden_size, output_size, DTYPE_FLOAT32, DEVICE_CPU, true));
-```
-
-### Training Loop
-```c
-for (int epoch = 0; epoch < num_epochs; epoch++) {
-    // Forward
-    Tensor* output = cml_nn_sequential_forward(model, X);
-    Tensor* loss = cml_nn_mse_loss(output, y);
-
-    // Backward
-    cml_optim_zero_grad(optimizer);
-    cml_backward(loss, NULL, false, false);
-    cml_optim_step(optimizer);
-}
-```
-
-### Creating Tensors
-```c
-float data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-int shape[] = {2, 2};
-Tensor* t = cml_tensor(data, shape, 2, NULL);
-```
-
-## Troubleshooting
-
-### "cannot find -lcml"
-Make sure C-ML is installed or specify the library path:
 ```bash
-gcc simple_xor.c -I../include -L../build -lcml -lm -o simple_xor
+./build/ex01_tensor_ops
 ```
 
-### "error while loading shared libraries"
-Add the library path to LD_LIBRARY_PATH:
+### ex02 -- Linear Regression
+
+Linear regression trained with SGD on the Boston Housing dataset. Demonstrates `cml_dataset_load()`, `dataset_normalize()`, and `dataset_split()`.
+
 ```bash
-export LD_LIBRARY_PATH=../build:$LD_LIBRARY_PATH
-./simple_xor
+./build/ex02_linear_regression
 ```
 
-Or use the static library:
+### ex03 -- Logistic Regression
+
+Binary classification using sigmoid + BCE loss on the Breast Cancer dataset.
+
 ```bash
-gcc simple_xor.c -I../include ../build/libcml.a -lm -o simple_xor
+./build/ex03_logistic_regression
 ```
 
-## Next Steps
+### ex04 -- MLP Classifier
 
-1. Try running `simple_xor.c` first
-2. Modify it to solve a different problem
-3. Check out the more advanced examples
-4. Read the [USAGE.md](../USAGE.md) guide for more details
+Multi-class classification with a 2-layer MLP on the Iris dataset. Shows Sequential model building and MSE training.
 
-## Contributing
+```bash
+./build/ex04_mlp_classifier
+```
 
-Have a cool example? Submit a pull request! Good examples:
-- Solve a specific problem clearly
-- Are well-commented
-- Include compilation instructions
-- Show best practices
+### ex05 -- Autoencoder
+
+Autoencoder with an encoder-decoder architecture and bottleneck layer. Trained on Digits 8x8 images.
+
+```bash
+./build/ex05_autoencoder
+```
+
+### ex06 -- Image Classification
+
+Image classification MLP that processes 8x8 digit images using raw pixel features. Uses Digits dataset with BCE loss.
+
+```bash
+./build/ex06_conv_net
+```
+
+### ex07 -- RNN Sequence Prediction
+
+RNN-based time series prediction on the Airline passengers dataset. Demonstrates `cml_nn_rnn_cell()` with sliding window input.
+
+```bash
+./build/ex07_rnn_sequence
+```
+
+### ex08 -- LSTM Time Series
+
+LSTM-based time series forecasting on Airline data. Shows `cml_nn_lstm_cell()` with hidden and cell state management.
+
+```bash
+./build/ex08_lstm_timeseries
+```
+
+### ex09 -- GRU Classifier
+
+GRU-based sequence classifier on the Iris dataset. Demonstrates `cml_nn_gru_cell()` processing features as a sequence.
+
+```bash
+./build/ex09_gru_classifier
+```
+
+### ex10 -- Embedding
+
+Embedding lookup table demo. Shows `cml_nn_embedding()` for mapping integer indices to dense vectors.
+
+```bash
+./build/ex10_embedding
+```
+
+### ex11 -- GAN
+
+Generative Adversarial Network with separate generator and discriminator networks. Trained on Digits 8x8.
+
+```bash
+./build/ex11_gan
+```
+
+### ex12 -- Multi-Task Learning
+
+Multi-task learning with shared layers and task-specific heads. Uses the Wine dataset with two prediction targets.
+
+```bash
+./build/ex12_multi_task
+```
+
+### ex13 -- Transformer Encoder
+
+Demonstrates `cml_nn_multihead_attention()` and `cml_nn_transformer_encoder_layer()` with self-attention on synthetic sequences.
+
+```bash
+./build/ex13_transformer
+```
+
+### ex14 -- LR Scheduler Comparison
+
+Compares learning rate schedulers (Step, Exponential, Cosine, ReduceOnPlateau) side-by-side on Boston Housing regression.
+
+```bash
+./build/ex14_lr_scheduler
+```
+
+### ex15 -- Activation Functions Showcase
+
+Trains separate networks using all 12 activation functions (ReLU, Sigmoid, Tanh, LeakyReLU, GELU, ELU, SELU, SiLU, Mish, HardSwish, Softmax, LogSoftmax) and compares convergence.
+
+```bash
+./build/ex15_activations_showcase
+```
+
+## Benchmarks
+
+Performance measurement tools.
+
+### bench_forward -- Forward Pass Benchmark
+
+Benchmarks forward pass throughput for various layer types and sizes.
+
+```bash
+./build/bench_forward
+```
+
+### bench_gemm -- GEMM Benchmark
+
+Benchmarks general matrix multiply (GEMM) performance across different matrix sizes.
+
+```bash
+./build/bench_gemm
+```
+
+## Demos
+
+Feature demonstrations and advanced usage patterns.
+
+| Demo | Description |
+|------|-------------|
+| `autograd_example` | Automatic differentiation and gradient computation |
+| `auto_capture_example` | Automatic graph capture for optimization |
+| `comprehensive_fusion_example` | IR fusion pass demonstration |
+| `dead_code_example` | Dead code elimination optimization |
+| `early_stopping_lr_scheduler` | Early stopping with learning rate scheduling |
+| `export_graph` | Export computation graph to DOT format |
+| `mnist_example` | MNIST digit classification |
+| `print_kernels` | Print generated IR kernels |
+| `training_loop_example` | Complete training loop with metrics |
+
+Run any demo:
+
+```bash
+./build/<demo_name>
+```
+
+## Summary Table
+
+| Example | Task | Dataset | Key APIs |
+|---------|------|---------|----------|
+| ex01 | Tensor ops | -- | `cml_add`, `cml_matmul`, `cml_sum` |
+| ex02 | Regression | Boston Housing | `cml_dataset_load`, `cml_optim_sgd` |
+| ex03 | Binary classification | Breast Cancer | `cml_nn_bce_loss`, `cml_nn_sigmoid` |
+| ex04 | Multi-class classification | Iris | `cml_nn_sequential`, `cml_nn_linear` |
+| ex05 | Autoencoder | Digits 8x8 | `cml_nn_sequential`, bottleneck |
+| ex06 | Image classification | Digits 8x8 | `cml_nn_linear`, `cml_nn_relu` |
+| ex07 | Time series | Airline | `cml_nn_rnn_cell` |
+| ex08 | Time series | Airline | `cml_nn_lstm_cell` |
+| ex09 | Sequence classification | Iris | `cml_nn_gru_cell` |
+| ex10 | Embedding | -- | `cml_nn_embedding` |
+| ex11 | Generative | Digits 8x8 | GAN training loop |
+| ex12 | Multi-task | Wine | Shared layers |
+| ex13 | Self-attention | -- | `cml_nn_transformer_encoder_layer` |
+| ex14 | Scheduler comparison | Boston Housing | `lr_scheduler_*` |
+| ex15 | Activation comparison | Breast Cancer | All activation layers |
+| hello_cml | Forward pass | -- | `cml_nn_linear` |
+| simple_xor | Full training | XOR | Complete training loop |
