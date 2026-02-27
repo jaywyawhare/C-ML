@@ -9,7 +9,7 @@
 #include <assert.h>
 
 #include "cml.h"
-#include "ops/ir/mlir/mlir_dispatch.h"
+#include "ops/ir/dispatch.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
 #include "tensor/tensor.h"
@@ -31,9 +31,7 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-// ============================================================================
 // Test: Dispatch Context Creation
-// ============================================================================
 
 static int test_dispatch_create(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -55,9 +53,7 @@ static int test_dispatch_create(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Dispatch Initialization
-// ============================================================================
 
 static int test_dispatch_init(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -85,9 +81,7 @@ static int test_dispatch_init(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Backend Detection
-// ============================================================================
 
 static int test_backend_detection(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -111,9 +105,7 @@ static int test_backend_detection(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Backend Names
-// ============================================================================
 
 static int test_backend_names(void) {
     const char* name;
@@ -130,12 +122,6 @@ static int test_backend_names(void) {
     name = cml_dispatch_backend_name(CML_BACKEND_ROCM);
     if (!name || strlen(name) == 0) return 0;
 
-    name = cml_dispatch_backend_name(CML_BACKEND_METAL);
-    if (!name || strlen(name) == 0) return 0;
-
-    name = cml_dispatch_backend_name(CML_BACKEND_VULKAN);
-    if (!name || strlen(name) == 0) return 0;
-
     // Invalid backend should return "Unknown"
     name = cml_dispatch_backend_name(CML_BACKEND_COUNT + 1);
     if (!name) return 0;
@@ -143,9 +129,7 @@ static int test_backend_names(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Set Preferred Backend
-// ============================================================================
 
 static int test_set_preferred(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -169,9 +153,7 @@ static int test_set_preferred(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Global Context Singleton
-// ============================================================================
 
 static int test_global_context(void) {
     CMLDispatchContext* ctx1 = cml_dispatch_get_global();
@@ -189,9 +171,7 @@ static int test_global_context(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Backend Info
-// ============================================================================
 
 static int test_backend_info(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -226,9 +206,7 @@ static int test_backend_info(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Best Backend Selection
-// ============================================================================
 
 static int test_best_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -254,9 +232,7 @@ static int test_best_backend(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Simple IR Execution via Dispatch
-// ============================================================================
 
 static int test_dispatch_execute_simple(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -265,7 +241,7 @@ static int test_dispatch_execute_simple(void) {
     cml_dispatch_init(ctx);
 
     // Create a simple IR with add operation
-    CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+    CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     if (!ir) {
         cml_dispatch_free(ctx);
         return 0;
@@ -328,9 +304,7 @@ static int test_dispatch_execute_simple(void) {
     return success;
 }
 
-// ============================================================================
 // Test: Environment Variable Backend Selection
-// ============================================================================
 
 static int test_env_backend_selection(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -371,9 +345,7 @@ static int test_env_backend_selection(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Statistics Tracking
-// ============================================================================
 
 static int test_statistics(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -390,7 +362,7 @@ static int test_statistics(void) {
     }
 
     // Create and execute a simple IR
-    CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+    CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     cml_ir_set_global_context(ir);
 
     Tensor* a = tensor_empty_2d(2, 2);
@@ -412,9 +384,7 @@ static int test_statistics(void) {
     return success;
 }
 
-// ============================================================================
 // Main
-// ============================================================================
 
 int main(void) {
     printf("\n=== Dispatch Layer Unit Tests ===\n\n");

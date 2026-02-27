@@ -10,8 +10,8 @@
 #include <math.h>
 
 #include "cml.h"
-#include "ops/ir/mlir/mlir_dispatch.h"
-#include "ops/ir/mlir/mlir_kernel_cache.h"
+#include "ops/ir/dispatch.h"
+#include "ops/ir/kernel_cache.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
 #include "tensor/tensor.h"
@@ -19,9 +19,7 @@
 #include "backend/blas.h"
 #include "core/logging.h"
 
-// ============================================================================
 // Timing Utilities
-// ============================================================================
 
 typedef struct {
     struct timespec start;
@@ -39,17 +37,17 @@ static double bench_timer_stop(BenchTimer* t) {
     return elapsed;  // milliseconds
 }
 
-// ============================================================================
 // Benchmark: Matrix Multiplication
-// ============================================================================
 
 static void bench_matmul(int size, int iterations) {
     printf("\n--- Matrix Multiplication Benchmark (size=%dx%d, iterations=%d) ---\n\n",
            size, size, iterations);
 
-    // Create tensors
-    Tensor* A = tensor_empty_2d(size, size);
-    Tensor* B = tensor_empty_2d(size, size);
+    // Create tensors on CPU (benchmarks need host-accessible data)
+    int mat_shape[] = {size, size};
+    TensorConfig cpu_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* A = tensor_empty(mat_shape, 2, &cpu_cfg);
+    Tensor* B = tensor_empty(mat_shape, 2, &cpu_cfg);
 
     if (!A || !B) {
         printf("Failed to allocate tensors\n");
@@ -74,11 +72,13 @@ static void bench_matmul(int size, int iterations) {
 
         double total_time = 0;
         for (int i = 0; i < iterations; i++) {
-            CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+            CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
+            Tensor* C = tensor_matmul(A, B);
+            Tensor* inputs[] = {A, B};
+            Tensor* outputs[] = {C};
             bench_timer_start(&timer);
-            tensor_matmul(A, B);
-            cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
+            cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
             total_time += bench_timer_stop(&timer);
             cml_ir_free(ir);
         }
@@ -112,9 +112,8 @@ static void bench_matmul(int size, int iterations) {
         }
     }
 
-    // Benchmark 3: CPU LLVM JIT (if MLIR available)
-    // Note: Each iteration creates new IR because re-execution of same IR
-    // requires proper state management (TODO: implement kernel caching)
+    // Benchmark 3: CPU LLVM JIT (if available)
+    // Use kernel caching to avoid recompiling the same kernel each iteration
     {
         CMLDispatchContext* ctx = cml_dispatch_create();
         cml_dispatch_init(ctx);
@@ -122,27 +121,53 @@ static void bench_matmul(int size, int iterations) {
         if (cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_LLVM)) {
             cml_dispatch_set_preferred(ctx, CML_BACKEND_CPU_LLVM);
 
-            double total_time = 0;
-            for (int i = 0; i < iterations; i++) {
-                CMLIR_t ir = cml_ir_new(IR_TARGET_C);
-                cml_ir_set_global_context(ir);
-                bench_timer_start(&timer);
-                tensor_matmul(A, B);
-                cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
-                total_time += bench_timer_stop(&timer);
+            // Enable kernel cache to reuse compiled kernels
+            cml_dispatch_enable_cache(ctx, 100);
+
+            // Create IR once and reuse it
+            CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
+            cml_ir_set_global_context(ir);
+
+            // Build the computation graph once and get output tensor
+            Tensor* C = tensor_matmul(A, B);
+            if (!C) {
+                printf("  CPU LLVM JIT:    Failed to create matmul operation\n");
                 cml_ir_free(ir);
+                cml_dispatch_free(ctx);
+                tensor_free(A);
+                tensor_free(B);
+                return;
             }
 
-            printf("  CPU LLVM JIT:    %8.2f ms avg (%.2f ms total) [includes JIT compile]\n",
-                   total_time / iterations, total_time);
+            // Prepare inputs and outputs arrays for dispatch
+            Tensor* inputs[] = {A, B};
+            Tensor* outputs[] = {C};
+
+            double total_time = 0;
+            for (int i = 0; i < iterations; i++) {
+                bench_timer_start(&timer);
+                // Re-execute the same IR - kernel cache will reuse compiled kernel
+                cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
+                total_time += bench_timer_stop(&timer);
+            }
+
+            // Get cache statistics
+            size_t cache_hits = 0, cache_misses = 0, cache_size = 0;
+            cml_dispatch_cache_stats(ctx, &cache_hits, &cache_misses, &cache_size);
+
+            printf("  CPU LLVM JIT:    %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
+                   total_time / iterations, total_time, cache_hits, cache_misses);
+
+            cml_ir_free(ir);
         } else {
-            printf("  CPU LLVM JIT:    Not available (no MLIR)\n");
+            printf("  CPU LLVM JIT:    Not available\n");
         }
 
         cml_dispatch_free(ctx);
     }
 
     // Benchmark 4: CUDA (if available)
+    // Use kernel caching to avoid recompiling kernels each iteration
     {
         CMLDispatchContext* ctx = cml_dispatch_create();
         cml_dispatch_init(ctx);
@@ -150,19 +175,44 @@ static void bench_matmul(int size, int iterations) {
         if (cml_dispatch_backend_available(ctx, CML_BACKEND_CUDA)) {
             cml_dispatch_set_preferred(ctx, CML_BACKEND_CUDA);
 
-            double total_time = 0;
-            for (int i = 0; i < iterations; i++) {
-                CMLIR_t ir = cml_ir_new(IR_TARGET_C);
-                cml_ir_set_global_context(ir);
-                bench_timer_start(&timer);
-                tensor_matmul(A, B);
-                cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
-                total_time += bench_timer_stop(&timer);
+            // Enable kernel cache
+            cml_dispatch_enable_cache(ctx, 100);
+
+            // Create IR once and reuse it
+            CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
+            cml_ir_set_global_context(ir);
+
+            // Build the computation graph once and get output tensor
+            Tensor* C = tensor_matmul(A, B);
+            if (!C) {
+                printf("  CUDA:            Failed to create matmul operation\n");
                 cml_ir_free(ir);
+                cml_dispatch_free(ctx);
+                tensor_free(A);
+                tensor_free(B);
+                return;
             }
 
-            printf("  CUDA:            %8.2f ms avg (%.2f ms total)\n",
-                   total_time / iterations, total_time);
+            // Prepare inputs and outputs arrays for dispatch
+            Tensor* inputs[] = {A, B};
+            Tensor* outputs[] = {C};
+
+            double total_time = 0;
+            for (int i = 0; i < iterations; i++) {
+                bench_timer_start(&timer);
+                // Re-execute the same IR - kernel cache will reuse compiled kernel
+                cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
+                total_time += bench_timer_stop(&timer);
+            }
+
+            // Get cache statistics
+            size_t cache_hits = 0, cache_misses = 0, cache_size = 0;
+            cml_dispatch_cache_stats(ctx, &cache_hits, &cache_misses, &cache_size);
+
+            printf("  CUDA:            %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
+                   total_time / iterations, total_time, cache_hits, cache_misses);
+
+            cml_ir_free(ir);
         } else {
             printf("  CUDA:            Not available\n");
         }
@@ -174,9 +224,7 @@ static void bench_matmul(int size, int iterations) {
     tensor_free(B);
 }
 
-// ============================================================================
 // Benchmark: Kernel Cache
-// ============================================================================
 
 static void bench_kernel_cache(int iterations) {
     printf("\n--- Kernel Cache Benchmark (iterations=%d) ---\n\n", iterations);
@@ -225,17 +273,16 @@ static void bench_kernel_cache(int iterations) {
     cml_kernel_cache_free(cache);
 }
 
-// ============================================================================
 // Benchmark: Element-wise Operations
-// ============================================================================
 
 static void bench_elementwise(int size, int iterations) {
     printf("\n--- Element-wise Operations Benchmark (size=%d, iterations=%d) ---\n\n",
            size, iterations);
 
     int shape[] = {size};
-    Tensor* A = tensor_empty(shape, 1, NULL);
-    Tensor* B = tensor_empty(shape, 1, NULL);
+    TensorConfig cpu_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* A = tensor_empty(shape, 1, &cpu_cfg);
+    Tensor* B = tensor_empty(shape, 1, &cpu_cfg);
 
     if (!A || !B) {
         printf("Failed to allocate tensors\n");
@@ -259,11 +306,13 @@ static void bench_elementwise(int size, int iterations) {
 
         double total_time = 0;
         for (int i = 0; i < iterations; i++) {
-            CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+            CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
+            Tensor* C = tensor_add(A, B);
+            Tensor* inputs[] = {A, B};
+            Tensor* outputs[] = {C};
             bench_timer_start(&timer);
-            tensor_add(A, B);
-            cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
+            cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
             total_time += bench_timer_stop(&timer);
             cml_ir_free(ir);
         }
@@ -279,11 +328,13 @@ static void bench_elementwise(int size, int iterations) {
 
         double total_time = 0;
         for (int i = 0; i < iterations; i++) {
-            CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+            CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
+            Tensor* C = tensor_mul(A, B);
+            Tensor* inputs[] = {A, B};
+            Tensor* outputs[] = {C};
             bench_timer_start(&timer);
-            tensor_mul(A, B);
-            cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
+            cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
             total_time += bench_timer_stop(&timer);
             cml_ir_free(ir);
         }
@@ -299,11 +350,13 @@ static void bench_elementwise(int size, int iterations) {
 
         double total_time = 0;
         for (int i = 0; i < iterations; i++) {
-            CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+            CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
+            Tensor* C = tensor_exp(A);
+            Tensor* inputs[] = {A};
+            Tensor* outputs[] = {C};
             bench_timer_start(&timer);
-            tensor_exp(A);
-            cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
+            cml_dispatch_execute(ctx, ir, inputs, 1, outputs, 1);
             total_time += bench_timer_stop(&timer);
             cml_ir_free(ir);
         }
@@ -316,9 +369,7 @@ static void bench_elementwise(int size, int iterations) {
     tensor_free(B);
 }
 
-// ============================================================================
 // Benchmark: Dispatch Overhead
-// ============================================================================
 
 static void bench_dispatch_overhead(int iterations) {
     printf("\n--- Dispatch Overhead Benchmark (iterations=%d) ---\n\n", iterations);
@@ -359,9 +410,7 @@ static void bench_dispatch_overhead(int iterations) {
            detect_time, detect_time * 1000.0 / iterations);
 }
 
-// ============================================================================
 // Print System Info
-// ============================================================================
 
 static void print_system_info(void) {
     printf("\n=== System Information ===\n\n");
@@ -390,9 +439,7 @@ static void print_system_info(void) {
     cml_dispatch_free(ctx);
 }
 
-// ============================================================================
 // Main
-// ============================================================================
 
 int main(int argc, char* argv[]) {
     // Default parameters

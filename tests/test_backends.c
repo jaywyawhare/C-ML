@@ -9,11 +9,9 @@
 #include <stdbool.h>
 
 #include "cml.h"
-#include "ops/ir/mlir/mlir_dispatch.h"
-#include "ops/ir/mlir/backends/cuda_backend.h"
-#include "ops/ir/mlir/backends/rocm_backend.h"
-#include "ops/ir/mlir/backends/metal_backend.h"
-#include "ops/ir/mlir/backends/vulkan_backend.h"
+#include "ops/ir/dispatch.h"
+#include "ops/ir/gpu/cuda_backend.h"
+#include "ops/ir/gpu/rocm_backend.h"
 #include "backend/blas.h"
 #include "backend/device.h"
 #include "core/logging.h"
@@ -33,9 +31,7 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-// ============================================================================
 // Test: CUDA Backend Detection
-// ============================================================================
 
 static int test_cuda_detection(void) {
     bool available = cml_cuda_available();
@@ -45,9 +41,7 @@ static int test_cuda_detection(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: CUDA Backend Create/Free
-// ============================================================================
 
 static int test_cuda_lifecycle(void) {
     if (!cml_cuda_available()) {
@@ -65,9 +59,7 @@ static int test_cuda_lifecycle(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: ROCm Backend Detection
-// ============================================================================
 
 static int test_rocm_detection(void) {
     bool available = cml_rocm_available();
@@ -75,9 +67,7 @@ static int test_rocm_detection(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: ROCm Backend Create/Free
-// ============================================================================
 
 static int test_rocm_lifecycle(void) {
     if (!cml_rocm_available()) {
@@ -95,69 +85,7 @@ static int test_rocm_lifecycle(void) {
     return 1;
 }
 
-// ============================================================================
-// Test: Metal Backend Detection
-// ============================================================================
-
-static int test_metal_detection(void) {
-    bool available = cml_metal_available();
-    printf("(available=%s) ", available ? "yes" : "no");
-    return 1;
-}
-
-// ============================================================================
-// Test: Metal Backend Create/Free
-// ============================================================================
-
-static int test_metal_lifecycle(void) {
-    if (!cml_metal_available()) {
-        printf("(skipped - Metal not available) ");
-        return 1;
-    }
-
-    CMLMetalBackend* backend = cml_metal_backend_create();
-    if (!backend) return 0;
-
-    int result = cml_metal_backend_init(backend);
-    printf("(init=%s) ", result == 0 ? "ok" : "failed");
-
-    cml_metal_backend_free(backend);
-    return 1;
-}
-
-// ============================================================================
-// Test: Vulkan Backend Detection
-// ============================================================================
-
-static int test_vulkan_detection(void) {
-    bool available = cml_vulkan_available();
-    printf("(available=%s) ", available ? "yes" : "no");
-    return 1;
-}
-
-// ============================================================================
-// Test: Vulkan Backend Create/Free
-// ============================================================================
-
-static int test_vulkan_lifecycle(void) {
-    if (!cml_vulkan_available()) {
-        printf("(skipped - Vulkan not available) ");
-        return 1;
-    }
-
-    CMLVulkanBackend* backend = cml_vulkan_backend_create();
-    if (!backend) return 0;
-
-    int result = cml_vulkan_backend_init(backend);
-    printf("(init=%s) ", result == 0 ? "ok" : "failed");
-
-    cml_vulkan_backend_free(backend);
-    return 1;
-}
-
-// ============================================================================
 // Test: BLAS Detection
-// ============================================================================
 
 static int test_blas_detection(void) {
     bool available = cml_blas_available();
@@ -165,9 +93,7 @@ static int test_blas_detection(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: BLAS Context Create/Free
-// ============================================================================
 
 static int test_blas_lifecycle(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -182,9 +108,7 @@ static int test_blas_lifecycle(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: BLAS SGEMM (if available)
-// ============================================================================
 
 static int test_blas_sgemm(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -223,9 +147,7 @@ static int test_blas_sgemm(void) {
     return success;
 }
 
-// ============================================================================
 // Test: BLAS Vector Operations
-// ============================================================================
 
 static int test_blas_vector_ops(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -248,7 +170,7 @@ static int test_blas_vector_ops(void) {
 
     // Test norm
     float norm = cml_blas_snrm2(ctx, x, 4);
-    // Expected: sqrt(1 + 4 + 9 + 16) = sqrt(30) ≈ 5.477
+    // Expected: sqrt(1 + 4 + 9 + 16) = sqrt(30) ~ 5.477
     if (norm < 5.4f || norm > 5.5f) {
         printf("(norm=%.3f expected ~5.477) ", norm);
         cml_blas_free(ctx);
@@ -260,21 +182,16 @@ static int test_blas_vector_ops(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Device Detection (from device.h)
-// ============================================================================
 
 static int test_device_detection(void) {
-    printf("(cuda=%s, rocm=%s, metal=%s) ",
+    printf("(cuda=%s, rocm=%s) ",
            device_cuda_available() ? "yes" : "no",
-           device_rocm_available() ? "yes" : "no",
-           device_metal_available() ? "yes" : "no");
+           device_rocm_available() ? "yes" : "no");
     return 1;
 }
 
-// ============================================================================
 // Test: All Backends Summary
-// ============================================================================
 
 static int test_all_backends_summary(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -297,9 +214,7 @@ static int test_all_backends_summary(void) {
     return (num >= 1);  // At least CPU fallback
 }
 
-// ============================================================================
 // Main
-// ============================================================================
 
 int main(void) {
     printf("\n=== Backend Detection Unit Tests ===\n\n");
@@ -309,10 +224,6 @@ int main(void) {
     TEST(cuda_lifecycle);
     TEST(rocm_detection);
     TEST(rocm_lifecycle);
-    TEST(metal_detection);
-    TEST(metal_lifecycle);
-    TEST(vulkan_detection);
-    TEST(vulkan_lifecycle);
 
     printf("\nBLAS:\n");
     TEST(blas_detection);

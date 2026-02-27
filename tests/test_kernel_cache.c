@@ -9,7 +9,7 @@
 #include <assert.h>
 
 #include "cml.h"
-#include "ops/ir/mlir/mlir_kernel_cache.h"
+#include "ops/ir/kernel_cache.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
 #include "tensor/tensor.h"
@@ -31,9 +31,7 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-// ============================================================================
 // Test: Cache Creation
-// ============================================================================
 
 static int test_cache_create(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -43,9 +41,7 @@ static int test_cache_create(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Cache Creation with Zero Size
-// ============================================================================
 
 static int test_cache_create_zero(void) {
     // Zero means unlimited
@@ -56,12 +52,10 @@ static int test_cache_create_zero(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Hash Computation
-// ============================================================================
 
 static int test_hash_computation(void) {
-    CMLIR_t ir = cml_ir_new(IR_TARGET_C);
+    CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     if (!ir) return 0;
 
     cml_ir_set_global_context(ir);
@@ -96,9 +90,7 @@ static int test_hash_computation(void) {
     return success;
 }
 
-// ============================================================================
 // Test: Cache Insert and Lookup
-// ============================================================================
 
 static int test_insert_lookup(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -133,9 +125,7 @@ static int test_insert_lookup(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Cache Miss
-// ============================================================================
 
 static int test_cache_miss(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -152,9 +142,7 @@ static int test_cache_miss(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: Cache Clear
-// ============================================================================
 
 static int test_cache_clear(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -188,9 +176,7 @@ static int test_cache_clear(void) {
     return 1;
 }
 
-// ============================================================================
 // Test: LRU Eviction
-// ============================================================================
 
 static int test_lru_eviction(void) {
     // Create cache with max 3 entries
@@ -223,9 +209,7 @@ static int test_lru_eviction(void) {
     return has_1111 && has_3333 && has_4444 && !has_2222;
 }
 
-// ============================================================================
 // Test: Statistics
-// ============================================================================
 
 static int test_cache_statistics(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -249,9 +233,7 @@ static int test_cache_statistics(void) {
     return success;
 }
 
-// ============================================================================
 // Test: Multiple Backends Same Hash
-// ============================================================================
 
 static int test_multiple_backends(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -276,9 +258,7 @@ static int test_multiple_backends(void) {
     return success;
 }
 
-// ============================================================================
 // Test: Entry Update
-// ============================================================================
 
 static int test_entry_update(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -299,9 +279,7 @@ static int test_entry_update(void) {
     return success;
 }
 
-// ============================================================================
 // Test: Large Number of Entries
-// ============================================================================
 
 static int test_large_cache(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(1000);
@@ -328,9 +306,7 @@ static int test_large_cache(void) {
     return success;
 }
 
-// ============================================================================
 // Main
-// ============================================================================
 
 int main(void) {
     printf("\n=== Kernel Cache Unit Tests ===\n\n");

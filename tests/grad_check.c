@@ -13,7 +13,7 @@
 
 // Helper to create random tensor
 Tensor* random_tensor(int* shape, int ndim, bool requires_grad) {
-    TensorConfig config = tensor_config_default();
+    TensorConfig config = {0};
     Tensor* t = tensor_empty(shape, ndim, &config);
     if (t) {
         float* data = (float*)tensor_data_ptr(t);
@@ -52,18 +52,22 @@ bool check_log() {
     Tensor* y = uop_log(x);
 
     // Backward
-    TensorConfig config = tensor_config_default();
+    TensorConfig config = {0};
     Tensor* grad_out = tensor_ones(y->shape, y->ndim, &config);
     y->grad = grad_out;
 
     // Build backward graph
     if (y->ir_node) {
-        extern int cml_ir_build_backward(CMLIR_t, struct IRNode*);
-        extern int cml_ir_execute_backward(CMLIR_t);
+        extern int cml_ir_build_backward(CMLGraph_t, struct IRNode*);
+        extern int cml_ir_execute_backward(CMLGraph_t);
 
         cml_ir_build_backward(y->ir_context, y->ir_node);
         cml_ir_execute_backward(y->ir_context);
 
+        if (!x->grad) {
+            printf("FAIL: Log - no gradient computed for input\n");
+            return false;
+        }
         float* grad = (float*)tensor_data_ptr(x->grad);
         float* inp = (float*)tensor_data_ptr(x);
 
@@ -91,17 +95,21 @@ bool check_expand() {
     ExpandParams params = {.new_shape = new_shape, .new_ndim = 2};
     Tensor* y = uop_expand(x, &params);
 
-    TensorConfig config = tensor_config_default();
+    TensorConfig config = {0};
     Tensor* grad_out = tensor_ones(y->shape, y->ndim, &config); // Ones
     y->grad = grad_out;
 
     if (y->ir_node) {
-        extern int cml_ir_build_backward(CMLIR_t, struct IRNode*);
-        extern int cml_ir_execute_backward(CMLIR_t);
+        extern int cml_ir_build_backward(CMLGraph_t, struct IRNode*);
+        extern int cml_ir_execute_backward(CMLGraph_t);
 
         cml_ir_build_backward(y->ir_context, y->ir_node);
         cml_ir_execute_backward(y->ir_context);
 
+        if (!x->grad) {
+            printf("FAIL: Expand - no gradient computed for input\n");
+            return false;
+        }
         float* grad = (float*)tensor_data_ptr(x->grad);
 
         // Expected: sum of ones over the expanded dimension (dim 0, size 2)
@@ -128,17 +136,21 @@ bool check_mean() {
     ReduceParams params = {.dims = NULL, .num_dims = 0, .keepdim = false}; // Global mean
     Tensor* y = uop_mean(x, &params);
 
-    TensorConfig config = tensor_config_default();
+    TensorConfig config = {0};
     Tensor* grad_out = tensor_ones(y->shape, y->ndim, &config);
     y->grad = grad_out;
 
     if (y->ir_node) {
-        extern int cml_ir_build_backward(CMLIR_t, struct IRNode*);
-        extern int cml_ir_execute_backward(CMLIR_t);
+        extern int cml_ir_build_backward(CMLGraph_t, struct IRNode*);
+        extern int cml_ir_execute_backward(CMLGraph_t);
 
         cml_ir_build_backward(y->ir_context, y->ir_node);
         cml_ir_execute_backward(y->ir_context);
 
+        if (!x->grad) {
+            printf("FAIL: Mean - no gradient computed for input\n");
+            return false;
+        }
         float* grad = (float*)tensor_data_ptr(x->grad);
 
         // Expected: 1/N where N=6
@@ -188,13 +200,13 @@ bool check_conv2d() {
 
     // Output shape should be 1x1x2x2
 
-    TensorConfig config = tensor_config_default();
+    TensorConfig config = {0};
     Tensor* grad_out = tensor_ones(y->shape, y->ndim, &config);
     y->grad = grad_out;
 
     if (y->ir_node) {
-        extern int cml_ir_build_backward(CMLIR_t, struct IRNode*);
-        extern int cml_ir_execute_backward(CMLIR_t);
+        extern int cml_ir_build_backward(CMLGraph_t, struct IRNode*);
+        extern int cml_ir_execute_backward(CMLGraph_t);
 
         cml_ir_build_backward(y->ir_context, y->ir_node);
         cml_ir_execute_backward(y->ir_context);
@@ -214,6 +226,10 @@ bool check_conv2d() {
         // (2,2): 1
 
         float expected_grad[] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
+        if (!x->grad) {
+            printf("FAIL: Conv2D - no gradient computed for input\n");
+            return false;
+        }
         float* grad = (float*)tensor_data_ptr(x->grad);
 
         for (int i = 0; i < 9; i++) {
