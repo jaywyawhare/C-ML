@@ -25,6 +25,13 @@
 #include "nn/layers/layernorm.h"
 #include "nn/layers/pooling.h"
 #include "nn/layers/sequential.h"
+#include "nn/layers/conv1d.h"
+#include "nn/layers/conv3d.h"
+#include "nn/layers/embedding.h"
+#include "nn/layers/groupnorm.h"
+#include "nn/layers/rnn.h"
+#include "nn/layers/transformer.h"
+#include "nn/layers/containers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +66,18 @@ extern "C" {
     nn_avgpool2d(kernel, stride, padding, ceil_mode, count_pad)
 
 #define nn_Sequential() nn_sequential()
+
+#define nn_Conv1d(...) nn_conv1d(__VA_ARGS__)
+#define nn_Conv3d(...) nn_conv3d(__VA_ARGS__)
+#define nn_Embedding(...) nn_embedding(__VA_ARGS__)
+#define nn_GroupNorm(...) nn_groupnorm(__VA_ARGS__)
+#define nn_RNNCell(...) nn_rnn_cell(__VA_ARGS__)
+#define nn_LSTMCell(...) nn_lstm_cell(__VA_ARGS__)
+#define nn_GRUCell(...) nn_gru_cell(__VA_ARGS__)
+#define nn_MultiHeadAttention(...) nn_multihead_attention(__VA_ARGS__)
+#define nn_TransformerEncoderLayer(...) nn_transformer_encoder_layer(__VA_ARGS__)
+#define nn_ModuleList() nn_module_list()
+#define nn_ModuleDict() nn_module_dict()
 
 #ifdef __cplusplus
 }
