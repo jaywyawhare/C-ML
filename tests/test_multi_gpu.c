@@ -59,8 +59,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== Simulated GPU Device Tests ===== */
-
 static int test_sim_gpu_enable_disable(void) {
     /* Enable 4 simulated GPUs with 256MB each */
     int ret = device_sim_gpu_enable(4, 256 * 1024 * 1024);
@@ -281,8 +279,6 @@ static int test_device_set_default_sim_gpu(void) {
     return 1;
 }
 
-/* ===== Distributed Training Tests ===== */
-
 #ifdef CML_HAS_DISTRIBUTED
 
 static int test_dist_init_destroy(void) {
@@ -462,8 +458,6 @@ static int test_dist_not_initialized(void) {
     return 1;
 }
 
-/* ===== DDP Tests ===== */
-
 static int test_ddp_create_free(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
@@ -606,8 +600,6 @@ static int test_ddp_without_dist(void) {
     return 1;
 }
 
-/* ===== Pipeline Parallel Tests ===== */
-
 static int test_pipeline_create_free(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
@@ -731,8 +723,6 @@ static int test_pipeline_null(void) {
     return 1;
 }
 
-/* ===== Simulated Multi-GPU Distributed Combo Tests ===== */
-
 static int test_sim_gpu_with_distributed(void) {
     device_sim_gpu_enable(4, 128 * 1024 * 1024);
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
@@ -835,8 +825,6 @@ static int test_ddp_training_loop(void) {
     return loss_decreased ? 1 : 1; /* Pass regardless — training can be noisy */
 }
 
-/* ===== Multi-Process Simulation ===== */
-
 static int test_dist_multi_rank_simulation(void) {
     /* Simulate what multi-rank setup looks like:
      * Init with world_size=4, different ranks */
@@ -858,8 +846,6 @@ static int test_dist_multi_rank_simulation(void) {
 }
 
 #endif /* CML_HAS_DISTRIBUTED */
-
-/* ===== Main ===== */
 
 int main(void) {
     printf("\n=== Multi-GPU & Distributed Training Tests ===\n\n");
