@@ -20,6 +20,7 @@
 #include "nn/layers.h"
 #include "nn/layers/sequential.h"
 #include "nn/layers/linear.h"
+#include "nn/layers/instancenorm.h"
 #include "tensor/tensor.h"
 #include "tensor/tensor_manipulation.h"
 #include "autograd/forward_ops.h"
@@ -27,6 +28,7 @@
 #include "autograd/autograd.h"
 #include "autograd/loss_functions.h"
 #include "ops/ir/context.h"
+#include "ops/uops.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1012,3 +1014,125 @@ void cml_nn_module_set_training(Module* module, bool training) {
 bool cml_nn_module_is_training(Module* module) { return module_is_training(module); }
 void cml_nn_module_eval(Module* module) { module_set_training(module, false); }
 void cml_nn_module_train(Module* module) { module_set_training(module, true); }
+
+// ===== New Unary Math Operations =====
+Tensor* cml_sign(Tensor* a) { return uop_sign(a); }
+Tensor* cml_floor(Tensor* a) { return uop_floor(a); }
+Tensor* cml_ceil(Tensor* a) { return uop_ceil(a); }
+Tensor* cml_round(Tensor* a) { return uop_round(a); }
+Tensor* cml_log2(Tensor* a) { return uop_log2(a); }
+Tensor* cml_exp2(Tensor* a) { return uop_exp2(a); }
+Tensor* cml_asin(Tensor* a) { return uop_asin(a); }
+Tensor* cml_acos(Tensor* a) { return uop_acos(a); }
+Tensor* cml_atan(Tensor* a) { return uop_atan(a); }
+Tensor* cml_square(Tensor* a) { return uop_square(a); }
+Tensor* cml_rsqrt(Tensor* a) { return uop_rsqrt(a); }
+Tensor* cml_erf(Tensor* a) { return uop_erf(a); }
+
+Tensor* cml_clamp(Tensor* a, float min_val, float max_val) {
+    return uop_clamp(a, min_val, max_val);
+}
+
+// ===== New Reduction Operations =====
+Tensor* cml_prod(Tensor* a, int dim, bool keepdim) {
+    int dims[] = {dim};
+    ReduceParams params = {.dims = dims, .num_dims = 1, .keepdim = keepdim};
+    return uop_prod(a, &params);
+}
+
+Tensor* cml_argmax(Tensor* a, int dim) { return tensor_argmax(a, dim); }
+Tensor* cml_argmin(Tensor* a, int dim) { return tensor_argmin(a, dim); }
+
+Tensor* cml_cumsum(Tensor* a, int dim) {
+    return uop_cumsum(a, dim);
+}
+
+Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
+    return tensor_var(a, dim, unbiased, keepdim);
+}
+
+Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
+    return tensor_std(a, dim, unbiased, keepdim);
+}
+
+// ===== New Shape Operations =====
+Tensor* cml_squeeze(Tensor* a, int dim) { return tensor_squeeze(a, dim); }
+Tensor* cml_unsqueeze(Tensor* a, int dim) { return tensor_unsqueeze(a, dim); }
+Tensor* cml_flip(Tensor* a, int dim) { return tensor_flip(a, dim); }
+Tensor* cml_repeat(Tensor* a, int* repeats, int num_repeats) {
+    return tensor_repeat(a, repeats, num_repeats);
+}
+Tensor** cml_split(Tensor* a, int num_splits, int dim, int* out_count) {
+    return tensor_split(a, num_splits, dim, out_count);
+}
+Tensor** cml_chunk(Tensor* a, int chunks, int dim, int* out_count) {
+    return tensor_chunk(a, chunks, dim, out_count);
+}
+
+Tensor* cml_triu(Tensor* a, int diagonal) {
+    return uop_triu(a, diagonal);
+}
+
+Tensor* cml_tril(Tensor* a, int diagonal) {
+    return uop_tril(a, diagonal);
+}
+
+Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value) {
+    return uop_pad(a, pad_widths, num_dims, value);
+}
+
+// ===== New Tensor Creation Functions =====
+Tensor* cml_arange(float start, float end, float step, const TensorConfig* config) {
+    return tensor_arange(start, end, step, config);
+}
+Tensor* cml_linspace(float start, float end, int steps, const TensorConfig* config) {
+    return tensor_linspace(start, end, steps, config);
+}
+Tensor* cml_eye(int n, const TensorConfig* config) { return tensor_eye(n, config); }
+Tensor* cml_rand(int* shape, int ndim, const TensorConfig* config) {
+    return tensor_rand(shape, ndim, config);
+}
+Tensor* cml_randn(int* shape, int ndim, const TensorConfig* config) {
+    return tensor_randn(shape, ndim, config);
+}
+Tensor* cml_randint(int low, int high, int* shape, int ndim, const TensorConfig* config) {
+    return tensor_randint(low, high, shape, ndim, config);
+}
+void cml_manual_seed(uint64_t seed) { tensor_manual_seed(seed); }
+Tensor* cml_zeros_like(Tensor* a) { return tensor_zeros_like(a); }
+Tensor* cml_ones_like(Tensor* a) { return tensor_ones_like(a); }
+Tensor* cml_rand_like(Tensor* a) { return tensor_rand_like(a); }
+Tensor* cml_randn_like(Tensor* a) { return tensor_randn_like(a); }
+Tensor* cml_full_like(Tensor* a, float value) { return tensor_full_like(a, value); }
+
+// ===== Weight Initializers =====
+Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
+    return tensor_kaiming_uniform(shape, ndim, fan_in, config);
+}
+Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config) {
+    return tensor_kaiming_normal(shape, ndim, fan_in, config);
+}
+Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
+                            const TensorConfig* config) {
+    return tensor_glorot_uniform(shape, ndim, fan_in, fan_out, config);
+}
+Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
+                           const TensorConfig* config) {
+    return tensor_xavier_normal(shape, ndim, fan_in, fan_out, config);
+}
+
+// ===== New Optimizers =====
+Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                           float beta1, float beta2, float epsilon) {
+    return optim_lamb(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
+}
+Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
+                           float weight_decay, float trust_coefficient) {
+    return optim_lars(parameters, num_parameters, lr, momentum, weight_decay, trust_coefficient);
+}
+
+// ===== New Layer =====
+InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
+                                       DeviceType device) {
+    return nn_instancenorm2d(num_features, eps, affine, dtype, device);
+}

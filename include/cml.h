@@ -842,6 +842,70 @@ void cml_nn_module_eval(Module* module);
  */
 void cml_nn_module_train(Module* module);
 
+// ===== New Unary Math Operations =====
+Tensor* cml_sign(Tensor* a);
+Tensor* cml_floor(Tensor* a);
+Tensor* cml_ceil(Tensor* a);
+Tensor* cml_round(Tensor* a);
+Tensor* cml_log2(Tensor* a);
+Tensor* cml_exp2(Tensor* a);
+Tensor* cml_asin(Tensor* a);
+Tensor* cml_acos(Tensor* a);
+Tensor* cml_atan(Tensor* a);
+Tensor* cml_square(Tensor* a);
+Tensor* cml_rsqrt(Tensor* a);
+Tensor* cml_erf(Tensor* a);
+Tensor* cml_clamp(Tensor* a, float min_val, float max_val);
+
+// ===== New Reduction Operations =====
+Tensor* cml_prod(Tensor* a, int dim, bool keepdim);
+Tensor* cml_argmax(Tensor* a, int dim);
+Tensor* cml_argmin(Tensor* a, int dim);
+Tensor* cml_cumsum(Tensor* a, int dim);
+Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim);
+Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim);
+
+// ===== New Shape Operations =====
+Tensor* cml_squeeze(Tensor* a, int dim);
+Tensor* cml_unsqueeze(Tensor* a, int dim);
+Tensor* cml_flip(Tensor* a, int dim);
+Tensor* cml_repeat(Tensor* a, int* repeats, int num_repeats);
+Tensor** cml_split(Tensor* a, int num_splits, int dim, int* out_count);
+Tensor** cml_chunk(Tensor* a, int chunks, int dim, int* out_count);
+Tensor* cml_triu(Tensor* a, int diagonal);
+Tensor* cml_tril(Tensor* a, int diagonal);
+Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value);
+
+// ===== New Tensor Creation Functions =====
+Tensor* cml_arange(float start, float end, float step, const TensorConfig* config);
+Tensor* cml_linspace(float start, float end, int steps, const TensorConfig* config);
+Tensor* cml_eye(int n, const TensorConfig* config);
+Tensor* cml_rand(int* shape, int ndim, const TensorConfig* config);
+Tensor* cml_randn(int* shape, int ndim, const TensorConfig* config);
+Tensor* cml_randint(int low, int high, int* shape, int ndim, const TensorConfig* config);
+void cml_manual_seed(uint64_t seed);
+Tensor* cml_zeros_like(Tensor* a);
+Tensor* cml_ones_like(Tensor* a);
+Tensor* cml_rand_like(Tensor* a);
+Tensor* cml_randn_like(Tensor* a);
+Tensor* cml_full_like(Tensor* a, float value);
+
+// ===== Weight Initializers =====
+Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
+Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
+Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+
+// ===== New Optimizers =====
+Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                           float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
+                           float weight_decay, float trust_coefficient);
+
+// ===== New Layer =====
+InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
+                                       DeviceType device);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
