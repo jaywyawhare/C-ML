@@ -105,6 +105,19 @@ if(ENABLE_ROCM)
     endif()
 endif()
 
+option(ENABLE_OPENCL "Enable OpenCL backend" ON)
+if(ENABLE_OPENCL)
+    find_package(OpenCL QUIET)
+    if(OpenCL_FOUND)
+        message(STATUS "OpenCL found: ${OpenCL_VERSION_STRING}")
+        add_definitions(-DCML_HAS_OPENCL)
+        include_directories(${OpenCL_INCLUDE_DIRS})
+        set(OPENCL_LIBS ${OpenCL_LIBRARIES})
+    else()
+        message(STATUS "OpenCL not found - OpenCL backend disabled")
+        set(OPENCL_LIBS "")
+    endif()
+endif()
 
 # Source files
 set(CORE_SOURCES
@@ -121,6 +134,7 @@ set(CORE_SOURCES
     src/core/error_stack.c
     src/core/computation_graph.c
     src/core/graph_context.c
+    src/core/quantization.c
 )
 
 set(ALLOC_SOURCES
@@ -136,6 +150,7 @@ set(BACKEND_SOURCES
     src/backend/threadpool.c
     src/backend/profiling.c
     src/backend/blas.c
+    src/backend/opencl_backend.c
 )
 
 set(OPS_SOURCES
@@ -196,10 +211,13 @@ set(NN_SOURCES
     src/nn/layers/containers.c
     src/nn/layers/rnn.c
     src/nn/layers/transformer.c
+    src/nn/layers/rmsnorm.c
+    src/nn/layers/conv_transpose2d.c
 )
 
 set(OPTIM_SOURCES
     src/optim.c
+    src/optim/lr_scheduler.c
 )
 
 # Distributed training
@@ -310,6 +328,9 @@ endif()
 if(ROCM_LIBS)
     target_link_libraries(cml_static ${ROCM_LIBS})
 endif()
+if(OPENCL_LIBS)
+    target_link_libraries(cml_static ${OPENCL_LIBS})
+endif()
 
 # Create shared library
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -333,6 +354,9 @@ if(BUILD_SHARED_LIBS)
     if(ROCM_LIBS)
         target_link_libraries(cml_shared ${ROCM_LIBS})
     endif()
+    if(OPENCL_LIBS)
+        target_link_libraries(cml_shared ${OPENCL_LIBS})
+    endif()
 endif()
 
 # Tests
@@ -355,6 +379,9 @@ if(BUILD_TESTS)
         endif()
         if(CUDA_LIBS)
             target_link_libraries(${test_name} ${CUDA_LIBS})
+        endif()
+        if(OPENCL_LIBS)
+            target_link_libraries(${test_name} ${OPENCL_LIBS})
         endif()
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
