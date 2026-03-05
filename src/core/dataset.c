@@ -8,6 +8,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include "core/dataset.h"
+#include "datasets/datasets.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 #include "core/config.h"
@@ -388,6 +389,86 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
     }
 
     LOG_DEBUG("Arrays loaded successfully into dataset");
+    return 0;
+}
+
+int dataset_load_file(Dataset* dataset, const char* filepath, const char* format) {
+    if (!dataset || !filepath || !format) {
+        LOG_ERROR("Invalid parameters for dataset_load_file");
+        return -1;
+    }
+
+    LOG_DEBUG("Loading dataset from file: %s (format: %s)", filepath, format);
+
+    if (strcmp(format, "csv") == 0 || strcmp(format, "CSV") == 0) {
+        float* X = NULL;
+        float* y = NULL;
+        int num_samples = 0, num_features = 0, num_classes = 0;
+        char** class_names = NULL;
+
+        if (cml_csv_parse(filepath, -1, &X, &y, &num_samples, &num_features,
+                          &num_classes, &class_names) != 0) {
+            LOG_ERROR("Failed to parse CSV file: %s", filepath);
+            return -1;
+        }
+
+        int result = dataset_load_arrays(dataset, X, y, num_samples, num_features, 1);
+        free(X);
+        free(y);
+
+        if (result != 0) {
+            if (class_names) {
+                for (int i = 0; i < num_classes; i++)
+                    free(class_names[i]);
+                free(class_names);
+            }
+            return -1;
+        }
+
+        dataset->num_classes = num_classes;
+        dataset->class_names = class_names;
+        dataset->filepath = strdup(filepath);
+
+        cml_dataset_compute_stats(dataset);
+
+        LOG_DEBUG("CSV file loaded: %d samples, %d features, %d classes",
+                  num_samples, num_features, num_classes);
+        return 0;
+    }
+
+    LOG_ERROR("Unsupported file format: %s (supported: csv)", format);
+    return -1;
+}
+
+int dataset_get_statistics(Dataset* dataset, void* stats) {
+    if (!dataset) {
+        LOG_ERROR("Invalid dataset for dataset_get_statistics");
+        return -1;
+    }
+
+    if (!dataset->X || dataset->num_samples == 0 || dataset->input_size == 0) {
+        LOG_ERROR("Dataset has no data for statistics computation");
+        return -1;
+    }
+
+    /* Compute statistics if not already present */
+    if (!dataset->feature_means || !dataset->feature_stds ||
+        !dataset->feature_mins || !dataset->feature_maxs) {
+        cml_dataset_compute_stats(dataset);
+    }
+
+    /* If caller provided a stats buffer, copy the four arrays into it.
+     * Layout: float[4][input_size] = { means, stds, mins, maxs } */
+    if (stats && dataset->feature_means && dataset->feature_stds &&
+        dataset->feature_mins && dataset->feature_maxs) {
+        size_t sz = (size_t)dataset->input_size * sizeof(float);
+        float* out = (float*)stats;
+        memcpy(out, dataset->feature_means, sz);
+        memcpy(out + dataset->input_size, dataset->feature_stds, sz);
+        memcpy(out + 2 * dataset->input_size, dataset->feature_mins, sz);
+        memcpy(out + 3 * dataset->input_size, dataset->feature_maxs, sz);
+    }
+
     return 0;
 }
 

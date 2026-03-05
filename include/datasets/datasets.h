@@ -72,8 +72,6 @@ void cml_dataset_set_cache_dir(const char* dir);
 /** Compute feature statistics (min/max/mean/std) for normalization */
 void cml_dataset_compute_stats(Dataset* ds);
 
-/* ---- Internal parsers (exposed for advanced use) ---- */
-
 /** Load IDX-3 ubyte images -> float array normalized to [0,1] */
 float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols);
 
@@ -85,8 +83,6 @@ int cml_csv_parse(const char* filepath, int target_col,
                   float** X_out, float** y_out,
                   int* num_samples, int* num_features, int* num_classes,
                   char*** class_names_out);
-
-/* ---- Built-in datasets (no download needed) ---- */
 
 /** Airline passengers (144 monthly values, 1949-1960) */
 const float* cml_builtin_airline_data(int* n);
