@@ -238,6 +238,35 @@ float lr_scheduler_update(LRScheduler* scheduler, float metric) {
     }
     case LR_SCHEDULER_NONE:
     default:
+        // Handle OneCycleLR (defined in optim/lr_scheduler.h as #define)
+        if ((int)scheduler->type == 11) { // LR_SCHEDULER_ONE_CYCLE
+            float max_lr   = scheduler->initial_lr;
+            float init_lr  = scheduler->eta_min;
+            float final_lr = scheduler->factor;
+            int total      = scheduler->T_max;
+            float pct      = scheduler->gamma;
+            int warmup     = (int)(pct * (float)total);
+            int epoch      = scheduler->last_epoch;
+
+            float new_lr;
+            if (epoch <= warmup) {
+                // Linear warmup: init_lr -> max_lr
+                float t = warmup > 0 ? (float)epoch / (float)warmup : 1.0f;
+                new_lr  = init_lr + (max_lr - init_lr) * t;
+            } else {
+                // Cosine annealing: max_lr -> final_lr
+                int anneal_steps = total - warmup;
+                float t = anneal_steps > 0
+                              ? (float)(epoch - warmup) / (float)anneal_steps
+                              : 1.0f;
+                if (t > 1.0f) t = 1.0f;
+                new_lr = final_lr + (max_lr - final_lr) * (1.0f + cosf((float)M_PI * t)) / 2.0f;
+            }
+
+            for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
+                scheduler->optimizer->param_groups[i].lr = new_lr;
+            }
+        }
         break;
     }
 
