@@ -75,6 +75,46 @@ const char* uop_type_to_string(UOpType type) {
         return "STRIDE";
     case UOP_SLICE:
         return "SLICE";
+    case UOP_SIGN:
+        return "SIGN";
+    case UOP_FLOOR:
+        return "FLOOR";
+    case UOP_CEIL:
+        return "CEIL";
+    case UOP_ROUND:
+        return "ROUND";
+    case UOP_LOG2:
+        return "LOG2";
+    case UOP_EXP2:
+        return "EXP2";
+    case UOP_ASIN:
+        return "ASIN";
+    case UOP_ACOS:
+        return "ACOS";
+    case UOP_ATAN:
+        return "ATAN";
+    case UOP_SQUARE:
+        return "SQUARE";
+    case UOP_RSQRT:
+        return "RSQRT";
+    case UOP_ERF:
+        return "ERF";
+    case UOP_CLAMP:
+        return "CLAMP";
+    case UOP_PROD:
+        return "PROD";
+    case UOP_ARGMAX:
+        return "ARGMAX";
+    case UOP_ARGMIN:
+        return "ARGMIN";
+    case UOP_CUMSUM:
+        return "CUMSUM";
+    case UOP_TRIU:
+        return "TRIU";
+    case UOP_TRIL:
+        return "TRIL";
+    case UOP_PAD:
+        return "PAD";
     case UOP_COUNT:
         return "COUNT";
     default:
@@ -136,9 +176,55 @@ static void free_node_params(struct IRNode* node) {
     case UOP_MATMUL:
     case UOP_WHERE:
     case UOP_CMPLT:
+    case UOP_SIGN:
+    case UOP_FLOOR:
+    case UOP_CEIL:
+    case UOP_ROUND:
+    case UOP_LOG2:
+    case UOP_EXP2:
+    case UOP_ASIN:
+    case UOP_ACOS:
+    case UOP_ATAN:
+    case UOP_SQUARE:
+    case UOP_RSQRT:
+    case UOP_ERF:
     case UOP_COUNT:
         // No params to free for these operations
         break;
+    case UOP_CLAMP: {
+        ClampParams* p = (ClampParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_PROD:
+    case UOP_ARGMAX:
+    case UOP_ARGMIN: {
+        ReduceParams* p = (ReduceParams*)node->params;
+        if (p) {
+            if (p->dims) free(p->dims);
+            free(p);
+        }
+        break;
+    }
+    case UOP_CUMSUM: {
+        CumsumParams* p = (CumsumParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_TRIU:
+    case UOP_TRIL: {
+        TriParams* p = (TriParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_PAD: {
+        PadParams* p = (PadParams*)node->params;
+        if (p) {
+            if (p->pad_widths) free(p->pad_widths);
+            free(p);
+        }
+        break;
+    }
     case UOP_FILL: {
         FillParams* p = (FillParams*)node->params;
         if (p) {
