@@ -60,12 +60,54 @@ typedef enum {
     UOP_STRIDE,  // change stride (view)
     UOP_SLICE,   // slice tensor (view)
 
+    // Additional Unary Ops
+    UOP_SIGN,    // sign(a): -1, 0, or 1
+    UOP_FLOOR,   // floor(a)
+    UOP_CEIL,    // ceil(a)
+    UOP_ROUND,   // round(a)
+    UOP_LOG2,    // log2(a)
+    UOP_EXP2,    // 2^a
+    UOP_ASIN,    // asin(a)
+    UOP_ACOS,    // acos(a)
+    UOP_ATAN,    // atan(a)
+    UOP_SQUARE,  // a * a
+    UOP_RSQRT,   // 1 / sqrt(a)
+    UOP_ERF,     // erf(a)
+    UOP_CLAMP,   // clamp(a, min, max)
+
+    // Additional Reduction Ops
+    UOP_PROD,       // product along dimension(s)
+    UOP_ARGMAX,     // argmax along dimension
+    UOP_ARGMIN,     // argmin along dimension
+    UOP_CUMSUM,     // cumulative sum along dimension
+
     // Special Ops
     UOP_MATMUL, // matrix multiplication
     UOP_CONV2D, // 2D convolution
     UOP_WHERE,  // conditional: where(cond, a, b)
     UOP_FILL,   // fill tensor with constant value
     UOP_GATHER, // gather elements by index: out[i] = input[i, indices[i]]
+    UOP_TRIU,   // upper triangular
+    UOP_TRIL,   // lower triangular
+    UOP_PAD,    // pad tensor
+
+    // Sorting Ops
+    UOP_SORT,       // sort along dimension
+    UOP_ARGSORT,    // indices that would sort
+    UOP_TOPK,       // top-k elements along dimension
+
+    // Cumulative Ops
+    UOP_CUMPROD,    // cumulative product along dimension
+
+    // Bitwise Ops
+    UOP_BITWISE_AND,
+    UOP_BITWISE_OR,
+    UOP_BITWISE_XOR,
+    UOP_BITWISE_NOT,
+
+    // Masking Ops
+    UOP_NONZERO,     // indices of non-zero elements
+    UOP_MASKED_FILL, // fill where mask is true
 
     UOP_COUNT // Total count
 } UOpType;
@@ -343,6 +385,40 @@ typedef struct {
     int dim; // Dimension to gather along (-1 for last dim)
 } GatherParams;
 
+typedef struct {
+    float min_val;
+    float max_val;
+} ClampParams;
+
+typedef struct {
+    int dim; // Dimension for cumulative op
+} CumsumParams;
+
+typedef struct {
+    int diagonal; // Offset from main diagonal (0 = main, positive = above, negative = below)
+} TriParams;
+
+typedef struct {
+    int* pad_widths; // [before_0, after_0, before_1, after_1, ...]
+    int num_dims;
+    float value; // Pad value (usually 0)
+} PadParams;
+
+typedef struct {
+    int dim;
+    bool descending;
+} SortParams;
+
+typedef struct {
+    int k;
+    int dim;
+    bool largest;
+} TopkParams;
+
+typedef struct {
+    float value;
+} MaskedFillParams;
+
 /**
  * @brief Fill tensor with constant value (lazy)
  * @param shape Output shape
@@ -424,6 +500,102 @@ Tensor* uop_softmax(Tensor* x, int dim);
  * @brief Leaky ReLU built from uops: max(x, alpha * x) = x if x > 0, else alpha * x
  */
 Tensor* uop_leaky_relu(Tensor* x, float negative_slope);
+
+// ===== New Unary Operations =====
+
+/** @brief Element-wise sign: -1, 0, or 1 */
+Tensor* uop_sign(Tensor* a);
+
+/** @brief Element-wise floor */
+Tensor* uop_floor(Tensor* a);
+
+/** @brief Element-wise ceil */
+Tensor* uop_ceil(Tensor* a);
+
+/** @brief Element-wise round */
+Tensor* uop_round(Tensor* a);
+
+/** @brief Element-wise log base 2 */
+Tensor* uop_log2(Tensor* a);
+
+/** @brief Element-wise 2^a */
+Tensor* uop_exp2(Tensor* a);
+
+/** @brief Element-wise arcsine */
+Tensor* uop_asin(Tensor* a);
+
+/** @brief Element-wise arccosine */
+Tensor* uop_acos(Tensor* a);
+
+/** @brief Element-wise arctangent */
+Tensor* uop_atan(Tensor* a);
+
+/** @brief Element-wise square: a*a */
+Tensor* uop_square(Tensor* a);
+
+/** @brief Element-wise inverse square root: 1/sqrt(a) */
+Tensor* uop_rsqrt(Tensor* a);
+
+/** @brief Element-wise error function */
+Tensor* uop_erf(Tensor* a);
+
+/** @brief Element-wise clamp to [min, max] */
+Tensor* uop_clamp(Tensor* a, float min_val, float max_val);
+
+// ===== New Reduction Operations =====
+
+/** @brief Product reduction along dimension(s) */
+Tensor* uop_prod(Tensor* a, ReduceParams* params);
+
+/** @brief Argmax along a dimension */
+Tensor* uop_argmax(Tensor* a, ReduceParams* params);
+
+/** @brief Argmin along a dimension */
+Tensor* uop_argmin(Tensor* a, ReduceParams* params);
+
+/** @brief Cumulative sum along a dimension */
+Tensor* uop_cumsum(Tensor* a, int dim);
+
+// ===== New Special Operations =====
+
+/** @brief Upper triangular matrix */
+Tensor* uop_triu(Tensor* a, int diagonal);
+
+/** @brief Lower triangular matrix */
+Tensor* uop_tril(Tensor* a, int diagonal);
+
+/** @brief Pad tensor with constant value */
+Tensor* uop_pad(Tensor* a, int* pad_widths, int num_dims, float value);
+
+/** @brief Sort along dimension. descending=true for largest first */
+Tensor* uop_sort(Tensor* a, int dim, bool descending);
+
+/** @brief Return indices that would sort along dimension */
+Tensor* uop_argsort(Tensor* a, int dim, bool descending);
+
+/** @brief Return top-k elements along dimension */
+Tensor* uop_topk(Tensor* a, int k, int dim, bool largest, Tensor** indices_out);
+
+/** @brief Cumulative product along dimension */
+Tensor* uop_cumprod(Tensor* a, int dim);
+
+/** @brief Bitwise AND (operates on int cast of float) */
+Tensor* uop_bitwise_and(Tensor* a, Tensor* b);
+
+/** @brief Bitwise OR */
+Tensor* uop_bitwise_or(Tensor* a, Tensor* b);
+
+/** @brief Bitwise XOR */
+Tensor* uop_bitwise_xor(Tensor* a, Tensor* b);
+
+/** @brief Bitwise NOT */
+Tensor* uop_bitwise_not(Tensor* a);
+
+/** @brief Return indices of non-zero elements as [N, ndim] tensor */
+Tensor* uop_nonzero(Tensor* a);
+
+/** @brief Fill tensor with value where mask is true */
+Tensor* uop_masked_fill(Tensor* a, Tensor* mask, float value);
 
 #ifdef __cplusplus
 }
