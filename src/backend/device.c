@@ -795,7 +795,6 @@ int device_move_tensor_to_default(Tensor* tensor) {
     return device_move_tensor(tensor, device_get_default());
 }
 
-/* ===== Simulated Multi-GPU Implementation ===== */
 
 int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     if (num_devices <= 0 || num_devices > SIM_GPU_MAX_DEVICES) {
