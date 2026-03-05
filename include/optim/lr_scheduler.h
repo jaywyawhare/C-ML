@@ -26,6 +26,7 @@ extern "C" {
 #endif
 
 #define LR_SCHEDULER_MULTI_STEP 10
+#define LR_SCHEDULER_ONE_CYCLE 11
 
 /**
  * @brief Create a CosineAnnealingLR scheduler (alias)
@@ -55,6 +56,23 @@ void lr_scheduler_step_epoch(LRScheduler* scheduler);
  * Calls lr_scheduler_update(scheduler, metric) internally.
  */
 void lr_scheduler_step_metric(LRScheduler* scheduler, float metric);
+
+/**
+ * @brief Create a OneCycleLR scheduler
+ *
+ * Implements the 1cycle policy: linearly ramps up LR from initial_lr/div_factor to max_lr,
+ * then cosine anneals down to max_lr/final_div_factor.
+ *
+ * @param optimizer Optimizer to schedule
+ * @param max_lr Maximum learning rate
+ * @param total_steps Total number of training steps
+ * @param pct_start Percentage of training spent increasing LR (default: 0.3)
+ * @param div_factor Initial lr = max_lr / div_factor (default: 25.0)
+ * @param final_div_factor Final lr = max_lr / final_div_factor (default: 1e4)
+ * @return LRScheduler, or NULL on failure
+ */
+LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
+                                     float pct_start, float div_factor, float final_div_factor);
 
 #ifdef __cplusplus
 }

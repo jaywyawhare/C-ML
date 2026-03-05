@@ -49,3 +49,43 @@ void lr_scheduler_step_metric(LRScheduler* scheduler, float metric) {
     if (!scheduler) return;
     lr_scheduler_update(scheduler, metric);
 }
+
+LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
+                                     float pct_start, float div_factor, float final_div_factor) {
+    if (!optimizer || total_steps <= 0) {
+        LOG_ERROR("Invalid parameters for lr_scheduler_one_cycle");
+        return NULL;
+    }
+
+    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    if (!scheduler) return NULL;
+
+    memset(scheduler, 0, sizeof(LRScheduler));
+
+    scheduler->type      = (LRSchedulerType)LR_SCHEDULER_ONE_CYCLE;
+    scheduler->optimizer = optimizer;
+
+    // Store OneCycle parameters in available fields:
+    // initial_lr = max_lr
+    // eta_min = initial_lr (max_lr / div_factor)
+    // T_max = total_steps
+    // gamma = pct_start
+    // factor = final_lr (max_lr / final_div_factor)
+    // min_lr = final_div_factor (stored for reference)
+
+    float init_lr  = max_lr / (div_factor > 0.0f ? div_factor : 25.0f);
+    float final_lr = max_lr / (final_div_factor > 0.0f ? final_div_factor : 1e4f);
+
+    scheduler->initial_lr = max_lr;
+    scheduler->eta_min    = init_lr;
+    scheduler->T_max      = total_steps;
+    scheduler->gamma      = pct_start > 0.0f ? pct_start : 0.3f;
+    scheduler->factor     = final_lr;
+    scheduler->last_epoch = 0;
+
+    // Set optimizer to initial LR
+    scheduler->current_lr = init_lr;
+    optimizer_set_lr(optimizer, init_lr);
+
+    return scheduler;
+}
