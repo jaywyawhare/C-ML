@@ -360,6 +360,78 @@ int tensor_to_device(Tensor* tensor, DeviceType device);
  */
 Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context);
 
+// ===== New Tensor Creation Functions =====
+
+/** @brief Create 1D tensor with evenly spaced values in [start, end) */
+Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config);
+
+/** @brief Create 1D tensor with linearly spaced values between start and end */
+Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* config);
+
+/** @brief Create NxN identity matrix */
+Tensor* tensor_eye(int n, const TensorConfig* config);
+
+/** @brief Create tensor with uniform random values in [0, 1) */
+Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config);
+
+/** @brief Create tensor with standard normal random values */
+Tensor* tensor_randn(int* shape, int ndim, const TensorConfig* config);
+
+/** @brief Create tensor with random integers in [low, high) */
+Tensor* tensor_randint(int low, int high, int* shape, int ndim, const TensorConfig* config);
+
+/** @brief Set the random seed for reproducibility */
+void tensor_manual_seed(uint64_t seed);
+
+/** @brief Create zeros tensor with same shape/dtype/device as input */
+Tensor* tensor_zeros_like(Tensor* a);
+
+/** @brief Create ones tensor with same shape/dtype/device as input */
+Tensor* tensor_ones_like(Tensor* a);
+
+/** @brief Create random uniform tensor with same shape/dtype/device as input */
+Tensor* tensor_rand_like(Tensor* a);
+
+/** @brief Create random normal tensor with same shape/dtype/device as input */
+Tensor* tensor_randn_like(Tensor* a);
+
+/** @brief Create constant tensor with same shape/dtype/device as input */
+Tensor* tensor_full_like(Tensor* a, float value);
+
+// ===== Shape Operations =====
+
+/** @brief Remove dimensions of size 1. dim=-1 to squeeze all. */
+Tensor* tensor_squeeze(Tensor* a, int dim);
+
+/** @brief Insert a dimension of size 1 at the specified position */
+Tensor* tensor_unsqueeze(Tensor* a, int dim);
+
+/** @brief Reverse elements along a dimension */
+Tensor* tensor_flip(Tensor* a, int dim);
+
+/** @brief Repeat tensor along each dimension */
+Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats);
+
+/** @brief Split tensor into chunks along a dimension */
+Tensor** tensor_split(Tensor* a, int num_splits, int dim, int* out_count);
+
+/** @brief Split tensor into chunks (alias for tensor_split) */
+Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count);
+
+// ===== Weight Initializers =====
+
+/** @brief Kaiming uniform initialization (for ReLU networks) */
+Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
+
+/** @brief Kaiming normal initialization (for ReLU networks) */
+Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
+
+/** @brief Glorot/Xavier uniform initialization */
+Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+
+/** @brief Xavier normal initialization */
+Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+
 #ifdef __cplusplus
 }
 #endif

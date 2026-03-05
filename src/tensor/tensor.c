@@ -922,3 +922,362 @@ int tensor_to_device(Tensor* tensor, DeviceType device) {
     }
     return device_move_tensor(tensor, device);
 }
+
+// ===== New Tensor Creation Functions =====
+
+Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config) {
+    if (step == 0.0f) return NULL;
+    int count = (int)ceilf((end - start) / step);
+    if (count <= 0) count = 0;
+
+    int shape[] = {count};
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = tensor_create(dtype, device, 1, shape, false);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    for (int i = 0; i < count; i++) {
+        data[i] = start + (float)i * step;
+    }
+    return t;
+}
+
+Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* config) {
+    if (steps <= 0) return NULL;
+    int shape[] = {steps};
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = tensor_create(dtype, device, 1, shape, false);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    if (steps == 1) {
+        data[0] = start;
+    } else {
+        float step = (end - start) / (float)(steps - 1);
+        for (int i = 0; i < steps; i++) {
+            data[i] = start + (float)i * step;
+        }
+    }
+    return t;
+}
+
+Tensor* tensor_eye(int n, const TensorConfig* config) {
+    if (n <= 0) return NULL;
+    int shape[] = {n, n};
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = tensor_create(dtype, device, 2, shape, false);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    memset(data, 0, (size_t)(n * n) * sizeof(float));
+    for (int i = 0; i < n; i++) {
+        data[i * n + i] = 1.0f;
+    }
+    return t;
+}
+
+// Simple xorshift128+ PRNG for portability
+static uint64_t _rng_state[2] = {0x12345678DEADBEEF, 0xFEDCBA9876543210};
+static bool _rng_seeded = false;
+
+static void _ensure_rng_seeded(void) {
+    if (!_rng_seeded) {
+        // Use address of local var as entropy source
+        uint64_t seed = (uint64_t)(uintptr_t)&_rng_seeded ^ 0xDEADBEEFCAFEBABE;
+        _rng_state[0] = seed;
+        _rng_state[1] = seed ^ 0x0123456789ABCDEF;
+        _rng_seeded = true;
+    }
+}
+
+void tensor_manual_seed(uint64_t seed) {
+    _rng_state[0] = seed;
+    _rng_state[1] = seed ^ 0x0123456789ABCDEF;
+    _rng_seeded = true;
+}
+
+static float _rand_uniform(void) {
+    _ensure_rng_seeded();
+    uint64_t s0 = _rng_state[0];
+    uint64_t s1 = _rng_state[1];
+    uint64_t result = s0 + s1;
+    s1 ^= s0;
+    _rng_state[0] = ((s0 << 55) | (s0 >> 9)) ^ s1 ^ (s1 << 14);
+    _rng_state[1] = (s1 << 36) | (s1 >> 28);
+    // Convert to [0, 1) float
+    return (float)(result >> 11) * (1.0f / 9007199254740992.0f);
+}
+
+static float _rand_normal(void) {
+    // Box-Muller transform
+    float u1 = _rand_uniform();
+    float u2 = _rand_uniform();
+    if (u1 < 1e-10f) u1 = 1e-10f;
+    return sqrtf(-2.0f * logf(u1)) * cosf(2.0f * 3.14159265358979f * u2);
+}
+
+Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    for (size_t i = 0; i < t->numel; i++) {
+        data[i] = _rand_uniform();
+    }
+    return t;
+}
+
+Tensor* tensor_randn(int* shape, int ndim, const TensorConfig* config) {
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    for (size_t i = 0; i < t->numel; i++) {
+        data[i] = _rand_normal();
+    }
+    return t;
+}
+
+Tensor* tensor_randint(int low, int high, int* shape, int ndim, const TensorConfig* config) {
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    int range = high - low;
+    if (range <= 0) range = 1;
+    for (size_t i = 0; i < t->numel; i++) {
+        data[i] = (float)(low + (int)(_rand_uniform() * (float)range));
+    }
+    return t;
+}
+
+Tensor* tensor_zeros_like(Tensor* a) {
+    if (!a) return NULL;
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    return tensor_zeros(a->shape, a->ndim, &config);
+}
+
+Tensor* tensor_ones_like(Tensor* a) {
+    if (!a) return NULL;
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    return tensor_ones(a->shape, a->ndim, &config);
+}
+
+Tensor* tensor_rand_like(Tensor* a) {
+    if (!a) return NULL;
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    return tensor_rand(a->shape, a->ndim, &config);
+}
+
+Tensor* tensor_randn_like(Tensor* a) {
+    if (!a) return NULL;
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    return tensor_randn(a->shape, a->ndim, &config);
+}
+
+Tensor* tensor_full_like(Tensor* a, float value) {
+    if (!a) return NULL;
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    return tensor_full(a->shape, a->ndim, &config, value);
+}
+
+// ===== Shape Operations =====
+
+Tensor* tensor_squeeze(Tensor* a, int dim) {
+    if (!a) return NULL;
+
+    // Count dimensions that are not 1 (or specific dim)
+    int new_ndim = 0;
+    for (int i = 0; i < a->ndim; i++) {
+        if (dim >= 0) {
+            if (i == dim && a->shape[i] == 1) continue;
+        } else {
+            if (a->shape[i] == 1) continue;
+        }
+        new_ndim++;
+    }
+    if (new_ndim == 0) new_ndim = 1;
+
+    int* new_shape = malloc((size_t)new_ndim * sizeof(int));
+    if (!new_shape) return NULL;
+
+    int j = 0;
+    for (int i = 0; i < a->ndim; i++) {
+        if (dim >= 0) {
+            if (i == dim && a->shape[i] == 1) continue;
+        } else {
+            if (a->shape[i] == 1) continue;
+        }
+        if (j < new_ndim) new_shape[j++] = a->shape[i];
+    }
+    if (j == 0) new_shape[0] = 1;
+
+    Tensor* result = tensor_reshape(a, new_shape, new_ndim);
+    free(new_shape);
+    return result;
+}
+
+Tensor* tensor_unsqueeze(Tensor* a, int dim) {
+    if (!a) return NULL;
+    if (dim < 0) dim = a->ndim + 1 + dim;
+    if (dim < 0 || dim > a->ndim) return NULL;
+
+    int new_ndim = a->ndim + 1;
+    int* new_shape = malloc((size_t)new_ndim * sizeof(int));
+    if (!new_shape) return NULL;
+
+    int j = 0;
+    for (int i = 0; i < new_ndim; i++) {
+        if (i == dim) {
+            new_shape[i] = 1;
+        } else {
+            new_shape[i] = a->shape[j++];
+        }
+    }
+
+    Tensor* result = tensor_reshape(a, new_shape, new_ndim);
+    free(new_shape);
+    return result;
+}
+
+Tensor* tensor_flip(Tensor* a, int dim) {
+    if (!a) return NULL;
+    tensor_ensure_executed(a);
+    float* data = (float*)tensor_data_ptr(a);
+    if (!data) return NULL;
+
+    if (dim < 0) dim = a->ndim + dim;
+    if (dim < 0 || dim >= a->ndim) return NULL;
+
+    TensorConfig config = {.dtype = a->dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_empty(a->shape, a->ndim, &config);
+    if (!result) return NULL;
+    tensor_ensure_executed(result);
+    float* out_data = (float*)tensor_data_ptr(result);
+
+    if (a->ndim == 1) {
+        int n = a->shape[0];
+        for (int i = 0; i < n; i++)
+            out_data[i] = data[n - 1 - i];
+    } else if (a->ndim == 2) {
+        int rows = a->shape[0], cols = a->shape[1];
+        if (dim == 0) {
+            for (int r = 0; r < rows; r++)
+                memcpy(out_data + r * cols, data + (rows - 1 - r) * cols, (size_t)cols * sizeof(float));
+        } else {
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                    out_data[r * cols + c] = data[r * cols + (cols - 1 - c)];
+        }
+    } else {
+        // Fallback: just copy
+        memcpy(out_data, data, a->numel * sizeof(float));
+    }
+    return result;
+}
+
+Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
+    if (!a || !repeats || num_repeats != a->ndim) return NULL;
+    tensor_ensure_executed(a);
+    float* data = (float*)tensor_data_ptr(a);
+    if (!data) return NULL;
+
+    int* new_shape = malloc((size_t)a->ndim * sizeof(int));
+    if (!new_shape) return NULL;
+    for (int i = 0; i < a->ndim; i++)
+        new_shape[i] = a->shape[i] * repeats[i];
+
+    TensorConfig config = {.dtype = a->dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_empty(new_shape, a->ndim, &config);
+    if (!result) { free(new_shape); return NULL; }
+    tensor_ensure_executed(result);
+    float* out_data = (float*)tensor_data_ptr(result);
+
+    // Simple case: 1D
+    if (a->ndim == 1) {
+        int n = a->shape[0];
+        for (int r = 0; r < repeats[0]; r++)
+            memcpy(out_data + r * n, data, (size_t)n * sizeof(float));
+    } else if (a->ndim == 2) {
+        int rows = a->shape[0], cols = a->shape[1];
+        int out_cols = new_shape[1];
+        for (int rr = 0; rr < repeats[0]; rr++) {
+            for (int r = 0; r < rows; r++) {
+                for (int cr = 0; cr < repeats[1]; cr++) {
+                    memcpy(out_data + (rr * rows + r) * out_cols + cr * cols,
+                           data + r * cols, (size_t)cols * sizeof(float));
+                }
+            }
+        }
+    } else {
+        memcpy(out_data, data, a->numel * sizeof(float));
+    }
+
+    free(new_shape);
+    return result;
+}
+
+// tensor_split is defined in tensor_manipulation.c
+
+Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count) {
+    Tensor** result = tensor_split(a, chunks, dim, NULL);
+    if (result && out_count) *out_count = chunks;
+    return result;
+}
+
+// ===== Weight Initializers =====
+
+Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
+    Tensor* t = tensor_rand(shape, ndim, config);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    float bound = sqrtf(6.0f / (float)fan_in); // gain=sqrt(2) for ReLU, a=sqrt(5)
+    for (size_t i = 0; i < t->numel; i++)
+        data[i] = data[i] * 2.0f * bound - bound; // Scale [0,1) to [-bound, bound)
+    return t;
+}
+
+Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config) {
+    Tensor* t = tensor_randn(shape, ndim, config);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    float std_val = sqrtf(2.0f / (float)fan_in);
+    for (size_t i = 0; i < t->numel; i++)
+        data[i] *= std_val;
+    return t;
+}
+
+Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config) {
+    Tensor* t = tensor_rand(shape, ndim, config);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    float bound = sqrtf(6.0f / (float)(fan_in + fan_out));
+    for (size_t i = 0; i < t->numel; i++)
+        data[i] = data[i] * 2.0f * bound - bound;
+    return t;
+}
+
+Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config) {
+    Tensor* t = tensor_randn(shape, ndim, config);
+    if (!t) return NULL;
+    float* data = (float*)t->data;
+    float std_val = sqrtf(2.0f / (float)(fan_in + fan_out));
+    for (size_t i = 0; i < t->numel; i++)
+        data[i] *= std_val;
+    return t;
+}
