@@ -165,6 +165,20 @@ struct Tensor* tensor_focal_loss(struct Tensor* input, struct Tensor* target, fl
  */
 struct Tensor* tensor_smooth_l1_loss(struct Tensor* input, struct Tensor* target, float beta);
 
+/**
+ * @brief Sparse Cross Entropy Loss (numerically stable)
+ *
+ * Computes cross entropy loss directly from logits using log-sum-exp.
+ * More numerically stable than softmax + log + nll.
+ *
+ * Formula: loss = mean(-logits[target] + log(sum(exp(logits))))
+ *
+ * @param input Predicted logits [N, C] (before softmax)
+ * @param target Target class indices [N] with values in [0, C-1]
+ * @return Loss tensor (scalar) with autograd support, or NULL on failure
+ */
+struct Tensor* tensor_sparse_cross_entropy_loss(struct Tensor* input, struct Tensor* target);
+
 #ifdef __cplusplus
 }
 #endif

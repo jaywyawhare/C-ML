@@ -861,3 +861,90 @@ Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
     LOG_DEBUG("KL Divergence Loss computed using IR (lazy)");
     return result;
 }
+
+// Sparse Cross Entropy Loss (numerically stable)
+// Input: logits [N, C], Target: class indices [N]
+// Formula: loss = mean(-logits[target] + log(sum(exp(logits), dim=-1)))
+// Uses log-sum-exp trick for numerical stability
+Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
+    if (!input || !target) {
+        LOG_ERROR("Sparse Cross Entropy Loss: input or target is NULL");
+        return NULL;
+    }
+
+    if (target->ndim != 1) {
+        LOG_ERROR("Sparse Cross Entropy Loss: target must be 1D (class indices)");
+        return NULL;
+    }
+
+    if (input->ndim < 2) {
+        LOG_ERROR("Sparse Cross Entropy Loss: input must be at least 2D [N, C]");
+        return NULL;
+    }
+
+    size_t n_samples = target->numel;
+    size_t input_batch_size = 1;
+    for (int i = 0; i < input->ndim - 1; i++) {
+        input_batch_size *= (size_t)input->shape[i];
+    }
+
+    if (input_batch_size != n_samples) {
+        LOG_ERROR("Sparse Cross Entropy Loss: batch size mismatch. Input batch: %zu, target: %zu",
+                  input_batch_size, n_samples);
+        return NULL;
+    }
+
+    LOG_DEBUG("Computing Sparse Cross Entropy Loss using IR (lazy)");
+
+    // Step 1: Gather logits for target classes: logits[i, target[i]]
+    Tensor* target_logits = uop_gather(input, target, -1);
+    if (!target_logits) {
+        LOG_ERROR("Sparse Cross Entropy Loss: failed to gather target logits");
+        return NULL;
+    }
+
+    // Step 2: Compute log-sum-exp along class dimension
+    // log(sum(exp(logits), dim=-1))
+    Tensor* exp_logits = uop_exp(input);
+    if (!exp_logits)
+        return NULL;
+
+    ReduceParams sum_params = {0};
+    int sum_dim         = input->ndim - 1;
+    int sum_dims[]      = {sum_dim};
+    sum_params.dims     = sum_dims;
+    sum_params.num_dims = 1;
+    sum_params.keepdim  = false;
+
+    Tensor* sum_exp = uop_sum(exp_logits, &sum_params);
+    if (!sum_exp)
+        return NULL;
+
+    Tensor* log_sum_exp = uop_log(sum_exp);
+    if (!log_sum_exp)
+        return NULL;
+
+    // Step 3: loss_per_sample = -target_logits + log_sum_exp
+    Tensor* neg_target_logits = uop_neg(target_logits);
+    if (!neg_target_logits)
+        return NULL;
+
+    Tensor* loss_per_sample = uop_add(neg_target_logits, log_sum_exp);
+    if (!loss_per_sample)
+        return NULL;
+
+    // Step 4: Mean over all samples
+    ReduceParams mean_params = {0};
+    mean_params.dims     = NULL;
+    mean_params.num_dims = 0;
+    mean_params.keepdim  = false;
+    Tensor* result = uop_mean(loss_per_sample, &mean_params);
+
+    if (!result) {
+        LOG_ERROR("Sparse Cross Entropy Loss: failed to compute mean");
+        return NULL;
+    }
+
+    LOG_DEBUG("Sparse Cross Entropy Loss computed using IR (lazy)");
+    return result;
+}
