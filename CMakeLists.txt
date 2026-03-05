@@ -213,6 +213,7 @@ set(NN_SOURCES
     src/nn/layers/transformer.c
     src/nn/layers/rmsnorm.c
     src/nn/layers/conv_transpose2d.c
+    src/nn/layers/instancenorm.c
 )
 
 set(OPTIM_SOURCES
