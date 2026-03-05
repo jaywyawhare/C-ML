@@ -34,6 +34,7 @@
 #include "nn/layers/containers.h"
 #include "nn/layers/rmsnorm.h"
 #include "nn/layers/conv_transpose2d.h"
+#include "nn/layers/instancenorm.h"
 
 #ifdef __cplusplus
 extern "C" {
