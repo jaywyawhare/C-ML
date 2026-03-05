@@ -32,6 +32,8 @@
 #include "nn/layers/rnn.h"
 #include "nn/layers/transformer.h"
 #include "nn/layers/containers.h"
+#include "nn/layers/rmsnorm.h"
+#include "nn/layers/conv_transpose2d.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +80,10 @@ extern "C" {
 #define nn_TransformerEncoderLayer(...) nn_transformer_encoder_layer(__VA_ARGS__)
 #define nn_ModuleList() nn_module_list()
 #define nn_ModuleDict() nn_module_dict()
+#define nn_RMSNorm(normalized_shape, eps, dtype, device)                                           \
+    nn_rmsnorm(normalized_shape, eps, dtype, device)
+#define nn_ConvTranspose2d(in_ch, out_ch, kernel, stride, padding, opad, bias, dtype, device)      \
+    nn_conv_transpose2d(in_ch, out_ch, kernel, stride, padding, opad, bias, dtype, device)
 
 #ifdef __cplusplus
 }
