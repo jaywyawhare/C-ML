@@ -12,6 +12,47 @@
 #include "core/error_stack.h"
 #include "core/config.h"
 
+static inline uint16_t float_to_fp16(float f) {
+    uint32_t x;
+    memcpy(&x, &f, sizeof(x));
+    uint32_t sign = (x >> 16) & 0x8000;
+    int32_t exp = ((x >> 23) & 0xFF) - 127 + 15;
+    uint32_t mant = (x >> 13) & 0x3FF;
+    if (exp <= 0) return (uint16_t)sign;
+    if (exp >= 31) return (uint16_t)(sign | 0x7C00);
+    return (uint16_t)(sign | ((uint32_t)exp << 10) | mant);
+}
+
+static inline float fp16_to_float(uint16_t h) {
+    uint32_t sign = ((uint32_t)h & 0x8000) << 16;
+    uint32_t exp = (h >> 10) & 0x1F;
+    uint32_t mant = h & 0x3FF;
+    uint32_t result;
+    if (exp == 0) {
+        result = sign; /* zero / subnormals → 0 */
+    } else if (exp == 31) {
+        result = sign | 0x7F800000 | (mant << 13);
+    } else {
+        result = sign | ((exp - 15 + 127) << 23) | (mant << 13);
+    }
+    float f;
+    memcpy(&f, &result, sizeof(f));
+    return f;
+}
+
+static inline uint16_t float_to_bf16(float f) {
+    uint32_t x;
+    memcpy(&x, &f, sizeof(x));
+    return (uint16_t)(x >> 16);
+}
+
+static inline float bf16_to_float(uint16_t h) {
+    uint32_t x = (uint32_t)h << 16;
+    float f;
+    memcpy(&f, &x, sizeof(f));
+    return f;
+}
+
 static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType* device) {
     if (!config) {
         *dtype  = DTYPE_FLOAT32;
@@ -48,23 +89,7 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
         total_size *= shape[i];
     }
 
-    switch (dtype) {
-    case DTYPE_FLOAT32:
-        total_size *= sizeof(float);
-        break;
-    case DTYPE_FLOAT64:
-        total_size *= sizeof(double);
-        break;
-    case DTYPE_INT32:
-        total_size *= sizeof(int32_t);
-        break;
-    case DTYPE_INT64:
-        total_size *= sizeof(int64_t);
-        break;
-    case DTYPE_BOOL:
-        total_size *= sizeof(uint8_t);
-        break;
-    }
+    total_size *= cml_dtype_size(dtype);
 
     t->data = malloc(total_size);
     if (!t->data) {
@@ -152,6 +177,24 @@ Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
             ((double*)t->data)[i] = 1.0;
         }
         break;
+    case DTYPE_FLOAT16: {
+        uint16_t one_fp16 = float_to_fp16(1.0f);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint16_t*)t->data)[i] = one_fp16;
+        break;
+    }
+    case DTYPE_BFLOAT16: {
+        uint16_t one_bf16 = float_to_bf16(1.0f);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint16_t*)t->data)[i] = one_bf16;
+        break;
+    }
+    case DTYPE_INT8:
+        memset(t->data, 1, total_size);
+        break;
+    case DTYPE_UINT8:
+        memset(t->data, 1, total_size);
+        break;
     }
 
     return t;
@@ -196,6 +239,26 @@ Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float valu
         for (size_t i = 0; i < total_size; i++) {
             ((uint8_t*)t->data)[i] = (uint8_t)(fabsf(value) > 1e-9f);
         }
+        break;
+    case DTYPE_FLOAT16: {
+        uint16_t v16 = float_to_fp16(value);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint16_t*)t->data)[i] = v16;
+        break;
+    }
+    case DTYPE_BFLOAT16: {
+        uint16_t vbf = float_to_bf16(value);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint16_t*)t->data)[i] = vbf;
+        break;
+    }
+    case DTYPE_INT8:
+        for (size_t i = 0; i < total_size; i++)
+            ((int8_t*)t->data)[i] = (int8_t)value;
+        break;
+    case DTYPE_UINT8:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = (uint8_t)value;
         break;
     }
 
@@ -255,6 +318,12 @@ size_t cml_dtype_size(DType dtype) {
         return sizeof(int64_t);
     case DTYPE_BOOL:
         return sizeof(uint8_t);
+    case DTYPE_FLOAT16:
+    case DTYPE_BFLOAT16:
+        return 2;
+    case DTYPE_INT8:
+    case DTYPE_UINT8:
+        return 1;
     default:
         return sizeof(float);
     }
@@ -279,47 +348,20 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
     // Promotion hierarchy: BOOL < INT32 < INT64 < FLOAT32 < FLOAT64
     int rank1 = 0, rank2 = 0;
 
-    switch (dtype1) {
-    case DTYPE_BOOL:
-        rank1 = 0;
-        break;
-    case DTYPE_INT32:
-        rank1 = 1;
-        break;
-    case DTYPE_INT64:
-        rank1 = 2;
-        break;
-    case DTYPE_FLOAT32:
-        rank1 = 3;
-        break;
-    case DTYPE_FLOAT64:
-        rank1 = 4;
-        break;
-    default:
-        rank1 = 0;
-        break;
-    }
-
-    switch (dtype2) {
-    case DTYPE_BOOL:
-        rank2 = 0;
-        break;
-    case DTYPE_INT32:
-        rank2 = 1;
-        break;
-    case DTYPE_INT64:
-        rank2 = 2;
-        break;
-    case DTYPE_FLOAT32:
-        rank2 = 3;
-        break;
-    case DTYPE_FLOAT64:
-        rank2 = 4;
-        break;
-    default:
-        rank2 = 0;
-        break;
-    }
+    // Promotion hierarchy: BOOL < UINT8 < INT8 < INT32 < INT64 < FLOAT16 < BFLOAT16 < FLOAT32 < FLOAT64
+    static const int dtype_rank[] = {
+        [DTYPE_FLOAT32] = 7,
+        [DTYPE_FLOAT64] = 8,
+        [DTYPE_INT32]   = 4,
+        [DTYPE_INT64]   = 5,
+        [DTYPE_BOOL]    = 0,
+        [DTYPE_FLOAT16] = 6,
+        [DTYPE_BFLOAT16]= 6,
+        [DTYPE_INT8]    = 2,
+        [DTYPE_UINT8]   = 1,
+    };
+    rank1 = (dtype1 <= DTYPE_UINT8) ? dtype_rank[dtype1] : 0;
+    rank2 = (dtype2 <= DTYPE_UINT8) ? dtype_rank[dtype2] : 0;
 
     return (rank1 > rank2) ? dtype1 : dtype2;
 }
@@ -427,6 +469,14 @@ float tensor_get_float(Tensor* t, size_t idx) {
         return (float)((int64_t*)t->data)[offset];
     case DTYPE_BOOL:
         return (float)((uint8_t*)t->data)[offset];
+    case DTYPE_FLOAT16:
+        return fp16_to_float(((uint16_t*)t->data)[offset]);
+    case DTYPE_BFLOAT16:
+        return bf16_to_float(((uint16_t*)t->data)[offset]);
+    case DTYPE_INT8:
+        return (float)((int8_t*)t->data)[offset];
+    case DTYPE_UINT8:
+        return (float)((uint8_t*)t->data)[offset];
     default:
         return 0.0f;
     }
@@ -471,6 +521,18 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
         break;
     case DTYPE_BOOL:
         ((uint8_t*)t->data)[offset] = (uint8_t)(fabsf(value) > 1e-9f);
+        break;
+    case DTYPE_FLOAT16:
+        ((uint16_t*)t->data)[offset] = float_to_fp16(value);
+        break;
+    case DTYPE_BFLOAT16:
+        ((uint16_t*)t->data)[offset] = float_to_bf16(value);
+        break;
+    case DTYPE_INT8:
+        ((int8_t*)t->data)[offset] = (int8_t)value;
+        break;
+    case DTYPE_UINT8:
+        ((uint8_t*)t->data)[offset] = (uint8_t)value;
         break;
     }
 }
