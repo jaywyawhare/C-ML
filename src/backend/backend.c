@@ -1,4 +1,5 @@
 #include "backend/backend.h"
+#include "backend/opencl_backend.h"
 #include "core/logging.h"
 #include "backend/device.h"
 #include "ops/simd_utils.h"
@@ -657,6 +658,15 @@ int backend_init(BackendType type) {
         g_current_backend->ops = scalar_ops;
         LOG_DEBUG("Backend %d using scalar fallback (optimized version not available)", type);
         break;
+    case BACKEND_OPENCL:
+        if (opencl_backend_init() == 0) {
+            g_current_backend->ops = opencl_backend_get_ops();
+            LOG_INFO("OpenCL backend initialized");
+        } else {
+            g_current_backend->ops = scalar_ops;
+            LOG_WARNING("OpenCL not available, using scalar fallback");
+        }
+        break;
 #else
     case BACKEND_SSE:
     case BACKEND_AVX:
@@ -667,6 +677,15 @@ int backend_init(BackendType type) {
         // SIMD not available, use scalar fallback
         g_current_backend->ops = scalar_ops;
         LOG_DEBUG("Backend %d using scalar fallback (SIMD not available)", type);
+        break;
+    case BACKEND_OPENCL:
+        if (opencl_backend_init() == 0) {
+            g_current_backend->ops = opencl_backend_get_ops();
+            LOG_INFO("OpenCL backend initialized");
+        } else {
+            g_current_backend->ops = scalar_ops;
+            LOG_WARNING("OpenCL not available, using scalar fallback");
+        }
         break;
 #endif
     }
@@ -771,6 +790,8 @@ bool backend_is_available(BackendType type) {
         return device_metal_available();
     case BACKEND_ROCM:
         return device_rocm_available();
+    case BACKEND_OPENCL:
+        return opencl_backend_is_available();
     default:
         return false;
     }

@@ -26,7 +26,8 @@ typedef enum {
     BACKEND_BLAS,   // BLAS library (OpenBLAS, MKL, etc.)
     BACKEND_CUDA,   // CUDA/GPU
     BACKEND_METAL,  // Metal (Apple GPU)
-    BACKEND_ROCM    // ROCm (AMD GPU)
+    BACKEND_ROCM,   // ROCm (AMD GPU)
+    BACKEND_OPENCL  // OpenCL (cross-vendor GPU)
 } BackendType;
 
 /**
