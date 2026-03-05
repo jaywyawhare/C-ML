@@ -94,6 +94,15 @@ typedef struct AdaDeltaState {
     Tensor* acc_update; // Accumulated squared updates
 } AdaDeltaState;
 
+typedef struct LAMBState {
+    Tensor* exp_avg;
+    Tensor* exp_avg_sq;
+} LAMBState;
+
+typedef struct LARSState {
+    Tensor* momentum_buffer;
+} LARSState;
+
 void optimizer_free(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -176,6 +185,28 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->acc_grad);
                             if (states[j]->acc_update)
                                 tensor_free(states[j]->acc_update);
+                            free(states[j]);
+                        }
+                    }
+                    free(states);
+                } else if (strcmp(optimizer->name, "LAMB") == 0) {
+                    LAMBState** states = (LAMBState**)group->state;
+                    for (int j = 0; j < group->num_parameters; j++) {
+                        if (states[j]) {
+                            if (states[j]->exp_avg)
+                                tensor_free(states[j]->exp_avg);
+                            if (states[j]->exp_avg_sq)
+                                tensor_free(states[j]->exp_avg_sq);
+                            free(states[j]);
+                        }
+                    }
+                    free(states);
+                } else if (strcmp(optimizer->name, "LARS") == 0) {
+                    LARSState** states = (LARSState**)group->state;
+                    for (int j = 0; j < group->num_parameters; j++) {
+                        if (states[j]) {
+                            if (states[j]->momentum_buffer)
+                                tensor_free(states[j]->momentum_buffer);
                             free(states[j]);
                         }
                     }
@@ -1180,6 +1211,272 @@ Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, flo
     if (optimizer) {
         extern void cml_track_optimizer(Optimizer*);
         cml_track_optimizer(optimizer);
+    }
+
+    return optimizer;
+}
+
+static void lamb_step(Optimizer* optimizer) {
+    if (!optimizer)
+        return;
+
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
+        float lr              = group->lr;
+        float weight_decay    = group->weight_decay;
+        float beta1           = group->beta1;
+        float beta2           = group->beta2;
+        float epsilon         = group->epsilon;
+
+        // Initialize state if needed
+        if (!group->state) {
+            LAMBState** states = malloc((size_t)group->num_parameters * sizeof(LAMBState*));
+            if (!states) {
+                LOG_ERROR("Failed to allocate LAMB state");
+                continue;
+            }
+
+            for (int i = 0; i < group->num_parameters; i++) {
+                Parameter* param = group->parameters[i];
+                if (!param || !param->tensor)
+                    continue;
+
+                Tensor* tensor   = param->tensor;
+                LAMBState* state = malloc(sizeof(LAMBState));
+                if (!state)
+                    continue;
+
+                TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                     .device     = tensor->device,
+                                                     .has_dtype  = true,
+                                                     .has_device = true};
+                state->exp_avg    = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                state->exp_avg_sq = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]         = state;
+            }
+
+            group->state = states;
+        }
+
+        LAMBState** states = (LAMBState**)group->state;
+        int step           = group->step_count + 1;
+
+        float bias_correction1 = 1.0f - powf(beta1, (float)step);
+        float bias_correction2 = 1.0f - powf(beta2, (float)step);
+
+        for (int i = 0; i < group->num_parameters; i++) {
+            Parameter* param = group->parameters[i];
+            if (!param || !param->tensor || !param->requires_grad)
+                continue;
+
+            Tensor* tensor = param->tensor;
+            Tensor* grad   = tensor_get_grad(tensor);
+
+            if (!grad || !states[i])
+                continue;
+
+            float* param_data      = (float*)tensor_data_ptr(tensor);
+            float* grad_data       = (float*)tensor_data_ptr(grad);
+            float* exp_avg_data    = (float*)tensor_data_ptr(states[i]->exp_avg);
+            float* exp_avg_sq_data = (float*)tensor_data_ptr(states[i]->exp_avg_sq);
+
+            if (!param_data || !grad_data || !exp_avg_data || !exp_avg_sq_data)
+                continue;
+
+            size_t numel = tensor->numel;
+
+            // Update moment estimates
+            float param_norm = 0.0f;
+            float update_norm = 0.0f;
+
+            for (size_t j = 0; j < numel; j++) {
+                float grad_val = grad_data[j];
+
+                exp_avg_data[j] = beta1 * exp_avg_data[j] + (1.0f - beta1) * grad_val;
+                exp_avg_sq_data[j] =
+                    beta2 * exp_avg_sq_data[j] + (1.0f - beta2) * grad_val * grad_val;
+
+                param_norm += param_data[j] * param_data[j];
+            }
+            param_norm = sqrtf(param_norm);
+
+            // Compute update with bias correction and weight decay
+            for (size_t j = 0; j < numel; j++) {
+                float m = exp_avg_data[j] / bias_correction1;
+                float v = exp_avg_sq_data[j] / bias_correction2;
+                float update_val = m / (sqrtf(v) + epsilon);
+
+                if (weight_decay > 0.0f) {
+                    update_val += weight_decay * param_data[j];
+                }
+
+                update_norm += update_val * update_val;
+                // Temporarily store update in grad_data (will be overwritten by zero_grad)
+                grad_data[j] = update_val;
+            }
+            update_norm = sqrtf(update_norm);
+
+            // Compute trust ratio (LAMB layer-wise scaling)
+            float trust_ratio = 1.0f;
+            if (param_norm > 0.0f && update_norm > 0.0f) {
+                trust_ratio = param_norm / update_norm;
+            }
+
+            // Apply update with trust ratio
+            for (size_t j = 0; j < numel; j++) {
+                param_data[j] -= lr * trust_ratio * grad_data[j];
+            }
+        }
+
+        group->step_count++;
+    }
+}
+
+static void lars_step(Optimizer* optimizer) {
+    if (!optimizer)
+        return;
+
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
+        float lr              = group->lr;
+        float weight_decay    = group->weight_decay;
+        float momentum        = group->momentum;
+        float trust_coeff     = group->epsilon; // Reuse epsilon for trust coefficient
+
+        // Initialize momentum state if needed
+        if (momentum > 0.0f && !group->state) {
+            LARSState** states = malloc((size_t)group->num_parameters * sizeof(LARSState*));
+            if (!states) {
+                LOG_ERROR("Failed to allocate LARS state");
+                continue;
+            }
+
+            for (int i = 0; i < group->num_parameters; i++) {
+                Parameter* param = group->parameters[i];
+                if (!param || !param->tensor)
+                    continue;
+
+                Tensor* tensor   = param->tensor;
+                LARSState* state = malloc(sizeof(LARSState));
+                if (!state)
+                    continue;
+
+                TensorConfig config    = (TensorConfig){.dtype      = tensor->dtype,
+                                                        .device     = tensor->device,
+                                                        .has_dtype  = true,
+                                                        .has_device = true};
+                state->momentum_buffer = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                states[i]              = state;
+            }
+
+            group->state = states;
+        }
+
+        LARSState** states = momentum > 0.0f ? (LARSState**)group->state : NULL;
+
+        for (int i = 0; i < group->num_parameters; i++) {
+            Parameter* param = group->parameters[i];
+            if (!param || !param->tensor || !param->requires_grad)
+                continue;
+
+            Tensor* tensor = param->tensor;
+            Tensor* grad   = tensor_get_grad(tensor);
+
+            if (!grad)
+                continue;
+
+            float* param_data = (float*)tensor_data_ptr(tensor);
+            float* grad_data  = (float*)tensor_data_ptr(grad);
+
+            if (!param_data || !grad_data)
+                continue;
+
+            size_t numel = tensor->numel;
+
+            // Compute parameter and gradient norms
+            float param_norm = 0.0f;
+            float grad_norm  = 0.0f;
+            for (size_t j = 0; j < numel; j++) {
+                param_norm += param_data[j] * param_data[j];
+                float g = grad_data[j];
+                if (weight_decay > 0.0f) {
+                    g += weight_decay * param_data[j];
+                }
+                grad_norm += g * g;
+            }
+            param_norm = sqrtf(param_norm);
+            grad_norm  = sqrtf(grad_norm);
+
+            // Compute local learning rate (LARS scaling)
+            float local_lr = lr;
+            if (param_norm > 0.0f && grad_norm > 0.0f) {
+                local_lr = lr * trust_coeff * param_norm / grad_norm;
+            }
+
+            // Apply weight decay and update with optional momentum
+            if (momentum > 0.0f && states && states[i] && states[i]->momentum_buffer) {
+                float* momentum_data = (float*)tensor_data_ptr(states[i]->momentum_buffer);
+                if (momentum_data) {
+                    for (size_t j = 0; j < numel; j++) {
+                        float g = grad_data[j];
+                        if (weight_decay > 0.0f) {
+                            g += weight_decay * param_data[j];
+                        }
+                        momentum_data[j] = momentum * momentum_data[j] + local_lr * g;
+                        param_data[j] -= momentum_data[j];
+                    }
+                }
+            } else {
+                for (size_t j = 0; j < numel; j++) {
+                    float g = grad_data[j];
+                    if (weight_decay > 0.0f) {
+                        g += weight_decay * param_data[j];
+                    }
+                    param_data[j] -= local_lr * g;
+                }
+            }
+        }
+
+        group->step_count++;
+    }
+}
+
+Optimizer* optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                      float beta1, float beta2, float epsilon) {
+    Optimizer* optimizer = optimizer_create("LAMB", lamb_step, generic_zero_grad);
+    if (!optimizer)
+        return NULL;
+
+    if (optimizer_add_param_group(optimizer, parameters, num_parameters, lr, weight_decay) != 0) {
+        optimizer_free(optimizer);
+        return NULL;
+    }
+
+    if (optimizer->num_param_groups > 0) {
+        ParameterGroup* group = &optimizer->param_groups[0];
+        group->beta1          = beta1 > 0.0f ? beta1 : 0.9f;
+        group->beta2          = beta2 > 0.0f ? beta2 : 0.999f;
+        group->epsilon        = epsilon > 0.0f ? epsilon : 1e-6f;
+    }
+
+    return optimizer;
+}
+
+Optimizer* optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
+                      float weight_decay, float trust_coefficient) {
+    Optimizer* optimizer = optimizer_create("LARS", lars_step, generic_zero_grad);
+    if (!optimizer)
+        return NULL;
+
+    if (optimizer_add_param_group(optimizer, parameters, num_parameters, lr, weight_decay) != 0) {
+        optimizer_free(optimizer);
+        return NULL;
+    }
+
+    if (optimizer->num_param_groups > 0) {
+        ParameterGroup* group = &optimizer->param_groups[0];
+        group->momentum       = momentum > 0.0f ? momentum : 0.9f;
+        group->epsilon        = trust_coefficient > 0.0f ? trust_coefficient : 0.02f;
     }
 
     return optimizer;

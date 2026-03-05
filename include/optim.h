@@ -386,6 +386,35 @@ Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, flo
  */
 Optimizer* optim_sgd_for_model(Module* model, float lr, float momentum, float weight_decay);
 
+/**
+ * @brief Create LAMB optimizer (Layer-wise Adaptive Moments for Batch training)
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param lr Learning rate
+ * @param weight_decay Weight decay (default: 0.01)
+ * @param beta1 First moment decay rate (default: 0.9)
+ * @param beta2 Second moment decay rate (default: 0.999)
+ * @param epsilon Numerical stability constant (default: 1e-6)
+ * @return New LAMB optimizer, or NULL on failure
+ */
+Optimizer* optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                      float beta1, float beta2, float epsilon);
+
+/**
+ * @brief Create LARS optimizer (Layer-wise Adaptive Rate Scaling)
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param lr Learning rate
+ * @param momentum Momentum factor (default: 0.9)
+ * @param weight_decay Weight decay (default: 0.0)
+ * @param trust_coefficient LARS trust coefficient (default: 0.02)
+ * @return New LARS optimizer, or NULL on failure
+ */
+Optimizer* optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
+                      float weight_decay, float trust_coefficient);
+
 #ifdef __cplusplus
 }
 #endif
