@@ -47,6 +47,7 @@
 #include "core/training_metrics.h"
 #include "core/cleanup.h"
 #include "core/config.h"
+#include "core/quantization.h"
 #include "core/training_loop.h"
 #include "core/serialization.h"
 #include "backend/profiling.h"
@@ -697,6 +698,14 @@ Tensor* cml_nn_huber_loss(Tensor* input, Tensor* target, float delta);
  * @return Loss tensor
  */
 Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target);
+
+/**
+ * @brief Sparse Cross Entropy Loss (numerically stable)
+ * @param input Predicted logits [N, C]
+ * @param target Target class indices [N]
+ * @return Loss tensor
+ */
+Tensor* cml_nn_sparse_cross_entropy_loss(Tensor* input, Tensor* target);
 
 /**
  * @brief Perform backward pass

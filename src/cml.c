@@ -936,6 +936,9 @@ Tensor* cml_nn_huber_loss(Tensor* input, Tensor* target, float delta) {
 Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target) {
     return tensor_kl_div_loss(input, target);
 }
+Tensor* cml_nn_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
+    return tensor_sparse_cross_entropy_loss(input, target);
+}
 
 void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
     tensor_backward(tensor, gradient, retain_graph, create_graph);
