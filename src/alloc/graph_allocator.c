@@ -159,7 +159,6 @@ static size_t calculate_tensor_size(Tensor* tensor) {
 static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph);
 
 // Helper: Perform full liveness analysis to find peak memory usage
-//
 // This function performs complete liveness analysis by:
 // 1. Building a dependency graph from the computation graph
 // 2. Using topological sort to determine execution order
@@ -167,7 +166,6 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph);
 //    - Leaf nodes (inputs/parameters) are always alive
 //    - Intermediate nodes are alive from creation until all consumers finish
 // 4. Calculating peak = max(sum of alive tensor sizes) at each execution step
-//
 // This provides accurate memory estimates by simulating actual execution order
 // and tracking which tensors are alive at each step.
 static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
