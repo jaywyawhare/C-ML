@@ -234,7 +234,6 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
 // Input: logits [N, C] where N is batch size, C is number of classes
 // Target: class indices [N] with values in [0, C-1]
 // Formula: -mean(log(softmax(logits))[target]) = mean(-gather(log_softmax, target, dim=-1))
-//
 // Implementation uses lazy IR operations throughout:
 // 1. softmax(input, dim=-1) -> [N, C]
 // 2. log(softmax) -> [N, C]
