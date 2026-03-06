@@ -130,6 +130,8 @@ set(CORE_SOURCES
     src/core/training_loop.c
     src/core/training_metrics.c
     src/core/serialization.c
+    src/core/gguf.c
+    src/core/safetensors.c
     src/core/cleanup.c
     src/core/error_stack.c
     src/core/computation_graph.c
@@ -166,6 +168,7 @@ set(OPS_SOURCES
     src/ops/ir/kernel_cache.c
     src/ops/ir/fusion_patterns.c
     src/ops/ir/dispatch.c
+    src/ops/ir/decompose.c
     src/ops/ir/gpu/cuda_backend.c
     src/ops/ir/gpu/rocm_backend.c
     src/ops/simd_utils.c
@@ -214,6 +217,9 @@ set(NN_SOURCES
     src/nn/layers/rmsnorm.c
     src/nn/layers/conv_transpose2d.c
     src/nn/layers/instancenorm.c
+    src/nn/layers/conv_transpose1d.c
+    src/nn/layers/batchnorm3d.c
+    src/nn/layers/layernorm2d.c
 )
 
 set(OPTIM_SOURCES
@@ -307,6 +313,9 @@ if(CUDA_LIBS)
 endif()
 if(ROCM_LIBS)
     target_link_libraries(cml ${ROCM_LIBS})
+endif()
+if(OPENCL_LIBS)
+    target_link_libraries(cml ${OPENCL_LIBS})
 endif()
 
 # Create static library
