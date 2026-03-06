@@ -115,6 +115,140 @@ const char* uop_type_to_string(UOpType type) {
         return "TRIL";
     case UOP_PAD:
         return "PAD";
+    case UOP_SORT:
+        return "SORT";
+    case UOP_ARGSORT:
+        return "ARGSORT";
+    case UOP_TOPK:
+        return "TOPK";
+    case UOP_CUMPROD:
+        return "CUMPROD";
+    case UOP_BITWISE_AND:
+        return "BITWISE_AND";
+    case UOP_BITWISE_OR:
+        return "BITWISE_OR";
+    case UOP_BITWISE_XOR:
+        return "BITWISE_XOR";
+    case UOP_BITWISE_NOT:
+        return "BITWISE_NOT";
+    case UOP_NONZERO:
+        return "NONZERO";
+    case UOP_MASKED_FILL:
+        return "MASKED_FILL";
+    case UOP_LOG10:
+        return "LOG10";
+    case UOP_SINH:
+        return "SINH";
+    case UOP_COSH:
+        return "COSH";
+    case UOP_ASINH:
+        return "ASINH";
+    case UOP_ACOSH:
+        return "ACOSH";
+    case UOP_ATANH:
+        return "ATANH";
+    case UOP_TRUNC:
+        return "TRUNC";
+    case UOP_ISINF:
+        return "ISINF";
+    case UOP_ISNAN:
+        return "ISNAN";
+    case UOP_ISFINITE:
+        return "ISFINITE";
+    case UOP_LOGICAL_NOT:
+        return "LOGICAL_NOT";
+    case UOP_IDIV:
+        return "IDIV";
+    case UOP_MOD:
+        return "MOD";
+    case UOP_MINIMUM:
+        return "MINIMUM";
+    case UOP_COPYSIGN:
+        return "COPYSIGN";
+    case UOP_LOGADDEXP:
+        return "LOGADDEXP";
+    case UOP_LSHIFT:
+        return "LSHIFT";
+    case UOP_RSHIFT:
+        return "RSHIFT";
+    case UOP_LOGICAL_AND:
+        return "LOGICAL_AND";
+    case UOP_LOGICAL_OR:
+        return "LOGICAL_OR";
+    case UOP_CMPEQ:
+        return "CMPEQ";
+    case UOP_CMPNE:
+        return "CMPNE";
+    case UOP_CMPLE:
+        return "CMPLE";
+    case UOP_CMPGT:
+        return "CMPGT";
+    case UOP_CMPGE:
+        return "CMPGE";
+    case UOP_MIN_REDUCE:
+        return "MIN_REDUCE";
+    case UOP_VAR:
+        return "VAR";
+    case UOP_STD:
+        return "STD";
+    case UOP_ANY:
+        return "ANY";
+    case UOP_ALL:
+        return "ALL";
+    case UOP_LOGSUMEXP:
+        return "LOGSUMEXP";
+    case UOP_CUMMAX:
+        return "CUMMAX";
+    case UOP_CUMMIN:
+        return "CUMMIN";
+    case UOP_CAT:
+        return "CAT";
+    case UOP_STACK:
+        return "STACK";
+    case UOP_SCATTER:
+        return "SCATTER";
+    case UOP_ROLL:
+        return "ROLL";
+    case UOP_FLATTEN:
+        return "FLATTEN";
+    case UOP_UNFLATTEN:
+        return "UNFLATTEN";
+    case UOP_DIAG:
+        return "DIAG";
+    case UOP_ONE_HOT:
+        return "ONE_HOT";
+    case UOP_ERFC:
+        return "ERFC";
+    case UOP_LOGCUMSUMEXP:
+        return "LOGCUMSUMEXP";
+    case UOP_LERP:
+        return "LERP";
+    case UOP_TILE:
+        return "TILE";
+    case UOP_REPEAT_INTERLEAVE:
+        return "REPEAT_INTERLEAVE";
+    case UOP_TRACE:
+        return "TRACE";
+    case UOP_SHRINK:
+        return "SHRINK";
+    case UOP_RELU6:
+        return "RELU6";
+    case UOP_HARD_SIGMOID:
+        return "HARD_SIGMOID";
+    case UOP_HARD_TANH:
+        return "HARD_TANH";
+    case UOP_CELU:
+        return "CELU";
+    case UOP_QUICK_GELU:
+        return "QUICK_GELU";
+    case UOP_SOFTPLUS:
+        return "SOFTPLUS";
+    case UOP_SOFTSIGN:
+        return "SOFTSIGN";
+    case UOP_LOGSIGMOID:
+        return "LOGSIGMOID";
+    case UOP_UNFOLD:
+        return "UNFOLD";
     case UOP_COUNT:
         return "COUNT";
     default:
@@ -136,6 +270,7 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     // Execution state
     ir->is_executed                = false;
     ir->is_optimized               = false;
+    ir->is_decomposed              = false;
     ir->execution_results          = NULL;
     ir->execution_results_count    = 0;
     ir->execution_results_capacity = 0;
@@ -314,6 +449,168 @@ static void free_node_params(struct IRNode* node) {
         }
         break;
     }
+    case UOP_SORT:
+    case UOP_ARGSORT: {
+        SortParams* p = (SortParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_TOPK: {
+        TopkParams* p = (TopkParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_CUMPROD:
+    case UOP_CUMMAX:
+    case UOP_CUMMIN: {
+        CumsumParams* p = (CumsumParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_MASKED_FILL: {
+        MaskedFillParams* p = (MaskedFillParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    // New reduction ops using ReduceParams
+    case UOP_MIN_REDUCE:
+    case UOP_VAR:
+    case UOP_STD:
+    case UOP_ANY:
+    case UOP_ALL:
+    case UOP_LOGSUMEXP: {
+        ReduceParams* p = (ReduceParams*)node->params;
+        if (p) {
+            if (p->dims) free(p->dims);
+            free(p);
+        }
+        break;
+    }
+    // New movement ops
+    case UOP_CAT: {
+        CatParams* p = (CatParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_STACK: {
+        StackParams* p = (StackParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_SCATTER: {
+        ScatterParams* p = (ScatterParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_ROLL: {
+        RollParams* p = (RollParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_FLATTEN: {
+        FlattenParams* p = (FlattenParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_UNFLATTEN: {
+        UnflattenParams* p = (UnflattenParams*)node->params;
+        if (p) {
+            if (p->sizes) free(p->sizes);
+            free(p);
+        }
+        break;
+    }
+    case UOP_DIAG: {
+        DiagParams* p = (DiagParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_ONE_HOT: {
+        OneHotParams* p = (OneHotParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_TILE: {
+        TileParams* p = (TileParams*)node->params;
+        if (p) {
+            if (p->repeats) free(p->repeats);
+            free(p);
+        }
+        break;
+    }
+    case UOP_REPEAT_INTERLEAVE: {
+        RepeatInterleaveParams* p = (RepeatInterleaveParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_SHRINK: {
+        ShrinkParams* p = (ShrinkParams*)node->params;
+        if (p) {
+            if (p->starts) free(p->starts);
+            if (p->ends) free(p->ends);
+            free(p);
+        }
+        break;
+    }
+    case UOP_UNFOLD: {
+        UnfoldParams* p = (UnfoldParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_LOGCUMSUMEXP: {
+        CumsumParams* p = (CumsumParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_CELU: {
+        ClampParams* p = (ClampParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    // Ops with no params to free
+    case UOP_ERFC:
+    case UOP_LERP:
+    case UOP_TRACE:
+    case UOP_RELU6:
+    case UOP_HARD_SIGMOID:
+    case UOP_HARD_TANH:
+    case UOP_QUICK_GELU:
+    case UOP_SOFTPLUS:
+    case UOP_SOFTSIGN:
+    case UOP_LOGSIGMOID:
+    case UOP_LOG10:
+    case UOP_SINH:
+    case UOP_COSH:
+    case UOP_ASINH:
+    case UOP_ACOSH:
+    case UOP_ATANH:
+    case UOP_TRUNC:
+    case UOP_ISINF:
+    case UOP_ISNAN:
+    case UOP_ISFINITE:
+    case UOP_LOGICAL_NOT:
+    case UOP_IDIV:
+    case UOP_MOD:
+    case UOP_MINIMUM:
+    case UOP_COPYSIGN:
+    case UOP_LOGADDEXP:
+    case UOP_LSHIFT:
+    case UOP_RSHIFT:
+    case UOP_LOGICAL_AND:
+    case UOP_LOGICAL_OR:
+    case UOP_CMPEQ:
+    case UOP_CMPNE:
+    case UOP_CMPLE:
+    case UOP_CMPGT:
+    case UOP_CMPGE:
+    case UOP_BITWISE_AND:
+    case UOP_BITWISE_OR:
+    case UOP_BITWISE_XOR:
+    case UOP_BITWISE_NOT:
+    case UOP_NONZERO:
+    case UOP_TANH:
+    case UOP_SIGMOID:
+        break;
     default:
         break;
     }

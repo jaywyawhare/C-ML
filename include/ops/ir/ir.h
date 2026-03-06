@@ -105,5 +105,6 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node);
 #include "ops/ir/backward.h"
 #include "ops/ir/context.h"
 #include "ops/ir/export.h"
+#include "ops/ir/decompose.h"
 
 #endif // CML_CORE_IR_H
