@@ -467,7 +467,6 @@ static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params) {
     // Note: This computation graph execution is separate from IR-based execution.
     // IR-based execution (used by default) handles operations via uops.
     // This graph execution is for graph mode visualization/debugging.
-    //
     // For actual execution, the IR system should be used instead.
     if (node->tensor && !node->tensor->data) {
         // If tensor exists but not executed, this is a graph mode node
