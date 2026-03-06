@@ -17,6 +17,9 @@
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
 #else
+#ifndef CL_TARGET_OPENCL_VERSION
+#define CL_TARGET_OPENCL_VERSION 300
+#endif
 #include <CL/cl.h>
 #endif
 
