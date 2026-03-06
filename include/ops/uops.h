@@ -109,6 +109,83 @@ typedef enum {
     UOP_NONZERO,     // indices of non-zero elements
     UOP_MASKED_FILL, // fill where mask is true
 
+    // Additional Unary Ops (tinygrad parity)
+    UOP_LOG10,       // log10(a)
+    UOP_SINH,        // sinh(a)
+    UOP_COSH,        // cosh(a)
+    UOP_ASINH,       // asinh(a)
+    UOP_ACOSH,       // acosh(a)
+    UOP_ATANH,       // atanh(a)
+    UOP_TRUNC,       // truncate to integer
+    UOP_ISINF,       // test for infinity (returns 0 or 1)
+    UOP_ISNAN,       // test for NaN (returns 0 or 1)
+    UOP_ISFINITE,    // test for finite (returns 0 or 1)
+    UOP_LOGICAL_NOT, // logical NOT (returns 0 or 1)
+
+    // Additional Binary Ops (tinygrad parity)
+    UOP_IDIV,        // integer division: floor(a / b)
+    UOP_MOD,         // modulo: a % b (fmodf)
+    UOP_MINIMUM,     // min(a, b)
+    UOP_COPYSIGN,    // copysign(a, b)
+    UOP_LOGADDEXP,   // log(exp(a) + exp(b))
+    UOP_LSHIFT,      // a << b (left bit shift)
+    UOP_RSHIFT,      // a >> b (right bit shift)
+    UOP_LOGICAL_AND, // a && b (returns 0 or 1)
+    UOP_LOGICAL_OR,  // a || b (returns 0 or 1)
+
+    // Comparison Ops (tinygrad parity)
+    UOP_CMPEQ,       // a == b (returns 0 or 1)
+    UOP_CMPNE,       // a != b (returns 0 or 1)
+    UOP_CMPLE,       // a <= b (returns 0 or 1)
+    UOP_CMPGT,       // a > b (returns 0 or 1)
+    UOP_CMPGE,       // a >= b (returns 0 or 1)
+
+    // Additional Reduction Ops (tinygrad parity)
+    UOP_MIN_REDUCE,  // min along dimension(s)
+    UOP_VAR,         // variance along dimension(s)
+    UOP_STD,         // standard deviation along dimension(s)
+    UOP_ANY,         // logical OR reduce along dimension(s)
+    UOP_ALL,         // logical AND reduce along dimension(s)
+    UOP_LOGSUMEXP,   // log(sum(exp(a))) along dimension(s)
+    UOP_CUMMAX,      // cumulative max along dimension
+    UOP_CUMMIN,      // cumulative min along dimension
+
+    // Movement/Shape Ops (tinygrad parity)
+    UOP_CAT,         // concatenate tensors along dimension
+    UOP_STACK,       // stack tensors along new dimension
+    UOP_SCATTER,     // scatter elements by index
+    UOP_ROLL,        // circular shift along dimension
+    UOP_FLATTEN,     // collapse dimensions into one
+    UOP_UNFLATTEN,   // expand a dimension into multiple
+    UOP_DIAG,        // create/extract diagonal
+    UOP_ONE_HOT,     // one-hot encoding
+
+    // Additional Unary Ops (tinygrad parity round 2)
+    UOP_ERFC,            // complementary error function erfc(a)
+    UOP_LOGCUMSUMEXP,    // log(cumsum(exp(a))) along dimension
+
+    // Additional Binary Ops (tinygrad parity round 2)
+    UOP_LERP,            // linear interpolation: a + t*(b-a)
+
+    // Additional Movement/Shape Ops (tinygrad parity round 2)
+    UOP_TILE,            // repeat tensor along dimensions
+    UOP_REPEAT_INTERLEAVE, // repeat elements along dimension
+    UOP_TRACE,           // sum of diagonal elements
+    UOP_SHRINK,          // shrink tensor (slice with start/end per dim)
+
+    // Activation Ops (tinygrad parity)
+    UOP_RELU6,           // min(max(x, 0), 6)
+    UOP_HARD_SIGMOID,    // clamp((x + 3) / 6, 0, 1)
+    UOP_HARD_TANH,       // clamp(x, -1, 1)
+    UOP_CELU,            // max(0,x) + min(0, alpha*(exp(x/alpha)-1))
+    UOP_QUICK_GELU,      // x * sigmoid(1.702 * x)
+    UOP_SOFTPLUS,        // log(1 + exp(x))
+    UOP_SOFTSIGN,        // x / (1 + |x|)
+    UOP_LOGSIGMOID,      // log(sigmoid(x))
+
+    // Additional Ops (tinygrad parity round 3)
+    UOP_UNFOLD,          // sliding window extraction (im2col-like)
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -501,8 +578,6 @@ Tensor* uop_softmax(Tensor* x, int dim);
  */
 Tensor* uop_leaky_relu(Tensor* x, float negative_slope);
 
-// ===== New Unary Operations =====
-
 /** @brief Element-wise sign: -1, 0, or 1 */
 Tensor* uop_sign(Tensor* a);
 
@@ -542,8 +617,6 @@ Tensor* uop_erf(Tensor* a);
 /** @brief Element-wise clamp to [min, max] */
 Tensor* uop_clamp(Tensor* a, float min_val, float max_val);
 
-// ===== New Reduction Operations =====
-
 /** @brief Product reduction along dimension(s) */
 Tensor* uop_prod(Tensor* a, ReduceParams* params);
 
@@ -555,8 +628,6 @@ Tensor* uop_argmin(Tensor* a, ReduceParams* params);
 
 /** @brief Cumulative sum along a dimension */
 Tensor* uop_cumsum(Tensor* a, int dim);
-
-// ===== New Special Operations =====
 
 /** @brief Upper triangular matrix */
 Tensor* uop_triu(Tensor* a, int diagonal);
@@ -596,6 +667,245 @@ Tensor* uop_nonzero(Tensor* a);
 
 /** @brief Fill tensor with value where mask is true */
 Tensor* uop_masked_fill(Tensor* a, Tensor* mask, float value);
+
+/** @brief Element-wise log base 10 */
+Tensor* uop_log10(Tensor* a);
+
+/** @brief Element-wise hyperbolic sine */
+Tensor* uop_sinh(Tensor* a);
+
+/** @brief Element-wise hyperbolic cosine */
+Tensor* uop_cosh(Tensor* a);
+
+/** @brief Element-wise inverse hyperbolic sine */
+Tensor* uop_asinh(Tensor* a);
+
+/** @brief Element-wise inverse hyperbolic cosine */
+Tensor* uop_acosh(Tensor* a);
+
+/** @brief Element-wise inverse hyperbolic tangent */
+Tensor* uop_atanh(Tensor* a);
+
+/** @brief Element-wise truncate to integer */
+Tensor* uop_trunc(Tensor* a);
+
+/** @brief Element-wise test for infinity (returns 0 or 1) */
+Tensor* uop_isinf(Tensor* a);
+
+/** @brief Element-wise test for NaN (returns 0 or 1) */
+Tensor* uop_isnan(Tensor* a);
+
+/** @brief Element-wise test for finite (returns 0 or 1) */
+Tensor* uop_isfinite(Tensor* a);
+
+/** @brief Element-wise logical NOT (returns 0 or 1) */
+Tensor* uop_logical_not(Tensor* a);
+
+/** @brief Integer division: floor(a / b) */
+Tensor* uop_idiv(Tensor* a, Tensor* b);
+
+/** @brief Modulo: fmod(a, b) */
+Tensor* uop_mod(Tensor* a, Tensor* b);
+
+/** @brief Element-wise minimum */
+Tensor* uop_minimum(Tensor* a, Tensor* b);
+
+/** @brief Copy sign of b to magnitude of a */
+Tensor* uop_copysign(Tensor* a, Tensor* b);
+
+/** @brief log(exp(a) + exp(b)) numerically stable */
+Tensor* uop_logaddexp(Tensor* a, Tensor* b);
+
+/** @brief Left bit shift */
+Tensor* uop_lshift(Tensor* a, Tensor* b);
+
+/** @brief Right bit shift */
+Tensor* uop_rshift(Tensor* a, Tensor* b);
+
+/** @brief Logical AND */
+Tensor* uop_logical_and(Tensor* a, Tensor* b);
+
+/** @brief Logical OR */
+Tensor* uop_logical_or(Tensor* a, Tensor* b);
+
+/** @brief Element-wise equal */
+Tensor* uop_cmpeq(Tensor* a, Tensor* b);
+
+/** @brief Element-wise not equal */
+Tensor* uop_cmpne(Tensor* a, Tensor* b);
+
+/** @brief Element-wise less than or equal */
+Tensor* uop_cmple(Tensor* a, Tensor* b);
+
+/** @brief Element-wise greater than */
+Tensor* uop_cmpgt(Tensor* a, Tensor* b);
+
+/** @brief Element-wise greater than or equal */
+Tensor* uop_cmpge(Tensor* a, Tensor* b);
+
+/** @brief Min reduction along dimension(s) */
+Tensor* uop_min_reduce(Tensor* a, ReduceParams* params);
+
+/** @brief Variance along dimension(s) */
+Tensor* uop_var(Tensor* a, ReduceParams* params);
+
+/** @brief Standard deviation along dimension(s) */
+Tensor* uop_std(Tensor* a, ReduceParams* params);
+
+/** @brief Logical OR reduce (any non-zero) along dimension(s) */
+Tensor* uop_any(Tensor* a, ReduceParams* params);
+
+/** @brief Logical AND reduce (all non-zero) along dimension(s) */
+Tensor* uop_all(Tensor* a, ReduceParams* params);
+
+/** @brief log(sum(exp(a))) along dimension(s) */
+Tensor* uop_logsumexp(Tensor* a, ReduceParams* params);
+
+/** @brief Cumulative max along dimension */
+Tensor* uop_cummax(Tensor* a, int dim);
+
+/** @brief Cumulative min along dimension */
+Tensor* uop_cummin(Tensor* a, int dim);
+
+typedef struct {
+    int dim;         // Dimension to concatenate along
+    int num_tensors; // Number of input tensors
+} CatParams;
+
+typedef struct {
+    int dim;         // Dimension to stack along
+    int num_tensors; // Number of input tensors
+} StackParams;
+
+typedef struct {
+    int dim;   // Dimension to scatter along
+} ScatterParams;
+
+typedef struct {
+    int shift; // Number of positions to roll
+    int dim;   // Dimension to roll along
+} RollParams;
+
+typedef struct {
+    int start_dim; // First dimension to flatten
+    int end_dim;   // Last dimension to flatten
+} FlattenParams;
+
+typedef struct {
+    int dim;       // Dimension to unflatten
+    int* sizes;    // New sizes for the unflattened dimension
+    int num_sizes; // Number of new sizes
+} UnflattenParams;
+
+typedef struct {
+    int offset;    // Diagonal offset (0=main, positive=above, negative=below)
+} DiagParams;
+
+typedef struct {
+    int num_classes; // Number of classes (-1 = auto from max value)
+} OneHotParams;
+
+/** @brief Concatenate tensors along dimension */
+Tensor* uop_cat(Tensor** tensors, int num_tensors, int dim);
+
+/** @brief Stack tensors along new dimension */
+Tensor* uop_stack(Tensor** tensors, int num_tensors, int dim);
+
+/** @brief Scatter elements by index along dimension */
+Tensor* uop_scatter(Tensor* a, int dim, Tensor* index, Tensor* src);
+
+/** @brief Circular shift along dimension */
+Tensor* uop_roll(Tensor* a, int shift, int dim);
+
+/** @brief Flatten dimensions [start_dim, end_dim] into one */
+Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim);
+
+/** @brief Unflatten a dimension into multiple dimensions */
+Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes);
+
+/** @brief Create/extract diagonal. For 1D: creates diagonal matrix. For 2D: extracts diagonal. */
+Tensor* uop_diag(Tensor* a, int offset);
+
+/** @brief One-hot encoding. Input is integer tensor, output is float. */
+Tensor* uop_one_hot(Tensor* a, int num_classes);
+
+/** @brief Scaled dot product attention: softmax(Q*K^T / sqrt(d)) * V */
+Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask);
+
+typedef struct {
+    int* repeats;   // Number of repeats per dimension
+    int num_dims;   // Number of dimensions
+} TileParams;
+
+typedef struct {
+    int repeats;    // Number of times to repeat each element
+    int dim;        // Dimension along which to repeat
+} RepeatInterleaveParams;
+
+typedef struct {
+    int* starts;    // Start index per dimension
+    int* ends;      // End index per dimension
+    int num_dims;
+} ShrinkParams;
+
+/** @brief Complementary error function: erfc(a) = 1 - erf(a) */
+Tensor* uop_erfc(Tensor* a);
+
+/** @brief Linear interpolation: a + t*(b-a) */
+Tensor* uop_lerp(Tensor* a, Tensor* b, Tensor* t);
+
+/** @brief Tile (repeat) tensor along dimensions */
+Tensor* uop_tile(Tensor* a, int* repeats, int num_dims);
+
+/** @brief Repeat elements along dimension */
+Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim);
+
+/** @brief Sum of diagonal elements (trace) */
+Tensor* uop_trace(Tensor* a);
+
+/** @brief Shrink tensor dimensions (slice with start/end per dim) */
+Tensor* uop_shrink(Tensor* a, int* starts, int* ends, int num_dims);
+
+/** @brief log(cumsum(exp(a))) along dimension */
+Tensor* uop_logcumsumexp(Tensor* a, int dim);
+
+/** @brief ReLU6: min(max(x, 0), 6) */
+Tensor* uop_relu6(Tensor* x);
+
+/** @brief Hard sigmoid: clamp((x + 3) / 6, 0, 1) */
+Tensor* uop_hard_sigmoid(Tensor* x);
+
+/** @brief Hard tanh: clamp(x, -1, 1) */
+Tensor* uop_hard_tanh(Tensor* x);
+
+/** @brief CELU: max(0,x) + min(0, alpha*(exp(x/alpha)-1)) */
+Tensor* uop_celu(Tensor* x, float alpha);
+
+/** @brief Quick GELU: x * sigmoid(1.702 * x) */
+Tensor* uop_quick_gelu(Tensor* x);
+
+/** @brief Softplus: log(1 + exp(x)) */
+Tensor* uop_softplus(Tensor* x);
+
+/** @brief Softsign: x / (1 + |x|) */
+Tensor* uop_softsign(Tensor* x);
+
+/** @brief Log sigmoid: log(sigmoid(x)) = -softplus(-x) */
+Tensor* uop_logsigmoid(Tensor* x);
+
+typedef struct {
+    int kernel_size;  // Size of the sliding window
+    int stride;       // Stride of the sliding window (default = 1)
+} UnfoldParams;
+
+/** @brief Unfold (sliding window) along last dimension */
+Tensor* uop_unfold(Tensor* a, int kernel_size, int stride);
+
+/** @brief Variance and mean together: returns (var, mean) */
+void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** out_mean);
+
+/** @brief Standard deviation and mean together: returns (std, mean) */
+void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean);
 
 #ifdef __cplusplus
 }

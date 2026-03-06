@@ -1609,8 +1609,6 @@ Tensor* uop_leaky_relu(Tensor* x, float negative_slope) {
     return result;
 }
 
-// ===== New Unary Operations =====
-
 // Helper macro for simple unary UOps that just create an IR node with same shape
 #define DEFINE_SIMPLE_UNARY_UOP(name, uop_type)                                                    \
     Tensor* name(Tensor* a) {                                                                      \
@@ -1668,8 +1666,6 @@ Tensor* uop_clamp(Tensor* a, float min_val, float max_val) {
     }
     return tensor_from_ir_node(node, ir);
 }
-
-// ===== New Reduction Operations =====
 
 // Helper for reduction ops that follow the same pattern as uop_sum
 static Tensor* _uop_reduce_common(Tensor* a, ReduceParams* params, UOpType type) {
@@ -1875,8 +1871,6 @@ Tensor* uop_cumsum(Tensor* a, int dim) {
     }
     return tensor_from_ir_node(node, ir);
 }
-
-// ===== New Special Operations =====
 
 Tensor* uop_triu(Tensor* a, int diagonal) {
     if (!a || a->ndim < 2) return NULL;
@@ -2168,6 +2162,942 @@ Tensor* uop_masked_fill(Tensor* a, Tensor* mask, float value) {
     return tensor_from_ir_node(node, ir);
 }
 
+// Re-use the macro pattern for simple unary ops
+#define DEFINE_SIMPLE_UNARY_UOP2(name, uop_type)                                                   \
+    Tensor* name(Tensor* a) {                                                                      \
+        if (!a) return NULL;                                                                       \
+        CMLGraph_t ir = cml_ir_get_or_create_context();                                            \
+        if (!ir) return NULL;                                                                      \
+        Tensor* inputs[] = {a};                                                                    \
+        if (cml_ir_add_uop(ir, uop_type, inputs, 1, NULL) != 0) return NULL;                      \
+        struct IRNode* node = cml_ir_get_tail(ir);                                                 \
+        node->output_shape = tensor_shape_copy(a->shape, a->ndim);                                 \
+        node->output_ndim = a->ndim;                                                               \
+        if (a->requires_grad) {                                                                    \
+            node->requires_grad = true;                                                            \
+            node->needs_input_grad[0] = true;                                                      \
+        }                                                                                          \
+        return tensor_from_ir_node(node, ir);                                                      \
+    }
+
+// No-grad version for ops that produce boolean/integer results
+#define DEFINE_NOGRAD_UNARY_UOP(name, uop_type)                                                    \
+    Tensor* name(Tensor* a) {                                                                      \
+        if (!a) return NULL;                                                                       \
+        CMLGraph_t ir = cml_ir_get_or_create_context();                                            \
+        if (!ir) return NULL;                                                                      \
+        Tensor* inputs[] = {a};                                                                    \
+        if (cml_ir_add_uop(ir, uop_type, inputs, 1, NULL) != 0) return NULL;                      \
+        struct IRNode* node = cml_ir_get_tail(ir);                                                 \
+        node->output_shape = tensor_shape_copy(a->shape, a->ndim);                                 \
+        node->output_ndim = a->ndim;                                                               \
+        node->requires_grad = false;                                                               \
+        return tensor_from_ir_node(node, ir);                                                      \
+    }
+
+DEFINE_SIMPLE_UNARY_UOP2(uop_log10, UOP_LOG10)
+DEFINE_SIMPLE_UNARY_UOP2(uop_sinh, UOP_SINH)
+DEFINE_SIMPLE_UNARY_UOP2(uop_cosh, UOP_COSH)
+DEFINE_SIMPLE_UNARY_UOP2(uop_asinh, UOP_ASINH)
+DEFINE_SIMPLE_UNARY_UOP2(uop_acosh, UOP_ACOSH)
+DEFINE_SIMPLE_UNARY_UOP2(uop_atanh, UOP_ATANH)
+DEFINE_NOGRAD_UNARY_UOP(uop_trunc, UOP_TRUNC)
+DEFINE_NOGRAD_UNARY_UOP(uop_isinf, UOP_ISINF)
+DEFINE_NOGRAD_UNARY_UOP(uop_isnan, UOP_ISNAN)
+DEFINE_NOGRAD_UNARY_UOP(uop_isfinite, UOP_ISFINITE)
+DEFINE_NOGRAD_UNARY_UOP(uop_logical_not, UOP_LOGICAL_NOT)
+
+#undef DEFINE_SIMPLE_UNARY_UOP2
+#undef DEFINE_NOGRAD_UNARY_UOP
+
+// Helper macro for binary ops with broadcast shape computation
+#define DEFINE_BINARY_UOP(name, uop_type, has_grad)                                                \
+    Tensor* name(Tensor* a, Tensor* b) {                                                           \
+        if (!a || !b) return NULL;                                                                 \
+        CMLGraph_t ir = cml_ir_get_or_create_context();                                            \
+        if (!ir) return NULL;                                                                      \
+        Tensor* inputs[] = {a, b};                                                                 \
+        if (cml_ir_add_uop(ir, uop_type, inputs, 2, NULL) != 0) return NULL;                      \
+        struct IRNode* node = cml_ir_get_tail(ir);                                                 \
+        if (cml_ir_compute_broadcast_shape(node) != 0) return NULL;                                \
+        if (has_grad && (a->requires_grad || b->requires_grad)) {                                  \
+            node->requires_grad = true;                                                            \
+            node->needs_input_grad[0] = a->requires_grad;                                         \
+            node->needs_input_grad[1] = b->requires_grad;                                         \
+        }                                                                                          \
+        return tensor_from_ir_node(node, ir);                                                      \
+    }
+
+// No-grad version for comparison/logical binary ops
+#define DEFINE_CMP_BINARY_UOP(name, uop_type)                                                      \
+    Tensor* name(Tensor* a, Tensor* b) {                                                           \
+        if (!a || !b) return NULL;                                                                 \
+        CMLGraph_t ir = cml_ir_get_or_create_context();                                            \
+        if (!ir) return NULL;                                                                      \
+        Tensor* inputs[] = {a, b};                                                                 \
+        if (cml_ir_add_uop(ir, uop_type, inputs, 2, NULL) != 0) return NULL;                      \
+        struct IRNode* node = cml_ir_get_tail(ir);                                                 \
+        if (cml_ir_compute_broadcast_shape(node) != 0) return NULL;                                \
+        node->requires_grad = false;                                                               \
+        return tensor_from_ir_node(node, ir);                                                      \
+    }
+
+DEFINE_BINARY_UOP(uop_idiv, UOP_IDIV, false)
+DEFINE_BINARY_UOP(uop_mod, UOP_MOD, false)
+DEFINE_BINARY_UOP(uop_minimum, UOP_MINIMUM, true)
+DEFINE_BINARY_UOP(uop_copysign, UOP_COPYSIGN, false)
+DEFINE_BINARY_UOP(uop_logaddexp, UOP_LOGADDEXP, true)
+DEFINE_CMP_BINARY_UOP(uop_lshift, UOP_LSHIFT)
+DEFINE_CMP_BINARY_UOP(uop_rshift, UOP_RSHIFT)
+DEFINE_CMP_BINARY_UOP(uop_logical_and, UOP_LOGICAL_AND)
+DEFINE_CMP_BINARY_UOP(uop_logical_or, UOP_LOGICAL_OR)
+
+// Comparison ops
+DEFINE_CMP_BINARY_UOP(uop_cmpeq, UOP_CMPEQ)
+DEFINE_CMP_BINARY_UOP(uop_cmpne, UOP_CMPNE)
+DEFINE_CMP_BINARY_UOP(uop_cmple, UOP_CMPLE)
+DEFINE_CMP_BINARY_UOP(uop_cmpgt, UOP_CMPGT)
+DEFINE_CMP_BINARY_UOP(uop_cmpge, UOP_CMPGE)
+
+#undef DEFINE_BINARY_UOP
+#undef DEFINE_CMP_BINARY_UOP
+
+Tensor* uop_min_reduce(Tensor* a, ReduceParams* params) {
+    return _uop_reduce_common(a, params, UOP_MIN_REDUCE);
+}
+
+Tensor* uop_var(Tensor* a, ReduceParams* params) {
+    return _uop_reduce_common(a, params, UOP_VAR);
+}
+
+Tensor* uop_std(Tensor* a, ReduceParams* params) {
+    return _uop_reduce_common(a, params, UOP_STD);
+}
+
+Tensor* uop_any(Tensor* a, ReduceParams* params) {
+    if (!a) return NULL;
+    // any doesn't have gradients
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    ReduceParams* new_params = malloc(sizeof(ReduceParams));
+    if (!new_params) return NULL;
+    new_params->keepdim = params ? params->keepdim : false;
+    new_params->num_dims = params ? params->num_dims : 0;
+    if (params && params->dims && params->num_dims > 0) {
+        new_params->dims = malloc((size_t)params->num_dims * sizeof(int));
+        if (!new_params->dims) { free(new_params); return NULL; }
+        memcpy(new_params->dims, params->dims, (size_t)params->num_dims * sizeof(int));
+    } else {
+        new_params->dims = NULL;
+    }
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_ANY, inputs, 1, new_params) != 0) {
+        if (new_params->dims) free(new_params->dims);
+        free(new_params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int dim = params && params->dims && params->num_dims > 0 ? params->dims[0] : -1;
+    bool keepdim = params ? params->keepdim : false;
+    int* out_shape = NULL;
+    int out_ndim = 0;
+
+    if (dim < 0 || dim >= a->ndim) {
+        out_ndim = 1;
+        out_shape = malloc(sizeof(int));
+        if (!out_shape) return NULL;
+        out_shape[0] = 1;
+    } else {
+        out_ndim = keepdim ? a->ndim : (a->ndim - 1);
+        if (out_ndim == 0) out_ndim = 1;
+        out_shape = malloc((size_t)out_ndim * sizeof(int));
+        if (!out_shape) return NULL;
+        int out_idx = 0;
+        if (keepdim) {
+            for (int i = 0; i < a->ndim; i++)
+                out_shape[i] = (i == dim) ? 1 : a->shape[i];
+        } else {
+            for (int i = 0; i < a->ndim; i++)
+                if (i != dim) out_shape[out_idx++] = a->shape[i];
+        }
+    }
+
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    node->requires_grad = false;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_all(Tensor* a, ReduceParams* params) {
+    if (!a) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    ReduceParams* new_params = malloc(sizeof(ReduceParams));
+    if (!new_params) return NULL;
+    new_params->keepdim = params ? params->keepdim : false;
+    new_params->num_dims = params ? params->num_dims : 0;
+    if (params && params->dims && params->num_dims > 0) {
+        new_params->dims = malloc((size_t)params->num_dims * sizeof(int));
+        if (!new_params->dims) { free(new_params); return NULL; }
+        memcpy(new_params->dims, params->dims, (size_t)params->num_dims * sizeof(int));
+    } else {
+        new_params->dims = NULL;
+    }
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_ALL, inputs, 1, new_params) != 0) {
+        if (new_params->dims) free(new_params->dims);
+        free(new_params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int dim = params && params->dims && params->num_dims > 0 ? params->dims[0] : -1;
+    bool keepdim = params ? params->keepdim : false;
+    int* out_shape = NULL;
+    int out_ndim = 0;
+
+    if (dim < 0 || dim >= a->ndim) {
+        out_ndim = 1;
+        out_shape = malloc(sizeof(int));
+        if (!out_shape) return NULL;
+        out_shape[0] = 1;
+    } else {
+        out_ndim = keepdim ? a->ndim : (a->ndim - 1);
+        if (out_ndim == 0) out_ndim = 1;
+        out_shape = malloc((size_t)out_ndim * sizeof(int));
+        if (!out_shape) return NULL;
+        int out_idx = 0;
+        if (keepdim) {
+            for (int i = 0; i < a->ndim; i++)
+                out_shape[i] = (i == dim) ? 1 : a->shape[i];
+        } else {
+            for (int i = 0; i < a->ndim; i++)
+                if (i != dim) out_shape[out_idx++] = a->shape[i];
+        }
+    }
+
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    node->requires_grad = false;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_logsumexp(Tensor* a, ReduceParams* params) {
+    return _uop_reduce_common(a, params, UOP_LOGSUMEXP);
+}
+
+Tensor* uop_cummax(Tensor* a, int dim) {
+    if (!a) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    CumsumParams* params = malloc(sizeof(CumsumParams));
+    if (!params) return NULL;
+    params->dim = dim < 0 ? a->ndim + dim : dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_CUMMAX, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+    node->output_ndim = a->ndim;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_cummin(Tensor* a, int dim) {
+    if (!a) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    CumsumParams* params = malloc(sizeof(CumsumParams));
+    if (!params) return NULL;
+    params->dim = dim < 0 ? a->ndim + dim : dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_CUMMIN, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+    node->output_ndim = a->ndim;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_cat(Tensor** tensors, int num_tensors, int dim) {
+    if (!tensors || num_tensors <= 0) return NULL;
+    if (dim < 0) dim = tensors[0]->ndim + dim;
+    if (dim < 0 || dim >= tensors[0]->ndim) return NULL;
+
+    // Validate all tensors have same ndim and compatible shapes
+    int ndim = tensors[0]->ndim;
+    for (int t = 1; t < num_tensors; t++) {
+        if (!tensors[t] || tensors[t]->ndim != ndim) return NULL;
+        for (int d = 0; d < ndim; d++) {
+            if (d != dim && tensors[t]->shape[d] != tensors[0]->shape[d]) return NULL;
+        }
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    CatParams* params = malloc(sizeof(CatParams));
+    if (!params) return NULL;
+    params->dim = dim;
+    params->num_tensors = num_tensors;
+
+    if (cml_ir_add_uop(ir, UOP_CAT, tensors, num_tensors, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape = tensor_shape_copy(tensors[0]->shape, ndim);
+    if (!out_shape) return NULL;
+    out_shape[dim] = 0;
+    for (int t = 0; t < num_tensors; t++)
+        out_shape[dim] += tensors[t]->shape[dim];
+    node->output_shape = out_shape;
+    node->output_ndim = ndim;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_stack(Tensor** tensors, int num_tensors, int dim) {
+    if (!tensors || num_tensors <= 0) return NULL;
+    int ndim = tensors[0]->ndim;
+    if (dim < 0) dim = ndim + 1 + dim;
+    if (dim < 0 || dim > ndim) return NULL;
+
+    // All tensors must have same shape
+    for (int t = 1; t < num_tensors; t++) {
+        if (!tensors[t] || tensors[t]->ndim != ndim) return NULL;
+        for (int d = 0; d < ndim; d++) {
+            if (tensors[t]->shape[d] != tensors[0]->shape[d]) return NULL;
+        }
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    StackParams* params = malloc(sizeof(StackParams));
+    if (!params) return NULL;
+    params->dim = dim;
+    params->num_tensors = num_tensors;
+
+    if (cml_ir_add_uop(ir, UOP_STACK, tensors, num_tensors, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int out_ndim = ndim + 1;
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    int si = 0;
+    for (int d = 0; d < out_ndim; d++) {
+        if (d == dim) out_shape[d] = num_tensors;
+        else out_shape[d] = tensors[0]->shape[si++];
+    }
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_scatter(Tensor* a, int dim, Tensor* index, Tensor* src) {
+    if (!a || !index || !src) return NULL;
+    if (dim < 0) dim = a->ndim + dim;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    ScatterParams* params = malloc(sizeof(ScatterParams));
+    if (!params) return NULL;
+    params->dim = dim;
+
+    Tensor* inputs[] = {a, index, src};
+    if (cml_ir_add_uop(ir, UOP_SCATTER, inputs, 3, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+    node->output_ndim = a->ndim;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_roll(Tensor* a, int shift, int dim) {
+    if (!a) return NULL;
+    if (dim < 0) dim = a->ndim + dim;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    RollParams* params = malloc(sizeof(RollParams));
+    if (!params) return NULL;
+    params->shift = shift;
+    params->dim = dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_ROLL, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+    node->output_ndim = a->ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim) {
+    if (!a) return NULL;
+    if (start_dim < 0) start_dim = a->ndim + start_dim;
+    if (end_dim < 0) end_dim = a->ndim + end_dim;
+    if (start_dim < 0 || end_dim >= a->ndim || start_dim > end_dim) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    FlattenParams* params = malloc(sizeof(FlattenParams));
+    if (!params) return NULL;
+    params->start_dim = start_dim;
+    params->end_dim = end_dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_FLATTEN, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int out_ndim = a->ndim - (end_dim - start_dim);
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    int oi = 0;
+    for (int i = 0; i < a->ndim; i++) {
+        if (i == start_dim) {
+            int flat_size = 1;
+            for (int j = start_dim; j <= end_dim; j++) flat_size *= a->shape[j];
+            out_shape[oi++] = flat_size;
+            i = end_dim;
+        } else {
+            out_shape[oi++] = a->shape[i];
+        }
+    }
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes) {
+    if (!a || !sizes || num_sizes <= 0) return NULL;
+    if (dim < 0) dim = a->ndim + dim;
+    if (dim < 0 || dim >= a->ndim) return NULL;
+
+    // Validate product of sizes equals shape[dim]
+    int product = 1;
+    for (int i = 0; i < num_sizes; i++) product *= sizes[i];
+    if (product != a->shape[dim]) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    UnflattenParams* params = malloc(sizeof(UnflattenParams));
+    if (!params) return NULL;
+    params->dim = dim;
+    params->num_sizes = num_sizes;
+    params->sizes = malloc((size_t)num_sizes * sizeof(int));
+    if (!params->sizes) { free(params); return NULL; }
+    memcpy(params->sizes, sizes, (size_t)num_sizes * sizeof(int));
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_UNFLATTEN, inputs, 1, params) != 0) {
+        free(params->sizes); free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int out_ndim = a->ndim - 1 + num_sizes;
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    int oi = 0;
+    for (int i = 0; i < a->ndim; i++) {
+        if (i == dim) {
+            for (int j = 0; j < num_sizes; j++) out_shape[oi++] = sizes[j];
+        } else {
+            out_shape[oi++] = a->shape[i];
+        }
+    }
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_diag(Tensor* a, int offset) {
+    if (!a) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    DiagParams* params = malloc(sizeof(DiagParams));
+    if (!params) return NULL;
+    params->offset = offset;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_DIAG, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (a->ndim == 1) {
+        // 1D -> 2D diagonal matrix
+        int n = a->shape[0] + abs(offset);
+        int out_shape[] = {n, n};
+        node->output_shape = tensor_shape_copy(out_shape, 2);
+        node->output_ndim = 2;
+    } else if (a->ndim == 2) {
+        // 2D -> 1D extract diagonal
+        int rows = a->shape[0], cols = a->shape[1];
+        int diag_len = 0;
+        if (offset >= 0) diag_len = (rows < cols - offset) ? rows : cols - offset;
+        else diag_len = (rows + offset < cols) ? rows + offset : cols;
+        if (diag_len < 0) diag_len = 0;
+        int out_shape[] = {diag_len};
+        node->output_shape = tensor_shape_copy(out_shape, 1);
+        node->output_ndim = 1;
+    } else {
+        free(params); return NULL;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_one_hot(Tensor* a, int num_classes) {
+    if (!a || num_classes <= 0) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    OneHotParams* params = malloc(sizeof(OneHotParams));
+    if (!params) return NULL;
+    params->num_classes = num_classes;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_ONE_HOT, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    // Output shape is input_shape + [num_classes]
+    int out_ndim = a->ndim + 1;
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    for (int i = 0; i < a->ndim; i++) out_shape[i] = a->shape[i];
+    out_shape[a->ndim] = num_classes;
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    node->requires_grad = false;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_erfc(Tensor* a) {
+    if (!a) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_ERFC, inputs, 1, NULL) != 0) return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+    node->output_ndim = a->ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_lerp(Tensor* a, Tensor* b, Tensor* t) {
+    if (!a || !b || !t) return NULL;
+    // lerp(a, b, t) = a + t * (b - a)
+    Tensor* diff = uop_sub(b, a);
+    if (!diff) return NULL;
+    Tensor* scaled = uop_mul(t, diff);
+    if (!scaled) return NULL;
+    return uop_add(a, scaled);
+}
+
+Tensor* uop_tile(Tensor* a, int* repeats, int num_dims) {
+    if (!a || !repeats || num_dims != a->ndim) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    TileParams* params = malloc(sizeof(TileParams));
+    if (!params) return NULL;
+    params->num_dims = num_dims;
+    params->repeats = malloc((size_t)num_dims * sizeof(int));
+    if (!params->repeats) { free(params); return NULL; }
+    memcpy(params->repeats, repeats, (size_t)num_dims * sizeof(int));
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_TILE, inputs, 1, params) != 0) {
+        free(params->repeats); free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape = malloc((size_t)num_dims * sizeof(int));
+    if (!out_shape) return NULL;
+    for (int i = 0; i < num_dims; i++)
+        out_shape[i] = a->shape[i] * repeats[i];
+    node->output_shape = out_shape;
+    node->output_ndim = num_dims;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim) {
+    if (!a || repeats <= 0) return NULL;
+    if (dim < 0) dim = a->ndim + dim;
+    if (dim < 0 || dim >= a->ndim) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    RepeatInterleaveParams* params = malloc(sizeof(RepeatInterleaveParams));
+    if (!params) return NULL;
+    params->repeats = repeats;
+    params->dim = dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_REPEAT_INTERLEAVE, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape = tensor_shape_copy(a->shape, a->ndim);
+    if (!out_shape) return NULL;
+    out_shape[dim] *= repeats;
+    node->output_shape = out_shape;
+    node->output_ndim = a->ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_trace(Tensor* a) {
+    if (!a || a->ndim != 2) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_TRACE, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int out_shape[] = {1};
+    node->output_shape = tensor_shape_copy(out_shape, 1);
+    node->output_ndim = 1;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_shrink(Tensor* a, int* starts, int* ends, int num_dims) {
+    if (!a || !starts || !ends || num_dims != a->ndim) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    ShrinkParams* params = malloc(sizeof(ShrinkParams));
+    if (!params) return NULL;
+    params->num_dims = num_dims;
+    params->starts = malloc((size_t)num_dims * sizeof(int));
+    params->ends = malloc((size_t)num_dims * sizeof(int));
+    if (!params->starts || !params->ends) {
+        if (params->starts) free(params->starts);
+        if (params->ends) free(params->ends);
+        free(params);
+        return NULL;
+    }
+    memcpy(params->starts, starts, (size_t)num_dims * sizeof(int));
+    memcpy(params->ends, ends, (size_t)num_dims * sizeof(int));
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_SHRINK, inputs, 1, params) != 0) {
+        free(params->starts); free(params->ends); free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape = malloc((size_t)num_dims * sizeof(int));
+    if (!out_shape) return NULL;
+    for (int i = 0; i < num_dims; i++)
+        out_shape[i] = ends[i] - starts[i];
+    node->output_shape = out_shape;
+    node->output_ndim = num_dims;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_logcumsumexp(Tensor* a, int dim) {
+    if (!a) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    CumsumParams* params = malloc(sizeof(CumsumParams));
+    if (!params) return NULL;
+    params->dim = dim < 0 ? a->ndim + dim : dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_LOGCUMSUMEXP, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+    node->output_ndim = a->ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_relu6(Tensor* x) {
+    if (!x) return NULL;
+    // relu6(x) = min(max(x, 0), 6) = clamp(x, 0, 6)
+    return uop_clamp(x, 0.0f, 6.0f);
+}
+
+Tensor* uop_hard_sigmoid(Tensor* x) {
+    if (!x) return NULL;
+    // hard_sigmoid(x) = clamp((x + 3) / 6, 0, 1)
+    Tensor* three = uop_fill(x->shape, x->ndim, 3.0f);
+    if (!three) return NULL;
+    Tensor* shifted = uop_add(x, three);
+    if (!shifted) return NULL;
+    Tensor* six = uop_fill(x->shape, x->ndim, 6.0f);
+    if (!six) return NULL;
+    Tensor* scaled = uop_div(shifted, six);
+    if (!scaled) return NULL;
+    return uop_clamp(scaled, 0.0f, 1.0f);
+}
+
+Tensor* uop_hard_tanh(Tensor* x) {
+    if (!x) return NULL;
+    return uop_clamp(x, -1.0f, 1.0f);
+}
+
+Tensor* uop_celu(Tensor* x, float alpha) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    ClampParams* params = malloc(sizeof(ClampParams));
+    if (!params) return NULL;
+    params->min_val = alpha; // store alpha in min_val
+    params->max_val = 0.0f;  // unused
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_CELU, inputs, 1, params) != 0) {
+        free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_quick_gelu(Tensor* x) {
+    if (!x) return NULL;
+    // quick_gelu(x) = x * sigmoid(1.702 * x)
+    Tensor* coeff = uop_fill(x->shape, x->ndim, 1.702f);
+    if (!coeff) return NULL;
+    Tensor* scaled = uop_mul(coeff, x);
+    if (!scaled) return NULL;
+    Tensor* sig = uop_sigmoid(scaled);
+    if (!sig) return NULL;
+    return uop_mul(x, sig);
+}
+
+Tensor* uop_softplus(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_SOFTPLUS, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_softsign(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_SOFTSIGN, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_logsigmoid(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_LOGSIGMOID, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_unfold(Tensor* a, int kernel_size, int stride) {
+    if (!a) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    UnfoldParams* params = malloc(sizeof(UnfoldParams));
+    if (!params) return NULL;
+    params->kernel_size = kernel_size;
+    params->stride = stride > 0 ? stride : 1;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_UNFOLD, inputs, 1, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    // Output shape: for 1D [L] -> [num_windows, kernel_size]
+    // For 2D [N, L] -> [N, num_windows, kernel_size]
+    int last_dim = a->shape[a->ndim - 1];
+    int num_windows = (last_dim - kernel_size) / params->stride + 1;
+    if (num_windows <= 0) {
+        LOG_ERROR("uop_unfold: invalid params (kernel_size=%d, stride=%d for dim=%d)",
+                  kernel_size, params->stride, last_dim);
+        return NULL;
+    }
+
+    int out_ndim = a->ndim + 1;
+    node->output_shape = malloc((size_t)out_ndim * sizeof(int));
+    for (int i = 0; i < a->ndim - 1; i++) {
+        node->output_shape[i] = a->shape[i];
+    }
+    node->output_shape[out_ndim - 2] = num_windows;
+    node->output_shape[out_ndim - 1] = kernel_size;
+    node->output_ndim = out_ndim;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** out_mean) {
+    if (!a || !out_var || !out_mean) return;
+    *out_mean = uop_mean(a, params);
+    *out_var = uop_var(a, params);
+}
+
+void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean) {
+    if (!a || !out_std || !out_mean) return;
+    *out_mean = uop_mean(a, params);
+    *out_std = uop_std(a, params);
+}
+
+Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask) {
+    if (!q || !k || !v) return NULL;
+    // SDPA: softmax(Q*K^T / sqrt(d_k)) * V
+    // Q: [..., seq_len, d_k], K: [..., seq_len, d_k], V: [..., seq_len, d_v]
+
+    int d_k = q->shape[q->ndim - 1];
+    float scale = 1.0f / sqrtf((float)d_k);
+
+    // K^T: permute last two dims
+    PermuteParams perm_params = {0};
+    int* perm = malloc((size_t)k->ndim * sizeof(int));
+    if (!perm) return NULL;
+    for (int i = 0; i < k->ndim - 2; i++) perm[i] = i;
+    perm[k->ndim - 2] = k->ndim - 1;
+    perm[k->ndim - 1] = k->ndim - 2;
+    perm_params.perm = perm;
+    perm_params.num_dims = k->ndim;
+
+    Tensor* kt = uop_permute(k, &perm_params);
+    free(perm);
+    if (!kt) return NULL;
+
+    // Q * K^T
+    Tensor* scores = uop_matmul(q, kt);
+    if (!scores) return NULL;
+
+    // / sqrt(d_k)
+    Tensor* scale_t = uop_fill(scores->shape, scores->ndim, scale);
+    if (!scale_t) return NULL;
+    Tensor* scaled = uop_mul(scores, scale_t);
+    if (!scaled) return NULL;
+
+    // Apply mask if provided
+    if (mask) {
+        scaled = uop_masked_fill(scaled, mask, -1e9f);
+        if (!scaled) return NULL;
+    }
+
+    // softmax along last dim
+    Tensor* attn = uop_softmax(scaled, scaled->ndim - 1);
+    if (!attn) return NULL;
+
+    // * V
+    return uop_matmul(attn, v);
+}
+
 int uop_execute(UOp* uop) {
     if (!uop || !uop->inputs) {
         LOG_ERROR("Invalid uop");
@@ -2427,6 +3357,12 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
         if (num_inputs >= 2 && params) {
             MaskedFillParams* mfp = (MaskedFillParams*)params;
             return uop_masked_fill(inputs[0], inputs[1], mfp->value);
+        }
+        break;
+    case UOP_UNFOLD:
+        if (num_inputs >= 1 && params) {
+            UnfoldParams* up = (UnfoldParams*)params;
+            return uop_unfold(inputs[0], up->kernel_size, up->stride);
         }
         break;
     case UOP_COUNT:
