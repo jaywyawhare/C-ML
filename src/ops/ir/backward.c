@@ -228,6 +228,78 @@ static int cpu_backward_node(struct IRNode* node) {
         }
         break;
 
+    case UOP_RECIP:
+        // d(1/a)/da = -1/a^2 = -recip(a)^2
+        if (in1 && in1->requires_grad && out->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data  = (float*)g1->data;
+                float* out_data = (float*)out->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float r = out_data[i]; // recip(a) = 1/a
+                    g1_data[i % in1->numel] += out_grad[i] * (-r * r);
+                }
+            }
+        }
+        break;
+
+    case UOP_SIN:
+        // d(sin(a))/da = cos(a) = sin(a + pi/2)
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data  = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    size_t i1 = i % in1->numel;
+                    g1_data[i1] += out_grad[i] * cosf(in1_data[i1]);
+                }
+            }
+        }
+        break;
+
+    case UOP_WHERE:
+        // where(cond, a, b): grad flows to a where cond is true, to b where false
+        // No gradient for cond (discrete)
+        if (node->num_inputs >= 3) {
+            Tensor* cond = node->inputs[0];
+            Tensor* in_a = node->inputs[1];
+            Tensor* in_b = node->inputs[2];
+            if (cond && cond->data) {
+                float* cond_data = (float*)cond->data;
+                size_t cond_numel = cond->numel;
+                if (in_a && in_a->requires_grad) {
+                    Tensor* ga = ensure_grad(in_a);
+                    if (ga && ga->data) {
+                        float* ga_data = (float*)ga->data;
+                        for (size_t i = 0; i < out_numel; i++) {
+                            size_t ci = (cond_numel == 1) ? 0 : i % cond_numel;
+                            if (cond_data[ci] != 0.0f) {
+                                ga_data[i % in_a->numel] += out_grad[i];
+                            }
+                        }
+                    }
+                }
+                if (in_b && in_b->requires_grad) {
+                    Tensor* gb = ensure_grad(in_b);
+                    if (gb && gb->data) {
+                        float* gb_data = (float*)gb->data;
+                        for (size_t i = 0; i < out_numel; i++) {
+                            size_t ci = (cond_numel == 1) ? 0 : i % cond_numel;
+                            if (cond_data[ci] == 0.0f) {
+                                gb_data[i % in_b->numel] += out_grad[i];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        break;
+
+    case UOP_CMPLT:
+        // Comparison ops have no gradient (discrete/non-differentiable)
+        break;
+
     case UOP_SIGMOID:
         // d(sigmoid(a))/da = sigmoid(a) * (1 - sigmoid(a))
         if (in1 && in1->requires_grad && out->data) {
