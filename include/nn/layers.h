@@ -35,6 +35,9 @@
 #include "nn/layers/rmsnorm.h"
 #include "nn/layers/conv_transpose2d.h"
 #include "nn/layers/instancenorm.h"
+#include "nn/layers/conv_transpose1d.h"
+#include "nn/layers/batchnorm3d.h"
+#include "nn/layers/layernorm2d.h"
 
 #ifdef __cplusplus
 extern "C" {
