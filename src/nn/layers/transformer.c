@@ -608,3 +608,409 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
 
     return layer;
 }
+
+static Tensor* transformer_encoder_forward(Module* module, Tensor* input) {
+    TransformerEncoder* enc = (TransformerEncoder*)module;
+    if (!enc || !input) return NULL;
+
+    Tensor* x = input;
+    bool owns_x = false;
+
+    for (int i = 0; i < enc->num_layers; i++) {
+        Tensor* out = module_forward((Module*)enc->layers[i], x);
+        if (owns_x) tensor_free(x);
+        if (!out) return NULL;
+        x = out;
+        owns_x = true;
+    }
+
+    // Final layer norm
+    tensor_ensure_executed(x);
+    float* x_data = (float*)tensor_data_ptr(x);
+    if (!x_data) { if (owns_x) tensor_free(x); return NULL; }
+
+    int total = 1;
+    for (int i = 0; i < x->ndim - 1; i++) total *= x->shape[i];
+    int d_model = enc->d_model;
+
+    float* norm_w = (float*)tensor_data_ptr(enc->norm_weight->tensor);
+    float* norm_b = (float*)tensor_data_ptr(enc->norm_bias->tensor);
+
+    // Clone data for in-place normalization
+    size_t buf_size = (size_t)total * d_model;
+    float* buf = malloc(buf_size * sizeof(float));
+    if (!buf) { if (owns_x) tensor_free(x); return NULL; }
+    memcpy(buf, x_data, buf_size * sizeof(float));
+
+    layer_norm_inplace(buf, total, d_model, norm_w, norm_b, enc->norm_eps);
+
+    int* out_shape = malloc(x->ndim * sizeof(int));
+    if (!out_shape) { free(buf); if (owns_x) tensor_free(x); return NULL; }
+    memcpy(out_shape, x->shape, x->ndim * sizeof(int));
+    int out_ndim = x->ndim;
+
+    TensorConfig cfg = {.dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    if (owns_x) tensor_free(x);
+
+    Tensor* output = tensor_from_data(buf, out_shape, out_ndim, &cfg);
+    free(buf);
+    free(out_shape);
+    return output;
+}
+
+static void transformer_encoder_free(Module* module) {
+    TransformerEncoder* enc = (TransformerEncoder*)module;
+    if (!enc) return;
+    if (enc->layers) {
+        for (int i = 0; i < enc->num_layers; i++) {
+            if (enc->layers[i]) module_free((Module*)enc->layers[i]);
+        }
+        free(enc->layers);
+    }
+    free(enc);
+}
+
+TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
+                                            float dropout, int num_layers,
+                                            DType dtype, DeviceType device) {
+    TransformerEncoder* enc = malloc(sizeof(TransformerEncoder));
+    if (!enc) return NULL;
+
+    if (module_init((Module*)enc, "TransformerEncoder", transformer_encoder_forward, transformer_encoder_free) != 0) {
+        free(enc); return NULL;
+    }
+
+    enc->d_model = d_model;
+    enc->num_layers = num_layers;
+    enc->norm_eps = 1e-5f;
+
+    enc->layers = malloc(num_layers * sizeof(TransformerEncoderLayer*));
+    if (!enc->layers) { module_free((Module*)enc); return NULL; }
+
+    for (int i = 0; i < num_layers; i++) {
+        enc->layers[i] = nn_transformer_encoder_layer(d_model, nhead, dim_feedforward, dropout, dtype, device);
+        if (!enc->layers[i]) {
+            enc->num_layers = i;
+            module_free((Module*)enc);
+            return NULL;
+        }
+    }
+
+    TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    int norm_shape[] = {d_model};
+
+    Tensor* nw = tensor_ones(norm_shape, 1, &config);
+    if (!nw) { module_free((Module*)enc); return NULL; }
+    if (module_add_parameter((Module*)enc, nw, "norm_weight", true) != 0) {
+        tensor_free(nw); module_free((Module*)enc); return NULL;
+    }
+    enc->norm_weight = module_get_parameter((Module*)enc, "norm_weight");
+
+    Tensor* nb = tensor_zeros(norm_shape, 1, &config);
+    if (!nb) { module_free((Module*)enc); return NULL; }
+    if (module_add_parameter((Module*)enc, nb, "norm_bias", true) != 0) {
+        tensor_free(nb); module_free((Module*)enc); return NULL;
+    }
+    enc->norm_bias = module_get_parameter((Module*)enc, "norm_bias");
+
+    return enc;
+}
+
+static Tensor* decoder_layer_forward_wrapper(Module* module, Tensor* input) {
+    // Module forward wraps with tgt=input, memory=NULL (self-attention only mode)
+    TransformerDecoderLayer* layer = (TransformerDecoderLayer*)module;
+    return transformer_decoder_layer_forward(layer, input, NULL, NULL, NULL);
+}
+
+Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor* tgt,
+                                           Tensor* memory, Tensor* tgt_mask, Tensor* memory_mask) {
+    if (!layer || !tgt) return NULL;
+
+    tensor_ensure_executed(tgt);
+    if (tgt->ndim != 3) return NULL;
+
+    int batch = tgt->shape[0];
+    int seq_len = tgt->shape[1];
+    int d_model = layer->d_model;
+    int dim_ff = layer->dim_feedforward;
+    int total = batch * seq_len;
+
+    float* x_data = (float*)tensor_data_ptr(tgt);
+    if (!x_data) return NULL;
+
+    size_t buf_size = (size_t)total * d_model;
+    float* x = malloc(buf_size * sizeof(float));
+    if (!x) return NULL;
+    memcpy(x, x_data, buf_size * sizeof(float));
+
+    // Step 1: Self-attention
+    Tensor* self_attn_out = multihead_attention_forward(layer->self_attn, tgt, tgt, tgt, tgt_mask);
+    if (!self_attn_out) { free(x); return NULL; }
+    tensor_ensure_executed(self_attn_out);
+    float* attn_data = (float*)tensor_data_ptr(self_attn_out);
+
+    // Residual + LayerNorm1
+    for (size_t i = 0; i < buf_size; i++) x[i] += attn_data[i];
+    tensor_free(self_attn_out);
+
+    float* n1w = (float*)tensor_data_ptr(layer->norm1_weight->tensor);
+    float* n1b = (float*)tensor_data_ptr(layer->norm1_bias->tensor);
+    layer_norm_inplace(x, total, d_model, n1w, n1b, layer->norm_eps);
+
+    // Step 2: Cross-attention (if memory provided)
+    if (memory) {
+        tensor_ensure_executed(memory);
+        // Create temporary tensor from x for cross-attention query
+        int x_shape[] = {batch, seq_len, d_model};
+        TensorConfig cfg = {.dtype = tgt->dtype, .device = tgt->device, .has_dtype = true, .has_device = true};
+        Tensor* x_tensor = tensor_from_data(x, x_shape, 3, &cfg);
+        if (!x_tensor) { free(x); return NULL; }
+
+        Tensor* cross_out = multihead_attention_forward(layer->cross_attn, x_tensor, memory, memory, memory_mask);
+        tensor_free(x_tensor);
+        if (!cross_out) { free(x); return NULL; }
+        tensor_ensure_executed(cross_out);
+        float* cross_data = (float*)tensor_data_ptr(cross_out);
+
+        for (size_t i = 0; i < buf_size; i++) x[i] += cross_data[i];
+        tensor_free(cross_out);
+
+        float* n2w = (float*)tensor_data_ptr(layer->norm2_weight->tensor);
+        float* n2b = (float*)tensor_data_ptr(layer->norm2_bias->tensor);
+        layer_norm_inplace(x, total, d_model, n2w, n2b, layer->norm_eps);
+    }
+
+    // Step 3: Feedforward
+    float* l1w = (float*)tensor_data_ptr(layer->linear1_weight->tensor);
+    float* l1b = (float*)tensor_data_ptr(layer->linear1_bias->tensor);
+    float* l2w = (float*)tensor_data_ptr(layer->linear2_weight->tensor);
+    float* l2b = (float*)tensor_data_ptr(layer->linear2_bias->tensor);
+
+    float* ff_hidden = malloc((size_t)total * dim_ff * sizeof(float));
+    if (!ff_hidden) { free(x); return NULL; }
+    linear_project(ff_hidden, x, l1w, l1b, total, d_model, dim_ff);
+    for (size_t i = 0; i < (size_t)total * dim_ff; i++)
+        if (ff_hidden[i] < 0.0f) ff_hidden[i] = 0.0f;
+
+    float* ff_out = malloc(buf_size * sizeof(float));
+    if (!ff_out) { free(x); free(ff_hidden); return NULL; }
+    linear_project(ff_out, ff_hidden, l2w, l2b, total, dim_ff, d_model);
+    free(ff_hidden);
+
+    for (size_t i = 0; i < buf_size; i++) x[i] += ff_out[i];
+    free(ff_out);
+
+    float* n3w = (float*)tensor_data_ptr(layer->norm3_weight->tensor);
+    float* n3b = (float*)tensor_data_ptr(layer->norm3_bias->tensor);
+    layer_norm_inplace(x, total, d_model, n3w, n3b, layer->norm_eps);
+
+    // Output
+    int out_shape[] = {batch, seq_len, d_model};
+    TensorConfig out_cfg = {.dtype = tgt->dtype, .device = tgt->device, .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_from_data(x, out_shape, 3, &out_cfg);
+    free(x);
+    return output;
+}
+
+static void decoder_layer_free(Module* module) {
+    TransformerDecoderLayer* layer = (TransformerDecoderLayer*)module;
+    if (!layer) return;
+    if (layer->self_attn) module_free((Module*)layer->self_attn);
+    if (layer->cross_attn) module_free((Module*)layer->cross_attn);
+    free(layer);
+}
+
+TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
+                                                       float dropout, DType dtype, DeviceType device) {
+    TransformerDecoderLayer* layer = malloc(sizeof(TransformerDecoderLayer));
+    if (!layer) return NULL;
+
+    if (module_init((Module*)layer, "TransformerDecoderLayer", decoder_layer_forward_wrapper, decoder_layer_free) != 0) {
+        free(layer); return NULL;
+    }
+
+    layer->d_model = d_model;
+    layer->nhead = nhead;
+    layer->dim_feedforward = dim_feedforward;
+    layer->dropout = dropout;
+    layer->norm_eps = 1e-5f;
+
+    layer->self_attn = nn_multihead_attention(d_model, nhead, dropout, dtype, device);
+    if (!layer->self_attn) { module_free((Module*)layer); return NULL; }
+
+    layer->cross_attn = nn_multihead_attention(d_model, nhead, dropout, dtype, device);
+    if (!layer->cross_attn) { module_free((Module*)layer); return NULL; }
+
+    TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+
+    int l1_w_shape[] = {dim_feedforward, d_model};
+    int l1_b_shape[] = {dim_feedforward};
+    int l2_w_shape[] = {d_model, dim_feedforward};
+    int l2_b_shape[] = {d_model};
+    int norm_shape[] = {d_model};
+
+    // Linear1
+    Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
+    if (!l1w) { module_free((Module*)layer); return NULL; }
+    float* l1w_data = (float*)tensor_data_ptr(l1w);
+    if (l1w_data) xavier_init(l1w_data, (size_t)dim_feedforward * d_model, d_model, dim_feedforward);
+    if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
+        tensor_free(l1w); module_free((Module*)layer); return NULL;
+    }
+    layer->linear1_weight = module_get_parameter((Module*)layer, "linear1_weight");
+
+    Tensor* l1b = tensor_zeros(l1_b_shape, 1, &config);
+    if (!l1b) { module_free((Module*)layer); return NULL; }
+    if (module_add_parameter((Module*)layer, l1b, "linear1_bias", true) != 0) {
+        tensor_free(l1b); module_free((Module*)layer); return NULL;
+    }
+    layer->linear1_bias = module_get_parameter((Module*)layer, "linear1_bias");
+
+    // Linear2
+    Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
+    if (!l2w) { module_free((Module*)layer); return NULL; }
+    float* l2w_data = (float*)tensor_data_ptr(l2w);
+    if (l2w_data) xavier_init(l2w_data, (size_t)d_model * dim_feedforward, dim_feedforward, d_model);
+    if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
+        tensor_free(l2w); module_free((Module*)layer); return NULL;
+    }
+    layer->linear2_weight = module_get_parameter((Module*)layer, "linear2_weight");
+
+    Tensor* l2b = tensor_zeros(l2_b_shape, 1, &config);
+    if (!l2b) { module_free((Module*)layer); return NULL; }
+    if (module_add_parameter((Module*)layer, l2b, "linear2_bias", true) != 0) {
+        tensor_free(l2b); module_free((Module*)layer); return NULL;
+    }
+    layer->linear2_bias = module_get_parameter((Module*)layer, "linear2_bias");
+
+    // 3 layer norms
+    struct { const char* wn; const char* bn; Parameter** wp; Parameter** bp; } norms[] = {
+        {"norm1_weight", "norm1_bias", &layer->norm1_weight, &layer->norm1_bias},
+        {"norm2_weight", "norm2_bias", &layer->norm2_weight, &layer->norm2_bias},
+        {"norm3_weight", "norm3_bias", &layer->norm3_weight, &layer->norm3_bias},
+    };
+    for (int i = 0; i < 3; i++) {
+        Tensor* nw = tensor_ones(norm_shape, 1, &config);
+        if (!nw) { module_free((Module*)layer); return NULL; }
+        if (module_add_parameter((Module*)layer, nw, norms[i].wn, true) != 0) {
+            tensor_free(nw); module_free((Module*)layer); return NULL;
+        }
+        *norms[i].wp = module_get_parameter((Module*)layer, norms[i].wn);
+
+        Tensor* nb = tensor_zeros(norm_shape, 1, &config);
+        if (!nb) { module_free((Module*)layer); return NULL; }
+        if (module_add_parameter((Module*)layer, nb, norms[i].bn, true) != 0) {
+            tensor_free(nb); module_free((Module*)layer); return NULL;
+        }
+        *norms[i].bp = module_get_parameter((Module*)layer, norms[i].bn);
+    }
+
+    return layer;
+}
+
+static Tensor* transformer_decoder_forward(Module* module, Tensor* input) {
+    // When called via module_forward, only self-attention (no cross-attention)
+    TransformerDecoder* dec = (TransformerDecoder*)module;
+    if (!dec || !input) return NULL;
+
+    Tensor* x = input;
+    bool owns_x = false;
+
+    for (int i = 0; i < dec->num_layers; i++) {
+        Tensor* out = transformer_decoder_layer_forward(dec->layers[i], x, NULL, NULL, NULL);
+        if (owns_x) tensor_free(x);
+        if (!out) return NULL;
+        x = out;
+        owns_x = true;
+    }
+
+    // Final layer norm
+    tensor_ensure_executed(x);
+    float* x_data = (float*)tensor_data_ptr(x);
+    if (!x_data) { if (owns_x) tensor_free(x); return NULL; }
+
+    int total = 1;
+    for (int i = 0; i < x->ndim - 1; i++) total *= x->shape[i];
+    int d_model = dec->d_model;
+
+    float* norm_w = (float*)tensor_data_ptr(dec->norm_weight->tensor);
+    float* norm_b = (float*)tensor_data_ptr(dec->norm_bias->tensor);
+
+    size_t buf_size = (size_t)total * d_model;
+    float* buf = malloc(buf_size * sizeof(float));
+    if (!buf) { if (owns_x) tensor_free(x); return NULL; }
+    memcpy(buf, x_data, buf_size * sizeof(float));
+
+    layer_norm_inplace(buf, total, d_model, norm_w, norm_b, dec->norm_eps);
+
+    int* out_shape = malloc(x->ndim * sizeof(int));
+    if (!out_shape) { free(buf); if (owns_x) tensor_free(x); return NULL; }
+    memcpy(out_shape, x->shape, x->ndim * sizeof(int));
+    int out_ndim = x->ndim;
+
+    TensorConfig cfg = {.dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    if (owns_x) tensor_free(x);
+
+    Tensor* output = tensor_from_data(buf, out_shape, out_ndim, &cfg);
+    free(buf);
+    free(out_shape);
+    return output;
+}
+
+static void transformer_decoder_free(Module* module) {
+    TransformerDecoder* dec = (TransformerDecoder*)module;
+    if (!dec) return;
+    if (dec->layers) {
+        for (int i = 0; i < dec->num_layers; i++) {
+            if (dec->layers[i]) module_free((Module*)dec->layers[i]);
+        }
+        free(dec->layers);
+    }
+    free(dec);
+}
+
+TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
+                                            float dropout, int num_layers,
+                                            DType dtype, DeviceType device) {
+    TransformerDecoder* dec = malloc(sizeof(TransformerDecoder));
+    if (!dec) return NULL;
+
+    if (module_init((Module*)dec, "TransformerDecoder", transformer_decoder_forward, transformer_decoder_free) != 0) {
+        free(dec); return NULL;
+    }
+
+    dec->d_model = d_model;
+    dec->num_layers = num_layers;
+    dec->norm_eps = 1e-5f;
+
+    dec->layers = malloc(num_layers * sizeof(TransformerDecoderLayer*));
+    if (!dec->layers) { module_free((Module*)dec); return NULL; }
+
+    for (int i = 0; i < num_layers; i++) {
+        dec->layers[i] = nn_transformer_decoder_layer(d_model, nhead, dim_feedforward, dropout, dtype, device);
+        if (!dec->layers[i]) {
+            dec->num_layers = i;
+            module_free((Module*)dec);
+            return NULL;
+        }
+    }
+
+    TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    int norm_shape[] = {d_model};
+
+    Tensor* nw = tensor_ones(norm_shape, 1, &config);
+    if (!nw) { module_free((Module*)dec); return NULL; }
+    if (module_add_parameter((Module*)dec, nw, "norm_weight", true) != 0) {
+        tensor_free(nw); module_free((Module*)dec); return NULL;
+    }
+    dec->norm_weight = module_get_parameter((Module*)dec, "norm_weight");
+
+    Tensor* nb = tensor_zeros(norm_shape, 1, &config);
+    if (!nb) { module_free((Module*)dec); return NULL; }
+    if (module_add_parameter((Module*)dec, nb, "norm_bias", true) != 0) {
+        tensor_free(nb); module_free((Module*)dec); return NULL;
+    }
+    dec->norm_bias = module_get_parameter((Module*)dec, "norm_bias");
+
+    return dec;
+}

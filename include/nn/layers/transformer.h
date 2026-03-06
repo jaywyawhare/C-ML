@@ -54,6 +54,61 @@ typedef struct TransformerEncoderLayer {
 TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, int dim_feedforward,
                                                        float dropout, DType dtype, DeviceType device);
 
+typedef struct TransformerEncoder {
+    Module base;
+    int num_layers;
+    int d_model;
+    TransformerEncoderLayer** layers;
+    Parameter* norm_weight;  // Final layer norm [d_model]
+    Parameter* norm_bias;    // Final layer norm [d_model]
+    float norm_eps;
+} TransformerEncoder;
+
+TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
+                                            float dropout, int num_layers,
+                                            DType dtype, DeviceType device);
+
+typedef struct TransformerDecoderLayer {
+    Module base;
+    int d_model;
+    int nhead;
+    int dim_feedforward;
+    float dropout;
+    MultiHeadAttention* self_attn;   // Self-attention
+    MultiHeadAttention* cross_attn;  // Cross-attention (encoder-decoder)
+    Parameter* linear1_weight;  // [dim_feedforward, d_model]
+    Parameter* linear1_bias;    // [dim_feedforward]
+    Parameter* linear2_weight;  // [d_model, dim_feedforward]
+    Parameter* linear2_bias;    // [d_model]
+    Parameter* norm1_weight;    // [d_model] (after self-attn)
+    Parameter* norm1_bias;
+    Parameter* norm2_weight;    // [d_model] (after cross-attn)
+    Parameter* norm2_bias;
+    Parameter* norm3_weight;    // [d_model] (after FFN)
+    Parameter* norm3_bias;
+    float norm_eps;
+} TransformerDecoderLayer;
+
+TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
+                                                       float dropout, DType dtype, DeviceType device);
+
+Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor* tgt,
+                                           Tensor* memory, Tensor* tgt_mask, Tensor* memory_mask);
+
+typedef struct TransformerDecoder {
+    Module base;
+    int num_layers;
+    int d_model;
+    TransformerDecoderLayer** layers;
+    Parameter* norm_weight;  // Final layer norm [d_model]
+    Parameter* norm_bias;
+    float norm_eps;
+} TransformerDecoder;
+
+TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
+                                            float dropout, int num_layers,
+                                            DType dtype, DeviceType device);
+
 #ifdef __cplusplus
 }
 #endif
