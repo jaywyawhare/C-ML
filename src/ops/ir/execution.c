@@ -823,8 +823,6 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
-    // ===== New Unary Operations =====
-
     case UOP_SIGN:
         if (!in1_data) return -1;
         for (size_t i = 0; i < out->numel; i++) {
@@ -916,8 +914,6 @@ int cpu_execute_node(struct IRNode* node) {
         }
         break;
     }
-
-    // ===== New Reduction Operations =====
 
     case UOP_PROD: {
         if (!in1_data) return -1;
@@ -1089,8 +1085,6 @@ int cpu_execute_node(struct IRNode* node) {
         }
         break;
     }
-
-    // ===== New Special Operations =====
 
     case UOP_TRIU: {
         if (!in1_data) return -1;
@@ -1412,6 +1406,977 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_LOG10:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = log10f(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_SINH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = sinhf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_COSH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = coshf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_ASINH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = asinhf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_ACOSH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = acoshf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_ATANH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = atanhf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_TRUNC:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = truncf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_ISINF:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = isinf(in1_data[i % in1_numel]) ? 1.0f : 0.0f;
+        break;
+
+    case UOP_ISNAN:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = isnan(in1_data[i % in1_numel]) ? 1.0f : 0.0f;
+        break;
+
+    case UOP_ISFINITE:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = isfinite(in1_data[i % in1_numel]) ? 1.0f : 0.0f;
+        break;
+
+    case UOP_LOGICAL_NOT:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = (in1_data[i % in1_numel] == 0.0f) ? 1.0f : 0.0f;
+        break;
+
+    case UOP_IDIV:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = floorf(in1_data[i1] / (in2_data[i2] + 1e-8f));
+        }
+        break;
+
+    case UOP_MOD:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = fmodf(in1_data[i1], in2_data[i2]);
+        }
+        break;
+
+    case UOP_MINIMUM:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = fminf(in1_data[i1], in2_data[i2]);
+        }
+        break;
+
+    case UOP_COPYSIGN:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = copysignf(in1_data[i1], in2_data[i2]);
+        }
+        break;
+
+    case UOP_LOGADDEXP:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            float a_val = in1_data[i1], b_val = in2_data[i2];
+            float mx = fmaxf(a_val, b_val);
+            out_data[i] = mx + logf(expf(a_val - mx) + expf(b_val - mx));
+        }
+        break;
+
+    case UOP_LSHIFT:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (float)((int)in1_data[i1] << (int)in2_data[i2]);
+        }
+        break;
+
+    case UOP_RSHIFT:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (float)((int)in1_data[i1] >> (int)in2_data[i2]);
+        }
+        break;
+
+    case UOP_LOGICAL_AND:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] != 0.0f && in2_data[i2] != 0.0f) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_LOGICAL_OR:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] != 0.0f || in2_data[i2] != 0.0f) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_CMPEQ:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] == in2_data[i2]) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_CMPNE:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] != in2_data[i2]) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_CMPLE:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] <= in2_data[i2]) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_CMPGT:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] > in2_data[i2]) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_CMPGE:
+        if (!in1_data || !in2_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
+            out_data[i] = (in1_data[i1] >= in2_data[i2]) ? 1.0f : 0.0f;
+        }
+        break;
+
+    case UOP_MIN_REDUCE: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        ReduceParams* rp = (ReduceParams*)node->params;
+        int dim = rp && rp->dims && rp->num_dims > 0 ? rp->dims[0] : -1;
+
+        if (dim < 0 || dim >= inp->ndim) {
+            // Global min
+            float mn = in1_data[0];
+            for (size_t i = 1; i < in1_numel; i++)
+                if (in1_data[i] < mn) mn = in1_data[i];
+            out_data[0] = mn;
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    float mn = in1_data[c];
+                    for (int r = 1; r < rows; r++)
+                        if (in1_data[r * cols + c] < mn) mn = in1_data[r * cols + c];
+                    out_data[c] = mn;
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    float mn = in1_data[r * cols];
+                    for (int c = 1; c < cols; c++)
+                        if (in1_data[r * cols + c] < mn) mn = in1_data[r * cols + c];
+                    out_data[r] = mn;
+                }
+            }
+        } else if (inp->ndim == 1) {
+            float mn = in1_data[0];
+            for (size_t i = 1; i < in1_numel; i++)
+                if (in1_data[i] < mn) mn = in1_data[i];
+            out_data[0] = mn;
+        }
+        break;
+    }
+
+    case UOP_VAR: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        ReduceParams* rp = (ReduceParams*)node->params;
+        int dim = rp && rp->dims && rp->num_dims > 0 ? rp->dims[0] : -1;
+
+        if (dim < 0 || dim >= inp->ndim) {
+            float mean_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) mean_val += in1_data[i];
+            mean_val /= (float)in1_numel;
+            float var_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) {
+                float diff = in1_data[i] - mean_val;
+                var_val += diff * diff;
+            }
+            out_data[0] = var_val / (float)in1_numel;
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    float mean_val = 0;
+                    for (int r = 0; r < rows; r++) mean_val += in1_data[r * cols + c];
+                    mean_val /= (float)rows;
+                    float var_val = 0;
+                    for (int r = 0; r < rows; r++) {
+                        float diff = in1_data[r * cols + c] - mean_val;
+                        var_val += diff * diff;
+                    }
+                    out_data[c] = var_val / (float)rows;
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    float mean_val = 0;
+                    for (int c = 0; c < cols; c++) mean_val += in1_data[r * cols + c];
+                    mean_val /= (float)cols;
+                    float var_val = 0;
+                    for (int c = 0; c < cols; c++) {
+                        float diff = in1_data[r * cols + c] - mean_val;
+                        var_val += diff * diff;
+                    }
+                    out_data[r] = var_val / (float)cols;
+                }
+            }
+        } else if (inp->ndim == 1) {
+            float mean_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) mean_val += in1_data[i];
+            mean_val /= (float)in1_numel;
+            float var_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) {
+                float diff = in1_data[i] - mean_val;
+                var_val += diff * diff;
+            }
+            out_data[0] = var_val / (float)in1_numel;
+        }
+        break;
+    }
+
+    case UOP_STD: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        ReduceParams* rp = (ReduceParams*)node->params;
+        int dim = rp && rp->dims && rp->num_dims > 0 ? rp->dims[0] : -1;
+
+        if (dim < 0 || dim >= inp->ndim) {
+            float mean_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) mean_val += in1_data[i];
+            mean_val /= (float)in1_numel;
+            float var_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) {
+                float diff = in1_data[i] - mean_val;
+                var_val += diff * diff;
+            }
+            out_data[0] = sqrtf(var_val / (float)in1_numel);
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    float mean_val = 0;
+                    for (int r = 0; r < rows; r++) mean_val += in1_data[r * cols + c];
+                    mean_val /= (float)rows;
+                    float var_val = 0;
+                    for (int r = 0; r < rows; r++) {
+                        float diff = in1_data[r * cols + c] - mean_val;
+                        var_val += diff * diff;
+                    }
+                    out_data[c] = sqrtf(var_val / (float)rows);
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    float mean_val = 0;
+                    for (int c = 0; c < cols; c++) mean_val += in1_data[r * cols + c];
+                    mean_val /= (float)cols;
+                    float var_val = 0;
+                    for (int c = 0; c < cols; c++) {
+                        float diff = in1_data[r * cols + c] - mean_val;
+                        var_val += diff * diff;
+                    }
+                    out_data[r] = sqrtf(var_val / (float)cols);
+                }
+            }
+        } else if (inp->ndim == 1) {
+            float mean_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) mean_val += in1_data[i];
+            mean_val /= (float)in1_numel;
+            float var_val = 0;
+            for (size_t i = 0; i < in1_numel; i++) {
+                float diff = in1_data[i] - mean_val;
+                var_val += diff * diff;
+            }
+            out_data[0] = sqrtf(var_val / (float)in1_numel);
+        }
+        break;
+    }
+
+    case UOP_ANY: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        ReduceParams* rp = (ReduceParams*)node->params;
+        int dim = rp && rp->dims && rp->num_dims > 0 ? rp->dims[0] : -1;
+
+        if (dim < 0 || dim >= inp->ndim) {
+            float result = 0.0f;
+            for (size_t i = 0; i < in1_numel; i++)
+                if (in1_data[i] != 0.0f) { result = 1.0f; break; }
+            out_data[0] = result;
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    out_data[c] = 0.0f;
+                    for (int r = 0; r < rows; r++)
+                        if (in1_data[r * cols + c] != 0.0f) { out_data[c] = 1.0f; break; }
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    out_data[r] = 0.0f;
+                    for (int c = 0; c < cols; c++)
+                        if (in1_data[r * cols + c] != 0.0f) { out_data[r] = 1.0f; break; }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_ALL: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        ReduceParams* rp = (ReduceParams*)node->params;
+        int dim = rp && rp->dims && rp->num_dims > 0 ? rp->dims[0] : -1;
+
+        if (dim < 0 || dim >= inp->ndim) {
+            float result = 1.0f;
+            for (size_t i = 0; i < in1_numel; i++)
+                if (in1_data[i] == 0.0f) { result = 0.0f; break; }
+            out_data[0] = result;
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    out_data[c] = 1.0f;
+                    for (int r = 0; r < rows; r++)
+                        if (in1_data[r * cols + c] == 0.0f) { out_data[c] = 0.0f; break; }
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    out_data[r] = 1.0f;
+                    for (int c = 0; c < cols; c++)
+                        if (in1_data[r * cols + c] == 0.0f) { out_data[r] = 0.0f; break; }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_LOGSUMEXP: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        ReduceParams* rp = (ReduceParams*)node->params;
+        int dim = rp && rp->dims && rp->num_dims > 0 ? rp->dims[0] : -1;
+
+        if (dim < 0 || dim >= inp->ndim) {
+            float mx = in1_data[0];
+            for (size_t i = 1; i < in1_numel; i++)
+                if (in1_data[i] > mx) mx = in1_data[i];
+            float sum = 0;
+            for (size_t i = 0; i < in1_numel; i++)
+                sum += expf(in1_data[i] - mx);
+            out_data[0] = mx + logf(sum);
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    float mx = in1_data[c];
+                    for (int r = 1; r < rows; r++)
+                        if (in1_data[r * cols + c] > mx) mx = in1_data[r * cols + c];
+                    float sum = 0;
+                    for (int r = 0; r < rows; r++)
+                        sum += expf(in1_data[r * cols + c] - mx);
+                    out_data[c] = mx + logf(sum);
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    float mx = in1_data[r * cols];
+                    for (int c = 1; c < cols; c++)
+                        if (in1_data[r * cols + c] > mx) mx = in1_data[r * cols + c];
+                    float sum = 0;
+                    for (int c = 0; c < cols; c++)
+                        sum += expf(in1_data[r * cols + c] - mx);
+                    out_data[r] = mx + logf(sum);
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_CUMMAX: {
+        if (!in1_data) return -1;
+        CumsumParams* cp = (CumsumParams*)node->params;
+        int cdim = cp ? cp->dim : 0;
+        Tensor* inp = node->inputs[0];
+
+        if (inp->ndim == 1) {
+            out_data[0] = in1_data[0];
+            for (size_t i = 1; i < in1_numel; i++)
+                out_data[i] = fmaxf(out_data[i-1], in1_data[i]);
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (cdim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    out_data[c] = in1_data[c];
+                    for (int r = 1; r < rows; r++)
+                        out_data[r * cols + c] = fmaxf(out_data[(r-1) * cols + c], in1_data[r * cols + c]);
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    out_data[r * cols] = in1_data[r * cols];
+                    for (int c = 1; c < cols; c++)
+                        out_data[r * cols + c] = fmaxf(out_data[r * cols + c - 1], in1_data[r * cols + c]);
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_CUMMIN: {
+        if (!in1_data) return -1;
+        CumsumParams* cp = (CumsumParams*)node->params;
+        int cdim = cp ? cp->dim : 0;
+        Tensor* inp = node->inputs[0];
+
+        if (inp->ndim == 1) {
+            out_data[0] = in1_data[0];
+            for (size_t i = 1; i < in1_numel; i++)
+                out_data[i] = fminf(out_data[i-1], in1_data[i]);
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (cdim == 0) {
+                for (int c = 0; c < cols; c++) {
+                    out_data[c] = in1_data[c];
+                    for (int r = 1; r < rows; r++)
+                        out_data[r * cols + c] = fminf(out_data[(r-1) * cols + c], in1_data[r * cols + c]);
+                }
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    out_data[r * cols] = in1_data[r * cols];
+                    for (int c = 1; c < cols; c++)
+                        out_data[r * cols + c] = fminf(out_data[r * cols + c - 1], in1_data[r * cols + c]);
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_CAT: {
+        CatParams* cp = (CatParams*)node->params;
+        int cat_dim = cp ? cp->dim : 0;
+        int num_t = node->num_inputs;
+        size_t offset = 0;
+
+        if (out->ndim == 1) {
+            for (int t = 0; t < num_t; t++) {
+                float* tdata = (float*)node->inputs[t]->data;
+                if (!tdata) return -1;
+                size_t tlen = node->inputs[t]->numel;
+                memcpy(out_data + offset, tdata, tlen * sizeof(float));
+                offset += tlen;
+            }
+        } else if (out->ndim == 2) {
+            int out_cols = out->shape[1];
+            if (cat_dim == 0) {
+                for (int t = 0; t < num_t; t++) {
+                    float* tdata = (float*)node->inputs[t]->data;
+                    if (!tdata) return -1;
+                    size_t tlen = node->inputs[t]->numel;
+                    memcpy(out_data + offset, tdata, tlen * sizeof(float));
+                    offset += tlen;
+                }
+            } else {
+                int rows = out->shape[0];
+                for (int r = 0; r < rows; r++) {
+                    int col_off = 0;
+                    for (int t = 0; t < num_t; t++) {
+                        float* tdata = (float*)node->inputs[t]->data;
+                        if (!tdata) return -1;
+                        int tcols = node->inputs[t]->shape[1];
+                        memcpy(out_data + r * out_cols + col_off, tdata + r * tcols, (size_t)tcols * sizeof(float));
+                        col_off += tcols;
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_STACK: {
+        StackParams* sp = (StackParams*)node->params;
+        int stack_dim = sp ? sp->dim : 0;
+        int num_t = node->num_inputs;
+
+        if (stack_dim == 0) {
+            size_t offset = 0;
+            for (int t = 0; t < num_t; t++) {
+                float* tdata = (float*)node->inputs[t]->data;
+                if (!tdata) return -1;
+                size_t tlen = node->inputs[t]->numel;
+                memcpy(out_data + offset, tdata, tlen * sizeof(float));
+                offset += tlen;
+            }
+        } else {
+            // General case: interleave along stack_dim
+            size_t out_numel = out->numel;
+            size_t per_tensor = out_numel / (size_t)num_t;
+            // Simple: for each output position, determine which tensor and source index
+            size_t outer_size = 1;
+            for (int d = 0; d < stack_dim; d++) outer_size *= (size_t)out->shape[d];
+            size_t inner_size = per_tensor / outer_size;
+
+            for (size_t o = 0; o < outer_size; o++) {
+                for (int t = 0; t < num_t; t++) {
+                    float* tdata = (float*)node->inputs[t]->data;
+                    if (!tdata) return -1;
+                    memcpy(out_data + (o * (size_t)num_t + (size_t)t) * inner_size,
+                           tdata + o * inner_size, inner_size * sizeof(float));
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SCATTER: {
+        if (!in1_data || !in2_data) return -1;
+        ScatterParams* sp = (ScatterParams*)node->params;
+        int sdim = sp ? sp->dim : 0;
+        float* src_data = NULL;
+        if (node->num_inputs >= 3 && node->inputs[2])
+            src_data = (float*)node->inputs[2]->data;
+        if (!src_data) return -1;
+
+        // Copy input first
+        memcpy(out_data, in1_data, out->numel * sizeof(float));
+
+        // Scatter: out[index[i]] = src[i] along sdim
+        Tensor* idx_t = node->inputs[1];
+        for (size_t i = 0; i < idx_t->numel; i++) {
+            if (out->ndim == 1) {
+                int idx = (int)in2_data[i];
+                if (idx >= 0 && idx < (int)out->numel)
+                    out_data[idx] = src_data[i];
+            } else if (out->ndim == 2) {
+                int rows = out->shape[0], cols = out->shape[1];
+                int r = (int)i / idx_t->shape[1], c = (int)i % idx_t->shape[1];
+                int idx = (int)in2_data[i];
+                if (sdim == 0 && idx >= 0 && idx < rows)
+                    out_data[idx * cols + c] = src_data[i];
+                else if (sdim == 1 && idx >= 0 && idx < cols)
+                    out_data[r * cols + idx] = src_data[i];
+            }
+        }
+        break;
+    }
+
+    case UOP_ROLL: {
+        if (!in1_data) return -1;
+        RollParams* rp = (RollParams*)node->params;
+        int shift = rp ? rp->shift : 0;
+        int rdim = rp ? rp->dim : 0;
+        Tensor* inp = node->inputs[0];
+
+        if (inp->ndim == 1) {
+            int n = inp->shape[0];
+            int s = ((shift % n) + n) % n;
+            for (int i = 0; i < n; i++)
+                out_data[(i + s) % n] = in1_data[i];
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (rdim == 0) {
+                int s = ((shift % rows) + rows) % rows;
+                for (int r = 0; r < rows; r++)
+                    for (int c = 0; c < cols; c++)
+                        out_data[((r + s) % rows) * cols + c] = in1_data[r * cols + c];
+            } else {
+                int s = ((shift % cols) + cols) % cols;
+                for (int r = 0; r < rows; r++)
+                    for (int c = 0; c < cols; c++)
+                        out_data[r * cols + ((c + s) % cols)] = in1_data[r * cols + c];
+            }
+        }
+        break;
+    }
+
+    case UOP_FLATTEN: {
+        if (!in1_data) return -1;
+        memcpy(out_data, in1_data, out->numel * sizeof(float));
+        break;
+    }
+
+    case UOP_UNFLATTEN: {
+        if (!in1_data) return -1;
+        memcpy(out_data, in1_data, out->numel * sizeof(float));
+        break;
+    }
+
+    case UOP_DIAG: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        DiagParams* dp = (DiagParams*)node->params;
+        int offset = dp ? dp->offset : 0;
+
+        if (inp->ndim == 1) {
+            // Create diagonal matrix
+            int n = out->shape[0];
+            memset(out_data, 0, out->numel * sizeof(float));
+            for (int i = 0; i < inp->shape[0]; i++) {
+                int r = (offset >= 0) ? i : i - offset;
+                int c = (offset >= 0) ? i + offset : i;
+                if (r >= 0 && r < n && c >= 0 && c < n)
+                    out_data[r * n + c] = in1_data[i];
+            }
+        } else if (inp->ndim == 2) {
+            // Extract diagonal
+            int rows = inp->shape[0], cols = inp->shape[1];
+            int oi = 0;
+            for (int i = 0; oi < (int)out->numel; i++) {
+                int r = (offset >= 0) ? i : i - offset;
+                int c = (offset >= 0) ? i + offset : i;
+                if (r >= 0 && r < rows && c >= 0 && c < cols)
+                    out_data[oi++] = in1_data[r * cols + c];
+                else break;
+            }
+        }
+        break;
+    }
+
+    case UOP_ONE_HOT: {
+        if (!in1_data) return -1;
+        OneHotParams* ohp = (OneHotParams*)node->params;
+        int nc = ohp ? ohp->num_classes : 0;
+        Tensor* inp = node->inputs[0];
+
+        memset(out_data, 0, out->numel * sizeof(float));
+        for (size_t i = 0; i < inp->numel; i++) {
+            int cls = (int)in1_data[i];
+            if (cls >= 0 && cls < nc)
+                out_data[i * (size_t)nc + (size_t)cls] = 1.0f;
+        }
+        break;
+    }
+
+    case UOP_ERFC:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = erfcf(in1_data[i % in1_numel]);
+        break;
+
+    case UOP_TILE: {
+        if (!in1_data) return -1;
+        TileParams* tp = (TileParams*)node->params;
+        Tensor* inp = node->inputs[0];
+
+        if (inp->ndim == 1) {
+            int n = inp->shape[0];
+            int reps = tp->repeats[0];
+            for (int r = 0; r < reps; r++)
+                memcpy(out_data + r * n, in1_data, (size_t)n * sizeof(float));
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            int rreps = tp->repeats[0], creps = tp->repeats[1];
+            int out_cols = cols * creps;
+            for (int rr = 0; rr < rreps; rr++) {
+                for (int r = 0; r < rows; r++) {
+                    for (int cr = 0; cr < creps; cr++) {
+                        memcpy(out_data + (rr * rows + r) * out_cols + cr * cols,
+                               in1_data + r * cols, (size_t)cols * sizeof(float));
+                    }
+                }
+            }
+        } else {
+            // Generic fallback using modular indexing
+            for (size_t i = 0; i < out->numel; i++) {
+                size_t src_idx = 0;
+                size_t remaining = i;
+                size_t in_stride = 1;
+                for (int d = out->ndim - 1; d >= 0; d--) {
+                    int coord = (int)(remaining % (size_t)out->shape[d]);
+                    remaining /= (size_t)out->shape[d];
+                    int in_coord = coord % inp->shape[d];
+                    src_idx += (size_t)in_coord * in_stride;
+                    in_stride *= (size_t)inp->shape[d];
+                }
+                out_data[i] = in1_data[src_idx];
+            }
+        }
+        break;
+    }
+
+    case UOP_REPEAT_INTERLEAVE: {
+        if (!in1_data) return -1;
+        RepeatInterleaveParams* rip = (RepeatInterleaveParams*)node->params;
+        Tensor* inp = node->inputs[0];
+        int dim = rip->dim;
+        int reps = rip->repeats;
+
+        if (inp->ndim == 1) {
+            int n = inp->shape[0];
+            for (int i = 0; i < n; i++)
+                for (int r = 0; r < reps; r++)
+                    out_data[i * reps + r] = in1_data[i];
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 0) {
+                for (int r = 0; r < rows; r++)
+                    for (int rep = 0; rep < reps; rep++)
+                        memcpy(out_data + (r * reps + rep) * cols, in1_data + r * cols, (size_t)cols * sizeof(float));
+            } else {
+                int out_cols = cols * reps;
+                for (int r = 0; r < rows; r++)
+                    for (int c = 0; c < cols; c++)
+                        for (int rep = 0; rep < reps; rep++)
+                            out_data[r * out_cols + c * reps + rep] = in1_data[r * cols + c];
+            }
+        }
+        break;
+    }
+
+    case UOP_TRACE: {
+        if (!in1_data) return -1;
+        Tensor* inp = node->inputs[0];
+        int rows = inp->shape[0], cols = inp->shape[1];
+        int n = rows < cols ? rows : cols;
+        float sum = 0;
+        for (int i = 0; i < n; i++)
+            sum += in1_data[i * cols + i];
+        out_data[0] = sum;
+        break;
+    }
+
+    case UOP_SHRINK: {
+        if (!in1_data) return -1;
+        ShrinkParams* sp = (ShrinkParams*)node->params;
+        Tensor* inp = node->inputs[0];
+
+        if (inp->ndim == 1) {
+            int start = sp->starts[0];
+            int len = sp->ends[0] - start;
+            memcpy(out_data, in1_data + start, (size_t)len * sizeof(float));
+        } else if (inp->ndim == 2) {
+            int in_cols = inp->shape[1];
+            int r_start = sp->starts[0], c_start = sp->starts[1];
+            int out_rows = sp->ends[0] - r_start, out_cols = sp->ends[1] - c_start;
+            for (int r = 0; r < out_rows; r++)
+                memcpy(out_data + r * out_cols, in1_data + (r_start + r) * in_cols + c_start,
+                       (size_t)out_cols * sizeof(float));
+        }
+        break;
+    }
+
+    case UOP_LOGCUMSUMEXP: {
+        if (!in1_data) return -1;
+        CumsumParams* cp = (CumsumParams*)node->params;
+        Tensor* inp = node->inputs[0];
+        int dim = cp ? cp->dim : 0;
+
+        if (inp->ndim == 1) {
+            float mx = in1_data[0];
+            out_data[0] = in1_data[0];
+            for (size_t i = 1; i < in1_numel; i++) {
+                mx = fmaxf(mx, in1_data[i]);
+                float sum = 0;
+                for (size_t j = 0; j <= i; j++)
+                    sum += expf(in1_data[j] - mx);
+                out_data[i] = mx + logf(sum);
+            }
+        } else if (inp->ndim == 2) {
+            int rows = inp->shape[0], cols = inp->shape[1];
+            if (dim == 1) {
+                for (int r = 0; r < rows; r++) {
+                    float mx = in1_data[r * cols];
+                    out_data[r * cols] = in1_data[r * cols];
+                    for (int c = 1; c < cols; c++) {
+                        mx = fmaxf(mx, in1_data[r * cols + c]);
+                        float sum = 0;
+                        for (int j = 0; j <= c; j++)
+                            sum += expf(in1_data[r * cols + j] - mx);
+                        out_data[r * cols + c] = mx + logf(sum);
+                    }
+                }
+            } else {
+                for (int c = 0; c < cols; c++) {
+                    float mx = in1_data[c];
+                    out_data[c] = in1_data[c];
+                    for (int r = 1; r < rows; r++) {
+                        mx = fmaxf(mx, in1_data[r * cols + c]);
+                        float sum = 0;
+                        for (int j = 0; j <= r; j++)
+                            sum += expf(in1_data[j * cols + c] - mx);
+                        out_data[r * cols + c] = mx + logf(sum);
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_RELU6:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = fminf(fmaxf(x, 0.0f), 6.0f);
+        }
+        break;
+
+    case UOP_HARD_SIGMOID:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = (in1_data[i % in1_numel] + 3.0f) / 6.0f;
+            out_data[i] = fminf(fmaxf(x, 0.0f), 1.0f);
+        }
+        break;
+
+    case UOP_HARD_TANH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = fminf(fmaxf(x, -1.0f), 1.0f);
+        }
+        break;
+
+    case UOP_CELU: {
+        if (!in1_data) return -1;
+        ClampParams* cp = (ClampParams*)node->params;
+        float alpha = cp ? cp->min_val : 1.0f;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = fmaxf(0.0f, x) + fminf(0.0f, alpha * (expf(x / alpha) - 1.0f));
+        }
+        break;
+    }
+
+    case UOP_QUICK_GELU:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            float sig = 1.0f / (1.0f + expf(-1.702f * x));
+            out_data[i] = x * sig;
+        }
+        break;
+
+    case UOP_SOFTPLUS:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            // Numerically stable: log(1 + exp(x)) = max(x,0) + log(1 + exp(-|x|))
+            out_data[i] = fmaxf(x, 0.0f) + logf(1.0f + expf(-fabsf(x)));
+        }
+        break;
+
+    case UOP_SOFTSIGN:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = x / (1.0f + fabsf(x));
+        }
+        break;
+
+    case UOP_LOGSIGMOID:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            // log(sigmoid(x)) = -softplus(-x) = -max(-x,0) - log(1+exp(-|-x|))
+            // = min(x,0) - log(1+exp(-|x|))
+            out_data[i] = fminf(x, 0.0f) - logf(1.0f + expf(-fabsf(x)));
+        }
+        break;
+
+    case UOP_UNFOLD: {
+        if (!in1_data || !node->params) return -1;
+        UnfoldParams* up = (UnfoldParams*)node->params;
+        int ks = up->kernel_size;
+        int stride = up->stride;
+        // Input: [..., L], Output: [..., num_windows, ks]
+        int ndim_in = node->inputs[0]->ndim;
+        int last_dim = node->inputs[0]->shape[ndim_in - 1];
+        int num_windows = (last_dim - ks) / stride + 1;
+
+        if (ndim_in == 1) {
+            // [L] -> [num_windows, ks]
+            for (int w = 0; w < num_windows; w++) {
+                for (int k = 0; k < ks; k++) {
+                    out_data[w * ks + k] = in1_data[w * stride + k];
+                }
+            }
+        } else if (ndim_in == 2) {
+            // [N, L] -> [N, num_windows, ks]
+            int N = node->inputs[0]->shape[0];
+            for (int n = 0; n < N; n++) {
+                for (int w = 0; w < num_windows; w++) {
+                    for (int k = 0; k < ks; k++) {
+                        out_data[(n * num_windows + w) * ks + k] =
+                            in1_data[n * last_dim + w * stride + k];
+                    }
+                }
+            }
+        } else {
+            // Generic: batch dims + [L] -> batch dims + [num_windows, ks]
+            size_t batch_size = 1;
+            for (int d = 0; d < ndim_in - 1; d++)
+                batch_size *= (size_t)node->inputs[0]->shape[d];
+            for (size_t b = 0; b < batch_size; b++) {
+                for (int w = 0; w < num_windows; w++) {
+                    for (int k = 0; k < ks; k++) {
+                        out_data[(b * (size_t)num_windows + w) * ks + k] =
+                            in1_data[b * (size_t)last_dim + w * stride + k];
+                    }
+                }
+            }
+        }
+        break;
+    }
+
     default:
         LOG_WARNING("CPU fallback: unsupported op type %d", node->type);
         for (size_t i = 0; i < out->numel; i++) {
@@ -1439,6 +2404,11 @@ int cpu_execute_ir(CMLGraph_t ir) {
     g_cpu_exec_calls++;
 
     LOG_DEBUG("Executing IR using CPU fallback interpreter (call #%zu)", g_cpu_exec_calls);
+
+    // Decompose composite ops into primitives before execution
+    if (!ir->is_decomposed) {
+        cml_ir_decompose(ir);
+    }
 
     // Execute nodes in order
     struct IRNode* node = ir->head;
