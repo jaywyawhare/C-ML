@@ -29,6 +29,8 @@
 #include "autograd/loss_functions.h"
 #include "ops/ir/context.h"
 #include "ops/uops.h"
+#include "core/gguf.h"
+#include "core/safetensors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1015,7 +1017,6 @@ bool cml_nn_module_is_training(Module* module) { return module_is_training(modul
 void cml_nn_module_eval(Module* module) { module_set_training(module, false); }
 void cml_nn_module_train(Module* module) { module_set_training(module, true); }
 
-// ===== New Unary Math Operations =====
 Tensor* cml_sign(Tensor* a) { return uop_sign(a); }
 Tensor* cml_floor(Tensor* a) { return uop_floor(a); }
 Tensor* cml_ceil(Tensor* a) { return uop_ceil(a); }
@@ -1033,7 +1034,6 @@ Tensor* cml_clamp(Tensor* a, float min_val, float max_val) {
     return uop_clamp(a, min_val, max_val);
 }
 
-// ===== New Reduction Operations =====
 Tensor* cml_prod(Tensor* a, int dim, bool keepdim) {
     int dims[] = {dim};
     ReduceParams params = {.dims = dims, .num_dims = 1, .keepdim = keepdim};
@@ -1055,7 +1055,6 @@ Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return tensor_std(a, dim, unbiased, keepdim);
 }
 
-// ===== New Shape Operations =====
 Tensor* cml_squeeze(Tensor* a, int dim) { return tensor_squeeze(a, dim); }
 Tensor* cml_unsqueeze(Tensor* a, int dim) { return tensor_unsqueeze(a, dim); }
 Tensor* cml_flip(Tensor* a, int dim) { return tensor_flip(a, dim); }
@@ -1081,7 +1080,6 @@ Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value) {
     return uop_pad(a, pad_widths, num_dims, value);
 }
 
-// ===== New Tensor Creation Functions =====
 Tensor* cml_arange(float start, float end, float step, const TensorConfig* config) {
     return tensor_arange(start, end, step, config);
 }
@@ -1105,7 +1103,6 @@ Tensor* cml_rand_like(Tensor* a) { return tensor_rand_like(a); }
 Tensor* cml_randn_like(Tensor* a) { return tensor_randn_like(a); }
 Tensor* cml_full_like(Tensor* a, float value) { return tensor_full_like(a, value); }
 
-// ===== Weight Initializers =====
 Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     return tensor_kaiming_uniform(shape, ndim, fan_in, config);
 }
@@ -1121,7 +1118,6 @@ Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
     return tensor_xavier_normal(shape, ndim, fan_in, fan_out, config);
 }
 
-// ===== New Optimizers =====
 Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                            float beta1, float beta2, float epsilon) {
     return optim_lamb(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
@@ -1131,8 +1127,138 @@ Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, 
     return optim_lars(parameters, num_parameters, lr, momentum, weight_decay, trust_coefficient);
 }
 
-// ===== New Layer =====
 InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
                                        DeviceType device) {
     return nn_instancenorm2d(num_features, eps, affine, dtype, device);
+}
+ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
+                                          int stride, int padding, int output_padding,
+                                          bool use_bias, DType dtype, DeviceType device) {
+    return nn_conv_transpose1d(in_channels, out_channels, kernel_size, stride, padding,
+                               output_padding, use_bias, dtype, device);
+}
+BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
+                                 bool track_running_stats, DType dtype, DeviceType device) {
+    return nn_batchnorm3d(num_features, eps, momentum, affine, track_running_stats, dtype, device);
+}
+LayerNorm2d* cml_nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
+                                 DeviceType device) {
+    return nn_layernorm2d(num_channels, eps, affine, dtype, device);
+}
+
+Optimizer* cml_optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
+                           float weight_decay, bool nesterov) {
+    return optim_muon(parameters, num_parameters, lr, momentum, weight_decay, nesterov);
+}
+Optimizer* cml_optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                            float beta1, float beta2, float epsilon) {
+    return optim_adamw(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
+}
+Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
+                               float weight_decay, float epsilon) {
+    return optim_adadelta(parameters, num_parameters, rho, weight_decay, epsilon);
+}
+
+Tensor* cml_unfold(Tensor* a, int kernel_size, int stride) {
+    return uop_unfold(a, kernel_size, stride);
+}
+
+Tensor* cml_cast(Tensor* a, DType dtype) { return tensor_cast(a, dtype); }
+Tensor* cml_contiguous(Tensor* a) { return tensor_contiguous(a); }
+Tensor* cml_from_blob(void* data, int* shape, int ndim, const TensorConfig* config) {
+    return tensor_from_blob(data, shape, ndim, config);
+}
+Tensor* cml_randperm(int n, const TensorConfig* config) { return tensor_randperm(n, config); }
+Tensor* cml_half(Tensor* a) { return tensor_half(a); }
+Tensor* cml_double(Tensor* a) { return tensor_double(a); }
+Tensor* cml_int_(Tensor* a) { return tensor_int(a); }
+Tensor* cml_long(Tensor* a) { return tensor_long(a); }
+Tensor* cml_short(Tensor* a) { return tensor_short(a); }
+Tensor* cml_bool_(Tensor* a) { return tensor_bool(a); }
+Tensor* cml_bfloat16(Tensor* a) { return tensor_bfloat16(a); }
+
+Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode) {
+    return tensor_interpolate(a, output_size, num_dims, mode);
+}
+
+Tensor* cml_dot(Tensor* a, Tensor* b) { return tensor_dot(a, b); }
+
+MaxPool1d* cml_nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
+    return nn_maxpool1d(kernel_size, stride, padding, dilation, ceil_mode);
+}
+AvgPool1d* cml_nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode,
+                            bool count_include_pad) {
+    return nn_avgpool1d(kernel_size, stride, padding, ceil_mode, count_include_pad);
+}
+AdaptiveAvgPool2d* cml_nn_adaptive_avgpool2d(int output_h, int output_w) {
+    return nn_adaptive_avgpool2d(output_h, output_w);
+}
+AdaptiveAvgPool1d* cml_nn_adaptive_avgpool1d(int output_size) {
+    return nn_adaptive_avgpool1d(output_size);
+}
+
+MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
+    return nn_maxpool3d(kernel_size, stride, padding, dilation, ceil_mode);
+}
+AvgPool3d* cml_nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode,
+                            bool count_include_pad) {
+    return nn_avgpool3d(kernel_size, stride, padding, ceil_mode, count_include_pad);
+}
+AdaptiveMaxPool2d* cml_nn_adaptive_maxpool2d(int output_h, int output_w) {
+    return nn_adaptive_maxpool2d(output_h, output_w);
+}
+AdaptiveMaxPool1d* cml_nn_adaptive_maxpool1d(int output_size) {
+    return nn_adaptive_maxpool1d(output_size);
+}
+
+Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode) {
+    return tensor_scatter_reduce(self, dim, index, src, mode);
+}
+Tensor* cml_bitcast(Tensor* a, DType target_dtype) {
+    return tensor_bitcast(a, target_dtype);
+}
+
+QRResult cml_qr(Tensor* a) { return tensor_qr(a); }
+SVDResult cml_svd(Tensor* a) { return tensor_svd(a); }
+
+Tensor* cml_from_url(const char* url) { return tensor_from_url(url); }
+
+GGUFContext* cml_gguf_open_read(const char* p) { return gguf_open_read(p); }
+GGUFContext* cml_gguf_open_write(const char* p) { return gguf_open_write(p); }
+void cml_gguf_close(GGUFContext* c) { gguf_close(c); }
+int cml_gguf_write_tensor(GGUFContext* c, const char* n, Tensor* t) { return gguf_write_tensor(c, n, t); }
+Tensor* cml_gguf_read_tensor(GGUFContext* c, const char* n) { return gguf_read_tensor(c, n); }
+int cml_module_save_gguf(Module* m, const char* p) { return module_save_gguf(m, p); }
+int cml_module_load_gguf(Module* m, const char* p) { return module_load_gguf(m, p); }
+
+SafeTensorsContext* cml_safetensors_open_read(const char* p) { return safetensors_open_read(p); }
+SafeTensorsContext* cml_safetensors_open_write(const char* p) { return safetensors_open_write(p); }
+void cml_safetensors_close(SafeTensorsContext* c) { safetensors_close(c); }
+int cml_safetensors_write_tensor(SafeTensorsContext* c, const char* n, Tensor* t) { return safetensors_write_tensor(c, n, t); }
+Tensor* cml_safetensors_read_tensor(SafeTensorsContext* c, const char* n) { return safetensors_read_tensor(c, n); }
+int cml_module_save_safetensors(Module* m, const char* p) { return module_save_safetensors(m, p); }
+int cml_module_load_safetensors(Module* m, const char* p) { return module_load_safetensors(m, p); }
+
+TransformerEncoder* cml_nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
+                                                float dropout, int num_layers,
+                                                DType dtype, DeviceType device) {
+    return nn_transformer_encoder(d_model, nhead, dim_feedforward, dropout, num_layers, dtype, device);
+}
+TransformerDecoderLayer* cml_nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
+                                                           float dropout, DType dtype, DeviceType device) {
+    return nn_transformer_decoder_layer(d_model, nhead, dim_feedforward, dropout, dtype, device);
+}
+TransformerDecoder* cml_nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
+                                                float dropout, int num_layers,
+                                                DType dtype, DeviceType device) {
+    return nn_transformer_decoder(d_model, nhead, dim_feedforward, dropout, num_layers, dtype, device);
+}
+
+Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                            float beta1, float beta2, float epsilon) {
+    return optim_nadam(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
+}
+Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                             float beta1, float beta2, float epsilon) {
+    return optim_adamax(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
 }

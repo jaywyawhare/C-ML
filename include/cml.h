@@ -50,6 +50,8 @@
 #include "core/quantization.h"
 #include "core/training_loop.h"
 #include "core/serialization.h"
+#include "core/gguf.h"
+#include "core/safetensors.h"
 #include "backend/profiling.h"
 #include "backend/backend_buffer.h"
 #include "alloc/graph_allocator.h"
@@ -842,7 +844,6 @@ void cml_nn_module_eval(Module* module);
  */
 void cml_nn_module_train(Module* module);
 
-// ===== New Unary Math Operations =====
 Tensor* cml_sign(Tensor* a);
 Tensor* cml_floor(Tensor* a);
 Tensor* cml_ceil(Tensor* a);
@@ -857,7 +858,6 @@ Tensor* cml_rsqrt(Tensor* a);
 Tensor* cml_erf(Tensor* a);
 Tensor* cml_clamp(Tensor* a, float min_val, float max_val);
 
-// ===== New Reduction Operations =====
 Tensor* cml_prod(Tensor* a, int dim, bool keepdim);
 Tensor* cml_argmax(Tensor* a, int dim);
 Tensor* cml_argmin(Tensor* a, int dim);
@@ -865,7 +865,6 @@ Tensor* cml_cumsum(Tensor* a, int dim);
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim);
 Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim);
 
-// ===== New Shape Operations =====
 Tensor* cml_squeeze(Tensor* a, int dim);
 Tensor* cml_unsqueeze(Tensor* a, int dim);
 Tensor* cml_flip(Tensor* a, int dim);
@@ -876,7 +875,6 @@ Tensor* cml_triu(Tensor* a, int diagonal);
 Tensor* cml_tril(Tensor* a, int diagonal);
 Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value);
 
-// ===== New Tensor Creation Functions =====
 Tensor* cml_arange(float start, float end, float step, const TensorConfig* config);
 Tensor* cml_linspace(float start, float end, int steps, const TensorConfig* config);
 Tensor* cml_eye(int n, const TensorConfig* config);
@@ -890,21 +888,100 @@ Tensor* cml_rand_like(Tensor* a);
 Tensor* cml_randn_like(Tensor* a);
 Tensor* cml_full_like(Tensor* a, float value);
 
-// ===== Weight Initializers =====
 Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
 Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
 Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
 Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
 
-// ===== New Optimizers =====
 Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                            float beta1, float beta2, float epsilon);
 Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
                            float weight_decay, float trust_coefficient);
 
-// ===== New Layer =====
 InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
                                        DeviceType device);
+ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
+                                          int stride, int padding, int output_padding,
+                                          bool use_bias, DType dtype, DeviceType device);
+BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
+                                 bool track_running_stats, DType dtype, DeviceType device);
+LayerNorm2d* cml_nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
+                                 DeviceType device);
+
+Optimizer* cml_optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
+                           float weight_decay, bool nesterov);
+Optimizer* cml_optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                            float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
+                               float weight_decay, float epsilon);
+
+Tensor* cml_unfold(Tensor* a, int kernel_size, int stride);
+
+Tensor* cml_cast(Tensor* a, DType dtype);
+Tensor* cml_contiguous(Tensor* a);
+Tensor* cml_from_blob(void* data, int* shape, int ndim, const TensorConfig* config);
+Tensor* cml_randperm(int n, const TensorConfig* config);
+Tensor* cml_half(Tensor* a);
+Tensor* cml_double(Tensor* a);
+Tensor* cml_int_(Tensor* a);
+Tensor* cml_long(Tensor* a);
+Tensor* cml_short(Tensor* a);
+Tensor* cml_bool_(Tensor* a);
+Tensor* cml_bfloat16(Tensor* a);
+
+Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
+
+Tensor* cml_dot(Tensor* a, Tensor* b);
+
+MaxPool1d* cml_nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
+AvgPool1d* cml_nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode,
+                            bool count_include_pad);
+AdaptiveAvgPool2d* cml_nn_adaptive_avgpool2d(int output_h, int output_w);
+AdaptiveAvgPool1d* cml_nn_adaptive_avgpool1d(int output_size);
+
+MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
+AvgPool3d* cml_nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode,
+                            bool count_include_pad);
+AdaptiveMaxPool2d* cml_nn_adaptive_maxpool2d(int output_h, int output_w);
+AdaptiveMaxPool1d* cml_nn_adaptive_maxpool1d(int output_size);
+
+Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
+Tensor* cml_bitcast(Tensor* a, DType target_dtype);
+
+QRResult cml_qr(Tensor* a);
+SVDResult cml_svd(Tensor* a);
+
+Tensor* cml_from_url(const char* url);
+
+GGUFContext* cml_gguf_open_read(const char* path);
+GGUFContext* cml_gguf_open_write(const char* path);
+void cml_gguf_close(GGUFContext* ctx);
+int cml_gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor);
+Tensor* cml_gguf_read_tensor(GGUFContext* ctx, const char* name);
+int cml_module_save_gguf(Module* module, const char* path);
+int cml_module_load_gguf(Module* module, const char* path);
+
+SafeTensorsContext* cml_safetensors_open_read(const char* path);
+SafeTensorsContext* cml_safetensors_open_write(const char* path);
+void cml_safetensors_close(SafeTensorsContext* ctx);
+int cml_safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* tensor);
+Tensor* cml_safetensors_read_tensor(SafeTensorsContext* ctx, const char* name);
+int cml_module_save_safetensors(Module* module, const char* path);
+int cml_module_load_safetensors(Module* module, const char* path);
+
+TransformerEncoder* cml_nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
+                                                float dropout, int num_layers,
+                                                DType dtype, DeviceType device);
+TransformerDecoderLayer* cml_nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
+                                                           float dropout, DType dtype, DeviceType device);
+TransformerDecoder* cml_nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
+                                                float dropout, int num_layers,
+                                                DType dtype, DeviceType device);
+
+Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                            float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                             float beta1, float beta2, float epsilon);
 
 #ifdef __cplusplus
 extern "C" {
