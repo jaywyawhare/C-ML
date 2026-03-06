@@ -795,7 +795,6 @@ int device_move_tensor_to_default(Tensor* tensor) {
     return device_move_tensor(tensor, device_get_default());
 }
 
-
 int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     if (num_devices <= 0 || num_devices > SIM_GPU_MAX_DEVICES) {
         LOG_ERROR("SimGPU: invalid device count %d (must be 1-%d)", num_devices, SIM_GPU_MAX_DEVICES);
