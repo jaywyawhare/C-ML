@@ -25,6 +25,12 @@ typedef enum {
     DTYPE_BFLOAT16,
     DTYPE_INT8,
     DTYPE_UINT8,
+    DTYPE_INT16,
+    DTYPE_UINT16,
+    DTYPE_UINT32,
+    DTYPE_UINT64,
+    DTYPE_FLOAT8_E4M3,  // 1 sign, 4 exponent, 3 mantissa (range [-448, 448])
+    DTYPE_FLOAT8_E5M2,  // 1 sign, 5 exponent, 2 mantissa (range [-57344, 57344])
 } DType;
 
 // DeviceType is now defined in Core/device.h
@@ -360,8 +366,6 @@ int tensor_to_device(Tensor* tensor, DeviceType device);
  */
 Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context);
 
-// ===== New Tensor Creation Functions =====
-
 /** @brief Create 1D tensor with evenly spaced values in [start, end) */
 Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config);
 
@@ -398,8 +402,6 @@ Tensor* tensor_randn_like(Tensor* a);
 /** @brief Create constant tensor with same shape/dtype/device as input */
 Tensor* tensor_full_like(Tensor* a, float value);
 
-// ===== Shape Operations =====
-
 /** @brief Remove dimensions of size 1. dim=-1 to squeeze all. */
 Tensor* tensor_squeeze(Tensor* a, int dim);
 
@@ -418,8 +420,6 @@ Tensor** tensor_split(Tensor* a, int num_splits, int dim, int* out_count);
 /** @brief Split tensor into chunks (alias for tensor_split) */
 Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count);
 
-// ===== Weight Initializers =====
-
 /** @brief Kaiming uniform initialization (for ReLU networks) */
 Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
 
@@ -431,6 +431,91 @@ Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, con
 
 /** @brief Xavier normal initialization */
 Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+
+/** @brief Cast tensor to a different dtype */
+Tensor* tensor_cast(Tensor* a, DType dtype);
+
+/** @brief Make a contiguous copy of tensor */
+Tensor* tensor_contiguous(Tensor* a);
+
+/** @brief Create tensor from existing memory without copy (caller retains ownership) */
+Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* config);
+
+/** @brief Create random permutation of integers [0, n) */
+Tensor* tensor_randperm(int n, const TensorConfig* config);
+
+/** @brief Convenience cast to float16 */
+Tensor* tensor_half(Tensor* a);
+
+/** @brief Convenience cast to float32 */
+Tensor* tensor_float(Tensor* a);
+
+/** @brief Convenience cast to float64 */
+Tensor* tensor_double(Tensor* a);
+
+/** @brief Convenience cast to int32 */
+Tensor* tensor_int(Tensor* a);
+
+/** @brief Convenience cast to int64 */
+Tensor* tensor_long(Tensor* a);
+
+/** @brief Convenience cast to int16 */
+Tensor* tensor_short(Tensor* a);
+
+/** @brief Convenience cast to bool */
+Tensor* tensor_bool(Tensor* a);
+
+/** @brief Convenience cast to bfloat16 */
+Tensor* tensor_bfloat16(Tensor* a);
+
+/** @brief Interpolation modes */
+typedef enum {
+    INTERP_NEAREST,
+    INTERP_BILINEAR,
+} InterpMode;
+
+/** @brief Interpolate/upsample tensor (4D: [N,C,H,W]) */
+Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
+
+/** @brief Dot product of two 1D tensors */
+Tensor* tensor_dot(Tensor* a, Tensor* b);
+
+/** @brief Scatter reduce modes */
+typedef enum {
+    SCATTER_REDUCE_SUM,
+    SCATTER_REDUCE_PROD,
+    SCATTER_REDUCE_MEAN,
+    SCATTER_REDUCE_AMAX,
+    SCATTER_REDUCE_AMIN,
+} ScatterReduceMode;
+
+/** @brief Scatter with reduction: self[index[i]] = reduce(self[index[i]], src[i]) */
+Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
+
+/** @brief Reinterpret tensor bits as a different dtype (no conversion) */
+Tensor* tensor_bitcast(Tensor* a, DType target_dtype);
+
+/** @brief QR decomposition result */
+typedef struct {
+    Tensor* Q;  // Orthogonal matrix [m, m] or [m, k] (reduced)
+    Tensor* R;  // Upper triangular [m, n] or [k, n] (reduced)
+} QRResult;
+
+/** @brief QR decomposition via Householder reflections (reduced form: Q=[m,k], R=[k,n], k=min(m,n)) */
+QRResult tensor_qr(Tensor* a);
+
+/** @brief SVD decomposition result */
+typedef struct {
+    Tensor* U;  // Left singular vectors [m, k]
+    Tensor* S;  // Singular values [k]
+    Tensor* Vt; // Right singular vectors transposed [k, n]
+} SVDResult;
+
+/** @brief SVD decomposition via one-sided Jacobi (reduced form, k=min(m,n)) */
+SVDResult tensor_svd(Tensor* a);
+
+/** @brief Download tensor from URL and load it */
+Tensor* tensor_from_url(const char* url);
 
 #ifdef __cplusplus
 }

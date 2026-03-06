@@ -1,9 +1,12 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include "tensor/tensor.h"
+#include "core/serialization.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "backend/backend_buffer.h"
@@ -50,6 +53,53 @@ static inline float bf16_to_float(uint16_t h) {
     uint32_t x = (uint32_t)h << 16;
     float f;
     memcpy(&f, &x, sizeof(f));
+    return f;
+}
+
+// FP8 E4M3: 1 sign, 4 exponent, 3 mantissa, bias=7, no inf, NaN=0x7F
+static inline uint8_t float_to_fp8_e4m3(float f) {
+    uint32_t x;
+    memcpy(&x, &f, sizeof(x));
+    uint8_t sign = (x >> 24) & 0x80;
+    int32_t exp = ((x >> 23) & 0xFF) - 127 + 7;
+    uint32_t mant = (x >> 20) & 0x07;
+    if (exp <= 0) return sign;
+    if (exp >= 15) return sign | 0x7E; // max finite: S.1111.110
+    return sign | ((uint8_t)exp << 3) | (uint8_t)mant;
+}
+
+static inline float fp8_e4m3_to_float(uint8_t h) {
+    uint32_t sign = ((uint32_t)(h & 0x80)) << 24;
+    uint32_t exp = (h >> 3) & 0x0F;
+    uint32_t mant = h & 0x07;
+    if (exp == 0) { float f; uint32_t r = sign; memcpy(&f, &r, sizeof(f)); return f; }
+    uint32_t result = sign | ((exp - 7 + 127) << 23) | (mant << 20);
+    float f;
+    memcpy(&f, &result, sizeof(f));
+    return f;
+}
+
+// FP8 E5M2: 1 sign, 5 exponent, 2 mantissa, bias=15 (like IEEE fp8)
+static inline uint8_t float_to_fp8_e5m2(float f) {
+    uint32_t x;
+    memcpy(&x, &f, sizeof(x));
+    uint8_t sign = (x >> 24) & 0x80;
+    int32_t exp = ((x >> 23) & 0xFF) - 127 + 15;
+    uint32_t mant = (x >> 21) & 0x03;
+    if (exp <= 0) return sign;
+    if (exp >= 31) return sign | 0x7C; // inf: S.11111.00
+    return sign | ((uint8_t)exp << 2) | (uint8_t)mant;
+}
+
+static inline float fp8_e5m2_to_float(uint8_t h) {
+    uint32_t sign = ((uint32_t)(h & 0x80)) << 24;
+    uint32_t exp = (h >> 2) & 0x1F;
+    uint32_t mant = h & 0x03;
+    if (exp == 0) { float f; uint32_t r = sign; memcpy(&f, &r, sizeof(f)); return f; }
+    if (exp == 31) { float f; uint32_t r = sign | 0x7F800000 | (mant << 21); memcpy(&f, &r, sizeof(f)); return f; }
+    uint32_t result = sign | ((exp - 15 + 127) << 23) | (mant << 21);
+    float f;
+    memcpy(&f, &result, sizeof(f));
     return f;
 }
 
@@ -195,6 +245,34 @@ Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
     case DTYPE_UINT8:
         memset(t->data, 1, total_size);
         break;
+    case DTYPE_INT16:
+        for (size_t i = 0; i < total_size; i++)
+            ((int16_t*)t->data)[i] = 1;
+        break;
+    case DTYPE_UINT16:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint16_t*)t->data)[i] = 1;
+        break;
+    case DTYPE_UINT32:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint32_t*)t->data)[i] = 1;
+        break;
+    case DTYPE_UINT64:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint64_t*)t->data)[i] = 1;
+        break;
+    case DTYPE_FLOAT8_E4M3: {
+        uint8_t one_e4m3 = float_to_fp8_e4m3(1.0f);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = one_e4m3;
+        break;
+    }
+    case DTYPE_FLOAT8_E5M2: {
+        uint8_t one_e5m2 = float_to_fp8_e5m2(1.0f);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = one_e5m2;
+        break;
+    }
     }
 
     return t;
@@ -260,6 +338,34 @@ Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float valu
         for (size_t i = 0; i < total_size; i++)
             ((uint8_t*)t->data)[i] = (uint8_t)value;
         break;
+    case DTYPE_INT16:
+        for (size_t i = 0; i < total_size; i++)
+            ((int16_t*)t->data)[i] = (int16_t)value;
+        break;
+    case DTYPE_UINT16:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint16_t*)t->data)[i] = (uint16_t)value;
+        break;
+    case DTYPE_UINT32:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint32_t*)t->data)[i] = (uint32_t)value;
+        break;
+    case DTYPE_UINT64:
+        for (size_t i = 0; i < total_size; i++)
+            ((uint64_t*)t->data)[i] = (uint64_t)value;
+        break;
+    case DTYPE_FLOAT8_E4M3: {
+        uint8_t v8 = float_to_fp8_e4m3(value);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = v8;
+        break;
+    }
+    case DTYPE_FLOAT8_E5M2: {
+        uint8_t v8 = float_to_fp8_e5m2(value);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = v8;
+        break;
+    }
     }
 
     return t;
@@ -324,6 +430,16 @@ size_t cml_dtype_size(DType dtype) {
     case DTYPE_INT8:
     case DTYPE_UINT8:
         return 1;
+    case DTYPE_INT16:
+    case DTYPE_UINT16:
+        return sizeof(int16_t);
+    case DTYPE_UINT32:
+        return sizeof(uint32_t);
+    case DTYPE_UINT64:
+        return sizeof(uint64_t);
+    case DTYPE_FLOAT8_E4M3:
+    case DTYPE_FLOAT8_E5M2:
+        return 1;
     default:
         return sizeof(float);
     }
@@ -350,18 +466,22 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
 
     // Promotion hierarchy: BOOL < UINT8 < INT8 < INT32 < INT64 < FLOAT16 < BFLOAT16 < FLOAT32 < FLOAT64
     static const int dtype_rank[] = {
-        [DTYPE_FLOAT32] = 7,
-        [DTYPE_FLOAT64] = 8,
-        [DTYPE_INT32]   = 4,
-        [DTYPE_INT64]   = 5,
-        [DTYPE_BOOL]    = 0,
-        [DTYPE_FLOAT16] = 6,
-        [DTYPE_BFLOAT16]= 6,
-        [DTYPE_INT8]    = 2,
-        [DTYPE_UINT8]   = 1,
+        [DTYPE_FLOAT32]  = 9,
+        [DTYPE_FLOAT64]  = 10,
+        [DTYPE_INT32]    = 5,
+        [DTYPE_INT64]    = 7,
+        [DTYPE_BOOL]     = 0,
+        [DTYPE_FLOAT16]  = 8,
+        [DTYPE_BFLOAT16] = 8,
+        [DTYPE_INT8]     = 2,
+        [DTYPE_UINT8]    = 1,
+        [DTYPE_INT16]    = 3,
+        [DTYPE_UINT16]   = 3,
+        [DTYPE_UINT32]   = 5,
+        [DTYPE_UINT64]   = 6,
     };
-    rank1 = (dtype1 <= DTYPE_UINT8) ? dtype_rank[dtype1] : 0;
-    rank2 = (dtype2 <= DTYPE_UINT8) ? dtype_rank[dtype2] : 0;
+    rank1 = (dtype1 <= DTYPE_UINT64) ? dtype_rank[dtype1] : 0;
+    rank2 = (dtype2 <= DTYPE_UINT64) ? dtype_rank[dtype2] : 0;
 
     return (rank1 > rank2) ? dtype1 : dtype2;
 }
@@ -477,6 +597,18 @@ float tensor_get_float(Tensor* t, size_t idx) {
         return (float)((int8_t*)t->data)[offset];
     case DTYPE_UINT8:
         return (float)((uint8_t*)t->data)[offset];
+    case DTYPE_INT16:
+        return (float)((int16_t*)t->data)[offset];
+    case DTYPE_UINT16:
+        return (float)((uint16_t*)t->data)[offset];
+    case DTYPE_UINT32:
+        return (float)((uint32_t*)t->data)[offset];
+    case DTYPE_UINT64:
+        return (float)((uint64_t*)t->data)[offset];
+    case DTYPE_FLOAT8_E4M3:
+        return fp8_e4m3_to_float(((uint8_t*)t->data)[offset]);
+    case DTYPE_FLOAT8_E5M2:
+        return fp8_e5m2_to_float(((uint8_t*)t->data)[offset]);
     default:
         return 0.0f;
     }
@@ -533,6 +665,24 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
         break;
     case DTYPE_UINT8:
         ((uint8_t*)t->data)[offset] = (uint8_t)value;
+        break;
+    case DTYPE_INT16:
+        ((int16_t*)t->data)[offset] = (int16_t)value;
+        break;
+    case DTYPE_UINT16:
+        ((uint16_t*)t->data)[offset] = (uint16_t)value;
+        break;
+    case DTYPE_UINT32:
+        ((uint32_t*)t->data)[offset] = (uint32_t)value;
+        break;
+    case DTYPE_UINT64:
+        ((uint64_t*)t->data)[offset] = (uint64_t)value;
+        break;
+    case DTYPE_FLOAT8_E4M3:
+        ((uint8_t*)t->data)[offset] = float_to_fp8_e4m3(value);
+        break;
+    case DTYPE_FLOAT8_E5M2:
+        ((uint8_t*)t->data)[offset] = float_to_fp8_e5m2(value);
         break;
     }
 }
@@ -923,8 +1073,6 @@ int tensor_to_device(Tensor* tensor, DeviceType device) {
     return device_move_tensor(tensor, device);
 }
 
-// ===== New Tensor Creation Functions =====
-
 Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config) {
     if (step == 0.0f) return NULL;
     int count = (int)ceilf((end - start) / step);
@@ -1096,8 +1244,6 @@ Tensor* tensor_full_like(Tensor* a, float value) {
     return tensor_full(a->shape, a->ndim, &config, value);
 }
 
-// ===== Shape Operations =====
-
 Tensor* tensor_squeeze(Tensor* a, int dim) {
     if (!a) return NULL;
 
@@ -1240,8 +1386,6 @@ Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count) {
     return result;
 }
 
-// ===== Weight Initializers =====
-
 Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
     if (!t) return NULL;
@@ -1279,5 +1423,557 @@ Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, cons
     float std_val = sqrtf(2.0f / (float)(fan_in + fan_out));
     for (size_t i = 0; i < t->numel; i++)
         data[i] *= std_val;
+    return t;
+}
+
+Tensor* tensor_cast(Tensor* a, DType dtype) {
+    if (!a) return NULL;
+    if (a->dtype == dtype) return tensor_clone(a);
+    tensor_ensure_executed(a);
+    if (!a->data) return NULL;
+
+    TensorConfig config = {.dtype = dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* out = tensor_empty(a->shape, a->ndim, &config);
+    if (!out) return NULL;
+    tensor_ensure_executed(out);
+    if (!out->data) { tensor_free(out); return NULL; }
+
+    for (size_t i = 0; i < a->numel; i++) {
+        float val = tensor_get_float(a, i);
+        tensor_set_float(out, i, val);
+    }
+    return out;
+}
+
+Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* config) {
+    if (!data || !shape || ndim <= 0) return NULL;
+
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    Tensor* t = (Tensor*)calloc(1, sizeof(Tensor));
+    if (!t) return NULL;
+
+    t->ndim = ndim;
+    t->shape = (int*)malloc((size_t)ndim * sizeof(int));
+    if (!t->shape) { free(t); return NULL; }
+    memcpy(t->shape, shape, (size_t)ndim * sizeof(int));
+
+    t->numel = tensor_numel(shape, ndim);
+    t->dtype = dtype;
+    t->device = device;
+    t->data = data;
+    t->owns_data = false;  // caller retains ownership
+    t->is_executed = true;
+    t->is_contiguous = true;
+    t->strides = compute_contiguous_strides(shape, ndim);
+    t->storage_offset = 0;
+    t->ref_count = 1;
+
+    return t;
+}
+
+Tensor* tensor_randperm(int n, const TensorConfig* config) {
+    if (n <= 0) return NULL;
+
+    int shape[] = {n};
+    DType dtype;
+    DeviceType device;
+    resolve_config(config, &dtype, &device);
+
+    TensorConfig int_config = {.dtype = DTYPE_FLOAT32, .device = device, .has_dtype = true, .has_device = true};
+    Tensor* t = tensor_empty(shape, 1, &int_config);
+    if (!t) return NULL;
+    tensor_ensure_executed(t);
+    if (!t->data) { tensor_free(t); return NULL; }
+
+    float* data = (float*)t->data;
+    // Fisher-Yates shuffle
+    for (int i = 0; i < n; i++) data[i] = (float)i;
+    for (int i = n - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        float tmp = data[i];
+        data[i] = data[j];
+        data[j] = tmp;
+    }
+    return t;
+}
+
+Tensor* tensor_half(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT16); }
+Tensor* tensor_float(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT32); }
+Tensor* tensor_double(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT64); }
+Tensor* tensor_int(Tensor* a) { return tensor_cast(a, DTYPE_INT32); }
+Tensor* tensor_long(Tensor* a) { return tensor_cast(a, DTYPE_INT64); }
+Tensor* tensor_short(Tensor* a) { return tensor_cast(a, DTYPE_INT16); }
+Tensor* tensor_bool(Tensor* a) { return tensor_cast(a, DTYPE_BOOL); }
+Tensor* tensor_bfloat16(Tensor* a) { return tensor_cast(a, DTYPE_BFLOAT16); }
+
+Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode) {
+    if (!a || !output_size || num_dims < 1) return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data) return NULL;
+
+    // Support 4D [N, C, H, W]
+    if (a->ndim != 4 || num_dims != 2) {
+        LOG_ERROR("tensor_interpolate: only 4D [N,C,H,W] with 2D output_size supported");
+        return NULL;
+    }
+
+    int N = a->shape[0], C = a->shape[1];
+    int in_h = a->shape[2], in_w = a->shape[3];
+    int out_h = output_size[0], out_w = output_size[1];
+
+    int out_shape[] = {N, C, out_h, out_w};
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* out = tensor_empty(out_shape, 4, &config);
+    if (!out) return NULL;
+    tensor_ensure_executed(out);
+    float* in_data = (float*)a->data;
+    float* out_data = (float*)out->data;
+
+    for (int n = 0; n < N; n++) {
+        for (int c = 0; c < C; c++) {
+            for (int oh = 0; oh < out_h; oh++) {
+                for (int ow = 0; ow < out_w; ow++) {
+                    size_t out_idx = (size_t)n * C * out_h * out_w + (size_t)c * out_h * out_w +
+                                     (size_t)oh * out_w + ow;
+
+                    if (mode == INTERP_NEAREST) {
+                        int ih = (int)((float)oh * in_h / out_h);
+                        int iw = (int)((float)ow * in_w / out_w);
+                        if (ih >= in_h) ih = in_h - 1;
+                        if (iw >= in_w) iw = in_w - 1;
+                        size_t in_idx = (size_t)n * C * in_h * in_w + (size_t)c * in_h * in_w +
+                                        (size_t)ih * in_w + iw;
+                        out_data[out_idx] = in_data[in_idx];
+                    } else { // INTERP_BILINEAR
+                        float fy = (float)oh * (float)(in_h - 1) / (float)(out_h - 1 > 0 ? out_h - 1 : 1);
+                        float fx = (float)ow * (float)(in_w - 1) / (float)(out_w - 1 > 0 ? out_w - 1 : 1);
+                        int y0 = (int)floorf(fy), x0 = (int)floorf(fx);
+                        int y1 = y0 + 1, x1 = x0 + 1;
+                        if (y0 < 0) y0 = 0;
+                        if (y1 >= in_h) y1 = in_h - 1;
+                        if (x0 < 0) x0 = 0;
+                        if (x1 >= in_w) x1 = in_w - 1;
+                        float wy = fy - (float)y0, wx = fx - (float)x0;
+                        size_t base = (size_t)n * C * in_h * in_w + (size_t)c * in_h * in_w;
+                        float v00 = in_data[base + (size_t)y0 * in_w + x0];
+                        float v01 = in_data[base + (size_t)y0 * in_w + x1];
+                        float v10 = in_data[base + (size_t)y1 * in_w + x0];
+                        float v11 = in_data[base + (size_t)y1 * in_w + x1];
+                        out_data[out_idx] = (1 - wy) * (1 - wx) * v00 + (1 - wy) * wx * v01 +
+                                            wy * (1 - wx) * v10 + wy * wx * v11;
+                    }
+                }
+            }
+        }
+    }
+    return out;
+}
+
+Tensor* tensor_dot(Tensor* a, Tensor* b) {
+    if (!a || !b) return NULL;
+    if (a->ndim != 1 || b->ndim != 1 || a->numel != b->numel) {
+        LOG_ERROR("tensor_dot: both tensors must be 1D with same size");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data) return NULL;
+
+    float sum = 0.0f;
+    for (size_t i = 0; i < a->numel; i++) {
+        sum += tensor_get_float(a, i) * tensor_get_float(b, i);
+    }
+
+    int shape[] = {1};
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* out = tensor_full(shape, 1, &config, sum);
+    return out;
+}
+
+Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode) {
+    if (!self || !index || !src) return NULL;
+    if (dim < 0) dim += self->ndim;
+    if (dim < 0 || dim >= self->ndim) {
+        LOG_ERROR("tensor_scatter_reduce: invalid dim %d for %dD tensor", dim, self->ndim);
+        return NULL;
+    }
+
+    tensor_ensure_executed(self);
+    tensor_ensure_executed(index);
+    tensor_ensure_executed(src);
+    if (!self->data || !index->data || !src->data) return NULL;
+
+    // Clone self as output
+    Tensor* output = tensor_clone(self);
+    if (!output) return NULL;
+    tensor_ensure_executed(output);
+
+    // For simplicity, handle 1D and 2D cases
+    if (self->ndim == 1) {
+        for (size_t i = 0; i < index->numel; i++) {
+            int idx = (int)tensor_get_float(index, i);
+            if (idx < 0 || idx >= self->shape[0]) continue;
+            float src_val = tensor_get_float(src, i);
+            float cur_val = tensor_get_float(output, idx);
+            float new_val;
+            switch (mode) {
+                case SCATTER_REDUCE_SUM:  new_val = cur_val + src_val; break;
+                case SCATTER_REDUCE_PROD: new_val = cur_val * src_val; break;
+                case SCATTER_REDUCE_AMAX: new_val = src_val > cur_val ? src_val : cur_val; break;
+                case SCATTER_REDUCE_AMIN: new_val = src_val < cur_val ? src_val : cur_val; break;
+                case SCATTER_REDUCE_MEAN: new_val = cur_val + src_val; break; // accumulate, divide later
+                default: new_val = cur_val; break;
+            }
+            tensor_set_float(output, idx, new_val);
+        }
+        if (mode == SCATTER_REDUCE_MEAN) {
+            // Count contributions per index
+            int* counts = calloc(self->shape[0], sizeof(int));
+            if (counts) {
+                for (int i = 0; i < self->shape[0]; i++) counts[i] = 1; // self contributes 1
+                for (size_t i = 0; i < index->numel; i++) {
+                    int idx = (int)tensor_get_float(index, i);
+                    if (idx >= 0 && idx < self->shape[0]) counts[idx]++;
+                }
+                for (int i = 0; i < self->shape[0]; i++) {
+                    if (counts[i] > 1) {
+                        tensor_set_float(output, i, tensor_get_float(output, i) / counts[i]);
+                    }
+                }
+                free(counts);
+            }
+        }
+    } else if (self->ndim == 2) {
+        int rows = self->shape[0], cols = self->shape[1];
+        for (size_t i = 0; i < index->numel; i++) {
+            int r = (int)(i / index->shape[1]);
+            int c = (int)(i % index->shape[1]);
+            int idx = (int)tensor_get_float(index, i);
+            size_t src_off = r * src->shape[1] + c;
+            float src_val = tensor_get_float(src, src_off);
+
+            size_t out_off;
+            if (dim == 0) {
+                if (idx < 0 || idx >= rows) continue;
+                out_off = idx * cols + c;
+            } else {
+                if (idx < 0 || idx >= cols) continue;
+                out_off = r * cols + idx;
+            }
+            float cur_val = tensor_get_float(output, out_off);
+            float new_val;
+            switch (mode) {
+                case SCATTER_REDUCE_SUM:  new_val = cur_val + src_val; break;
+                case SCATTER_REDUCE_PROD: new_val = cur_val * src_val; break;
+                case SCATTER_REDUCE_AMAX: new_val = src_val > cur_val ? src_val : cur_val; break;
+                case SCATTER_REDUCE_AMIN: new_val = src_val < cur_val ? src_val : cur_val; break;
+                case SCATTER_REDUCE_MEAN: new_val = cur_val + src_val; break;
+                default: new_val = cur_val; break;
+            }
+            tensor_set_float(output, out_off, new_val);
+        }
+    }
+    return output;
+}
+
+Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
+    if (!a) return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data) return NULL;
+
+    size_t src_size = cml_dtype_size(a->dtype);
+    size_t dst_size = cml_dtype_size(target_dtype);
+
+    if (src_size == 0 || dst_size == 0) {
+        LOG_ERROR("tensor_bitcast: unsupported dtype size");
+        return NULL;
+    }
+
+    size_t total_bytes = a->numel * src_size;
+    if (total_bytes % dst_size != 0) {
+        LOG_ERROR("tensor_bitcast: total byte size %zu not divisible by target element size %zu",
+                  total_bytes, dst_size);
+        return NULL;
+    }
+
+    size_t new_numel = total_bytes / dst_size;
+
+    // Compute new shape: same shape but last dim adjusted
+    int new_ndim = a->ndim;
+    int* new_shape = malloc(new_ndim * sizeof(int));
+    if (!new_shape) return NULL;
+
+    for (int i = 0; i < new_ndim - 1; i++) new_shape[i] = a->shape[i];
+    size_t leading = 1;
+    for (int i = 0; i < new_ndim - 1; i++) leading *= a->shape[i];
+    if (leading == 0) { free(new_shape); return NULL; }
+    new_shape[new_ndim - 1] = (int)(new_numel / leading);
+
+    TensorConfig config = {.dtype = target_dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* out = tensor_empty(new_shape, new_ndim, &config);
+    free(new_shape);
+    if (!out) return NULL;
+    tensor_ensure_executed(out);
+
+    // Raw memcpy — reinterpret bits
+    memcpy(out->data, a->data, total_bytes);
+    return out;
+}
+
+QRResult tensor_qr(Tensor* a) {
+    QRResult result = {NULL, NULL};
+    if (!a || a->ndim != 2) {
+        LOG_ERROR("tensor_qr: input must be a 2D matrix");
+        return result;
+    }
+
+    tensor_ensure_executed(a);
+    if (!a->data) return result;
+
+    int m = a->shape[0], n = a->shape[1];
+    int k = m < n ? m : n;
+
+    // Work on a copy of A (will become R)
+    float* R = malloc((size_t)m * n * sizeof(float));
+    if (!R) return result;
+    for (int i = 0; i < m * n; i++)
+        R[i] = tensor_get_float(a, i);
+
+    // Q starts as identity [m, m]
+    float* Q = calloc((size_t)m * m, sizeof(float));
+    if (!Q) { free(R); return result; }
+    for (int i = 0; i < m; i++) Q[i * m + i] = 1.0f;
+
+    float* v = malloc((size_t)m * sizeof(float));
+    if (!v) { free(R); free(Q); return result; }
+
+    for (int j = 0; j < k; j++) {
+        // Extract column j from row j..m-1
+        float norm = 0.0f;
+        for (int i = j; i < m; i++) {
+            v[i] = R[i * n + j];
+            norm += v[i] * v[i];
+        }
+        norm = sqrtf(norm);
+        if (norm < 1e-12f) continue;
+
+        float sign = (R[j * n + j] >= 0.0f) ? 1.0f : -1.0f;
+        v[j] += sign * norm;
+
+        // Normalize v
+        float vnorm = 0.0f;
+        for (int i = j; i < m; i++) vnorm += v[i] * v[i];
+        if (vnorm < 1e-24f) continue;
+        float inv_vnorm = 1.0f / vnorm;
+
+        // Apply Householder to R: R = R - 2*v*(v^T * R) / (v^T * v)
+        for (int c = j; c < n; c++) {
+            float dot = 0.0f;
+            for (int i = j; i < m; i++) dot += v[i] * R[i * n + c];
+            dot *= 2.0f * inv_vnorm;
+            for (int i = j; i < m; i++) R[i * n + c] -= dot * v[i];
+        }
+
+        // Apply Householder to Q: Q = Q - 2*Q*v*v^T / (v^T * v)
+        for (int r = 0; r < m; r++) {
+            float dot = 0.0f;
+            for (int i = j; i < m; i++) dot += Q[r * m + i] * v[i];
+            dot *= 2.0f * inv_vnorm;
+            for (int i = j; i < m; i++) Q[r * m + i] -= dot * v[i];
+        }
+    }
+    free(v);
+
+    // Create reduced Q [m, k] and R [k, n]
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+
+    int q_shape[] = {m, k};
+    result.Q = tensor_empty(q_shape, 2, &config);
+    if (!result.Q) { free(R); free(Q); return result; }
+    tensor_ensure_executed(result.Q);
+    float* q_out = (float*)result.Q->data;
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < k; j++)
+            q_out[i * k + j] = Q[i * m + j];
+
+    int r_shape[] = {k, n};
+    result.R = tensor_empty(r_shape, 2, &config);
+    if (!result.R) { free(R); free(Q); tensor_free(result.Q); result.Q = NULL; return result; }
+    tensor_ensure_executed(result.R);
+    float* r_out = (float*)result.R->data;
+    for (int i = 0; i < k; i++)
+        for (int j = 0; j < n; j++)
+            r_out[i * n + j] = R[i * n + j];
+
+    free(R);
+    free(Q);
+    return result;
+}
+
+SVDResult tensor_svd(Tensor* a) {
+    SVDResult result = {NULL, NULL, NULL};
+    if (!a || a->ndim != 2) {
+        LOG_ERROR("tensor_svd: input must be a 2D matrix");
+        return result;
+    }
+
+    tensor_ensure_executed(a);
+    if (!a->data) return result;
+
+    int m = a->shape[0], n = a->shape[1];
+    int k = m < n ? m : n;
+
+    // Work on A^T * A for right singular vectors, or use Jacobi on A directly
+    // Use one-sided Jacobi: iterate on columns of A copy
+    float* W = malloc((size_t)m * n * sizeof(float));
+    if (!W) return result;
+    for (int i = 0; i < m * n; i++)
+        W[i] = tensor_get_float(a, i);
+
+    // V starts as identity [n, n]
+    float* V = calloc((size_t)n * n, sizeof(float));
+    if (!V) { free(W); return result; }
+    for (int i = 0; i < n; i++) V[i * n + i] = 1.0f;
+
+    // One-sided Jacobi rotations
+    int max_iter = 100;
+    for (int iter = 0; iter < max_iter; iter++) {
+        float off = 0.0f;
+        for (int p = 0; p < n - 1; p++) {
+            for (int q = p + 1; q < n; q++) {
+                // Compute col_p^T * col_q and norms
+                float alpha = 0.0f, beta = 0.0f, gamma = 0.0f;
+                for (int i = 0; i < m; i++) {
+                    alpha += W[i * n + p] * W[i * n + p];
+                    beta  += W[i * n + q] * W[i * n + q];
+                    gamma += W[i * n + p] * W[i * n + q];
+                }
+                off += gamma * gamma;
+                if (fabsf(gamma) < 1e-12f) continue;
+
+                // Compute Jacobi rotation
+                float tau = (beta - alpha) / (2.0f * gamma);
+                float t;
+                if (tau >= 0.0f)
+                    t = 1.0f / (tau + sqrtf(1.0f + tau * tau));
+                else
+                    t = -1.0f / (-tau + sqrtf(1.0f + tau * tau));
+                float c = 1.0f / sqrtf(1.0f + t * t);
+                float s = t * c;
+
+                // Rotate columns of W
+                for (int i = 0; i < m; i++) {
+                    float wp = W[i * n + p], wq = W[i * n + q];
+                    W[i * n + p] = c * wp - s * wq;
+                    W[i * n + q] = s * wp + c * wq;
+                }
+                // Rotate columns of V
+                for (int i = 0; i < n; i++) {
+                    float vp = V[i * n + p], vq = V[i * n + q];
+                    V[i * n + p] = c * vp - s * vq;
+                    V[i * n + q] = s * vp + c * vq;
+                }
+            }
+        }
+        if (off < 1e-20f) break;
+    }
+
+    // Compute singular values (column norms of W) and U = W / sigma
+    float* sigma = malloc((size_t)k * sizeof(float));
+    float* U = malloc((size_t)m * k * sizeof(float));
+    if (!sigma || !U) { free(W); free(V); free(sigma); free(U); return result; }
+
+    // Sort by descending singular value
+    int* order = malloc((size_t)n * sizeof(int));
+    if (!order) { free(W); free(V); free(sigma); free(U); return result; }
+    for (int i = 0; i < n; i++) order[i] = i;
+
+    float* col_norms = malloc((size_t)n * sizeof(float));
+    if (!col_norms) { free(W); free(V); free(sigma); free(U); free(order); return result; }
+    for (int j = 0; j < n; j++) {
+        float norm = 0.0f;
+        for (int i = 0; i < m; i++) norm += W[i * n + j] * W[i * n + j];
+        col_norms[j] = sqrtf(norm);
+    }
+
+    // Simple selection sort by descending col_norms
+    for (int i = 0; i < k; i++) {
+        int max_idx = i;
+        for (int j = i + 1; j < n; j++) {
+            if (col_norms[order[j]] > col_norms[order[max_idx]]) max_idx = j;
+        }
+        if (max_idx != i) { int tmp = order[i]; order[i] = order[max_idx]; order[max_idx] = tmp; }
+    }
+
+    for (int j = 0; j < k; j++) {
+        int oj = order[j];
+        sigma[j] = col_norms[oj];
+        if (sigma[j] > 1e-12f) {
+            for (int i = 0; i < m; i++)
+                U[i * k + j] = W[i * n + oj] / sigma[j];
+        } else {
+            for (int i = 0; i < m; i++)
+                U[i * k + j] = 0.0f;
+        }
+    }
+
+    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+
+    int u_shape[] = {m, k};
+    result.U = tensor_empty(u_shape, 2, &config);
+    if (result.U) { tensor_ensure_executed(result.U); memcpy(result.U->data, U, (size_t)m * k * sizeof(float)); }
+
+    int s_shape[] = {k};
+    result.S = tensor_empty(s_shape, 1, &config);
+    if (result.S) { tensor_ensure_executed(result.S); memcpy(result.S->data, sigma, (size_t)k * sizeof(float)); }
+
+    // Vt = V^T but only rows corresponding to sorted order
+    int vt_shape[] = {k, n};
+    result.Vt = tensor_empty(vt_shape, 2, &config);
+    if (result.Vt) {
+        tensor_ensure_executed(result.Vt);
+        float* vt_data = (float*)result.Vt->data;
+        for (int j = 0; j < k; j++) {
+            int oj = order[j];
+            for (int i = 0; i < n; i++)
+                vt_data[j * n + i] = V[i * n + oj];
+        }
+    }
+
+    free(W); free(V); free(sigma); free(U); free(order); free(col_norms);
+    return result;
+}
+
+Tensor* tensor_from_url(const char* url) {
+    if (!url) return NULL;
+
+    // Create temp file
+    char tmppath[] = "/tmp/cml_tensor_XXXXXX";
+    int fd = mkstemp(tmppath);
+    if (fd < 0) {
+        LOG_ERROR("tensor_from_url: failed to create temp file");
+        return NULL;
+    }
+    close(fd);
+
+    // Download using curl or wget
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd),
+             "curl -fsSL -o '%s' '%s' 2>/dev/null || wget -q -O '%s' '%s' 2>/dev/null",
+             tmppath, url, tmppath, url);
+
+    int ret = system(cmd);
+    if (ret != 0) {
+        LOG_ERROR("tensor_from_url: download failed for %s", url);
+        remove(tmppath);
+        return NULL;
+    }
+
+    // Load tensor from downloaded file
+    Tensor* t = tensor_read_file(tmppath);
+    remove(tmppath);
     return t;
 }
