@@ -113,6 +113,9 @@ struct CMLGraph {
     int tensor_refs_count;
     int tensor_refs_capacity;
 
+    // Decomposition state
+    bool is_decomposed;         // Has decomposition pass been run?
+
     // (Using LLVM backend directly)
 };
 
