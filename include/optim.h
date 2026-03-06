@@ -415,6 +415,53 @@ Optimizer* optim_lamb(Parameter** parameters, int num_parameters, float lr, floa
 Optimizer* optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
                       float weight_decay, float trust_coefficient);
 
+/**
+ * @brief Create Muon optimizer (Momentum + Orthogonalization)
+ *
+ * Muon uses Nesterov momentum combined with Newton-Schulz orthogonalization
+ * of the gradient update. Particularly effective for training with large batch sizes.
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param lr Learning rate (default: 0.02)
+ * @param momentum Momentum factor (default: 0.95)
+ * @param weight_decay Weight decay (default: 0.0)
+ * @param nesterov Whether to use Nesterov momentum (default: true)
+ * @return New Muon optimizer, or NULL on failure
+ */
+Optimizer* optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
+                      float weight_decay, bool nesterov);
+
+/**
+ * @brief Create Nadam optimizer (Nesterov-accelerated Adam)
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param lr Learning rate
+ * @param weight_decay Weight decay (default: 0.0)
+ * @param beta1 First moment decay rate (default: 0.9)
+ * @param beta2 Second moment decay rate (default: 0.999)
+ * @param epsilon Numerical stability constant (default: 1e-8)
+ * @return New Nadam optimizer, or NULL on failure
+ */
+Optimizer* optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                       float beta1, float beta2, float epsilon);
+
+/**
+ * @brief Create AdaMax optimizer (Adam variant based on infinity norm)
+ *
+ * @param parameters Array of parameters to optimize
+ * @param num_parameters Number of parameters
+ * @param lr Learning rate (default: 0.002)
+ * @param weight_decay Weight decay (default: 0.0)
+ * @param beta1 First moment decay rate (default: 0.9)
+ * @param beta2 Second moment decay rate (default: 0.999)
+ * @param epsilon Numerical stability constant (default: 1e-8)
+ * @return New AdaMax optimizer, or NULL on failure
+ */
+Optimizer* optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                        float beta1, float beta2, float epsilon);
+
 #ifdef __cplusplus
 }
 #endif
