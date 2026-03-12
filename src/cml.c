@@ -1,11 +1,3 @@
-/**
- * @file cml.c
- * @brief C-ML Library main implementation
- *
- * This file contains the main library initialization, cleanup,
- * and utility functions for the C-ML library.
- */
-
 #include "cml.h"
 #include "core/logging.h"
 #include "core/training_metrics.h"
@@ -27,6 +19,13 @@
 #include "optim.h"
 #include "autograd/autograd.h"
 #include "autograd/loss_functions.h"
+#include "autograd/amp.h"
+#include "autograd/checkpointing.h"
+#include "tensor/sparse_tensor.h"
+#include "nn/layers/rnn.h"
+#include "nn/layers/conv_transpose3d.h"
+#include "nn/layers/upsample.h"
+#include "nn/layers/pixel_shuffle.h"
 #include "ops/ir/context.h"
 #include "ops/uops.h"
 #include "core/gguf.h"
@@ -398,15 +397,6 @@ static void check_and_launch_viz(void) {
 static const char* g_build_info = "C-ML Library\n"
                                   "Features: autograd, nn, optim, logging, memory_management";
 
-/**
- * @brief Initialize the C-ML library
- *
- * This function should be called before using any C-ML functionality.
- * It initializes internal systems, sets up logging, and prepares
- * the library for use.
- *
- * @return 0 on success, negative value on failure
- */
 int cml_init(void) {
     if (g_cml_initialized) {
         g_cml_init_count++;
@@ -455,14 +445,6 @@ int cml_init(void) {
     return result;
 }
 
-/**
- * @brief Cleanup the C-ML library
- *
- * This function should be called when the library is no longer needed.
- * It cleans up internal resources and ensures proper shutdown.
- *
- * @return 0 on success, negative value on failure
- */
 int cml_cleanup(void) {
     if (!g_cml_initialized) {
         LOG_WARNING("C-ML library not initialized, nothing to cleanup");
@@ -561,55 +543,27 @@ void cml_set_error_handler(CMLGlobalErrorHandler handler) { g_error_handler = ha
 
 CMLGlobalErrorHandler cml_get_error_handler(void) { return g_error_handler; }
 
-/**
- * @brief Get library version information
- *
- * @param major Pointer to store major version
- * @param minor Pointer to store minor version
- * @param patch Pointer to store patch version
- * @param version_string Pointer to store version string
- */
 void cml_get_version(int* major, int* minor, int* patch, const char** version_string) {
-    // Version managed by release process - return NULL/0 for now
     if (major)
-        *major = 0;
+        *major = CML_VERSION_MAJOR;
     if (minor)
-        *minor = 0;
+        *minor = CML_VERSION_MINOR;
     if (patch)
-        *patch = 0;
+        *patch = CML_VERSION_PATCH;
     if (version_string)
-        *version_string = NULL;
+        *version_string = CML_VERSION_STRING;
 }
 
-/**
- * @brief Get library build information
- *
- * @return String containing build information (compiler, flags, etc.)
- */
+int cml_version(void) { return CML_VERSION; }
+
+const char* cml_version_string(void) { return CML_VERSION_STRING; }
+
 const char* cml_get_build_info(void) { return g_build_info; }
 
-/**
- * @brief Check if C-ML library is initialized
- *
- * @return true if initialized, false otherwise
- */
 bool cml_is_initialized(void) { return g_cml_initialized; }
 
-/**
- * @brief Get C-ML library initialization count
- *
- * @return Current initialization reference count
- */
 int cml_get_init_count(void) { return g_cml_init_count; }
 
-/**
- * @brief Force cleanup of C-ML library (ignores reference count)
- *
- * This function should be used with caution as it forces cleanup
- * regardless of the reference count.
- *
- * @return 0 on success, negative value on failure
- */
 int cml_force_cleanup(void) {
     if (!g_cml_initialized) {
         return 0;
@@ -621,14 +575,6 @@ int cml_force_cleanup(void) {
     return cml_cleanup();
 }
 
-/**
- * @brief Print model summary (TensorFlow/Keras style)
- *
- * Prints a summary of the model architecture, showing layers,
- * parameter counts, and total trainable parameters.
- *
- * @param module The module to summarize (can be Sequential, Linear, etc.)
- */
 static void print_layer_summary(Module* module, int indent, int* layer_num) {
     if (!module)
         return;
@@ -802,6 +748,12 @@ Tensor* cml_relu(Tensor* a) { return tensor_relu(a); }
 Tensor* cml_sigmoid(Tensor* a) { return tensor_sigmoid(a); }
 Tensor* cml_tanh(Tensor* a) { return tensor_tanh(a); }
 Tensor* cml_softmax(Tensor* a, int dim) { return tensor_softmax(a, dim); }
+Tensor* cml_elu(Tensor* x, float alpha) { return tensor_elu(x, alpha); }
+Tensor* cml_selu(Tensor* x) { return tensor_selu(x); }
+Tensor* cml_mish(Tensor* x) { return tensor_mish(x); }
+Tensor* cml_silu(Tensor* x) { return tensor_silu(x); }
+Tensor* cml_hardswish(Tensor* x) { return tensor_hardswish(x); }
+Tensor* cml_leaky_relu(Tensor* x, float negative_slope) { return tensor_leaky_relu(x, negative_slope); }
 Tensor* cml_sum(Tensor* a, int dim, bool keepdim) { return tensor_sum(a, dim, keepdim); }
 Tensor* cml_mean(Tensor* a, int dim, bool keepdim) { return tensor_mean(a, dim, keepdim); }
 Tensor* cml_max(Tensor* a, int dim, bool keepdim) { return tensor_max(a, dim, keepdim); }
@@ -943,6 +895,16 @@ Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target) {
 Tensor* cml_nn_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
     return tensor_sparse_cross_entropy_loss(input, target);
 }
+Tensor* cml_nn_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* negative,
+                                   float margin) {
+    return tensor_triplet_margin_loss(anchor, positive, negative, margin);
+}
+Tensor* cml_nn_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, float margin) {
+    return tensor_cosine_embedding_loss(x1, x2, target, margin);
+}
+Tensor* cml_nn_nll_loss(Tensor* log_probs, Tensor* targets) {
+    return tensor_nll_loss(log_probs, targets);
+}
 
 void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
     tensor_backward(tensor, gradient, retain_graph, create_graph);
@@ -1078,6 +1040,12 @@ Tensor* cml_tril(Tensor* a, int diagonal) {
 
 Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value) {
     return uop_pad(a, pad_widths, num_dims, value);
+}
+Tensor* cml_pad_reflect(Tensor* a, int* pad_widths, int num_dims) {
+    return uop_pad_reflect(a, pad_widths, num_dims);
+}
+Tensor* cml_pad_replicate(Tensor* a, int* pad_widths, int num_dims) {
+    return uop_pad_replicate(a, pad_widths, num_dims);
 }
 
 Tensor* cml_arange(float start, float end, float step, const TensorConfig* config) {
@@ -1261,4 +1229,150 @@ Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr,
 Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                              float beta1, float beta2, float epsilon) {
     return optim_adamax(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
+}
+
+RNN* cml_nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
+                bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device) {
+    return nn_rnn(input_size, hidden_size, num_layers, bidirectional, batch_first, dropout,
+                  use_bias, dtype, device);
+}
+LSTM* cml_nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectional,
+                  bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device) {
+    return nn_lstm(input_size, hidden_size, num_layers, bidirectional, batch_first, dropout,
+                   use_bias, dtype, device);
+}
+GRU* cml_nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
+                bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device) {
+    return nn_gru(input_size, hidden_size, num_layers, bidirectional, batch_first, dropout,
+                  use_bias, dtype, device);
+}
+ConvTranspose3d* cml_nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
+                                          int stride, int padding, int output_padding,
+                                          bool use_bias, DType dtype, DeviceType device) {
+    return nn_conv_transpose3d(in_channels, out_channels, kernel_size, stride, padding,
+                               output_padding, use_bias, dtype, device);
+}
+Upsample* cml_nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
+                           UpsampleMode mode, bool align_corners) {
+    return nn_upsample(scale_factor, output_size, num_output_dims, mode, align_corners);
+}
+PixelShuffle* cml_nn_pixel_shuffle(int upscale_factor) {
+    return nn_pixel_shuffle(upscale_factor);
+}
+PixelUnshuffle* cml_nn_pixel_unshuffle(int downscale_factor) {
+    return nn_pixel_unshuffle(downscale_factor);
+}
+
+Flatten* cml_nn_flatten(int start_dim, int end_dim) {
+    return nn_flatten(start_dim, end_dim);
+}
+Identity* cml_nn_identity(void) {
+    return nn_identity();
+}
+BatchNorm1d* cml_nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
+                                 bool track_running_stats, DType dtype, DeviceType device) {
+    return nn_batchnorm1d(num_features, eps, momentum, affine, track_running_stats, dtype, device);
+}
+PReLU* cml_nn_prelu(int num_parameters, float init, DType dtype, DeviceType device) {
+    return nn_prelu(num_parameters, init, dtype, device);
+}
+
+Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims,
+                           UpsampleMode mode, bool align_corners) {
+    return f_interpolate(input, output_size, num_dims, mode, align_corners);
+}
+Tensor* cml_f_pixel_shuffle(Tensor* input, int upscale_factor) {
+    return f_pixel_shuffle(input, upscale_factor);
+}
+Tensor* cml_f_pixel_unshuffle(Tensor* input, int downscale_factor) {
+    return f_pixel_unshuffle(input, downscale_factor);
+}
+
+void cml_autocast_enter(DType target_dtype) { autocast_enter(target_dtype); }
+void cml_autocast_exit(void) { autocast_exit(); }
+bool cml_autocast_is_enabled(void) { return autocast_is_enabled(); }
+GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor,
+                                     float backoff_factor, int growth_interval) {
+    return grad_scaler_create(init_scale, growth_factor, backoff_factor, growth_interval);
+}
+void cml_grad_scaler_free(GradScaler* scaler) { grad_scaler_free(scaler); }
+Tensor* cml_grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
+    return grad_scaler_scale(scaler, loss);
+}
+void cml_grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params) {
+    grad_scaler_unscale(scaler, params, num_params);
+}
+void cml_grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimizer) {
+    grad_scaler_step(scaler, step_fn, optimizer);
+}
+void cml_grad_scaler_update(GradScaler* scaler) { grad_scaler_update(scaler); }
+
+SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values,
+                                      const int* dense_shape, int dense_ndim) {
+    return sparse_coo_tensor(indices, values, dense_shape, dense_ndim);
+}
+SparseCOOData* cml_sparse_from_dense(Tensor* dense) { return sparse_from_dense(dense); }
+Tensor* cml_sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
+    return sparse_to_dense(sparse, config);
+}
+Tensor* cml_sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
+    return sparse_matmul(sparse, dense);
+}
+SparseCOOData* cml_sparse_coalesce(SparseCOOData* sparse) { return sparse_coalesce(sparse); }
+void cml_sparse_free(SparseCOOData* sparse) { sparse_free(sparse); }
+
+// New tensor operations
+Tensor* cml_sort(Tensor* a, int dim, bool descending) { return tensor_sort(a, dim, descending); }
+Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
+    return tensor_topk(a, k, dim, largest, sorted);
+}
+Tensor* cml_masked_select(Tensor* a, Tensor* mask) { return tensor_masked_select(a, mask); }
+Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
+    return tensor_meshgrid(tensors, num_tensors, num_outputs);
+}
+Tensor* cml_diagonal(Tensor* a, int offset, int dim1, int dim2) {
+    return tensor_diagonal(a, offset, dim1, dim2);
+}
+Tensor* cml_lerp(Tensor* a, Tensor* b, float weight) { return tensor_lerp(a, b, weight); }
+Tensor* cml_idiv(Tensor* a, Tensor* b) { return tensor_idiv(a, b); }
+Tensor* cml_mod(Tensor* a, Tensor* b) { return tensor_mod(a, b); }
+
+// LR Scheduler wrappers
+LRScheduler* cml_lr_scheduler_step(Optimizer* opt, int step_size, float gamma) {
+    return lr_scheduler_step(opt, step_size, gamma);
+}
+LRScheduler* cml_lr_scheduler_reduce_on_plateau(Optimizer* opt, float factor, int patience,
+                                                  float min_lr) {
+    return lr_scheduler_reduce_on_plateau(opt, factor, patience, min_lr);
+}
+LRScheduler* cml_lr_scheduler_exponential(Optimizer* opt, float gamma) {
+    return lr_scheduler_exponential(opt, gamma);
+}
+LRScheduler* cml_lr_scheduler_cosine(Optimizer* opt, int T_max, float eta_min) {
+    return lr_scheduler_cosine(opt, T_max, eta_min);
+}
+LRScheduler* cml_lr_scheduler_one_cycle(Optimizer* opt, float max_lr, int total_steps,
+                                         float pct_start, float div_factor, float final_div_factor) {
+    return lr_scheduler_one_cycle(opt, max_lr, total_steps, pct_start, div_factor, final_div_factor);
+}
+LRScheduler* cml_lr_scheduler_multi_step(Optimizer* opt, int* milestones, int num_milestones,
+                                          float gamma) {
+    return lr_scheduler_multi_step(opt, milestones, num_milestones, gamma);
+}
+LRScheduler* cml_lr_scheduler_polynomial(Optimizer* opt, int total_iters, float power,
+                                          float min_lr) {
+    return lr_scheduler_polynomial(opt, total_iters, power, min_lr);
+}
+LRScheduler* cml_lr_scheduler_warmup(LRScheduler* inner, int warmup_steps,
+                                      float warmup_start_factor) {
+    return lr_scheduler_warmup(inner, warmup_steps, warmup_start_factor);
+}
+float cml_lr_scheduler_update(LRScheduler* scheduler, float metric) {
+    return lr_scheduler_update(scheduler, metric);
+}
+float cml_lr_scheduler_get_lr(LRScheduler* scheduler) {
+    return lr_scheduler_get_lr(scheduler);
+}
+void cml_lr_scheduler_free(LRScheduler* scheduler) {
+    lr_scheduler_free(scheduler);
 }

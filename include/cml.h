@@ -1,44 +1,8 @@
-/**
- * @file cml.h
- * @brief C-ML: C Machine Learning Library - Main Header
- * @version 0.0.2
- * @author Arinjay
- * @date 2025
- *
- * This is the main header file for the C-ML library. Include this file
- * to access all the major components.
- *
- * @example
- * ```c
- * #include "cml.h"
- *
- * // Create model
- * Sequential *model = nn_sequential();
- * sequential_add(model, (Module*)nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
- * sequential_add(model, (Module*)nn_relu(false));
- *
- * // Create optimizer
- * Parameter **params; int num_params;
- * module_collect_parameters((Module*)model, &params, &num_params, true);
- * Optimizer *optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
- *
- * // Training loop
- * for (int epoch = 0; epoch < epochs; epoch++) {
- *     optimizer_zero_grad(optimizer);
- *     Tensor *outputs = module_forward((Module*)model, X);
- *     Tensor *loss = tensor_mse_loss(outputs, y);
- *     tensor_backward(loss, NULL, false, false);
- *     optimizer_step(optimizer);
- * }
- * ```
- */
-
 #ifndef CML_H
 #define CML_H
 
-// Version information - managed by release process
+#include "core/export.h"
 
-// Core utilities
 #include "core/logging.h"
 #include "alloc/memory_management.h"
 #include "core/error_codes.h"
@@ -71,6 +35,9 @@
 
 #include "autograd/autograd.h"
 #include "autograd/loss_functions.h"
+#include "autograd/amp.h"
+#include "autograd/checkpointing.h"
+#include "tensor/sparse_tensor.h"
 
 #include "nn.h"
 #include "nn/layers.h"
@@ -84,766 +51,56 @@
 #include "distributed/pipeline_parallel.h"
 #endif
 
+#include "symbolic/symbolic.h"
+
+#include "ops/ir/schedule.h"
+#include "ops/ir/graph_capture.h"
+#include "ops/ir/compiler_viz.h"
+#include "tensor/image_dtype.h"
+#include "backend/null_device.h"
+#include "backend/disk_backend.h"
+#include "core/pth_loader.h"
+#include "core/tinyfs.h"
+#include "nn/llm_ops.h"
+#include "alloc/tlsf_alloc.h"
+
 #include "zoo/zoo.h"
 #include "datasets/datasets.h"
 
-// Global utility functions
 void cml_summary(struct Module* module);
 
-// Resource tracking functions (for automatic cleanup)
 void cml_track_module(struct Module* module);
 void cml_untrack_module(struct Module* module);
 void cml_track_optimizer(struct Optimizer* optimizer);
 void cml_track_dataset(struct Dataset* dataset);
 
-/**
- * @brief Create an empty tensor with specified shape and configuration
- * @param shape Array of dimensions
- * @param ndim Number of dimensions
- * @param config Tensor configuration (dtype, device)
- * @return New tensor, or NULL on failure
- */
+// Tensor creation
 Tensor* cml_empty(int* shape, int ndim, const TensorConfig* config);
-
-/**
- * @brief Create a tensor filled with zeros
- * @param shape Array of dimensions
- * @param ndim Number of dimensions
- * @param config Tensor configuration (dtype, device)
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_zeros(int* shape, int ndim, const TensorConfig* config);
-
-/**
- * @brief Create a tensor filled with ones
- * @param shape Array of dimensions
- * @param ndim Number of dimensions
- * @param config Tensor configuration (dtype, device)
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_ones(int* shape, int ndim, const TensorConfig* config);
-
-/**
- * @brief Create a tensor filled with a constant value
- * @param shape Array of dimensions
- * @param ndim Number of dimensions
- * @param config Tensor configuration (dtype, device)
- * @param value Value to fill the tensor with
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_full(int* shape, int ndim, const TensorConfig* config, float value);
-
-/**
- * @brief Create a tensor from existing data
- * @param data Pointer to data
- * @param shape Array of dimensions
- * @param ndim Number of dimensions
- * @param config Tensor configuration (dtype, device)
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_tensor(void* data, int* shape, int ndim, const TensorConfig* config);
-
-/**
- * @brief Create a 2D tensor filled with zeros
- * @param rows Number of rows
- * @param cols Number of columns
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_zeros_2d(int rows, int cols);
-
-/**
- * @brief Create a 2D tensor filled with ones
- * @param rows Number of rows
- * @param cols Number of columns
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_ones_2d(int rows, int cols);
-
-/**
- * @brief Create an empty 2D tensor
- * @param rows Number of rows
- * @param cols Number of columns
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_empty_2d(int rows, int cols);
-
-/**
- * @brief Create a 2D tensor from data
- * @param data Pointer to flat data array
- * @param rows Number of rows
- * @param cols Number of columns
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_tensor_2d(const float* data, int rows, int cols);
-
-/**
- * @brief Create a 1D tensor filled with zeros
- * @param size Number of elements
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_zeros_1d(int size);
-
-/**
- * @brief Create a 1D tensor filled with ones
- * @param size Number of elements
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_ones_1d(int size);
-
-/**
- * @brief Create an empty 1D tensor
- * @param size Number of elements
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_empty_1d(int size);
-
-/**
- * @brief Create a 1D tensor from data
- * @param data Pointer to data array
- * @param size Number of elements
- * @return New tensor, or NULL on failure
- */
 Tensor* cml_tensor_1d(const float* data, int size);
 
-/**
- * @brief Element-wise addition
- * @param a First tensor
- * @param b Second tensor
- * @return Result tensor
- */
+// Element-wise ops
 Tensor* cml_add(Tensor* a, Tensor* b);
-
-/**
- * @brief Element-wise subtraction
- * @param a First tensor
- * @param b Second tensor
- * @return Result tensor
- */
 Tensor* cml_sub(Tensor* a, Tensor* b);
-
-/**
- * @brief Element-wise multiplication
- * @param a First tensor
- * @param b Second tensor
- * @return Result tensor
- */
 Tensor* cml_mul(Tensor* a, Tensor* b);
-
-/**
- * @brief Element-wise division
- * @param a First tensor
- * @param b Second tensor
- * @return Result tensor
- */
 Tensor* cml_div(Tensor* a, Tensor* b);
-
-/**
- * @brief Element-wise exponential
- * @param a Input tensor
- * @return Result tensor
- */
 Tensor* cml_exp(Tensor* a);
-
-/**
- * @brief Element-wise natural logarithm
- * @param a Input tensor
- * @return Result tensor
- */
 Tensor* cml_log(Tensor* a);
-
-/**
- * @brief Element-wise square root
- * @param a Input tensor
- * @return Result tensor
- */
 Tensor* cml_sqrt(Tensor* a);
-
-/**
- * @brief Element-wise sine
- * @param a Input tensor
- * @return Result tensor
- */
 Tensor* cml_sin(Tensor* a);
-
-/**
- * @brief Element-wise cosine
- * @param a Input tensor
- * @return Result tensor
- */
 Tensor* cml_cos(Tensor* a);
-
-/**
- * @brief Element-wise tangent
- * @param a Input tensor
- * @return Result tensor
- */
 Tensor* cml_tan(Tensor* a);
-
-/**
- * @brief Element-wise power function
- * @param a Base tensor
- * @param b Exponent tensor
- * @return Result tensor
- */
 Tensor* cml_pow(Tensor* a, Tensor* b);
-
-/**
- * @brief Rectified Linear Unit activation
- * @param a Input tensor
- * @return Result tensor
- */
-Tensor* cml_relu(Tensor* a);
-
-/**
- * @brief Sigmoid activation
- * @param a Input tensor
- * @return Result tensor
- */
-Tensor* cml_sigmoid(Tensor* a);
-
-/**
- * @brief Hyperbolic tangent activation
- * @param a Input tensor
- * @return Result tensor
- */
-Tensor* cml_tanh(Tensor* a);
-
-/**
- * @brief Softmax activation along a dimension
- * @param a Input tensor
- * @param dim Dimension to apply softmax
- * @return Result tensor
- */
-Tensor* cml_softmax(Tensor* a, int dim);
-
-/**
- * @brief Sum reduction
- * @param a Input tensor
- * @param dim Dimension to reduce
- * @param keepdim Whether to keep the reduced dimension
- * @return Result tensor
- */
-Tensor* cml_sum(Tensor* a, int dim, bool keepdim);
-
-/**
- * @brief Mean reduction
- * @param a Input tensor
- * @param dim Dimension to reduce
- * @param keepdim Whether to keep the reduced dimension
- * @return Result tensor
- */
-Tensor* cml_mean(Tensor* a, int dim, bool keepdim);
-
-/**
- * @brief Max reduction
- * @param a Input tensor
- * @param dim Dimension to reduce
- * @param keepdim Whether to keep the reduced dimension
- * @return Result tensor
- */
-Tensor* cml_max(Tensor* a, int dim, bool keepdim);
-
-/**
- * @brief Min reduction
- * @param a Input tensor
- * @param dim Dimension to reduce
- * @param keepdim Whether to keep the reduced dimension
- * @return Result tensor
- */
-Tensor* cml_min(Tensor* a, int dim, bool keepdim);
-
-/**
- * @brief Matrix multiplication
- * @param a First matrix
- * @param b Second matrix
- * @return Result tensor
- */
-Tensor* cml_matmul(Tensor* a, Tensor* b);
-
-/**
- * @brief Transpose tensor dimensions
- * @param a Input tensor
- * @param dim1 First dimension
- * @param dim2 Second dimension
- * @return Result tensor
- */
-Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
-
-/**
- * @brief Reshape tensor
- * @param a Input tensor
- * @param new_shape New shape array
- * @param new_ndim New number of dimensions
- * @return Result tensor
- */
-Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);
-
-/**
- * @brief Clone tensor
- * @param a Input tensor
- * @return Cloned tensor
- */
-Tensor* cml_clone(Tensor* a);
-
-/**
- * @brief Detach tensor from computation graph
- * @param a Input tensor
- * @return Detached tensor
- */
-Tensor* cml_detach(Tensor* a);
-
-/**
- * @brief Concatenate tensors
- * @param tensors Array of tensors
- * @param num_tensors Number of tensors
- * @param dim Dimension to concatenate along
- * @return Result tensor
- */
-Tensor* cml_concat(Tensor** tensors, int num_tensors, int dim);
-
-/**
- * @brief Stack tensors
- * @param tensors Array of tensors
- * @param num_tensors Number of tensors
- * @param dim Dimension to stack along
- * @return Result tensor
- */
-Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim);
-
-/**
- * @brief Create a sequential container
- * @return New sequential module
- */
-Sequential* cml_nn_sequential(void);
-
-/**
- * @brief Add a layer to a sequential container
- * @param seq Sequential container
- * @param layer Layer to add
- * @return The sequential container
- */
-Sequential* cml_nn_sequential_add(Sequential* seq, Module* layer);
-
-/**
- * @brief Forward pass through a sequential container
- * @param seq Sequential container
- * @param input Input tensor
- * @return Output tensor
- */
-Tensor* cml_nn_sequential_forward(Sequential* seq, Tensor* input);
-
-/**
- * @brief Create a linear layer
- * @param in_features Input features
- * @param out_features Output features
- * @param dtype Data type
- * @param device Device
- * @param bias Whether to include bias
- * @return New linear layer
- */
-Linear* cml_nn_linear(int in_features, int out_features, DType dtype, DeviceType device, bool bias);
-
-/**
- * @brief Create a ReLU activation layer
- * @param inplace Whether to perform operation in-place
- * @return New ReLU layer
- */
-ReLU* cml_nn_relu(bool inplace);
-
-/**
- * @brief Create a Sigmoid activation layer
- * @return New Sigmoid layer
- */
-Sigmoid* cml_nn_sigmoid(void);
-
-/**
- * @brief Create a Tanh activation layer
- * @return New Tanh layer
- */
-Tanh* cml_nn_tanh(void);
-
-/**
- * @brief Create a LeakyReLU activation layer
- * @param negative_slope Slope for negative values
- * @param inplace Whether to perform operation in-place
- * @return New LeakyReLU layer
- */
-LeakyReLU* cml_nn_leaky_relu(float negative_slope, bool inplace);
-
-/**
- * @brief Create a Dropout layer
- * @param p Dropout probability
- * @param inplace Whether to perform operation in-place
- * @return New Dropout layer
- */
-Dropout* cml_nn_dropout(float p, bool inplace);
-
-/**
- * @brief Create a 2D Convolution layer
- * @param in_channels Input channels
- * @param out_channels Output channels
- * @param kernel_size Kernel size
- * @param stride Stride
- * @param padding Padding
- * @param dilation Dilation
- * @param bias Whether to include bias
- * @param dtype Data type
- * @param device Device
- * @return New Conv2d layer
- */
-Conv2d* cml_nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
-                      int dilation, bool bias, DType dtype, DeviceType device);
-
-/**
- * @brief Create a 2D BatchNorm layer
- * @param num_features Number of features
- * @param eps Epsilon value
- * @param momentum Momentum value
- * @param affine Whether to include learnable affine parameters
- * @param track_running_stats Whether to track running statistics
- * @param dtype Data type
- * @param device Device
- * @return New BatchNorm2d layer
- */
-BatchNorm2d* cml_nn_batchnorm2d(int num_features, float eps, float momentum, bool affine,
-                                bool track_running_stats, DType dtype, DeviceType device);
-
-/**
- * @brief Create a LayerNorm layer
- * @param normalized_shape Shape to normalize
- * @param eps Epsilon value
- * @param affine Whether to include learnable affine parameters
- * @param dtype Data type
- * @param device Device
- * @return New LayerNorm layer
- */
-LayerNorm* cml_nn_layernorm(int normalized_shape, float eps, bool affine, DType dtype,
-                            DeviceType device);
-
-/**
- * @brief Create a 2D MaxPool layer
- * @param kernel_size Kernel size
- * @param stride Stride
- * @param padding Padding
- * @param dilation Dilation
- * @param ceil_mode Whether to use ceil for output size calculation
- * @return New MaxPool2d layer
- */
-MaxPool2d* cml_nn_maxpool2d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
-
-/**
- * @brief Create a 2D AvgPool layer
- * @param kernel_size Kernel size
- * @param stride Stride
- * @param padding Padding
- * @param ceil_mode Whether to use ceil for output size calculation
- * @param count_include_pad Whether to include padding in average calculation
- * @return New AvgPool2d layer
- */
-AvgPool2d* cml_nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode,
-                            bool count_include_pad);
-
-// New layer wrappers
-Conv1d* cml_nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
-                      int dilation, bool use_bias, DType dtype, DeviceType device);
-Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
-                      int dilation, bool use_bias, DType dtype, DeviceType device);
-Embedding* cml_nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
-                            DeviceType device);
-GroupNorm* cml_nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
-                            DeviceType device);
-RNNCell* cml_nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
-                         DeviceType device);
-LSTMCell* cml_nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
-                           DeviceType device);
-GRUCell* cml_nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
-                         DeviceType device);
-MultiHeadAttention* cml_nn_multihead_attention(int embed_dim, int num_heads, float dropout,
-                                               DType dtype, DeviceType device);
-TransformerEncoderLayer* cml_nn_transformer_encoder_layer(int d_model, int nhead,
-                                                          int dim_feedforward, float dropout,
-                                                          DType dtype, DeviceType device);
-ModuleList* cml_nn_module_list(void);
-ModuleDict* cml_nn_module_dict(void);
-
-/**
- * @brief Create an Adam optimizer
- * @param parameters Array of parameters
- * @param num_parameters Number of parameters
- * @param lr Learning rate
- * @param weight_decay Weight decay
- * @param beta1 Beta1 coefficient
- * @param beta2 Beta2 coefficient
- * @param eps Epsilon value
- * @return New Adam optimizer
- */
-Optimizer* cml_optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                          float beta1, float beta2, float eps);
-
-/**
- * @brief Create an SGD optimizer
- * @param parameters Array of parameters
- * @param num_parameters Number of parameters
- * @param lr Learning rate
- * @param momentum Momentum factor
- * @param weight_decay Weight decay
- * @return New SGD optimizer
- */
-Optimizer* cml_optim_sgd(Parameter** parameters, int num_parameters, float lr, float momentum,
-                         float weight_decay);
-
-/**
- * @brief Create an RMSprop optimizer
- * @param parameters Array of parameters
- * @param num_parameters Number of parameters
- * @param lr Learning rate
- * @param weight_decay Weight decay
- * @param alpha Smoothing constant
- * @param eps Epsilon value
- * @return New RMSprop optimizer
- */
-Optimizer* cml_optim_rmsprop(Parameter** parameters, int num_parameters, float lr,
-                             float weight_decay, float alpha, float eps);
-
-/**
- * @brief Create an Adagrad optimizer
- * @param parameters Array of parameters
- * @param num_parameters Number of parameters
- * @param lr Learning rate
- * @param weight_decay Weight decay
- * @param eps Epsilon value
- * @return New Adagrad optimizer
- */
-Optimizer* cml_optim_adagrad(Parameter** parameters, int num_parameters, float lr,
-                             float weight_decay, float eps);
-
-/**
- * @brief Create an Adam optimizer for a model
- * @param model Model to optimize
- * @param lr Learning rate
- * @param weight_decay Weight decay
- * @param beta1 Beta1 coefficient
- * @param beta2 Beta2 coefficient
- * @param eps Epsilon value
- * @return New Adam optimizer
- */
-Optimizer* cml_optim_adam_for_model(Module* model, float lr, float weight_decay, float beta1,
-                                    float beta2, float eps);
-
-/**
- * @brief Create an SGD optimizer for a model
- * @param model Model to optimize
- * @param lr Learning rate
- * @param momentum Momentum factor
- * @param weight_decay Weight decay
- * @return New SGD optimizer
- */
-Optimizer* cml_optim_sgd_for_model(Module* model, float lr, float momentum, float weight_decay);
-
-/**
- * @brief Zero gradients of an optimizer
- * @param optimizer Optimizer instance
- */
-void cml_optim_zero_grad(Optimizer* optimizer);
-
-/**
- * @brief Perform an optimization step
- * @param optimizer Optimizer instance
- */
-void cml_optim_step(Optimizer* optimizer);
-
-/**
- * @brief MSE Loss
- * @param input Input tensor
- * @param target Target tensor
- * @return Loss tensor
- */
-Tensor* cml_nn_mse_loss(Tensor* input, Tensor* target);
-
-/**
- * @brief MAE Loss
- * @param input Input tensor
- * @param target Target tensor
- * @return Loss tensor
- */
-Tensor* cml_nn_mae_loss(Tensor* input, Tensor* target);
-
-/**
- * @brief BCE Loss
- * @param input Input tensor
- * @param target Target tensor
- * @return Loss tensor
- */
-Tensor* cml_nn_bce_loss(Tensor* input, Tensor* target);
-
-/**
- * @brief Cross Entropy Loss
- * @param input Input tensor
- * @param target Target tensor
- * @return Loss tensor
- */
-Tensor* cml_nn_cross_entropy_loss(Tensor* input, Tensor* target);
-
-/**
- * @brief Huber Loss
- * @param input Input tensor
- * @param target Target tensor
- * @param delta Delta value
- * @return Loss tensor
- */
-Tensor* cml_nn_huber_loss(Tensor* input, Tensor* target, float delta);
-
-/**
- * @brief KL Divergence Loss
- * @param input Input tensor
- * @param target Target tensor
- * @return Loss tensor
- */
-Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target);
-
-/**
- * @brief Sparse Cross Entropy Loss (numerically stable)
- * @param input Predicted logits [N, C]
- * @param target Target class indices [N]
- * @return Loss tensor
- */
-Tensor* cml_nn_sparse_cross_entropy_loss(Tensor* input, Tensor* target);
-
-/**
- * @brief Perform backward pass
- * @param tensor Tensor to start backward pass from
- * @param gradient Gradient tensor (optional)
- * @param retain_graph Whether to retain the graph
- * @param create_graph Whether to create a graph for higher-order derivatives
- */
-void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
-
-/**
- * @brief Zero gradients of a tensor
- * @param tensor Tensor to zero gradients for
- */
-void cml_zero_grad(Tensor* tensor);
-
-/**
- * @brief Disable gradient calculation
- */
-void cml_no_grad(void);
-
-/**
- * @brief Enable gradient calculation
- */
-void cml_enable_grad(void);
-
-/**
- * @brief Check if gradient calculation is enabled
- * @return true if enabled, false otherwise
- */
-bool cml_is_grad_enabled(void);
-
-/**
- * @brief Check if tensor requires gradients
- * @param t Input tensor
- * @return true if requires gradients, false otherwise
- */
-bool cml_requires_grad(Tensor* t);
-
-/**
- * @brief Set whether tensor requires gradients
- * @param t Input tensor
- * @param requires_grad Whether to require gradients
- */
-void cml_set_requires_grad(Tensor* t, bool requires_grad);
-
-/**
- * @brief Check if tensor is a leaf node
- * @param t Input tensor
- * @return true if leaf node, false otherwise
- */
-bool cml_is_leaf(Tensor* t);
-
-/**
- * @brief Reset the global IR context
- *
- * This frees all IR nodes accumulated during forward/backward passes.
- * Call this after each training batch to prevent memory growth.
- * Gradients are already materialized in parameter tensors after optimizer step,
- * so it's safe to call this after cml_optim_step().
- */
-void cml_reset_ir_context(void);
-
-// JIT Kernel Cache Management
-
-/**
- * @brief Clear the JIT kernel cache
- *
- * This frees all cached LLVM JIT execution engines. Call this if you want to
- * reclaim memory used by cached kernels. Note that this will cause recompilation
- * on next execution.
- *
- * The kernel cache uses LRU eviction by default (256 entry limit), so you
- * typically don't need to call this unless you want to force memory reclamation.
- */
-void cml_kernel_cache_clear(void);
-
-/**
- * @brief Get kernel cache statistics
- *
- * @param hits Pointer to store cache hit count (can be NULL)
- * @param misses Pointer to store cache miss count (can be NULL)
- * @param count Pointer to store current entry count (can be NULL)
- * @param memory Pointer to store estimated memory usage in bytes (can be NULL)
- */
-void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory);
-
-/**
- * @brief Get kernel cache hit rate
- *
- * @return Hit rate as a value between 0.0 and 1.0
- */
-double cml_kernel_cache_hit_rate(void);
-
-/**
- * @brief Print kernel cache statistics to stdout
- *
- * Prints detailed cache statistics including hit/miss counts, hit rate,
- * memory usage, and eviction counts.
- */
-void cml_kernel_cache_print_stats(void);
-
-/**
- * @brief Forward pass through a module
- * @param module Module instance
- * @param input Input tensor
- * @return Output tensor
- */
-Tensor* cml_nn_module_forward(Module* module, Tensor* input);
-
-/**
- * @brief Set module training mode
- * @param module Module instance
- * @param training Whether to set to training mode
- */
-void cml_nn_module_set_training(Module* module, bool training);
-
-/**
- * @brief Check if module is in training mode
- * @param module Module instance
- * @return true if in training mode, false otherwise
- */
-bool cml_nn_module_is_training(Module* module);
-
-/**
- * @brief Set module to evaluation mode
- * @param module Module instance
- */
-void cml_nn_module_eval(Module* module);
-
-/**
- * @brief Set module to training mode
- * @param module Module instance
- */
-void cml_nn_module_train(Module* module);
-
 Tensor* cml_sign(Tensor* a);
 Tensor* cml_floor(Tensor* a);
 Tensor* cml_ceil(Tensor* a);
@@ -858,6 +115,23 @@ Tensor* cml_rsqrt(Tensor* a);
 Tensor* cml_erf(Tensor* a);
 Tensor* cml_clamp(Tensor* a, float min_val, float max_val);
 
+// Activations
+Tensor* cml_relu(Tensor* a);
+Tensor* cml_sigmoid(Tensor* a);
+Tensor* cml_tanh(Tensor* a);
+Tensor* cml_softmax(Tensor* a, int dim);
+Tensor* cml_elu(Tensor* x, float alpha);
+Tensor* cml_selu(Tensor* x);
+Tensor* cml_mish(Tensor* x);
+Tensor* cml_silu(Tensor* x);
+Tensor* cml_hardswish(Tensor* x);
+Tensor* cml_leaky_relu(Tensor* x, float negative_slope);
+
+// Reductions
+Tensor* cml_sum(Tensor* a, int dim, bool keepdim);
+Tensor* cml_mean(Tensor* a, int dim, bool keepdim);
+Tensor* cml_max(Tensor* a, int dim, bool keepdim);
+Tensor* cml_min(Tensor* a, int dim, bool keepdim);
 Tensor* cml_prod(Tensor* a, int dim, bool keepdim);
 Tensor* cml_argmax(Tensor* a, int dim);
 Tensor* cml_argmin(Tensor* a, int dim);
@@ -865,6 +139,19 @@ Tensor* cml_cumsum(Tensor* a, int dim);
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim);
 Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim);
 
+// Linear algebra
+Tensor* cml_matmul(Tensor* a, Tensor* b);
+Tensor* cml_dot(Tensor* a, Tensor* b);
+QRResult cml_qr(Tensor* a);
+SVDResult cml_svd(Tensor* a);
+
+// Tensor manipulation
+Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
+Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);
+Tensor* cml_clone(Tensor* a);
+Tensor* cml_detach(Tensor* a);
+Tensor* cml_concat(Tensor** tensors, int num_tensors, int dim);
+Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim);
 Tensor* cml_squeeze(Tensor* a, int dim);
 Tensor* cml_unsqueeze(Tensor* a, int dim);
 Tensor* cml_flip(Tensor* a, int dim);
@@ -874,53 +161,40 @@ Tensor** cml_chunk(Tensor* a, int chunks, int dim, int* out_count);
 Tensor* cml_triu(Tensor* a, int diagonal);
 Tensor* cml_tril(Tensor* a, int diagonal);
 Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value);
+Tensor* cml_pad_reflect(Tensor* a, int* pad_widths, int num_dims);
+Tensor* cml_pad_replicate(Tensor* a, int* pad_widths, int num_dims);
+Tensor* cml_unfold(Tensor* a, int kernel_size, int stride);
+Tensor* cml_sort(Tensor* a, int dim, bool descending);
+Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted);
+Tensor* cml_masked_select(Tensor* a, Tensor* mask);
+Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
+Tensor* cml_diagonal(Tensor* a, int offset, int dim1, int dim2);
+Tensor* cml_lerp(Tensor* a, Tensor* b, float weight);
+Tensor* cml_idiv(Tensor* a, Tensor* b);
+Tensor* cml_mod(Tensor* a, Tensor* b);
+Tensor* cml_contiguous(Tensor* a);
+Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
+Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
 
+// Tensor factory
 Tensor* cml_arange(float start, float end, float step, const TensorConfig* config);
 Tensor* cml_linspace(float start, float end, int steps, const TensorConfig* config);
 Tensor* cml_eye(int n, const TensorConfig* config);
 Tensor* cml_rand(int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_randn(int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_randint(int low, int high, int* shape, int ndim, const TensorConfig* config);
+Tensor* cml_randperm(int n, const TensorConfig* config);
 void cml_manual_seed(uint64_t seed);
 Tensor* cml_zeros_like(Tensor* a);
 Tensor* cml_ones_like(Tensor* a);
 Tensor* cml_rand_like(Tensor* a);
 Tensor* cml_randn_like(Tensor* a);
 Tensor* cml_full_like(Tensor* a, float value);
-
-Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
-Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
-Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
-Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
-
-Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                           float beta1, float beta2, float epsilon);
-Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
-                           float weight_decay, float trust_coefficient);
-
-InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
-                                       DeviceType device);
-ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
-                                          int stride, int padding, int output_padding,
-                                          bool use_bias, DType dtype, DeviceType device);
-BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
-                                 bool track_running_stats, DType dtype, DeviceType device);
-LayerNorm2d* cml_nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
-                                 DeviceType device);
-
-Optimizer* cml_optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
-                           float weight_decay, bool nesterov);
-Optimizer* cml_optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                            float beta1, float beta2, float epsilon);
-Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
-                               float weight_decay, float epsilon);
-
-Tensor* cml_unfold(Tensor* a, int kernel_size, int stride);
-
-Tensor* cml_cast(Tensor* a, DType dtype);
-Tensor* cml_contiguous(Tensor* a);
 Tensor* cml_from_blob(void* data, int* shape, int ndim, const TensorConfig* config);
-Tensor* cml_randperm(int n, const TensorConfig* config);
+
+// Dtype casting
+Tensor* cml_cast(Tensor* a, DType dtype);
+Tensor* cml_bitcast(Tensor* a, DType target_dtype);
 Tensor* cml_half(Tensor* a);
 Tensor* cml_double(Tensor* a);
 Tensor* cml_int_(Tensor* a);
@@ -929,46 +203,98 @@ Tensor* cml_short(Tensor* a);
 Tensor* cml_bool_(Tensor* a);
 Tensor* cml_bfloat16(Tensor* a);
 
-Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
+// Initialization
+Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
+Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
+Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
 
-Tensor* cml_dot(Tensor* a, Tensor* b);
+// Module API
+Sequential* cml_nn_sequential(void);
+Sequential* cml_nn_sequential_add(Sequential* seq, Module* layer);
+Tensor* cml_nn_sequential_forward(Sequential* seq, Tensor* input);
+Tensor* cml_nn_module_forward(Module* module, Tensor* input);
+void cml_nn_module_set_training(Module* module, bool training);
+bool cml_nn_module_is_training(Module* module);
+void cml_nn_module_eval(Module* module);
+void cml_nn_module_train(Module* module);
 
+// Layers
+Linear* cml_nn_linear(int in_features, int out_features, DType dtype, DeviceType device, bool bias);
+ReLU* cml_nn_relu(bool inplace);
+Sigmoid* cml_nn_sigmoid(void);
+Tanh* cml_nn_tanh(void);
+LeakyReLU* cml_nn_leaky_relu(float negative_slope, bool inplace);
+Dropout* cml_nn_dropout(float p, bool inplace);
+Conv1d* cml_nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool use_bias, DType dtype, DeviceType device);
+Conv2d* cml_nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool bias, DType dtype, DeviceType device);
+Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
+                      int dilation, bool use_bias, DType dtype, DeviceType device);
+ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
+                                          int stride, int padding, int output_padding,
+                                          bool use_bias, DType dtype, DeviceType device);
+ConvTranspose3d* cml_nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
+                                          int stride, int padding, int output_padding,
+                                          bool use_bias, DType dtype, DeviceType device);
+BatchNorm1d* cml_nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
+                                 bool track_running_stats, DType dtype, DeviceType device);
+BatchNorm2d* cml_nn_batchnorm2d(int num_features, float eps, float momentum, bool affine,
+                                bool track_running_stats, DType dtype, DeviceType device);
+BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
+                                 bool track_running_stats, DType dtype, DeviceType device);
+LayerNorm* cml_nn_layernorm(int normalized_shape, float eps, bool affine, DType dtype,
+                            DeviceType device);
+LayerNorm2d* cml_nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
+                                 DeviceType device);
+InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
+                                       DeviceType device);
+GroupNorm* cml_nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
+                            DeviceType device);
+Embedding* cml_nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
+                            DeviceType device);
+Flatten* cml_nn_flatten(int start_dim, int end_dim);
+Identity* cml_nn_identity(void);
+PReLU* cml_nn_prelu(int num_parameters, float init, DType dtype, DeviceType device);
+ModuleList* cml_nn_module_list(void);
+ModuleDict* cml_nn_module_dict(void);
+
+// Pooling
 MaxPool1d* cml_nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
+MaxPool2d* cml_nn_maxpool2d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
+MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
 AvgPool1d* cml_nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode,
                             bool count_include_pad);
-AdaptiveAvgPool2d* cml_nn_adaptive_avgpool2d(int output_h, int output_w);
-AdaptiveAvgPool1d* cml_nn_adaptive_avgpool1d(int output_size);
-
-MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
+AvgPool2d* cml_nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode,
+                            bool count_include_pad);
 AvgPool3d* cml_nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode,
                             bool count_include_pad);
-AdaptiveMaxPool2d* cml_nn_adaptive_maxpool2d(int output_h, int output_w);
+AdaptiveAvgPool1d* cml_nn_adaptive_avgpool1d(int output_size);
+AdaptiveAvgPool2d* cml_nn_adaptive_avgpool2d(int output_h, int output_w);
 AdaptiveMaxPool1d* cml_nn_adaptive_maxpool1d(int output_size);
+AdaptiveMaxPool2d* cml_nn_adaptive_maxpool2d(int output_h, int output_w);
 
-Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
-Tensor* cml_bitcast(Tensor* a, DType target_dtype);
+// RNN layers
+RNNCell* cml_nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                         DeviceType device);
+LSTMCell* cml_nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                           DeviceType device);
+GRUCell* cml_nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                         DeviceType device);
+RNN* cml_nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
+                bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
+LSTM* cml_nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectional,
+                  bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
+GRU* cml_nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
+                bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
 
-QRResult cml_qr(Tensor* a);
-SVDResult cml_svd(Tensor* a);
-
-Tensor* cml_from_url(const char* url);
-
-GGUFContext* cml_gguf_open_read(const char* path);
-GGUFContext* cml_gguf_open_write(const char* path);
-void cml_gguf_close(GGUFContext* ctx);
-int cml_gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor);
-Tensor* cml_gguf_read_tensor(GGUFContext* ctx, const char* name);
-int cml_module_save_gguf(Module* module, const char* path);
-int cml_module_load_gguf(Module* module, const char* path);
-
-SafeTensorsContext* cml_safetensors_open_read(const char* path);
-SafeTensorsContext* cml_safetensors_open_write(const char* path);
-void cml_safetensors_close(SafeTensorsContext* ctx);
-int cml_safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* tensor);
-Tensor* cml_safetensors_read_tensor(SafeTensorsContext* ctx, const char* name);
-int cml_module_save_safetensors(Module* module, const char* path);
-int cml_module_load_safetensors(Module* module, const char* path);
-
+// Attention / Transformer
+MultiHeadAttention* cml_nn_multihead_attention(int embed_dim, int num_heads, float dropout,
+                                               DType dtype, DeviceType device);
+TransformerEncoderLayer* cml_nn_transformer_encoder_layer(int d_model, int nhead,
+                                                          int dim_feedforward, float dropout,
+                                                          DType dtype, DeviceType device);
 TransformerEncoder* cml_nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
                                                 float dropout, int num_layers,
                                                 DType dtype, DeviceType device);
@@ -978,114 +304,150 @@ TransformerDecoder* cml_nn_transformer_decoder(int d_model, int nhead, int dim_f
                                                 float dropout, int num_layers,
                                                 DType dtype, DeviceType device);
 
+// Upsampling
+Upsample* cml_nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
+                           UpsampleMode mode, bool align_corners);
+PixelShuffle* cml_nn_pixel_shuffle(int upscale_factor);
+PixelUnshuffle* cml_nn_pixel_unshuffle(int downscale_factor);
+
+// Functional API
+Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims,
+                           UpsampleMode mode, bool align_corners);
+Tensor* cml_f_pixel_shuffle(Tensor* input, int upscale_factor);
+Tensor* cml_f_pixel_unshuffle(Tensor* input, int downscale_factor);
+
+// Optimizers
+Optimizer* cml_optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                          float beta1, float beta2, float eps);
+Optimizer* cml_optim_sgd(Parameter** parameters, int num_parameters, float lr, float momentum,
+                         float weight_decay);
+Optimizer* cml_optim_rmsprop(Parameter** parameters, int num_parameters, float lr,
+                             float weight_decay, float alpha, float eps);
+Optimizer* cml_optim_adagrad(Parameter** parameters, int num_parameters, float lr,
+                             float weight_decay, float eps);
+Optimizer* cml_optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                            float beta1, float beta2, float epsilon);
 Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                             float beta1, float beta2, float epsilon);
 Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                              float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
+                               float weight_decay, float epsilon);
+Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                           float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
+                           float weight_decay, float trust_coefficient);
+Optimizer* cml_optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
+                           float weight_decay, bool nesterov);
+Optimizer* cml_optim_adam_for_model(Module* model, float lr, float weight_decay, float beta1,
+                                    float beta2, float eps);
+Optimizer* cml_optim_sgd_for_model(Module* model, float lr, float momentum, float weight_decay);
+void cml_optim_zero_grad(Optimizer* optimizer);
+void cml_optim_step(Optimizer* optimizer);
+
+// LR Schedulers
+LRScheduler* cml_lr_scheduler_step(Optimizer* opt, int step_size, float gamma);
+LRScheduler* cml_lr_scheduler_reduce_on_plateau(Optimizer* opt, float factor, int patience, float min_lr);
+LRScheduler* cml_lr_scheduler_exponential(Optimizer* opt, float gamma);
+LRScheduler* cml_lr_scheduler_cosine(Optimizer* opt, int T_max, float eta_min);
+LRScheduler* cml_lr_scheduler_one_cycle(Optimizer* opt, float max_lr, int total_steps,
+                                         float pct_start, float div_factor, float final_div_factor);
+LRScheduler* cml_lr_scheduler_multi_step(Optimizer* opt, int* milestones, int num_milestones,
+                                          float gamma);
+LRScheduler* cml_lr_scheduler_polynomial(Optimizer* opt, int total_iters, float power, float min_lr);
+LRScheduler* cml_lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor);
+float cml_lr_scheduler_update(LRScheduler* scheduler, float metric);
+float cml_lr_scheduler_get_lr(LRScheduler* scheduler);
+void cml_lr_scheduler_free(LRScheduler* scheduler);
+
+// Loss functions
+Tensor* cml_nn_mse_loss(Tensor* input, Tensor* target);
+Tensor* cml_nn_mae_loss(Tensor* input, Tensor* target);
+Tensor* cml_nn_bce_loss(Tensor* input, Tensor* target);
+Tensor* cml_nn_cross_entropy_loss(Tensor* input, Tensor* target);
+Tensor* cml_nn_huber_loss(Tensor* input, Tensor* target, float delta);
+Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target);
+Tensor* cml_nn_sparse_cross_entropy_loss(Tensor* input, Tensor* target);
+Tensor* cml_nn_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* negative,
+                                   float margin);
+Tensor* cml_nn_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, float margin);
+Tensor* cml_nn_nll_loss(Tensor* log_probs, Tensor* targets);
+
+// Autograd
+void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
+void cml_zero_grad(Tensor* tensor);
+void cml_no_grad(void);
+void cml_enable_grad(void);
+bool cml_is_grad_enabled(void);
+bool cml_requires_grad(Tensor* t);
+void cml_set_requires_grad(Tensor* t, bool requires_grad);
+bool cml_is_leaf(Tensor* t);
+
+/*
+ * Free all IR nodes from forward/backward passes.
+ * Safe to call after optimizer step since gradients are already materialized.
+ */
+void cml_reset_ir_context(void);
+
+// JIT kernel cache
+void cml_kernel_cache_clear(void);
+void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory);
+double cml_kernel_cache_hit_rate(void);
+void cml_kernel_cache_print_stats(void);
+
+// AMP (automatic mixed precision)
+void cml_autocast_enter(DType target_dtype);
+void cml_autocast_exit(void);
+bool cml_autocast_is_enabled(void);
+GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor,
+                                     float backoff_factor, int growth_interval);
+void cml_grad_scaler_free(GradScaler* scaler);
+Tensor* cml_grad_scaler_scale(GradScaler* scaler, Tensor* loss);
+void cml_grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params);
+void cml_grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimizer);
+void cml_grad_scaler_update(GradScaler* scaler);
+
+// Sparse tensors
+SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values,
+                                      const int* dense_shape, int dense_ndim);
+SparseCOOData* cml_sparse_from_dense(Tensor* dense);
+Tensor* cml_sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config);
+Tensor* cml_sparse_matmul(SparseCOOData* sparse, Tensor* dense);
+SparseCOOData* cml_sparse_coalesce(SparseCOOData* sparse);
+void cml_sparse_free(SparseCOOData* sparse);
+
+// Serialization
+Tensor* cml_from_url(const char* url);
+GGUFContext* cml_gguf_open_read(const char* path);
+GGUFContext* cml_gguf_open_write(const char* path);
+void cml_gguf_close(GGUFContext* ctx);
+int cml_gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor);
+Tensor* cml_gguf_read_tensor(GGUFContext* ctx, const char* name);
+int cml_module_save_gguf(Module* module, const char* path);
+int cml_module_load_gguf(Module* module, const char* path);
+SafeTensorsContext* cml_safetensors_open_read(const char* path);
+SafeTensorsContext* cml_safetensors_open_write(const char* path);
+void cml_safetensors_close(SafeTensorsContext* ctx);
+int cml_safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* tensor);
+Tensor* cml_safetensors_read_tensor(SafeTensorsContext* ctx, const char* name);
+int cml_module_save_safetensors(Module* module, const char* path);
+int cml_module_load_safetensors(Module* module, const char* path);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @brief Initialize the C-ML library
- *
- * This function should be called before using any C-ML functionality.
- * It initializes internal systems, sets up logging, and prepares
- * the library for use.
- *
- * @return 0 on success, negative value on failure
- */
 int cml_init(void);
-
-/**
- * @brief Cleanup the C-ML library
- *
- * This function should be called when the library is no longer needed.
- * It cleans up internal resources and ensures proper shutdown.
- * Note: This is automatically called on program exit via atexit().
- *
- * @return 0 on success, negative value on failure
- */
 int cml_cleanup(void);
-
-/**
- * @brief Register a cleanup context for automatic cleanup
- *
- * This function registers a cleanup context to be automatically freed
- * when the program exits. Cleanup contexts created with cleanup_context_create()
- * are automatically registered.
- *
- * @param ctx Cleanup context to register
- */
 void cml_register_cleanup_context(CleanupContext* ctx);
-
-/**
- * @brief Get library version information
- *
- * @param major Pointer to store major version
- * @param minor Pointer to store minor version
- * @param patch Pointer to store patch version
- * @param version_string Pointer to store version string
- */
 void cml_get_version(int* major, int* minor, int* patch, const char** version_string);
-
-/**
- * @brief Get library build information
- *
- * @return String containing build information (compiler, flags, etc.)
- */
 const char* cml_get_build_info(void);
-
-/**
- * @brief Check if C-ML library is initialized
- *
- * @return true if initialized, false otherwise
- */
 bool cml_is_initialized(void);
-
-/**
- * @brief Get C-ML library initialization count
- *
- * @return Current initialization reference count
- */
 int cml_get_init_count(void);
-
-/**
- * @brief Force cleanup of C-ML library (ignores reference count)
- *
- * This function should be used with caution as it forces cleanup
- * regardless of the reference count.
- *
- * @return 0 on success, negative value on failure
- */
 int cml_force_cleanup(void);
 
-/**
- * @brief Global error handler function pointer type
- *
- * Called when a checked constructor would fail.
- * Should handle the error and return a sentinel object.
- *
- * @param error_code Error code
- * @param error_msg Error message
- * @param context Context information
- * @return Sentinel object to use instead of NULL
- */
 typedef void* (*CMLGlobalErrorHandler)(int error_code, const char* error_msg, void* context);
-
-/**
- * @brief Set global error handler for checked constructors
- *
- * @param handler Error handler function (NULL to use default)
- */
 void cml_set_error_handler(CMLGlobalErrorHandler handler);
-
-/**
- * @brief Get current error handler
- *
- * @return Current error handler function
- */
 CMLGlobalErrorHandler cml_get_error_handler(void);
 
 #ifdef __cplusplus
