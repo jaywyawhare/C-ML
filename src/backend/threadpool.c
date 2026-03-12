@@ -36,6 +36,16 @@ struct ThreadPool {
     bool shutdown;
 };
 
+static pthread_mutex_t g_pool_lock;
+static bool g_pool_lock_initialized = false;
+
+static inline void pool_lock(void) {
+    if (g_pool_lock_initialized) pthread_mutex_lock(&g_pool_lock);
+}
+static inline void pool_unlock(void) {
+    if (g_pool_lock_initialized) pthread_mutex_unlock(&g_pool_lock);
+}
+
 static ThreadPool* g_global_pool = NULL;
 
 static void* worker_thread(void* arg) {
@@ -221,17 +231,30 @@ void threadpool_wait(ThreadPool* pool) {
 size_t threadpool_get_num_threads(ThreadPool* pool) { return pool ? pool->num_threads : 0; }
 
 ThreadPool* threadpool_get_global(void) {
+    if (!g_pool_lock_initialized) {
+        pthread_mutex_init(&g_pool_lock, NULL);
+        g_pool_lock_initialized = true;
+    }
+    pool_lock();
     if (!g_global_pool) {
         g_global_pool = threadpool_create(0);
     }
-    return g_global_pool;
+    ThreadPool* result = g_global_pool;
+    pool_unlock();
+    return result;
 }
 
 void threadpool_set_global(ThreadPool* pool) {
+    if (!g_pool_lock_initialized) {
+        pthread_mutex_init(&g_pool_lock, NULL);
+        g_pool_lock_initialized = true;
+    }
+    pool_lock();
     if (g_global_pool && g_global_pool != pool) {
         threadpool_destroy(g_global_pool);
     }
     g_global_pool = pool;
+    pool_unlock();
 }
 
 void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n) {

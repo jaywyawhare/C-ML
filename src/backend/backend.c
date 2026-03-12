@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #include <cpuid.h>
@@ -39,6 +40,16 @@
 #define CML_DLCLOSE(handle) ((void)0)
 #define RTLD_LAZY 0
 #endif
+
+static pthread_mutex_t g_backend_lock;
+static bool g_backend_lock_initialized = false;
+
+static inline void backend_lock(void) {
+    if (g_backend_lock_initialized) pthread_mutex_lock(&g_backend_lock);
+}
+static inline void backend_unlock(void) {
+    if (g_backend_lock_initialized) pthread_mutex_unlock(&g_backend_lock);
+}
 
 static Backend* g_current_backend = NULL;
 
@@ -537,25 +548,42 @@ static BackendOps simd_ops = {.matmul     = simd_matmul,
 #endif // __SSE__
 
 Backend* backend_get_current(void) {
+    backend_lock();
     if (!g_current_backend) {
+        backend_unlock();
         backend_init(BACKEND_SCALAR);
+        backend_lock();
     }
-    return g_current_backend;
+    Backend* result = g_current_backend;
+    backend_unlock();
+    return result;
 }
 
 int backend_set(BackendType type) { return backend_init(type); }
 
 int backend_init(BackendType type) {
+    if (!g_backend_lock_initialized) {
+        pthread_mutex_init(&g_backend_lock, NULL);
+        g_backend_lock_initialized = true;
+    }
+
+    backend_lock();
     if (g_current_backend && g_current_backend->type == type) {
+        backend_unlock();
         return 0; // Already initialized
     }
 
     if (g_current_backend) {
-        backend_cleanup();
+        if (g_current_backend->context) {
+            free(g_current_backend->context);
+        }
+        free(g_current_backend);
+        g_current_backend = NULL;
     }
 
     g_current_backend = malloc(sizeof(Backend));
     if (!g_current_backend) {
+        backend_unlock();
         LOG_ERROR("Failed to allocate backend");
         return -1;
     }
@@ -690,11 +718,13 @@ int backend_init(BackendType type) {
 #endif
     }
 
+    backend_unlock();
     LOG_INFO("Backend initialized: %d", type);
     return 0;
 }
 
 void backend_cleanup(void) {
+    backend_lock();
     if (g_current_backend) {
         if (g_current_backend->context) {
             free(g_current_backend->context);
@@ -702,6 +732,7 @@ void backend_cleanup(void) {
         free(g_current_backend);
         g_current_backend = NULL;
     }
+    backend_unlock();
 }
 
 static bool check_cpu_feature_sse(void) {

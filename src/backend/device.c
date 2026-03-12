@@ -1,8 +1,3 @@
-/**
- * @file device.c
- * @brief Automatic device detection and management implementation
- */
-
 #include "backend/device.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
@@ -11,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #ifdef __linux__
 #include <dlfcn.h>
@@ -43,6 +39,16 @@
 #define CML_DLCLOSE(handle) ((void)0)
 #define RTLD_LAZY 0
 #endif
+
+static pthread_mutex_t g_device_lock;
+static bool g_device_lock_initialized = false;
+
+static inline void device_lock(void) {
+    if (g_device_lock_initialized) pthread_mutex_lock(&g_device_lock);
+}
+static inline void device_unlock(void) {
+    if (g_device_lock_initialized) pthread_mutex_unlock(&g_device_lock);
+}
 
 static DeviceType g_default_device = DEVICE_CPU;
 static DeviceType g_current_device = DEVICE_CPU;
@@ -110,9 +116,6 @@ static void* g_rocm_lib                             = NULL;
 // Metal detection (macOS/iOS) - handled in check_metal_available()
 // Metal uses Objective-C runtime, so we'll use a simpler approach
 
-/**
- * @brief Try to load CUDA library dynamically
- */
 static bool try_load_cuda(void) {
     const char* lib_paths[] = {
 #ifdef __linux__
@@ -155,9 +158,6 @@ static bool try_load_cuda(void) {
     return true;
 }
 
-/**
- * @brief Check if CUDA is actually available
- */
 static bool check_cuda_available(void) {
     if (!try_load_cuda()) {
         return false;
@@ -184,9 +184,6 @@ static bool check_cuda_available(void) {
     return false;
 }
 
-/**
- * @brief Check if Metal is available (macOS/iOS)
- */
 static bool check_metal_available(void) {
 #ifdef __APPLE__
     // Try to load Metal framework dynamically
@@ -213,9 +210,6 @@ static bool check_metal_available(void) {
     return false;
 }
 
-/**
- * @brief Try to load ROCm library dynamically
- */
 static bool try_load_rocm(void) {
     const char* lib_paths[] = {
 #ifdef __linux__
@@ -257,9 +251,6 @@ static bool try_load_rocm(void) {
     }
 }
 
-/**
- * @brief Check if ROCm is available
- */
 static bool check_rocm_available(void) {
     if (g_rocm_lib) {
         return true; // Already loaded
@@ -323,12 +314,18 @@ void device_init(void) {
         return;
     }
 
+    if (!g_device_lock_initialized) {
+        pthread_mutex_init(&g_device_lock, NULL);
+        g_device_lock_initialized = true;
+    }
+
     LOG_DEBUG("Initializing device management system");
     device_detect_available();
     g_device_initialized = true;
 }
 
 void device_cleanup(void) {
+    device_lock();
     if (g_cuda_lib) {
         CML_DLCLOSE(g_cuda_lib);
         g_cuda_lib = NULL;
@@ -337,37 +334,56 @@ void device_cleanup(void) {
     g_metal_available    = false;
     g_rocm_available     = false;
     g_device_initialized = false;
+    device_unlock();
+
+    if (g_device_lock_initialized) {
+        pthread_mutex_destroy(&g_device_lock);
+        g_device_lock_initialized = false;
+    }
 }
 
 DeviceType device_get_default(void) {
     if (!g_device_initialized) {
         device_init();
     }
-    // If DEVICE_AUTO is set, return the best available device
-    if (g_default_device == DEVICE_AUTO) {
-        return device_get_best_available();
+    device_lock();
+    DeviceType result = g_default_device;
+    if (result == DEVICE_AUTO) {
+        result = device_get_best_available();
     }
-    return g_default_device;
+    device_unlock();
+    return result;
 }
 
 void device_set_default(DeviceType device) {
-    // Initialize device system if not already done, but don't let it override our setting
     if (!g_device_initialized) {
-        // Just do detection without setting defaults
+        if (!g_device_lock_initialized) {
+            pthread_mutex_init(&g_device_lock, NULL);
+            g_device_lock_initialized = true;
+        }
         g_cuda_available     = check_cuda_available();
         g_metal_available    = check_metal_available();
         g_rocm_available     = check_rocm_available();
         g_device_initialized = true;
     }
+    device_lock();
     g_default_device = device;
     g_current_device = device;
+    device_unlock();
     LOG_INFO("Default device set to %s", device_get_name(device));
 }
 
-DeviceType device_get_current(void) { return g_current_device; }
+DeviceType device_get_current(void) {
+    device_lock();
+    DeviceType result = g_current_device;
+    device_unlock();
+    return result;
+}
 
 void device_set_current(DeviceType device) {
+    device_lock();
     g_current_device = device;
+    device_unlock();
     LOG_DEBUG("Set current device to: %s", device_get_name(device));
 }
 
@@ -801,8 +817,11 @@ int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
         return -1;
     }
 
+    device_lock();
     if (g_sim_gpu_enabled) {
+        device_unlock();
         device_sim_gpu_disable();
+        device_lock();
     }
 
     size_t mem = memory_per_device > 0 ? memory_per_device : SIM_GPU_DEFAULT_MEMORY;
@@ -818,6 +837,7 @@ int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     g_sim_gpu_count = num_devices;
     g_sim_gpu_current = 0;
     g_sim_gpu_enabled = true;
+    device_unlock();
 
     LOG_INFO("SimGPU: enabled %d simulated GPU(s), %zuMB each",
              num_devices, mem / (1024 * 1024));
@@ -826,6 +846,7 @@ int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
 }
 
 void device_sim_gpu_disable(void) {
+    device_lock();
     for (int i = 0; i < g_sim_gpu_count; i++) {
         g_sim_gpus[i].active = false;
         g_sim_gpus[i].allocated = 0;
@@ -833,29 +854,42 @@ void device_sim_gpu_disable(void) {
     g_sim_gpu_count = 0;
     g_sim_gpu_current = 0;
     g_sim_gpu_enabled = false;
+    device_unlock();
     LOG_INFO("SimGPU: disabled");
 }
 
 bool device_sim_gpu_available(void) {
-    return g_sim_gpu_enabled && g_sim_gpu_count > 0;
+    device_lock();
+    bool result = g_sim_gpu_enabled && g_sim_gpu_count > 0;
+    device_unlock();
+    return result;
 }
 
 int device_sim_gpu_get_count(void) {
-    return g_sim_gpu_enabled ? g_sim_gpu_count : 0;
+    device_lock();
+    int result = g_sim_gpu_enabled ? g_sim_gpu_count : 0;
+    device_unlock();
+    return result;
 }
 
 int device_sim_gpu_set_device(int device_id) {
+    device_lock();
     if (!g_sim_gpu_enabled || device_id < 0 || device_id >= g_sim_gpu_count) {
+        device_unlock();
         LOG_ERROR("SimGPU: invalid device ID %d (have %d devices)", device_id, g_sim_gpu_count);
         return -1;
     }
     g_sim_gpu_current = device_id;
+    device_unlock();
     LOG_DEBUG("SimGPU: set active device to %d", device_id);
     return 0;
 }
 
 int device_sim_gpu_get_device(void) {
-    return g_sim_gpu_current;
+    device_lock();
+    int result = g_sim_gpu_current;
+    device_unlock();
+    return result;
 }
 
 int device_sim_gpu_get_info(int device_id, DeviceInfo* info) {

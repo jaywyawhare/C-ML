@@ -1,16 +1,9 @@
-/**
- * @file opencl_backend.c
- * @brief OpenCL backend implementation
- *
- * Provides GPU-accelerated tensor operations via OpenCL.
- * This backend works across vendors (NVIDIA, AMD, Intel, ARM Mali).
- */
-
 #include "backend/opencl_backend.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #ifdef CML_HAS_OPENCL
 
@@ -22,6 +15,93 @@
 #endif
 #include <CL/cl.h>
 #endif
+
+static pthread_mutex_t g_opencl_lock;
+static bool g_lock_initialized = false;
+
+static inline void opencl_lock(void) {
+    if (g_lock_initialized) pthread_mutex_lock(&g_opencl_lock);
+}
+static inline void opencl_unlock(void) {
+    if (g_lock_initialized) pthread_mutex_unlock(&g_opencl_lock);
+}
+
+#define GPU_POOL_MAX_ENTRIES 128
+
+typedef struct {
+    cl_mem  buffer;
+    size_t  size;
+    bool    in_use;
+} GPUPoolEntry;
+
+typedef struct {
+    GPUPoolEntry entries[GPU_POOL_MAX_ENTRIES];
+    int          count;
+} GPUBufferPool;
+
+static GPUBufferPool g_gpu_pool = { .count = 0 };
+
+static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, void* host_ptr,
+                             cl_int* errcode) {
+    /* Best-fit reuse: find smallest free buffer >= size */
+    int best = -1;
+    size_t best_size = (size_t)-1;
+    for (int i = 0; i < g_gpu_pool.count; i++) {
+        GPUPoolEntry* e = &g_gpu_pool.entries[i];
+        if (!e->in_use && e->size >= size && e->size < best_size) {
+            best = i;
+            best_size = e->size;
+        }
+    }
+    if (best >= 0) {
+        g_gpu_pool.entries[best].in_use = true;
+        cl_mem buf = g_gpu_pool.entries[best].buffer;
+        /* If caller supplied host data, write it into the reused buffer */
+        if (host_ptr && (flags & CL_MEM_COPY_HOST_PTR)) {
+            /* Caller must enqueue a write after this; for simplicity we
+               create a fresh buffer when host_ptr is given. */
+        } else {
+            if (errcode) *errcode = CL_SUCCESS;
+            return buf;
+        }
+    }
+
+    /* No suitable buffer found — allocate a new one */
+    cl_int err;
+    cl_mem buf = clCreateBuffer(ctx, flags, size, host_ptr, &err);
+    if (errcode) *errcode = err;
+    if (err != CL_SUCCESS) return NULL;
+
+    /* Register in pool */
+    if (g_gpu_pool.count < GPU_POOL_MAX_ENTRIES) {
+        GPUPoolEntry* e = &g_gpu_pool.entries[g_gpu_pool.count++];
+        e->buffer = buf;
+        e->size   = size;
+        e->in_use = true;
+    }
+    return buf;
+}
+
+static void gpu_pool_release(cl_mem buf) {
+    for (int i = 0; i < g_gpu_pool.count; i++) {
+        if (g_gpu_pool.entries[i].buffer == buf) {
+            g_gpu_pool.entries[i].in_use = false;
+            return;
+        }
+    }
+    /* Buffer not in pool — release it directly */
+    clReleaseMemObject(buf);
+}
+
+static void gpu_pool_cleanup(void) {
+    for (int i = 0; i < g_gpu_pool.count; i++) {
+        if (g_gpu_pool.entries[i].buffer) {
+            clReleaseMemObject(g_gpu_pool.entries[i].buffer);
+            g_gpu_pool.entries[i].buffer = NULL;
+        }
+    }
+    g_gpu_pool.count = 0;
+}
 
 static cl_platform_id   g_platform   = NULL;
 static cl_device_id     g_device     = NULL;
@@ -78,16 +158,18 @@ static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b,
     if (dtype != DTYPE_FLOAT32 || !g_initialized) return;
     (void)b; // b may be NULL for unary ops
 
+    opencl_lock();
+
     cl_int err;
     size_t byte_size = n * sizeof(float);
 
-    cl_mem buf_a   = clCreateBuffer(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+    cl_mem buf_a   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                      byte_size, (void*)a, &err);
-    cl_mem buf_out = clCreateBuffer(g_context, CL_MEM_WRITE_ONLY, byte_size, NULL, &err);
+    cl_mem buf_out = gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY, byte_size, NULL, &err);
     cl_mem buf_b   = NULL;
 
     if (b) {
-        buf_b = clCreateBuffer(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+        buf_b = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                 byte_size, (void*)b, &err);
     }
 
@@ -102,9 +184,11 @@ static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b,
     clEnqueueNDRangeKernel(g_queue, kernel, 1, NULL, &global_size, NULL, 0, NULL, NULL);
     clEnqueueReadBuffer(g_queue, buf_out, CL_TRUE, 0, byte_size, out, 0, NULL, NULL);
 
-    clReleaseMemObject(buf_a);
-    clReleaseMemObject(buf_out);
-    if (buf_b) clReleaseMemObject(buf_b);
+    gpu_pool_release(buf_a);
+    gpu_pool_release(buf_out);
+    if (buf_b) gpu_pool_release(buf_b);
+
+    opencl_unlock();
 }
 
 static void opencl_add(const void* a, const void* b, void* out, size_t n, DType dtype) {
@@ -127,12 +211,14 @@ static void opencl_matmul(const void* a, const void* b, void* out, int m, int n,
                            DType dtype) {
     if (dtype != DTYPE_FLOAT32 || !g_initialized) return;
 
+    opencl_lock();
+
     cl_int err;
-    cl_mem buf_a   = clCreateBuffer(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+    cl_mem buf_a   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                      (size_t)(m * k) * sizeof(float), (void*)a, &err);
-    cl_mem buf_b   = clCreateBuffer(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+    cl_mem buf_b   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                      (size_t)(k * n) * sizeof(float), (void*)b, &err);
-    cl_mem buf_out = clCreateBuffer(g_context, CL_MEM_WRITE_ONLY,
+    cl_mem buf_out = gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY,
                                      (size_t)(m * n) * sizeof(float), NULL, &err);
 
     clSetKernelArg(g_k_matmul, 0, sizeof(cl_mem), &buf_a);
@@ -147,18 +233,22 @@ static void opencl_matmul(const void* a, const void* b, void* out, int m, int n,
     clEnqueueReadBuffer(g_queue, buf_out, CL_TRUE, 0,
                         (size_t)(m * n) * sizeof(float), out, 0, NULL, NULL);
 
-    clReleaseMemObject(buf_a);
-    clReleaseMemObject(buf_b);
-    clReleaseMemObject(buf_out);
+    gpu_pool_release(buf_a);
+    gpu_pool_release(buf_b);
+    gpu_pool_release(buf_out);
+
+    opencl_unlock();
 }
 
 static void opencl_sum(const void* x, void* out, size_t n, DType dtype) {
     if (dtype != DTYPE_FLOAT32 || !g_initialized) return;
 
+    opencl_lock();
+
     cl_int err;
-    cl_mem buf_x   = clCreateBuffer(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+    cl_mem buf_x   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                      n * sizeof(float), (void*)x, &err);
-    cl_mem buf_out = clCreateBuffer(g_context, CL_MEM_WRITE_ONLY, sizeof(float), NULL, &err);
+    cl_mem buf_out = gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY, sizeof(float), NULL, &err);
 
     int n_int = (int)n;
     clSetKernelArg(g_k_sum, 0, sizeof(cl_mem), &buf_x);
@@ -169,8 +259,10 @@ static void opencl_sum(const void* x, void* out, size_t n, DType dtype) {
     clEnqueueNDRangeKernel(g_queue, g_k_sum, 1, NULL, &global_size, NULL, 0, NULL, NULL);
     clEnqueueReadBuffer(g_queue, buf_out, CL_TRUE, 0, sizeof(float), out, 0, NULL, NULL);
 
-    clReleaseMemObject(buf_x);
-    clReleaseMemObject(buf_out);
+    gpu_pool_release(buf_x);
+    gpu_pool_release(buf_out);
+
+    opencl_unlock();
 }
 
 static void opencl_mean(const void* x, void* out, size_t n, DType dtype) {
@@ -193,7 +285,18 @@ static void opencl_matmul_add(const void* a, const void* b, const void* bias, vo
 }
 
 int opencl_backend_init(void) {
-    if (g_initialized) return 0;
+    /* Double-checked locking for mutex initialization */
+    if (!g_lock_initialized) {
+        pthread_mutex_init(&g_opencl_lock, NULL);
+        g_lock_initialized = true;
+    }
+
+    opencl_lock();
+
+    if (g_initialized) {
+        opencl_unlock();
+        return 0;
+    }
 
     cl_int err;
 
@@ -202,6 +305,7 @@ int opencl_backend_init(void) {
     err = clGetPlatformIDs(0, NULL, &num_platforms);
     if (err != CL_SUCCESS || num_platforms == 0) {
         LOG_ERROR("OpenCL: no platforms found");
+        opencl_unlock();
         return -1;
     }
 
@@ -216,6 +320,7 @@ int opencl_backend_init(void) {
         err = clGetDeviceIDs(g_platform, CL_DEVICE_TYPE_ALL, 1, &g_device, NULL);
         if (err != CL_SUCCESS) {
             LOG_ERROR("OpenCL: no devices found");
+            opencl_unlock();
             return -1;
         }
     }
@@ -224,6 +329,7 @@ int opencl_backend_init(void) {
     g_context = clCreateContext(NULL, 1, &g_device, NULL, NULL, &err);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL: failed to create context");
+        opencl_unlock();
         return -1;
     }
 
@@ -235,6 +341,7 @@ int opencl_backend_init(void) {
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL: failed to create command queue");
         clReleaseContext(g_context);
+        opencl_unlock();
         return -1;
     }
 
@@ -244,6 +351,7 @@ int opencl_backend_init(void) {
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL: failed to create program");
         opencl_backend_cleanup();
+        opencl_unlock();
         return -1;
     }
 
@@ -253,6 +361,7 @@ int opencl_backend_init(void) {
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG, sizeof(log), log, NULL);
         LOG_ERROR("OpenCL build error: %s", log);
         opencl_backend_cleanup();
+        opencl_unlock();
         return -1;
     }
 
@@ -265,10 +374,16 @@ int opencl_backend_init(void) {
 
     g_initialized = true;
     LOG_INFO("OpenCL backend initialized");
+
+    opencl_unlock();
     return 0;
 }
 
 void opencl_backend_cleanup(void) {
+    opencl_lock();
+
+    gpu_pool_cleanup();
+
     if (g_k_add)     clReleaseKernel(g_k_add);
     if (g_k_mul)     clReleaseKernel(g_k_mul);
     if (g_k_relu)    clReleaseKernel(g_k_relu);
@@ -284,6 +399,13 @@ void opencl_backend_cleanup(void) {
     g_queue = NULL;
     g_context = NULL;
     g_initialized = false;
+
+    opencl_unlock();
+
+    if (g_lock_initialized) {
+        pthread_mutex_destroy(&g_opencl_lock);
+        g_lock_initialized = false;
+    }
 }
 
 bool opencl_backend_is_available(void) {
@@ -306,7 +428,12 @@ BackendOps opencl_backend_get_ops(void) {
 }
 
 int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
-    if (!g_initialized || !g_device) return -1;
+    opencl_lock();
+
+    if (!g_initialized || !g_device) {
+        opencl_unlock();
+        return -1;
+    }
 
     char name[256] = {0};
     char vendor[256] = {0};
@@ -318,6 +445,8 @@ int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
 
     snprintf(buffer, buffer_size, "OpenCL Device: %s (%s), Memory: %lu MB",
              name, vendor, (unsigned long)(mem_size / (1024 * 1024)));
+
+    opencl_unlock();
     return 0;
 }
 

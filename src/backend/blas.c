@@ -1,8 +1,3 @@
-/**
- * @file blas.c
- * @brief BLAS library integration implementation
- */
-
 #include "backend/blas.h"
 #include "core/logging.h"
 
@@ -10,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <pthread.h>
 
 #ifdef __linux__
 #include <dlfcn.h>
@@ -31,6 +27,16 @@
 #define LIB_SYM(handle, name) NULL
 #define LIB_CLOSE(handle) ((void)0)
 #endif
+
+static pthread_mutex_t g_blas_lock;
+static bool g_blas_lock_initialized = false;
+
+static inline void blas_lock(void) {
+    if (g_blas_lock_initialized) pthread_mutex_lock(&g_blas_lock);
+}
+static inline void blas_unlock(void) {
+    if (g_blas_lock_initialized) pthread_mutex_unlock(&g_blas_lock);
+}
 
 static CMLBlasContext* g_blas_ctx = NULL;
 
@@ -148,6 +154,7 @@ void cml_blas_free(CMLBlasContext* ctx) {
     if (!ctx)
         return;
 
+    blas_lock();
     if (ctx->lib_handle) {
         LIB_CLOSE(ctx->lib_handle);
     }
@@ -155,15 +162,23 @@ void cml_blas_free(CMLBlasContext* ctx) {
     if (ctx == g_blas_ctx) {
         g_blas_ctx = NULL;
     }
+    blas_unlock();
 
     free(ctx);
 }
 
 CMLBlasContext* cml_blas_get_context(void) {
+    if (!g_blas_lock_initialized) {
+        pthread_mutex_init(&g_blas_lock, NULL);
+        g_blas_lock_initialized = true;
+    }
+    blas_lock();
     if (!g_blas_ctx) {
         g_blas_ctx = cml_blas_init();
     }
-    return g_blas_ctx;
+    CMLBlasContext* result = g_blas_ctx;
+    blas_unlock();
+    return result;
 }
 
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
