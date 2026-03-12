@@ -1,8 +1,3 @@
-/**
- * @file training_loop.c
- * @brief Training loop implementation
- */
-
 #include "core/training_loop.h"
 #include "core/logging.h"
 #include "core/training_metrics.h"
@@ -163,6 +158,63 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
     return scheduler;
 }
 
+// Note: lr_scheduler_one_cycle and lr_scheduler_multi_step are defined in optim/lr_scheduler.c
+
+LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, float power,
+                                      float min_lr) {
+    if (!optimizer || total_iters <= 0) {
+        return NULL;
+    }
+
+    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    if (!scheduler) {
+        return NULL;
+    }
+
+    scheduler->type        = LR_SCHEDULER_POLYNOMIAL;
+    scheduler->optimizer   = optimizer;
+    scheduler->total_iters = total_iters;
+    scheduler->power       = power;
+    scheduler->min_lr      = min_lr;
+    scheduler->last_epoch  = 0;
+
+    if (optimizer->num_param_groups > 0) {
+        scheduler->initial_lr = optimizer->param_groups[0].lr;
+        scheduler->current_lr = scheduler->initial_lr;
+    }
+
+    return scheduler;
+}
+
+LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor) {
+    if (!inner || warmup_steps <= 0) {
+        return NULL;
+    }
+
+    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    if (!scheduler) {
+        return NULL;
+    }
+
+    scheduler->type                = LR_SCHEDULER_WARMUP;
+    scheduler->optimizer           = inner->optimizer;
+    scheduler->inner_scheduler     = inner;
+    scheduler->warmup_steps        = warmup_steps;
+    scheduler->warmup_start_factor = warmup_start_factor;
+    scheduler->last_epoch          = 0;
+
+    if (scheduler->optimizer && scheduler->optimizer->num_param_groups > 0) {
+        scheduler->initial_lr = scheduler->optimizer->param_groups[0].lr;
+        scheduler->current_lr = scheduler->initial_lr * warmup_start_factor;
+        // Set initial warmup LR
+        for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
+            scheduler->optimizer->param_groups[i].lr = scheduler->current_lr;
+        }
+    }
+
+    return scheduler;
+}
+
 float lr_scheduler_update(LRScheduler* scheduler, float metric) {
     if (!scheduler || !scheduler->optimizer) {
         return 0.0f;
@@ -236,37 +288,75 @@ float lr_scheduler_update(LRScheduler* scheduler, float metric) {
         }
         break;
     }
-    case LR_SCHEDULER_NONE:
-    default:
-        // Handle OneCycleLR (defined in optim/lr_scheduler.h as #define)
-        if ((int)scheduler->type == 11) { // LR_SCHEDULER_ONE_CYCLE
-            float max_lr   = scheduler->initial_lr;
-            float init_lr  = scheduler->eta_min;
-            float final_lr = scheduler->factor;
-            int total      = scheduler->T_max;
-            float pct      = scheduler->gamma;
-            int warmup     = (int)(pct * (float)total);
-            int epoch      = scheduler->last_epoch;
+    case LR_SCHEDULER_ONE_CYCLE: {
+        float init_lr  = scheduler->max_lr / scheduler->div_factor;
+        float final_lr = init_lr / scheduler->final_div_factor;
+        int warmup_end = (int)(scheduler->pct_start * (float)scheduler->total_steps);
+        int epoch      = scheduler->last_epoch;
 
-            float new_lr;
-            if (epoch <= warmup) {
-                // Linear warmup: init_lr -> max_lr
-                float t = warmup > 0 ? (float)epoch / (float)warmup : 1.0f;
-                new_lr  = init_lr + (max_lr - init_lr) * t;
-            } else {
-                // Cosine annealing: max_lr -> final_lr
-                int anneal_steps = total - warmup;
-                float t = anneal_steps > 0
-                              ? (float)(epoch - warmup) / (float)anneal_steps
-                              : 1.0f;
-                if (t > 1.0f) t = 1.0f;
-                new_lr = final_lr + (max_lr - final_lr) * (1.0f + cosf((float)M_PI * t)) / 2.0f;
+        float new_lr;
+        if (epoch <= warmup_end) {
+            // Linear warmup: init_lr -> max_lr
+            float t = warmup_end > 0 ? (float)epoch / (float)warmup_end : 1.0f;
+            new_lr  = init_lr + (scheduler->max_lr - init_lr) * t;
+        } else {
+            // Cosine annealing: max_lr -> final_lr
+            int anneal_steps = scheduler->total_steps - warmup_end;
+            float t = anneal_steps > 0
+                          ? (float)(epoch - warmup_end) / (float)anneal_steps
+                          : 1.0f;
+            if (t > 1.0f) t = 1.0f;
+            new_lr = final_lr + (scheduler->max_lr - final_lr) * (1.0f + cosf((float)M_PI * t)) / 2.0f;
+        }
+
+        for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
+            scheduler->optimizer->param_groups[i].lr = new_lr;
+        }
+        break;
+    }
+    case LR_SCHEDULER_MULTI_STEP: {
+        // Check if current epoch is a milestone
+        for (int m = 0; m < scheduler->num_milestones; m++) {
+            if (scheduler->last_epoch == scheduler->milestones[m]) {
+                for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
+                    scheduler->optimizer->param_groups[i].lr *= scheduler->gamma;
+                }
+                break;
             }
+        }
+        break;
+    }
+    case LR_SCHEDULER_POLYNOMIAL: {
+        // lr = (initial_lr - min_lr) * (1 - epoch/total_iters)^power + min_lr
+        float progress = (float)scheduler->last_epoch / (float)scheduler->total_iters;
+        if (progress > 1.0f) progress = 1.0f;
+
+        float decay  = powf(1.0f - progress, scheduler->power);
+        float new_lr = (scheduler->initial_lr - scheduler->min_lr) * decay + scheduler->min_lr;
+
+        for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
+            scheduler->optimizer->param_groups[i].lr = new_lr;
+        }
+        break;
+    }
+    case LR_SCHEDULER_WARMUP: {
+        if (scheduler->last_epoch <= scheduler->warmup_steps) {
+            // Linear warmup: start_factor -> 1.0
+            float t = (float)scheduler->last_epoch / (float)scheduler->warmup_steps;
+            float factor = scheduler->warmup_start_factor + (1.0f - scheduler->warmup_start_factor) * t;
+            float new_lr = scheduler->initial_lr * factor;
 
             for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
                 scheduler->optimizer->param_groups[i].lr = new_lr;
             }
+        } else if (scheduler->inner_scheduler) {
+            // Delegate to inner scheduler
+            lr_scheduler_update(scheduler->inner_scheduler, metric);
         }
+        break;
+    }
+    case LR_SCHEDULER_NONE:
+    default:
         break;
     }
 
@@ -294,6 +384,12 @@ void lr_scheduler_free(LRScheduler* scheduler) {
     if (!scheduler) {
         return;
     }
+    if (scheduler->milestones) {
+        free(scheduler->milestones);
+    }
+    if (scheduler->inner_scheduler) {
+        lr_scheduler_free(scheduler->inner_scheduler);
+    }
     free(scheduler);
 }
 
@@ -306,15 +402,17 @@ void training_callbacks_create(TrainingCallbacks* callbacks) {
 void training_config_default(TrainingConfig* config) {
     if (!config)
         return;
-    *config = (TrainingConfig){.epochs                   = 10,
-                               .verbose                  = true,
-                               .use_progress_bar         = true,
-                               .scheduler                = NULL,
-                               .callbacks                = (TrainingCallbacks){0},
-                               .grad_clip_norm           = 0.0f,
-                               .early_stopping           = false,
-                               .early_stopping_patience  = 5,
-                               .early_stopping_min_delta = 0.0f};
+    *config = (TrainingConfig){.epochs                    = 10,
+                               .verbose                   = true,
+                               .use_progress_bar          = true,
+                               .scheduler                 = NULL,
+                               .callbacks                 = (TrainingCallbacks){0},
+                               .grad_clip_norm            = 0.0f,
+                               .early_stopping            = false,
+                               .early_stopping_patience   = 5,
+                               .early_stopping_min_delta  = 0.0f,
+                               .use_checkpointing         = false,
+                               .checkpoint_every_n_layers = 0};
 }
 
 static ProgressCallback g_progress_callback = NULL;
@@ -369,15 +467,17 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
     training_metrics_register_model(model);
 
     // Use default config if not provided
-    TrainingConfig default_config = {.epochs                   = 10,
-                                     .verbose                  = true,
-                                     .use_progress_bar         = true,
-                                     .scheduler                = NULL,
-                                     .callbacks                = (TrainingCallbacks){0},
-                                     .grad_clip_norm           = 0.0f,
-                                     .early_stopping           = false,
-                                     .early_stopping_patience  = 5,
-                                     .early_stopping_min_delta = 0.0f};
+    TrainingConfig default_config = {.epochs                    = 10,
+                                     .verbose                   = true,
+                                     .use_progress_bar          = true,
+                                     .scheduler                 = NULL,
+                                     .callbacks                 = (TrainingCallbacks){0},
+                                     .grad_clip_norm            = 0.0f,
+                                     .early_stopping            = false,
+                                     .early_stopping_patience   = 5,
+                                     .early_stopping_min_delta  = 0.0f,
+                                     .use_checkpointing         = false,
+                                     .checkpoint_every_n_layers = 0};
     if (!config) {
         config = &default_config;
     }
@@ -623,15 +723,17 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
     training_metrics_register_model(model);
 
     // Use default config if not provided
-    TrainingConfig default_config = {.epochs                   = 10,
-                                     .verbose                  = true,
-                                     .use_progress_bar         = true,
-                                     .scheduler                = NULL,
-                                     .callbacks                = (TrainingCallbacks){0},
-                                     .grad_clip_norm           = 0.0f,
-                                     .early_stopping           = false,
-                                     .early_stopping_patience  = 5,
-                                     .early_stopping_min_delta = 0.0f};
+    TrainingConfig default_config = {.epochs                    = 10,
+                                     .verbose                   = true,
+                                     .use_progress_bar          = true,
+                                     .scheduler                 = NULL,
+                                     .callbacks                 = (TrainingCallbacks){0},
+                                     .grad_clip_norm            = 0.0f,
+                                     .early_stopping            = false,
+                                     .early_stopping_patience   = 5,
+                                     .early_stopping_min_delta  = 0.0f,
+                                     .use_checkpointing         = false,
+                                     .checkpoint_every_n_layers = 0};
     if (!config) {
         config = &default_config;
     }

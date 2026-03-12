@@ -4,6 +4,7 @@
  */
 
 #include "core/gguf.h"
+#include "core/gguf_quant.h"
 #include "core/serialization.h"
 #include "core/logging.h"
 #include <stdio.h>
@@ -168,7 +169,14 @@ GGUFContext* gguf_open_read(const char* filepath) {
         size_t numel = 1;
         for (int d = 0; d < ctx->tensors[i].ndim; d++)
             numel *= (size_t)ctx->tensors[i].shape[d];
-        ctx->tensors[i].data_size = numel * cml_dtype_size(gguf_type_to_dtype(ctx->tensors[i].type));
+        if (gguf_type_is_quantized(ctx->tensors[i].type)) {
+            int block_size = gguf_quant_block_size(ctx->tensors[i].type);
+            size_t type_size = gguf_quant_type_size(ctx->tensors[i].type);
+            size_t num_blocks = (numel + (size_t)block_size - 1) / (size_t)block_size;
+            ctx->tensors[i].data_size = num_blocks * type_size;
+        } else {
+            ctx->tensors[i].data_size = numel * cml_dtype_size(gguf_type_to_dtype(ctx->tensors[i].type));
+        }
     }
 
     // Align to 32 bytes for tensor data
@@ -265,11 +273,41 @@ Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
     if (idx < 0) return NULL;
 
     GGUFTensorInfo* info = &ctx->tensors[idx];
-    DType dtype = gguf_type_to_dtype(info->type);
 
     int shape[8];
     for (int d = 0; d < info->ndim; d++) shape[d] = (int)info->shape[d];
 
+    size_t numel = 1;
+    for (int d = 0; d < info->ndim; d++) numel *= (size_t)info->shape[d];
+
+    if (gguf_type_is_quantized(info->type)) {
+        /* Quantized: read raw block data, dequantize to float32 */
+        void* raw = malloc(info->data_size);
+        if (!raw) return NULL;
+
+        fseek(ctx->file, (long)(ctx->data_offset + info->offset), SEEK_SET);
+        if (fread(raw, 1, info->data_size, ctx->file) != info->data_size) {
+            free(raw);
+            return NULL;
+        }
+
+        TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                               .has_dtype = true, .has_device = true};
+        Tensor* t = tensor_empty(shape, info->ndim, &config);
+        if (!t) { free(raw); return NULL; }
+        tensor_ensure_executed(t);
+
+        if (gguf_dequantize(info->type, raw, (float*)t->data, numel) != 0) {
+            free(raw);
+            tensor_free(t);
+            return NULL;
+        }
+        free(raw);
+        return t;
+    }
+
+    /* Non-quantized: read directly */
+    DType dtype = gguf_type_to_dtype(info->type);
     TensorConfig config = {.dtype = dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* t = tensor_empty(shape, info->ndim, &config);
     if (!t) return NULL;

@@ -1,12 +1,3 @@
-/**
- * @file config.h
- * @brief Global configuration for C-ML library
- *
- * Provides sensible defaults for device, dtype, RNG, and allocator.
- * This removes noise from examples by eliminating the need to specify
- * DEVICE_CPU/DTYPE_FLOAT32 everywhere.
- */
-
 #ifndef CML_CORE_CONFIG_H
 #define CML_CORE_CONFIG_H
 
@@ -18,6 +9,34 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Version macros
+#define CML_VERSION_MAJOR 0
+#define CML_VERSION_MINOR 0
+#define CML_VERSION_PATCH 2
+#define CML_VERSION_STRING "0.0.2"
+
+/**
+ * @brief Encode version components into a single integer for comparison
+ *
+ * Usage: #if CML_VERSION_ENCODE(CML_VERSION_MAJOR, CML_VERSION_MINOR, CML_VERSION_PATCH) >= CML_VERSION_ENCODE(0, 0, 2)
+ */
+#define CML_VERSION_ENCODE(major, minor, patch) \
+    ((major) * 10000 + (minor) * 100 + (patch))
+
+#define CML_VERSION CML_VERSION_ENCODE(CML_VERSION_MAJOR, CML_VERSION_MINOR, CML_VERSION_PATCH)
+
+/**
+ * @brief Get library version as an encoded integer
+ * @return Encoded version (major*10000 + minor*100 + patch)
+ */
+int cml_version(void);
+
+/**
+ * @brief Get library version as a string
+ * @return Version string (e.g., "0.0.2")
+ */
+const char* cml_version_string(void);
 
 /**
  * @brief Set the default device for tensor creation

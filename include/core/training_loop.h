@@ -1,14 +1,3 @@
-/**
- * @file training_loop.h
- * @brief Training loop utilities with callbacks and LR schedulers
- *
- * Provides:
- * - Learning rate schedulers
- * - Training callbacks and hooks
- * - One-line training function
- * - Progress bars
- */
-
 #ifndef CML_CORE_TRAINING_LOOP_H
 #define CML_CORE_TRAINING_LOOP_H
 
@@ -30,6 +19,10 @@ typedef enum {
     LR_SCHEDULER_REDUCE_ON_PLATEAU, // ReduceLROnPlateau: reduce when metric plateaus
     LR_SCHEDULER_EXPONENTIAL,       // ExponentialLR: lr *= gamma every epoch
     LR_SCHEDULER_COSINE,            // CosineAnnealingLR: cosine annealing
+    LR_SCHEDULER_ONE_CYCLE,         // OneCycleLR: ramp up then ramp down
+    LR_SCHEDULER_MULTI_STEP,        // MultiStepLR: decay at specified milestones
+    LR_SCHEDULER_POLYNOMIAL,        // PolynomialLR: polynomial decay
+    LR_SCHEDULER_WARMUP,            // Warmup wrapper: linear warmup then delegate
 } LRSchedulerType;
 
 /**
@@ -60,6 +53,26 @@ typedef struct LRScheduler {
     int T_max;
     float eta_min;
     float initial_lr; // Initial learning rate (for cosine annealing)
+
+    // OneCycleLR parameters
+    float max_lr;
+    int total_steps;
+    float pct_start;
+    float div_factor;
+    float final_div_factor;
+
+    // MultiStepLR parameters
+    int* milestones;
+    int num_milestones;
+
+    // PolynomialLR parameters
+    int total_iters;
+    float power;
+
+    // Warmup parameters
+    struct LRScheduler* inner_scheduler;
+    int warmup_steps;
+    float warmup_start_factor;
 
     // Internal state
     int last_epoch;
@@ -109,6 +122,63 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma);
  * @return LRScheduler, or NULL on failure
  */
 LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min);
+
+/**
+ * @brief Create OneCycleLR scheduler
+ *
+ * Ramps learning rate up from initial to max_lr, then down to final.
+ *
+ * @param optimizer Optimizer to schedule
+ * @param max_lr Maximum learning rate
+ * @param total_steps Total number of steps
+ * @param pct_start Percentage of steps spent in warmup phase (0.0-1.0)
+ * @param div_factor Initial lr = max_lr / div_factor
+ * @param final_div_factor Final lr = initial_lr / final_div_factor
+ * @return LRScheduler, or NULL on failure
+ */
+LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
+                                     float pct_start, float div_factor, float final_div_factor);
+
+/**
+ * @brief Create MultiStepLR scheduler
+ *
+ * Decays learning rate by gamma at each milestone epoch.
+ *
+ * @param optimizer Optimizer to schedule
+ * @param milestones Array of epoch indices at which to decay
+ * @param num_milestones Number of milestones
+ * @param gamma Multiplicative decay factor
+ * @return LRScheduler, or NULL on failure
+ */
+LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int num_milestones,
+                                      float gamma);
+
+/**
+ * @brief Create PolynomialLR scheduler
+ *
+ * Decays learning rate using polynomial function.
+ * lr = (initial_lr - min_lr) * (1 - epoch/total_iters)^power + min_lr
+ *
+ * @param optimizer Optimizer to schedule
+ * @param total_iters Total number of iterations
+ * @param power Polynomial power
+ * @param min_lr Minimum learning rate
+ * @return LRScheduler, or NULL on failure
+ */
+LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, float power,
+                                      float min_lr);
+
+/**
+ * @brief Create Warmup wrapper scheduler
+ *
+ * Linear warmup for first N steps, then delegates to inner scheduler.
+ *
+ * @param inner Inner scheduler to delegate to after warmup
+ * @param warmup_steps Number of warmup steps
+ * @param warmup_start_factor Starting factor (lr = initial_lr * start_factor)
+ * @return LRScheduler, or NULL on failure
+ */
+LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor);
 
 /**
  * @brief Step the learning rate scheduler
@@ -177,6 +247,8 @@ typedef struct TrainingConfig {
     bool early_stopping;
     int early_stopping_patience;
     float early_stopping_min_delta;
+    bool use_checkpointing;           // Enable gradient checkpointing
+    int checkpoint_every_n_layers;    // Checkpoint every N layers (0 = auto)
 } TrainingConfig;
 
 /**

@@ -36,6 +36,12 @@ typedef enum {
 typedef enum {
     GGUF_TENSOR_F32  = 0,
     GGUF_TENSOR_F16  = 1,
+    GGUF_TENSOR_Q4_0 = 2,
+    GGUF_TENSOR_Q4_1 = 3,
+    GGUF_TENSOR_Q8_0 = 7,
+    GGUF_TENSOR_Q4_K = 12,
+    GGUF_TENSOR_Q5_K = 13,
+    GGUF_TENSOR_Q6_K = 14,
     GGUF_TENSOR_I8   = 16,
     GGUF_TENSOR_I16  = 17,
     GGUF_TENSOR_I32  = 18,
