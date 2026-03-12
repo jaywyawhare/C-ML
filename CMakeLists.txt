@@ -119,6 +119,39 @@ if(ENABLE_OPENCL)
     endif()
 endif()
 
+# Metal Backend (macOS only)
+option(ENABLE_METAL "Enable Metal backend (macOS only)" ON)
+set(METAL_FOUND FALSE)
+if(ENABLE_METAL AND APPLE)
+    find_library(METAL_FRAMEWORK Metal)
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+    if(METAL_FRAMEWORK AND FOUNDATION_FRAMEWORK)
+        enable_language(OBJC)
+        add_definitions(-DCML_HAS_METAL)
+        set(METAL_LIBS ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
+        set(METAL_FOUND TRUE)
+        message(STATUS "Metal backend enabled")
+    else()
+        message(STATUS "Metal framework not found - Metal backend disabled")
+    endif()
+else()
+    message(STATUS "Metal backend disabled (not macOS or disabled)")
+endif()
+
+# WebGPU Backend (wgpu-native)
+option(ENABLE_WEBGPU "Enable WebGPU backend via wgpu-native" OFF)
+if(ENABLE_WEBGPU)
+    add_definitions(-DCML_HAS_WEBGPU)
+    message(STATUS "WebGPU backend enabled (dynamic loading)")
+endif()
+
+# ONNX Runtime
+option(ENABLE_ONNX "Enable ONNX model loading and execution" ON)
+if(ENABLE_ONNX)
+    add_definitions(-DCML_HAS_ONNX)
+    message(STATUS "ONNX runtime enabled")
+endif()
+
 # Source files
 set(CORE_SOURCES
     src/cml.c
@@ -137,12 +170,25 @@ set(CORE_SOURCES
     src/core/computation_graph.c
     src/core/graph_context.c
     src/core/quantization.c
+    src/core/gguf_quant.c
+    src/core/protobuf_mini.c
+    src/core/pth_loader.c
+    src/core/tinyfs.c
 )
+
+# ONNX sources (conditional)
+if(ENABLE_ONNX)
+    list(APPEND CORE_SOURCES
+        src/core/onnx.c
+        src/core/onnx_ops.c
+    )
+endif()
 
 set(ALLOC_SOURCES
     src/alloc/memory_management.c
     src/alloc/memory_pools.c
     src/alloc/graph_allocator.c
+    src/alloc/tlsf_alloc.c
 )
 
 set(BACKEND_SOURCES
@@ -153,10 +199,14 @@ set(BACKEND_SOURCES
     src/backend/profiling.c
     src/backend/blas.c
     src/backend/opencl_backend.c
+    src/backend/null_device.c
+    src/backend/disk_backend.c
+    src/backend/usb_device.c
 )
 
 set(OPS_SOURCES
     src/ops/uops.c
+    src/ops/winograd.c
     src/ops/ir/ir.c
     src/ops/ir/context.c
     src/ops/ir/execution.c
@@ -169,12 +219,37 @@ set(OPS_SOURCES
     src/ops/ir/fusion_patterns.c
     src/ops/ir/dispatch.c
     src/ops/ir/decompose.c
+    src/ops/ir/pattern_matcher.c
+    src/ops/ir/hcq.c
+    src/ops/ir/hcq_cuda.c
+    src/ops/ir/hcq_opencl.c
+    src/ops/ir/beam_search.c
+    src/ops/ir/trace.c
+    src/ops/ir/schedule.c
+    src/ops/ir/graph_capture.c
+    src/ops/ir/nir_compiler.c
+    src/ops/ir/z3_verify.c
+    src/ops/ir/compiler_viz.c
     src/ops/ir/gpu/cuda_backend.c
     src/ops/ir/gpu/rocm_backend.c
+    src/ops/ir/gpu/wmma.c
+    src/ops/ir/gpu/wgsl_codegen.c
+    src/ops/ir/gpu/metal_codegen.c
+    src/ops/ir/gpu/ptx_codegen.c
+    src/ops/ir/gpu/adreno_backend.c
+    src/ops/ir/gpu/hexagon_backend.c
     src/ops/simd_utils.c
     src/ops/simd_math.c
     src/ops/simd_views.c
 )
+
+# Metal backend sources
+if(METAL_FOUND)
+    list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_backend.m)
+endif()
+
+# WebGPU backend sources (has internal stubs when WebGPU unavailable)
+list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
 
 # LLVM backend source (direct LLVM IR JIT)
 if(LLVM_BACKEND_FOUND)
@@ -187,6 +262,8 @@ set(TENSOR_SOURCES
     src/tensor/tensor.c
     src/tensor/tensor_views.c
     src/tensor/tensor_manipulation.c
+    src/tensor/sparse_tensor.c
+    src/tensor/image_dtype.c
 )
 
 set(AUTOGRAD_SOURCES
@@ -194,6 +271,7 @@ set(AUTOGRAD_SOURCES
     src/autograd/forward_ops.c
     src/autograd/loss_functions.c
     src/autograd/checkpointing.c
+    src/autograd/amp.c
 )
 
 set(NN_SOURCES
@@ -220,6 +298,18 @@ set(NN_SOURCES
     src/nn/layers/conv_transpose1d.c
     src/nn/layers/batchnorm3d.c
     src/nn/layers/layernorm2d.c
+    src/nn/layers/conv_transpose3d.c
+    src/nn/layers/upsample.c
+    src/nn/layers/pixel_shuffle.c
+    src/nn/layers/flatten.c
+    src/nn/layers/identity.c
+    src/nn/layers/batchnorm1d.c
+    src/nn/layers/prelu.c
+    src/nn/llm_ops.c
+)
+
+set(SYMBOLIC_SOURCES
+    src/symbolic/symbolic.c
 )
 
 set(OPTIM_SOURCES
@@ -285,6 +375,7 @@ set(LIBRARY_SOURCES
     ${AUTOGRAD_SOURCES}
     ${NN_SOURCES}
     ${OPTIM_SOURCES}
+    ${SYMBOLIC_SOURCES}
     ${DISTRIBUTED_SOURCES}
     ${ZOO_SOURCES}
     ${DATASET_SOURCES}
@@ -301,10 +392,7 @@ set_target_properties(cml PROPERTIES
 )
 
 # Link libraries
-target_link_libraries(cml m dl)  # dl for dynamic loading
-if(ENABLE_DISTRIBUTED)
-    target_link_libraries(cml pthread)
-endif()
+target_link_libraries(cml m dl pthread)  # dl for dynamic loading, pthread for thread safety
 if(LLVM_BACKEND_FOUND)
     target_link_libraries(cml ${LLVM_BACKEND_LIBS_LIST})
 endif()
@@ -317,6 +405,9 @@ endif()
 if(OPENCL_LIBS)
     target_link_libraries(cml ${OPENCL_LIBS})
 endif()
+if(METAL_FOUND)
+    target_link_libraries(cml ${METAL_LIBS})
+endif()
 
 # Create static library
 add_library(cml_static STATIC ${LIBRARY_SOURCES})
@@ -325,10 +416,7 @@ set_target_properties(cml_static PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
 )
-target_link_libraries(cml_static m dl)
-if(ENABLE_DISTRIBUTED)
-    target_link_libraries(cml_static pthread)
-endif()
+target_link_libraries(cml_static m dl pthread)
 if(LLVM_BACKEND_FOUND)
     target_link_libraries(cml_static ${LLVM_BACKEND_LIBS_LIST})
 endif()
@@ -341,6 +429,9 @@ endif()
 if(OPENCL_LIBS)
     target_link_libraries(cml_static ${OPENCL_LIBS})
 endif()
+if(METAL_FOUND)
+    target_link_libraries(cml_static ${METAL_LIBS})
+endif()
 
 # Create shared library
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -351,10 +442,7 @@ if(BUILD_SHARED_LIBS)
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}
     )
-    target_link_libraries(cml_shared m dl)
-    if(ENABLE_DISTRIBUTED)
-        target_link_libraries(cml_shared pthread)
-    endif()
+    target_link_libraries(cml_shared m dl pthread)
     if(LLVM_BACKEND_FOUND)
         target_link_libraries(cml_shared ${LLVM_BACKEND_LIBS_LIST})
     endif()
@@ -366,6 +454,9 @@ if(BUILD_SHARED_LIBS)
     endif()
     if(OPENCL_LIBS)
         target_link_libraries(cml_shared ${OPENCL_LIBS})
+    endif()
+    if(METAL_FOUND)
+        target_link_libraries(cml_shared ${METAL_LIBS})
     endif()
 endif()
 
@@ -380,10 +471,7 @@ if(BUILD_TESTS)
     foreach(test_source ${TEST_SOURCES})
         get_filename_component(test_name ${test_source} NAME_WE)
         add_executable(${test_name} ${test_source} ${LIBRARY_SOURCES})
-        target_link_libraries(${test_name} m dl)
-        if(ENABLE_DISTRIBUTED)
-            target_link_libraries(${test_name} pthread)
-        endif()
+        target_link_libraries(${test_name} m dl pthread)
         if(LLVM_BACKEND_FOUND)
             target_link_libraries(${test_name} ${LLVM_BACKEND_LIBS_LIST})
         endif()
@@ -392,6 +480,9 @@ if(BUILD_TESTS)
         endif()
         if(OPENCL_LIBS)
             target_link_libraries(${test_name} ${OPENCL_LIBS})
+        endif()
+        if(METAL_FOUND)
+            target_link_libraries(${test_name} ${METAL_LIBS})
         endif()
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
@@ -426,6 +517,7 @@ endif()
 
 # Install rules
 install(TARGETS cml cml_static
+    EXPORT CMLTargets
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
@@ -433,9 +525,52 @@ install(TARGETS cml cml_static
 
 if(BUILD_SHARED_LIBS)
     install(TARGETS cml_shared
+        EXPORT CMLTargets
         LIBRARY DESTINATION lib
     )
+
+    # Shared library visibility: hide symbols by default
+    set_target_properties(cml_shared PROPERTIES
+        C_VISIBILITY_PRESET hidden
+    )
+    target_compile_definitions(cml_shared PRIVATE CML_BUILDING_DLL)
 endif()
+
+# Static library definition
+target_compile_definitions(cml_static PUBLIC CML_STATIC_DEFINE)
+
+# CMake package config (find_package(CML) support)
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMLConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
+    INSTALL_DESTINATION lib/cmake/CML
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(EXPORT CMLTargets
+    FILE CMLTargets.cmake
+    NAMESPACE CML::
+    DESTINATION lib/cmake/CML
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
+    DESTINATION lib/cmake/CML
+)
+
+# pkg-config support
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cml.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/cml.pc
+    @ONLY
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cml.pc
+    DESTINATION lib/pkgconfig
+)
 
 # Install headers
 install(DIRECTORY include/
@@ -476,6 +611,9 @@ message(STATUS "Backend Support:")
 message(STATUS "  LLVM JIT: ${LLVM_BACKEND_FOUND}")
 message(STATUS "  CUDA: ${CUDAToolkit_FOUND}")
 message(STATUS "  ROCm/HIP: ${hip_FOUND}")
+message(STATUS "  Metal: ${METAL_FOUND}")
+message(STATUS "  WebGPU: ${ENABLE_WEBGPU}")
+message(STATUS "  ONNX: ${ENABLE_ONNX}")
 message(STATUS "")
 message(STATUS "Build Options:")
 message(STATUS "  Build tests: ${BUILD_TESTS}")
