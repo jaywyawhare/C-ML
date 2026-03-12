@@ -25,8 +25,8 @@
 extern "C" {
 #endif
 
-#define LR_SCHEDULER_MULTI_STEP 10
-#define LR_SCHEDULER_ONE_CYCLE 11
+// LR_SCHEDULER_MULTI_STEP and LR_SCHEDULER_ONE_CYCLE are now in the
+// LRSchedulerType enum defined in core/training_loop.h
 
 /**
  * @brief Create a CosineAnnealingLR scheduler (alias)

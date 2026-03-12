@@ -23,18 +23,28 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int 
         return NULL;
     }
 
-    /* Use StepLR as a base, then override type to MULTI_STEP.
-     * We store milestones in a heap-allocated copy and gamma
-     * so that lr_scheduler_step_epoch can apply them. */
-    LRScheduler* scheduler = lr_scheduler_step(optimizer, 1, gamma);
+    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
     if (!scheduler) return NULL;
 
-    /* Override type so our step_epoch knows this is multi-step */
-    scheduler->type = (LRSchedulerType)LR_SCHEDULER_MULTI_STEP;
+    memset(scheduler, 0, sizeof(LRScheduler));
 
-    /* Store initial LR for computing from scratch each epoch */
+    scheduler->type           = LR_SCHEDULER_MULTI_STEP;
+    scheduler->optimizer      = optimizer;
+    scheduler->gamma          = gamma;
+    scheduler->num_milestones = num_milestones;
+    scheduler->last_epoch     = 0;
+
+    // Copy milestones array
+    scheduler->milestones = malloc(sizeof(int) * (size_t)num_milestones);
+    if (!scheduler->milestones) {
+        free(scheduler);
+        return NULL;
+    }
+    memcpy(scheduler->milestones, milestones, sizeof(int) * (size_t)num_milestones);
+
     if (optimizer->num_param_groups > 0) {
         scheduler->initial_lr = optimizer->param_groups[0].lr;
+        scheduler->current_lr = scheduler->initial_lr;
     }
 
     return scheduler;
@@ -62,28 +72,18 @@ LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int tota
 
     memset(scheduler, 0, sizeof(LRScheduler));
 
-    scheduler->type      = (LRSchedulerType)LR_SCHEDULER_ONE_CYCLE;
-    scheduler->optimizer = optimizer;
+    scheduler->type             = LR_SCHEDULER_ONE_CYCLE;
+    scheduler->optimizer        = optimizer;
+    scheduler->max_lr           = max_lr;
+    scheduler->total_steps      = total_steps;
+    scheduler->pct_start        = pct_start > 0.0f ? pct_start : 0.3f;
+    scheduler->div_factor       = div_factor > 0.0f ? div_factor : 25.0f;
+    scheduler->final_div_factor = final_div_factor > 0.0f ? final_div_factor : 1e4f;
+    scheduler->last_epoch       = 0;
 
-    // Store OneCycle parameters in available fields:
-    // initial_lr = max_lr
-    // eta_min = initial_lr (max_lr / div_factor)
-    // T_max = total_steps
-    // gamma = pct_start
-    // factor = final_lr (max_lr / final_div_factor)
-    // min_lr = final_div_factor (stored for reference)
-
-    float init_lr  = max_lr / (div_factor > 0.0f ? div_factor : 25.0f);
-    float final_lr = max_lr / (final_div_factor > 0.0f ? final_div_factor : 1e4f);
-
-    scheduler->initial_lr = max_lr;
-    scheduler->eta_min    = init_lr;
-    scheduler->T_max      = total_steps;
-    scheduler->gamma      = pct_start > 0.0f ? pct_start : 0.3f;
-    scheduler->factor     = final_lr;
-    scheduler->last_epoch = 0;
-
-    // Set optimizer to initial LR
+    // Set initial learning rate = max_lr / div_factor
+    float init_lr = max_lr / scheduler->div_factor;
+    scheduler->initial_lr = init_lr;
     scheduler->current_lr = init_lr;
     optimizer_set_lr(optimizer, init_lr);
 
