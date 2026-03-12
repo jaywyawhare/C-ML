@@ -7,25 +7,19 @@ int main(void) {
     cml_init();
     cml_seed(42);
 
-    int input_size  = 16;
-    int num_epochs  = 300;
-    int num_samples = 500;
+    int input_size  = 8;
+    int num_epochs  = 50;
+    int num_samples = 100;
     int output_size = 1;
 
     Sequential* model = nn_sequential();
     DeviceType device = cml_get_default_device();
     DType dtype       = cml_get_default_dtype();
-    model = sequential_add_chain(model, (Module*)nn_linear(input_size, 64, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_linear(input_size, 32, dtype, device, true));
     model = sequential_add_chain(model, (Module*)nn_relu(false));
-    model = sequential_add_chain(model, (Module*)nn_linear(64, 64, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_linear(32, 16, dtype, device, true));
     model = sequential_add_chain(model, (Module*)nn_relu(false));
-    model = sequential_add_chain(model, (Module*)nn_linear(64, 128, dtype, device, true));
-    model = sequential_add_chain(model, (Module*)nn_relu(false));
-    model = sequential_add_chain(model, (Module*)nn_linear(128, 64, dtype, device, true));
-    model = sequential_add_chain(model, (Module*)nn_tanh());
-    model = sequential_add_chain(model, (Module*)nn_linear(64, 32, dtype, device, true));
-    model = sequential_add_chain(model, (Module*)nn_relu(false));
-    model = sequential_add_chain(model, (Module*)nn_linear(32, 1, dtype, device, true));
+    model = sequential_add_chain(model, (Module*)nn_linear(16, 1, dtype, device, true));
     model = sequential_add_chain(model, (Module*)nn_sigmoid());
 
     cml_summary((Module*)model);
@@ -119,7 +113,7 @@ int main(void) {
             printf("Warning: Validation evaluation failed at epoch %d\n", epoch);
         }
 
-        if ((epoch + 1) % 25 == 0 || (epoch < 25 && (epoch + 1) % 5 == 0) || epoch == 0) {
+        if ((epoch + 1) % 10 == 0 || epoch == 0) {
             TrainingMetrics* metrics = training_metrics_get_global();
             float val_loss = INFINITY, val_acc = 0.0f;
             if (metrics && metrics->epoch_validation_losses &&

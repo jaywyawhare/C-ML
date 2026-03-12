@@ -1,8 +1,3 @@
-/**
- * @file test_optim.c
- * @brief Unit tests for optimizers and LR schedulers
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +10,7 @@ static int tests_run = 0;
 static int tests_passed = 0;
 
 #define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
+    printf("  %-30s ", #name); \
     tests_run++; \
     if (test_##name()) { \
         printf("PASS\n"); \
@@ -27,7 +22,6 @@ static int tests_passed = 0;
 
 #define APPROX_EQ(a, b) (fabsf((a) - (b)) < 1e-4f)
 
-/* Helper: create a simple model and return its parameters */
 static void create_test_model(Sequential** model_out, Parameter*** params_out, int* num_params_out) {
     Sequential* model = cml_nn_sequential();
     sequential_add(model, (Module*)cml_nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
@@ -50,7 +44,6 @@ static int test_sgd(void) {
     Optimizer* opt = cml_optim_sgd(params, num_params, 0.01f, 0.0f, 0.0f);
     if (!opt) return 0;
 
-    /* Simulate a gradient and step */
     for (int i = 0; i < num_params; i++) {
         if (params[i] && params[i]->tensor && params[i]->tensor->grad) {
             float* grad = (float*)params[i]->tensor->grad->data;
@@ -148,6 +141,38 @@ static int test_adadelta(void) {
     return 1;
 }
 
+static int test_lamb(void) {
+    Sequential* model; Parameter** params; int num_params;
+    create_test_model(&model, &params, &num_params);
+
+    Optimizer* opt = optim_lamb(params, num_params, 0.001f, 0.01f, 0.9f, 0.999f, 1e-6f);
+    if (!opt) { free(params); module_free((Module*)model); return 0; }
+
+    optimizer_step(opt);
+    printf("(ok) ");
+
+    optimizer_free(opt);
+    free(params);
+    module_free((Module*)model);
+    return 1;
+}
+
+static int test_lars(void) {
+    Sequential* model; Parameter** params; int num_params;
+    create_test_model(&model, &params, &num_params);
+
+    Optimizer* opt = optim_lars(params, num_params, 0.01f, 0.9f, 0.0f, 0.02f);
+    if (!opt) { free(params); module_free((Module*)model); return 0; }
+
+    optimizer_step(opt);
+    printf("(ok) ");
+
+    optimizer_free(opt);
+    free(params);
+    module_free((Module*)model);
+    return 1;
+}
+
 static int test_zero_grad(void) {
     Sequential* model; Parameter** params; int num_params;
     create_test_model(&model, &params, &num_params);
@@ -175,7 +200,6 @@ static int test_lr_scheduler_step(void) {
     if (!sched) { optimizer_free(opt); free(params); module_free((Module*)model); return 0; }
 
     float lr_before = lr_scheduler_get_lr(sched);
-    /* Step 10 epochs */
     for (int i = 0; i < 10; i++)
         lr_scheduler_update(sched, 0.0f);
     float lr_after = lr_scheduler_get_lr(sched);
@@ -206,26 +230,21 @@ static int test_optim_for_model(void) {
 int main(void) {
     cml_init();
 
-    printf("\n=== Optimizer Unit Tests ===\n\n");
+    printf("test_optim\n\n");
 
-    printf("Optimizers:\n");
     TEST(sgd);
     TEST(adam);
     TEST(adamw);
     TEST(rmsprop);
     TEST(adagrad);
     TEST(adadelta);
-
-    printf("\nUtilities:\n");
+    TEST(lamb);
+    TEST(lars);
     TEST(zero_grad);
     TEST(optim_for_model);
-
-    printf("\nLR Scheduler:\n");
     TEST(lr_scheduler_step);
 
-    printf("\n=============================\n");
-    printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=============================\n\n");
+    printf("\n%d/%d passed\n", tests_passed, tests_run);
 
     return (tests_passed == tests_run) ? 0 : 1;
 }
