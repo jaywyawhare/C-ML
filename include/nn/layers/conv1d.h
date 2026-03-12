@@ -1,10 +1,3 @@
-/**
- * @file conv1d.h
- * @brief 1D Convolution layer
- *
- * Implements the nn.Conv1d layer
- */
-
 #ifndef CML_NN_LAYERS_CONV1D_H
 #define CML_NN_LAYERS_CONV1D_H
 
@@ -23,9 +16,10 @@ typedef struct Conv1d {
     int stride;
     int padding;
     int dilation;
+    int groups;
     bool use_bias;
 
-    Parameter* weight; // [out_channels, in_channels, kernel_size]
+    Parameter* weight; // [out_channels, in_channels/groups, kernel_size]
     Parameter* bias;   // [out_channels]
 } Conv1d;
 

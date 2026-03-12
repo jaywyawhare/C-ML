@@ -1,10 +1,3 @@
-/**
- * @file conv2d.h
- * @brief 2D Convolution layer
- *
- * Implements the nn.Conv2d layer
- */
-
 #ifndef CML_NN_LAYERS_CONV2D_H
 #define CML_NN_LAYERS_CONV2D_H
 
@@ -23,9 +16,10 @@ typedef struct Conv2d {
     int stride[2];
     int padding[2];
     int dilation[2];
+    int groups;
     bool use_bias;
 
-    Parameter* weight; // [out_channels, in_channels, kernel_h, kernel_w]
+    Parameter* weight; // [out_channels, in_channels/groups, kernel_h, kernel_w]
     Parameter* bias;   // [out_channels]
 } Conv2d;
 

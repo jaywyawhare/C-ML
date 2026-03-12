@@ -1,11 +1,3 @@
-/**
- * @file conv1d.c
- * @brief 1D Convolution layer implementation
- *
- * Fully functional 1D convolution implementation using direct computation.
- * Supports stride, padding, dilation, and bias.
- */
-
 #include "nn/layers/conv1d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -173,6 +165,7 @@ Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride
     conv->padding      = padding;
     conv->dilation     = dilation;
     conv->use_bias     = use_bias;
+    conv->groups       = 1;
 
     // Create weight tensor [out_channels, in_channels, kernel_size]
     int weight_shape[] = {out_channels, in_channels, kernel_size};

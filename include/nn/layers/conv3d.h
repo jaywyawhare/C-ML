@@ -1,8 +1,3 @@
-/**
- * @file conv3d.h
- * @brief 3D Convolution layer
- */
-
 #ifndef CML_NN_LAYERS_CONV3D_H
 #define CML_NN_LAYERS_CONV3D_H
 
@@ -20,8 +15,9 @@ typedef struct Conv3d {
     int stride[3];
     int padding[3];
     int dilation[3];
+    int groups;
     bool use_bias;
-    Parameter* weight; // [out_channels, in_channels, kd, kh, kw]
+    Parameter* weight; // [out_channels, in_channels/groups, kd, kh, kw]
     Parameter* bias;   // [out_channels]
 } Conv3d;
 

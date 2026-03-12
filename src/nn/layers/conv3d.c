@@ -1,11 +1,3 @@
-/**
- * @file conv3d.c
- * @brief 3D Convolution layer implementation
- *
- * Fully functional 3D convolution implementation using direct computation.
- * Supports stride, padding, dilation, and bias.
- */
-
 #include "nn/layers/conv3d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -161,6 +153,7 @@ Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride
     conv3d->dilation[1]    = dilation;
     conv3d->dilation[2]    = dilation;
     conv3d->use_bias       = use_bias;
+    conv3d->groups         = 1;
 
     // Create weight tensor [out_channels, in_channels, kd, kh, kw]
     int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size, kernel_size};

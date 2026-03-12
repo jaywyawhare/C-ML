@@ -1,11 +1,3 @@
-/**
- * @file conv2d.c
- * @brief 2D Convolution layer implementation
- *
- * Fully functional 2D convolution implementation using uop_conv2d.
- * Supports stride, padding, dilation, and bias.
- */
-
 #include "nn/layers/conv2d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -137,6 +129,7 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
     conv2d->dilation[0]    = dilation;
     conv2d->dilation[1]    = dilation;
     conv2d->use_bias       = use_bias;
+    conv2d->groups         = 1;
 
     // Create weight tensor [out_channels, in_channels, kernel_h, kernel_w]
     int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size};

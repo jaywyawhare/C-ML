@@ -1,9 +1,3 @@
-/**
- * @file linear.c
- * @brief Linear (fully connected) layer implementation
- *
- */
-
 #include "nn/layers/linear.h"
 #include "nn.h"
 #include "autograd/forward_ops.h"
@@ -18,7 +12,10 @@
 #include <math.h>
 
 // Forward pass: output = input @ weight.T + bias
-// Uses IR operations for autograd support
+// Uses IR operations for autograd support.
+// Note: Intermediate tensors (weight_t, matmul result) are managed by the IR
+// graph context and freed when cml_reset_ir_context() is called — they are not
+// leaked even though they are not explicitly freed here.
 Tensor* linear_forward(Module* module, Tensor* input) {
     Linear* linear = (Linear*)module;
 
