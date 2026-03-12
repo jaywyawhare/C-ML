@@ -705,12 +705,20 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     // Set shape from IR node (computed by broadcasting)
     if (node->output_shape) {
         t->shape = tensor_shape_copy(node->output_shape, node->output_ndim);
+        if (!t->shape) {
+            free(t);
+            return NULL;
+        }
         t->ndim  = node->output_ndim;
         t->numel = tensor_numel(node->output_shape, node->output_ndim);
     } else {
         // Fallback: use first input's shape if available
         if (node->inputs && node->inputs[0]) {
             t->shape = tensor_shape_copy(node->inputs[0]->shape, node->inputs[0]->ndim);
+            if (!t->shape) {
+                free(t);
+                return NULL;
+            }
             t->ndim  = node->inputs[0]->ndim;
             t->numel = node->inputs[0]->numel;
         } else {
@@ -741,7 +749,12 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->ref_count = 1;
     t->base      = NULL;
 
-    t->strides        = compute_contiguous_strides(t->shape, t->ndim);
+    t->strides = compute_contiguous_strides(t->shape, t->ndim);
+    if (!t->strides && t->ndim > 0) {
+        free(t->shape);
+        free(t);
+        return NULL;
+    }
     t->storage_offset = 0;
     t->is_contiguous  = true;
     t->buffer_handle  = NULL;
@@ -966,6 +979,11 @@ void tensor_free(Tensor* t) {
 
 Tensor* tensor_clone(Tensor* t) {
     if (!t)
+        return NULL;
+
+    // Ensure source tensor data is materialized before copying
+    tensor_ensure_executed(t);
+    if (!t->data)
         return NULL;
 
     TensorConfig config = (TensorConfig){t->dtype, t->device, true, true};
