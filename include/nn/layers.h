@@ -1,18 +1,3 @@
-/**
- * @file layers.h
- * @brief Unified header for all neural network layers
- *
- * This header provides access to all neural network layers in C-ML.
- * Include this header to get access to all layer types.
- *
- * Usage:
- *   #include "nn/layers.h"
- *
- *   Linear *fc = nn_linear(10, 20, DTYPE_FLOAT32, DEVICE_CPU, true);
- *   ReLU *relu = nn_relu(false);
- *   Dropout *dropout = nn_dropout(0.5, false);
- */
-
 #ifndef CML_NN_LAYERS_H
 #define CML_NN_LAYERS_H
 
@@ -36,8 +21,15 @@
 #include "nn/layers/conv_transpose2d.h"
 #include "nn/layers/instancenorm.h"
 #include "nn/layers/conv_transpose1d.h"
+#include "nn/layers/conv_transpose3d.h"
 #include "nn/layers/batchnorm3d.h"
 #include "nn/layers/layernorm2d.h"
+#include "nn/layers/upsample.h"
+#include "nn/layers/pixel_shuffle.h"
+#include "nn/layers/flatten.h"
+#include "nn/layers/identity.h"
+#include "nn/layers/batchnorm1d.h"
+#include "nn/layers/prelu.h"
 
 #ifdef __cplusplus
 extern "C" {
