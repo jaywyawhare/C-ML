@@ -186,6 +186,22 @@ typedef enum {
     // Additional Ops (tinygrad parity round 3)
     UOP_UNFOLD,          // sliding window extraction (im2col-like)
 
+    // Additional Activation Ops (tinygrad parity round 4)
+    UOP_ELU,             // x > 0 ? x : alpha*(exp(x)-1)
+    UOP_SELU,            // scale*(x > 0 ? x : alpha*(exp(x)-1))
+    UOP_MISH,            // x * tanh(softplus(x))
+    UOP_SILU,            // x * sigmoid(x) (swish)
+    UOP_HARDSWISH,       // x > 3 ? x : x < -3 ? 0 : x*(x+3)/6
+
+    // Masking/Selection Ops (tinygrad parity round 4)
+    UOP_MASKED_SELECT,   // select elements where mask is true
+
+    // Movement/Shape Ops (tinygrad parity round 4)
+    UOP_SPLIT,           // split tensor into chunks along dim
+    UOP_CHUNK,           // split tensor into N chunks along dim
+    UOP_MESHGRID,        // create coordinate matrices from vectors
+    UOP_DIAGONAL,        // extract diagonal with offset, dim1, dim2
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -444,6 +460,7 @@ typedef struct {
     int* dilation;
     int groups;
     bool bias;
+    bool use_winograd;  /* set by uop_conv2d when Winograd is applicable */
 } Conv2DParams;
 
 typedef struct {
@@ -475,10 +492,20 @@ typedef struct {
     int diagonal; // Offset from main diagonal (0 = main, positive = above, negative = below)
 } TriParams;
 
+/**
+ * @brief Padding mode
+ */
+typedef enum {
+    PAD_CONSTANT = 0,  // Fill with constant value
+    PAD_REFLECT,       // Reflect at boundary (e.g. [a,b,c,d] -> [c,b,a,b,c,d,c,b])
+    PAD_REPLICATE      // Replicate edge values (e.g. [a,b,c,d] -> [a,a,a,b,c,d,d,d])
+} PadMode;
+
 typedef struct {
     int* pad_widths; // [before_0, after_0, before_1, after_1, ...]
     int num_dims;
     float value; // Pad value (usually 0)
+    PadMode mode; // Padding mode (default: PAD_CONSTANT)
 } PadParams;
 
 typedef struct {
@@ -906,6 +933,42 @@ void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** ou
 
 /** @brief Standard deviation and mean together: returns (std, mean) */
 void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean);
+
+/** @brief ELU: x > 0 ? x : alpha*(exp(x)-1) */
+Tensor* uop_elu(Tensor* x, float alpha);
+
+/** @brief SELU: scale * elu(x, alpha), scale=1.0507, alpha=1.6733 */
+Tensor* uop_selu(Tensor* x);
+
+/** @brief Mish: x * tanh(softplus(x)) = x * tanh(ln(1+exp(x))) */
+Tensor* uop_mish(Tensor* x);
+
+/** @brief SiLU (Swish): x * sigmoid(x) */
+Tensor* uop_silu(Tensor* x);
+
+/** @brief HardSwish: x > 3 ? x : x < -3 ? 0 : x*(x+3)/6 */
+Tensor* uop_hardswish(Tensor* x);
+
+/** @brief Select elements where mask is true (returns 1D tensor) */
+Tensor* uop_masked_select(Tensor* a, Tensor* mask);
+
+/** @brief Split tensor into chunks of split_size along dim */
+Tensor** uop_split(Tensor* a, int split_size, int dim, int* num_splits);
+
+/** @brief Split tensor into N roughly equal chunks along dim */
+Tensor** uop_chunk(Tensor* a, int chunks, int dim, int* num_chunks);
+
+/** @brief Create coordinate matrices from 1D vectors */
+Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
+
+/** @brief Extract diagonal with offset from dimensions dim1, dim2 */
+Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2);
+
+/** @brief Pad tensor with reflect mode */
+Tensor* uop_pad_reflect(Tensor* a, int* pad_widths, int num_dims);
+
+/** @brief Pad tensor with replicate mode */
+Tensor* uop_pad_replicate(Tensor* a, int* pad_widths, int num_dims);
 
 #ifdef __cplusplus
 }

@@ -4,6 +4,7 @@
  */
 
 #include "ops/uops.h"
+#include "ops/winograd.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
@@ -1201,6 +1202,10 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
     params_copy->dilation[1]    = dilation_w;
     params_copy->groups         = params ? params->groups : 1;
 
+    /* Tag for Winograd acceleration at execution time */
+    params_copy->use_winograd = winograd_applicable(
+        kernel_h, kernel_w, stride_h, stride_w, dilation_h, dilation_w);
+
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {
         conv2d_params_free_local(params_copy);
@@ -1931,6 +1936,7 @@ Tensor* uop_pad(Tensor* a, int* pad_widths, int num_dims, float value) {
     if (!params) return NULL;
     params->num_dims = num_dims;
     params->value = value;
+    params->mode = PAD_CONSTANT;
     params->pad_widths = malloc((size_t)(num_dims * 2) * sizeof(int));
     if (!params->pad_widths) { free(params); return NULL; }
     memcpy(params->pad_widths, pad_widths, (size_t)(num_dims * 2) * sizeof(int));
@@ -3050,6 +3056,336 @@ void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** ou
     if (!a || !out_std || !out_mean) return;
     *out_mean = uop_mean(a, params);
     *out_std = uop_std(a, params);
+}
+
+// --- New Activation UOps ---
+
+Tensor* uop_elu(Tensor* x, float alpha) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    ClampParams* params = malloc(sizeof(ClampParams));
+    if (!params) return NULL;
+    params->min_val = alpha;
+    params->max_val = 0.0f; // unused
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_ELU, inputs, 1, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_selu(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_SELU, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_mish(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_MISH, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_silu(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_SILU, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_hardswish(Tensor* x) {
+    if (!x) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_HARDSWISH, inputs, 1, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim = x->ndim;
+    if (x->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+// --- New Tensor Operation UOps ---
+
+Tensor* uop_masked_select(Tensor* a, Tensor* mask) {
+    if (!a || !mask) return NULL;
+    // masked_select flattens and selects where mask is true
+    // We need to count nonzeros at execution time, so we use a special UOp
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    Tensor* inputs[] = {a, mask};
+    if (cml_ir_add_uop(ir, UOP_MASKED_SELECT, inputs, 2, NULL) != 0) return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    // Output is 1D with at most a->numel elements (actual size determined at execution)
+    node->output_shape = malloc(sizeof(int));
+    if (!node->output_shape) return NULL;
+    node->output_shape[0] = (int)a->numel; // upper bound, actual may be less
+    node->output_ndim = 1;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor** uop_split(Tensor* a, int split_size, int dim, int* num_splits) {
+    if (!a || split_size <= 0 || !num_splits) return NULL;
+    if (dim < 0) dim += a->ndim;
+    if (dim < 0 || dim >= a->ndim) return NULL;
+
+    int dim_size = a->shape[dim];
+    int n_splits = (dim_size + split_size - 1) / split_size;
+    *num_splits = n_splits;
+
+    Tensor** results = malloc((size_t)n_splits * sizeof(Tensor*));
+    if (!results) return NULL;
+
+    for (int i = 0; i < n_splits; i++) {
+        int start = i * split_size;
+        int end = start + split_size;
+        if (end > dim_size) end = dim_size;
+
+        // Use slice to extract each split
+        int* starts = calloc((size_t)a->ndim, sizeof(int));
+        int* ends = malloc((size_t)a->ndim * sizeof(int));
+        int* steps = malloc((size_t)a->ndim * sizeof(int));
+        if (!starts || !ends || !steps) {
+            free(starts); free(ends); free(steps);
+            free(results);
+            return NULL;
+        }
+        for (int d = 0; d < a->ndim; d++) {
+            starts[d] = (d == dim) ? start : 0;
+            ends[d] = (d == dim) ? end : a->shape[d];
+            steps[d] = 1;
+        }
+
+        SliceParams* sp = malloc(sizeof(SliceParams));
+        if (!sp) { free(starts); free(ends); free(steps); free(results); return NULL; }
+        sp->start = starts;
+        sp->end = ends;
+        sp->step = steps;
+        sp->num_dims = a->ndim;
+
+        results[i] = uop_slice(a, sp);
+    }
+
+    return results;
+}
+
+Tensor** uop_chunk(Tensor* a, int chunks, int dim, int* num_chunks) {
+    if (!a || chunks <= 0 || !num_chunks) return NULL;
+    if (dim < 0) dim += a->ndim;
+    if (dim < 0 || dim >= a->ndim) return NULL;
+
+    int dim_size = a->shape[dim];
+    int chunk_size = (dim_size + chunks - 1) / chunks;
+    return uop_split(a, chunk_size, dim, num_chunks);
+}
+
+Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
+    if (!tensors || num_tensors <= 0 || !num_outputs) return NULL;
+    *num_outputs = num_tensors;
+
+    // Compute output shape: [len(t0), len(t1), ...]
+    int* out_shape = malloc((size_t)num_tensors * sizeof(int));
+    if (!out_shape) return NULL;
+    for (int i = 0; i < num_tensors; i++) {
+        if (!tensors[i]) { free(out_shape); return NULL; }
+        out_shape[i] = (int)tensors[i]->numel;
+    }
+
+    Tensor** results = malloc((size_t)num_tensors * sizeof(Tensor*));
+    if (!results) { free(out_shape); return NULL; }
+
+    for (int i = 0; i < num_tensors; i++) {
+        // Reshape tensor[i] so it broadcasts to out_shape
+        int* reshape = malloc((size_t)num_tensors * sizeof(int));
+        if (!reshape) { free(out_shape); free(results); return NULL; }
+        for (int j = 0; j < num_tensors; j++) {
+            reshape[j] = (i == j) ? out_shape[j] : 1;
+        }
+        Tensor* reshaped = uop_reshape(tensors[i], &(ReshapeParams){.new_shape = reshape, .new_ndim = num_tensors});
+        free(reshape);
+        if (!reshaped) { free(out_shape); free(results); return NULL; }
+
+        // Expand to full shape
+        ExpandParams ep = {.new_shape = out_shape, .new_ndim = num_tensors};
+        results[i] = uop_expand(reshaped, &ep);
+    }
+
+    free(out_shape);
+    return results;
+}
+
+Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2) {
+    if (!a || a->ndim < 2) return NULL;
+    if (dim1 < 0) dim1 += a->ndim;
+    if (dim2 < 0) dim2 += a->ndim;
+    if (dim1 < 0 || dim1 >= a->ndim || dim2 < 0 || dim2 >= a->ndim || dim1 == dim2) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    DiagParams* params = malloc(sizeof(DiagParams));
+    if (!params) return NULL;
+    params->offset = offset;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_DIAGONAL, inputs, 1, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+
+    // Compute output shape: replace dim1,dim2 with diag_size
+    int rows = a->shape[dim1];
+    int cols = a->shape[dim2];
+    int diag_size;
+    if (offset >= 0) {
+        diag_size = rows < (cols - offset) ? rows : (cols - offset);
+    } else {
+        diag_size = (rows + offset) < cols ? (rows + offset) : cols;
+    }
+    if (diag_size < 0) diag_size = 0;
+
+    // Output has ndim-1 dimensions
+    int out_ndim = a->ndim - 1;
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    int oi = 0;
+    for (int d = 0; d < a->ndim; d++) {
+        if (d == dim1) {
+            out_shape[oi++] = diag_size;
+        } else if (d == dim2) {
+            continue; // skip
+        } else {
+            out_shape[oi++] = a->shape[d];
+        }
+    }
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_pad_reflect(Tensor* a, int* pad_widths, int num_dims) {
+    if (!a || !pad_widths || num_dims != a->ndim) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    PadParams* params = malloc(sizeof(PadParams));
+    if (!params) return NULL;
+    params->num_dims = num_dims;
+    params->value = 0.0f;
+    params->mode = PAD_REFLECT;
+    params->pad_widths = malloc((size_t)(num_dims * 2) * sizeof(int));
+    if (!params->pad_widths) { free(params); return NULL; }
+    memcpy(params->pad_widths, pad_widths, (size_t)(num_dims * 2) * sizeof(int));
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_PAD, inputs, 1, params) != 0) {
+        free(params->pad_widths); free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape = malloc((size_t)a->ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    for (int i = 0; i < a->ndim; i++) {
+        out_shape[i] = a->shape[i] + pad_widths[i * 2] + pad_widths[i * 2 + 1];
+    }
+    node->output_shape = out_shape;
+    node->output_ndim = a->ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_pad_replicate(Tensor* a, int* pad_widths, int num_dims) {
+    if (!a || !pad_widths || num_dims != a->ndim) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    PadParams* params = malloc(sizeof(PadParams));
+    if (!params) return NULL;
+    params->num_dims = num_dims;
+    params->value = 0.0f;
+    params->mode = PAD_REPLICATE;
+    params->pad_widths = malloc((size_t)(num_dims * 2) * sizeof(int));
+    if (!params->pad_widths) { free(params); return NULL; }
+    memcpy(params->pad_widths, pad_widths, (size_t)(num_dims * 2) * sizeof(int));
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_PAD, inputs, 1, params) != 0) {
+        free(params->pad_widths); free(params); return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape = malloc((size_t)a->ndim * sizeof(int));
+    if (!out_shape) return NULL;
+    for (int i = 0; i < a->ndim; i++) {
+        out_shape[i] = a->shape[i] + pad_widths[i * 2] + pad_widths[i * 2 + 1];
+    }
+    node->output_shape = out_shape;
+    node->output_ndim = a->ndim;
+    if (a->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
 }
 
 Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask) {
