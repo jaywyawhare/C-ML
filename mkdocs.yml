@@ -62,6 +62,13 @@ nav:
   - Neural Network Layers: nn_layers.md
   - Training: training.md
   - Graph Mode: graph_mode.md
+  - Benchmarks: benchmarks.md
+  - Datasets: datasets.md
+  - External Dependencies: EXTERNAL_DEPENDENCIES.md
+  - IR Graph Management: ir_graph_management.md
+  - Kernel Studio: kernel_studio.md
+  - Kernel Studio Quick Reference: kernel_studio_quickref.md
+  - Optimizations: optimizations.md
 
 extra:
   social:
