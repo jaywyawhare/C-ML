@@ -5,6 +5,7 @@
 
 #include "ops/ir/ir.h"
 #include "ops/ir/optimization.h"
+#include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
 #include <stdio.h>
@@ -809,6 +810,23 @@ int cml_ir_optimize(CMLGraph_t ir) {
     if (build_dependency_graph(ir) != 0) {
         LOG_ERROR("Failed to rebuild dependency graph");
         return -1;
+    }
+
+    // Pass 3.5: Pattern-matcher algebraic rewrites
+    {
+        CMLRewriteRegistry* builtin = cml_rewrite_builtin_rules();
+        if (builtin) {
+            int rewrites = cml_rewrite_apply(builtin, ir, 0);
+            if (rewrites > 0) {
+                LOG_DEBUG("Pattern matcher applied %d rewrites", rewrites);
+                /* Rebuild deps after rewrites */
+                build_dependency_graph(ir);
+                mark_reachable_nodes(ir);
+                remove_dead_nodes(ir);
+                build_dependency_graph(ir);
+            }
+            cml_rewrite_registry_free(builtin);
+        }
     }
 
     // Pass 4: Fuse operations

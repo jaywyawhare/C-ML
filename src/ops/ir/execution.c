@@ -1130,31 +1130,73 @@ int cpu_execute_node(struct IRNode* node) {
         if (!in1_data) return -1;
         PadParams* pp = (PadParams*)node->params;
         Tensor* inp = node->inputs[0];
+        PadMode pad_mode = pp->mode;
 
-        // Fill with pad value first
-        for (size_t i = 0; i < out->numel; i++)
-            out_data[i] = pp->value;
-
-        if (inp->ndim == 1) {
-            int pad_before = pp->pad_widths[0];
-            for (int i = 0; i < inp->shape[0]; i++)
-                out_data[pad_before + i] = in1_data[i];
-        } else if (inp->ndim == 2) {
-            int pad_r_before = pp->pad_widths[0];
-            int pad_c_before = pp->pad_widths[2];
-            int in_rows = inp->shape[0], in_cols = inp->shape[1];
-            int out_cols = out->shape[1];
-            for (int r = 0; r < in_rows; r++)
-                for (int c = 0; c < in_cols; c++)
-                    out_data[(pad_r_before + r) * out_cols + (pad_c_before + c)] =
-                        in1_data[r * in_cols + c];
+        if (pad_mode == PAD_REFLECT || pad_mode == PAD_REPLICATE) {
+            // Reflect or replicate padding
+            if (inp->ndim == 1) {
+                int pad_before = pp->pad_widths[0];
+                int in_len = inp->shape[0];
+                int out_len = out->shape[0];
+                for (int i = 0; i < out_len; i++) {
+                    int src = i - pad_before;
+                    if (src < 0)
+                        src = (pad_mode == PAD_REFLECT) ? -src : 0;
+                    else if (src >= in_len)
+                        src = (pad_mode == PAD_REFLECT) ? 2 * in_len - 2 - src : in_len - 1;
+                    if (src < 0) src = 0;
+                    if (src >= in_len) src = in_len - 1;
+                    out_data[i] = in1_data[src];
+                }
+            } else if (inp->ndim == 2) {
+                int pad_r_before = pp->pad_widths[0];
+                int pad_c_before = pp->pad_widths[2];
+                int in_rows = inp->shape[0], in_cols = inp->shape[1];
+                int out_rows = out->shape[0], out_cols = out->shape[1];
+                for (int r = 0; r < out_rows; r++) {
+                    int sr = r - pad_r_before;
+                    if (sr < 0) sr = (pad_mode == PAD_REFLECT) ? -sr : 0;
+                    else if (sr >= in_rows) sr = (pad_mode == PAD_REFLECT) ? 2 * in_rows - 2 - sr : in_rows - 1;
+                    if (sr < 0) sr = 0;
+                    if (sr >= in_rows) sr = in_rows - 1;
+                    for (int c = 0; c < out_cols; c++) {
+                        int sc = c - pad_c_before;
+                        if (sc < 0) sc = (pad_mode == PAD_REFLECT) ? -sc : 0;
+                        else if (sc >= in_cols) sc = (pad_mode == PAD_REFLECT) ? 2 * in_cols - 2 - sc : in_cols - 1;
+                        if (sc < 0) sc = 0;
+                        if (sc >= in_cols) sc = in_cols - 1;
+                        out_data[r * out_cols + c] = in1_data[sr * in_cols + sc];
+                    }
+                }
+            } else {
+                LOG_WARNING("UOP_PAD: reflect/replicate only for 1D/2D, falling back to constant");
+                for (size_t i = 0; i < out->numel; i++) out_data[i] = 0.0f;
+                for (size_t i = 0; i < in1_numel && i < out->numel; i++) out_data[i] = in1_data[i];
+            }
         } else {
-            // Generic N-dim: copy element by element
-            // For simplicity, only handle up to 4D
-            LOG_WARNING("UOP_PAD: generic N-dim padding, may be slow");
-            // Just copy what we can
-            for (size_t i = 0; i < in1_numel && i < out->numel; i++)
-                out_data[i] = in1_data[i];
+            // PAD_CONSTANT (default)
+            for (size_t i = 0; i < out->numel; i++)
+                out_data[i] = pp->value;
+
+            if (inp->ndim == 1) {
+                int pad_before = pp->pad_widths[0];
+                for (int i = 0; i < inp->shape[0]; i++)
+                    out_data[pad_before + i] = in1_data[i];
+            } else if (inp->ndim == 2) {
+                int pad_r_before = pp->pad_widths[0];
+                int pad_c_before = pp->pad_widths[2];
+                int in_rows = inp->shape[0], in_cols = inp->shape[1];
+                int out_cols = out->shape[1];
+                for (int r = 0; r < in_rows; r++)
+                    for (int c = 0; c < in_cols; c++)
+                        out_data[(pad_r_before + r) * out_cols + (pad_c_before + c)] =
+                            in1_data[r * in_cols + c];
+            } else {
+                // Generic N-dim: copy element by element
+                LOG_WARNING("UOP_PAD: generic N-dim padding, may be slow");
+                for (size_t i = 0; i < in1_numel && i < out->numel; i++)
+                    out_data[i] = in1_data[i];
+            }
         }
         break;
     }
@@ -2331,6 +2373,95 @@ int cpu_execute_node(struct IRNode* node) {
             out_data[i] = fminf(x, 0.0f) - logf(1.0f + expf(-fabsf(x)));
         }
         break;
+
+    case UOP_ELU: {
+        if (!in1_data) return -1;
+        ClampParams* cp = (ClampParams*)node->params;
+        float alpha = cp ? cp->min_val : 1.0f;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = x > 0.0f ? x : alpha * (expf(x) - 1.0f);
+        }
+        break;
+    }
+
+    case UOP_SELU: {
+        if (!in1_data) return -1;
+        const float selu_alpha = 1.6732632423543772f;
+        const float selu_scale = 1.0507009873554805f;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = selu_scale * (x > 0.0f ? x : selu_alpha * (expf(x) - 1.0f));
+        }
+        break;
+    }
+
+    case UOP_MISH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            // softplus(x) = log(1 + exp(x)), numerically stable
+            float sp = fmaxf(x, 0.0f) + logf(1.0f + expf(-fabsf(x)));
+            out_data[i] = x * tanhf(sp);
+        }
+        break;
+
+    case UOP_SILU:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            out_data[i] = x / (1.0f + expf(-x));
+        }
+        break;
+
+    case UOP_HARDSWISH:
+        if (!in1_data) return -1;
+        for (size_t i = 0; i < out->numel; i++) {
+            float x = in1_data[i % in1_numel];
+            if (x >= 3.0f) out_data[i] = x;
+            else if (x <= -3.0f) out_data[i] = 0.0f;
+            else out_data[i] = x * (x + 3.0f) / 6.0f;
+        }
+        break;
+
+    case UOP_MASKED_SELECT: {
+        if (!in1_data) return -1;
+        float* mask_data = (node->num_inputs >= 2 && node->inputs[1]) ?
+                           (float*)node->inputs[1]->data : NULL;
+        if (!mask_data) return -1;
+        size_t mask_numel = node->inputs[1]->numel;
+        size_t count = 0;
+        for (size_t i = 0; i < in1_numel && i < mask_numel; i++) {
+            if (mask_data[i] != 0.0f) {
+                out_data[count++] = in1_data[i];
+            }
+        }
+        // Update actual output size
+        out->numel = count;
+        out->shape[0] = (int)count;
+        break;
+    }
+
+    case UOP_DIAGONAL: {
+        if (!in1_data) return -1;
+        DiagParams* dp = (DiagParams*)node->params;
+        int offset = dp ? dp->offset : 0;
+        Tensor* inp = node->inputs[0];
+        // For 2D input: extract diagonal
+        if (inp->ndim == 2) {
+            int rows = inp->shape[0];
+            int cols = inp->shape[1];
+            int diag_len = (int)out->numel;
+            for (int i = 0; i < diag_len; i++) {
+                int r = (offset >= 0) ? i : i - offset;
+                int c = (offset >= 0) ? i + offset : i;
+                if (r < rows && c < cols) {
+                    out_data[i] = in1_data[r * cols + c];
+                }
+            }
+        }
+        break;
+    }
 
     case UOP_UNFOLD: {
         if (!in1_data || !node->params) return -1;

@@ -556,6 +556,292 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_ELU: {
+        // d(elu)/dx = x > 0 ? 1 : alpha * exp(x) = x > 0 ? 1 : output + alpha
+        if (in1 && in1->requires_grad && in1->data && out->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                float* out_data = (float*)out->data;
+                ClampParams* cp = (ClampParams*)node->params;
+                float alpha = cp ? cp->min_val : 1.0f;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad = (x > 0.0f) ? 1.0f : (out_data[i] + alpha);
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SELU: {
+        // d(selu)/dx = scale * (x > 0 ? 1 : alpha * exp(x))
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                const float selu_alpha = 1.6732632423543772f;
+                const float selu_scale = 1.0507009873554805f;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad = selu_scale * (x > 0.0f ? 1.0f : selu_alpha * expf(x));
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_MISH: {
+        // d(mish)/dx = d/dx[x * tanh(softplus(x))]
+        // = tanh(sp) + x * sech^2(sp) * sigmoid(x)
+        // where sp = softplus(x) = log(1+exp(x)), sigmoid(x) = 1/(1+exp(-x))
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float sp = fmaxf(x, 0.0f) + logf(1.0f + expf(-fabsf(x)));
+                    float tsp = tanhf(sp);
+                    float sig = 1.0f / (1.0f + expf(-x));
+                    float sech2 = 1.0f - tsp * tsp;
+                    float grad = tsp + x * sech2 * sig;
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SILU: {
+        // d(silu)/dx = sigmoid(x) * (1 + x * (1 - sigmoid(x)))
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float sig = 1.0f / (1.0f + expf(-x));
+                    float grad = sig * (1.0f + x * (1.0f - sig));
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_HARDSWISH: {
+        // d(hardswish)/dx = x >= 3 ? 1 : x <= -3 ? 0 : (2x+3)/6
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad;
+                    if (x >= 3.0f) grad = 1.0f;
+                    else if (x <= -3.0f) grad = 0.0f;
+                    else grad = (2.0f * x + 3.0f) / 6.0f;
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SOFTPLUS: {
+        // d(softplus)/dx = sigmoid(x)
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float sig = 1.0f / (1.0f + expf(-x));
+                    g1_data[i % in1->numel] += out_grad[i] * sig;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_RELU6: {
+        // d(relu6)/dx = x > 0 && x < 6 ? 1 : 0
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad = (x > 0.0f && x < 6.0f) ? 1.0f : 0.0f;
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_HARD_SIGMOID: {
+        // d(hard_sigmoid)/dx = x > -3 && x < 3 ? 1/6 : 0
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad = (x > -3.0f && x < 3.0f) ? (1.0f / 6.0f) : 0.0f;
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_HARD_TANH: {
+        // d(hard_tanh)/dx = -1 < x && x < 1 ? 1 : 0
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad = (x > -1.0f && x < 1.0f) ? 1.0f : 0.0f;
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_CELU: {
+        // d(celu)/dx = x > 0 ? 1 : exp(x/alpha)
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                ClampParams* cp = (ClampParams*)node->params;
+                float alpha = cp ? cp->min_val : 1.0f;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float grad = x > 0.0f ? 1.0f : expf(x / alpha);
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_LOGSIGMOID: {
+        // d(logsigmoid)/dx = 1 - sigmoid(x)
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float sig = 1.0f / (1.0f + expf(-x));
+                    g1_data[i % in1->numel] += out_grad[i] * (1.0f - sig);
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_QUICK_GELU: {
+        // d(quick_gelu)/dx = d/dx[x * sigmoid(1.702*x)]
+        // = sigmoid(1.702x) + x * 1.702 * sigmoid(1.702x) * (1 - sigmoid(1.702x))
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float sig = 1.0f / (1.0f + expf(-1.702f * x));
+                    float grad = sig + x * 1.702f * sig * (1.0f - sig);
+                    g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SOFTSIGN: {
+        // d(softsign)/dx = 1 / (1 + |x|)^2
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    float denom = 1.0f + fabsf(x);
+                    g1_data[i % in1->numel] += out_grad[i] / (denom * denom);
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_LERP: {
+        // lerp(a, b, t) = a + t*(b-a)
+        // d/da = 1 - t, d/db = t, d/dt = b - a
+        if (node->num_inputs >= 3) {
+            Tensor* in_a = node->inputs[0];
+            Tensor* in_b = node->inputs[1];
+            Tensor* in_t = node->inputs[2];
+            if (in_t && in_t->data) {
+                float* t_data = (float*)in_t->data;
+                if (in_a && in_a->requires_grad) {
+                    Tensor* ga = ensure_grad(in_a);
+                    if (ga && ga->data) {
+                        float* ga_data = (float*)ga->data;
+                        for (size_t i = 0; i < out_numel; i++) {
+                            float t = t_data[i % in_t->numel];
+                            ga_data[i % in_a->numel] += out_grad[i] * (1.0f - t);
+                        }
+                    }
+                }
+                if (in_b && in_b->requires_grad) {
+                    Tensor* gb = ensure_grad(in_b);
+                    if (gb && gb->data) {
+                        float* gb_data = (float*)gb->data;
+                        for (size_t i = 0; i < out_numel; i++) {
+                            float t = t_data[i % in_t->numel];
+                            gb_data[i % in_b->numel] += out_grad[i] * t;
+                        }
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_IDIV:
+    case UOP_MOD:
+    case UOP_SORT:
+    case UOP_TOPK:
+    case UOP_MASKED_SELECT:
+    case UOP_SPLIT:
+    case UOP_CHUNK:
+    case UOP_MESHGRID:
+    case UOP_DIAGONAL:
+        // Non-differentiable or complex-gradient ops - no gradient
+        break;
+
     default:
         // Unsupported op - gradients not computed
         LOG_DEBUG("CPU backward: no gradient rule for op type %d", node->type);

@@ -82,6 +82,17 @@ void cml_print_buffer_cache_stats(void);
  */
 void cml_cleanup_buffer_cache(void);
 
+/**
+ * @brief Execute IR graph with trace-and-replay optimization
+ *
+ * On first call: records kernel launch sequence.
+ * On subsequent calls with same graph structure: replays without re-scheduling.
+ *
+ * @param ir IR context
+ * @return 0 on success, negative on failure
+ */
+int cml_ir_execute_traced(CMLGraph_t ir);
+
 #ifdef __cplusplus
 }
 #endif

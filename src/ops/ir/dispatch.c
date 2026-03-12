@@ -22,6 +22,15 @@
 
 #include "ops/ir/gpu/cuda_backend.h"
 #include "ops/ir/gpu/rocm_backend.h"
+#include "ops/ir/gpu/ptx_codegen.h"
+
+#ifdef CML_HAS_METAL
+#include "ops/ir/gpu/metal_backend.h"
+#endif
+
+#ifdef CML_HAS_WEBGPU
+#include "ops/ir/gpu/webgpu_backend.h"
+#endif
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -41,6 +50,8 @@ static const char* backend_names[] = {
     "CPU (LLVM JIT)",
     "CUDA",
     "ROCm",
+    "Metal",
+    "WebGPU",
 };
 
 static const char* backend_descriptions[] = {
@@ -48,6 +59,8 @@ static const char* backend_descriptions[] = {
     "LLVM IR to JIT compilation",
     "NVIDIA CUDA GPU acceleration",
     "AMD ROCm GPU acceleration",
+    "Apple Metal GPU acceleration",
+    "WebGPU via wgpu-native",
 };
 
 CMLDispatchContext* cml_dispatch_create(void) {
@@ -75,9 +88,11 @@ CMLDispatchContext* cml_dispatch_create(void) {
     // Default fallback chain
     ctx->fallback_chain[0] = CML_BACKEND_CUDA;
     ctx->fallback_chain[1] = CML_BACKEND_ROCM;
-    ctx->fallback_chain[2] = CML_BACKEND_CPU_LLVM;
-    ctx->fallback_chain[3] = CML_BACKEND_CPU_FALLBACK;
-    ctx->fallback_count    = 4;
+    ctx->fallback_chain[2] = CML_BACKEND_METAL;
+    ctx->fallback_chain[3] = CML_BACKEND_WEBGPU;
+    ctx->fallback_chain[4] = CML_BACKEND_CPU_LLVM;
+    ctx->fallback_chain[5] = CML_BACKEND_CPU_FALLBACK;
+    ctx->fallback_count    = 6;
 
     ctx->preferred   = CML_BACKEND_CPU_LLVM;
     ctx->active      = CML_BACKEND_CPU_FALLBACK;
@@ -195,6 +210,28 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
         available++;
     }
 
+    // Metal detection
+#ifdef CML_HAS_METAL
+    if (cml_metal_available()) {
+        ctx->backends[CML_BACKEND_METAL].status       = CML_BACKEND_STATUS_AVAILABLE;
+        ctx->backends[CML_BACKEND_METAL].device_count  = 1;
+        ctx->backends[CML_BACKEND_METAL].supports_async = true;
+        available++;
+        LOG_INFO("Metal backend available");
+    }
+#endif
+
+    // WebGPU detection
+#ifdef CML_HAS_WEBGPU
+    if (cml_webgpu_available()) {
+        ctx->backends[CML_BACKEND_WEBGPU].status       = CML_BACKEND_STATUS_AVAILABLE;
+        ctx->backends[CML_BACKEND_WEBGPU].device_count  = 1;
+        ctx->backends[CML_BACKEND_WEBGPU].supports_async = true;
+        available++;
+        LOG_INFO("WebGPU backend available");
+    }
+#endif
+
     LOG_INFO("Detected %d available backends", available);
     return available;
 }
@@ -231,6 +268,10 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
         return CML_BACKEND_CUDA;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_ROCM))
         return CML_BACKEND_ROCM;
+    if (cml_dispatch_backend_available(ctx, CML_BACKEND_METAL))
+        return CML_BACKEND_METAL;
+    if (cml_dispatch_backend_available(ctx, CML_BACKEND_WEBGPU))
+        return CML_BACKEND_WEBGPU;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_LLVM))
         return CML_BACKEND_CPU_LLVM;
     return CML_BACKEND_CPU_FALLBACK;
@@ -283,16 +324,57 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
             int r = cml_gpu_execute(*cg_ptr, ir);
             if (r == 0) { ctx->executions_total++; return 0; }
         }
+        /* LLVM GPU codegen failed; fall through to PTX string codegen */
+#endif
+        /* PTX string codegen fallback (no LLVM dependency) */
+        if (backend == CML_BACKEND_CUDA && g_cuda_backend && g_cuda_backend->initialized) {
+            static CMLPTXCodegen* g_ptx_cg = NULL;
+            if (!g_ptx_cg) {
+                int sm = g_cuda_backend->compute_capability_major * 10
+                       + g_cuda_backend->compute_capability_minor;
+                g_ptx_cg = cml_ptx_codegen_create(sm);
+            }
+            if (g_ptx_cg) {
+                int r = cml_ptx_execute_graph(g_ptx_cg, ir);
+                if (r == 0) { ctx->executions_total++; return 0; }
+            }
+            LOG_DEBUG("PTX string codegen: graph execution unavailable");
+        }
+        LOG_DEBUG("GPU backend %s: no codegen path available", backend_names[backend]);
         return -1;
+    }
+
+    case CML_BACKEND_METAL:
+#ifdef CML_HAS_METAL
+        LOG_DEBUG("Metal backend execution requested");
+        /* Metal execution routed through HCQ or direct MSL pipeline */
+        return -1; /* Full Metal dispatch handled by metal_backend */
 #else
-        LOG_DEBUG("GPU backend %s: requires LLVM backend", backend_names[backend]);
+        LOG_DEBUG("Metal backend not compiled");
         return -1;
 #endif
-    }
+
+    case CML_BACKEND_WEBGPU:
+#ifdef CML_HAS_WEBGPU
+        LOG_DEBUG("WebGPU backend execution requested");
+        return -1; /* Full WebGPU dispatch handled by webgpu_backend */
+#else
+        LOG_DEBUG("WebGPU backend not compiled");
+        return -1;
+#endif
 
     default:
         return -1;
     }
+}
+
+int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
+                               Tensor** inputs, int num_inputs,
+                               Tensor** outputs, int num_outputs) {
+    /* Async execution: currently dispatches synchronously.
+     * With HCQ integration, this will submit to a hardware command queue
+     * and return immediately, allowing overlapped compute/transfer. */
+    return cml_dispatch_execute(ctx, ir, inputs, num_inputs, outputs, num_outputs);
 }
 
 int cml_dispatch_execute(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs, int nin,
@@ -455,6 +537,10 @@ int cml_dispatch_set_from_env(CMLDispatchContext* ctx) {
     } else if (strcasecmp(env, "rocm") == 0 || strcasecmp(env, "amd") == 0 ||
                strcasecmp(env, "hip") == 0) {
         backend = CML_BACKEND_ROCM;
+    } else if (strcasecmp(env, "metal") == 0) {
+        backend = CML_BACKEND_METAL;
+    } else if (strcasecmp(env, "webgpu") == 0 || strcasecmp(env, "wgpu") == 0) {
+        backend = CML_BACKEND_WEBGPU;
     } else {
         LOG_WARNING("Unknown CML_BACKEND value: %s", env);
         return -1;

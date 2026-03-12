@@ -31,6 +31,8 @@ typedef enum CMLBackendType {
     CML_BACKEND_CPU_LLVM,         // LLVM JIT (requires LLVM)
     CML_BACKEND_CUDA,             // LLVM NVPTX -> cuLaunchKernel
     CML_BACKEND_ROCM,             // LLVM AMDGPU -> hipLaunchKernel
+    CML_BACKEND_METAL,            // Metal GPU (macOS)
+    CML_BACKEND_WEBGPU,           // WebGPU via wgpu-native
     CML_BACKEND_COUNT             // Number of backends
 } CMLBackendType;
 
@@ -107,6 +109,11 @@ int cml_dispatch_enable_cache(CMLDispatchContext* ctx, size_t max_entries);
 void cml_dispatch_disable_cache(CMLDispatchContext* ctx);
 void cml_dispatch_clear_cache(CMLDispatchContext* ctx);
 void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* misses, size_t* size);
+
+// Async Execution
+int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
+                               Tensor** inputs, int num_inputs,
+                               Tensor** outputs, int num_outputs);
 
 // Utility
 void cml_dispatch_print_status(CMLDispatchContext* ctx);

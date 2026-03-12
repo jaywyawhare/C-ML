@@ -33,6 +33,8 @@ typedef enum CMLKernelBackend {
     CML_KERNEL_CPU_LLVM,
     CML_KERNEL_CUDA,
     CML_KERNEL_ROCM,
+    CML_KERNEL_METAL,
+    CML_KERNEL_WEBGPU,
     CML_KERNEL_BACKEND_COUNT
 } CMLKernelBackend;
 
