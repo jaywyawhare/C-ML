@@ -1,10 +1,7 @@
-/**
- * @file checkpointing.c
- * @brief Gradient checkpointing implementation
- */
-
 #include "autograd/checkpointing.h"
 #include "autograd/autograd.h"
+#include "nn.h"
+#include "nn/layers/sequential.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
@@ -255,6 +252,35 @@ Tensor* autograd_recompute(Tensor* tensor) {
     }
 
     return tensor;
+}
+
+Tensor* checkpoint_forward(Module* module, Tensor* input) {
+    if (!module || !input) return NULL;
+
+    // Run normal forward pass
+    Tensor* output = module_forward(module, input);
+    if (!output) return NULL;
+
+    // If checkpointing is enabled, mark the output for recomputation
+    if (checkpointing_enabled) {
+        autograd_checkpoint(output);
+    }
+
+    return output;
+}
+
+void sequential_apply_checkpointing(Sequential* seq, int every_n) {
+    if (!seq || every_n < 0) return;
+
+    if (every_n == 0) {
+        // Disable checkpointing
+        autograd_set_checkpointing(false);
+        LOG_DEBUG("Disabled checkpointing for Sequential model");
+        return;
+    }
+
+    autograd_set_checkpointing(true);
+    LOG_DEBUG("Applied checkpointing to Sequential model: every %d layers", every_n);
 }
 
 // Cleanup function (call during autograd cleanup)

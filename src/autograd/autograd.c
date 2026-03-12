@@ -12,11 +12,12 @@
 
 AutogradEngine* global_autograd_engine = NULL;
 
-void autograd_init(void) {
-    if (global_autograd_engine) {
-        LOG_WARNING("Autograd engine already initialized");
-        return;
-    }
+/* Thread-safe singleton initialization via pthread_once */
+static pthread_once_t g_autograd_once = PTHREAD_ONCE_INIT;
+static pthread_mutex_t g_hook_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void autograd_init_once(void) {
+    if (global_autograd_engine) return;
 
     global_autograd_engine = malloc(sizeof(AutogradEngine));
     if (!global_autograd_engine) {
@@ -30,28 +31,42 @@ void autograd_init(void) {
     global_autograd_engine->deterministic     = false;
     global_autograd_engine->create_graph      = false;
     global_autograd_engine->accumulate_grad   = true;
+    global_autograd_engine->lock_initialized  = false;
+
+    pthread_mutex_init(&global_autograd_engine->lock, NULL);
+    global_autograd_engine->lock_initialized = true;
 
     LOG_INFO("Autograd engine initialized successfully");
 }
 
+void autograd_init(void) {
+    pthread_once(&g_autograd_once, autograd_init_once);
+}
+
 void autograd_shutdown(void) {
     if (global_autograd_engine) {
+        if (global_autograd_engine->lock_initialized) {
+            pthread_mutex_destroy(&global_autograd_engine->lock);
+            global_autograd_engine->lock_initialized = false;
+        }
         free(global_autograd_engine);
         global_autograd_engine = NULL;
+        /* Reset pthread_once so re-init is possible (e.g., in tests) */
+        g_autograd_once = (pthread_once_t)PTHREAD_ONCE_INIT;
         LOG_INFO("Autograd engine shut down");
     }
 }
 
 AutogradEngine* autograd_get_engine(void) {
-    if (!global_autograd_engine) {
-        autograd_init();
-    }
+    pthread_once(&g_autograd_once, autograd_init_once);
     return global_autograd_engine;
 }
 
 void autograd_set_grad_mode(bool enabled) {
     AutogradEngine* engine = autograd_get_engine();
-    engine->grad_mode      = enabled;
+    if (engine->lock_initialized) pthread_mutex_lock(&engine->lock);
+    engine->grad_mode = enabled;
+    if (engine->lock_initialized) pthread_mutex_unlock(&engine->lock);
     LOG_DEBUG("Gradient mode set to %s", enabled ? "enabled" : "disabled");
 }
 
@@ -65,8 +80,10 @@ void autograd_no_grad_enter(void) { autograd_set_grad_mode(false); }
 void autograd_no_grad_exit(void) { autograd_set_grad_mode(true); }
 
 void autograd_set_anomaly_detection(bool enabled) {
-    AutogradEngine* engine    = autograd_get_engine();
+    AutogradEngine* engine = autograd_get_engine();
+    if (engine->lock_initialized) pthread_mutex_lock(&engine->lock);
     engine->anomaly_detection = enabled;
+    if (engine->lock_initialized) pthread_mutex_unlock(&engine->lock);
     LOG_INFO("Anomaly detection %s", enabled ? "enabled" : "disabled");
 }
 
@@ -846,7 +863,10 @@ void tensor_register_hook(Tensor* tensor, TensorHookFn hook_fn) {
         return;
     }
 
+    pthread_mutex_lock(&g_hook_lock);
+
     if (g_tensor_hook_count >= MAX_TENSOR_HOOKS) {
+        pthread_mutex_unlock(&g_hook_lock);
         LOG_WARNING("Maximum tensor hooks reached (%d), cannot register more", MAX_TENSOR_HOOKS);
         return;
     }
@@ -856,6 +876,8 @@ void tensor_register_hook(Tensor* tensor, TensorHookFn hook_fn) {
     g_tensor_hooks[g_tensor_hook_count].hook_fn = hook_fn;
     g_tensor_hooks[g_tensor_hook_count].active  = true;
     g_tensor_hook_count++;
+
+    pthread_mutex_unlock(&g_hook_lock);
 
     LOG_DEBUG("Registered tensor hook for tensor %p (total hooks: %d)", (void*)tensor,
               g_tensor_hook_count);

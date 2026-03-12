@@ -759,3 +759,77 @@ Tensor* tensor_argmin(Tensor* a, int dim) {
 }
 
 bool tensor_has_grad(Tensor* a) { return a && a->grad != NULL; }
+
+// --- Additional Activation Forward Ops ---
+
+Tensor* tensor_elu(Tensor* a, float alpha) {
+    if (!a) return NULL;
+    return uop_elu(a, alpha);
+}
+
+Tensor* tensor_selu(Tensor* a) {
+    if (!a) return NULL;
+    return uop_selu(a);
+}
+
+Tensor* tensor_mish(Tensor* a) {
+    if (!a) return NULL;
+    return uop_mish(a);
+}
+
+Tensor* tensor_silu(Tensor* a) {
+    if (!a) return NULL;
+    return uop_silu(a);
+}
+
+Tensor* tensor_hardswish(Tensor* a) {
+    if (!a) return NULL;
+    return uop_hardswish(a);
+}
+
+// --- Additional Tensor Operation Forward Ops ---
+
+Tensor* tensor_sort(Tensor* a, int dim, bool descending) {
+    if (!a) return NULL;
+    return uop_sort(a, dim, descending);
+}
+
+Tensor* tensor_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
+    (void)sorted; // topk always returns sorted
+    if (!a) return NULL;
+    return uop_topk(a, k, dim, largest, NULL);
+}
+
+Tensor* tensor_masked_select(Tensor* a, Tensor* mask) {
+    if (!a || !mask) return NULL;
+    return uop_masked_select(a, mask);
+}
+
+// Note: tensor_split and tensor_chunk are defined in tensor_manipulation.c / tensor.c
+
+Tensor** tensor_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
+    if (!tensors || !num_outputs) return NULL;
+    return uop_meshgrid(tensors, num_tensors, num_outputs);
+}
+
+Tensor* tensor_diagonal(Tensor* a, int offset, int dim1, int dim2) {
+    if (!a) return NULL;
+    return uop_diagonal(a, offset, dim1, dim2);
+}
+
+Tensor* tensor_lerp(Tensor* a, Tensor* b, float weight) {
+    if (!a || !b) return NULL;
+    Tensor* w = uop_fill(a->shape, a->ndim, weight);
+    if (!w) return NULL;
+    return uop_lerp(a, b, w);
+}
+
+Tensor* tensor_idiv(Tensor* a, Tensor* b) {
+    if (!a || !b) return NULL;
+    return uop_idiv(a, b);
+}
+
+Tensor* tensor_mod(Tensor* a, Tensor* b) {
+    if (!a || !b) return NULL;
+    return uop_mod(a, b);
+}

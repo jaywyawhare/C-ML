@@ -8,6 +8,7 @@
 #include "tensor/tensor.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <pthread.h>
 
 // Forward declarations
 struct Tensor;
@@ -88,6 +89,10 @@ typedef struct AutogradEngine {
 
     // Gradient accumulation
     bool accumulate_grad;
+
+    // Thread safety
+    pthread_mutex_t lock;
+    bool lock_initialized;
 } AutogradEngine;
 
 // Global autograd engine

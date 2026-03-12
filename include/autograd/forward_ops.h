@@ -275,6 +275,51 @@ Tensor* tensor_argmin(Tensor* a, int dim);
  */
 bool tensor_has_grad(Tensor* a);
 
+// Additional Activations
+
+/** @brief ELU activation: x > 0 ? x : alpha*(exp(x)-1) */
+Tensor* tensor_elu(Tensor* a, float alpha);
+
+/** @brief SELU activation: scale * elu(x, alpha) */
+Tensor* tensor_selu(Tensor* a);
+
+/** @brief Mish activation: x * tanh(softplus(x)) */
+Tensor* tensor_mish(Tensor* a);
+
+/** @brief SiLU/Swish activation: x * sigmoid(x) */
+Tensor* tensor_silu(Tensor* a);
+
+/** @brief HardSwish activation */
+Tensor* tensor_hardswish(Tensor* a);
+
+// Additional Tensor Operations
+
+/** @brief Sort along dimension */
+Tensor* tensor_sort(Tensor* a, int dim, bool descending);
+
+/** @brief Top-k values along dimension */
+Tensor* tensor_topk(Tensor* a, int k, int dim, bool largest, bool sorted);
+
+/** @brief Select elements where mask is true */
+Tensor* tensor_masked_select(Tensor* a, Tensor* mask);
+
+// Note: tensor_split and tensor_chunk are declared in tensor/tensor.h
+
+/** @brief Create coordinate matrices from 1D vectors */
+Tensor** tensor_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
+
+/** @brief Extract diagonal from tensor */
+Tensor* tensor_diagonal(Tensor* a, int offset, int dim1, int dim2);
+
+/** @brief Linear interpolation: a + weight*(b-a) */
+Tensor* tensor_lerp(Tensor* a, Tensor* b, float weight);
+
+/** @brief Integer division */
+Tensor* tensor_idiv(Tensor* a, Tensor* b);
+
+/** @brief Modulo */
+Tensor* tensor_mod(Tensor* a, Tensor* b);
+
 #ifdef __cplusplus
 }
 #endif
