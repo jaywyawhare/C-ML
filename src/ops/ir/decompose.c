@@ -638,8 +638,8 @@ static int decompose_sign(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -687,8 +687,8 @@ static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_cmpne(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -746,8 +746,8 @@ static int decompose_cmpne(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_cmple(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -775,8 +775,8 @@ static int decompose_cmple(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_cmpgt(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -793,8 +793,8 @@ static int decompose_cmpgt(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_cmpge(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -820,8 +820,8 @@ static int decompose_cmpge(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_minimum(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -870,8 +870,8 @@ static int decompose_log10(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_logaddexp(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -945,8 +945,8 @@ static int decompose_logaddexp(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_mod(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -981,8 +981,8 @@ static int decompose_mod(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_idiv(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -1004,8 +1004,8 @@ static int decompose_idiv(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_copysign(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -1058,8 +1058,9 @@ static int decompose_copysign(CMLGraph_t ir, struct IRNode* node) {
 // MEAN: sum(x) / n
 static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x = node->inputs[0];
-    int* out_shape = node->output->shape;
-    int out_ndim = node->output->ndim;
+    int* out_shape = node->output ? node->output->shape : node->output_shape;
+    int out_ndim = node->output ? node->output->ndim : node->output_ndim;
+    if (!out_shape) return -1;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -1121,8 +1122,9 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
 // MIN_REDUCE: neg(max_reduce(neg(x)))
 static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x = node->inputs[0];
-    int* out_shape = node->output->shape;
-    int out_ndim = node->output->ndim;
+    int* out_shape = node->output ? node->output->shape : node->output_shape;
+    int out_ndim = node->output ? node->output->ndim : node->output_ndim;
+    if (!out_shape) return -1;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -1231,8 +1233,8 @@ static int decompose_logical_not(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_logical_and(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
@@ -1268,8 +1270,8 @@ static int decompose_logical_and(CMLGraph_t ir, struct IRNode* node) {
 static int decompose_logical_or(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
     Tensor* b = node->inputs[1];
-    int* shape = node->output->shape;
-    int ndim = node->output->ndim;
+    int* shape = node->output ? node->output->shape : node->output_shape;
+    int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
 
