@@ -6,6 +6,7 @@
 #include "core/quantization.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <float.h>
 
@@ -194,4 +195,187 @@ Tensor* cml_dequantize_uint8(Tensor* tensor, const QuantParams* params) {
     }
 
     return dequantized;
+}
+
+/* ===== NF4 Quantization ===== */
+
+const float CML_NF4_TABLE[16] = {
+    -1.0f, -0.6962f, -0.5251f, -0.3949f, -0.2844f, -0.1848f, -0.0911f, 0.0f,
+     0.0796f, 0.1609f, 0.2461f, 0.3379f, 0.4407f, 0.5626f, 0.7230f, 1.0f
+};
+
+/**
+ * Find the nearest NF4 table index for a normalized value in [-1, 1].
+ * Uses linear scan over the 16-entry table.
+ */
+static int nf4_find_nearest(float normalized) {
+    int best_idx = 0;
+    float best_dist = fabsf(normalized - CML_NF4_TABLE[0]);
+    for (int i = 1; i < 16; i++) {
+        float dist = fabsf(normalized - CML_NF4_TABLE[i]);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_idx = i;
+        }
+    }
+    return best_idx;
+}
+
+Tensor* cml_quantize_nf4(Tensor* tensor, int block_size,
+                          float** out_scales, int* out_num_scales) {
+    if (!tensor) {
+        LOG_ERROR("cml_quantize_nf4: NULL tensor");
+        return NULL;
+    }
+    if (block_size <= 0) {
+        LOG_ERROR("cml_quantize_nf4: block_size must be positive, got %d", block_size);
+        return NULL;
+    }
+    if (!out_scales || !out_num_scales) {
+        LOG_ERROR("cml_quantize_nf4: NULL output pointers");
+        return NULL;
+    }
+
+    tensor_ensure_executed(tensor);
+    if (!tensor->data) {
+        LOG_ERROR("cml_quantize_nf4: tensor has no data");
+        return NULL;
+    }
+
+    size_t numel = tensor->numel;
+    if (numel == 0) {
+        LOG_ERROR("cml_quantize_nf4: tensor has 0 elements");
+        return NULL;
+    }
+
+    /* Pad numel up to even for packing */
+    size_t padded_numel = (numel + 1) & ~(size_t)1;
+    size_t packed_size = padded_numel / 2;
+
+    /* Compute number of blocks */
+    int num_blocks = (int)((numel + (size_t)block_size - 1) / (size_t)block_size);
+
+    float* scales = (float*)calloc((size_t)num_blocks, sizeof(float));
+    if (!scales) {
+        LOG_ERROR("cml_quantize_nf4: failed to allocate scales");
+        return NULL;
+    }
+
+    float* fdata = (float*)tensor->data;
+
+    /* Compute per-block absmax scales */
+    for (int b = 0; b < num_blocks; b++) {
+        size_t start = (size_t)b * (size_t)block_size;
+        size_t end = start + (size_t)block_size;
+        if (end > numel) end = numel;
+
+        float absmax = 0.0f;
+        for (size_t i = start; i < end; i++) {
+            float av = fabsf(fdata[i]);
+            if (av > absmax) absmax = av;
+        }
+        scales[b] = (absmax < 1e-10f) ? 1e-10f : absmax;
+    }
+
+    /* Create packed uint8 output tensor */
+    int packed_shape[1] = {(int)packed_size};
+    TensorConfig config = {.dtype = DTYPE_UINT8, .device = tensor->device,
+                           .has_dtype = true, .has_device = true};
+    Tensor* packed = tensor_empty(packed_shape, 1, &config);
+    if (!packed) {
+        free(scales);
+        LOG_ERROR("cml_quantize_nf4: failed to allocate packed tensor");
+        return NULL;
+    }
+    tensor_ensure_executed(packed);
+    uint8_t* pdata = (uint8_t*)packed->data;
+    memset(pdata, 0, packed_size);
+
+    /* Quantize: for each element, normalize by block scale, find nearest NF4 index */
+    uint8_t* indices = (uint8_t*)calloc(padded_numel, sizeof(uint8_t));
+    if (!indices) {
+        free(scales);
+        tensor_free(packed);
+        LOG_ERROR("cml_quantize_nf4: failed to allocate index buffer");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < numel; i++) {
+        int block_idx = (int)(i / (size_t)block_size);
+        float normalized = fdata[i] / scales[block_idx];
+        /* Clamp to [-1, 1] */
+        if (normalized > 1.0f) normalized = 1.0f;
+        if (normalized < -1.0f) normalized = -1.0f;
+        indices[i] = (uint8_t)nf4_find_nearest(normalized);
+    }
+    /* Pad element (if numel is odd) defaults to index 0 from calloc */
+
+    /* Pack two 4-bit indices into one uint8: high nibble = even index, low nibble = odd index */
+    for (size_t i = 0; i < packed_size; i++) {
+        pdata[i] = (uint8_t)((indices[2 * i] << 4) | (indices[2 * i + 1] & 0x0F));
+    }
+
+    free(indices);
+
+    *out_scales = scales;
+    *out_num_scales = num_blocks;
+    return packed;
+}
+
+Tensor* cml_dequantize_nf4(Tensor* nf4_tensor, const float* scales,
+                            int num_scales, int block_size, size_t original_numel) {
+    if (!nf4_tensor || !scales) {
+        LOG_ERROR("cml_dequantize_nf4: NULL argument");
+        return NULL;
+    }
+    if (num_scales <= 0 || block_size <= 0 || original_numel == 0) {
+        LOG_ERROR("cml_dequantize_nf4: invalid parameters");
+        return NULL;
+    }
+
+    tensor_ensure_executed(nf4_tensor);
+    if (!nf4_tensor->data) {
+        LOG_ERROR("cml_dequantize_nf4: tensor has no data");
+        return NULL;
+    }
+
+    uint8_t* pdata = (uint8_t*)nf4_tensor->data;
+
+    /* Create float32 output tensor with original shape (flat 1D) */
+    int out_shape[1] = {(int)original_numel};
+    TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = nf4_tensor->device,
+                           .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty(out_shape, 1, &config);
+    if (!output) {
+        LOG_ERROR("cml_dequantize_nf4: failed to allocate output tensor");
+        return NULL;
+    }
+    tensor_ensure_executed(output);
+    float* fdata = (float*)output->data;
+
+    /* Unpack and dequantize */
+    size_t padded_numel = (original_numel + 1) & ~(size_t)1;
+    size_t packed_size = padded_numel / 2;
+
+    for (size_t i = 0; i < packed_size; i++) {
+        uint8_t byte = pdata[i];
+        int idx_hi = (byte >> 4) & 0x0F;
+        int idx_lo = byte & 0x0F;
+
+        size_t elem0 = 2 * i;
+        size_t elem1 = 2 * i + 1;
+
+        if (elem0 < original_numel) {
+            int block_idx = (int)(elem0 / (size_t)block_size);
+            if (block_idx >= num_scales) block_idx = num_scales - 1;
+            fdata[elem0] = CML_NF4_TABLE[idx_hi] * scales[block_idx];
+        }
+        if (elem1 < original_numel) {
+            int block_idx = (int)(elem1 / (size_t)block_size);
+            if (block_idx >= num_scales) block_idx = num_scales - 1;
+            fdata[elem1] = CML_NF4_TABLE[idx_lo] * scales[block_idx];
+        }
+    }
+
+    return output;
 }
