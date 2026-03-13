@@ -105,6 +105,11 @@ void cml_trace_cache_free(CMLTraceCache* cache);
 CMLTrace* cml_trace_cache_lookup(CMLTraceCache* cache, uint64_t graph_hash);
 int cml_trace_cache_insert(CMLTraceCache* cache, uint64_t graph_hash, CMLTrace* trace);
 
+/* ── Active trace (thread-local) ── */
+
+CMLTrace* cml_trace_get_active(void);
+void cml_trace_set_active(CMLTrace* trace);
+
 /* ── High-level traced execution ── */
 
 int cml_ir_execute_traced(CMLGraph_t ir);

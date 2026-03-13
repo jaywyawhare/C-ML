@@ -93,6 +93,9 @@ void cml_cleanup_buffer_cache(void);
  */
 int cml_ir_execute_traced(CMLGraph_t ir);
 
+/** Execute IR graph with V2 fusion scheduler */
+int cml_ir_execute_v2(CMLGraph_t ir);
+
 #ifdef __cplusplus
 }
 #endif

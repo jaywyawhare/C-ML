@@ -109,6 +109,58 @@ int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                           const CMLBeamConfig* config, double time_us);
 
+/* ── Hardware timing ── */
+
+/**
+ * @brief A compiled kernel variant for hardware auto-tuning
+ */
+typedef struct {
+    CMLBeamConfig config;
+    void* compiled_kernel;   /* backend-specific compiled kernel */
+    char* source_code;       /* generated source (PTX/CUDA C/MSL/WGSL) */
+} CMLBeamVariant;
+
+/**
+ * @brief Hardware timing callback: compile+launch+time a variant
+ * @param variant The variant to time
+ * @param user_data Opaque backend context
+ * @return Execution time in microseconds, or -1.0 on error
+ */
+typedef double (*CMLBeamTimingFn)(const CMLBeamVariant* variant, void* user_data);
+
+/**
+ * @brief Tune a kernel using actual hardware timing
+ *
+ * @param ctx           Search context
+ * @param kernel_hash   Hash identifying the kernel
+ * @param total_elements Total elements to process
+ * @param timing_fn     Hardware timing callback
+ * @param user_data     Opaque context passed to timing_fn
+ * @param best_out      Output: best configuration found
+ * @return 0 on success, -1 on error
+ */
+int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
+                             size_t total_elements,
+                             CMLBeamTimingFn timing_fn, void* user_data,
+                             CMLBeamConfig* best_out);
+
+/**
+ * @brief Save BEAM cache to disk
+ */
+int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path);
+
+/**
+ * @brief Load BEAM cache from disk
+ */
+int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path);
+
+/* ── CUDA timing callback (implemented in beam_cuda_timing.c) ── */
+
+/**
+ * @brief CUDA hardware timing callback for BEAM search
+ */
+double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data);
+
 #ifdef __cplusplus
 }
 #endif

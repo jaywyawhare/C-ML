@@ -29,9 +29,13 @@ struct CMLKernelCache;
 typedef enum CMLBackendType {
     CML_BACKEND_CPU_FALLBACK = 0, // CPU interpreter (no JIT, always available)
     CML_BACKEND_CPU_LLVM,         // LLVM JIT (requires LLVM)
+    CML_BACKEND_NV,               // NV userspace driver (direct ioctl, no libcuda)
     CML_BACKEND_CUDA,             // LLVM NVPTX -> cuLaunchKernel
+    CML_BACKEND_AM,               // AM userspace driver (KFD ioctl, no libamdhip64)
     CML_BACKEND_ROCM,             // LLVM AMDGPU -> hipLaunchKernel
+    CML_BACKEND_NIR,              // Mesa NIR -> SPIR-V -> Vulkan
     CML_BACKEND_METAL,            // Metal GPU (macOS)
+    CML_BACKEND_VULKAN,           // Vulkan/SPIR-V compute
     CML_BACKEND_WEBGPU,           // WebGPU via wgpu-native
     CML_BACKEND_COUNT             // Number of backends
 } CMLBackendType;
@@ -114,6 +118,21 @@ void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* mis
 int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
                                Tensor** inputs, int num_inputs,
                                Tensor** outputs, int num_outputs);
+
+// Backend Accessors
+struct CMLCUDABackend;
+struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void);
+struct CMLVulkanBackend;
+struct CMLVulkanBackend* cml_dispatch_get_vulkan_backend(void);
+struct CMLNVDriver;
+struct CMLNVDriver* cml_dispatch_get_nv_driver(void);
+struct CMLAMDriver;
+struct CMLAMDriver* cml_dispatch_get_am_driver(void);
+
+// JIT Dispatch
+int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
+                             Tensor** inputs, int num_inputs,
+                             Tensor** outputs, int num_outputs);
 
 // Utility
 void cml_dispatch_print_status(CMLDispatchContext* ctx);

@@ -98,6 +98,13 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
  */
 CMLRewriteRegistry* cml_rewrite_builtin_rules(void);
 
+/**
+ * @brief Dead code elimination pass: remove nodes not reachable from outputs
+ * @param ir IR graph
+ * @return Number of nodes removed, or -1 on error
+ */
+int cml_rewrite_dce(CMLGraph_t ir);
+
 #ifdef __cplusplus
 }
 #endif

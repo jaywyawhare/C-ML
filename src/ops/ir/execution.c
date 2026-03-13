@@ -3,6 +3,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/graph_cache.h"
+#include "ops/ir/schedule.h"
 #include "core/logging.h"
 #ifdef CML_HAS_LLVM_BACKEND
 #include "ops/ir/llvm/llvm_backend.h"
@@ -2584,6 +2585,12 @@ int cml_ir_execute(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute");
         return -1;
+    }
+
+    /* Use V2 fusion scheduler when CML_SCHEDULE_V2=1 */
+    const char* v2_env = getenv("CML_SCHEDULE_V2");
+    if (v2_env && v2_env[0] == '1') {
+        return cml_ir_execute_v2(ir);
     }
 
     return cpu_execute_ir(ir);

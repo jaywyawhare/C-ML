@@ -112,6 +112,60 @@ void cml_schedule_print(const CMLSchedule* sched);
 /** Convert schedule to string */
 char* cml_schedule_to_string(const CMLSchedule* sched);
 
+/* ── V2 Fusion Scheduler ── */
+
+/** Fusion analysis for a pair of ops */
+typedef struct CMLFusionAnalysis {
+    bool can_fuse;
+    float benefit;           /* Estimated speedup from fusion */
+    size_t memory_saved;     /* Bytes of intermediate storage eliminated */
+    bool eliminates_buffer;  /* True if fusion removes an intermediate buffer */
+} CMLFusionAnalysis;
+
+/** A group of fused operations */
+typedef struct CMLFusionGroup {
+    struct IRNode** nodes;     /* Ops in this group (topological order) */
+    int num_nodes;
+    int node_capacity;
+
+    int* eliminated_buffers;   /* Indices of intermediate buffers kept in registers */
+    int num_eliminated;
+    int elim_capacity;
+
+    CMLScheduleItemType type;  /* Dominant type of the group */
+    size_t total_flops;
+    size_t total_memory;
+    int color;                 /* Graph coloring ID */
+} CMLFusionGroup;
+
+/** V2 schedule with fusion groups */
+typedef struct CMLScheduleV2 {
+    CMLFusionGroup** groups;
+    int num_groups;
+    int group_capacity;
+
+    int* execution_order;      /* Indices into groups[] in execution order */
+    int num_ordered;
+
+    /* Stats */
+    int total_ops_before;
+    int total_groups_after;
+    float fusion_ratio;
+    size_t memory_saved;
+} CMLScheduleV2;
+
+/** Create V2 schedule from IR graph */
+CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph, const CMLScheduleOptions* opts);
+
+/** Free V2 schedule */
+void cml_schedule_v2_free(CMLScheduleV2* sched);
+
+/** Analyze fusion potential between two nodes */
+CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b);
+
+/** Print V2 schedule summary */
+void cml_schedule_v2_print(const CMLScheduleV2* sched);
+
 #ifdef __cplusplus
 }
 #endif

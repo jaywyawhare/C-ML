@@ -25,6 +25,9 @@ typedef enum {
     CML_HCQ_OPENCL,
     CML_HCQ_METAL,
     CML_HCQ_WEBGPU,
+    CML_HCQ_VULKAN,
+    CML_HCQ_NV,
+    CML_HCQ_AM,
     CML_HCQ_BACKEND_COUNT
 } CMLHCQBackendType;
 

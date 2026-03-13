@@ -9,8 +9,21 @@
 #include "ops/ir/trace.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/execution.h"
+#include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+
+/* ── Thread-local active trace ── */
+
+static _Thread_local CMLTrace* g_active_trace = NULL;
+
+CMLTrace* cml_trace_get_active(void) {
+    return g_active_trace;
+}
+
+void cml_trace_set_active(CMLTrace* trace) {
+    g_active_trace = trace;
+}
 
 /* ── FNV-1a constants ── */
 
@@ -363,8 +376,15 @@ int cml_ir_execute_traced(CMLGraph_t ir)
 
     cml_trace_begin(trace, hash);
 
+    /* Set the active trace so the execution engine can record launches */
+    cml_trace_set_active(trace);
+
     /* Execute the graph normally */
     int rc = cml_ir_execute(ir);
+
+    /* Clear active trace */
+    cml_trace_set_active(NULL);
+
     if (rc != 0) {
         cml_trace_free(trace);
         return rc;

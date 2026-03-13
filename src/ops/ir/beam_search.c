@@ -17,6 +17,7 @@
 #include "core/logging.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -341,5 +342,177 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
     /* 6. Store in cache. */
     cml_beam_search_store(ctx, kernel_hash, best_out,
                           ctx->candidates[best_idx].time_us);
+    return 0;
+}
+
+/* ── Hardware timing tune ────────────────────────────────────────────────── */
+
+int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
+                             size_t total_elements,
+                             CMLBeamTimingFn timing_fn, void* user_data,
+                             CMLBeamConfig* best_out)
+{
+    if (!ctx || !timing_fn || !best_out) {
+        LOG_ERROR("NULL arguments in beam_search_tune_hw");
+        return -1;
+    }
+
+    /* 1. Check cache first. */
+    if (cml_beam_search_lookup(ctx, kernel_hash, best_out) == 0) {
+        return 0;
+    }
+
+    /* 2. Generate candidate configs (same as heuristic path). */
+    CMLBeamResult all_candidates[CML_BEAM_MAX_CANDIDATES];
+    int num_all = 0;
+
+    for (int bi = 0; bi < NUM_BLOCK_SIZES && num_all < CML_BEAM_MAX_CANDIDATES; bi++) {
+        for (int ui = 0; ui < NUM_UNROLL_FACTORS && num_all < CML_BEAM_MAX_CANDIDATES; ui++) {
+            for (int vi = 0; vi < NUM_VEC_WIDTHS && num_all < CML_BEAM_MAX_CANDIDATES; vi++) {
+                CMLBeamResult* r = &all_candidates[num_all];
+                memset(r, 0, sizeof(*r));
+
+                r->config.block_size_x  = BLOCK_SIZES[bi];
+                r->config.block_size_y  = 1;
+                r->config.block_size_z  = 1;
+                r->config.unroll_factor = UNROLL_FACTORS[ui];
+                r->config.vec_width     = VEC_WIDTHS[vi];
+                r->config.shared_mem    = 0;
+
+                size_t threads = (size_t)r->config.block_size_x;
+                r->config.block[0] = threads;
+                r->config.block[1] = 1;
+                r->config.block[2] = 1;
+                r->config.grid[0]  = (total_elements + threads - 1) / threads;
+                r->config.grid[1]  = 1;
+                r->config.grid[2]  = 1;
+
+                r->valid   = true;
+                r->time_us = heuristic_score(&r->config, total_elements);
+                num_all++;
+            }
+        }
+    }
+
+    if (num_all == 0) return -1;
+
+    /* 3. Heuristic pre-filter: keep top beam_width * 2 candidates. */
+    qsort(all_candidates, (size_t)num_all, sizeof(CMLBeamResult),
+          cmp_beam_result);
+
+    int pre_filter = ctx->beam_width * 2;
+    if (pre_filter > num_all) pre_filter = num_all;
+
+    LOG_INFO("BEAM hw tune: %d candidates -> pre-filter to %d",
+             num_all, pre_filter);
+
+    /* 4. Time each surviving candidate on hardware. */
+    int best_idx = -1;
+    double best_time = 1e18;
+
+    for (int i = 0; i < pre_filter; i++) {
+        CMLBeamVariant variant;
+        memset(&variant, 0, sizeof(variant));
+        variant.config = all_candidates[i].config;
+        variant.compiled_kernel = NULL;
+        variant.source_code = NULL;
+
+        double t = timing_fn(&variant, user_data);
+        if (t >= 0.0) {
+            all_candidates[i].time_us = t;
+            if (t < best_time) {
+                best_time = t;
+                best_idx = i;
+            }
+        } else {
+            all_candidates[i].valid = false;
+        }
+    }
+
+    if (best_idx < 0) {
+        LOG_WARNING("BEAM hw tune: all candidates failed");
+        return -1;
+    }
+
+    *best_out = all_candidates[best_idx].config;
+    cml_beam_search_store(ctx, kernel_hash, best_out, best_time);
+
+    LOG_INFO("BEAM hw tune: best config block=%d unroll=%d vec=%d (%.2f us)",
+             best_out->block_size_x, best_out->unroll_factor,
+             best_out->vec_width, best_time);
+
+    return 0;
+}
+
+/* ── Disk persistence ────────────────────────────────────────────────────── */
+
+int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path)
+{
+    if (!ctx || !path) return -1;
+
+    FILE* fp = fopen(path, "wb");
+    if (!fp) {
+        LOG_ERROR("BEAM cache save: cannot open %s", path);
+        return -1;
+    }
+
+    /* Write header: magic + count */
+    uint32_t magic = 0x424D4348; /* "BMCH" */
+    fwrite(&magic, sizeof(magic), 1, fp);
+    fwrite(&ctx->cache_count, sizeof(ctx->cache_count), 1, fp);
+
+    /* Write occupied entries */
+    for (int i = 0; i < 256; i++) {
+        if (!ctx->cache[i].occupied) continue;
+        fwrite(&ctx->cache[i].hash, sizeof(uint64_t), 1, fp);
+        fwrite(&ctx->cache[i].config, sizeof(CMLBeamConfig), 1, fp);
+        fwrite(&ctx->cache[i].time_us, sizeof(double), 1, fp);
+    }
+
+    fclose(fp);
+    LOG_INFO("BEAM cache saved: %d entries to %s", ctx->cache_count, path);
+    return 0;
+}
+
+int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path)
+{
+    if (!ctx || !path) return -1;
+
+    FILE* fp = fopen(path, "rb");
+    if (!fp) {
+        LOG_DEBUG("BEAM cache load: cannot open %s", path);
+        return -1;
+    }
+
+    uint32_t magic = 0;
+    if (fread(&magic, sizeof(magic), 1, fp) != 1 || magic != 0x424D4348) {
+        LOG_ERROR("BEAM cache load: invalid magic in %s", path);
+        fclose(fp);
+        return -1;
+    }
+
+    int count = 0;
+    if (fread(&count, sizeof(count), 1, fp) != 1) {
+        fclose(fp);
+        return -1;
+    }
+
+    int loaded = 0;
+    for (int i = 0; i < count; i++) {
+        uint64_t hash;
+        CMLBeamConfig config;
+        double time_us;
+
+        if (fread(&hash, sizeof(hash), 1, fp) != 1) break;
+        if (fread(&config, sizeof(config), 1, fp) != 1) break;
+        if (fread(&time_us, sizeof(time_us), 1, fp) != 1) break;
+
+        if (cml_beam_search_store(ctx, hash, &config, time_us) == 0) {
+            loaded++;
+        }
+    }
+
+    fclose(fp);
+    LOG_INFO("BEAM cache loaded: %d entries from %s", loaded, path);
     return 0;
 }
