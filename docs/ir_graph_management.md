@@ -560,9 +560,8 @@ ______________________________________________________________________
 ## References
 
 - [Autograd Documentation](autograd.md)
-- [Tensor Operations](tensor_ops.md)
-- [Visualization Guide](visualization.md)
-- [Training Metrics](training_metrics.md)
+- [API Reference](api_reference.md)
+- [Training Guide](training.md)
 
 ______________________________________________________________________
 
