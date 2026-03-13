@@ -309,6 +309,5 @@ To add new fusion patterns:
 
 ## References
 
-- [USAGE.md](USAGE.md) - General C-ML usage guide
-- [REFERENCE.md](REFERENCE.md) - API reference
-- [examples/demos/comprehensive_fusion_example.c](examples/demos/comprehensive_fusion_example.c) - Complete example
+- [Getting Started](getting_started.md) - General C-ML usage guide
+- [API Reference](api_reference.md) - API reference
