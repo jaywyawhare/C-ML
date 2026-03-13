@@ -1386,7 +1386,7 @@ ______________________________________________________________________
 | AVX-512 SIMD     | `simd_math.c`     | 8-16x          | None                  |
 | AVX2 SIMD        | `simd_math.c`     | 4-8x           | None                  |
 | BLAS GEMM        | `blas.c`          | 10-100x        | None                  |
-| Operation Fusion | `optimization.c`  | 1.5-3x         | Reduced               |
+| Operation Fusion | `optimization.c`  | 1.5-5x         | Reduced               |
 | Graph Caching    | `graph_cache.c`   | 2-10x          | Increased             |
 | Kernel Caching   | `kernel_cache.c`  | 2-5x           | Increased             |
 | Memory Pooling   | `memory_pools.c`  | 1.2-2x         | Reduced fragmentation |
