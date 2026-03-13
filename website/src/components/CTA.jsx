@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -24,9 +25,9 @@ export default function CTA() {
       <h2 style={{ opacity: 0 }}>Start training.</h2>
       <p style={{ opacity: 0 }}>Pure C. Zero dependencies. Maximum control.</p>
       <div className="cta-btns" style={{ opacity: 0 }}>
-        <a className="btn primary" href="https://github.com/jaywyawhare/C-ML#quick-start" target="_blank" rel="noopener">
+        <Link className="btn primary" to="/docs/getting_started">
           Get Started
-        </a>
+        </Link>
         <a className="btn" href="https://github.com/jaywyawhare/C-ML" target="_blank" rel="noopener">
           View on GitHub
         </a>
