@@ -50,6 +50,9 @@ const sections = [
       { slug: 'graph_mode', label: 'Graph Mode', file: 'graph_mode.md' },
       { slug: 'ir_graph_management', label: 'IR Graph Management', file: 'ir_graph_management.md' },
       { slug: 'optimizations', label: 'Optimizations', file: 'optimizations.md' },
+      { slug: 'linearization', label: 'Linearization & Fused Codegen', file: 'linearization.md' },
+      { slug: 'beam_search', label: 'BEAM Search Auto-Tuning', file: 'beam_search.md' },
+      { slug: 'speculative_decoding', label: 'Speculative Decoding', file: 'speculative_decoding.md' },
     ],
   },
   {
