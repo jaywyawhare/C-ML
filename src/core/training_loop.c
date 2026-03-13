@@ -20,7 +20,7 @@ LRScheduler* lr_scheduler_step(Optimizer* optimizer, int step_size, float gamma)
         return NULL;
     }
 
-    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -29,22 +29,7 @@ LRScheduler* lr_scheduler_step(Optimizer* optimizer, int step_size, float gamma)
     scheduler->optimizer  = optimizer;
     scheduler->step_size  = step_size;
     scheduler->gamma      = gamma;
-    scheduler->last_epoch = 0;
-    scheduler->current_lr = 0.0f;
-
-    // Initialize other fields
-    scheduler->factor        = 0.0f;
-    scheduler->patience      = 0;
-    scheduler->min_lr        = 0.0f;
-    scheduler->threshold     = 0.0f;
-    scheduler->cooldown      = 0;
-    scheduler->best_epoch    = 0;
-    scheduler->best_metric   = INFINITY;
-    scheduler->plateau_count = 0;
-    scheduler->exp_gamma     = 0.0f;
-    scheduler->T_max         = 0;
-    scheduler->eta_min       = 0.0f;
-    scheduler->initial_lr    = 0.0f;
+    scheduler->best_metric = INFINITY;
 
     return scheduler;
 }
@@ -55,7 +40,7 @@ LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, 
         return NULL;
     }
 
-    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -65,21 +50,7 @@ LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, 
     scheduler->factor        = factor;
     scheduler->patience      = patience;
     scheduler->min_lr        = min_lr;
-    scheduler->last_epoch    = 0;
-    scheduler->current_lr    = 0.0f;
     scheduler->best_metric   = INFINITY;
-    scheduler->plateau_count = 0;
-
-    // Initialize other fields
-    scheduler->step_size  = 0;
-    scheduler->gamma      = 0.0f;
-    scheduler->threshold  = 0.0f;
-    scheduler->cooldown   = 0;
-    scheduler->best_epoch = 0;
-    scheduler->exp_gamma  = 0.0f;
-    scheduler->T_max      = 0;
-    scheduler->eta_min    = 0.0f;
-    scheduler->initial_lr = 0.0f;
 
     return scheduler;
 }
@@ -89,7 +60,7 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma) {
         return NULL;
     }
 
-    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -97,23 +68,7 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma) {
     scheduler->type       = LR_SCHEDULER_EXPONENTIAL;
     scheduler->optimizer  = optimizer;
     scheduler->exp_gamma  = gamma;
-    scheduler->last_epoch = 0;
-    scheduler->current_lr = 0.0f;
-
-    // Initialize other fields
-    scheduler->step_size     = 0;
-    scheduler->gamma         = 0.0f;
-    scheduler->factor        = 0.0f;
-    scheduler->patience      = 0;
-    scheduler->min_lr        = 0.0f;
-    scheduler->threshold     = 0.0f;
-    scheduler->cooldown      = 0;
-    scheduler->best_epoch    = 0;
-    scheduler->best_metric   = INFINITY;
-    scheduler->plateau_count = 0;
-    scheduler->T_max         = 0;
-    scheduler->eta_min       = 0.0f;
-    scheduler->initial_lr    = 0.0f;
+    scheduler->best_metric = INFINITY;
 
     return scheduler;
 }
@@ -123,7 +78,7 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
         return NULL;
     }
 
-    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -132,8 +87,8 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
     scheduler->optimizer  = optimizer;
     scheduler->T_max      = T_max;
     scheduler->eta_min    = eta_min;
-    scheduler->last_epoch = 0;
-    scheduler->current_lr = 0.0f;
+    scheduler->min_lr     = eta_min;
+    scheduler->best_metric = INFINITY;
 
     // Store initial learning rate for cosine annealing
     if (optimizer->num_param_groups > 0) {
@@ -141,19 +96,6 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
     } else {
         scheduler->initial_lr = 0.001f; // Default fallback
     }
-
-    // Initialize other fields
-    scheduler->step_size     = 0;
-    scheduler->gamma         = 0.0f;
-    scheduler->factor        = 0.0f;
-    scheduler->patience      = 0;
-    scheduler->min_lr        = eta_min;
-    scheduler->threshold     = 0.0f;
-    scheduler->cooldown      = 0;
-    scheduler->best_epoch    = 0;
-    scheduler->best_metric   = INFINITY;
-    scheduler->plateau_count = 0;
-    scheduler->exp_gamma     = 0.0f;
 
     return scheduler;
 }
