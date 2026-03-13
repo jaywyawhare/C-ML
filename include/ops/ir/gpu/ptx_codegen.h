@@ -21,6 +21,9 @@
 extern "C" {
 #endif
 
+/* Forward declaration */
+struct CMLCUDABackend;
+
 /**
  * @brief PTX codegen context
  */
@@ -28,14 +31,16 @@ typedef struct CMLPTXCodegen {
     int sm_version;       // e.g. 50 for sm_50
     int kernel_count;
     bool initialized;
+    struct CMLCUDABackend* cuda;  // CUDA backend for compilation + launch
 } CMLPTXCodegen;
 
 /**
  * @brief Create PTX codegen context
  * @param sm_version Target compute capability (e.g. 50 for sm_50, 75 for sm_75)
+ * @param cuda CUDA backend context (may be NULL for codegen-only use)
  * @return New codegen context or NULL
  */
-CMLPTXCodegen* cml_ptx_codegen_create(int sm_version);
+CMLPTXCodegen* cml_ptx_codegen_create(int sm_version, struct CMLCUDABackend* cuda);
 
 /**
  * @brief Destroy PTX codegen context
@@ -94,6 +99,16 @@ char* cml_ptx_gen_reduction(CMLPTXCodegen* cg, UOpType op, const char* kernel_na
  * @return Heap-allocated PTX string (caller must free), or NULL on error
  */
 char* cml_ptx_gen_matmul(CMLPTXCodegen* cg, const char* kernel_name);
+
+/**
+ * @brief Generate CUDA C source for a 16x16 tiled matmul (compiled via NVRTC)
+ */
+char* cml_ptx_gen_tiled_matmul(CMLPTXCodegen* cg, const char* kernel_name);
+
+/**
+ * @brief Generate CUDA C source for direct conv2d kernel (compiled via NVRTC)
+ */
+char* cml_ptx_gen_conv2d(CMLPTXCodegen* cg, const char* kernel_name);
 
 /**
  * @brief Execute an IR graph using PTX codegen + CUDA runtime

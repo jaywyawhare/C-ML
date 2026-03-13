@@ -106,6 +106,10 @@ int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host,
 
 char* cml_wgsl_generate(struct IRNode* node);
 
+/* ── Graph execution ── */
+
+int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph);
+
 #ifdef __cplusplus
 }
 #endif

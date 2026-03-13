@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include <stdbool.h>
 
 static bool g_nvptx_initialized = false;
@@ -651,6 +652,9 @@ static LLVMModuleRef gpu_build_reduction(LLVMContextRef ctx, UOpType type,
     } else if (type == UOP_MAX_REDUCE) {
         LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpFMax, out_gep, val,
                            LLVMAtomicOrderingMonotonic, 0);
+    } else if (type == UOP_MIN_REDUCE) {
+        LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpFMin, out_gep, val,
+                           LLVMAtomicOrderingMonotonic, 0);
     }
 
     LLVMBuildRetVoid(bld);
@@ -746,6 +750,252 @@ static LLVMModuleRef gpu_build_matmul(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef rc_c_64 = LLVMBuildZExt(bld, rc_c, i64, "rc_c_64");
     LLVMValueRef c_gep = LLVMBuildGEP2(bld, f32, C, &rc_c_64, 1, "C.p");
     LLVMBuildStore(bld, acc, c_gep);
+    LLVMBuildRetVoid(bld);
+
+    LLVMDisposeBuilder(bld);
+    return mod;
+}
+
+// Conv2D: void kernel(ptr(1) input, ptr(1) weight, ptr(1) bias, ptr(1) output,
+//                      i32 batch, i32 in_c, i32 in_h, i32 in_w,
+//                      i32 out_c, i32 out_h, i32 out_w,
+//                      i32 kernel_h, i32 kernel_w,
+//                      i32 stride_h, i32 stride_w,
+//                      i32 pad_h, i32 pad_w)
+// One thread per output element. Direct convolution with padding.
+static LLVMModuleRef gpu_build_conv2d(LLVMContextRef ctx, const char* fn_name,
+                                       CMLGPUCodegen* cg) {
+    LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
+
+    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
+    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
+    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
+    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
+    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+
+    // 17 params: 4 pointers + 13 i32s
+    LLVMTypeRef params[] = {
+        ptr1, ptr1, ptr1, ptr1,     // input, weight, bias, output
+        i32, i32, i32, i32,         // batch, in_c, in_h, in_w
+        i32, i32, i32,              // out_c, out_h, out_w
+        i32, i32,                   // kernel_h, kernel_w
+        i32, i32,                   // stride_h, stride_w
+        i32, i32                    // pad_h, pad_w
+    };
+    LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 17, 0);
+    LLVMValueRef fn = LLVMAddFunction(mod, fn_name, fn_type);
+    configure_gpu_module(mod, fn, cg);
+
+    LLVMValueRef p_input  = LLVMGetParam(fn, 0);
+    LLVMValueRef p_weight = LLVMGetParam(fn, 1);
+    LLVMValueRef p_bias   = LLVMGetParam(fn, 2);
+    LLVMValueRef p_output = LLVMGetParam(fn, 3);
+    LLVMValueRef p_batch  = LLVMGetParam(fn, 4);
+    LLVMValueRef p_in_c   = LLVMGetParam(fn, 5);
+    LLVMValueRef p_in_h   = LLVMGetParam(fn, 6);
+    LLVMValueRef p_in_w   = LLVMGetParam(fn, 7);
+    LLVMValueRef p_out_c  = LLVMGetParam(fn, 8);
+    LLVMValueRef p_out_h  = LLVMGetParam(fn, 9);
+    LLVMValueRef p_out_w  = LLVMGetParam(fn, 10);
+    LLVMValueRef p_kh     = LLVMGetParam(fn, 11);
+    LLVMValueRef p_kw     = LLVMGetParam(fn, 12);
+    LLVMValueRef p_sh     = LLVMGetParam(fn, 13);
+    LLVMValueRef p_sw     = LLVMGetParam(fn, 14);
+    LLVMValueRef p_ph     = LLVMGetParam(fn, 15);
+    LLVMValueRef p_pw     = LLVMGetParam(fn, 16);
+
+    (void)p_batch; // used indirectly via total element count
+
+    LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
+    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMPositionBuilderAtEnd(bld, entry);
+
+    LLVMValueRef gid = emit_global_thread_id(bld, mod, ctx, cg->target);
+
+    // total = batch * out_c * out_h * out_w (passed as grid size, recompute for bounds)
+    LLVMValueRef oc_oh = LLVMBuildMul(bld, p_out_c, p_out_h, "oc_oh");
+    LLVMValueRef oc_oh_ow = LLVMBuildMul(bld, oc_oh, p_out_w, "oc_oh_ow");
+    LLVMValueRef total = LLVMBuildMul(bld, p_batch, oc_oh_ow, "total");
+    emit_bounds_check(bld, ctx, fn, gid, total);
+
+    LLVMValueRef zero_i32 = LLVMConstInt(i32, 0, 0);
+    LLVMValueRef one_i32  = LLVMConstInt(i32, 1, 0);
+
+    // Decompose gid -> b, oc, oh, ow
+    // oh_ow = out_h * out_w
+    LLVMValueRef oh_ow = LLVMBuildMul(bld, p_out_h, p_out_w, "oh_ow");
+    // oc_oh_ow already computed above
+    // b = gid / (out_c * out_h * out_w)
+    LLVMValueRef b_val = LLVMBuildUDiv(bld, gid, oc_oh_ow, "b");
+    // rem1 = gid % (out_c * out_h * out_w)
+    LLVMValueRef rem1 = LLVMBuildURem(bld, gid, oc_oh_ow, "rem1");
+    // oc = rem1 / (out_h * out_w)
+    LLVMValueRef oc_val = LLVMBuildUDiv(bld, rem1, oh_ow, "oc");
+    // rem2 = rem1 % (out_h * out_w)
+    LLVMValueRef rem2 = LLVMBuildURem(bld, rem1, oh_ow, "rem2");
+    // oh = rem2 / out_w
+    LLVMValueRef oh_val = LLVMBuildUDiv(bld, rem2, p_out_w, "oh");
+    // ow = rem2 % out_w
+    LLVMValueRef ow_val = LLVMBuildURem(bld, rem2, p_out_w, "ow");
+
+    // acc = bias[oc]
+    LLVMValueRef oc_64 = LLVMBuildZExt(bld, oc_val, i64, "oc_64");
+    LLVMValueRef bias_gep = LLVMBuildGEP2(bld, f32, p_bias, &oc_64, 1, "bias_p");
+    LLVMValueRef bias_val = LLVMBuildLoad2(bld, f32, bias_gep, "bias_v");
+
+    // Precompute: in_h_w = in_h * in_w, kh_kw = kernel_h * kernel_w
+    // ic_kh_kw = in_c * kernel_h * kernel_w
+    LLVMValueRef in_hw = LLVMBuildMul(bld, p_in_h, p_in_w, "in_hw");
+    LLVMValueRef in_c_hw = LLVMBuildMul(bld, p_in_c, in_hw, "in_c_hw");
+    LLVMValueRef kh_kw = LLVMBuildMul(bld, p_kh, p_kw, "kh_kw");
+    LLVMValueRef ic_kh_kw = LLVMBuildMul(bld, p_in_c, kh_kw, "ic_kh_kw");
+
+    // === Outer loop: ic ===
+    LLVMBasicBlockRef ic_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "ic.hdr");
+    LLVMBasicBlockRef ic_body = LLVMAppendBasicBlockInContext(ctx, fn, "ic.body");
+    LLVMBasicBlockRef ic_exit = LLVMAppendBasicBlockInContext(ctx, fn, "ic.exit");
+    LLVMBasicBlockRef body_bb = LLVMGetInsertBlock(bld); // "body" from bounds check
+
+    LLVMBuildBr(bld, ic_hdr);
+
+    LLVMPositionBuilderAtEnd(bld, ic_hdr);
+    LLVMValueRef ic_phi = LLVMBuildPhi(bld, i32, "ic");
+    LLVMValueRef acc_ic = LLVMBuildPhi(bld, f32, "acc_ic");
+    LLVMValueRef ic_cond = LLVMBuildICmp(bld, LLVMIntULT, ic_phi, p_in_c, "ic.cond");
+    LLVMBuildCondBr(bld, ic_cond, ic_body, ic_exit);
+
+    LLVMPositionBuilderAtEnd(bld, ic_body);
+
+    // === Middle loop: kh ===
+    LLVMBasicBlockRef kh_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "kh.hdr");
+    LLVMBasicBlockRef kh_body = LLVMAppendBasicBlockInContext(ctx, fn, "kh.body");
+    LLVMBasicBlockRef kh_exit = LLVMAppendBasicBlockInContext(ctx, fn, "kh.exit");
+
+    LLVMBuildBr(bld, kh_hdr);
+
+    LLVMPositionBuilderAtEnd(bld, kh_hdr);
+    LLVMValueRef kh_phi = LLVMBuildPhi(bld, i32, "kh");
+    LLVMValueRef acc_kh = LLVMBuildPhi(bld, f32, "acc_kh");
+    LLVMValueRef kh_cond = LLVMBuildICmp(bld, LLVMIntULT, kh_phi, p_kh, "kh.cond");
+    LLVMBuildCondBr(bld, kh_cond, kh_body, kh_exit);
+
+    LLVMPositionBuilderAtEnd(bld, kh_body);
+
+    // === Inner loop: kw ===
+    LLVMBasicBlockRef kw_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "kw.hdr");
+    LLVMBasicBlockRef kw_body = LLVMAppendBasicBlockInContext(ctx, fn, "kw.body");
+    LLVMBasicBlockRef kw_exit = LLVMAppendBasicBlockInContext(ctx, fn, "kw.exit");
+    LLVMBasicBlockRef kw_pad  = LLVMAppendBasicBlockInContext(ctx, fn, "kw.pad");
+
+    LLVMBuildBr(bld, kw_hdr);
+
+    LLVMPositionBuilderAtEnd(bld, kw_hdr);
+    LLVMValueRef kw_phi = LLVMBuildPhi(bld, i32, "kw");
+    LLVMValueRef acc_kw = LLVMBuildPhi(bld, f32, "acc_kw");
+    LLVMValueRef kw_cond_v = LLVMBuildICmp(bld, LLVMIntULT, kw_phi, p_kw, "kw.cond");
+    LLVMBuildCondBr(bld, kw_cond_v, kw_body, kw_exit);
+
+    // kw body: compute ih, iw, bounds check, accumulate
+    LLVMPositionBuilderAtEnd(bld, kw_body);
+
+    // ih = oh * stride_h - pad_h + kh  (signed arithmetic)
+    LLVMValueRef oh_sh = LLVMBuildMul(bld, oh_val, p_sh, "oh_sh");
+    LLVMValueRef oh_sh_sub = LLVMBuildSub(bld, oh_sh, p_ph, "oh_sh_sub");
+    LLVMValueRef ih_val = LLVMBuildAdd(bld, oh_sh_sub, kh_phi, "ih");
+
+    // iw = ow * stride_w - pad_w + kw
+    LLVMValueRef ow_sw = LLVMBuildMul(bld, ow_val, p_sw, "ow_sw");
+    LLVMValueRef ow_sw_sub = LLVMBuildSub(bld, ow_sw, p_pw, "ow_sw_sub");
+    LLVMValueRef iw_val = LLVMBuildAdd(bld, ow_sw_sub, kw_phi, "iw");
+
+    // Bounds check: ih >= 0 && ih < in_h && iw >= 0 && iw < in_w
+    // Using signed comparison (SGE, SLT) since ih/iw can be negative
+    LLVMValueRef ih_ge0 = LLVMBuildICmp(bld, LLVMIntSGE, ih_val, zero_i32, "ih_ge0");
+    LLVMValueRef ih_lt  = LLVMBuildICmp(bld, LLVMIntSLT, ih_val, p_in_h, "ih_lt");
+    LLVMValueRef iw_ge0 = LLVMBuildICmp(bld, LLVMIntSGE, iw_val, zero_i32, "iw_ge0");
+    LLVMValueRef iw_lt  = LLVMBuildICmp(bld, LLVMIntSLT, iw_val, p_in_w, "iw_lt");
+    LLVMValueRef h_ok = LLVMBuildAnd(bld, ih_ge0, ih_lt, "h_ok");
+    LLVMValueRef w_ok = LLVMBuildAnd(bld, iw_ge0, iw_lt, "w_ok");
+    LLVMValueRef in_bounds = LLVMBuildAnd(bld, h_ok, w_ok, "in_bounds");
+
+    LLVMBasicBlockRef kw_load = LLVMAppendBasicBlockInContext(ctx, fn, "kw.load");
+    LLVMBuildCondBr(bld, in_bounds, kw_load, kw_pad);
+
+    // kw_load: load input and weight, accumulate
+    LLVMPositionBuilderAtEnd(bld, kw_load);
+
+    // input[b*in_c*in_h*in_w + ic*in_h*in_w + ih*in_w + iw]
+    LLVMValueRef b_off = LLVMBuildMul(bld, b_val, in_c_hw, "b_off");
+    LLVMValueRef ic_off = LLVMBuildMul(bld, ic_phi, in_hw, "ic_off");
+    LLVMValueRef ih_off = LLVMBuildMul(bld, ih_val, p_in_w, "ih_off");
+    LLVMValueRef in_idx = LLVMBuildAdd(bld, b_off, ic_off, "in1");
+    in_idx = LLVMBuildAdd(bld, in_idx, ih_off, "in2");
+    in_idx = LLVMBuildAdd(bld, in_idx, iw_val, "in_idx");
+    LLVMValueRef in_idx_64 = LLVMBuildZExt(bld, in_idx, i64, "in_idx_64");
+    LLVMValueRef in_gep = LLVMBuildGEP2(bld, f32, p_input, &in_idx_64, 1, "in_p");
+    LLVMValueRef in_val = LLVMBuildLoad2(bld, f32, in_gep, "in_v");
+
+    // weight[oc*in_c*kernel_h*kernel_w + ic*kernel_h*kernel_w + kh*kernel_w + kw]
+    LLVMValueRef oc_w_off = LLVMBuildMul(bld, oc_val, ic_kh_kw, "oc_w_off");
+    LLVMValueRef ic_w_off = LLVMBuildMul(bld, ic_phi, kh_kw, "ic_w_off");
+    LLVMValueRef kh_w_off = LLVMBuildMul(bld, kh_phi, p_kw, "kh_w_off");
+    LLVMValueRef w_idx = LLVMBuildAdd(bld, oc_w_off, ic_w_off, "w1");
+    w_idx = LLVMBuildAdd(bld, w_idx, kh_w_off, "w2");
+    w_idx = LLVMBuildAdd(bld, w_idx, kw_phi, "w_idx");
+    LLVMValueRef w_idx_64 = LLVMBuildZExt(bld, w_idx, i64, "w_idx_64");
+    LLVMValueRef w_gep = LLVMBuildGEP2(bld, f32, p_weight, &w_idx_64, 1, "w_p");
+    LLVMValueRef w_val = LLVMBuildLoad2(bld, f32, w_gep, "w_v");
+
+    LLVMValueRef prod = LLVMBuildFMul(bld, in_val, w_val, "prod");
+    LLVMValueRef new_acc_load = LLVMBuildFAdd(bld, acc_kw, prod, "new_acc_load");
+    LLVMBuildBr(bld, kw_pad);
+
+    // kw_pad: merge point for in-bounds / out-of-bounds
+    LLVMPositionBuilderAtEnd(bld, kw_pad);
+    LLVMValueRef acc_merge = LLVMBuildPhi(bld, f32, "acc_merge");
+    LLVMValueRef merge_vals[] = { acc_kw, new_acc_load };
+    LLVMBasicBlockRef merge_bbs[] = { kw_body, kw_load };
+    LLVMAddIncoming(acc_merge, merge_vals, merge_bbs, 2);
+
+    LLVMValueRef kw_next = LLVMBuildAdd(bld, kw_phi, one_i32, "kw.next");
+    LLVMBuildBr(bld, kw_hdr);
+
+    // Wire kw phi nodes
+    LLVMValueRef kw_phi_vals[] = { zero_i32, kw_next };
+    LLVMBasicBlockRef kw_phi_bbs[] = { kh_body, kw_pad };
+    LLVMAddIncoming(kw_phi, kw_phi_vals, kw_phi_bbs, 2);
+    LLVMValueRef acc_kw_vals[] = { acc_kh, acc_merge };
+    LLVMAddIncoming(acc_kw, acc_kw_vals, kw_phi_bbs, 2);
+
+    // kw exit: end of inner loop
+    LLVMPositionBuilderAtEnd(bld, kw_exit);
+    LLVMValueRef kh_next = LLVMBuildAdd(bld, kh_phi, one_i32, "kh.next");
+    LLVMBuildBr(bld, kh_hdr);
+
+    // Wire kh phi nodes
+    LLVMValueRef kh_phi_vals[] = { zero_i32, kh_next };
+    LLVMBasicBlockRef kh_phi_bbs[] = { ic_body, kw_exit };
+    LLVMAddIncoming(kh_phi, kh_phi_vals, kh_phi_bbs, 2);
+    LLVMValueRef acc_kh_vals[] = { acc_ic, acc_kw };
+    LLVMAddIncoming(acc_kh, acc_kh_vals, kh_phi_bbs, 2);
+
+    // kh exit: end of middle loop
+    LLVMPositionBuilderAtEnd(bld, kh_exit);
+    LLVMValueRef ic_next = LLVMBuildAdd(bld, ic_phi, one_i32, "ic.next");
+    LLVMBuildBr(bld, ic_hdr);
+
+    // Wire ic phi nodes
+    LLVMValueRef ic_phi_vals[] = { zero_i32, ic_next };
+    LLVMBasicBlockRef ic_phi_bbs[] = { body_bb, kh_exit };
+    LLVMAddIncoming(ic_phi, ic_phi_vals, ic_phi_bbs, 2);
+    LLVMValueRef acc_ic_vals[] = { bias_val, acc_kh };
+    LLVMAddIncoming(acc_ic, acc_ic_vals, ic_phi_bbs, 2);
+
+    // ic exit: store result to output[gid]
+    LLVMPositionBuilderAtEnd(bld, ic_exit);
+    LLVMValueRef gid_64 = LLVMBuildZExt(bld, gid, i64, "gid_64");
+    LLVMValueRef out_gep = LLVMBuildGEP2(bld, f32, p_output, &gid_64, 1, "out_p");
+    LLVMBuildStore(bld, acc_ic, out_gep);
     LLVMBuildRetVoid(bld);
 
     LLVMDisposeBuilder(bld);
@@ -1013,7 +1263,8 @@ static bool is_unary_op(UOpType type) {
 }
 
 static bool is_reduction(UOpType type) {
-    return type == UOP_SUM || type == UOP_MEAN || type == UOP_MAX_REDUCE;
+    return type == UOP_SUM || type == UOP_MEAN || type == UOP_MAX_REDUCE ||
+           type == UOP_MIN_REDUCE;
 }
 
 // Upload tensor data to GPU, returning device pointer
@@ -1059,6 +1310,31 @@ static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
         }
     }
     free(zeros);
+    return dptr;
+}
+
+// Allocate GPU memory filled with a constant value
+static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
+    size_t size = numel * sizeof(float);
+    float* buf = malloc(size);
+    if (!buf) return NULL;
+    for (size_t i = 0; i < numel; i++) buf[i] = fill_val;
+
+    void* dptr = NULL;
+    if (cg->target == GPU_TARGET_CUDA) {
+        CUdeviceptr cptr = cml_cuda_malloc(cg->cuda, size);
+        if (cptr) {
+            cml_cuda_memcpy_h2d(cg->cuda, cptr, buf, size);
+            dptr = (void*)(uintptr_t)cptr;
+        }
+    } else {
+        hipDeviceptr_t hptr = cml_rocm_malloc(cg->rocm, size);
+        if (hptr) {
+            cml_rocm_memcpy_h2d(cg->rocm, hptr, buf, size);
+            dptr = hptr;
+        }
+    }
+    free(buf);
     return dptr;
 }
 
@@ -1141,7 +1417,7 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
     UOpType type = node->type;
 
     // Unsupported ops fall back to CPU
-    if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE) {
+    if (type == UOP_STRIDE || type == UOP_SLICE) {
         return cpu_execute_node(node);
     }
 
@@ -1176,6 +1452,8 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
          * compiled via NVRTC (separate path), so we fall through to the
          * LLVM NVPTX matmul as the default. */
         mod = gpu_build_matmul(ctx, fn_name, cg);
+    } else if (type == UOP_CONV2D) {
+        mod = gpu_build_conv2d(ctx, fn_name, cg);
     } else if (type == UOP_FILL) {
         FillParams* p = (FillParams*)node->params;
         float fill_val = p ? p->value : 0.0f;
@@ -1256,7 +1534,13 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
             goto fallback;
 
         void* d_in = gpu_upload(cg, (float*)node->inputs[0]->data, node->inputs[0]->numel);
-        void* d_out = gpu_alloc_zero(cg, out->numel);  // zero-init for atomicAdd
+        void* d_out;
+        if (type == UOP_MIN_REDUCE)
+            d_out = gpu_alloc_filled(cg, out->numel, FLT_MAX);
+        else if (type == UOP_MAX_REDUCE)
+            d_out = gpu_alloc_filled(cg, out->numel, -FLT_MAX);
+        else
+            d_out = gpu_alloc_zero(cg, out->numel);  // zero-init for atomicAdd
         if (!d_in || !d_out) goto reduce_cleanup;
 
         int32_t n = (int32_t)node->inputs[0]->numel;
@@ -1294,6 +1578,59 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
         }
     matmul_cleanup:
         gpu_free(cg, d_A); gpu_free(cg, d_B); gpu_free(cg, d_C);
+    }
+    else if (type == UOP_CONV2D) {
+        if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
+            goto fallback;
+        Conv2DParams* cp = (Conv2DParams*)node->params;
+        if (!cp) goto fallback;
+
+        Tensor* input = node->inputs[0];   // [batch, in_c, in_h, in_w]
+        Tensor* weight = node->inputs[1];  // [out_c, in_c, kh, kw]
+        Tensor* bias_t = (node->num_inputs >= 3) ? node->inputs[2] : NULL;
+
+        if (input->ndim < 4 || weight->ndim < 4) goto fallback;
+
+        void* d_input = gpu_upload(cg, (float*)input->data, input->numel);
+        void* d_weight = gpu_upload(cg, (float*)weight->data, weight->numel);
+        void* d_bias = NULL;
+        if (bias_t && bias_t->data) {
+            d_bias = gpu_upload(cg, (float*)bias_t->data, bias_t->numel);
+        } else {
+            d_bias = gpu_alloc_zero(cg, weight->shape[0]); // out_c zeros
+        }
+        void* d_out = gpu_alloc_zero(cg, out->numel);
+        if (!d_input || !d_weight || !d_bias || !d_out) goto conv2d_cleanup;
+
+        int32_t batch     = (int32_t)input->shape[0];
+        int32_t in_c      = (int32_t)input->shape[1];
+        int32_t in_h      = (int32_t)input->shape[2];
+        int32_t in_w      = (int32_t)input->shape[3];
+        int32_t out_c_val = (int32_t)weight->shape[0];
+        int32_t out_h_val = (int32_t)out->shape[2];
+        int32_t out_w_val = (int32_t)out->shape[3];
+        int32_t kh        = (int32_t)weight->shape[2];
+        int32_t kw        = (int32_t)weight->shape[3];
+        int32_t sh        = cp->stride ? (int32_t)cp->stride[0] : 1;
+        int32_t sw        = cp->stride ? (int32_t)(cp->stride[1] ? cp->stride[1] : cp->stride[0]) : 1;
+        int32_t ph        = cp->padding ? (int32_t)cp->padding[0] : 0;
+        int32_t pw        = cp->padding ? (int32_t)(cp->padding[1] ? cp->padding[1] : cp->padding[0]) : 0;
+
+        void* args[] = { &d_input, &d_weight, &d_bias, &d_out,
+                         &batch, &in_c, &in_h, &in_w,
+                         &out_c_val, &out_h_val, &out_w_val,
+                         &kh, &kw, &sh, &sw, &ph, &pw };
+
+        int total_elems = batch * out_c_val * out_h_val * out_w_val;
+        if (gpu_compile_and_launch(cg, mod, fn_name, total_elems, args, 17) == 0) {
+            mod = NULL;
+            gpu_sync(cg);
+            gpu_download(cg, d_out, (float*)out->data, out->numel);
+            result = 0;
+        }
+    conv2d_cleanup:
+        gpu_free(cg, d_input); gpu_free(cg, d_weight);
+        gpu_free(cg, d_bias); gpu_free(cg, d_out);
     }
     else if (type == UOP_FILL) {
         void* d_out = gpu_alloc_zero(cg, out->numel);

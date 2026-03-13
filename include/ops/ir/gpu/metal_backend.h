@@ -75,6 +75,10 @@ int cml_metal_download(CMLMetalBackend* backend, void* dst_host,
 
 char* cml_metal_generate_msl(struct IRNode* node);
 
+/* ── Graph execution ── */
+
+int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph);
+
 #ifdef __cplusplus
 }
 #endif

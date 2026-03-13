@@ -147,6 +147,22 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
     LOAD_FUNC(cuStreamSynchronize);
     LOAD_FUNC(cuCtxSynchronize);
 
+    /* Event and async transfer functions (best-effort, non-fatal) */
+#define LOAD_FUNC_OPTIONAL(name) \
+    backend->name = get_symbol(backend->cuda_lib, #name);
+
+    LOAD_FUNC_OPTIONAL(cuEventCreate);
+    LOAD_FUNC_OPTIONAL(cuEventDestroy);
+    LOAD_FUNC_OPTIONAL(cuEventRecord);
+    LOAD_FUNC_OPTIONAL(cuEventSynchronize);
+    LOAD_FUNC_OPTIONAL(cuEventQuery);
+    LOAD_FUNC_OPTIONAL(cuStreamWaitEvent);
+    LOAD_FUNC_OPTIONAL(cuMemcpyHtoDAsync);
+    LOAD_FUNC_OPTIONAL(cuMemcpyDtoHAsync);
+    LOAD_FUNC_OPTIONAL(cuEventElapsedTime);
+
+#undef LOAD_FUNC_OPTIONAL
+
 #undef LOAD_FUNC
 
     // Optionally load NVRTC for runtime compilation

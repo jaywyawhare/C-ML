@@ -32,6 +32,7 @@ typedef void* CUmodule;
 typedef void* CUfunction;
 typedef void* CUstream;
 typedef void* CUdeviceptr;
+typedef void* CUevent;
 typedef int CUresult;
 
 /**
@@ -83,6 +84,17 @@ typedef struct CMLCUDABackend {
     CUresult (*cuStreamDestroy)(CUstream hStream);
     CUresult (*cuStreamSynchronize)(CUstream hStream);
     CUresult (*cuCtxSynchronize)(void);
+
+    // Event / async function pointers (for HCQ)
+    CUresult (*cuEventCreate)(CUevent* phEvent, unsigned int Flags);
+    CUresult (*cuEventDestroy)(CUevent hEvent);
+    CUresult (*cuEventRecord)(CUevent hEvent, CUstream hStream);
+    CUresult (*cuEventSynchronize)(CUevent hEvent);
+    CUresult (*cuEventQuery)(CUevent hEvent);
+    CUresult (*cuStreamWaitEvent)(CUstream hStream, CUevent hEvent, unsigned int Flags);
+    CUresult (*cuMemcpyHtoDAsync)(CUdeviceptr dst, const void* src, size_t n, CUstream s);
+    CUresult (*cuMemcpyDtoHAsync)(void* dst, CUdeviceptr src, size_t n, CUstream s);
+    CUresult (*cuEventElapsedTime)(float* ms, CUevent start, CUevent end);
 
     // NVRTC function pointers (for runtime compilation)
     void* (*nvrtcCreateProgram)(void** prog, const char* src, const char* name, int numHeaders,
