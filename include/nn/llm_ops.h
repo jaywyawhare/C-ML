@@ -58,7 +58,35 @@ typedef struct CMLGQAConfig {
     int head_dim;           /* Dimension per head */
     float scale;            /* Attention scale (default: 1/sqrt(head_dim)) */
     bool causal;            /* Apply causal mask */
+    int window_size;        /* Sliding window size (0 = unlimited) */
 } CMLGQAConfig;
+
+/* ===== Flash Attention ===== */
+
+typedef struct CMLFlashAttentionConfig {
+    int tile_size_q;        /* Tile size for Q dimension (default: 64) */
+    int tile_size_kv;       /* Tile size for KV dimension (default: 64) */
+    bool enabled;           /* Enable flash attention */
+} CMLFlashAttentionConfig;
+
+/** Default flash attention config */
+CMLFlashAttentionConfig cml_flash_attention_default_config(void);
+
+/** Flash GQA forward pass (O(N) memory via online softmax)
+ * Q: [batch, seq_len, num_heads * head_dim]
+ * K: [batch, kv_len, num_kv_heads * head_dim]
+ * V: [batch, kv_len, num_kv_heads * head_dim]
+ * Returns: [batch, seq_len, num_heads * head_dim]
+ */
+Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
+                               const CMLGQAConfig* config,
+                               const CMLFlashAttentionConfig* flash_config);
+
+/** Flash GQA with KV cache */
+Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
+                                      CMLKVCache* kv_cache,
+                                      const CMLGQAConfig* config,
+                                      const CMLFlashAttentionConfig* flash_config);
 
 /** Grouped Query Attention forward pass
  * Q: [batch, seq_len, num_heads * head_dim]

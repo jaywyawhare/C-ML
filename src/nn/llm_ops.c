@@ -329,6 +329,17 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
                 }
             }
 
+            /* Apply sliding window mask */
+            if (config->window_size > 0) {
+                for (int sq = 0; sq < seq_q; sq++) {
+                    for (int sk = 0; sk < kv_len; sk++) {
+                        if (sq - sk > config->window_size) {
+                            scores[sq * kv_len + sk] = -1e9f;
+                        }
+                    }
+                }
+            }
+
             /* Apply external mask if provided */
             if (mask_data) {
                 for (int sq = 0; sq < seq_q; sq++) {
@@ -459,6 +470,266 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     /* Run GQA with full cached KV (no external mask -- causal is in config) */
     Tensor* result = cml_gqa_forward(Q, full_k, full_v, config, NULL);
 
+    tensor_free(full_k);
+    tensor_free(full_v);
+    return result;
+}
+
+/* =========================================================================
+ * Flash Attention (tiled, O(N) memory via online softmax)
+ * ========================================================================= */
+
+CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
+    CMLFlashAttentionConfig cfg = {
+        .tile_size_q  = 64,
+        .tile_size_kv = 64,
+        .enabled      = true
+    };
+    return cfg;
+}
+
+Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
+                               const CMLGQAConfig* config,
+                               const CMLFlashAttentionConfig* flash_config) {
+    if (!Q || !K || !V || !config || !flash_config) {
+        LOG_ERROR("cml_gqa_flash_forward: NULL argument");
+        return NULL;
+    }
+
+    tensor_ensure_executed(Q);
+    tensor_ensure_executed(K);
+    tensor_ensure_executed(V);
+
+    if (Q->ndim != 3 || K->ndim != 3 || V->ndim != 3) {
+        LOG_ERROR("cml_gqa_flash_forward: expected 3D tensors");
+        return NULL;
+    }
+
+    int num_heads = config->num_heads;
+    int num_kv_heads = config->num_kv_heads;
+    int head_dim = config->head_dim;
+
+    if (num_heads <= 0 || num_kv_heads <= 0 || head_dim <= 0 ||
+        num_heads % num_kv_heads != 0) {
+        LOG_ERROR("cml_gqa_flash_forward: invalid config");
+        return NULL;
+    }
+
+    int groups = num_heads / num_kv_heads;
+    int batch = Q->shape[0];
+    int seq_q = Q->shape[1];
+    int kv_len = K->shape[1];
+
+    float scale = config->scale;
+    if (scale <= 0.0f) scale = 1.0f / sqrtf((float)head_dim);
+
+    int tile_q = flash_config->tile_size_q;
+    int tile_kv = flash_config->tile_size_kv;
+    if (tile_q <= 0) tile_q = 64;
+    if (tile_kv <= 0) tile_kv = 64;
+
+    float* q_data = (float*)tensor_data_ptr(Q);
+    float* k_data = (float*)tensor_data_ptr(K);
+    float* v_data = (float*)tensor_data_ptr(V);
+    if (!q_data || !k_data || !v_data) {
+        LOG_ERROR("cml_gqa_flash_forward: failed to get data pointers");
+        return NULL;
+    }
+
+    size_t out_size = (size_t)batch * seq_q * num_heads * head_dim;
+    float* output = (float*)calloc(out_size, sizeof(float));
+    if (!output) return NULL;
+
+    /* Per-query-position online softmax state */
+    float* row_max = (float*)malloc((size_t)tile_q * sizeof(float));
+    float* row_sum = (float*)malloc((size_t)tile_q * sizeof(float));
+    float* tile_scores = (float*)malloc((size_t)tile_q * tile_kv * sizeof(float));
+    float* acc = (float*)malloc((size_t)tile_q * head_dim * sizeof(float));
+
+    if (!row_max || !row_sum || !tile_scores || !acc) {
+        free(output); free(row_max); free(row_sum);
+        free(tile_scores); free(acc);
+        return NULL;
+    }
+
+    int window_size = config->window_size;
+
+    for (int b = 0; b < batch; b++) {
+        for (int h = 0; h < num_heads; h++) {
+            int kv_h = h / groups;
+
+            /* Process Q in tiles */
+            for (int tq_start = 0; tq_start < seq_q; tq_start += tile_q) {
+                int tq_end = tq_start + tile_q;
+                if (tq_end > seq_q) tq_end = seq_q;
+                int tq_len = tq_end - tq_start;
+
+                /* Initialize online softmax accumulators */
+                for (int i = 0; i < tq_len; i++) {
+                    row_max[i] = -1e30f;
+                    row_sum[i] = 0.0f;
+                }
+                memset(acc, 0, (size_t)tq_len * head_dim * sizeof(float));
+
+                /* Process KV in tiles */
+                for (int tkv_start = 0; tkv_start < kv_len; tkv_start += tile_kv) {
+                    int tkv_end = tkv_start + tile_kv;
+                    if (tkv_end > kv_len) tkv_end = kv_len;
+                    int tkv_len = tkv_end - tkv_start;
+
+                    /* Compute S = Q_tile @ K_tile^T * scale */
+                    for (int qi = 0; qi < tq_len; qi++) {
+                        int sq = tq_start + qi;
+                        for (int ki = 0; ki < tkv_len; ki++) {
+                            int sk = tkv_start + ki;
+                            float dot = 0.0f;
+                            for (int d = 0; d < head_dim; d++) {
+                                float qv = q_data[((size_t)b * seq_q + sq) * num_heads * head_dim
+                                                   + h * head_dim + d];
+                                float kv = k_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim
+                                                   + kv_h * head_dim + d];
+                                dot += qv * kv;
+                            }
+                            float s = dot * scale;
+
+                            /* Causal mask */
+                            if (config->causal && sk > sq) s = -1e30f;
+
+                            /* Sliding window mask */
+                            if (window_size > 0 && sq - sk > window_size) s = -1e30f;
+
+                            tile_scores[qi * tkv_len + ki] = s;
+                        }
+                    }
+
+                    /* Online softmax update: for each query position, update
+                     * running max, rescale previous sum and acc, then accumulate */
+                    for (int qi = 0; qi < tq_len; qi++) {
+                        /* Find tile max for this query row */
+                        float tile_max = -1e30f;
+                        for (int ki = 0; ki < tkv_len; ki++) {
+                            float s = tile_scores[qi * tkv_len + ki];
+                            if (s > tile_max) tile_max = s;
+                        }
+
+                        /* Compute new global max */
+                        float old_max = row_max[qi];
+                        float new_max = (tile_max > old_max) ? tile_max : old_max;
+
+                        /* Rescale previous accumulator */
+                        float rescale = expf(old_max - new_max);
+                        row_sum[qi] *= rescale;
+                        for (int d = 0; d < head_dim; d++) {
+                            acc[qi * head_dim + d] *= rescale;
+                        }
+
+                        /* Accumulate new tile's contribution */
+                        float tile_sum = 0.0f;
+                        for (int ki = 0; ki < tkv_len; ki++) {
+                            float p = expf(tile_scores[qi * tkv_len + ki] - new_max);
+                            tile_sum += p;
+
+                            int sk = tkv_start + ki;
+                            for (int d = 0; d < head_dim; d++) {
+                                float vv = v_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim
+                                                   + kv_h * head_dim + d];
+                                acc[qi * head_dim + d] += p * vv;
+                            }
+                        }
+
+                        row_sum[qi] += tile_sum;
+                        row_max[qi] = new_max;
+                    }
+                }
+
+                /* Normalize by sum and write output */
+                for (int qi = 0; qi < tq_len; qi++) {
+                    int sq = tq_start + qi;
+                    float inv_sum = (row_sum[qi] > 0.0f) ? 1.0f / row_sum[qi] : 0.0f;
+                    for (int d = 0; d < head_dim; d++) {
+                        output[((size_t)b * seq_q + sq) * num_heads * head_dim
+                               + h * head_dim + d] = acc[qi * head_dim + d] * inv_sum;
+                    }
+                }
+            }
+        }
+    }
+
+    free(row_max);
+    free(row_sum);
+    free(tile_scores);
+    free(acc);
+
+    int out_shape[] = {batch, seq_q, num_heads * head_dim};
+    TensorConfig out_cfg = {.dtype = Q->dtype, .device = Q->device,
+                            .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
+    free(output);
+    return result;
+}
+
+Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
+                                      CMLKVCache* kv_cache,
+                                      const CMLGQAConfig* config,
+                                      const CMLFlashAttentionConfig* flash_config) {
+    if (!Q || !K || !V || !kv_cache || !config || !flash_config) {
+        LOG_ERROR("cml_gqa_flash_forward_cached: NULL argument");
+        return NULL;
+    }
+
+    tensor_ensure_executed(K);
+    tensor_ensure_executed(V);
+
+    int seq_new = K->shape[1];
+    int kv_heads = config->num_kv_heads;
+    int head_dim = config->head_dim;
+
+    float* k_data = (float*)tensor_data_ptr(K);
+    float* v_data = (float*)tensor_data_ptr(V);
+    if (!k_data || !v_data) return NULL;
+
+    int kv_shape[] = {seq_new, kv_heads, head_dim};
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                        .has_dtype = true, .has_device = true};
+
+    Tensor* k_append = tensor_from_data(k_data, kv_shape, 3, &cfg);
+    Tensor* v_append = tensor_from_data(v_data, kv_shape, 3, &cfg);
+    if (!k_append || !v_append) {
+        if (k_append) tensor_free(k_append);
+        if (v_append) tensor_free(v_append);
+        return NULL;
+    }
+
+    int new_len = cml_kv_cache_append(kv_cache, k_append, v_append);
+    tensor_free(k_append);
+    tensor_free(v_append);
+    if (new_len < 0) return NULL;
+
+    Tensor* cached_k = cml_kv_cache_get_keys(kv_cache);
+    Tensor* cached_v = cml_kv_cache_get_values(kv_cache);
+    if (!cached_k || !cached_v) {
+        if (cached_k) tensor_free(cached_k);
+        if (cached_v) tensor_free(cached_v);
+        return NULL;
+    }
+
+    int cached_len = kv_cache->current_len;
+    float* ck_data = (float*)tensor_data_ptr(cached_k);
+    float* cv_data = (float*)tensor_data_ptr(cached_v);
+
+    int full_k_shape[] = {1, cached_len, kv_heads * head_dim};
+    Tensor* full_k = tensor_from_data(ck_data, full_k_shape, 3, &cfg);
+    Tensor* full_v = tensor_from_data(cv_data, full_k_shape, 3, &cfg);
+    tensor_free(cached_k);
+    tensor_free(cached_v);
+
+    if (!full_k || !full_v) {
+        if (full_k) tensor_free(full_k);
+        if (full_v) tensor_free(full_v);
+        return NULL;
+    }
+
+    Tensor* result = cml_gqa_flash_forward(Q, full_k, full_v, config, flash_config);
     tensor_free(full_k);
     tensor_free(full_v);
     return result;
