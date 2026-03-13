@@ -83,19 +83,3 @@ jobs:
   #     - name: Run GPU tests
   #       run: cd build && ctest --output-on-failure -L gpu
 
-  deploy:
-    if: github.ref == 'refs/heads/master'
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      - uses: actions/cache@v4
-        with:
-          key: ${{ github.ref }}
-          path: .cache
-      - run: pip install mkdocs mkdocs-material pillow cairosvg
-      - run: mkdocs gh-deploy --force
