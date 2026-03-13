@@ -1,0 +1,2740 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Production-ready Machine Learning Library in C">
+      
+      
+        <meta name="author" content="Arrry">
+      
+      
+      
+        <link rel="prev" href="../autograd/">
+      
+      
+        <link rel="next" href="../training/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../light-mode.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Neural Network Layers - C-ML Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CSource+Code+Pro:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Source Code Pro"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../docs/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#neural-network-layers-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="C-ML Documentation" class="md-header__button md-logo" aria-label="C-ML Documentation" data-md-component="logo">
+      
+  <img src="../light-mode.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            C-ML Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Neural Network Layers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1M8 13h8v-2H8zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4a5 5 0 0 0 5-5 5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5M7 15a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jaywyawhare/C-ML" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jaywyawhare/C-ML
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting_started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api_reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../autograd/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Autograd
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Neural Network Layers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../training/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Training
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../graph_mode/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Graph Mode
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../benchmarks/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Benchmarks
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../datasets/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Datasets
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../EXTERNAL_DEPENDENCIES/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  External Dependencies
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ir_graph_management/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  IR Graph Management
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../kernel_studio/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Kernel Studio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../kernel_studio_quickref/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Kernel Studio Quick Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../optimizations/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Optimizations
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="C-ML Documentation" class="md-nav__button md-logo" aria-label="C-ML Documentation" data-md-component="logo">
+      
+  <img src="../light-mode.svg" alt="logo">
+
+    </a>
+    C-ML Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jaywyawhare/C-ML" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jaywyawhare/C-ML
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../autograd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Autograd
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Network Layers
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Network Layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Containers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sequential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modulelist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModuleList
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moduledict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModuleDict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convolutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convolutions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Convolutions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conv1d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conv1d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conv2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conv2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conv3d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conv3d
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recurrent-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recurrent Layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recurrent Layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rnncell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RNNCell
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lstmcell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LSTMCell
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grucell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GRUCell
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiheadattention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MultiHeadAttention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transformerencoderlayer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransformerEncoderLayer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#embedding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Normalization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batchnorm2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BatchNorm2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layernorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LayerNorm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#groupnorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupNorm
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pooling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pooling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#maxpool2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MaxPool2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#avgpool2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AvgPool2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#activation-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation Layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Activation Layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Form
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#functional-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional Form
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dropout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dropout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../graph_mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graph Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../EXTERNAL_DEPENDENCIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External Dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ir_graph_management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Graph Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kernel_studio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kernel Studio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kernel_studio_quickref/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kernel Studio Quick Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Containers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sequential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modulelist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModuleList
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moduledict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModuleDict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convolutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convolutions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Convolutions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conv1d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conv1d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conv2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conv2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conv3d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conv3d
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recurrent-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recurrent Layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recurrent Layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rnncell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RNNCell
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lstmcell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LSTMCell
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grucell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GRUCell
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiheadattention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MultiHeadAttention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transformerencoderlayer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransformerEncoderLayer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#embedding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Normalization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batchnorm2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BatchNorm2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layernorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LayerNorm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#groupnorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupNorm
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pooling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pooling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#maxpool2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MaxPool2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#avgpool2d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AvgPool2d
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#activation-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation Layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Activation Layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Form
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#functional-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional Form
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dropout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dropout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="neural-network-layers-api">Neural Network Layers API</h1>
+<p>CML provides a comprehensive set of neural network layers following a consistent Module-based API.
+All layers inherit from <code>Module</code> and can be composed using container types like <code>Sequential</code>.</p>
+<p>Include <code>"cml.h"</code> or <code>"nn/layers.h"</code> to access all layer types.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#module-api">Module API</a></li>
+<li><a href="#containers">Containers</a></li>
+<li><a href="#sequential">Sequential</a></li>
+<li><a href="#modulelist">ModuleList</a></li>
+<li><a href="#moduledict">ModuleDict</a></li>
+<li><a href="#linear">Linear</a></li>
+<li><a href="#convolutions">Convolutions</a></li>
+<li><a href="#conv1d">Conv1d</a></li>
+<li><a href="#conv2d">Conv2d</a></li>
+<li><a href="#conv3d">Conv3d</a></li>
+<li><a href="#recurrent-layers">Recurrent Layers</a></li>
+<li><a href="#rnncell">RNNCell</a></li>
+<li><a href="#lstmcell">LSTMCell</a></li>
+<li><a href="#grucell">GRUCell</a></li>
+<li><a href="#transformer">Transformer</a></li>
+<li><a href="#multiheadattention">MultiHeadAttention</a></li>
+<li><a href="#transformerencoderlayer">TransformerEncoderLayer</a></li>
+<li><a href="#embedding">Embedding</a></li>
+<li><a href="#normalization">Normalization</a></li>
+<li><a href="#batchnorm2d">BatchNorm2d</a></li>
+<li><a href="#layernorm">LayerNorm</a></li>
+<li><a href="#groupnorm">GroupNorm</a></li>
+<li><a href="#pooling">Pooling</a></li>
+<li><a href="#maxpool2d">MaxPool2d</a></li>
+<li><a href="#avgpool2d">AvgPool2d</a></li>
+<li><a href="#activation-layers">Activation Layers</a></li>
+<li><a href="#module-form">Module Form</a></li>
+<li><a href="#functional-form">Functional Form</a></li>
+<li><a href="#dropout">Dropout</a></li>
+<li><a href="#complete-example">Complete Example</a></li>
+</ul>
+<hr />
+<h2 id="module-api">Module API</h2>
+<p>Every layer in CML inherits from the <code>Module</code> base type. The following operations work on any module:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Forward pass</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">cml_nn_module_forward</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+
+<span class="c1">// Training/evaluation mode</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">cml_nn_module_set_training</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">training</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">cml_nn_module_train</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span><span class="w">     </span><span class="c1">// Set training mode</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">cml_nn_module_eval</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span><span class="w">      </span><span class="c1">// Set evaluation mode</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">cml_nn_module_is_training</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span>
+
+<span class="c1">// Inspection</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">cml_summary</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span><span class="w">  </span><span class="c1">// Print model architecture summary</span>
+
+<span class="c1">// Cleanup</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">module_free</span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span>
+</code></pre></div>
+<p>Training mode affects the behavior of layers like <code>Dropout</code> (disabled during eval) and <code>BatchNorm2d</code> (uses running statistics during eval).</p>
+<hr />
+<h2 id="containers">Containers</h2>
+<h3 id="sequential">Sequential</h3>
+<p>A sequential container executes layers in the order they are added. This is the most common way to build feedforward networks.</p>
+<div class="highlight"><pre><span></span><code><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_sequential</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Add layers one at a time</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">sequential_add</span><span class="p">(</span><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">seq</span><span class="p">,</span><span class="w"> </span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span>
+
+<span class="c1">// Add multiple layers at once (NULL-terminated variadic)</span>
+<span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="nf">sequential_add_chain</span><span class="p">(</span><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">seq</span><span class="p">,</span><span class="w"> </span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">first</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+
+<span class="c1">// Access layers</span>
+<span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="nf">sequential_get</span><span class="p">(</span><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">seq</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">index</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">sequential_get_length</span><span class="p">(</span><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">seq</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_sequential</span><span class="p">();</span>
+
+<span class="c1">// Fluent chaining</span>
+<span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sequential_add_chain</span><span class="p">(</span><span class="n">model</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">),</span>
+<span class="w">    </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">),</span>
+<span class="w">    </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">),</span>
+<span class="w">    </span><span class="nb">NULL</span>
+<span class="p">);</span>
+
+<span class="c1">// Or add one at a time</span>
+<span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">cml_summary</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+<span class="n">module_free</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="modulelist">ModuleList</h3>
+<p>A dynamic, ordered collection of modules. Unlike <code>Sequential</code>, a <code>ModuleList</code> does not define a forward pass -- you iterate over it manually.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_module_list</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="kt">int</span><span class="w">  </span><span class="nf">module_list_append</span><span class="p">(</span><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="n">list</span><span class="p">,</span><span class="w"> </span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span>
+<span class="kt">int</span><span class="w">  </span><span class="nf">module_list_insert</span><span class="p">(</span><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="n">list</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">index</span><span class="p">,</span><span class="w"> </span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span>
+<span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="nf">module_list_get</span><span class="p">(</span><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="n">list</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">index</span><span class="p">);</span>
+<span class="kt">int</span><span class="w">  </span><span class="nf">module_list_remove</span><span class="p">(</span><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="n">list</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">index</span><span class="p">);</span>
+<span class="kt">int</span><span class="w">  </span><span class="nf">module_list_length</span><span class="p">(</span><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="n">list</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">ModuleList</span><span class="o">*</span><span class="w"> </span><span class="n">layers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_module_list</span><span class="p">();</span>
+<span class="n">module_list_append</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+<span class="n">module_list_append</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+
+<span class="c1">// Manual forward through all layers</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">input</span><span class="p">;</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">module_list_length</span><span class="p">(</span><span class="n">layers</span><span class="p">);</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">(</span><span class="n">module_list_get</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">),</span><span class="w"> </span><span class="n">x</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="moduledict">ModuleDict</h3>
+<p>A dictionary mapping string keys to modules. Useful for named sub-networks or branching architectures.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_module_dict</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="kt">int</span><span class="w">    </span><span class="nf">module_dict_add</span><span class="p">(</span><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="n">dict</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">module</span><span class="p">);</span>
+<span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="nf">module_dict_get</span><span class="p">(</span><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="n">dict</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">);</span>
+<span class="kt">int</span><span class="w">    </span><span class="nf">module_dict_remove</span><span class="p">(</span><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="n">dict</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">);</span>
+<span class="kt">int</span><span class="w">    </span><span class="nf">module_dict_size</span><span class="p">(</span><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="n">dict</span><span class="p">);</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="nf">module_dict_keys</span><span class="p">(</span><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="n">dict</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">num_keys</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">ModuleDict</span><span class="o">*</span><span class="w"> </span><span class="n">branches</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_module_dict</span><span class="p">();</span>
+<span class="n">module_dict_add</span><span class="p">(</span><span class="n">branches</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;encoder&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+<span class="n">module_dict_add</span><span class="p">(</span><span class="n">branches</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;decoder&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">784</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+
+<span class="n">Module</span><span class="o">*</span><span class="w"> </span><span class="n">enc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">module_dict_get</span><span class="p">(</span><span class="n">branches</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;encoder&quot;</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">latent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">(</span><span class="n">enc</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="linear">Linear</h2>
+<p>Fully connected layer computing <code>output = input @ weight + bias</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_linear</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">in_features</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">out_features</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">);</span>
+
+<span class="c1">// With custom initialization functions</span>
+<span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_linear_with_init</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">in_features</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">out_features</span><span class="p">,</span>
+<span class="w">                            </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">,</span>
+<span class="w">                            </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">weight_init</span><span class="p">)(</span><span class="n">Tensor</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">),</span>
+<span class="w">                            </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bias_init</span><span class="p">)(</span><span class="n">Tensor</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">));</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>in_features</code></td>
+<td>Size of each input sample</td>
+</tr>
+<tr>
+<td><code>out_features</code></td>
+<td>Size of each output sample</td>
+</tr>
+<tr>
+<td><code>dtype</code></td>
+<td>Data type (e.g., <code>DTYPE_FLOAT32</code>)</td>
+</tr>
+<tr>
+<td><code>device</code></td>
+<td>Device placement (e.g., <code>DEVICE_CPU</code>)</td>
+</tr>
+<tr>
+<td><code>use_bias</code></td>
+<td>If <code>true</code>, adds a learnable bias</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight</code>: <code>[out_features, in_features]</code></li>
+<li><code>bias</code>: <code>[out_features]</code> (if enabled)</li>
+</ul>
+<p><strong>Accessor functions:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Parameter</span><span class="o">*</span><span class="w"> </span><span class="nf">linear_get_weight</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">);</span>
+<span class="n">Parameter</span><span class="o">*</span><span class="w"> </span><span class="nf">linear_get_bias</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">linear_get_in_features</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">linear_get_out_features</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">linear_set_weight</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">weight</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">linear_set_bias</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">bias</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">linear_set_use_bias</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">linear_get_use_bias</span><span class="p">(</span><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">linear</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Linear</span><span class="o">*</span><span class="w"> </span><span class="n">fc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">fc</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+
+<span class="n">Parameter</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">linear_get_weight</span><span class="p">(</span><span class="n">fc</span><span class="p">);</span>
+<span class="n">module_free</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">fc</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="convolutions">Convolutions</h2>
+<h3 id="conv1d">Conv1d</h3>
+<p>1D convolution over a temporal/sequential input.</p>
+<div class="highlight"><pre><span></span><code><span class="n">Conv1d</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_conv1d</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">in_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">out_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">kernel_size</span><span class="p">,</span>
+<span class="w">                  </span><span class="kt">int</span><span class="w"> </span><span class="n">stride</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">padding</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dilation</span><span class="p">,</span>
+<span class="w">                  </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">,</span><span class="w"> </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight</code>: <code>[out_channels, in_channels, kernel_size]</code></li>
+<li><code>bias</code>: <code>[out_channels]</code> (if enabled)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Conv1d</span><span class="o">*</span><span class="w"> </span><span class="n">conv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_conv1d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">conv</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input shape: [batch, in_channels, length]</span>
+<span class="c1">// output shape: [batch, out_channels, output_length]</span>
+</code></pre></div>
+<h3 id="conv2d">Conv2d</h3>
+<p>2D convolution over spatial input (images).</p>
+<div class="highlight"><pre><span></span><code><span class="n">Conv2d</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_conv2d</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">in_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">out_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">kernel_size</span><span class="p">,</span>
+<span class="w">                  </span><span class="kt">int</span><span class="w"> </span><span class="n">stride</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">padding</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dilation</span><span class="p">,</span>
+<span class="w">                  </span><span class="kt">bool</span><span class="w"> </span><span class="n">bias</span><span class="p">,</span><span class="w"> </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight</code>: <code>[out_channels, in_channels, kernel_size, kernel_size]</code></li>
+<li><code>bias</code>: <code>[out_channels]</code> (if enabled)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Conv2d</span><span class="o">*</span><span class="w"> </span><span class="n">conv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_conv2d</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">conv</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input shape: [batch, in_channels, height, width]</span>
+<span class="c1">// output shape: [batch, out_channels, out_height, out_width]</span>
+</code></pre></div>
+<h3 id="conv3d">Conv3d</h3>
+<p>3D convolution over volumetric input (video, 3D data).</p>
+<div class="highlight"><pre><span></span><code><span class="n">Conv3d</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_conv3d</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">in_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">out_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">kernel_size</span><span class="p">,</span>
+<span class="w">                  </span><span class="kt">int</span><span class="w"> </span><span class="n">stride</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">padding</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dilation</span><span class="p">,</span>
+<span class="w">                  </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">,</span><span class="w"> </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight</code>: <code>[out_channels, in_channels, kd, kh, kw]</code></li>
+<li><code>bias</code>: <code>[out_channels]</code> (if enabled)</li>
+</ul>
+<p>When <code>kernel_size</code> is a single integer, it is applied uniformly across all three spatial dimensions (depth, height, width). Internally, <code>stride</code>, <code>padding</code>, and <code>dilation</code> are stored per-dimension as arrays of length 3.</p>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Conv3d</span><span class="o">*</span><span class="w"> </span><span class="n">conv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_conv3d</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">conv</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input shape: [batch, in_channels, depth, height, width]</span>
+</code></pre></div>
+<hr />
+<h2 id="recurrent-layers">Recurrent Layers</h2>
+<p>CML provides cell-level recurrent layers. For sequence processing, call the cell in a loop over time steps.</p>
+<h3 id="rnncell">RNNCell</h3>
+<p>A single vanilla RNN step: <code>h' = tanh(W_ih @ x + W_hh @ h + bias)</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">RNNCell</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_rnn_cell</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">input_size</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">hidden_size</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">rnn_cell_forward</span><span class="p">(</span><span class="n">RNNCell</span><span class="o">*</span><span class="w"> </span><span class="n">cell</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">hidden</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight_ih</code>: <code>[hidden_size, input_size]</code></li>
+<li><code>weight_hh</code>: <code>[hidden_size, hidden_size]</code></li>
+<li><code>bias_ih</code>, <code>bias_hh</code>: <code>[hidden_size]</code> (if enabled)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">RNNCell</span><span class="o">*</span><span class="w"> </span><span class="n">cell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_rnn_cell</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+
+<span class="c1">// Process a sequence of length T</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* initial hidden state [batch, hidden_size] */</span><span class="p">;</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">seq_len</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">x_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* input at time t [batch, input_size] */</span><span class="p">;</span>
+<span class="w">    </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rnn_cell_forward</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span><span class="w"> </span><span class="n">x_t</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="lstmcell">LSTMCell</h3>
+<p>A single LSTM step with four gates: input, forget, cell, output.</p>
+<div class="highlight"><pre><span></span><code><span class="n">LSTMCell</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_lstm_cell</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">input_size</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">hidden_size</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">,</span>
+<span class="w">                       </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">lstm_cell_forward</span><span class="p">(</span><span class="n">LSTMCell</span><span class="o">*</span><span class="w"> </span><span class="n">cell</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">,</span>
+<span class="w">                       </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">h_prev</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">c_prev</span><span class="p">,</span>
+<span class="w">                       </span><span class="n">Tensor</span><span class="o">**</span><span class="w"> </span><span class="n">h_out</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">**</span><span class="w"> </span><span class="n">c_out</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight_ih</code>: <code>[4*hidden_size, input_size]</code> (gates: input, forget, cell, output)</li>
+<li><code>weight_hh</code>: <code>[4*hidden_size, hidden_size]</code></li>
+<li><code>bias_ih</code>, <code>bias_hh</code>: <code>[4*hidden_size]</code> (if enabled)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">LSTMCell</span><span class="o">*</span><span class="w"> </span><span class="n">cell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_lstm_cell</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* [batch, hidden_size] */</span><span class="p">;</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* [batch, hidden_size] */</span><span class="p">;</span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">seq_len</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">x_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* [batch, input_size] */</span><span class="p">;</span>
+<span class="w">    </span><span class="n">lstm_cell_forward</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span><span class="w"> </span><span class="n">x_t</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">c</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="c1">// h is the final hidden state, c is the final cell state</span>
+</code></pre></div>
+<h3 id="grucell">GRUCell</h3>
+<p>A single GRU step with three gates: reset, update, new.</p>
+<div class="highlight"><pre><span></span><code><span class="n">GRUCell</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_gru_cell</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">input_size</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">hidden_size</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_bias</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">gru_cell_forward</span><span class="p">(</span><span class="n">GRUCell</span><span class="o">*</span><span class="w"> </span><span class="n">cell</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">hidden</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>weight_ih</code>: <code>[3*hidden_size, input_size]</code> (gates: reset, update, new)</li>
+<li><code>weight_hh</code>: <code>[3*hidden_size, hidden_size]</code></li>
+<li><code>bias_ih</code>, <code>bias_hh</code>: <code>[3*hidden_size]</code> (if enabled)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">GRUCell</span><span class="o">*</span><span class="w"> </span><span class="n">cell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_gru_cell</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* [batch, hidden_size] */</span><span class="p">;</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">seq_len</span><span class="p">;</span><span class="w"> </span><span class="n">t</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">x_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* [batch, input_size] */</span><span class="p">;</span>
+<span class="w">    </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">gru_cell_forward</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span><span class="w"> </span><span class="n">x_t</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="transformer">Transformer</h2>
+<h3 id="multiheadattention">MultiHeadAttention</h3>
+<p>Scaled dot-product multi-head attention with learned projections for queries, keys, and values.</p>
+<div class="highlight"><pre><span></span><code><span class="n">MultiHeadAttention</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_multihead_attention</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">embed_dim</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">num_heads</span><span class="p">,</span>
+<span class="w">                                            </span><span class="kt">float</span><span class="w"> </span><span class="n">dropout</span><span class="p">,</span>
+<span class="w">                                            </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">multihead_attention_forward</span><span class="p">(</span><span class="n">MultiHeadAttention</span><span class="o">*</span><span class="w"> </span><span class="n">mha</span><span class="p">,</span>
+<span class="w">                                     </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">query</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">key</span><span class="p">,</span>
+<span class="w">                                     </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">mask</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>embed_dim</code></td>
+<td>Total embedding dimension (must be divisible by <code>num_heads</code>)</td>
+</tr>
+<tr>
+<td><code>num_heads</code></td>
+<td>Number of parallel attention heads</td>
+</tr>
+<tr>
+<td><code>dropout</code></td>
+<td>Dropout probability on attention weights</td>
+</tr>
+<tr>
+<td><code>mask</code></td>
+<td>Optional attention mask (pass <code>NULL</code> for no mask)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Weight shapes:</strong></p>
+<ul>
+<li><code>W_q</code>, <code>W_k</code>, <code>W_v</code>, <code>W_o</code>: <code>[embed_dim, embed_dim]</code></li>
+<li><code>b_q</code>, <code>b_k</code>, <code>b_v</code>, <code>b_o</code>: <code>[embed_dim]</code></li>
+</ul>
+<p>Head dimension is computed as <code>embed_dim / num_heads</code>.</p>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">MultiHeadAttention</span><span class="o">*</span><span class="w"> </span><span class="n">mha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_multihead_attention</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span>
+<span class="w">                                                  </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+
+<span class="c1">// Self-attention: query = key = value</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">attn_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">multihead_attention_forward</span><span class="p">(</span><span class="n">mha</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="transformerencoderlayer">TransformerEncoderLayer</h3>
+<p>A single transformer encoder layer consisting of multi-head self-attention followed by a position-wise feedforward network, with residual connections and layer normalization.</p>
+<div class="highlight"><pre><span></span><code><span class="n">TransformerEncoderLayer</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_transformer_encoder_layer</span><span class="p">(</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">d_model</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">nhead</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dim_feedforward</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">dropout</span><span class="p">,</span><span class="w"> </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>d_model</code></td>
+<td>Model embedding dimension</td>
+</tr>
+<tr>
+<td><code>nhead</code></td>
+<td>Number of attention heads</td>
+</tr>
+<tr>
+<td><code>dim_feedforward</code></td>
+<td>Hidden dimension of the feedforward network</td>
+</tr>
+<tr>
+<td><code>dropout</code></td>
+<td>Dropout probability</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Internal structure:</strong></p>
+<ul>
+<li>Self-attention (<code>MultiHeadAttention</code>)</li>
+<li>Feedforward: <code>Linear(d_model, dim_feedforward)</code> -&gt; activation -&gt; <code>Linear(dim_feedforward, d_model)</code></li>
+<li>Two <code>LayerNorm</code> layers (norm1 and norm2)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">TransformerEncoderLayer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_transformer_encoder_layer</span><span class="p">(</span>
+<span class="w">    </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">2048</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">layer</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input/output shape: [seq_len, batch, d_model]</span>
+</code></pre></div>
+<hr />
+<h2 id="embedding">Embedding</h2>
+<p>A lookup table that maps integer indices to dense vectors. Commonly used for word embeddings.</p>
+<div class="highlight"><pre><span></span><code><span class="n">Embedding</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_embedding</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">num_embeddings</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">embedding_dim</span><span class="p">,</span>
+<span class="w">                         </span><span class="kt">int</span><span class="w"> </span><span class="n">padding_idx</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>num_embeddings</code></td>
+<td>Size of the vocabulary (number of embeddings)</td>
+</tr>
+<tr>
+<td><code>embedding_dim</code></td>
+<td>Dimension of each embedding vector</td>
+</tr>
+<tr>
+<td><code>padding_idx</code></td>
+<td>Index whose embedding is zeroed out; use <code>-1</code> for no padding</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Weight shape:</strong></p>
+<ul>
+<li><code>weight</code>: <code>[num_embeddings, embedding_dim]</code></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Vocabulary of 10000 words, 128-dimensional embeddings</span>
+<span class="n">Embedding</span><span class="o">*</span><span class="w"> </span><span class="n">emb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_embedding</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="c1">// padding_idx=0 means the embedding at index 0 stays zero</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">emb</span><span class="p">,</span><span class="w"> </span><span class="n">token_indices</span><span class="p">);</span>
+<span class="c1">// token_indices shape: [batch, seq_len] (integer tensor)</span>
+<span class="c1">// output shape: [batch, seq_len, 128]</span>
+</code></pre></div>
+<hr />
+<h2 id="normalization">Normalization</h2>
+<h3 id="batchnorm2d">BatchNorm2d</h3>
+<p>Batch normalization over 4D input (batch, channels, height, width). Normalizes across the batch dimension per channel.</p>
+<div class="highlight"><pre><span></span><code><span class="n">BatchNorm2d</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_batchnorm2d</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">num_features</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">eps</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">momentum</span><span class="p">,</span>
+<span class="w">                             </span><span class="kt">bool</span><span class="w"> </span><span class="n">affine</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">track_running_stats</span><span class="p">,</span>
+<span class="w">                             </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>num_features</code></td>
+<td>Number of channels (C)</td>
+</tr>
+<tr>
+<td><code>eps</code></td>
+<td>Small constant for numerical stability (typical: <code>1e-5</code>)</td>
+</tr>
+<tr>
+<td><code>momentum</code></td>
+<td>Running mean/variance update factor (typical: <code>0.1</code>)</td>
+</tr>
+<tr>
+<td><code>affine</code></td>
+<td>If <code>true</code>, learnable scale (gamma) and shift (beta)</td>
+</tr>
+<tr>
+<td><code>track_running_stats</code></td>
+<td>If <code>true</code>, tracks running mean/variance for eval mode</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">BatchNorm2d</span><span class="o">*</span><span class="w"> </span><span class="n">bn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_batchnorm2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">bn</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input shape: [batch, 64, height, width]</span>
+</code></pre></div>
+<h3 id="layernorm">LayerNorm</h3>
+<p>Layer normalization over the last dimension. Normalizes each sample independently.</p>
+<div class="highlight"><pre><span></span><code><span class="n">LayerNorm</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_layernorm</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">normalized_shape</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">eps</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">affine</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>normalized_shape</code></td>
+<td>Size of the normalized dimension</td>
+</tr>
+<tr>
+<td><code>eps</code></td>
+<td>Small constant for numerical stability (typical: <code>1e-5</code>)</td>
+</tr>
+<tr>
+<td><code>affine</code></td>
+<td>If <code>true</code>, learnable scale and shift parameters</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">LayerNorm</span><span class="o">*</span><span class="w"> </span><span class="n">ln</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_layernorm</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-5f</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">ln</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input shape: [batch, seq_len, 512]</span>
+</code></pre></div>
+<h3 id="groupnorm">GroupNorm</h3>
+<p>Group normalization that divides channels into groups and normalizes within each group. A middle ground between LayerNorm and InstanceNorm.</p>
+<div class="highlight"><pre><span></span><code><span class="n">GroupNorm</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_groupnorm</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">num_groups</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">num_channels</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">eps</span><span class="p">,</span>
+<span class="w">                         </span><span class="kt">bool</span><span class="w"> </span><span class="n">affine</span><span class="p">,</span><span class="w"> </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>num_groups</code></td>
+<td>Number of groups to divide channels into</td>
+</tr>
+<tr>
+<td><code>num_channels</code></td>
+<td>Total number of channels (must be divisible by <code>num_groups</code>)</td>
+</tr>
+<tr>
+<td><code>eps</code></td>
+<td>Small constant for numerical stability (typical: <code>1e-5</code>)</td>
+</tr>
+<tr>
+<td><code>affine</code></td>
+<td>If <code>true</code>, learnable scale and shift per channel</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Weight shapes</strong> (if affine):</p>
+<ul>
+<li><code>weight</code>: <code>[num_channels]</code></li>
+<li><code>bias</code>: <code>[num_channels]</code></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// 32 groups over 256 channels (8 channels per group)</span>
+<span class="n">GroupNorm</span><span class="o">*</span><span class="w"> </span><span class="n">gn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_groupnorm</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-5f</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">,</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">gn</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="pooling">Pooling</h2>
+<h3 id="maxpool2d">MaxPool2d</h3>
+<p>2D max pooling over spatial input. Selects the maximum value within each pooling window.</p>
+<div class="highlight"><pre><span></span><code><span class="n">MaxPool2d</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_maxpool2d</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">kernel_size</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">stride</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">padding</span><span class="p">,</span>
+<span class="w">                         </span><span class="kt">int</span><span class="w"> </span><span class="n">dilation</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">ceil_mode</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kernel_size</code></td>
+<td>Size of the pooling window</td>
+</tr>
+<tr>
+<td><code>stride</code></td>
+<td>Stride of the pooling window</td>
+</tr>
+<tr>
+<td><code>padding</code></td>
+<td>Zero-padding added to both sides</td>
+</tr>
+<tr>
+<td><code>dilation</code></td>
+<td>Spacing between kernel elements</td>
+</tr>
+<tr>
+<td><code>ceil_mode</code></td>
+<td>If <code>true</code>, use ceil instead of floor for output size</td>
+</tr>
+</tbody>
+</table>
+<h3 id="avgpool2d">AvgPool2d</h3>
+<p>2D average pooling over spatial input. Computes the average value within each pooling window.</p>
+<div class="highlight"><pre><span></span><code><span class="n">AvgPool2d</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_avgpool2d</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">kernel_size</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">stride</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">padding</span><span class="p">,</span>
+<span class="w">                         </span><span class="kt">bool</span><span class="w"> </span><span class="n">ceil_mode</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">count_include_pad</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kernel_size</code></td>
+<td>Size of the pooling window</td>
+</tr>
+<tr>
+<td><code>stride</code></td>
+<td>Stride of the pooling window</td>
+</tr>
+<tr>
+<td><code>padding</code></td>
+<td>Zero-padding added to both sides</td>
+</tr>
+<tr>
+<td><code>ceil_mode</code></td>
+<td>If <code>true</code>, use ceil instead of floor for output size</td>
+</tr>
+<tr>
+<td><code>count_include_pad</code></td>
+<td>If <code>true</code>, include padding in the averaging calculation</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">MaxPool2d</span><span class="o">*</span><span class="w"> </span><span class="n">pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_maxpool2d</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">pool</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="c1">// input shape: [batch, channels, height, width]</span>
+<span class="c1">// output shape: [batch, channels, height/2, width/2]</span>
+</code></pre></div>
+<hr />
+<h2 id="activation-layers">Activation Layers</h2>
+<p>Activations are available in two forms: as module objects (for use in <code>Sequential</code>) and as standalone functions (zero-allocation, for manual forward passes).</p>
+<h3 id="module-form">Module Form</h3>
+<p>Create activation modules that can be added to <code>Sequential</code> or used standalone.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Constructor</th>
+<th>Parameters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReLU</td>
+<td><code>nn_relu(bool inplace)</code></td>
+<td><code>inplace</code>: modify input in-place</td>
+</tr>
+<tr>
+<td>LeakyReLU</td>
+<td><code>nn_leaky_relu(float negative_slope, bool inplace)</code></td>
+<td><code>negative_slope</code>: slope for x \&lt; 0</td>
+</tr>
+<tr>
+<td>Sigmoid</td>
+<td><code>nn_sigmoid()</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>Tanh</td>
+<td><code>nn_tanh()</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>GELU</td>
+<td><code>nn_gelu(bool approximate)</code></td>
+<td><code>approximate</code>: use tanh approximation</td>
+</tr>
+<tr>
+<td>ELU</td>
+<td><code>nn_elu(float alpha, bool inplace)</code></td>
+<td><code>alpha</code>: scale for negative values</td>
+</tr>
+<tr>
+<td>SELU</td>
+<td><code>nn_selu()</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>SiLU</td>
+<td><code>nn_silu()</code></td>
+<td>-- (also known as Swish)</td>
+</tr>
+<tr>
+<td>Mish</td>
+<td><code>nn_mish()</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>HardSwish</td>
+<td><code>nn_hardswish()</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>Softmax</td>
+<td><code>nn_softmax(int dim)</code></td>
+<td><code>dim</code>: dimension to apply softmax</td>
+</tr>
+<tr>
+<td>LogSoftmax</td>
+<td><code>nn_log_softmax(int dim)</code></td>
+<td><code>dim</code>: dimension to apply log-softmax</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">ReLU</span><span class="o">*</span><span class="w"> </span><span class="n">relu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">relu</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+
+<span class="c1">// In a Sequential</span>
+<span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_gelu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+<span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_softmax</span><span class="p">(</span><span class="mi">-1</span><span class="p">));</span>
+</code></pre></div>
+<h3 id="functional-form">Functional Form</h3>
+<p>Functional activations do not allocate a module. They take a tensor and return a tensor directly.</p>
+<div class="highlight"><pre><span></span><code><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_relu</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_sigmoid</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_tanh</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_gelu</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_elu</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">alpha</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_selu</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_silu</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_mish</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="nf">f_hardswish</span><span class="p">(</span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">f_relu</span><span class="p">(</span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">linear</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">));</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">probs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">f_sigmoid</span><span class="p">(</span><span class="n">h</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="dropout">Dropout</h2>
+<p>Randomly zeroes elements during training with probability <code>p</code>. Automatically disabled during evaluation.</p>
+<div class="highlight"><pre><span></span><code><span class="n">Dropout</span><span class="o">*</span><span class="w"> </span><span class="nf">nn_dropout</span><span class="p">(</span><span class="kt">float</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">inplace</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>p</code></td>
+<td>Probability of an element being zeroed (0.0 to 1.0)</td>
+</tr>
+<tr>
+<td><code>inplace</code></td>
+<td>If <code>true</code>, modify the input tensor in-place</td>
+</tr>
+</tbody>
+</table>
+<p>During training, outputs are scaled by <code>1/(1-p)</code> to maintain expected values. During evaluation (<code>cml_nn_module_eval</code>), dropout is a no-op.</p>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">Dropout</span><span class="o">*</span><span class="w"> </span><span class="n">drop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_dropout</span><span class="p">(</span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+
+<span class="n">cml_nn_module_train</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">drop</span><span class="p">);</span><span class="w">  </span><span class="c1">// Dropout active</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">train_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">drop</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+
+<span class="n">cml_nn_module_eval</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">drop</span><span class="p">);</span><span class="w">   </span><span class="c1">// Dropout disabled</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">eval_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">drop</span><span class="p">,</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="complete-example">Complete Example</h2>
+<p>A full example building and running a multi-layer perceptron classifier:</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;cml.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">cml_init</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_get_default_device</span><span class="p">();</span>
+<span class="w">    </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_get_default_dtype</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Build model</span>
+<span class="w">    </span><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_sequential</span><span class="p">();</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_dropout</span><span class="p">(</span><span class="mf">0.3f</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_dropout</span><span class="p">(</span><span class="mf">0.3f</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+
+<span class="w">    </span><span class="c1">// Print architecture</span>
+<span class="w">    </span><span class="n">cml_summary</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Training mode</span>
+<span class="w">    </span><span class="n">cml_nn_module_train</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+<span class="w">    </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">train_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">train_input</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Evaluation mode</span>
+<span class="w">    </span><span class="n">cml_nn_module_eval</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+<span class="w">    </span><span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">eval_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_nn_module_forward</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">test_input</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Cleanup</span>
+<span class="w">    </span><span class="n">module_free</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cml_cleanup</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>A convolutional network example:</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;cml.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">cml_init</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">DType</span><span class="w"> </span><span class="n">dtype</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DTYPE_FLOAT32</span><span class="p">;</span>
+<span class="w">    </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DEVICE_CPU</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">Sequential</span><span class="o">*</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nn_sequential</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Convolutional feature extractor</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_conv2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_batchnorm2d</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_maxpool2d</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_conv2d</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_batchnorm2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_maxpool2d</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">));</span>
+
+<span class="w">    </span><span class="c1">// Classifier head (after flattening)</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">64</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">7</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_relu</span><span class="p">(</span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_dropout</span><span class="p">(</span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sequential_add</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">nn_linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">cml_summary</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">module_free</span><span class="p">((</span><span class="n">Module</span><span class="o">*</span><span class="p">)</span><span class="n">model</span><span class="p">);</span>
+<span class="w">    </span><span class="n">cml_cleanup</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 C-ML Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/jaywyawhare/C-ML" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../docs/logo-switcher.js"></script>
+      
+    
+  </body>
+</html>

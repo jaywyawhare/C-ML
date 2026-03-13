@@ -1,0 +1,1996 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Production-ready Machine Learning Library in C">
+      
+      
+        <meta name="author" content="Arrry">
+      
+      
+      
+        <link rel="prev" href="../ir_graph_management/">
+      
+      
+        <link rel="next" href="../kernel_studio_quickref/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../light-mode.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Kernel Studio - C-ML Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CSource+Code+Pro:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Source Code Pro"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../docs/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kernel-studio-code-generation-optimization-visualization" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="C-ML Documentation" class="md-header__button md-logo" aria-label="C-ML Documentation" data-md-component="logo">
+      
+  <img src="../light-mode.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            C-ML Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Kernel Studio
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1M8 13h8v-2H8zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4a5 5 0 0 0 5-5 5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5M7 15a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jaywyawhare/C-ML" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jaywyawhare/C-ML
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting_started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api_reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../autograd/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Autograd
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../nn_layers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Neural Network Layers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../training/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Training
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../graph_mode/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Graph Mode
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../benchmarks/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Benchmarks
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../datasets/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Datasets
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../EXTERNAL_DEPENDENCIES/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  External Dependencies
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ir_graph_management/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  IR Graph Management
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Kernel Studio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../kernel_studio_quickref/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Kernel Studio Quick Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../optimizations/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Optimizations
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="C-ML Documentation" class="md-nav__button md-logo" aria-label="C-ML Documentation" data-md-component="logo">
+      
+  <img src="../light-mode.svg" alt="logo">
+
+    </a>
+    C-ML Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jaywyawhare/C-ML" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jaywyawhare/C-ML
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../autograd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Autograd
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nn_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural Network Layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../graph_mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graph Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../EXTERNAL_DEPENDENCIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External Dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ir_graph_management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Graph Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kernel Studio
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kernel Studio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-kernel-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Kernel Inspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-dead-code-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Dead Code Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-kernel-fusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Kernel Fusion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Kernel Fusion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fusion-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fusion Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-cache-locality-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cache Locality Optimization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-kernel-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Kernel Studio
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the Kernel Studio">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#viewing-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing Kernels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-insights-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Insights Tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling-auto-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Auto-Capture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-ir-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual IR Construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-passes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Passes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Impact
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-comprehensive-fusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Comprehensive Fusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#target-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target Backends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future Enhancements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ir-node-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IR Node Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fusion-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fusion Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kernel_studio_quickref/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kernel Studio Quick Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-kernel-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Kernel Inspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-dead-code-elimination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Dead Code Elimination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-kernel-fusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Kernel Fusion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Kernel Fusion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fusion-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fusion Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-cache-locality-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cache Locality Optimization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-kernel-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Kernel Studio
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the Kernel Studio">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#viewing-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing Kernels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding Statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-insights-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Insights Tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling-auto-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Auto-Capture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-ir-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual IR Construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-passes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Passes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Impact
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-comprehensive-fusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Comprehensive Fusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#target-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target Backends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future Enhancements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ir-node-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IR Node Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fusion-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fusion Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="kernel-studio-code-generation-optimization-visualization">Kernel Studio - Code Generation &amp; Optimization Visualization</h1>
+<h2 id="overview">Overview</h2>
+<p>The <strong>Kernel Studio</strong> is an interactive visualization tool for analyzing generated code kernels, dead code elimination, and optimization passes in C-ML. It provides insights into how the IR (Intermediate Representation) compiler optimizes your computation graphs.</p>
+<h2 id="features">Features</h2>
+<h3 id="1-kernel-inspection">1. <strong>Kernel Inspection</strong></h3>
+<ul>
+<li>View all generated kernels with syntax-highlighted code</li>
+<li>Browse individual kernel implementations</li>
+<li>See input/output tensor mappings</li>
+<li>Understand operation types (UOps)</li>
+</ul>
+<h3 id="2-dead-code-elimination">2. <strong>Dead Code Elimination</strong></h3>
+<p>The optimizer automatically removes unused operations that don't contribute to final outputs:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Example: These operations are marked as dead code</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">dead_mul</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_mul</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">);</span><span class="w">  </span><span class="c1">// Not used in any output</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">dead_add</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_add</span><span class="p">(</span><span class="n">dead_mul</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">);</span><span class="w">  </span><span class="c1">// Not used</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">dead_exp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_exp</span><span class="p">(</span><span class="n">dead_add</span><span class="p">);</span><span class="w">  </span><span class="c1">// Not used</span>
+</code></pre></div>
+<p><strong>How it works:</strong></p>
+<ol>
+<li><strong>Mark Phase</strong>: Starting from output nodes, traverse backward to mark all reachable nodes</li>
+<li><strong>Sweep Phase</strong>: Remove nodes that weren't marked as reachable</li>
+<li><strong>Result</strong>: Reduced memory usage and faster execution</li>
+</ol>
+<h3 id="3-kernel-fusion">3. <strong>Kernel Fusion</strong></h3>
+<p>The optimizer combines multiple operations into single, efficient kernels:</p>
+<h4 id="fusion-types">Fusion Types</h4>
+<p><strong>FMA (Fused Multiply-Add)</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Before optimization:</span>
+<span class="n">t1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w">  </span><span class="c1">// MUL kernel</span>
+<span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">c</span><span class="p">;</span><span class="w"> </span><span class="c1">// ADD kernel</span>
+
+<span class="c1">// After optimization:</span>
+<span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fmaf</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">);</span><span class="w">  </span><span class="c1">// Single FMA kernel (1.8x faster)</span>
+</code></pre></div>
+<p><strong>Elementwise Chains</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Before: 5 separate kernels</span>
+<span class="n">t1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="p">;</span>
+<span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">exp</span><span class="p">(</span><span class="n">t1</span><span class="p">);</span>
+<span class="n">t3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">log</span><span class="p">(</span><span class="n">t2</span><span class="p">);</span>
+<span class="n">t4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sqrt</span><span class="p">(</span><span class="n">t3</span><span class="p">);</span>
+<span class="n">t5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">c</span><span class="p">;</span>
+
+<span class="c1">// After: 1 fused kernel (4.2x faster)</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">inputs</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">t1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expf</span><span class="p">(</span><span class="n">t0</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">logf</span><span class="p">(</span><span class="n">t1</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">t3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sqrtf</span><span class="p">(</span><span class="n">t2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">inputs</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">i</span><span class="p">];</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Identity Elimination</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Before:</span>
+<span class="n">t1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">exp</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+<span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">log</span><span class="p">(</span><span class="n">t1</span><span class="p">);</span><span class="w">  </span><span class="c1">// exp(log(x)) = x</span>
+
+<span class="c1">// After:</span>
+<span class="n">t2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w">  </span><span class="c1">// Optimized to identity</span>
+</code></pre></div>
+<p><strong>Other Fusion Patterns:</strong></p>
+<ul>
+<li><code>NEG + ADD -&gt; SUB</code></li>
+<li><code>SQRT + MUL -&gt; sqrt_mul</code></li>
+<li><code>EXP + RECIP -&gt; exp_recip</code></li>
+<li><code>MUL + DIV -&gt; identity</code> (if same operand)</li>
+</ul>
+<h3 id="4-cache-locality-optimization">4. <strong>Cache Locality Optimization</strong></h3>
+<p>Operations are reordered using topological sort to improve cache utilization:</p>
+<ul>
+<li>Reduces memory bandwidth requirements</li>
+<li>Improves data locality</li>
+<li>Minimizes cache misses</li>
+</ul>
+<h2 id="using-the-kernel-studio">Using the Kernel Studio</h2>
+<h3 id="viewing-kernels">Viewing Kernels</h3>
+<ol>
+<li><strong>Toggle View</strong>: Switch between "Unoptimized" and "Optimized" views</li>
+<li><strong>Browse Kernels</strong>: Click on kernels in the left panel to view details</li>
+<li><strong>Inspect Code</strong>: See generated C/CUDA code with syntax highlighting</li>
+<li><strong>Check Status</strong>: Look for badges:</li>
+<li><strong>DEAD</strong> - Will be eliminated</li>
+<li><strong>FUSED</strong> - Part of optimized kernel</li>
+</ol>
+<h3 id="understanding-statistics">Understanding Statistics</h3>
+<p><strong>Unoptimized View:</strong></p>
+<ul>
+<li><strong>Total Nodes</strong>: All operations in the graph</li>
+<li><strong>Kernels</strong>: Number of individual kernels</li>
+<li><strong>Dead Nodes</strong>: Operations that will be removed</li>
+<li><strong>Fusion Ops</strong>: Opportunities for kernel fusion</li>
+</ul>
+<p><strong>Optimized View:</strong></p>
+<ul>
+<li><strong>Total Nodes</strong>: Operations after dead code elimination</li>
+<li><strong>Kernels</strong>: Optimized kernel count</li>
+<li><strong>Fused</strong>: Number of fused kernels created</li>
+</ul>
+<h3 id="optimization-insights-tab">Optimization Insights Tab</h3>
+<p>View detailed information about:</p>
+<ul>
+<li>Dead code elimination statistics</li>
+<li>Kernel fusion patterns applied</li>
+<li>Cache locality improvements</li>
+<li>Performance gains (speedup estimates)</li>
+</ul>
+<h2 id="api-usage">API Usage</h2>
+<h3 id="enabling-auto-capture">Enabling Auto-Capture</h3>
+<div class="highlight"><pre><span></span><code><span class="c1">// Create IR context</span>
+<span class="n">CMLGraph_t</span><span class="w"> </span><span class="n">ir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_new</span><span class="p">(</span><span class="n">IR_TARGET_CUDA</span><span class="p">);</span>
+
+<span class="c1">// Enable automatic operation capture</span>
+<span class="n">cml_ir_enable_auto_capture</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+
+<span class="c1">// Your tensor operations are automatically captured</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_empty</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">config</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_empty</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">config</span><span class="p">);</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_mul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">);</span><span class="w">  </span><span class="c1">// Captured to IR</span>
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tensor_add</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">);</span><span class="w">  </span><span class="c1">// Captured to IR</span>
+
+<span class="c1">// Optimize the IR</span>
+<span class="n">cml_ir_optimize</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+
+<span class="c1">// Generate code</span>
+<span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_compile</span><span class="p">(</span><span class="n">ir</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="n">printf</span><span class="p">(</span><span class="s">&quot;%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">code</span><span class="p">);</span>
+<span class="n">free</span><span class="p">(</span><span class="n">code</span><span class="p">);</span>
+
+<span class="c1">// Export kernel analysis for visualization</span>
+<span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">analysis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_export_kernel_analysis</span><span class="p">(</span><span class="n">ir</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="c1">// Send to frontend...</span>
+<span class="n">free</span><span class="p">(</span><span class="n">analysis</span><span class="p">);</span>
+
+<span class="n">cml_ir_disable_auto_capture</span><span class="p">();</span>
+<span class="n">cml_ir_free</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="manual-ir-construction">Manual IR Construction</h3>
+<div class="highlight"><pre><span></span><code><span class="n">CMLGraph_t</span><span class="w"> </span><span class="n">ir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_new</span><span class="p">(</span><span class="n">IR_TARGET_C_SIMD</span><span class="p">);</span>
+
+<span class="n">Tensor</span><span class="o">*</span><span class="w"> </span><span class="n">inputs</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">};</span>
+<span class="n">cml_ir_add_uop</span><span class="p">(</span><span class="n">ir</span><span class="p">,</span><span class="w"> </span><span class="n">UOP_MUL</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="c1">// ... add more operations</span>
+
+<span class="n">cml_ir_optimize</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+<span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_compile</span><span class="p">(</span><span class="n">ir</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;output.c&quot;</span><span class="p">);</span>
+<span class="n">free</span><span class="p">(</span><span class="n">code</span><span class="p">);</span>
+</code></pre></div>
+<h2 id="optimization-passes">Optimization Passes</h2>
+<p>The <code>cml_ir_optimize()</code> function runs multiple passes:</p>
+<ol>
+<li><strong>Build Dependency Graph</strong>: Analyze which operations depend on others</li>
+<li><strong>Mark Reachable Nodes</strong>: Identify operations contributing to outputs</li>
+<li><strong>Remove Dead Nodes</strong>: Eliminate unused operations</li>
+<li><strong>Fuse Operations</strong>: Combine compatible operations into optimized kernels</li>
+<li><strong>Reorder for Cache</strong>: Topologically sort for better memory access patterns</li>
+</ol>
+<h2 id="performance-impact">Performance Impact</h2>
+<p>Typical improvements from optimization:</p>
+<ul>
+<li><strong>Dead Code Elimination</strong>: 10-30% reduction in operations</li>
+<li><strong>Kernel Fusion</strong>: 1.5-5x speedup for fused chains</li>
+<li><strong>Cache Optimization</strong>: 15-25% reduction in memory bandwidth</li>
+</ul>
+<h2 id="example-comprehensive-fusion">Example: Comprehensive Fusion</h2>
+<p>See <code>examples/demos/comprehensive_fusion_example.c</code> for a complete demonstration of all fusion types and optimizations.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Compile and run the example</span>
+make<span class="w"> </span>comprehensive_fusion_example
+./comprehensive_fusion_example
+</code></pre></div>
+<h2 id="target-backends">Target Backends</h2>
+<p>The Kernel Studio supports code generation for:</p>
+<ul>
+<li><strong>IR_TARGET_C</strong>: Plain C (scalar operations)</li>
+<li><strong>IR_TARGET_C_SIMD</strong>: C with SIMD intrinsics (AVX, NEON)</li>
+<li><strong>IR_TARGET_CUDA</strong>: CUDA kernels for NVIDIA GPUs</li>
+<li><strong>IR_TARGET_METAL</strong>: Metal shaders for Apple GPUs</li>
+<li><strong>IR_TARGET_OPENCL</strong>: OpenCL kernels (portable)</li>
+<li><strong>IR_TARGET_WGSL</strong>: WebGPU shaders</li>
+</ul>
+<h2 id="future-enhancements">Future Enhancements</h2>
+<p>Planned features for Kernel Studio:</p>
+<ul class="task-list">
+<li class="task-list-item"><input type="checkbox" disabled/> Interactive kernel editing and testing</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Performance profiling integration</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Register allocation visualization</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Memory access pattern analysis</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Multi-backend comparison</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Auto-tuning suggestions</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Export to standalone kernels</li>
+<li class="task-list-item"><input type="checkbox" disabled/> Benchmark generation</li>
+</ul>
+<h2 id="technical-details">Technical Details</h2>
+<h3 id="ir-node-structure">IR Node Structure</h3>
+<p>Each IR node contains:</p>
+<ul>
+<li><strong>Type</strong>: UOpType (operation type)</li>
+<li><strong>Inputs</strong>: Array of input tensor names</li>
+<li><strong>Output</strong>: Output tensor name</li>
+<li><strong>Params</strong>: Operation-specific parameters</li>
+<li><strong>Optimization Metadata</strong>:</li>
+<li><code>is_used</code>: Marked during dead code elimination</li>
+<li><code>is_fused</code>: Part of a fused kernel</li>
+<li><code>fused_kernel</code>: Pointer to fused kernel structure</li>
+<li><code>use_count</code>: Number of operations using this output</li>
+<li><code>users</code>: Array of dependent operations</li>
+</ul>
+<h3 id="fusion-detection">Fusion Detection</h3>
+<p>Fusion opportunities are detected by:</p>
+<ol>
+<li>Analyzing operation types and dependencies</li>
+<li>Checking if operations can be safely combined</li>
+<li>Verifying data flow patterns</li>
+<li>Ensuring no side effects are violated</li>
+</ol>
+<h3 id="code-generation">Code Generation</h3>
+<p>Code generation process:</p>
+<ol>
+<li>Traverse optimized IR graph</li>
+<li>For each kernel (fused or individual):</li>
+<li>Generate function signature</li>
+<li>Emit operation code</li>
+<li>Handle broadcasting and shape transformations</li>
+<li>Add target-specific optimizations (SIMD, GPU)</li>
+<li>Combine into complete program</li>
+</ol>
+<h2 id="debugging-tips">Debugging Tips</h2>
+<p><strong>Enable Debug Logging:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">cml_set_log_level</span><span class="p">(</span><span class="n">LOG_LEVEL_DEBUG</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Inspect IR Before/After Optimization:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">before</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_to_string</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+<span class="n">printf</span><span class="p">(</span><span class="s">&quot;Before:</span><span class="se">\n</span><span class="s">%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">before</span><span class="p">);</span>
+<span class="n">free</span><span class="p">(</span><span class="n">before</span><span class="p">);</span>
+
+<span class="n">cml_ir_optimize</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+
+<span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">after</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_to_string</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+<span class="n">printf</span><span class="p">(</span><span class="s">&quot;After:</span><span class="se">\n</span><span class="s">%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">after</span><span class="p">);</span>
+<span class="n">free</span><span class="p">(</span><span class="n">after</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Check Individual Nodes:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">IRNode</span><span class="o">*</span><span class="w"> </span><span class="n">node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cml_ir_get_tail</span><span class="p">(</span><span class="n">ir</span><span class="p">);</span>
+<span class="n">printf</span><span class="p">(</span><span class="s">&quot;Last node: %s, used: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">uop_type_to_string</span><span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">type</span><span class="p">),</span>
+<span class="w">    </span><span class="n">node</span><span class="o">-&gt;</span><span class="n">is_used</span><span class="p">);</span>
+</code></pre></div>
+<h2 id="contributing">Contributing</h2>
+<p>To add new fusion patterns:</p>
+<ol>
+<li>Add fusion type to <code>FusionType</code> enum in <code>ir_internal.h</code></li>
+<li>Implement detection in <code>can_fuse_operations()</code> in <code>ir.c</code></li>
+<li>Add code generation in <code>generate_c_code()</code> or backend-specific generators</li>
+<li>Update Kernel Studio visualization to display new pattern</li>
+</ol>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="USAGE.md">USAGE.md</a> - General C-ML usage guide</li>
+<li><a href="REFERENCE.md">REFERENCE.md</a> - API reference</li>
+<li><a href="examples/demos/comprehensive_fusion_example.c">examples/demos/comprehensive_fusion_example.c</a> - Complete example</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 C-ML Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/jaywyawhare/C-ML" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../docs/logo-switcher.js"></script>
+      
+    
+  </body>
+</html>
