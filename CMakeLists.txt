@@ -145,6 +145,34 @@ if(ENABLE_WEBGPU)
     message(STATUS "WebGPU backend enabled (dynamic loading)")
 endif()
 
+# Vulkan Backend (dynamic loading, no compile-time Vulkan SDK needed)
+option(ENABLE_VULKAN "Enable Vulkan/SPIR-V compute backend" ON)
+if(ENABLE_VULKAN)
+    add_definitions(-DCML_HAS_VULKAN)
+    message(STATUS "Vulkan backend enabled (dynamic loading)")
+endif()
+
+# NV Userspace Driver (direct ioctl, bypasses libcuda)
+option(ENABLE_NV_DRIVER "Enable NVIDIA userspace driver (direct ioctl)" OFF)
+if(ENABLE_NV_DRIVER)
+    add_definitions(-DCML_HAS_NV_DRIVER)
+    message(STATUS "NV userspace driver enabled")
+endif()
+
+# AM (AMD) Userspace Driver (KFD ioctl, bypasses libamdhip64)
+option(ENABLE_AM_DRIVER "Enable AMD userspace driver (KFD ioctl)" OFF)
+if(ENABLE_AM_DRIVER)
+    add_definitions(-DCML_HAS_AM_DRIVER)
+    message(STATUS "AM userspace driver enabled")
+endif()
+
+# Mesa NIR Backend
+option(ENABLE_NIR "Enable Mesa NIR multi-vendor GPU backend" OFF)
+if(ENABLE_NIR)
+    add_definitions(-DCML_HAS_NIR)
+    message(STATUS "NIR/Mesa backend enabled (dynamic loading)")
+endif()
+
 # ONNX Runtime
 option(ENABLE_ONNX "Enable ONNX model loading and execution" ON)
 if(ENABLE_ONNX)
@@ -223,11 +251,19 @@ set(OPS_SOURCES
     src/ops/ir/hcq.c
     src/ops/ir/hcq_cuda.c
     src/ops/ir/hcq_opencl.c
+    src/ops/ir/hcq_am.c
     src/ops/ir/beam_search.c
     src/ops/ir/trace.c
+    src/ops/ir/tiny_jit.c
+    src/ops/ir/beam_cuda_timing.c
     src/ops/ir/schedule.c
+    src/ops/ir/schedule_v2.c
+    src/ops/ir/linearize.c
+    src/ops/ir/fused_codegen.c
+    src/ops/ir/runtime_compiler.c
     src/ops/ir/graph_capture.c
     src/ops/ir/nir_compiler.c
+    src/ops/ir/hcq_nir.c
     src/ops/ir/z3_verify.c
     src/ops/ir/compiler_viz.c
     src/ops/ir/gpu/cuda_backend.c
@@ -236,6 +272,8 @@ set(OPS_SOURCES
     src/ops/ir/gpu/wgsl_codegen.c
     src/ops/ir/gpu/metal_codegen.c
     src/ops/ir/gpu/ptx_codegen.c
+    src/ops/ir/gpu/nv_driver.c
+    src/ops/ir/gpu/am_driver.c
     src/ops/ir/gpu/adreno_backend.c
     src/ops/ir/gpu/hexagon_backend.c
     src/ops/simd_utils.c
@@ -250,6 +288,45 @@ endif()
 
 # WebGPU backend sources (has internal stubs when WebGPU unavailable)
 list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
+
+# Vulkan/SPIR-V backend sources
+if(ENABLE_VULKAN)
+    list(APPEND OPS_SOURCES
+        src/ops/ir/gpu/vulkan_backend.c
+        src/ops/ir/gpu/spirv_codegen.c
+        src/ops/ir/hcq_vulkan.c
+    )
+endif()
+
+# NV userspace driver sources
+if(ENABLE_NV_DRIVER)
+    list(APPEND OPS_SOURCES
+        src/ops/ir/gpu/nv_driver.c
+        src/ops/ir/hcq_nv.c
+    )
+endif()
+
+# AM (AMD) userspace driver sources
+if(ENABLE_AM_DRIVER)
+    list(APPEND OPS_SOURCES
+        src/ops/ir/gpu/am_driver.c
+        src/ops/ir/hcq_am.c
+    )
+endif()
+
+# NIR/Mesa backend sources
+if(ENABLE_NIR)
+    list(APPEND OPS_SOURCES
+        src/ops/ir/nir_compiler.c
+        src/ops/ir/hcq_nir.c
+    )
+endif()
+
+# Kernel fusion scheduler V2
+list(APPEND OPS_SOURCES
+    src/ops/ir/schedule_v2.c
+    src/ops/ir/linearize.c
+)
 
 # LLVM backend source (direct LLVM IR JIT)
 if(LLVM_BACKEND_FOUND)
@@ -306,6 +383,12 @@ set(NN_SOURCES
     src/nn/layers/batchnorm1d.c
     src/nn/layers/prelu.c
     src/nn/llm_ops.c
+    src/nn/llama.c
+    src/nn/lora.c
+    src/nn/qlora.c
+    src/nn/paged_attention.c
+    src/nn/serving.c
+    src/nn/speculative.c
 )
 
 set(SYMBOLIC_SOURCES
@@ -330,6 +413,7 @@ if(ENABLE_DISTRIBUTED)
         src/distributed/ring_allreduce.c
         src/distributed/data_parallel.c
         src/distributed/pipeline_parallel.c
+        src/distributed/tensor_parallel.c
     )
     if(ENABLE_NCCL)
         list(APPEND DISTRIBUTED_SOURCES src/distributed/nccl_backend.c)
@@ -341,8 +425,11 @@ if(ENABLE_DISTRIBUTED)
     endif()
     message(STATUS "Distributed training enabled (NCCL: ${ENABLE_NCCL}, MPI: ${ENABLE_MPI})")
 else()
-    set(DISTRIBUTED_SOURCES "")
-    message(STATUS "Distributed training disabled")
+    # Tensor parallelism is always available (single-process simulation)
+    set(DISTRIBUTED_SOURCES
+        src/distributed/tensor_parallel.c
+    )
+    message(STATUS "Distributed training disabled (tensor parallelism still available)")
 endif()
 
 # Dataset Hub
@@ -612,7 +699,11 @@ message(STATUS "  LLVM JIT: ${LLVM_BACKEND_FOUND}")
 message(STATUS "  CUDA: ${CUDAToolkit_FOUND}")
 message(STATUS "  ROCm/HIP: ${hip_FOUND}")
 message(STATUS "  Metal: ${METAL_FOUND}")
+message(STATUS "  Vulkan: ${ENABLE_VULKAN}")
 message(STATUS "  WebGPU: ${ENABLE_WEBGPU}")
+message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}")
+message(STATUS "  AM Driver: ${ENABLE_AM_DRIVER}")
+message(STATUS "  NIR/Mesa: ${ENABLE_NIR}")
 message(STATUS "  ONNX: ${ENABLE_ONNX}")
 message(STATUS "")
 message(STATUS "Build Options:")
@@ -660,6 +751,9 @@ if(BUILD_EXAMPLES)
     # Benchmarks
     cml_add_example(bench_forward examples/benchmarks/bench_forward.c)
     cml_add_example(bench_gemm examples/benchmarks/bench_gemm.c)
+
+    # LLM Inference
+    cml_add_example(llama_inference examples/llama_inference.c)
 
     # Demos
     cml_add_example(autograd_example examples/demos/autograd_example.c)
