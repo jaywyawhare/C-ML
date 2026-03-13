@@ -54,7 +54,7 @@ static void assert_ptx_common(const char* ptx, const char* kernel_name) {
 
 static void test_create_destroy(void) {
     TEST(create_destroy);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(75);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(75, NULL);
     ASSERT_NOT_NULL(cg);
     if (cg->sm_version != 75) { FAIL("Wrong sm_version"); cml_ptx_codegen_destroy(cg); return; }
     if (!cg->initialized) { FAIL("Not initialized"); cml_ptx_codegen_destroy(cg); return; }
@@ -64,7 +64,7 @@ static void test_create_destroy(void) {
 
 static void test_unary_neg(void) {
     TEST(unary_neg);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_NEG, "kernel_neg");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_neg");
@@ -79,7 +79,7 @@ static void test_unary_neg(void) {
 
 static void test_unary_exp(void) {
     TEST(unary_exp);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_EXP, "kernel_exp");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_exp");
@@ -92,7 +92,7 @@ static void test_unary_exp(void) {
 
 static void test_unary_log(void) {
     TEST(unary_log);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_LOG, "kernel_log");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_log");
@@ -104,7 +104,7 @@ static void test_unary_log(void) {
 
 static void test_unary_sqrt(void) {
     TEST(unary_sqrt);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_SQRT, "kernel_sqrt");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "sqrt.approx.f32");
@@ -115,7 +115,7 @@ static void test_unary_sqrt(void) {
 
 static void test_unary_abs(void) {
     TEST(unary_abs);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_ABS, "kernel_abs");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "abs.f32");
@@ -126,7 +126,7 @@ static void test_unary_abs(void) {
 
 static void test_unary_sin(void) {
     TEST(unary_sin);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_SIN, "kernel_sin");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "sin.approx.f32");
@@ -137,7 +137,7 @@ static void test_unary_sin(void) {
 
 static void test_unary_cos(void) {
     TEST(unary_cos);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_COS, "kernel_cos");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "cos.approx.f32");
@@ -148,7 +148,7 @@ static void test_unary_cos(void) {
 
 static void test_unary_sigmoid(void) {
     TEST(unary_sigmoid);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_SIGMOID, "kernel_sigmoid");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_sigmoid");
@@ -162,7 +162,7 @@ static void test_unary_sigmoid(void) {
 
 static void test_unary_tanh(void) {
     TEST(unary_tanh);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_TANH, "kernel_tanh");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "ex2.approx.f32");
@@ -175,7 +175,7 @@ static void test_unary_tanh(void) {
 
 static void test_binary_add(void) {
     TEST(binary_add);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_binary(cg, UOP_ADD, "kernel_add");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_add");
@@ -189,7 +189,7 @@ static void test_binary_add(void) {
 
 static void test_binary_mul(void) {
     TEST(binary_mul);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_binary(cg, UOP_MUL, "kernel_mul");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "mul.f32");
@@ -200,7 +200,7 @@ static void test_binary_mul(void) {
 
 static void test_binary_max(void) {
     TEST(binary_max);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_binary(cg, UOP_MAX, "kernel_max");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "max.f32");
@@ -211,7 +211,7 @@ static void test_binary_max(void) {
 
 static void test_binary_cmplt(void) {
     TEST(binary_cmplt);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_binary(cg, UOP_CMPLT, "kernel_cmplt");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "setp.lt.f32");
@@ -223,7 +223,7 @@ static void test_binary_cmplt(void) {
 
 static void test_binary_pow(void) {
     TEST(binary_pow);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_binary(cg, UOP_POW, "kernel_pow");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "lg2.approx.f32");
@@ -235,7 +235,7 @@ static void test_binary_pow(void) {
 
 static void test_fill(void) {
     TEST(fill);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_fill(cg, 3.14f, "kernel_fill");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_fill");
@@ -249,7 +249,7 @@ static void test_fill(void) {
 
 static void test_where(void) {
     TEST(where);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_where(cg, "kernel_where");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_where");
@@ -263,7 +263,7 @@ static void test_where(void) {
 
 static void test_reduction_sum(void) {
     TEST(reduction_sum);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_reduction(cg, UOP_SUM, "kernel_sum");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_sum");
@@ -275,7 +275,7 @@ static void test_reduction_sum(void) {
 
 static void test_reduction_mean(void) {
     TEST(reduction_mean);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_reduction(cg, UOP_MEAN, "kernel_mean");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "atom.global.add.f32");
@@ -287,7 +287,7 @@ static void test_reduction_mean(void) {
 
 static void test_matmul(void) {
     TEST(matmul);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_matmul(cg, "kernel_matmul");
     ASSERT_NOT_NULL(ptx);
     assert_ptx_common(ptx, "kernel_matmul");
@@ -303,7 +303,7 @@ static void test_matmul(void) {
 
 static void test_sm_version(void) {
     TEST(sm_version_custom);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(86);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(86, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_NEG, "kernel_neg86");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "sm_86");
@@ -314,7 +314,7 @@ static void test_sm_version(void) {
 
 static void test_kernel_count(void) {
     TEST(kernel_count);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     if (cg->kernel_count != 0) { FAIL("Initial count not 0"); cml_ptx_codegen_destroy(cg); return; }
     char* p1 = cml_ptx_gen_unary(cg, UOP_NEG, "k1");
     char* p2 = cml_ptx_gen_binary(cg, UOP_ADD, "k2");
@@ -327,7 +327,7 @@ static void test_kernel_count(void) {
 
 static void test_invalid_unary_op(void) {
     TEST(invalid_unary_op);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_ADD, "invalid"); // ADD is binary, not unary
     if (ptx != NULL) { FAIL("Should return NULL for invalid op"); free(ptx); }
     else { PASS(); }
@@ -336,7 +336,7 @@ static void test_invalid_unary_op(void) {
 
 static void test_register_declarations(void) {
     TEST(register_declarations);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_NEG, "kernel_test");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, ".reg .pred");
@@ -350,7 +350,7 @@ static void test_register_declarations(void) {
 
 static void test_bounds_check(void) {
     TEST(bounds_check);
-    CMLPTXCodegen* cg = cml_ptx_codegen_create(50);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
     char* ptx = cml_ptx_gen_unary(cg, UOP_NEG, "kernel_bc");
     ASSERT_NOT_NULL(ptx);
     ASSERT_CONTAINS(ptx, "setp.ge.u32");

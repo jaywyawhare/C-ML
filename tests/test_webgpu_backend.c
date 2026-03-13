@@ -26,9 +26,10 @@ static void test_wgsl_generate_add(void) {
     /* Verify the generated WGSL contains expected tokens */
     assert(strstr(wgsl, "@compute") != NULL);
     assert(strstr(wgsl, "@workgroup_size") != NULL);
-    assert(strstr(wgsl, "input_a") != NULL);
-    assert(strstr(wgsl, "input_b") != NULL);
-    assert(strstr(wgsl, "output") != NULL);
+    assert(strstr(wgsl, "var<storage") != NULL);
+    assert(strstr(wgsl, "@binding(0)") != NULL);
+    assert(strstr(wgsl, "@binding(1)") != NULL);
+    assert(strstr(wgsl, "result") != NULL);
 
     printf(" (generated %zu bytes) ", strlen(wgsl));
     free(wgsl);
