@@ -38,7 +38,7 @@ export default function Navbar() {
 
       <div className="nav-right">
         <a className="btn-sm" href="https://github.com/jaywyawhare/C-ML" target="_blank" rel="noopener">GitHub</a>
-        <a className="btn-sm filled" href="https://github.com/jaywyawhare/C-ML#quick-start" target="_blank" rel="noopener">Get Started</a>
+        <Link className="btn-sm filled" to="/docs/getting_started">Get Started</Link>
       </div>
     </nav>
   )
