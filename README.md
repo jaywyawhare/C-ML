@@ -16,19 +16,13 @@
 
 ---
 
-C-ML is a machine learning library written from scratch in C11 with zero required dependencies beyond a C compiler and libm. It covers the full stack: tensor operations, automatic differentiation, 28 neural network layers, optimizers, loss functions, a compiler pipeline with operator fusion and codegen to six GPU backends, distributed training, LLM inference (LoRA, paged attention, speculative decoding), and model I/O for GGUF/ONNX/SafeTensors/PyTorch formats. Everything is lazy-evaluated through an IR graph that gets optimized, linearized, and compiled to native code (PTX, SPIR-V, MSL, WGSL, or plain C) before hitting hardware. Python bindings via CFFI are included.
-
-## Build
+C-ML is a from-scratch C11 ML library. Tensors, autograd, 28 layers, optimizers, a compiler that fuses ops and emits GPU kernels (PTX/SPIR-V/WGSL/MSL), distributed training, LLM inference, and model I/O for GGUF/ONNX/SafeTensors. Zero required dependencies.
 
 ```bash
 git clone https://github.com/jaywyawhare/C-ML.git
 cd C-ML && mkdir -p build && cd build
-cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON ..
-make -j$(nproc)
-ctest --output-on-failure   # 56 tests
+cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON .. && make -j$(nproc)
 ```
-
-## Usage
 
 ```c
 #include "cml.h"
@@ -65,55 +59,41 @@ int main(void) {
 }
 ```
 
-```bash
-gcc -std=c11 -O2 example.c -I./include -L./build/lib -lcml_static -lm -ldl -o example
-```
+---
 
-## What's in the box
+| | |
+|:--|:--|
+| **Layers** | 28: Linear, Conv1d/2d/3d, ConvTranspose, RNN/LSTM/GRU, Transformer, BatchNorm, LayerNorm, RMSNorm, Pooling, Dropout, PixelShuffle, ... |
+| **LLM** | LoRA/QLoRA, Flash Attention, GQA, paged KV cache, RoPE, MoE, speculative decoding, LLaMA 7B-70B |
+| **Training** | 9 optimizers, 13 losses, 6 LR schedulers, gradient checkpointing, DDP, pipeline & tensor parallel |
+| **Compiler** | IR fusion (11 patterns), linearization, codegen to C/PTX/SPIR-V/WGSL/MSL, AOT, JIT, kernel cache |
+| **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL — userspace drivers for NV (RM ioctl) and AMD (KFD) |
+| **Runtime** | SIMD (SSE/AVX/AVX-512/NEON), BLAS, TLSF allocator, memory pools, thread pool |
+| **I/O** | GGUF, SafeTensors, ONNX, PyTorch .pth, int8/NF4 quantization |
+| **Python** | CFFI bindings, NumPy integration, operator overloading |
 
-**Layers** -- 28 total. Linear, Conv1d/2d/3d, ConvTranspose1d/2d/3d, RNN, LSTM, GRU, Transformer, Embedding, BatchNorm, LayerNorm, RMSNorm, InstanceNorm, GroupNorm, Pooling, Dropout, PReLU, PixelShuffle, Upsample. Sequential/ModuleList/ModuleDict containers.
-
-**LLM** -- LoRA/QLoRA fine-tuning, Flash Attention, grouped-query attention, paged KV cache, RoPE, mixture of experts, speculative decoding, continuous batching server. LLaMA 7B/13B/70B inference from GGUF.
-
-**Training** -- 9 optimizers (Adam, AdamW, SGD, RMSprop, Adagrad, AdaDelta). 6 LR schedulers. 13 loss functions. Gradient checkpointing. DDP with bucketed all-reduce, GPipe pipeline parallelism, Megatron tensor parallelism over NCCL/MPI/Gloo.
-
-**Compiler** -- Lazy IR graph with DCE, operator fusion (11+ patterns), pattern matching, Z3 formal verification. Schedule, linearize, fused codegen to C/PTX/SPIR-V/WGSL/MSL. AOT compilation, LLVM JIT, TinyJIT replay, kernel caching.
-
-**GPU** -- CUDA (PTX codegen + userspace NV driver via RM ioctl), ROCm (KFD + AQL dispatch), Vulkan (SPIR-V), Metal (MSL), WebGPU (WGSL), OpenCL. Hardware command queue abstraction. Automatic dispatch with CPU fallback.
-
-**Runtime** -- SIMD (SSE/AVX/AVX-512/NEON, runtime detected), BLAS (MKL/OpenBLAS/Accelerate, dynamically loaded), thread pool, TLSF allocator, memory pools, graph allocator with timeline planning.
-
-**I/O** -- GGUF, SafeTensors, ONNX, PyTorch .pth loading. Int8/NF4 quantization. Architecture export to JSON.
-
-**Data** -- 9 built-in datasets with auto-download and caching. CSV parser. Augmentation pipeline.
-
-**Python** -- CFFI bindings with NumPy integration, operator overloading, context managers.
-
-## Stack
+---
 
 ```
 user code       C or Python
      |
-     v
-cml.h           public API, 28 layers, optimizers, losses, LLM ops, serving
+cml.h           28 layers, optimizers, losses, LLM ops, serving
      |
-     v
-autograd        dynamic graphs, checkpointing, distributed training
+autograd        dynamic graphs, checkpointing, distributed
      |
-     v
 tensor ops      broadcasting, SIMD, BLAS
      |
-     v
-compiler        IR -> schedule -> linearize -> codegen -> kernel cache
+compiler        IR -> schedule -> linearize -> codegen -> cache
      |
-     v
-drivers         HCQ, NV (RM ioctl), AM (KFD), memory (TLSF, pools)
+drivers         HCQ, NV (RM ioctl), AM (KFD), TLSF, pools
      |
-     v
 hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, CPU
 ```
 
-## Docs
+---
+
+<details>
+<summary><b>Docs</b></summary>
 
 | | |
 |---|---|
@@ -128,6 +108,6 @@ hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, CPU
 | [Kernel Studio](docs/kernel_studio.md) | [Benchmarks](docs/benchmarks.md) |
 | [External Deps](docs/EXTERNAL_DEPENDENCIES.md) | [Python Setup](python/INSTALLATION.md) |
 
-## License
+</details>
 
 [DBaJ-NC-CFL](LICENCE.md)
