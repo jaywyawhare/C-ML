@@ -241,7 +241,7 @@ start_viz() {
     echo "Press Ctrl+C to stop"
     echo ""
 
-    python3 scripts/fastapi_server.py
+    python3 viz/serve.py
 }
 
 # Show help
