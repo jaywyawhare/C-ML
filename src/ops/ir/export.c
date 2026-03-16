@@ -544,7 +544,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
             // For fused kernels, collect ALL unique inputs from all ops
             // that are not produced by previous ops in the chain
             FusedKernel* fk = node->fused_kernel;
-            char* inputs[64]; // Max 64 inputs for now
+            char* inputs[64];
             int num_inputs = 0;
 
             // Track produced outputs to identify internal edges

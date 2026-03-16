@@ -14,9 +14,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ========================================================================
- * CML_HAS_WEBGPU -- full implementation
- * ======================================================================== */
 #ifdef CML_HAS_WEBGPU
 
 #if defined(__linux__)
@@ -30,7 +27,6 @@
 #define WGPU_LIB_NAME "wgpu_native.dll"
 #endif
 
-/* ── Platform-specific library helpers ── */
 
 #if defined(__linux__) || defined(__APPLE__)
 static void* wgpu_load_library(const char* name) {
@@ -72,7 +68,6 @@ static void* wgpu_get_symbol(void* lib, const char* name) {
 static void wgpu_unload_library(void* lib) { (void)lib; }
 #endif
 
-/* ── WebGPU C-API type definitions (avoid requiring webgpu.h) ── */
 
 typedef void*    WGPUInstance;
 typedef void*    WGPUAdapter;
@@ -109,7 +104,6 @@ typedef enum {
     WGPUBufferMapAsyncStatus_Success = 0,
 } WGPUBufferMapAsyncStatus;
 
-/* ── Internal helper: synchronous adapter request ── */
 
 typedef struct {
     WGPUAdapter adapter;
@@ -130,7 +124,6 @@ static void adapter_request_cb(WGPURequestAdapterStatus status,
     ud->done = true;
 }
 
-/* ── Internal helper: synchronous device request ── */
 
 typedef struct {
     WGPUDevice device;
@@ -151,7 +144,6 @@ static void device_request_cb(WGPURequestDeviceStatus status,
     ud->done = true;
 }
 
-/* ── Internal helper: synchronous buffer map ── */
 
 typedef struct {
     bool success;
@@ -164,7 +156,6 @@ static void buffer_map_cb(WGPUBufferMapAsyncStatus status, void* userdata) {
     ud->done = true;
 }
 
-/* ── Availability ── */
 
 bool cml_webgpu_available(void) {
 #ifndef WGPU_LIB_NAME
@@ -179,7 +170,6 @@ bool cml_webgpu_available(void) {
 #endif
 }
 
-/* ── Lifecycle ── */
 
 CMLWebGPUBackend* cml_webgpu_backend_create(void) {
     CMLWebGPUBackend* backend = (CMLWebGPUBackend*)calloc(1, sizeof(CMLWebGPUBackend));
@@ -244,7 +234,6 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void) {
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     if (!backend) return -1;
     if (backend->initialized) {
-        LOG_DEBUG("WebGPU backend already initialized");
         return 0;
     }
 
@@ -364,7 +353,6 @@ void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
     free(backend);
 }
 
-/* ── Compilation ── */
 
 CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
                                            const char* wgsl_source,
@@ -487,7 +475,6 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
     strncpy(kernel->name, entry_point, sizeof(kernel->name) - 1);
     kernel->name[sizeof(kernel->name) - 1] = '\0';
 
-    LOG_DEBUG("Compiled WebGPU kernel: %s", entry_point);
     return kernel;
 }
 
@@ -500,7 +487,6 @@ void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
     free(kernel);
 }
 
-/* ── Execution ── */
 
 int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
                              CMLWebGPUKernel* kernel,
@@ -660,7 +646,6 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     return 0;
 }
 
-/* ── Memory ── */
 
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
     if (!backend || !backend->initialized || size == 0) return NULL;
@@ -854,9 +839,6 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
     return 0;
 }
 
-/* ========================================================================
- * Stubs -- when CML_HAS_WEBGPU is NOT defined
- * ======================================================================== */
 #else /* !CML_HAS_WEBGPU */
 
 bool cml_webgpu_available(void) { return false; }

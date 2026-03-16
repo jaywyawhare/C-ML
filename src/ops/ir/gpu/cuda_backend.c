@@ -175,7 +175,7 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
             backend->nvrtcGetProgramLog  = get_symbol(backend->nvrtc_lib, "nvrtcGetProgramLog");
             backend->nvrtcGetProgramLogSize =
                 get_symbol(backend->nvrtc_lib, "nvrtcGetProgramLogSize");
-            LOG_DEBUG("NVRTC loaded for runtime CUDA compilation");
+
         }
     }
 
@@ -186,10 +186,8 @@ int cml_cuda_backend_init(CMLCUDABackend* backend, int device_ordinal) {
     if (!backend)
         return -1;
 
-    if (backend->initialized) {
-        LOG_DEBUG("CUDA backend already initialized");
+    if (backend->initialized)
         return 0;
-    }
 
     if (load_cuda_functions(backend) != 0) {
         return -1;

@@ -425,7 +425,7 @@ CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v,
 
     /* Schedule verification: check that all dependencies are satisfied
      * (i.e., producers execute before consumers in the schedule order).
-     * For now, delegate to bounds checking as a basic sanity check. */
+     * Delegates to bounds checking as a basic sanity check. */
     return cml_z3_verify_bounds(v, ir);
 }
 

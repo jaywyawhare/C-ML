@@ -278,9 +278,6 @@ int cml_wmma_matmul(const void* A, const void* B, void* C,
     return result;
 }
 
-/* ========================================================================
- * Stubs -- when CML_HAS_CUDA is NOT defined
- * ======================================================================== */
 #else /* !CML_HAS_CUDA */
 
 bool cml_wmma_available(void) {

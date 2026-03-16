@@ -25,9 +25,7 @@
 /* Tile size for tiled matmul */
 #define TILE_SIZE 16
 
-/**
- * @brief Append a formatted string to a dynamically-growing buffer.
- */
+/** Append a formatted string to a dynamically-growing buffer. */
 static void wgsl_appendf(char** buf, size_t* cap, size_t* len,
                           const char* fmt, ...) {
     va_list ap;
@@ -54,9 +52,6 @@ static void wgsl_appendf(char** buf, size_t* cap, size_t* len,
     *len += (size_t)needed;
 }
 
-/**
- * @brief Allocate and initialise a WGSL buffer.
- */
 static char* wgsl_buf_new(size_t* cap, size_t* len) {
     *cap = WGSL_BUF_INIT_SIZE;
     *len = 0;
@@ -65,19 +60,7 @@ static char* wgsl_buf_new(size_t* cap, size_t* len) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Binary elementwise kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL binary elementwise compute shader.
- *
- * Layout:
- *   @group(0) @binding(0) var<storage, read>       a : array<f32>;
- *   @group(0) @binding(1) var<storage, read>       b : array<f32>;
- *   @group(0) @binding(2) var<storage, read_write>  out : array<f32>;
- *   @group(0) @binding(3) var<uniform>              n : u32;
- */
 static char* wgsl_binary_kernel(UOpType type) {
     const char* expr = NULL;
     switch (type) {
@@ -119,18 +102,7 @@ static char* wgsl_binary_kernel(UOpType type) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Unary elementwise kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL unary elementwise compute shader.
- *
- * Layout:
- *   @group(0) @binding(0) var<storage, read>       a : array<f32>;
- *   @group(0) @binding(1) var<storage, read_write>  out : array<f32>;
- *   @group(0) @binding(2) var<uniform>              n : u32;
- */
 static char* wgsl_unary_kernel(UOpType type) {
     const char* expr = NULL;
     switch (type) {
@@ -173,13 +145,7 @@ static char* wgsl_unary_kernel(UOpType type) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Activation kernels (multi-statement bodies)
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL sigmoid compute shader.
- */
 static char* wgsl_sigmoid_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -206,9 +172,6 @@ static char* wgsl_sigmoid_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL tanh compute shader.
- */
 static char* wgsl_tanh_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -235,10 +198,6 @@ static char* wgsl_tanh_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL ELU compute shader.
- *        ELU(x) = x if x > 0, else exp(x) - 1
- */
 static char* wgsl_elu_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -265,10 +224,6 @@ static char* wgsl_elu_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL SELU compute shader.
- *        SELU(x) = scale * (x if x > 0, else alpha*(exp(x)-1))
- */
 static char* wgsl_selu_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -298,10 +253,6 @@ static char* wgsl_selu_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL SiLU (Swish) compute shader.
- *        SiLU(x) = x / (1 + exp(-x))
- */
 static char* wgsl_silu_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -329,10 +280,6 @@ static char* wgsl_silu_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL Mish compute shader.
- *        Mish(x) = x * tanh(ln(1 + exp(x)))
- */
 static char* wgsl_mish_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -360,10 +307,6 @@ static char* wgsl_mish_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL HardSwish compute shader.
- *        HardSwish(x) = x if x >= 3, 0 if x < -3, else x*(x+3)/6
- */
 static char* wgsl_hardswish_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -391,18 +334,7 @@ static char* wgsl_hardswish_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * FILL kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL fill kernel. Sets every element to a constant
- *        value passed via a uniform parameter.
- *
- * Layout:
- *   @group(0) @binding(0) var<storage, read_write> result : array<f32>;
- *   @group(0) @binding(1) var<uniform>             params : FillParams;
- */
 static char* wgsl_fill_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -429,22 +361,7 @@ static char* wgsl_fill_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * WHERE kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL where (conditional select) kernel.
- *
- * result[idx] = select(b[idx], a[idx], cond[idx] != 0.0)
- *
- * Layout:
- *   @group(0) @binding(0) var<storage, read>       cond   : array<f32>;
- *   @group(0) @binding(1) var<storage, read>       a      : array<f32>;
- *   @group(0) @binding(2) var<storage, read>       b      : array<f32>;
- *   @group(0) @binding(3) var<storage, read_write> result : array<f32>;
- *   @group(0) @binding(4) var<uniform>             params : Params;
- */
 static char* wgsl_where_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -473,21 +390,7 @@ static char* wgsl_where_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * GATHER kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL gather kernel.
- *
- * result[idx] = input[u32(indices[idx]) * C + idx % C]
- *
- * Layout:
- *   @group(0) @binding(0) var<storage, read>       input   : array<f32>;
- *   @group(0) @binding(1) var<storage, read>       indices : array<f32>;
- *   @group(0) @binding(2) var<storage, read_write> result  : array<f32>;
- *   @group(0) @binding(3) var<uniform>             params  : GatherParams;
- */
 static char* wgsl_gather_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -516,13 +419,7 @@ static char* wgsl_gather_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Reduction kernels (CAS-loop atomic pattern)
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL max-reduction kernel using CAS loop.
- */
 static char* wgsl_max_reduce_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -566,9 +463,6 @@ static char* wgsl_max_reduce_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL min-reduction kernel using CAS loop.
- */
 static char* wgsl_min_reduce_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -612,10 +506,6 @@ static char* wgsl_min_reduce_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL mean-reduction kernel using CAS loop.
- *        Each thread adds a[idx]/n to the accumulator.
- */
 static char* wgsl_mean_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -655,9 +545,6 @@ static char* wgsl_mean_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL product-reduction kernel using CAS loop.
- */
 static char* wgsl_prod_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -697,9 +584,6 @@ static char* wgsl_prod_kernel(void) {
     return buf;
 }
 
-/**
- * @brief Generate a WGSL sum reduction compute shader (naive atomic).
- */
 static char* wgsl_sum_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -742,15 +626,7 @@ static char* wgsl_sum_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * 16x16 tiled matmul kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL tiled matmul compute shader (16x16 tiles).
- *
- * Uses shared memory tiles and workgroupBarrier() for synchronisation.
- */
 static char* wgsl_matmul_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -815,20 +691,7 @@ static char* wgsl_matmul_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * conv2d kernel
- * ──────────────────────────────────────────────────────────────────── */
 
-/**
- * @brief Generate a WGSL direct conv2d compute shader.
- *
- * Input  : [N, Cin,  H,   W]
- * Weight : [Cout, Cin, KH, KW]
- * Output : [N, Cout, OH, OW]
- *
- * Uniform params carry N, Cin, Cout, H, W, KH, KW, stride, padding.
- * Each thread computes one output element.
- */
 static char* wgsl_conv2d_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -889,9 +752,6 @@ static char* wgsl_conv2d_kernel(void) {
     return buf;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Main dispatch: cml_wgsl_generate
- * ──────────────────────────────────────────────────────────────────── */
 
 /**
  * @brief Generate WGSL compute shader source for a single IR node.
@@ -975,9 +835,6 @@ char* cml_wgsl_generate(struct IRNode* node) {
     return NULL;
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Graph-level WebGPU execution
- * ──────────────────────────────────────────────────────────────────── */
 
 /**
  * @brief Execute a full IR graph on the WebGPU backend.

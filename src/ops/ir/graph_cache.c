@@ -248,7 +248,6 @@ void cml_free_execution_plan(CMLExecutionPlan* plan) {
     free(plan);
 }
 
-// Execute single node using pre-allocated buffer
 static int execute_node_fast(struct IRNode* node, float* out_buf) {
     if (!node || !out_buf)
         return -1;
@@ -415,7 +414,6 @@ static int execute_node_fast(struct IRNode* node, float* out_buf) {
             }
             out_buf[0] = sum;
         } else {
-            // Partial sum - simplified
             memset(out_buf, 0, out_n * sizeof(float));
             for (size_t i = 0; i < in1_n; i++) {
                 out_buf[i % out_n] += in1[i];
@@ -486,7 +484,6 @@ static int execute_node_fast(struct IRNode* node, float* out_buf) {
             }
             out_buf[0] = sum / (float)in1_n;
         } else {
-            // Partial mean - simplified
             memset(out_buf, 0, out_n * sizeof(float));
             for (size_t i = 0; i < in1_n; i++) {
                 out_buf[i % out_n] += in1[i];

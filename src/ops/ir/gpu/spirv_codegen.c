@@ -13,7 +13,6 @@
 #include <string.h>
 #include <math.h>
 
-/* ── SPIR-V magic and opcode constants ── */
 
 #define SPIRV_MAGIC       0x07230203
 #define SPIRV_VERSION     0x00010300  /* SPIR-V 1.3 */
@@ -137,7 +136,6 @@
 #define GLSLstd450Cosh         20
 #define GLSLstd450FSign        6
 
-/* ── SPIR-V builder ── */
 
 SPIRVBuilder* spirv_builder_create(void) {
     SPIRVBuilder* b = (SPIRVBuilder*)calloc(1, sizeof(SPIRVBuilder));
@@ -275,7 +273,6 @@ uint32_t* spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size) {
     return result;
 }
 
-/* ── Codegen lifecycle ── */
 
 CMLSPIRVCodegen* cml_spirv_codegen_create(void) {
     CMLSPIRVCodegen* cg = (CMLSPIRVCodegen*)calloc(1, sizeof(CMLSPIRVCodegen));

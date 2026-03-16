@@ -24,10 +24,10 @@ extern "C" {
 
 /** A compiled kernel ready for execution */
 typedef struct CMLCompiledKernel {
-    uint64_t hash;              /* Hash of the LinearProgram */
+    uint64_t hash;
     CMLFusedBackend backend;
-    char* source;               /* Source code (for recompilation) */
-    void* binary;               /* Compiled binary (PTX cubin, SPIR-V, etc.) */
+    char* source;
+    void* binary;
     size_t binary_size;
     int num_inputs;
     int num_outputs;
@@ -35,7 +35,7 @@ typedef struct CMLCompiledKernel {
     bool valid;
 
     /* Stored linear ops for CPU interpreter execution */
-    CMLLinearOp* ops;           /* Copy of LinearProgram ops */
+    CMLLinearOp* ops;
     int num_ops;
     int num_vregs;
 } CMLCompiledKernel;

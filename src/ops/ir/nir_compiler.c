@@ -247,10 +247,7 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
         compiler->spirv_size = 0;
     }
 
-     * Step 1: Create a compute shader via the NIR builder.
-     * nir_builder_init_simple_shader(NULL, options, MESA_SHADER_COMPUTE,
-     *                                 "cml_kernel");
-     * MESA_SHADER_COMPUTE = 5 in Mesa's gl_shader_stage enum.
+    /* MESA_SHADER_COMPUTE = 5 in Mesa's gl_shader_stage enum */
     void* builder = compiler->nir_builder_init_simple_shader(
         NULL, compiler->compiler_options, /*MESA_SHADER_COMPUTE*/ 5, "cml_kernel");
     if (!builder) {
@@ -264,15 +261,7 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
         LOG_WARNING("NIR: failed to load global_invocation_id");
     }
 
-     * Step 3: Walk the IR graph and emit NIR operations.
-     *
-     * A full implementation would iterate over every node in the
-     * CMLGraph, map each UOp to the corresponding NIR builder call,
-     * and wire up the SSA value chain.  For now we delegate per-node
-     * emission to cml_nir_emit_uop() which logs and validates.
-     *
-     * The per-node emission is handled by cml_nir_emit_uop().
-    (void)gid; /* Used as indexing source when per-node emission is wired up */
+    (void)gid;
 
     size_t spirv_size = 0;
     void* spirv = compiler->nir_shader_to_spirv(builder, &spirv_size);

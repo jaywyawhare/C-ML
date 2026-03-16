@@ -87,7 +87,6 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
        writes to .ll file, then invokes llc for object/shared lib */
     LOG_INFO("AOT compiling IR graph to: %s (via LLVM backend)", output_path);
 
-    /* For now, header-only mode is always supported */
     if (opts.format == AOT_FORMAT_HEADER_ONLY) {
         return cml_aot_generate_header(ir, output_path, func_name);
     }

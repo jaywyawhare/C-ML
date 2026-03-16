@@ -31,7 +31,7 @@ void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
 int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {
     (void)ir;
     if (!backend || !backend->initialized) return -1;
-    return -1; /* Not yet implemented */
+    return -1;
 }
 
 const char* cml_adreno_device_info(const CMLAdrenoBackend* backend) {

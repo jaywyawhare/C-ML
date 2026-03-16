@@ -500,11 +500,13 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
     return buf;
 }
 
+/*
  * SPIR-V Backend codegen
  *
  * Generates a valid SPIR-V 1.3 compute shader that implements the fused
  * kernel.  Each LOAD reads from a storage buffer, each COMPUTE performs
  * arithmetic, and each STORE writes to a storage buffer.
+ */
 
 /* SPIR-V opcode helpers */
 #define SPIRV_OP(opcode, word_count) (((uint32_t)(word_count) << 16) | (uint32_t)(opcode))

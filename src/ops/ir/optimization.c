@@ -121,8 +121,7 @@ static int remove_dead_nodes(CMLGraph_t ir) {
                 ir->tail = prev;
             }
 
-            // CRITICAL: Clear tensor's ir_node pointer before freeing the node
-            // This prevents dangling pointers when tensors are later freed
+            /* Clear back-pointer before freeing to prevent dangling refs */
             if (node->output) {
                 node->output->ir_node    = NULL;
                 node->output->ir_context = NULL;
@@ -365,7 +364,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         // MUL + ADD -> FMA: a * b + c
         char* other_input = find_other_input(node1, node2);
         if (other_input && node1->num_inputs >= 2) {
-            // Create fused kernel
+    
             struct IRNode* ops[] = {node1, node2};
             FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_FMA);
             if (kernel) {
@@ -420,7 +419,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
     }
 
     case FUSION_EXP_LOG: {
-        // EXP + LOG -> identity: log(exp(a)) -> a
+        struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_EXP_LOG);
         if (kernel) {
             node1->fused_kernel = kernel;
@@ -434,7 +433,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
     }
 
     case FUSION_MUL_DIV: {
-        // MUL + DIV -> identity: (a * b) / a -> b or (a * b) / b -> a
+        struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_MUL_DIV);
         if (kernel) {
             node1->fused_kernel = kernel;
@@ -448,7 +447,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
     }
 
     case FUSION_SQRT_MUL: {
-        // SQRT + MUL -> sqrt_mul: sqrt(a) * b
+        struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_SQRT_MUL);
         if (kernel) {
             node1->fused_kernel = kernel;
@@ -462,7 +461,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
     }
 
     case FUSION_EXP_RECIP: {
-        // EXP + RECIP -> exp_recip: 1 / exp(a)
+        struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_EXP_RECIP);
         if (kernel) {
             node1->fused_kernel = kernel;
@@ -477,7 +476,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
 
     case FUSION_CHAIN_ELEMENTWISE:
     case FUSION_REDUCE_ELEMENTWISE: {
-        // Chain elementwise operations or reduction + elementwise
+        struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, fusion_type);
         if (kernel) {
             node1->fused_kernel = kernel;
@@ -567,11 +566,12 @@ static int fuse_operations(CMLGraph_t ir) {
                     chain[i]->is_fused     = true;
                     chain[i]->fusion_type  = FUSION_CHAIN_ELEMENTWISE;
                     chain[i]->fused_kernel = kernel;
-                    chain[i]->chain_id     = fused; // Same chain ID for all
+                    chain[i]->chain_id     = fused;
                 }
                 fused++;
+            }
+            node = chain[chain_len - 1]->next;
             continue;
-        } else if (all_same && chain_len >= 2) {
         }
 
         for (int i = 0; i < node->use_count; i++) {
@@ -595,7 +595,7 @@ static int fuse_operations(CMLGraph_t ir) {
         node = node->next;
     }
 
-    if (fused > 0) {
+    return 0;
 }
 
 static int reorder_for_cache_locality(CMLGraph_t ir) {

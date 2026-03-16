@@ -47,7 +47,6 @@ static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     float* g_data  = (float*)g->data;
     size_t t_numel = t->numel;
 
-    // Handle broadcasting: accumulate with modulo indexing
     for (size_t i = 0; i < numel; i++) {
         g_data[i % t_numel] += grad_data[i];
     }
@@ -64,7 +63,6 @@ static int cpu_backward_node(struct IRNode* node) {
     float* out_grad  = (float*)out->grad->data;
     size_t out_numel = out->numel;
 
-    // Get input tensors
     Tensor* in1 = (node->num_inputs >= 1 && node->inputs) ? node->inputs[0] : NULL;
     Tensor* in2 = (node->num_inputs >= 2 && node->inputs) ? node->inputs[1] : NULL;
 

@@ -19,13 +19,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── External accessor for the global NV driver context ─────────────────
+/* External accessor for the global NV driver context.
  * Provided by dispatch.c (or equivalent) so that HCQ does not own the
  * driver lifecycle.
  */
 extern CMLNVDriver* cml_dispatch_get_nv_driver(void);
 
-/* ── File-local: per-queue GPFIFO bookkeeping ───────────────────────────
+/* Per-queue GPFIFO bookkeeping.
  *
  * Each HCQ queue gets its own submit counter so that signal_record can
  * snapshot the value and signal_wait_cpu can poll against it.
@@ -94,8 +94,8 @@ int cml_hcq_nv_submit_kernel(CMLHCQQueue* queue,
      * 2. Push the pushbuffer address into the GPFIFO ring
      * 3. Ring the doorbell to notify the GPU
      *
-     * For now, delegate to cml_nv_kernel_launch() if we have a real kernel,
-     * or log the passthrough.
+     * Delegates to cml_nv_kernel_launch() if we have a real kernel,
+     * or logs the passthrough.
      */
     uint32_t grid[3]  = { (uint32_t)desc->grid[0],
                            (uint32_t)desc->grid[1],

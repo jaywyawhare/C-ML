@@ -39,7 +39,6 @@ static void init_nvptx_target(void) {
     LLVMInitializeNVPTXTargetMC();
     LLVMInitializeNVPTXAsmPrinter();
     g_nvptx_initialized = true;
-    LOG_DEBUG("NVPTX target initialized");
 }
 
 static void init_amdgpu_target(void) {
@@ -49,7 +48,6 @@ static void init_amdgpu_target(void) {
     LLVMInitializeAMDGPUTargetMC();
     LLVMInitializeAMDGPUAsmPrinter();
     g_amdgpu_initialized = true;
-    LOG_DEBUG("AMDGPU target initialized");
 }
 
 CMLGPUCodegen* cml_gpu_codegen_create(GPUTarget target, void* backend) {
@@ -850,7 +848,7 @@ static LLVMModuleRef gpu_build_conv2d(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef kh_kw = LLVMBuildMul(bld, p_kh, p_kw, "kh_kw");
     LLVMValueRef ic_kh_kw = LLVMBuildMul(bld, p_in_c, kh_kw, "ic_kh_kw");
 
-    // === Outer loop: ic ===
+    // Outer loop: ic
     LLVMBasicBlockRef ic_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "ic.hdr");
     LLVMBasicBlockRef ic_body = LLVMAppendBasicBlockInContext(ctx, fn, "ic.body");
     LLVMBasicBlockRef ic_exit = LLVMAppendBasicBlockInContext(ctx, fn, "ic.exit");
@@ -866,7 +864,7 @@ static LLVMModuleRef gpu_build_conv2d(LLVMContextRef ctx, const char* fn_name,
 
     LLVMPositionBuilderAtEnd(bld, ic_body);
 
-    // === Middle loop: kh ===
+    // Middle loop: kh
     LLVMBasicBlockRef kh_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "kh.hdr");
     LLVMBasicBlockRef kh_body = LLVMAppendBasicBlockInContext(ctx, fn, "kh.body");
     LLVMBasicBlockRef kh_exit = LLVMAppendBasicBlockInContext(ctx, fn, "kh.exit");
@@ -881,7 +879,7 @@ static LLVMModuleRef gpu_build_conv2d(LLVMContextRef ctx, const char* fn_name,
 
     LLVMPositionBuilderAtEnd(bld, kh_body);
 
-    // === Inner loop: kw ===
+    // Inner loop: kw
     LLVMBasicBlockRef kw_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "kw.hdr");
     LLVMBasicBlockRef kw_body = LLVMAppendBasicBlockInContext(ctx, fn, "kw.body");
     LLVMBasicBlockRef kw_exit = LLVMAppendBasicBlockInContext(ctx, fn, "kw.exit");

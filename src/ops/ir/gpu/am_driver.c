@@ -34,9 +34,6 @@
 #include <sys/stat.h>
 #endif
 
-/* ======================================================================
- * KFD ioctl structures (minimal, matching kernel headers)
- * ====================================================================== */
 
 #ifdef __linux__
 
@@ -173,9 +170,6 @@ struct kfd_ioctl_unmap_memory_from_gpu_args {
 
 #endif /* __linux__ */
 
-/* ======================================================================
- * Helper: KFD ioctl wrapper
- * ====================================================================== */
 
 #ifdef __linux__
 
@@ -186,7 +180,7 @@ static int kfd_ioctl(int fd, unsigned long request, void* arg) {
     } while (ret == -1 && errno == EINTR);
 
     if (ret == -1) {
-        LOG_DEBUG("AM driver: KFD ioctl 0x%lx failed: %s (errno=%d)",
+        LOG_DEBUG("KFD ioctl 0x%lx failed: %s (errno=%d)",
                   request, strerror(errno), errno);
     }
     return ret;
@@ -291,9 +285,6 @@ static void am_free_and_unmap(CMLAMDriver* drv, uint64_t handle,
 
 #endif /* __linux__ */
 
-/* ======================================================================
- * Driver availability check
- * ====================================================================== */
 
 bool cml_am_driver_available(void) {
 #ifdef __linux__
@@ -322,11 +313,10 @@ bool cml_am_driver_available(void) {
     close(fd);
 
     if (ret != 0) {
-        LOG_DEBUG("AM driver: KFD GET_VERSION ioctl failed");
         return false;
     }
 
-    LOG_DEBUG("AM driver: KFD version %u.%u detected",
+    LOG_INFO("AM driver: KFD version %u.%u",
               ver.major_version, ver.minor_version);
     return true;
 #else
@@ -335,9 +325,6 @@ bool cml_am_driver_available(void) {
 #endif
 }
 
-/* ======================================================================
- * Driver lifecycle
- * ====================================================================== */
 
 CMLAMDriver* cml_am_driver_create(void) {
     CMLAMDriver* drv = (CMLAMDriver*)calloc(1, sizeof(CMLAMDriver));
@@ -361,10 +348,8 @@ int cml_am_driver_init(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv) return -1;
 
-    if (drv->initialized) {
-        LOG_DEBUG("AM driver: already initialized");
+    if (drv->initialized)
         return 0;
-    }
 
     /* Open /dev/kfd */
     drv->fd_kfd = open("/dev/kfd", O_RDWR | O_CLOEXEC);
@@ -541,8 +526,8 @@ void cml_am_driver_free(CMLAMDriver* drv) {
         }
 
         /* Note: In a full implementation, we would track all memory handles
-         * and free them here.  For now, the kernel will clean up on process
-         * exit or when the KFD file descriptor is closed. */
+         * and free them here.  The kernel cleans up on process exit
+         * or when the KFD file descriptor is closed. */
     }
 
     if (drv->fd_drm >= 0) close(drv->fd_drm);
@@ -552,9 +537,6 @@ void cml_am_driver_free(CMLAMDriver* drv) {
     free(drv);
 }
 
-/* ======================================================================
- * Buffer management
- * ====================================================================== */
 
 CMLAMBuffer* cml_am_buffer_create(CMLAMDriver* drv, size_t size, bool vram) {
 #ifdef __linux__
@@ -708,9 +690,6 @@ int cml_am_buffer_download(CMLAMDriver* drv, CMLAMBuffer* src,
 #endif
 }
 
-/* ======================================================================
- * Kernel management
- * ====================================================================== */
 
 CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object,
                                 size_t code_size, const char* kernel_name) {
@@ -1087,9 +1066,6 @@ int cml_am_kernel_launch(CMLAMDriver* drv, CMLAMKernel* kernel,
 #endif
 }
 
-/* ======================================================================
- * Synchronization
- * ====================================================================== */
 
 int cml_am_synchronize(CMLAMDriver* drv) {
 #ifdef __linux__
@@ -1140,9 +1116,6 @@ int cml_am_synchronize(CMLAMDriver* drv) {
 #endif
 }
 
-/* ======================================================================
- * Graph execution (stub)
- * ====================================================================== */
 
 int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
     if (!drv || !ir) return -1;
@@ -1152,7 +1125,6 @@ int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
         return -1;
     }
 
-    LOG_DEBUG("AM driver: executing IR graph (%d nodes)", ir->node_count);
 
     struct IRNode* node = ir->head;
     while (node) {
@@ -1241,7 +1213,7 @@ int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
                  * cml_am_buffer_download(drv, buf_out, output->data, bytes);
                  * gpu_ok = true;
                  *
-                 * For now, check if we have GTT buffers and use CPU on the
+                 * Check if we have GTT buffers and use CPU on the
                  * GPU-mapped memory (zero-copy path). */
 
                 /* Zero-copy CPU execution on GTT-mapped buffers */

@@ -975,7 +975,7 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
     }
 
     // Store JIT for cleanup (we keep the latest one alive)
-    // In production, we'd cache these. For now, destroy old, keep new.
+    // Destroy old JIT, keep new
     if (backend->jit) {
         LLVMOrcDisposeLLJIT(backend->jit);
     }

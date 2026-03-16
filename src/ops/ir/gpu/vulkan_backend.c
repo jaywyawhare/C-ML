@@ -28,7 +28,6 @@
 #define VULKAN_LIB_NAME NULL
 #endif
 
-/* ── Vulkan structure definitions (minimal, matching Vulkan spec layout) ── */
 
 /* VkApplicationInfo */
 typedef struct {
@@ -336,7 +335,6 @@ typedef struct {
 #define VK_ACCESS_TRANSFER_READ_BIT          0x00000080
 #define VK_PIPELINE_BIND_POINT_COMPUTE       1
 
-/* ── Dynamic library helpers ── */
 
 static void* vk_load_library(const char* name) {
     if (!name) return NULL;
@@ -355,7 +353,6 @@ static void vk_unload_library(void* lib) {
     if (lib) dlclose(lib);
 }
 
-/* ── Load all function pointers ── */
 
 #define VK_LOAD_FUNC(name) \
     backend->name = vk_get_symbol(backend->vulkan_lib, #name); \
@@ -418,7 +415,6 @@ static int load_vulkan_functions(CMLVulkanBackend* backend) {
 
 #undef VK_LOAD_FUNC
 
-/* ── Availability check ── */
 
 bool cml_vulkan_available(void) {
 #ifndef __linux__
@@ -435,7 +431,6 @@ bool cml_vulkan_available(void) {
 #endif
 }
 
-/* ── Backend lifecycle ── */
 
 CMLVulkanBackend* cml_vulkan_backend_create(void) {
     CMLVulkanBackend* backend = (CMLVulkanBackend*)calloc(1, sizeof(CMLVulkanBackend));
@@ -462,7 +457,6 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     if (!backend) return -1;
     if (backend->initialized) return 0;
 
-    /* Load library */
     backend->vulkan_lib = vk_load_library(VULKAN_LIB_NAME);
     if (!backend->vulkan_lib) {
         LOG_ERROR("Failed to load Vulkan library");
@@ -475,7 +469,6 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
         return -1;
     }
 
-    /* Create instance */
     VkApplicationInfo_t app_info = {0};
     app_info.sType = 0; /* VK_STRUCTURE_TYPE_APPLICATION_INFO */
     app_info.pApplicationName = "C-ML";
@@ -496,7 +489,6 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
         return -1;
     }
 
-    /* Enumerate physical devices */
     uint32_t dev_count = 0;
     backend->vkEnumeratePhysicalDevices(backend->instance, &dev_count, NULL);
     if (dev_count == 0) {
@@ -512,31 +504,26 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     backend->physical_device = devices[0]; /* Use first device */
     free(devices);
 
-    /* Get device properties */
     VkPhysicalDeviceProperties_t props = {0};
     backend->vkGetPhysicalDeviceProperties(backend->physical_device, &props);
     strncpy(backend->device_name, props.deviceName, sizeof(backend->device_name) - 1);
     backend->api_version = props.apiVersion;
 
-    /* Get memory properties */
     VkPhysicalDeviceMemoryProperties_t mem_props = {0};
     backend->vkGetPhysicalDeviceMemoryProperties(backend->physical_device, &mem_props);
 
-    /* Find memory types */
     backend->memory_type_device_local = find_memory_type(
         &mem_props, UINT32_MAX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     backend->memory_type_host_visible = find_memory_type(
         &mem_props, UINT32_MAX,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    /* Compute total memory */
     backend->total_memory = 0;
     for (uint32_t i = 0; i < mem_props.memoryHeapCount; i++) {
         if (mem_props.memoryHeaps[i].flags & 0x01) /* VK_MEMORY_HEAP_DEVICE_LOCAL_BIT */
             backend->total_memory += mem_props.memoryHeaps[i].size;
     }
 
-    /* Find compute queue family */
     uint32_t qf_count = 0;
     backend->vkGetPhysicalDeviceQueueFamilyProperties(backend->physical_device, &qf_count, NULL);
     VkQueueFamilyProperties_t* qf_props =
@@ -561,7 +548,6 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
         return -1;
     }
 
-    /* Create logical device */
     float queue_priority = 1.0f;
     VkDeviceQueueCreateInfo_t queue_info = {0};
     queue_info.sType = 2; /* VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO */
@@ -583,11 +569,9 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
         return -1;
     }
 
-    /* Get compute queue */
     backend->vkGetDeviceQueue(backend->device, backend->compute_queue_family, 0,
                                &backend->compute_queue);
 
-    /* Create command pool */
     VkCommandPoolCreateInfo_t pool_info = {0};
     pool_info.sType = 39; /* VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO */
     pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -633,7 +617,6 @@ void cml_vulkan_backend_free(CMLVulkanBackend* backend) {
     free(backend);
 }
 
-/* ── Buffer management ── */
 
 CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSize size,
                                            bool device_local) {
@@ -645,7 +628,6 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
     buf->size = size;
     buf->is_device_local = device_local;
 
-    /* Create buffer */
     VkBufferCreateInfo_t buf_info = {0};
     buf_info.sType = 12; /* VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO */
     buf_info.size = size;
@@ -660,11 +642,9 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
         return NULL;
     }
 
-    /* Get memory requirements */
     VkMemoryRequirements_t mem_reqs = {0};
     backend->vkGetBufferMemoryRequirements(backend->device, buf->buffer, &mem_reqs);
 
-    /* Allocate memory */
     VkMemoryAllocateInfo_t alloc_info = {0};
     alloc_info.sType = 5; /* VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO */
     alloc_info.allocationSize = mem_reqs.size;
@@ -679,7 +659,6 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
         return NULL;
     }
 
-    /* Bind buffer to memory */
     res = backend->vkBindBufferMemory(backend->device, buf->buffer, buf->memory, 0);
     if (res != VK_SUCCESS) {
         backend->vkFreeMemory(backend->device, buf->memory, NULL);
@@ -807,7 +786,6 @@ int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
     return 0;
 }
 
-/* ── Kernel management ── */
 
 CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint32_t* spirv,
                                             size_t spirv_size, const char* entry_point,
@@ -820,7 +798,6 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
     kernel->num_buffers = num_buffers;
     kernel->name = strdup(entry_point ? entry_point : "main");
 
-    /* Create shader module */
     VkShaderModuleCreateInfo_t sm_info = {0};
     sm_info.sType = 16;
     sm_info.codeSize = spirv_size;
@@ -851,7 +828,6 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
     free(bindings);
     if (res != VK_SUCCESS) goto fail;
 
-    /* Create pipeline layout */
     VkPipelineLayoutCreateInfo_t pl_info = {0};
     pl_info.sType = 30;
     pl_info.setLayoutCount = 1;
@@ -861,7 +837,6 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
                                             &kernel->pipeline_layout);
     if (res != VK_SUCCESS) goto fail;
 
-    /* Create compute pipeline */
     VkComputePipelineCreateInfo_t cp_info = {0};
     cp_info.sType = 29;
     cp_info.stage.sType = 18;
@@ -875,7 +850,6 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
                                               &kernel->pipeline);
     if (res != VK_SUCCESS) goto fail;
 
-    /* Create descriptor pool */
     VkDescriptorPoolSize_t pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)num_buffers};
     VkDescriptorPoolCreateInfo_t dp_info = {0};
     dp_info.sType = 33;
@@ -887,7 +861,6 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
                                             &kernel->desc_pool);
     if (res != VK_SUCCESS) goto fail;
 
-    /* Allocate descriptor set */
     VkDescriptorSetAllocateInfo_t ds_info = {0};
     ds_info.sType = 34;
     ds_info.descriptorPool = kernel->desc_pool;
@@ -947,7 +920,6 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
                                 uint32_t gx, uint32_t gy, uint32_t gz) {
     if (!backend || !kernel) return -1;
 
-    /* Allocate one-shot command buffer */
     VkCommandBufferAllocateInfo_t alloc_info = {0};
     alloc_info.sType = 40;
     alloc_info.commandPool = backend->command_pool;
@@ -963,13 +935,11 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     backend->vkBeginCommandBuffer(cmd, &begin_info);
 
-    /* Bind pipeline and descriptors */
     backend->vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, kernel->pipeline);
     backend->vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                                       kernel->pipeline_layout, 0, 1,
                                       &kernel->desc_set, 0, NULL);
 
-    /* Dispatch */
     backend->vkCmdDispatch(cmd, gx, gy, gz);
 
     /* Memory barrier for shader writes */
@@ -984,7 +954,6 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
 
     backend->vkEndCommandBuffer(cmd);
 
-    /* Create fence and submit */
     VkFenceCreateInfo_t fence_info = {0};
     fence_info.sType = 8;
     VkFence fence = NULL;
@@ -1003,7 +972,6 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
     return 0;
 }
 
-/* ── Graph execution ── */
 
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized || !ir) return -1;
@@ -1060,8 +1028,7 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
         size_t n = node->output->numel;
         uint32_t groups = ((uint32_t)n + local_size - 1) / local_size;
 
-        /* Upload inputs */
-        CMLVulkanBuffer* in_bufs[2] = {NULL, NULL};
+            CMLVulkanBuffer* in_bufs[2] = {NULL, NULL};
         for (int i = 0; i < node->num_inputs && i < 2; i++) {
             if (node->inputs[i] && node->inputs[i]->data) {
                 size_t sz = node->inputs[i]->numel * sizeof(float);
@@ -1073,20 +1040,17 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
 
         CMLVulkanBuffer* out_buf = cml_vulkan_buffer_create(backend, n * sizeof(float), true);
 
-        /* Bind and dispatch */
-        if (in_bufs[0]) cml_vulkan_kernel_bind_buffer(backend, kernel, 0, in_bufs[0]);
+            if (in_bufs[0]) cml_vulkan_kernel_bind_buffer(backend, kernel, 0, in_bufs[0]);
         if (out_buf) cml_vulkan_kernel_bind_buffer(backend, kernel, 1, out_buf);
         if (node->num_inputs > 1 && in_bufs[1])
             cml_vulkan_kernel_bind_buffer(backend, kernel, 2, in_bufs[1]);
 
         cml_vulkan_kernel_dispatch(backend, kernel, groups, 1, 1);
 
-        /* Download result */
-        if (out_buf && node->output->data)
+            if (out_buf && node->output->data)
             cml_vulkan_buffer_download(backend, out_buf, node->output->data, n * sizeof(float));
 
-        /* Cleanup */
-        for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; i++)
             if (in_bufs[i]) cml_vulkan_buffer_free(backend, in_bufs[i]);
         if (out_buf) cml_vulkan_buffer_free(backend, out_buf);
         cml_vulkan_kernel_free(backend, kernel);

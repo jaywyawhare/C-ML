@@ -104,7 +104,7 @@ static LinearProgram* linearize_group(const CMLFusionGroup* g) {
     LinearProgram* prog = linear_program_create();
     if (!prog) return NULL;
 
-    /* Map: node index -> vreg holding its output (-1 = not yet allocated) */
+    /* Map: node index -> vreg holding its output (-1 = unallocated) */
     int* node_vreg = calloc((size_t)g->num_nodes, sizeof(int));
     if (!node_vreg) { linear_program_free(prog); return NULL; }
     for (int i = 0; i < g->num_nodes; i++) node_vreg[i] = -1;

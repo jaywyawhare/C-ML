@@ -53,12 +53,12 @@ extern int           cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal,
 extern int           cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue);
 #endif
 
+/*
  * CPU kernel function pointer type.
- *
  * On the CPU backend the compiled_kernel field of CMLHCQKernelDesc is cast
  * to this signature.  The function receives the args array and arg count
  * and is expected to execute synchronously.
-
+ */
 typedef void (*cml_cpu_kernel_fn)(void** args, int num_args);
 
 CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {

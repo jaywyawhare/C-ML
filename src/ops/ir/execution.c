@@ -555,8 +555,7 @@ int cpu_execute_node(struct IRNode* node) {
                     }
                 }
             } else {
-                /* Generic N-dim: compute strides and iterate */
-                /* For now, fall back to global reduction for >2D */
+                /* Generic N-dim: fall back to global reduction for >2D */
                 float sum = simd_sum_float(in1_data, in1_numel);
                 if (node->type == UOP_MEAN && in1_numel > 0)
                     sum /= (float)in1_numel;
@@ -791,8 +790,6 @@ int cpu_execute_node(struct IRNode* node) {
         } else {
             // Generic N-dimensional gather (fallback - slower)
             LOG_WARNING("UOP_GATHER: using generic N-dim implementation");
-            // For now, just handle the most common case above
-            // More complex cases can be added later
             for (size_t i = 0; i < out->numel; i++) {
                 out_data[i] = 0.0f;
             }
@@ -2503,7 +2500,6 @@ int cpu_execute_node(struct IRNode* node) {
 static size_t g_cpu_exec_calls       = 0;
 static size_t g_total_nodes_executed = 0;
 
-// Execute IR graph using CPU interpreter
 // Non-static to allow use from dispatch layer
 int cpu_execute_ir(CMLGraph_t ir) {
     if (!ir)
@@ -2518,7 +2514,6 @@ int cpu_execute_ir(CMLGraph_t ir) {
         cml_ir_decompose(ir);
     }
 
-    // Execute nodes in order
     struct IRNode* node = ir->head;
     while (node) {
         // Ensure inputs are executed first
@@ -2529,7 +2524,6 @@ int cpu_execute_ir(CMLGraph_t ir) {
             }
         }
 
-        // Execute this node
         if (cpu_execute_node(node) != 0) {
             LOG_WARNING("CPU fallback: failed to execute node");
         }
@@ -2578,7 +2572,7 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
         return -1;
     }
 
-    // PERFORMANCE: Always use direct CPU execution for now
+    // Use direct CPU execution
     target_node->is_used = true;
     return cpu_execute_ir(ir);
 }

@@ -23,14 +23,7 @@
 /* Tile size for tiled matmul */
 #define TILE_SIZE 16
 
-/**
- * @brief Append a formatted string to a dynamically-growing buffer.
- *
- * @param buf    Pointer to the buffer (may be reallocated)
- * @param cap    Pointer to the current capacity
- * @param len    Pointer to the current length
- * @param fmt    printf-style format string
- */
+/** Append a formatted string to a dynamically-growing buffer. */
 static void buf_appendf(char** buf, size_t* cap, size_t* len,
                          const char* fmt, ...) {
     va_list ap;
@@ -40,7 +33,6 @@ static void buf_appendf(char** buf, size_t* cap, size_t* len,
 
     if (needed < 0) return;
 
-    /* Grow the buffer if necessary */
     while (*len + (size_t)needed + 1 > *cap) {
         *cap *= 2;
         char* tmp = (char*)realloc(*buf, *cap);
@@ -58,9 +50,6 @@ static void buf_appendf(char** buf, size_t* cap, size_t* len,
     *len += (size_t)needed;
 }
 
-/**
- * @brief Return the MSL expression for a binary operation.
- */
 static const char* msl_binary_expr(UOpType type) {
     switch (type) {
     case UOP_ADD:   return "a[idx] + b[idx]";
@@ -75,9 +64,6 @@ static const char* msl_binary_expr(UOpType type) {
     }
 }
 
-/**
- * @brief Return the MSL expression for a unary operation.
- */
 static const char* msl_unary_expr(UOpType type) {
     switch (type) {
     case UOP_NEG:     return "-a[idx]";
@@ -121,14 +107,12 @@ char* cml_metal_generate_msl(struct IRNode* node) {
     if (!buf) return NULL;
     buf[0] = '\0';
 
-    /* Metal standard library header (available implicitly in MSL) */
     buf_appendf(&buf, &cap, &len,
         "#include <metal_stdlib>\n"
         "using namespace metal;\n\n");
 
     UOpType type = node->type;
 
-    /* ── Binary elementwise ops ── */
     const char* bin_expr = msl_binary_expr(type);
     if (bin_expr) {
         buf_appendf(&buf, &cap, &len,
@@ -145,7 +129,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Unary elementwise ops (simple expression) ── */
     const char* un_expr = msl_unary_expr(type);
     if (un_expr) {
         buf_appendf(&buf, &cap, &len,
@@ -161,7 +144,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── ReLU6 ── */
     if (type == UOP_RELU6) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -177,7 +159,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Sigmoid ── */
     if (type == UOP_SIGMOID) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -192,7 +173,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Tanh ── */
     if (type == UOP_TANH) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -207,7 +187,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── ELU: x > 0 ? x : (exp(x) - 1) ── */
     if (type == UOP_ELU) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -223,7 +202,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── SELU: scale * (x > 0 ? x : alpha * (exp(x) - 1)) ── */
     if (type == UOP_SELU) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -241,7 +219,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── SiLU (Swish): x / (1 + exp(-x)) ── */
     if (type == UOP_SILU) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -257,7 +234,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Mish: x * tanh(log(1 + exp(x))) ── */
     if (type == UOP_MISH) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -273,7 +249,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── HardSwish: x > 3 ? x : (x < -3 ? 0 : x*(x+3)/6) ── */
     if (type == UOP_HARDSWISH) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -289,7 +264,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── MAX (used as ReLU: max(x, 0)) ── */
     if (type == UOP_MAX) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -305,7 +279,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── FILL: fill output with a constant value ── */
     if (type == UOP_FILL) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -320,7 +293,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── WHERE: cond ? a : b ── */
     if (type == UOP_WHERE) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -337,7 +309,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── GATHER: out[idx] = input[(int)indices[idx] * C + idx %% C] ── */
     if (type == UOP_GATHER) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -354,7 +325,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Reduction SUM (naive atomicAdd emulation via threadgroup) ── */
     if (type == UOP_SUM) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -369,7 +339,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Reduction MAX_REDUCE (CAS loop for atomic max) ── */
     if (type == UOP_MAX_REDUCE) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -392,7 +361,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Reduction MIN_REDUCE (CAS loop for atomic min) ── */
     if (type == UOP_MIN_REDUCE) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -415,7 +383,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Reduction MEAN (atomicAdd of a[idx]/n) ── */
     if (type == UOP_MEAN) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -430,7 +397,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Reduction PROD (CAS loop for atomic multiply) ── */
     if (type == UOP_PROD) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -455,7 +421,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Matmul (16x16 tiled, using threadgroup shared memory) ── */
     if (type == UOP_MATMUL) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -500,7 +465,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Conv2D (direct convolution, one thread per output element) ── */
     if (type == UOP_CONV2D) {
         buf_appendf(&buf, &cap, &len,
             "kernel void cml_kernel(\n"
@@ -559,7 +523,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
         return buf;
     }
 
-    /* ── Unsupported op ── */
     LOG_WARNING("metal_codegen: Unsupported UOp type %d for MSL generation", (int)type);
     free(buf);
     return NULL;
@@ -597,8 +560,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             continue;
         }
 
-        /* ── 1. Generate MSL source for this node ── */
-        char* msl_source = cml_metal_generate_msl(node);
+            char* msl_source = cml_metal_generate_msl(node);
         if (!msl_source) {
             LOG_WARNING("metal_execute_graph: skipping unsupported node type %d",
                         (int)node->type);
@@ -606,8 +568,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             continue;
         }
 
-        /* ── 2. Compile MSL to a Metal pipeline ── */
-        CMLMetalKernel* kernel = cml_metal_compile_msl(backend, msl_source, "cml_kernel");
+            CMLMetalKernel* kernel = cml_metal_compile_msl(backend, msl_source, "cml_kernel");
         free(msl_source);
         if (!kernel) {
             LOG_ERROR("metal_execute_graph: failed to compile kernel for node type %d",
@@ -615,8 +576,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             return -1;
         }
 
-        /* ── 3. Prepare Metal buffers from tensor data ── */
-        int max_bufs = node->num_inputs + 8; /* inputs + output + scalar params */
+            int max_bufs = node->num_inputs + 8; /* inputs + output + scalar params */
         void** metal_buffers = (void**)calloc((size_t)max_bufs, sizeof(void*));
         if (!metal_buffers) {
             cml_metal_kernel_free(kernel);
@@ -624,7 +584,6 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
         }
         int buf_count = 0;
 
-        /* Upload input tensors */
         for (int i = 0; i < node->num_inputs; i++) {
             Tensor* t = node->inputs[i];
             if (!t || !t->data) continue;
@@ -644,7 +603,6 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             metal_buffers[buf_count++] = mbuf;
         }
 
-        /* Allocate output buffer */
         Tensor* out = node->output;
         size_t out_bytes = out ? out->numel * sizeof(float) : 0;
         void* out_buf = NULL;
@@ -662,8 +620,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             metal_buffers[buf_count++] = out_buf;
         }
 
-        /* ── 4. Determine grid / block dimensions and launch ── */
-        size_t total_threads = out ? out->numel : 1;
+            size_t total_threads = out ? out->numel : 1;
         size_t block_size = 256;
         if (node->type == UOP_MATMUL) {
             /* Tiled matmul uses 2D threadgroups of TILE_SIZE x TILE_SIZE */
@@ -685,8 +642,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
                                     metal_buffers, buf_count);
         }
 
-        /* ── 5. Download result back to tensor ── */
-        if (out && out_buf && out_bytes > 0) {
+            if (out && out_buf && out_bytes > 0) {
             if (!out->data) {
                 out->data = malloc(out_bytes);
                 out->owns_data = true;
@@ -698,8 +654,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
         }
         node->is_executed = true;
 
-        /* ── 6. Cleanup Metal buffers ── */
-        for (int j = 0; j < buf_count; j++) {
+            for (int j = 0; j < buf_count; j++) {
             cml_metal_free(backend, metal_buffers[j]);
         }
         free(metal_buffers);

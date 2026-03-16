@@ -28,10 +28,6 @@
 // Default block size for kernel launches
 #define PTX_BLOCK_SIZE 256
 
-// ============================================================================
-// Internal helpers
-// ============================================================================
-
 /** Convert float to PTX hex literal (0fHHHHHHHH) */
 static void float_to_ptx_hex(float val, char* buf, int buf_size) {
     uint32_t bits;
@@ -181,10 +177,6 @@ static bool ptx_is_reduction(UOpType t) {
         return false;
     }
 }
-
-// ============================================================================
-// Public API
-// ============================================================================
 
 CMLPTXCodegen* cml_ptx_codegen_create(int sm_version, struct CMLCUDABackend* cuda) {
     CMLPTXCodegen* cg = (CMLPTXCodegen*)calloc(1, sizeof(CMLPTXCodegen));
@@ -857,10 +849,6 @@ char* cml_ptx_gen_conv2d(CMLPTXCodegen* cg, const char* kernel_name) {
     return src;
 }
 
-// ============================================================================
-// Graph execution via PTX codegen + CUDA runtime
-// ============================================================================
-
 /**
  * Execute a single IR node using PTX codegen.
  * Returns 0 on success, -1 on failure (caller should use CPU fallback).
@@ -890,7 +878,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
     char* ptx_code = NULL;
     int result = -1;
 
-    // --- Unary ops ---
+    // Unary ops
     if (ptx_is_unary_op(type)) {
         if (node->num_inputs < 1 || !node->inputs[0] || !node->inputs[0]->data)
             return -1;
@@ -928,7 +916,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // --- Binary ops ---
+    // Binary ops
     if (ptx_is_binary_op(type)) {
         if (node->num_inputs < 2 || !node->inputs[0] || !node->inputs[1] ||
             !node->inputs[0]->data || !node->inputs[1]->data)
@@ -971,7 +959,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // --- Reduction ops ---
+    // Reduction ops
     if (ptx_is_reduction(type)) {
         if (node->num_inputs < 1 || !node->inputs[0] || !node->inputs[0]->data)
             return -1;
@@ -1024,7 +1012,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // --- Fill ---
+    // Fill
     if (type == UOP_FILL) {
         FillParams* p = (FillParams*)node->params;
         float fill_val = p ? p->value : 0.0f;
@@ -1057,7 +1045,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // --- Where ---
+    // Where
     if (type == UOP_WHERE) {
         if (node->num_inputs < 3 || !node->inputs[0] || !node->inputs[1] ||
             !node->inputs[2] || !node->inputs[0]->data ||
@@ -1105,7 +1093,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // --- Matmul ---
+    // Matmul
     if (type == UOP_MATMUL) {
         if (node->num_inputs < 2 || !node->inputs[0] || !node->inputs[1] ||
             !node->inputs[0]->data || !node->inputs[1]->data)

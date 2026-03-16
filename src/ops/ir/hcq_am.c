@@ -83,8 +83,7 @@ int cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst,
         return -1;
     }
 
-    /* For HCQ, dst is a CMLAMBuffer*. In a fully integrated path,
-     * we would enqueue a DMA copy via AQL.  For now, passthrough. */
+    /* DMA copy not available; passthrough */
     (void)src;
     return 0;
 }
