@@ -35,18 +35,14 @@ CML reads environment variables for auto-configuration when `world_size` or
 ```c
 #include "distributed/distributed.h"
 
-// Initialize with NCCL backend, auto-detect rank/world_size from env
 int ret = cml_dist_init(DIST_BACKEND_NCCL, /*world_size=*/-1, /*rank=*/-1);
 
-// Query state
 int rank       = cml_dist_get_rank();
 int world_size = cml_dist_get_world_size();
 bool ready     = cml_dist_is_initialized();
 
-// Access the default process group directly
 DistProcessGroup* group = cml_dist_get_default_group();
 
-// Shutdown
 cml_dist_destroy();
 ```
 
@@ -61,7 +57,6 @@ rank       = dist.get_rank()
 world_size = dist.get_world_size()
 ready      = dist.is_initialized()
 
-# When finished
 dist.destroy_process_group()
 ```
 
@@ -99,10 +94,9 @@ All collectives operate on the default process group.
 Reduces a tensor **in-place** across all ranks.
 
 ```c
-// Synchronous
 int cml_dist_allreduce(Tensor* tensor, DistReduceOp op);
 
-// Asynchronous (returns a handle; falls back to sync if backend lacks async)
+// Returns a handle; falls back to sync if backend lacks async
 DistWork* cml_dist_allreduce_async(Tensor* tensor, DistReduceOp op);
 int       cml_dist_wait(DistWork* work);
 void      cml_dist_work_free(DistWork* work);
@@ -198,17 +192,14 @@ DDPConfig cml_ddp_default_config(void);
 ```c
 #include "distributed/data_parallel.h"
 
-// Wrap a module
 CMLDataParallel* ddp = cml_ddp_create(model, NULL);  // NULL = default config
 
-// Training loop
 Tensor* output = cml_ddp_forward(ddp, input);
 // ... compute loss, call tensor_backward(loss) ...
 cml_ddp_sync_gradients(ddp);   // all-reduce + average gradients
 optimizer_step(optimizer);
 optimizer_zero_grad(optimizer);
 
-// Cleanup
 cml_ddp_free(ddp);  // does NOT free the underlying module
 ```
 
@@ -423,7 +414,6 @@ Backend name strings: `"nccl"`, `"mpi"`, `"gloo"`.
 #include "optim.h"
 
 int main(int argc, char** argv) {
-    // 1. Initialize distributed (reads CML_RANK / CML_WORLD_SIZE from env)
     if (cml_dist_init(DIST_BACKEND_NCCL, -1, -1) != 0) {
         fprintf(stderr, "Failed to init distributed\n");
         return 1;
@@ -433,22 +423,18 @@ int main(int argc, char** argv) {
     int world_size = cml_dist_get_world_size();
     printf("Rank %d/%d\n", rank, world_size);
 
-    // 2. Build model
     Module* model = module_create("mlp");
     module_add_layer(model, linear_create(784, 256));
     module_add_layer(model, linear_create(256, 10));
 
-    // 3. Wrap in DDP (broadcasts params from rank 0, sets up buckets)
+    // Broadcasts params from rank 0, sets up buckets
     DDPConfig cfg = cml_ddp_default_config();
     cfg.bucket_size_bytes = 25 * 1024 * 1024;  // 25 MB
     CMLDataParallel* ddp = cml_ddp_create(model, &cfg);
 
-    // 4. Create optimizer
     Optimizer* opt = optimizer_adam_create(model, 1e-3f);
 
-    // 5. Training loop
     for (int epoch = 0; epoch < 10; epoch++) {
-        // Each rank processes its own data shard
         Tensor* input  = load_data_shard(rank, world_size, epoch);
         Tensor* target = load_label_shard(rank, world_size, epoch);
 
@@ -457,21 +443,18 @@ int main(int argc, char** argv) {
 
         tensor_backward(loss);
 
-        // Synchronize gradients (all-reduce + average)
-        cml_ddp_sync_gradients(ddp);
+        cml_ddp_sync_gradients(ddp);   // all-reduce + average
 
         optimizer_step(opt);
         optimizer_zero_grad(opt);
 
-        // Optional: barrier to keep ranks in sync for logging
-        cml_dist_barrier();
+        cml_dist_barrier();  // keep ranks in sync for logging
 
         if (rank == 0) {
             printf("Epoch %d complete\n", epoch);
         }
     }
 
-    // 6. Cleanup
     cml_ddp_free(ddp);
     optimizer_free(opt);
     module_free(model);
@@ -487,24 +470,19 @@ int main(int argc, char** argv) {
 import cml
 import cml.distributed as dist
 
-# 1. Initialize
 dist.init_process_group(backend="nccl")
 rank       = dist.get_rank()
 world_size = dist.get_world_size()
 print(f"Rank {rank}/{world_size}")
 
-# 2. Build model
 model = cml.Sequential()
 model.add(cml.Linear(784, 256))
 model.add(cml.Linear(256, 10))
 
-# 3. Wrap in DDP
 ddp_model = dist.DistributedDataParallel(model, bucket_size_mb=25)
 
-# 4. Optimizer
 optimizer = cml.Adam(model.parameters(), lr=1e-3)
 
-# 5. Training loop
 for epoch in range(10):
     input_data, target = load_data_shard(rank, world_size, epoch)
 
@@ -522,7 +500,6 @@ for epoch in range(10):
     if rank == 0:
         print(f"Epoch {epoch} complete")
 
-# 6. Cleanup
 dist.destroy_process_group()
 ```
 

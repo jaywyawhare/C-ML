@@ -31,14 +31,12 @@ where A is `[rank, in_features]` and B is `[out_features, rank]`. B is initializ
 ### Key API
 
 ```c
-// Single LoRA layer
 CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha);
 void           cml_lora_linear_free(CMLLoRALinear* lora);
 Tensor*        cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input);
 int            cml_lora_linear_merge(CMLLoRALinear* lora);    // Fold into base weight
 int            cml_lora_linear_unmerge(CMLLoRALinear* lora);  // Restore original weight
 
-// Adapter (groups multiple LoRA layers)
 CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha);
 void            cml_lora_adapter_free(CMLLoRAAdapter* adapter);
 int             cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer);
@@ -51,13 +49,10 @@ int             cml_lora_adapter_unmerge_all(CMLLoRAAdapter* adapter);
 ```c
 #include "nn/lora.h"
 
-// Wrap an existing weight with rank-8 LoRA
 CMLLoRALinear* lora = cml_lora_linear_create(base_weight, /*rank=*/8, /*alpha=*/8.0f);
 
-// Forward pass includes LoRA contribution
 Tensor* out = cml_lora_linear_forward(lora, input);
 
-// Group layers into an adapter for batch merge/unmerge
 CMLLoRAAdapter* adapter = cml_lora_adapter_create("task_adapter", 8, 8.0f);
 cml_lora_adapter_add_layer(adapter, lora);
 cml_lora_adapter_merge_all(adapter);   // Fold LoRA into base weights for fast inference
@@ -87,17 +82,14 @@ y = x @ dequant(W_nf4)^T + (alpha / rank) * x @ A^T @ B^T
 ### Key API
 
 ```c
-// NF4 quantization
 CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size);
 void          cml_nf4_tensor_free(CMLNF4Tensor* nf4);
 Tensor*       cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4);
 
-// QLoRA layer
 CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank, float alpha, int block_size);
 void            cml_qlora_linear_free(CMLQLoRALinear* qlora);
 Tensor*         cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input);
 
-// Memory comparison
 size_t cml_qlora_memory_usage(const CMLQLoRALinear* qlora);
 size_t cml_qlora_full_memory_usage(int in_features, int out_features);
 ```
@@ -107,13 +99,11 @@ size_t cml_qlora_full_memory_usage(int in_features, int out_features);
 ```c
 #include "nn/qlora.h"
 
-// Create QLoRA layer: quantizes base_weight to NF4, adds rank-8 LoRA
 CMLQLoRALinear* qlora = cml_qlora_linear_create(base_weight, /*rank=*/8,
                                                   /*alpha=*/8.0f, /*block_size=*/64);
 
 Tensor* out = cml_qlora_linear_forward(qlora, input);
 
-// Check memory savings
 size_t qlora_mem = cml_qlora_memory_usage(qlora);
 size_t full_mem  = cml_qlora_full_memory_usage(4096, 4096);
 printf("Memory: %zu bytes vs %zu bytes (%.1fx reduction)\n",
@@ -154,7 +144,6 @@ Tensor*     cml_kv_cache_get_values(CMLKVCache* cache);
 Supports fewer KV heads than query heads (e.g., LLaMA 2 70B uses 8 KV heads for 64 query heads). Configurable with causal masking and sliding window.
 
 ```c
-// Configuration
 typedef struct CMLGQAConfig {
     int num_heads;       // Query heads
     int num_kv_heads;    // KV heads (can be < num_heads)
@@ -164,7 +153,6 @@ typedef struct CMLGQAConfig {
     int window_size;     // 0 = unlimited
 } CMLGQAConfig;
 
-// Standard and cached variants
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask);
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache, const CMLGQAConfig* config);
 ```
@@ -243,24 +231,19 @@ Each page block holds `CML_PAGE_BLOCK_SIZE` (16) tokens. Blocks are allocated fr
 ### Key API
 
 ```c
-// Cache lifecycle
 CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
                                             int num_kv_heads, int head_dim);
 void cml_paged_kv_cache_free(CMLPagedKVCache* cache);
 
-// Block allocator
 int  cml_paged_cache_alloc_block(CMLPagedKVCache* cache);
 void cml_paged_cache_free_block(CMLPagedKVCache* cache, int block_id);
 
-// Sequence management
 int  cml_paged_cache_init_sequence(CMLPagedKVCache* cache);
 void cml_paged_cache_free_sequence(CMLPagedKVCache* cache, int seq_id);
 
-// Token append (auto-allocates new blocks when current block is full)
 int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id,
                             const float* key, const float* value);
 
-// Attention over paged blocks
 Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
                                Tensor* Q, const CMLGQAConfig* config);
 ```
@@ -276,12 +259,10 @@ CMLPagedKVCache* cache = cml_paged_kv_cache_create(
 
 int seq = cml_paged_cache_init_sequence(cache);
 
-// Append KV data token by token (blocks allocated automatically)
 for (int i = 0; i < seq_len; i++) {
     cml_paged_cache_append(cache, seq, key_data[i], value_data[i]);
 }
 
-// Run attention gathering K/V from paged blocks
 Tensor* out = cml_paged_gqa_forward(cache, seq, Q, &gqa_config);
 
 cml_paged_cache_free_sequence(cache, seq);
@@ -315,23 +296,18 @@ Key config fields: `vocab_size`, `hidden_size`, `intermediate_size`, `num_layers
 ### Key API
 
 ```c
-// Lifecycle
 CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config);
 void           cml_llama_free(CMLLLaMAModel* model);
 
-// Weight loading
 int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath);
 
-// Forward pass
 Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_len);
 
-// Text generation
 CMLGenerationConfig  cml_generation_default_config(void);
 CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt,
                                          const CMLGenerationConfig* config);
 void cml_generation_result_free(CMLGenerationResult* result);
 
-// Utilities
 int  cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config);
 void cml_llama_reset(CMLLLaMAModel* model);
 ```
@@ -393,13 +369,11 @@ QUEUED -> PREFILL -> DECODING -> FINISHED
 ### Key API
 
 ```c
-// Setup
 CMLServingConfig   cml_serving_default_config(void);
 CMLServingContext*  cml_serving_create(const CMLServingConfig* config);
 void               cml_serving_free(CMLServingContext* ctx);
 void               cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache);
 
-// Request management
 int                cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens,
                                       int num_tokens, int max_new_tokens);
 int                cml_serving_step(CMLServingContext* ctx);  // One scheduling iteration
@@ -407,7 +381,6 @@ CMLSequenceStatus  cml_serving_get_status(CMLServingContext* ctx, int request_id
 const int*         cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* out_count);
 int                cml_serving_finish_request(CMLServingContext* ctx, int request_id);
 
-// Stats
 CMLServingStats    cml_serving_get_stats(const CMLServingContext* ctx);
 ```
 
@@ -432,14 +405,11 @@ CMLServingConfig cfg = cml_serving_default_config();
 cfg.max_batch_size = 32;
 CMLServingContext* ctx = cml_serving_create(&cfg);
 
-// Attach a paged KV cache
 CMLPagedKVCache* kv = cml_paged_kv_cache_create(2048, 256, 8, 128);
 cml_serving_set_kv_cache(ctx, kv);
 
-// Submit requests
 int req1 = cml_serving_submit(ctx, prompt_tokens, num_tokens, /*max_new=*/128);
 
-// Serve loop
 while (cml_serving_step(ctx) > 0) {
     // Run model forward pass on ctx->active_batch here
     // Call cml_serving_finish_request() when a sequence hits EOS

@@ -5,7 +5,7 @@ All layers inherit from `Module` and can be composed using container types like 
 
 Include `"cml.h"` or `"nn/layers.h"` to access all layer types.
 
-______________________________________________________________________
+---
 
 ## Table of Contents
 
@@ -55,24 +55,22 @@ ______________________________________________________________________
   - [Upsample](#upsample)
 - [Complete Example](#complete-example)
 
-______________________________________________________________________
+---
 
 ## Module API
 
 Every layer in CML inherits from the `Module` base type. The following operations work on any module:
 
 ```c
-// Forward pass
 Tensor* cml_nn_module_forward(Module* module, Tensor* input);
 
-// Training/evaluation mode
 void cml_nn_module_set_training(Module* module, bool training);
-void cml_nn_module_train(Module* module);     // Set training mode
-void cml_nn_module_eval(Module* module);      // Set evaluation mode
+void cml_nn_module_train(Module* module);
+void cml_nn_module_eval(Module* module);
 bool cml_nn_module_is_training(Module* module);
 
 // Inspection
-void cml_summary(Module* module);  // Print model architecture summary
+void cml_summary(Module* module);
 
 // Cleanup
 void module_free(Module* module);
@@ -80,7 +78,7 @@ void module_free(Module* module);
 
 Training mode affects the behavior of layers like `Dropout` (disabled during eval) and `BatchNorm2d` (uses running statistics during eval).
 
-______________________________________________________________________
+---
 
 ## Containers
 
@@ -91,11 +89,8 @@ A sequential container executes layers in the order they are added. This is the 
 ```c
 Sequential* nn_sequential(void);
 
-// Add layers one at a time
 void sequential_add(Sequential* seq, Module* module);
-
-// Add multiple layers at once (NULL-terminated variadic)
-Sequential* sequential_add_chain(Sequential* seq, Module* first, ...);
+Sequential* sequential_add_chain(Sequential* seq, Module* first, ...);  // NULL-terminated
 
 // Access layers
 Module* sequential_get(Sequential* seq, int index);
@@ -176,7 +171,7 @@ Module* enc = module_dict_get(branches, "encoder");
 Tensor* latent = cml_nn_module_forward(enc, input);
 ```
 
-______________________________________________________________________
+---
 
 ## Linear
 
@@ -231,7 +226,7 @@ Parameter* w = linear_get_weight(fc);
 module_free((Module*)fc);
 ```
 
-______________________________________________________________________
+---
 
 ## Convolutions
 
@@ -310,7 +305,7 @@ Tensor* output = cml_nn_module_forward((Module*)conv, input);
 // input shape: [batch, in_channels, depth, height, width]
 ```
 
-______________________________________________________________________
+---
 
 ## Transposed Convolutions
 
@@ -431,7 +426,7 @@ Tensor* output = cml_nn_module_forward((Module*)deconv, input);
 // input shape: [batch, in_channels, depth, height, width]
 ```
 
-______________________________________________________________________
+---
 
 ## Recurrent Layers
 
@@ -530,7 +525,7 @@ for (int t = 0; t < seq_len; t++) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## Transformer
 
@@ -609,7 +604,7 @@ Tensor* output = cml_nn_module_forward((Module*)layer, input);
 // input/output shape: [seq_len, batch, d_model]
 ```
 
-______________________________________________________________________
+---
 
 ## Embedding
 
@@ -645,7 +640,7 @@ Tensor* output = cml_nn_module_forward((Module*)emb, token_indices);
 // output shape: [batch, seq_len, 128]
 ```
 
-______________________________________________________________________
+---
 
 ## Normalization
 
@@ -885,7 +880,7 @@ Tensor* output = cml_nn_module_forward((Module*)rms, input);
 
 **Note:** RMSNorm has no bias parameter and no mean subtraction, making it computationally cheaper than LayerNorm while achieving comparable performance in many settings.
 
-______________________________________________________________________
+---
 
 ## Pooling
 
@@ -936,7 +931,7 @@ Tensor* output = cml_nn_module_forward((Module*)pool, input);
 // output shape: [batch, channels, height/2, width/2]
 ```
 
-______________________________________________________________________
+---
 
 ## Activation Layers
 
@@ -1027,7 +1022,7 @@ PReLU* prelu_shared = nn_prelu(1, 0.25f, DTYPE_FLOAT32, DEVICE_CPU);
 
 **Note:** Unlike LeakyReLU which has a fixed slope, PReLU learns the optimal negative slope during training via backpropagation.
 
-______________________________________________________________________
+---
 
 ## Dropout
 
@@ -1058,7 +1053,7 @@ cml_nn_module_eval((Module*)drop);   // Dropout disabled
 Tensor* eval_out = cml_nn_module_forward((Module*)drop, input);
 ```
 
-______________________________________________________________________
+---
 
 ## Utility Layers
 
@@ -1209,7 +1204,7 @@ Tensor* resized = f_interpolate(input, out_size, 2, UPSAMPLE_BICUBIC, true);
 
 **Note:** `align_corners` only applies to bilinear and bicubic modes. When `true`, the corner pixels of input and output are exactly aligned, which can produce different results at boundaries.
 
-______________________________________________________________________
+---
 
 ## Complete Example
 
@@ -1234,7 +1229,6 @@ int main() {
     sequential_add(model, (Module*)nn_dropout(0.3f, false));
     sequential_add(model, (Module*)nn_linear(128, 10, dtype, device, true));
 
-    // Print architecture
     cml_summary((Module*)model);
 
     // Training mode

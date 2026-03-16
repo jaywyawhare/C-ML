@@ -5,23 +5,28 @@ C-ML provides a layered memory management system designed for high-performance t
 ## Architecture Overview
 
 ```
-+-----------------------------------------------------+
-|              Application / Graph Execution            |
-+-----------------------------------------------------+
-|   Graph Allocator          |   Context Allocator      |
-|   (liveness analysis,      |   (pre-allocated or      |
-|    per-graph buffers)      |    dynamic allocation)   |
-+----------------------------+--------------------------+
-|   Memory Pools             |   TLSF Allocator         |
-|   (fixed-size blocks,      |   (general-purpose,      |
-|    tensor pools)           |    O(1) alloc/free)      |
-+----------------------------+--------------------------+
-|   Timeline Planner (offline memory scheduling)        |
-+-----------------------------------------------------+
-|   Safe Allocation Wrappers / Device-Aware Allocation  |
-+-----------------------------------------------------+
-|   malloc / device_alloc (CPU, GPU, etc.)              |
-+-----------------------------------------------------+
+Application / Graph Execution
+     |
+     v
+Graph Allocator              Context Allocator
+  liveness analysis,           pre-allocated or
+  per-graph buffers            dynamic allocation
+     |                              |
+     v                              v
+Memory Pools                 TLSF Allocator
+  fixed-size blocks,           general-purpose,
+  tensor pools                 O(1) alloc/free
+     |                              |
+     +----------+-------------------+
+                |
+                v
+     Timeline Planner (offline memory scheduling)
+                |
+                v
+     Safe wrappers / device-aware allocation
+                |
+                v
+     malloc / device_alloc (CPU, GPU, etc.)
 ```
 
 **Header files:**
@@ -70,23 +75,15 @@ Each block header stores a `prev_phys` pointer and a `size` field. The two least
 ### API
 
 ```c
-// Create with internally allocated pool
 CMLTLSFAllocator* cml_tlsf_create(size_t pool_size);
-
-// Create on user-provided memory
 CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size);
 
 // Destroy
 void cml_tlsf_destroy(CMLTLSFAllocator* alloc);
 
-// Allocate (O(1))
 void* cml_tlsf_alloc(CMLTLSFAllocator* alloc, size_t size);
-
-// Allocate with custom alignment
 void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* alloc, size_t size, size_t alignment);
-
-// Free (O(1), with automatic coalescing of adjacent free blocks)
-void cml_tlsf_free(CMLTLSFAllocator* alloc, void* ptr);
+void cml_tlsf_free(CMLTLSFAllocator* alloc, void* ptr);  // O(1), coalesces adjacent free blocks
 
 // Realloc (tries in-place expansion before falling back to alloc+copy+free)
 void* cml_tlsf_realloc(CMLTLSFAllocator* alloc, void* ptr, size_t new_size);
@@ -94,7 +91,6 @@ void* cml_tlsf_realloc(CMLTLSFAllocator* alloc, void* ptr, size_t new_size);
 // Query allocated size for a pointer
 size_t cml_tlsf_alloc_size(CMLTLSFAllocator* alloc, void* ptr);
 
-// Get statistics: used bytes, peak bytes, allocation/free counts
 void cml_tlsf_stats(const CMLTLSFAllocator* alloc,
                      size_t* used, size_t* peak,
                      size_t* num_allocs, size_t* num_frees);
@@ -106,20 +102,14 @@ bool cml_tlsf_check(const CMLTLSFAllocator* alloc);
 ### Usage Example
 
 ```c
-// Create a 64 MB TLSF pool
 CMLTLSFAllocator* alloc = cml_tlsf_create(64 * 1024 * 1024);
-
-// Allocate tensor data
 float* data = (float*)cml_tlsf_alloc(alloc, 1024 * sizeof(float));
-
-// Allocate with 64-byte alignment (e.g., for SIMD)
-float* aligned = (float*)cml_tlsf_alloc_aligned(alloc, 4096, 64);
+float* aligned = (float*)cml_tlsf_alloc_aligned(alloc, 4096, 64);  // 64-byte alignment for SIMD
 
 // Free
 cml_tlsf_free(alloc, data);
 cml_tlsf_free(alloc, aligned);
 
-// Check stats
 size_t used, peak;
 cml_tlsf_stats(alloc, &used, &peak, NULL, NULL);
 
@@ -141,7 +131,6 @@ The timeline planner solves an offline memory scheduling problem: given a set of
 ### API
 
 ```c
-// Create planner (initial_capacity is hint for number of tensors)
 CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity);
 
 // Destroy planner
@@ -159,13 +148,8 @@ int cml_timeline_planner_solve(CMLTimelinePlanner* planner);
 const CMLTimelineRecord* cml_timeline_planner_get(
     const CMLTimelinePlanner* planner, int tensor_id);
 
-// Get total memory required (contiguous region size)
 size_t cml_timeline_planner_total_memory(const CMLTimelinePlanner* planner);
-
-// Get peak concurrent usage (sum of all alive tensors at any step)
 size_t cml_timeline_planner_peak_usage(const CMLTimelinePlanner* planner);
-
-// Print plan to stdout (including ASCII timeline visualization)
 void cml_timeline_planner_print(const CMLTimelinePlanner* planner);
 ```
 
@@ -219,10 +203,7 @@ The graph allocator manages memory for computation graph execution. It performs 
 ### API
 
 ```c
-// Create with single buffer type
 CMLGraphAllocator_t cml_graph_allocator_new(CMLBackendBufferType_t buft);
-
-// Create with multiple buffer types (multi-device)
 CMLGraphAllocator_t cml_graph_allocator_new_n(
     CMLBackendBufferType_t* bufts, int n_bufs);
 
@@ -237,7 +218,6 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
                                     const int* node_buffer_ids,
                                     const int* leaf_buffer_ids);
 
-// Allocate backend buffers for the graph
 bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph);
 
 // Query buffer size
@@ -287,7 +267,6 @@ void         cml_context_free(CMLContext_t ctx);
 size_t       cml_context_used_mem(CMLContext_t ctx);
 size_t       cml_context_total_mem(CMLContext_t ctx);
 
-// Allocate a tensor within the context's memory region
 Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim,
                                   DType dtype, DeviceType device);
 
@@ -312,16 +291,9 @@ Memory pools provide fast, fragmentation-free allocation for fixed-size blocks. 
 Pre-allocates a set of identically-sized memory blocks. Allocation scans for the first unused block (O(n) in pool size, but pools are typically small).
 
 ```c
-// Create pool: num_blocks blocks of block_size bytes each
 MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype);
-
-// Free pool and all blocks
 void memory_pool_free(MemoryPool* pool);
-
-// Get a block (returns NULL if pool exhausted)
 void* memory_pool_alloc(MemoryPool* pool);
-
-// Return a block
 int memory_pool_free_block(MemoryPool* pool, void* block);
 ```
 
@@ -330,11 +302,8 @@ int memory_pool_free_block(MemoryPool* pool, void* block);
 Pre-allocates tensors of a fixed shape, dtype, and device. Useful for workloads that repeatedly create and destroy tensors of the same size.
 
 ```c
-// Create pool of num_tensors tensors with given shape/dtype/device
 TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors,
                                 DType dtype, DeviceType device);
-
-// Free pool and all tensors
 void tensor_pool_free(TensorPool* pool);
 ```
 
@@ -376,10 +345,7 @@ void cml_safe_free(void** ptr);
 For tensor data that may reside on GPU or other accelerator memory:
 
 ```c
-// Allocate on the default device
 void* cml_device_alloc(size_t size);
-
-// Free device memory
 void cml_device_free(void* ptr, DeviceType device);
 ```
 

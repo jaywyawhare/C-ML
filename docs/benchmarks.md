@@ -132,13 +132,12 @@ static double get_time_sec(void) {
 int main(void) {
     cml_init();
 
-    // Warmup
-    // ... run operation a few times ...
+    // ... warmup: run operation a few times ...
 
     double start = get_time_sec();
     int iters = 100;
     for (int i = 0; i < iters; i++) {
-        // ... operation to benchmark ...
+        // ... operation under test ...
     }
     double elapsed = get_time_sec() - start;
 

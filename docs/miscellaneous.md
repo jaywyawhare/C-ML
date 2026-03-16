@@ -13,7 +13,7 @@ Additional C-ML subsystems covering sparse tensors, image dtypes, data augmentat
 - [Disk Backend](#disk-backend)
 - [CMake Integration](#cmake-integration)
 
-______________________________________________________________________
+---
 
 ## Sparse Tensors
 
@@ -43,7 +43,6 @@ typedef struct SparseCOOData {
 ### Functions
 
 ```c
-// Create sparse tensor from explicit indices and values
 SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
                                   const int* dense_shape, int dense_ndim);
 
@@ -59,14 +58,12 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense);
 // Sort indices and sum duplicate entries
 SparseCOOData* sparse_coalesce(SparseCOOData* sparse);
 
-// Free sparse tensor
 void sparse_free(SparseCOOData* sparse);
 ```
 
 ### Example
 
 ```c
-// Create a sparse 1000x1000 matrix with 3 non-zero entries
 int idx_data[] = {0, 0,  1, 5,  999, 999};   // row,col pairs
 float val_data[] = {1.0f, 2.0f, 3.0f};
 int dense_shape[] = {1000, 1000};
@@ -81,7 +78,7 @@ Tensor* result    = sparse_matmul(sp, dense_B);    // [1000, 64]
 sparse_free(sp);
 ```
 
-______________________________________________________________________
+---
 
 ## Image Dtype
 
@@ -109,13 +106,11 @@ typedef enum {
 ### Functions
 
 ```c
-// Check if a tensor shape is suitable for a given image format
 bool cml_image_dtype_compatible(const int* shape, int ndim, CMLImageFormat format);
 
 // Auto-select the best image format for a tensor shape
 CMLImageFormat cml_image_dtype_select(const int* shape, int ndim);
 
-// Create image tensor from a regular tensor
 CMLImageTensor* cml_image_tensor_create(Tensor* tensor, CMLImageFormat format);
 
 // Convert back to regular tensor
@@ -148,7 +143,7 @@ if (fmt != CML_IMAGE_NONE) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## Data Augmentation
 
@@ -202,7 +197,6 @@ Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channe
 ### Pipeline
 
 ```c
-// Apply all enabled transforms from a config in one call
 Tensor* augment_apply(Tensor* input, AugmentationConfig* config);
 ```
 
@@ -226,7 +220,7 @@ Tensor* augmented = augment_apply(batch, aug);
 augmentation_config_free(aug);
 ```
 
-______________________________________________________________________
+---
 
 ## Winograd Convolution
 
@@ -260,7 +254,7 @@ typedef struct {
 ### Functions
 
 ```c
-// Check if Winograd applies (requires 3x3 kernel, stride 1, dilation 1)
+// Requires 3x3 kernel, stride 1, dilation 1
 bool winograd_applicable(int kernel_h, int kernel_w,
                          int stride_h, int stride_w,
                          int dilation_h, int dilation_w);
@@ -295,7 +289,7 @@ winograd_conv2d(input, weight, bias, output,
                 /*groups=*/1, &cfg);
 ```
 
-______________________________________________________________________
+---
 
 ## Symbolic Computation
 
@@ -371,7 +365,6 @@ void      sym_shape_release(SymShape* shape);
 SymExpr* batch = sym_var("batch", 1, 128);
 SymExpr* seq   = sym_var("seq", 1, 2048);
 
-// Compute output shape: batch * seq
 SymExpr* total = sym_mul(batch, seq);
 printf("min elements = %ld, max elements = %ld\n",
        sym_expr_min(total), sym_expr_max(total));  // 1, 262144
@@ -386,7 +379,7 @@ sym_expr_release(seq);
 sym_expr_release(batch);
 ```
 
-______________________________________________________________________
+---
 
 ## SIMD Vectorization
 
@@ -477,7 +470,7 @@ void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
                          const size_t* strides, const int* perm, int ndim, size_t numel);
 ```
 
-______________________________________________________________________
+---
 
 ## Disk Backend
 
@@ -510,7 +503,6 @@ void            cml_disk_backend_free(CMLDiskBackend* backend);
 // Save tensor to disk under a name
 int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tensor);
 
-// Load tensor fully into memory
 Tensor* cml_disk_load_tensor(CMLDiskBackend* backend, const char* name);
 ```
 
@@ -566,7 +558,7 @@ cml_disk_tensor_free(dt);
 cml_disk_backend_free(disk);
 ```
 
-______________________________________________________________________
+---
 
 ## CMake Integration
 

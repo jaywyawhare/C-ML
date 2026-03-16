@@ -10,7 +10,7 @@
 
 **Version 0.0.2** | [GitHub](https://github.com/jaywyawhare/C-ML) | [Issues](https://github.com/jaywyawhare/C-ML/issues)
 
-______________________________________________________________________
+---
 
 ## Overview
 
@@ -67,15 +67,12 @@ make clean && make
 #include "cml.h"
 
 int main() {
-    // Initialize library
     cml_init();
     cml_seed(42);
 
-    // Get defaults
     DeviceType device = cml_get_default_device();
     DType dtype = cml_get_default_dtype();
 
-    // Create model
     Sequential* model = cml_nn_sequential();
     model = sequential_add_chain(model,
         (Module*)cml_nn_linear(784, 128, dtype, device, true),
@@ -84,16 +81,13 @@ int main() {
         NULL
     );
 
-    // Create optimizer (automatic parameter collection)
     Optimizer* optimizer = cml_optim_adam_for_model((Module*)model,
         0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
-    // Get dataset
     Dataset* dataset = dataset_xor();
     Tensor* inputs = dataset->X;
     Tensor* targets = dataset->y;
 
-    // Training loop
     cml_nn_module_set_training((Module*)model, true);
     for (int epoch = 0; epoch < 100; epoch++) {
         cml_optim_zero_grad(optimizer);
@@ -106,7 +100,6 @@ int main() {
         tensor_free(outputs);
     }
 
-    // Cleanup
     optimizer_free(optimizer);
     module_free((Module*)model);
     dataset_free(dataset);
@@ -115,82 +108,25 @@ int main() {
 }
 ```
 
-## Key Features
+## Optimization Stack
 
-### High-Level API
-
-The `cml_*` prefix functions provide a PyTorch-like interface:
-
-```c
-Tensor* x = cml_zeros(shape, ndim, NULL);
-Tensor* y = cml_add(a, b);
-Tensor* z = cml_relu(y);
 ```
-
-### Low-Level API
-
-Direct control with `tensor_*`, `nn_*`, `optim_*` functions:
-
-```c
-Tensor* x = tensor_zeros(shape, ndim, NULL);
-Tensor* y = tensor_add(a, b);
-Linear* layer = nn_linear(10, 20, dtype, device, true);
+User Code  (C or Python API)
+     |
+     v
+IR Graph   pattern matching, DCE, operator fusion, constant folding, Z3 verification
+     |
+     v
+Compiler   schedule -> linearize -> fused codegen -> kernel cache
+           backends: C / PTX / SPIR-V / WGSL / MSL
+           modes: AOT, LLVM JIT, TinyJIT replay
+     |
+     v
+Runtime    SIMD (SSE/AVX/AVX-512/NEON), BLAS, threading, memory pools
+     |
+     v
+Hardware   CPU, CUDA, ROCm, Vulkan, WebGPU, Metal, OpenCL
 ```
-
-### Automatic Differentiation
-
-Full autograd support with dynamic computation graphs:
-
-```c
-x->requires_grad = true;
-Tensor* y = cml_mul(x, x);
-cml_backward(y, NULL, false, false);
-// x->grad now contains gradients
-```
-
-### Multi-Device Support
-
-Automatic device detection and memory allocation:
-
-```c
-DeviceType device = cml_get_default_device();  // Auto-detects best device
-cml_set_default_device(DEVICE_CUDA);           // Use CUDA
-cml_set_default_device(DEVICE_METAL);          // Use Metal (macOS)
-```
-
-## API Overview
-
-### Tensor Operations
-
-- **Creation**: `cml_zeros()`, `cml_ones()`, `cml_empty()`, `cml_tensor()`
-- **Elementwise**: `cml_add()`, `cml_mul()`, `cml_exp()`, `cml_log()`, etc.
-- **Reductions**: `cml_sum()`, `cml_mean()`, `cml_max()`, `cml_min()`
-- **Views**: `cml_reshape()`, `cml_transpose()`, `cml_clone()`, `cml_detach()`
-
-### Neural Network Layers
-
-- **Linear**: `cml_nn_linear()`
-- **Convolutional**: `cml_nn_conv2d()`
-- **Normalization**: `cml_nn_batchnorm2d()`, `cml_nn_layernorm()`
-- **Pooling**: `cml_nn_maxpool2d()`, `cml_nn_avgpool2d()`
-- **Activations**: `cml_nn_relu()`, `cml_nn_sigmoid()`, `cml_nn_tanh()`, etc.
-- **Dropout**: `cml_nn_dropout()`
-
-### Optimizers
-
-- **Adam**: `cml_optim_adam()`, `cml_optim_adam_for_model()`
-- **SGD**: `cml_optim_sgd()`, `cml_optim_sgd_for_model()`
-- **RMSprop**: `cml_optim_rmsprop()`
-- **AdaGrad**: `cml_optim_adagrad()`
-
-### Loss Functions
-
-- **MSE**: `cml_nn_mse_loss()`
-- **MAE**: `cml_nn_mae_loss()`
-- **BCE**: `cml_nn_bce_loss()`
-- **Cross Entropy**: `cml_nn_cross_entropy_loss()`
-- **Huber**: `cml_nn_huber_loss()`
-- **KL Divergence**: `cml_nn_kl_div_loss()`
 
 ## Examples
 
@@ -269,6 +205,6 @@ We welcome contributions! Please see the main [README](../README.md) for contrib
 
 MIT License - see [LICENSE](../LICENSE) file for details.
 
-______________________________________________________________________
+---
 
 **Need help?** Open an [issue](https://github.com/jaywyawhare/C-ML/issues) or check the [API Reference](api_reference.md).

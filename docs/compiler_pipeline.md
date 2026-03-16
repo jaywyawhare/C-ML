@@ -70,12 +70,10 @@ Declarative `(pattern -> replacement)` rules that rewrite IR subgraphs until con
 ### API
 
 ```c
-// Build patterns
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int n);
 CMLPatternNode* cml_pattern_capture(const char* name);
 CMLPatternNode* cml_pattern_any(void);
 
-// Registry
 CMLRewriteRegistry* cml_rewrite_registry_create(void);
 CMLRewriteRegistry* cml_rewrite_builtin_rules(void);   // all built-in algebraic rules
 int  cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pat,
@@ -84,7 +82,6 @@ int  cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pat,
 // Apply rules to graph until fixpoint (max_iterations=0 for default of 16)
 int  cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations);
 
-// Dead code elimination
 int  cml_rewrite_dce(CMLGraph_t ir);
 ```
 
@@ -212,14 +209,12 @@ Lowers a `CMLLinearProgram` to backend-specific kernel source code.
 ### API
 
 ```c
-// Generic
 CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog,
                                     CMLFusedBackend backend, size_t work_size);
 CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group,
                                           CMLFusedBackend backend);
 void cml_fused_kernel_free(CMLFusedKernel* kernel);
 
-// Backend-specific
 char*     cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size);
 uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
                                       size_t work_size, int* out_num_words);
@@ -260,7 +255,6 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
 uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* out_size);
 uint32_t* cml_spirv_gen_fill(CMLSPIRVCodegen* cg, float value, const char* name, size_t* out_size);
 
-// Low-level builder
 SPIRVBuilder* spirv_builder_create(void);
 void          spirv_builder_emit(SPIRVBuilder* b, uint32_t word);
 uint32_t      spirv_builder_alloc_id(SPIRVBuilder* b);
@@ -282,13 +276,11 @@ Thread-safe LRU cache for compiled kernels. Uses FNV-1a hashing of IR structure 
 ### API
 
 ```c
-// Lifecycle
 CMLKernelCache* cml_kernel_cache_create(size_t max_entries);
 CMLKernelCache* cml_kernel_cache_create_with_limits(size_t max_entries, size_t max_memory);
 void cml_kernel_cache_free(CMLKernelCache* cache);
 CMLKernelCache* cml_kernel_cache_get_default(void);  // global singleton
 
-// Lookup
 uint64_t       cml_kernel_cache_compute_hash(CMLGraph_t ir, Tensor** inputs,
                                               int num_inputs, CMLKernelBackend backend);
 CMLKernelEntry* cml_kernel_cache_lookup(CMLKernelCache* cache, uint64_t hash);
@@ -296,15 +288,12 @@ CMLKernelEntry* cml_kernel_cache_lookup_ir(CMLKernelCache* cache, CMLGraph_t ir,
                                             Tensor** inputs, int num_inputs,
                                             CMLKernelBackend backend);
 
-// Insert
 int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash,
                              CMLKernelBackend backend, void* compiled, size_t memory_size);
 
-// Eviction & stats
 int    cml_kernel_cache_evict_lru(CMLKernelCache* cache);
 double kernel_cache_hit_rate(CMLKernelCache* cache);
 
-// Register per-backend free function
 void cml_kernel_cache_set_free_fn(CMLKernelBackend backend, CMLKernelFreeFn free_fn);
 ```
 
@@ -324,20 +313,17 @@ Orchestrates the full pipeline: IR -> schedule -> linearize -> codegen -> compil
 CMLRuntimeCompiler* cml_runtime_compiler_create(void);
 void cml_runtime_compiler_free(CMLRuntimeCompiler* rc);
 
-// Compile (with caching)
 const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
                                                      const CMLFusionGroup* group);
 const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
                                                        const CMLLinearProgram* prog,
                                                        size_t work_size);
 
-// Execute
 int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
                                   Tensor** inputs, int num_inputs,
                                   Tensor** outputs, int num_outputs);
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir);
 
-// Configuration
 void cml_runtime_compiler_set_backend(CMLRuntimeCompiler* rc, CMLFusedBackend backend);
 void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc);
 void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc,
@@ -353,18 +339,15 @@ Compiles IR graphs to native shared libraries with zero runtime compilation depe
 ```c
 AOTCompileOptions cml_aot_default_options(void);
 
-// Compile
 int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOptions* options);
 int cml_aot_compile_module(struct Module* module, Tensor* sample_input,
                             const char* output_path, const AOTCompileOptions* options);
 
-// Load & execute (runtime -- no compiler needed)
 CMLAOTModel* cml_aot_load(const char* path);
 int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
                      Tensor** outputs, int num_outputs);
 void cml_aot_free(CMLAOTModel* model);
 
-// Header generation
 int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* function_name);
 ```
 
@@ -406,7 +389,6 @@ Records GPU kernel launches into a replayable graph (CUDA Graph / Metal Command 
 CMLCapturedGraph* cml_graph_capture_create(void);
 void cml_graph_capture_free(CMLCapturedGraph* graph);
 
-// Record
 int cml_graph_capture_begin(CMLCapturedGraph* graph);
 int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op,
                               void* kernel_handle,
@@ -414,10 +396,8 @@ int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op,
                               void** args, int num_args, size_t shared_mem);
 int cml_graph_capture_end(CMLCapturedGraph* graph);
 
-// Replay
 int cml_graph_capture_replay(CMLCapturedGraph* graph);
 
-// Rebind inputs/outputs for new data
 int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* tensor);
 int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* tensor);
 ```
@@ -434,7 +414,6 @@ States: `CML_CAPTURE_IDLE` -> `CML_CAPTURE_RECORDING` -> `CML_CAPTURE_READY`.
 CMLRuntimeCompiler* rc = cml_runtime_compiler_create();
 cml_runtime_compiler_set_backend(rc, CML_FUSED_BACKEND_PTX);
 
-// Executes full pipeline: schedule -> linearize -> codegen -> cache -> launch
 cml_runtime_execute_graph(rc, ir);
 
 // Second call hits the cache
@@ -448,14 +427,12 @@ cml_runtime_compiler_free(rc);
 ### AOT path (deploy without compiler)
 
 ```c
-// Build time
 AOTCompileOptions opts = cml_aot_default_options();
 opts.opt_level = AOT_OPT_O3;
 opts.include_weights = true;
 opts.format = AOT_FORMAT_SHARED_LIB;
 cml_aot_compile(ir, "model.so", &opts);
 
-// Runtime (no compiler dependency)
 CMLAOTModel* model = cml_aot_load("model.so");
 cml_aot_execute(model, inputs, 1, outputs, 1);
 cml_aot_free(model);

@@ -133,29 +133,21 @@ View detailed information about:
 ### Enabling Auto-Capture
 
 ```c
-// Create IR context
 CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
-
-// Enable automatic operation capture
 cml_ir_enable_auto_capture(ir);
 
-// Your tensor operations are automatically captured
 Tensor* a = tensor_empty(shape, 1, &config);
 Tensor* b = tensor_empty(shape, 1, &config);
 Tensor* c = tensor_mul(a, b);  // Captured to IR
 Tensor* d = tensor_add(c, a);  // Captured to IR
 
-// Optimize the IR
 cml_ir_optimize(ir);
 
-// Generate code
 char* code = cml_ir_compile(ir, NULL);
 printf("%s\n", code);
 free(code);
 
-// Export kernel analysis for visualization
 char* analysis = cml_ir_export_kernel_analysis(ir, true);
-// Send to frontend...
 free(analysis);
 
 cml_ir_disable_auto_capture();

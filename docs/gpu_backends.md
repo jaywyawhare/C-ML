@@ -462,14 +462,12 @@ A cross-vendor backend that discovers OpenCL platforms/devices and provides tens
 ### API
 
 ```c
-// Check availability
 bool opencl_backend_is_available(void);
 
 // Lifecycle
 int  opencl_backend_init(void);
 void opencl_backend_cleanup(void);
 
-// Get backend operations (implements BackendOps interface)
 BackendOps opencl_backend_get_ops(void);
 
 // Device info

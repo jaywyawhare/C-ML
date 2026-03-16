@@ -2,7 +2,7 @@
 
 This document provides a comprehensive overview of all optimization techniques implemented in C-ML, how they work internally, and how to leverage them for maximum performance.
 
-______________________________________________________________________
+---
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ ______________________________________________________________________
 1. [Profiling](#12-profiling)
 1. [Best Practices](#best-practices)
 
-______________________________________________________________________
+---
 
 ## Overview
 
@@ -29,35 +29,21 @@ C-ML employs a multi-level optimization strategy that operates at different stag
 
 ```
 User Code
-    v
-┌─────────────────────────────────────────────────────┐
-│  Level 1: C-ML IR Optimizations                     │
-│  - Dead Code Elimination (DCE)                      │
-│  - Operation Fusion (11+ patterns)                  │
-│  - Cache Locality Reordering                        │
-└─────────────────────────────────────────────────────┘
-    v
-┌─────────────────────────────────────────────────────┐
-│  Level 2: LLVM JIT Compilation (optional)           │
-│  - IR to LLVM IR lowering                           │
-│  - LLVM optimization passes                         │
-│  - Native machine code generation                   │
-│  - Kernel caching (LRU)                             │
-└─────────────────────────────────────────────────────┘
-    v
-┌─────────────────────────────────────────────────────┐
-│  Level 3: Runtime Optimizations                     │
-│  - SIMD Vectorization (SSE/AVX/AVX-512/NEON)        │
-│  - Multi-threading (Thread Pool)                    │
-│  - BLAS Acceleration (OpenBLAS/MKL/Accelerate)      │
-│  - Kernel Caching (LRU)                             │
-│  - Memory Pooling                                   │
-└─────────────────────────────────────────────────────┘
-    v
+     |
+     v
+IR Optimizations       DCE, operator fusion (11+ patterns), cache locality reordering
+     |
+     v
+LLVM JIT (optional)    IR -> LLVM IR, optimization passes, native codegen, kernel cache
+     |
+     v
+Runtime                SIMD (SSE/AVX/AVX-512/NEON), threading, BLAS, kernel cache, memory pools
+     |
+     v
 Hardware (CPU/GPU)
 ```
 
-______________________________________________________________________
+---
 
 ## 1. SIMD Vectorization
 
@@ -80,7 +66,6 @@ typedef struct {
     bool has_sleef;    // SLEEF library available
 } CMLSimdCaps;
 
-// Get capabilities at runtime
 const CMLSimdCaps* caps = cml_get_simd_caps();
 ```
 
@@ -201,7 +186,7 @@ void simd_exp_f32_parallel(const float* in, float* out, size_t n);
 float simd_sum_f32_parallel(const float* data, size_t n);  // Parallel reduction
 ```
 
-______________________________________________________________________
+---
 
 ## 2. Memory Optimizations
 
@@ -222,13 +207,8 @@ typedef struct MemoryPool {
     DType dtype;
 } MemoryPool;
 
-// Create pool with 100 blocks of 4KB each
 MemoryPool* pool = memory_pool_create(4096, 100, DTYPE_F32);
-
-// Allocate from pool (O(n) first-fit)
 void* block = memory_pool_alloc(pool);
-
-// Return to pool
 memory_pool_free_block(pool, block);
 ```
 
@@ -244,14 +224,9 @@ typedef struct TensorPool {
     bool* in_use;       // Usage flags
 } TensorPool;
 
-// Create pool of 50 tensors with shape [64, 784]
 int shape[] = {64, 784};
 TensorPool* tpool = tensor_pool_create(shape, 2, 50, DTYPE_F32, DEVICE_CPU);
-
-// Get pre-allocated tensor
 Tensor* t = tensor_pool_get(tpool);
-
-// Return to pool
 tensor_pool_return(tpool, t);
 ```
 
@@ -282,14 +257,12 @@ Tensor* tensor_reuse(Tensor* tensor, int* new_shape, int new_ndim);
 Pre-allocates memory based on computation graph structure using liveness analysis:
 
 ```c
-// Create graph allocator
 CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(DEVICE_CPU);
 CMLGraphAllocator_t galloc = cml_graph_allocator_new(buft);
 
 // Reserve memory based on graph (performs liveness analysis)
 cml_graph_allocator_reserve(galloc, computation_graph);
 
-// Allocate buffers
 cml_graph_allocator_alloc_graph(galloc, computation_graph);
 ```
 
@@ -338,7 +311,7 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 3. Parallelization
 
@@ -358,10 +331,7 @@ typedef struct ThreadPool {
     bool shutdown;
 } ThreadPool;
 
-// Create thread pool (0 = auto-detect CPU count)
-ThreadPool* pool = threadpool_create(0);
-
-// Get global singleton
+ThreadPool* pool = threadpool_create(0);  // 0 = auto-detect CPU count
 ThreadPool* global = threadpool_get_global();
 ```
 
@@ -425,7 +395,7 @@ static void* worker_thread(void* arg) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 4. BLAS Integration
 
@@ -536,7 +506,7 @@ for (int i0 = 0; i0 < M; i0 += BLOCK) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 5. IR Graph Optimizations
 
@@ -623,7 +593,6 @@ static int remove_dead_nodes(CMLGraph_t ir) {
                 node->output->ir_context = NULL;
             }
 
-            // Free node and resources
             free(node);
             ir->node_count--;
             removed++;
@@ -653,7 +622,6 @@ static int build_dependency_graph(CMLGraph_t ir) {
         for (int i = 0; i < node->num_inputs; i++) {
             struct IRNode* producer = find_node_by_output(ir, node->input_names[i]);
             if (producer) {
-                // Add this node to producer's users list
                 if (producer->use_count >= producer->users_capacity) {
                     int new_cap = producer->users_capacity == 0 ? 4 : producer->users_capacity * 2;
                     producer->users = realloc(producer->users, new_cap * sizeof(struct IRNode*));
@@ -724,7 +692,7 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 6. Operation Fusion
 
@@ -850,7 +818,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 7. LLVM JIT Backend
 
@@ -885,7 +853,7 @@ cml_ir_optimize(ir);  // DCE, fusion, reordering
 // Happens automatically during execution
 ```
 
-______________________________________________________________________
+---
 
 ## 8. Caching
 
@@ -1074,7 +1042,7 @@ CMLKernelEntry* cml_kernel_cache_lookup(CMLKernelCache* cache, uint64_t hash) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 9. GPU Backends
 
@@ -1121,7 +1089,7 @@ typedef enum {
 - Cross-platform GPU support
 - SPIR-V code generation
 
-______________________________________________________________________
+---
 
 ## 10. Gradient Checkpointing
 
@@ -1177,7 +1145,6 @@ int autograd_checkpoint(Tensor* tensor) {
     tensor->ir_node = NULL;
     tensor->ir_context = NULL;
 
-    // Add to registry
     checkpointed_tensors[num_checkpointed++] = checkpoint;
     return 0;
 }
@@ -1224,7 +1191,7 @@ Tensor* autograd_recompute(Tensor* tensor) {
 }
 ```
 
-______________________________________________________________________
+---
 
 ## 11. Compiler Optimizations
 
@@ -1281,7 +1248,7 @@ analyze: CFLAGS += -fanalyzer
 | `-mavx2 -mfma`   | Enable AVX2 + FMA instructions     |
 | `-mavx512f`      | Enable AVX-512 instructions        |
 
-______________________________________________________________________
+---
 
 ## 12. Profiling
 
@@ -1323,7 +1290,7 @@ void cml_blas_print_status(CMLBlasContext* ctx);
 void cml_print_simd_caps(void);
 ```
 
-______________________________________________________________________
+---
 
 ## Best Practices
 
@@ -1356,14 +1323,13 @@ ______________________________________________________________________
 ### Debugging Performance
 
 ```c
-// Print all optimization status
 cml_print_simd_caps();
 cml_blas_print_status(NULL);
 cml_graph_cache_print_stats(NULL);
 cml_kernel_cache_print_stats(NULL);
 ```
 
-______________________________________________________________________
+---
 
 ## Known Limitations
 
@@ -1377,7 +1343,7 @@ When using LLVM JIT execution, memory can grow over time because LLVM's internal
 - Use larger batch sizes to reduce total JIT compilations
 - The kernel cache (LRU, 256 entries) automatically limits compiled kernel accumulation
 
-______________________________________________________________________
+---
 
 ## Summary Table
 
@@ -1393,7 +1359,7 @@ ______________________________________________________________________
 | Checkpointing    | `checkpointing.c` | 1x             | 50-80% reduction      |
 | Thread Pool      | `threadpool.c`    | Nx (N = cores) | Minimal               |
 
-______________________________________________________________________
+---
 
 ## References
 

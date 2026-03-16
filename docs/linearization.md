@@ -2,7 +2,7 @@
 
 Linearization converts a `CMLFusionGroup` (a set of fused IR operations) into a flat instruction sequence with virtual register allocation, which is then lowered to backend-specific kernel code. This is the bridge between the IR graph optimizer and actual executable GPU/CPU kernels.
 
-______________________________________________________________________
+---
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ ______________________________________________________________________
 1. [Runtime Compilation & Caching](#runtime-compilation--caching)
 1. [Usage Example](#usage-example)
 
-______________________________________________________________________
+---
 
 ## Overview
 
@@ -23,48 +23,36 @@ After the IR graph scheduler groups operations into `CMLFusionGroup`s, each grou
 
 **Files:** `src/ops/ir/linearize.c`, `src/ops/ir/fused_codegen.c`, `include/ops/ir/fused_codegen.h`
 
-______________________________________________________________________
+---
 
 ## Pipeline
 
 ```
 IR Graph
-    │
-    ▼
-┌─────────────────────────────────────────────────────────┐
-│  Schedule V2 (cml_schedule_v2_create)                   │
-│  - Topological walk                                     │
-│  - Group ops by fusibility rules                        │
-│  - Detect buffer elimination opportunities              │
-└────────────────┬────────────────────────────────────────┘
-                 │
-                 ▼  CMLFusionGroup[]
-┌─────────────────────────────────────────────────────────┐
-│  Linearization (cml_linearize_group)                    │
-│  - Map node outputs to virtual registers (v0–v63)       │
-│  - Emit LOAD / COMPUTE / STORE instructions             │
-│  - Mark eliminated intermediates                        │
-└────────────────┬────────────────────────────────────────┘
-                 │
-                 ▼  CMLLinearProgram
-┌─────────────────────────────────────────────────────────┐
-│  Code Generation (cml_fused_codegen)                    │
-│  - C: for-loop with float registers                     │
-│  - PTX: NVIDIA CUDA assembly                            │
-│  - SPIR-V: Vulkan shader bytecode                       │
-│  - WGSL / Metal: WebGPU / Apple shaders                 │
-└────────────────┬────────────────────────────────────────┘
-                 │
-                 ▼  CMLFusedKernel
-┌─────────────────────────────────────────────────────────┐
-│  Runtime Compilation & Cache                            │
-│  - Hash LinearProgram (FNV-1a)                          │
-│  - Compile to binary on cache miss                      │
-│  - Execute with data buffers                            │
-└─────────────────────────────────────────────────────────┘
+     |
+     v
+Schedule V2  (cml_schedule_v2_create)
+  topological walk, group ops by fusibility, detect buffer elimination
+     |
+     v  CMLFusionGroup[]
+Linearization  (cml_linearize_group)
+  map node outputs to virtual registers (v0-v63)
+  emit LOAD / COMPUTE / STORE instructions
+  mark eliminated intermediates
+     |
+     v  CMLLinearProgram
+Code Generation  (cml_fused_codegen)
+  C: for-loop with float registers
+  PTX: NVIDIA CUDA assembly
+  SPIR-V: Vulkan shader bytecode
+  WGSL / Metal: WebGPU / Apple shaders
+     |
+     v  CMLFusedKernel
+Runtime Compilation & Cache
+  hash LinearProgram (FNV-1a), compile on cache miss, execute
 ```
 
-______________________________________________________________________
+---
 
 ## Linearization
 
@@ -115,7 +103,7 @@ typedef struct CMLLinearProgram {
 } CMLLinearProgram;
 ```
 
-______________________________________________________________________
+---
 
 ## Code Generation Backends
 
@@ -163,7 +151,7 @@ add.f32 v4, v2, v3;
 st.global.f32 [out0 + tid*4], v4;
 ```
 
-______________________________________________________________________
+---
 
 ## API Reference
 
@@ -200,7 +188,7 @@ ______________________________________________________________________
 | `cml_runtime_compile_group(rc, group)` | Compile a fusion group (cached) |
 | `cml_runtime_compile_program(rc, prog, work_size)` | Compile a linear program (cached) |
 
-______________________________________________________________________
+---
 
 ## Buffer Elimination
 
@@ -222,7 +210,7 @@ Without elimination:            With elimination:
 
 This reduces memory bandwidth by keeping intermediate values in registers, which is critical for GPU performance where memory access is often the bottleneck.
 
-______________________________________________________________________
+---
 
 ## Runtime Compilation & Caching
 
@@ -240,24 +228,21 @@ const CMLCompiledKernel* k2 = cml_runtime_compile_group(rc, group);
 cml_runtime_compiler_free(rc);
 ```
 
-______________________________________________________________________
+---
 
 ## Usage Example
 
 ```c
 #include "ops/ir/fused_codegen.h"
 
-/* Linearize a fusion group */
 CMLLinearProgram* prog = cml_linearize_group(group);
-cml_linear_program_print(prog);     /* debug: inspect instruction sequence */
+cml_linear_program_print(prog);
 
-/* Generate a CUDA PTX kernel */
 CMLFusedKernel* kernel = cml_fused_codegen(prog, CML_FUSED_BACKEND_PTX, work_size);
 printf("Generated PTX:\n%s\n", kernel->source);
 printf("Inputs: %d, Outputs: %d, VRegs: %d\n",
        kernel->num_inputs, kernel->num_outputs, kernel->num_vregs);
 
-/* Or use the convenience function */
 CMLFusedKernel* kernel2 = cml_fused_codegen_group(group, CML_FUSED_BACKEND_C);
 
 cml_fused_kernel_free(kernel);

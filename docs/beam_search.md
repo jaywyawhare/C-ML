@@ -2,7 +2,7 @@
 
 BEAM search is C-ML's parametric kernel auto-tuning framework that automatically finds optimal GPU kernel launch configurations. It evaluates candidate configurations across multiple dimensions and selects the best-performing one, with optional hardware-level CUDA timing for precise measurements.
 
-______________________________________________________________________
+---
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ ______________________________________________________________________
 1. [Cache Persistence](#cache-persistence)
 1. [Usage Example](#usage-example)
 
-______________________________________________________________________
+---
 
 ## Overview
 
@@ -27,30 +27,28 @@ When launching GPU kernels, performance depends heavily on the block size, unrol
 
 **Files:** `include/ops/ir/beam_search.h`, `src/ops/ir/beam_search.c`, `src/ops/ir/beam_cuda_timing.c`
 
-______________________________________________________________________
+---
 
 ## How It Works
 
 ```
 Parameter Space (54 configs)
-  │
-  ▼
-┌──────────────────────┐
-│ Heuristic Filtering  │  Score by distance from sqrt(total_elements)
-│ Keep top beam_width  │  Default: top 4 candidates
-└──────────┬───────────┘
-           │
-     ┌─────┴──────┐
-     ▼             ▼
- Heuristic      Hardware
- Estimation     Timing (CUDA)
-     │             │
-     └─────┬───────┘
-           ▼
-┌──────────────────────┐
-│ Cache Best Config    │  Store by kernel_hash
-│ (256-entry table)    │  Persist to disk (BMCH format)
-└──────────────────────┘
+     |
+     v
+Heuristic Filtering        score by distance from sqrt(total_elements)
+  keep top beam_width      default: top 4 candidates
+     |
+     +--------+--------+
+     |                  |
+     v                  v
+Heuristic           Hardware
+Estimation          Timing (CUDA)
+     |                  |
+     +--------+---------+
+              |
+              v
+Cache Best Config          store by kernel_hash
+  256-entry table          persist to disk (BMCH format)
 ```
 
 ### Tuning Parameter Space
@@ -69,7 +67,7 @@ Candidates are scored based on:
 - **Overshoot penalty**: Configurations that exceed total elements waste work
 - The top `beam_width` candidates survive for evaluation
 
-______________________________________________________________________
+---
 
 ## API Reference
 
@@ -107,7 +105,7 @@ typedef struct {
 | `cml_beam_cache_load(ctx, path)` | Load cache from disk |
 | `cml_beam_cuda_timing_fn(variant, user_data)` | CUDA hardware timing callback |
 
-______________________________________________________________________
+---
 
 ## Configuration
 
@@ -128,7 +126,7 @@ export CML_BEAM=16   # Exhaustive search
 | `warmup_runs` | 2 | GPU warmup iterations before timing |
 | `timing_runs` | 5 | Actual measurement iterations |
 
-______________________________________________________________________
+---
 
 ## CUDA Hardware Timing
 
@@ -143,7 +141,6 @@ The `cml_beam_cuda_timing_fn()` callback provides precise GPU measurements using
 5. Synchronize and compute average time in microseconds
 
 ```c
-/* Hardware tuning with CUDA timing */
 CMLBeamConfig best;
 cml_beam_search_tune_hw(
     ctx,
@@ -159,37 +156,31 @@ The hardware path pre-filters to `beam_width * 2` candidates using heuristics be
 
 **Requires:** `CML_HAS_CUDA` compile flag. Without it, `cml_beam_cuda_timing_fn()` returns -1.0 (error).
 
-______________________________________________________________________
+---
 
 ## Cache Persistence
 
 Tuning results are cached in a 256-entry hash table with linear probing. Caches can be saved to and loaded from disk in a binary format with magic number `BMCH` (0x424D4348).
 
 ```c
-/* Save tuning results for reuse across runs */
 cml_beam_cache_save(ctx, "beam_cache.bin");
-
-/* Load previously saved results */
 cml_beam_cache_load(ctx, "beam_cache.bin");
 ```
 
-______________________________________________________________________
+---
 
 ## Usage Example
 
 ```c
 #include "ops/ir/beam_search.h"
 
-/* Create BEAM search context */
 CMLBeamSearchCtx* ctx = cml_beam_search_create();
 
-/* Check if enabled */
 if (!cml_beam_search_enabled()) {
     printf("BEAM search disabled (set CML_BEAM env var)\n");
     return;
 }
 
-/* Heuristic tuning */
 CMLBeamConfig best;
 int shape[] = {1024, 1024};
 int rc = cml_beam_search_tune(ctx, kernel_hash, 1024*1024, 2, shape, &best);
@@ -198,11 +189,9 @@ if (rc == 0) {
            best.block_size_x, best.unroll_factor, best.vec_width);
 }
 
-/* Or hardware tuning with CUDA */
 rc = cml_beam_search_tune_hw(ctx, kernel_hash, 1024*1024,
                               cml_beam_cuda_timing_fn, NULL, &best);
 
-/* Cache results to disk */
 cml_beam_cache_save(ctx, "beam_cache.bin");
 
 cml_beam_search_free(ctx);

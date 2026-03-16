@@ -10,17 +10,12 @@ C-ML provides a dataset hub for one-liner dataset loading with automatic downloa
 int main(void) {
     cml_init();
 
-    // Load a dataset
     Dataset* ds = cml_dataset_load("iris");
+    dataset_normalize(ds, "minmax");
 
-    // Normalize features
-    dataset_normalize(ds, "minmax");  // or "zscore"
-
-    // Split into train/test
     Dataset *train, *test;
     dataset_split(ds, 0.8f, &train, &test);
 
-    // Access data
     Tensor* X = train->X;   // [num_samples, input_size]
     Tensor* y = train->y;   // [num_samples, output_size]
 
@@ -56,10 +51,8 @@ Dataset names are case-insensitive.
 ### Loading
 
 ```c
-// Load a named dataset
 Dataset* cml_dataset_load(const char* name);
 
-// Load from CSV file
 // target_col: -1 = last column, 0 = first, etc.
 Dataset* cml_dataset_from_csv(const char* filepath, int target_col);
 ```
@@ -69,25 +62,15 @@ CSV loading auto-detects: header rows, delimiters (comma/semicolon), and string 
 ### Preprocessing
 
 ```c
-// Normalize features
-// method: "minmax" (scales to [0,1]) or "zscore" (zero mean, unit variance)
 void dataset_normalize(Dataset* ds, const char* method);
-
-// Train/test split
-// ratio: fraction for training (e.g., 0.8 = 80% train, 20% test)
 void dataset_split(Dataset* ds, float ratio, Dataset** train, Dataset** test);
-
-// Compute feature statistics (min, max, mean, std)
 void cml_dataset_compute_stats(Dataset* ds);
 ```
 
 ### Cache Management
 
 ```c
-// Get cache directory (default: ~/.cml/datasets/)
 const char* cml_dataset_cache_dir(void);
-
-// Set custom cache directory
 void cml_dataset_set_cache_dir(const char* dir);
 ```
 
@@ -134,24 +117,18 @@ Dataset* ds = cml_dataset_load("boston");
 dataset_normalize(ds, "zscore");
 Dataset *train, *test;
 dataset_split(ds, 0.8f, &train, &test);
-// Predict median home value
 ```
 
 ### Time Series (Airline)
 
 ```c
 Dataset* ds = cml_dataset_load("airline");
-// 144 monthly passenger counts (1949-1960)
-// Use sliding windows for RNN/LSTM input
 ```
 
 ### Custom CSV
 
 ```c
-// Last column is the target
 Dataset* ds = cml_dataset_from_csv("my_data.csv", -1);
-
-// First column is the target
 Dataset* ds = cml_dataset_from_csv("my_data.csv", 0);
 ```
 

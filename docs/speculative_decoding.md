@@ -2,7 +2,7 @@
 
 Speculative decoding is an LLM inference acceleration technique (based on Leviathan et al., 2023) that uses a small "draft" model to propose multiple tokens, which are then verified in parallel by a larger "target" model in a single forward pass. This amortizes the cost of autoregressive generation while preserving the target model's output quality.
 
-______________________________________________________________________
+---
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ ______________________________________________________________________
 1. [Usage Example](#usage-example)
 1. [Performance Metrics](#performance-metrics)
 
-______________________________________________________________________
+---
 
 ## Overview
 
@@ -27,20 +27,16 @@ This produces the same quality as the target model while reducing the number of 
 
 **Files:** `include/nn/speculative.h`, `src/nn/speculative.c`
 
-______________________________________________________________________
+---
 
 ## How It Works
 
 Each speculative decode step follows three phases:
 
 ```
-Draft Phase                 Verify Phase               Accept/Reject
-┌─────────────┐            ┌──────────────┐           ┌──────────────┐
-│ Draft model  │            │ Target model  │           │ Compare      │
-│ generates K  │──────────▶│ verifies all  │─────────▶│ draft vs     │
-│ tokens       │            │ K tokens in   │           │ target       │
-│ sequentially │            │ one pass      │           │ predictions  │
-└─────────────┘            └──────────────┘           └──────────────┘
+Draft model            Target model           Accept/Reject
+  generate K tokens  ->  verify all K tokens  ->  compare draft vs target
+  sequentially           in one forward pass       accept until mismatch
 ```
 
 **Phase 1 — Draft:** Autoregressively generate K tokens using the draft model. Each step feeds the growing sequence back to get the next draft token.
@@ -54,7 +50,7 @@ Draft Phase                 Verify Phase               Accept/Reject
 - On mismatch, use the target model's prediction as a correction token
 - If all K tokens are accepted, sample one bonus token from the target's final logits
 
-______________________________________________________________________
+---
 
 ## API Reference
 
@@ -104,7 +100,7 @@ typedef int (*CMLSampleTokenFn)(void* model_ctx, Tensor* logits, float temperatu
 | `cml_speculative_result_free(result)` | Free a decode result |
 | `cml_speculative_acceptance_rate(decoder)` | Get overall acceptance rate across all steps |
 
-______________________________________________________________________
+---
 
 ## Configuration
 
@@ -118,24 +114,21 @@ ______________________________________________________________________
 
 Maximum draft tokens per step is capped at `CML_SPEC_MAX_DRAFT_TOKENS` (16).
 
-______________________________________________________________________
+---
 
 ## Usage Example
 
 ```c
 #include "nn/speculative.h"
 
-/* Create decoder with default config */
 CMLSpeculativeConfig cfg = cml_speculative_default_config();
 cfg.num_draft_tokens = 5;
 
 CMLSpeculativeDecoder* dec = cml_speculative_create(&cfg, 32000);
 
-/* Register model callbacks */
 cml_speculative_set_draft_model(dec, &draft_ctx, draft_forward, draft_sample);
 cml_speculative_set_target_model(dec, &target_ctx, target_forward, target_sample);
 
-/* Run decode steps */
 int prefix[] = {1, 2, 3};
 CMLSpeculativeResult* res = cml_speculative_decode_step(dec, prefix, 3);
 
@@ -147,14 +140,13 @@ if (res) {
     cml_speculative_result_free(res);
 }
 
-/* Lifetime stats */
 printf("Overall acceptance: %.0f%%\n",
        cml_speculative_acceptance_rate(dec) * 100);
 
 cml_speculative_free(dec);
 ```
 
-______________________________________________________________________
+---
 
 ## Performance Metrics
 

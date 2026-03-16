@@ -46,17 +46,12 @@ The built-in binary format for saving and loading modules, individual tensors, a
 ```c
 #include "core/serialization.h"
 
-// Save after training
 module_save(model, "weights.bin");
-
-// Resume later
 module_load(model, "weights.bin");
 
-// Save/load optimizer state alongside weights
 optimizer_save(opt, "optimizer.bin");
 optimizer_load(opt, "optimizer.bin");
 
-// Save a single tensor
 tensor_write_file(my_tensor, "embedding.bin");
 Tensor* loaded = tensor_read_file("embedding.bin");
 ```
@@ -89,11 +84,9 @@ Higher-level convenience functions that bundle a model and its training state in
 ```c
 #include "nn/model_io.h"
 
-// Quick save / load
 model_save(model, "model.bin");
 model_load(model, "model.bin");
 
-// Full checkpoint for resuming training
 model_save_checkpoint(model, optimizer, epoch, loss, "checkpoint_ep10.bin");
 
 int resumed_epoch;
@@ -147,10 +140,8 @@ GGUF (GPT-Generated Unified Format) is the standard format used by llama.cpp and
 ```c
 #include "core/gguf.h"
 
-// Load a quantized model from a .gguf file
 module_load_gguf(model, "llama-7b-q4_0.gguf");
 
-// Or work with individual tensors
 GGUFContext* ctx = gguf_open_read("model.gguf");
 int n = gguf_get_num_tensors(ctx);
 for (int i = 0; i < n; i++) {
@@ -160,7 +151,6 @@ for (int i = 0; i < n; i++) {
 }
 gguf_close(ctx);
 
-// Export a module to GGUF
 module_save_gguf(model, "exported.gguf");
 ```
 
@@ -203,7 +193,6 @@ Dequantization kernels for GGUF quantized tensor types. These are used internall
 ```c
 #include "core/gguf_quant.h"
 
-// Check if a type needs dequantization
 if (gguf_type_is_quantized(GGUF_TENSOR_Q4_0)) {
     int block_sz = gguf_quant_block_size(GGUF_TENSOR_Q4_0); // 32
 
@@ -245,10 +234,8 @@ SafeTensors is the format popularized by Hugging Face. It stores tensors with a 
 ```c
 #include "core/safetensors.h"
 
-// Load a Hugging Face model
 module_load_safetensors(model, "model.safetensors");
 
-// Read individual tensors
 SafeTensorsContext* ctx = safetensors_open_read("model.safetensors");
 int n = safetensors_get_num_tensors(ctx);
 for (int i = 0; i < n; i++) {
@@ -258,7 +245,6 @@ for (int i = 0; i < n; i++) {
 }
 safetensors_close(ctx);
 
-// Export to SafeTensors
 module_save_safetensors(model, "exported.safetensors");
 ```
 
@@ -301,15 +287,12 @@ Load and execute ONNX (Open Neural Network Exchange) models. C-ML parses the pro
 ```c
 #include "core/onnx.h"
 
-// Load model
 CMLONNXModel* onnx = cml_onnx_load("resnet50.onnx");
 
-// Check operator support
 if (!cml_onnx_op_supported("Conv")) {
     printf("Conv not supported!\n");
 }
 
-// Run inference
 Tensor* inputs[] = { input_tensor };
 Tensor* outputs[1];
 cml_onnx_run(onnx, inputs, 1, outputs, 1);
@@ -355,17 +338,13 @@ Load PyTorch state dictionaries saved with `torch.save()`. Handles the modern ZI
 ```c
 #include "core/pth_loader.h"
 
-// Load a PyTorch checkpoint
 CMLPthStateDict* sd = cml_pth_load("resnet50.pth");
 
-// Inspect contents
 cml_pth_print(sd);
 printf("Total params: %zu\n", cml_pth_total_params(sd));
 
-// Get a specific tensor
 Tensor* conv1_weight = cml_pth_get_tensor(sd, "conv1.weight");
 
-// Or load everything into a Module at once
 cml_pth_load_into_module(sd, model);
 
 cml_pth_free(sd);
@@ -411,20 +390,16 @@ General-purpose quantization utilities for compressing float32 tensors to lower-
 ```c
 #include "core/quantization.h"
 
-// Int8 quantization
 QuantParams params;
 Tensor* quantized = cml_quantize_int8(float_tensor, NULL, &params);
 // params.scale and params.zero_point are now set
 
-// Dequantize
 Tensor* restored = cml_dequantize_int8(quantized, &params);
 
-// NF4 quantization (4-bit, block size 64)
 float* scales;
 int num_scales;
 Tensor* nf4 = cml_quantize_nf4(float_tensor, 64, &scales, &num_scales);
 
-// Dequantize NF4
 size_t original_numel = 4096;
 Tensor* restored_nf4 = cml_dequantize_nf4(nf4, scales, num_scales, 64, original_numel);
 free(scales);

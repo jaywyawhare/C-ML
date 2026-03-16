@@ -3,24 +3,17 @@
 ## Quick Start
 
 ```c
-// 1. Create IR context
 CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
-
-// 2. Enable auto-capture
 cml_ir_enable_auto_capture(ir);
 
-// 3. Write your tensor code (automatically captured)
 Tensor* result = tensor_add(tensor_mul(a, b), c);
 
-// 4. Optimize!
 cml_ir_optimize(ir);
 
-// 5. Generate code
 char* code = cml_ir_compile(ir, NULL);
 printf("%s\n", code);
 free(code);
 
-// 6. Cleanup
 cml_ir_disable_auto_capture();
 cml_ir_free(ir);
 ```
@@ -98,14 +91,12 @@ cml_set_log_level(LOG_LEVEL_DEBUG);
 ### Inspect IR
 
 ```c
-// Before optimization
 char* before = cml_ir_to_string(ir);
 printf("Before:\n%s\n", before);
 free(before);
 
 cml_ir_optimize(ir);
 
-// After optimization
 char* after = cml_ir_to_string(ir);
 printf("After:\n%s\n", after);
 free(after);
@@ -219,6 +210,6 @@ IR_TARGET_WGSL       // WebGPU
 - [ ] Profiled performance
 - [ ] Cleaned up resources
 
-______________________________________________________________________
+---
 
 **Remember**: The best optimization is the one you can measure! Always profile before and after.
