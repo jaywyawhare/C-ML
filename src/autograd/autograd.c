@@ -755,7 +755,8 @@ int autograd_export_json(Tensor* root, const char* path) {
         stack[stack_size++] = root->ir_node;
         map_get_or_insert(&reachable, (const void*)root->ir_node, 1);
 
-        while (stack_size > 0) {
+        bool stack_ok = true;
+        while (stack_size > 0 && stack_ok) {
             struct IRNode* n = stack[--stack_size];
             for (int j = 0; j < n->num_inputs; j++) {
                 if (!n->inputs[j] || !n->inputs[j]->ir_node)
@@ -766,10 +767,16 @@ int autograd_export_json(Tensor* root, const char* path) {
                     // Newly added - push to stack
                     if (stack_size >= stack_cap) {
                         stack_cap *= 2;
-                        stack = realloc(stack, stack_cap * sizeof(struct IRNode*));
+                        struct IRNode** new_stack = realloc(stack, stack_cap * sizeof(struct IRNode*));
+                        if (!new_stack) {
+                            // Realloc failed - break out of loop to avoid memory corruption
+                            LOG_WARNING("Failed to realloc stack in autograd_export_json, graph may be incomplete");
+                            stack_ok = false;
+                            break;
+                        }
+                        stack = new_stack;
                     }
-                    if (stack)
-                        stack[stack_size++] = input;
+                    stack[stack_size++] = input;
                 }
             }
         }
@@ -784,6 +791,13 @@ int autograd_export_json(Tensor* root, const char* path) {
     node = root->ir_context->head;
     while (node) {
         int my_id = map_get_or_insert(&idmap, (const void*)node, 0);
+        if (my_id < 0) {
+            LOG_ERROR("map_get_or_insert failed in autograd_export_json");
+            fclose(f);
+            map_free(&idmap);
+            map_free(&reachable);
+            return -4;
+        }
 
         if (!first_node)
             fputs(",\n", f);
@@ -824,8 +838,8 @@ int autograd_export_json(Tensor* root, const char* path) {
             struct IRNode* input_node = node->inputs[j]->ir_node;
             int src_id                = map_get_or_insert(&idmap, (const void*)input_node, 0);
 
-            // Only add edge if input node exists in our map
-            if (src_id > 0) {
+            // Only add edge if input node exists in our map and map operation succeeded
+            if (src_id >= 0 && src_id > 0) {
                 if (!first_edge) {
                     fputs(", ", f);
                 }
