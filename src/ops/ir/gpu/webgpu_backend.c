@@ -543,22 +543,76 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     }
 
     /* Build a bind group from the provided buffers.
-     * For simplicity we use a dynamic bind group matching the pipeline's
-     * auto-generated layout at group 0.  Each buffer is bound at
-     * @binding(i).
+     * We retrieve the auto-generated bind group layout from the pipeline,
+     * then create a bind group with one storage buffer entry per buffer.
      */
 
-    /* Create bind group via the low-level API.
-     * This is a simplified path: we rely on the auto-layout created by
-     * the pipeline. To get it we would need wgpuComputePipelineGetBindGroupLayout,
-     * which may not be loaded.  For now we pass the buffers as-is; a
-     * production implementation should retrieve the layout first. */
+    /* Try to load wgpuComputePipelineGetBindGroupLayout */
+    typedef WGPUBindGroupLayout (*PFN_getBindGroupLayout)(WGPUComputePipeline, uint32_t);
+    typedef WGPUBindGroup (*PFN_createBindGroup)(WGPUDevice, const void*);
 
-    /* TODO: Full bind-group creation requires several more descriptor structs.
-     *       For the initial implementation we accept that the bind group is
-     *       pre-built by the caller and passed as buffers[num_buffers]
-     *       (the last element).  If num_buffers == 0 no bind group is set.
-     */
+    PFN_getBindGroupLayout getBGL = (PFN_getBindGroupLayout)
+        wgpu_get_symbol(backend->lib_handle, "wgpuComputePipelineGetBindGroupLayout");
+    PFN_createBindGroup createBG = (PFN_createBindGroup)backend->fn_device_create_bind_group;
+
+    WGPUBindGroup bind_group = NULL;
+
+    if (getBGL && createBG && num_buffers > 0) {
+        WGPUBindGroupLayout layout = getBGL((WGPUComputePipeline)kernel->pipeline, 0);
+        if (layout) {
+            /* Build bind group entries.
+             * WGPUBindGroupEntry (packed):
+             *   uint32_t binding;
+             *   WGPUBuffer buffer;
+             *   uint64_t offset;
+             *   uint64_t size;
+             *   WGPUSampler sampler;       (NULL)
+             *   WGPUTextureView textureView; (NULL)
+             */
+            struct BindGroupEntry {
+                const void* nextInChain;
+                uint32_t binding;
+                uint32_t pad0;
+                WGPUBuffer buffer;
+                uint64_t offset;
+                uint64_t size;
+                void* sampler;
+                void* textureView;
+            };
+
+            struct BindGroupEntry* entries = (struct BindGroupEntry*)calloc(
+                (size_t)num_buffers, sizeof(struct BindGroupEntry));
+
+            if (entries) {
+                for (int i = 0; i < num_buffers; i++) {
+                    entries[i].nextInChain = NULL;
+                    entries[i].binding = (uint32_t)i;
+                    entries[i].buffer = (WGPUBuffer)buffers[i];
+                    entries[i].offset = 0;
+                    entries[i].size = buffer_sizes ? buffer_sizes[i] : 0;
+                    entries[i].sampler = NULL;
+                    entries[i].textureView = NULL;
+                }
+
+                /* WGPUBindGroupDescriptor */
+                struct {
+                    const void* nextInChain;
+                    const char* label;
+                    WGPUBindGroupLayout layout;
+                    size_t entryCount;
+                    const void* entries;
+                } bg_desc;
+                memset(&bg_desc, 0, sizeof(bg_desc));
+                bg_desc.label = "cml_bind_group";
+                bg_desc.layout = layout;
+                bg_desc.entryCount = (size_t)num_buffers;
+                bg_desc.entries = entries;
+
+                bind_group = createBG(backend->device, &bg_desc);
+                free(entries);
+            }
+        }
+    }
 
     WGPUCommandEncoder encoder = createEnc(backend->device, NULL);
     if (!encoder) {
@@ -574,9 +628,11 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
 
     setPipe(pass, (WGPUComputePipeline)kernel->pipeline);
 
-    /* If the caller provided a pre-built bind group as the last buffer,
-     * set it at group 0 */
-    if (num_buffers > 0 && setBG) {
+    /* Set the bind group if we created one, or use caller-provided one */
+    if (bind_group && setBG) {
+        setBG(pass, 0, bind_group, 0, NULL);
+    } else if (num_buffers > 0 && setBG) {
+        /* Fallback: assume last buffer entry is a pre-built bind group */
         WGPUBindGroup bg = (WGPUBindGroup)buffers[num_buffers - 1];
         setBG(pass, 0, bg, 0, NULL);
     }
