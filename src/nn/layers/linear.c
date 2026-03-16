@@ -11,18 +11,11 @@
 #include <string.h>
 #include <math.h>
 
-// Forward pass: output = input @ weight.T + bias
-// Uses IR operations for autograd support.
-// Note: Intermediate tensors (weight_t, matmul result) are managed by the IR
-// graph context and freed when cml_reset_ir_context() is called — they are not
-// leaked even though they are not explicitly freed here.
 Tensor* linear_forward(Module* module, Tensor* input) {
     Linear* linear = (Linear*)module;
 
     if (!linear || !input)
         return NULL;
-
-    // Get weight and bias
     Parameter* weight_param = linear->weight;
     Parameter* bias_param   = linear->bias;
 
@@ -34,24 +27,16 @@ Tensor* linear_forward(Module* module, Tensor* input) {
     Tensor* weight = weight_param->tensor;
 
     LOG_DEBUG("Linear forward: Computing output = input @ weight.T + bias (IR-based)");
-
-    // Transpose weight: [out_features, in_features] -> [in_features, out_features]
     Tensor* weight_t = tensor_transpose(weight, 0, 1);
     if (!weight_t) {
         LOG_ERROR("Linear layer: failed to transpose weight");
         return NULL;
     }
-
-    // Matrix multiplication: input @ weight.T
-    // input: [batch_size, in_features], weight.T: [in_features, out_features]
-    // output: [batch_size, out_features]
     Tensor* output = tensor_matmul(input, weight_t);
     if (!output) {
         LOG_ERROR("Linear layer: matmul failed");
         return NULL;
     }
-
-    // Add bias if present
     if (linear->use_bias && bias_param && bias_param->tensor) {
         Tensor* bias = bias_param->tensor;
         output       = tensor_add(output, bias);
@@ -72,7 +57,6 @@ static void linear_free_fn(Module* module) {
     free(linear);
 }
 
-// Initialize weight with Xavier/Glorot initialization
 static void xavier_init(Tensor* tensor, int in_features, int out_features) {
     if (!tensor || !tensor->data)
         return;
@@ -121,8 +105,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
                          __FILE__, __LINE__, __func__);
         return NULL;
     }
-
-    // Initialize base module
     if (module_init((Module*)linear, "Linear", linear_forward, linear_free_fn) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Linear module", __FILE__,
                          __LINE__, __func__);
@@ -134,8 +116,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     linear->out_features     = out_features;
     linear->use_bias         = use_bias;
     linear->transpose_weight = false;
-
-    // Create weight tensor [out_features, in_features]
     int weight_shape[] = {out_features, in_features};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -145,15 +125,11 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
         module_free((Module*)linear);
         return NULL;
     }
-
-    // Initialize weight
     if (weight_init) {
         weight_init(weight, in_features, out_features);
     } else {
         xavier_init(weight, in_features, out_features);
     }
-
-    // Add weight parameter
     if (module_add_parameter((Module*)linear, weight, "weight", true) != 0) {
         tensor_free(weight);
         module_free((Module*)linear);
@@ -161,8 +137,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     }
 
     linear->weight = module_get_parameter((Module*)linear, "weight");
-
-    // Create bias tensor [out_features] if needed
     if (use_bias) {
         int bias_shape[] = {out_features};
         TensorConfig bias_config =
@@ -173,15 +147,11 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
             module_free((Module*)linear);
             return NULL;
         }
-
-        // Initialize bias
         if (bias_init) {
             bias_init(bias, out_features);
         } else {
             zeros_init(bias, out_features);
         }
-
-        // Add bias parameter
         if (module_add_parameter((Module*)linear, bias, "bias", true) != 0) {
             tensor_free(bias);
             module_free((Module*)linear);
@@ -192,8 +162,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     } else {
         linear->bias = NULL;
     }
-
-    LOG_DEBUG("Created Linear layer: %d -> %d (bias=%d)", in_features, out_features, use_bias);
 
     return linear;
 }

@@ -49,8 +49,6 @@ ModuleList* nn_module_list(void) {
     list->modules     = NULL;
     list->num_modules = 0;
     list->capacity    = 0;
-
-    /* Automatically track for cleanup */
     extern void cml_track_module(Module*);
     cml_track_module((Module*)list);
 
@@ -71,8 +69,6 @@ int module_list_append(ModuleList* list, Module* module) {
     list->modules[list->num_modules] = module;
     int module_index = list->num_modules;
     list->num_modules++;
-
-    /* Register sub-module parameters with base using unique names */
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) == 0) {
@@ -87,9 +83,6 @@ int module_list_append(ModuleList* list, Module* module) {
         }
         if (params) free(params);
     }
-
-    LOG_DEBUG("Appended module '%s' (index %d) to ModuleList (total: %d)", module->name,
-              module_index, list->num_modules);
 
     return 0;
 }
@@ -112,8 +105,6 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
     }
     list->modules[index] = module;
     list->num_modules++;
-
-    /* Register sub-module parameters */
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) == 0) {
@@ -192,8 +183,6 @@ ModuleDict* nn_module_dict(void) {
     dict->entries     = NULL;
     dict->num_entries = 0;
     dict->capacity    = 0;
-
-    /* Automatically track for cleanup */
     extern void cml_track_module(Module*);
     cml_track_module((Module*)dict);
 
@@ -202,8 +191,6 @@ ModuleDict* nn_module_dict(void) {
 
 int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     if (!dict || !key || !module) return -1;
-
-    /* Check if key already exists - replace if so */
     for (int i = 0; i < dict->num_entries; i++) {
         if (strcmp(dict->entries[i].key, key) == 0) {
             // Do NOT free the old module here — it's tracked by global cleanup
@@ -213,8 +200,6 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
             return 0;
         }
     }
-
-    /* New entry - ensure capacity */
     if (dict->num_entries >= dict->capacity) {
         int new_cap = dict->capacity == 0 ? 8 : dict->capacity * 2;
         ModuleDictEntry* new_entries = realloc(dict->entries,
@@ -228,8 +213,6 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     dict->entries[dict->num_entries].module = module;
     if (!dict->entries[dict->num_entries].key) return -1;
     dict->num_entries++;
-
-    /* Register sub-module parameters with unique names */
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) == 0) {
@@ -244,9 +227,6 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
         }
         if (params) free(params);
     }
-
-    LOG_DEBUG("Added module '%s' with key '%s' to ModuleDict (total: %d)", module->name, key,
-              dict->num_entries);
 
     return 0;
 }

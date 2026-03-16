@@ -72,8 +72,6 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
         tensor_free(output);
         return NULL;
     }
-
-    // Weight shape: [in_channels, out_channels, kernel_size]
     // Transposed conv: scatter each input element to output
     for (int b = 0; b < batch; b++) {
         for (int ic = 0; ic < in_channels; ic++) {
@@ -93,8 +91,6 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
             }
         }
     }
-
-    // Add bias
     if (layer->use_bias && layer->bias && layer->bias->tensor) {
         tensor_ensure_executed(layer->bias->tensor);
         float* bias_data = (float*)layer->bias->tensor->data;
@@ -141,8 +137,6 @@ ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kern
     layer->output_padding = output_padding;
     layer->dilation       = 1;
     layer->use_bias       = use_bias;
-
-    // Weight: [in_channels, out_channels, kernel_size]
     int weight_shape[] = {in_channels, out_channels, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -151,8 +145,6 @@ ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kern
         module_free((Module*)layer);
         return NULL;
     }
-
-    // Kaiming initialization
     float scale = sqrtf(2.0f / (float)(in_channels * kernel_size));
     float* data = (float*)tensor_data_ptr(weight);
     if (data) {

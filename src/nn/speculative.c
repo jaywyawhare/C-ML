@@ -16,8 +16,6 @@
 #include <math.h>
 #include <time.h>
 
-/* ===== Helpers ===== */
-
 /** Return wall-clock time in milliseconds. */
 static double now_ms(void) {
     struct timespec ts;
@@ -47,8 +45,6 @@ static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
     }
     return best;
 }
-
-/* ===== Public API ===== */
 
 CMLSpeculativeConfig cml_speculative_default_config(void) {
     CMLSpeculativeConfig cfg;
@@ -147,9 +143,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         return NULL;
     }
 
-    /* ------------------------------------------------------------------
-     * 1. Draft phase: autoregressively generate K tokens with draft model.
-     * ------------------------------------------------------------------ */
+    /* 1. Draft phase: autoregressively generate K tokens with draft model. */
     double t_draft_start = now_ms();
 
     int draft_seq_len = prefix_len;
@@ -175,9 +169,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
     double t_draft_end = now_ms();
 
-    /* ------------------------------------------------------------------
-     * 2. Verify phase: single target-model forward on prefix + K drafts.
-     * ------------------------------------------------------------------ */
+    /* 2. Verify phase: single target-model forward on prefix + K drafts. */
     double t_verify_start = now_ms();
 
     int verify_seq_len = prefix_len + K;
@@ -192,16 +184,14 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         return NULL;
     }
 
-    /* ------------------------------------------------------------------
-     * 3. Accept / reject each draft token.
+    /* 3. Accept / reject each draft token.
      *
      * For draft position i (0-based), the target model's prediction is at
      * logits row (prefix_len - 1 + i): the target predicts "next token
      * given everything up to position prefix_len + i - 1".
      *
      * We use a simple greedy acceptance criterion: accept if the target
-     * model's argmax at that row equals the draft token.
-     * ------------------------------------------------------------------ */
+     * model's argmax at that row equals the draft token. */
     int num_accepted = 0;
     int correction_token = -1;
 
@@ -229,9 +219,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
     tensor_free(target_logits);
 
-    /* ------------------------------------------------------------------
-     * 4. Build the result.
-     * ------------------------------------------------------------------ */
+    /* 4. Build the result. */
     int total_output = num_accepted + ((num_accepted == K) ? 1 : 1);
     /* accepted draft tokens + either correction or bonus */
 

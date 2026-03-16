@@ -14,10 +14,6 @@
 #include <stdio.h>
 #include <math.h>
 
-/* =========================================================================
- * Internal helpers
- * ========================================================================= */
-
 /** Softmax over last dimension for a flat buffer treated as [rows, cols] */
 static void llm_softmax_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
@@ -47,10 +43,6 @@ static void llm_xavier_init(float* data, size_t numel, int fan_in, int fan_out) 
         data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
     }
 }
-
-/* =========================================================================
- * Hash table helpers for tokenizer
- * ========================================================================= */
 
 #define HASH_EMPTY (-1)
 
@@ -97,10 +89,6 @@ static int hash_lookup(const int* table, int table_size, char** vocab, const cha
     return -1;
 }
 
-/* =========================================================================
- * KV Cache
- * ========================================================================= */
-
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim) {
     if (max_seq_len <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
         LOG_ERROR("cml_kv_cache_create: invalid parameters (max_seq=%d, kv_heads=%d, head_dim=%d)",
@@ -133,9 +121,6 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
         free(cache);
         return NULL;
     }
-
-    LOG_DEBUG("Created KV cache: max_seq=%d, kv_heads=%d, head_dim=%d",
-              max_seq_len, num_kv_heads, head_dim);
     return cache;
 }
 
@@ -218,10 +203,6 @@ Tensor* cml_kv_cache_get_values(CMLKVCache* cache) {
 
     return tensor_from_data(v_data, shape, 3, &cfg);
 }
-
-/* =========================================================================
- * Grouped Query Attention (GQA)
- * ========================================================================= */
 
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
                          Tensor* mask) {
@@ -474,10 +455,6 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     tensor_free(full_v);
     return result;
 }
-
-/* =========================================================================
- * Flash Attention (tiled, O(N) memory via online softmax)
- * ========================================================================= */
 
 CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
     CMLFlashAttentionConfig cfg = {
@@ -735,10 +712,6 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     return result;
 }
 
-/* =========================================================================
- * Rotary Position Embeddings (RoPE)
- * ========================================================================= */
-
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) {
     if (!x || !config) {
         LOG_ERROR("cml_rope_forward: NULL argument");
@@ -844,10 +817,6 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
     return x; /* modified in-place, return same tensor for chaining */
 }
 
-/* =========================================================================
- * Mixture of Experts (MoE)
- * ========================================================================= */
-
 CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
     if (!config) {
         LOG_ERROR("cml_moe_create: NULL config");
@@ -921,9 +890,6 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
         if (w1) llm_xavier_init(w1, (size_t)input_dim * hidden_dim, input_dim, hidden_dim);
         if (w2) llm_xavier_init(w2, (size_t)hidden_dim * input_dim, hidden_dim, input_dim);
     }
-
-    LOG_DEBUG("Created MoE layer: %d experts, top-%d, dim=%d, hidden=%d",
-              num_experts, config->top_k, input_dim, hidden_dim);
     return moe;
 }
 
@@ -1184,10 +1150,6 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     return result;
 }
 
-/* =========================================================================
- * BPE Tokenizer
- * ========================================================================= */
-
 CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
                                      char** merge_pairs, int num_merges) {
     if (!vocab || vocab_size <= 0) {
@@ -1275,8 +1237,6 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
     } else {
         tok->merges = NULL;
     }
-
-    LOG_DEBUG("Created tokenizer: vocab_size=%d, num_merges=%d", vocab_size, num_merges);
     return tok;
 }
 

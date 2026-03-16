@@ -61,18 +61,12 @@ static Tensor* layernorm2d_forward(Module* module, Tensor* input) {
         tensor_ensure_executed(ln->bias->tensor);
         bias_data = (float*)tensor_data_ptr(ln->bias->tensor);
     }
-
-    // Normalize per sample over (C, H, W)
     for (int n = 0; n < batch; n++) {
         int offset = n * spatial;
-
-        // Compute mean over C*H*W
         float mean = 0.0f;
         for (int i = 0; i < spatial; i++)
             mean += input_data[offset + i];
         mean /= (float)spatial;
-
-        // Compute variance
         float var = 0.0f;
         for (int i = 0; i < spatial; i++) {
             float diff = input_data[offset + i] - mean;
@@ -81,8 +75,6 @@ static Tensor* layernorm2d_forward(Module* module, Tensor* input) {
         var /= (float)spatial;
 
         float inv_std = 1.0f / sqrtf(var + ln->eps);
-
-        // Normalize and apply per-channel affine
         for (int c = 0; c < channels; c++) {
             float w = weight_data ? weight_data[c] : 1.0f;
             float b = bias_data ? bias_data[c] : 0.0f;

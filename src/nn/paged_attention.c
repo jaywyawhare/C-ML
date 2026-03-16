@@ -14,10 +14,6 @@
 #include <string.h>
 #include <math.h>
 
-/* =========================================================================
- * Internal helpers
- * ========================================================================= */
-
 /** Softmax in-place over the last dimension of a flat [rows, cols] buffer. */
 static void paged_softmax_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
@@ -50,10 +46,6 @@ static inline size_t block_buf_size(const CMLPagedKVCache* cache) {
     return (size_t)cache->block_size * token_kv_size(cache);
 }
 
-/* =========================================================================
- * Cache lifecycle
- * ========================================================================= */
-
 CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
                                             int num_kv_heads, int head_dim) {
     if (max_blocks <= 0 || max_sequences <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
@@ -74,8 +66,6 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
     cache->num_kv_heads = num_kv_heads;
     cache->head_dim = head_dim;
     cache->block_size = CML_PAGE_BLOCK_SIZE;
-
-    /* --- Allocate block array --- */
     cache->blocks = (CMLPageBlock*)calloc((size_t)max_blocks, sizeof(CMLPageBlock));
     if (!cache->blocks) {
         LOG_ERROR("cml_paged_kv_cache_create: block array allocation failed");
@@ -103,8 +93,6 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
         cache->blocks[i].in_use = false;
     }
     cache->num_blocks = max_blocks;
-
-    /* --- Free list (stack: index 0 is bottom) --- */
     cache->free_list = (int*)malloc((size_t)max_blocks * sizeof(int));
     if (!cache->free_list) {
         LOG_ERROR("cml_paged_kv_cache_create: free list allocation failed");
@@ -121,8 +109,6 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
         cache->free_list[i] = i;
     }
     cache->free_count = max_blocks;
-
-    /* --- Sequence table --- */
     cache->sequences = (CMLBlockTable*)calloc((size_t)max_sequences, sizeof(CMLBlockTable));
     if (!cache->sequences) {
         LOG_ERROR("cml_paged_kv_cache_create: sequence table allocation failed");
@@ -172,10 +158,6 @@ void cml_paged_kv_cache_free(CMLPagedKVCache* cache) {
     free(cache);
 }
 
-/* =========================================================================
- * Block allocator (stack-based free list)
- * ========================================================================= */
-
 int cml_paged_cache_alloc_block(CMLPagedKVCache* cache) {
     if (!cache) {
         LOG_ERROR("cml_paged_cache_alloc_block: NULL cache");
@@ -220,10 +202,6 @@ void cml_paged_cache_free_block(CMLPagedKVCache* cache, int block_id) {
     cache->free_list[cache->free_count++] = block_id;
     cache->total_freed++;
 }
-
-/* =========================================================================
- * Sequence management
- * ========================================================================= */
 
 int cml_paged_cache_init_sequence(CMLPagedKVCache* cache) {
     if (!cache) {
@@ -292,10 +270,6 @@ void cml_paged_cache_free_sequence(CMLPagedKVCache* cache, int seq_id) {
     cache->num_sequences--;
 }
 
-/* =========================================================================
- * Token append
- * ========================================================================= */
-
 int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id,
                             const float* key, const float* value) {
     if (!cache || !key || !value) {
@@ -359,10 +333,6 @@ int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id,
 
     return 0;
 }
-
-/* =========================================================================
- * Paged GQA forward
- * ========================================================================= */
 
 Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
                                Tensor* Q, const CMLGQAConfig* config) {

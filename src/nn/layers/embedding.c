@@ -13,8 +13,6 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
     tensor_ensure_executed(input);
     tensor_ensure_executed(emb->weight->tensor);
 
-    // Input contains integer indices
-    // Output shape: input_shape + [embedding_dim]
     int out_ndim = input->ndim + 1;
     int* out_shape = malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape) return NULL;
@@ -31,8 +29,6 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
     float* out_data = (float*)tensor_data_ptr(output);
     float* weight_data = (float*)tensor_data_ptr(emb->weight->tensor);
 
-    // Get indices - input could be float (indices stored as floats) or int
-    // In this library tensors are float by default, so indices are stored as floats
     float* in_data = (float*)tensor_data_ptr(input);
 
     int dim = emb->embedding_dim;
@@ -75,7 +71,6 @@ Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
     emb->embedding_dim = embedding_dim;
     emb->padding_idx = padding_idx;
 
-    // Create weight tensor [num_embeddings, embedding_dim]
     int weight_shape[] = {num_embeddings, embedding_dim};
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 2, &config);
@@ -84,14 +79,12 @@ Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
         return NULL;
     }
 
-    // Initialize with normal distribution (std = 1.0)
     tensor_ensure_executed(weight);
     float* data = (float*)tensor_data_ptr(weight);
     if (data) {
         for (size_t i = 0; i < weight->numel; i++) {
             data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f;
         }
-        // Zero out padding row if specified
         if (padding_idx >= 0 && padding_idx < num_embeddings) {
             memset(&data[padding_idx * embedding_dim], 0, (size_t)embedding_dim * sizeof(float));
         }
@@ -104,6 +97,5 @@ Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
     }
     emb->weight = module_get_parameter((Module*)emb, "weight");
 
-    LOG_DEBUG("Created Embedding layer: %d x %d", num_embeddings, embedding_dim);
     return emb;
 }

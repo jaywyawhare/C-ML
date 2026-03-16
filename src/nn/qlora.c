@@ -16,8 +16,6 @@
 #include <string.h>
 #include <math.h>
 
-/* ===== NF4 Tensor ===== */
-
 CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     if (!float_tensor) {
         LOG_ERROR("cml_nf4_tensor_create: NULL tensor");
@@ -68,9 +66,6 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     nf4->packed_data = packed;
     nf4->scales = scales;
     nf4->num_scales = num_scales;
-
-    LOG_DEBUG("Created NF4 tensor: numel=%zu, packed_size=%zu, blocks=%d",
-              nf4->original_numel, packed->numel, num_scales);
 
     return nf4;
 }
@@ -144,8 +139,6 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
 
     return flat;
 }
-
-/* ===== QLoRA Linear Layer ===== */
 
 CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
                                          float alpha, int block_size) {
@@ -231,9 +224,6 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
         free(qlora);
         return NULL;
     }
-
-    LOG_DEBUG("Created QLoRA linear: in=%d, out=%d, rank=%d, alpha=%.1f, scaling=%.4f, block_size=%d",
-              in_features, out_features, rank, alpha, qlora->scaling, block_size);
 
     return qlora;
 }

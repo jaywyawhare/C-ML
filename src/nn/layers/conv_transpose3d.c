@@ -247,8 +247,5 @@ ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kern
         layer->bias = NULL;
     }
 
-    LOG_DEBUG("Created ConvTranspose3d layer: %d -> %d, kernel=%d, stride=%d, padding=%d",
-              in_channels, out_channels, kernel_size, stride, padding);
-
     return layer;
 }

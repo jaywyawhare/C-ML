@@ -8,14 +8,11 @@
 #include <string.h>
 #include <math.h>
 
-// 2D Convolution forward pass
 static Tensor* conv2d_forward(Module* module, Tensor* input) {
     Conv2d* conv2d = (Conv2d*)module;
 
     if (!conv2d || !input)
         return NULL;
-
-    // Input shape: [batch, in_channels, height, width]
     if (input->ndim != 4) {
         LOG_ERROR("Conv2d expects 4D input [batch, in_channels, height, width], got %dD",
                   input->ndim);
@@ -35,15 +32,11 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     int in_channels        = input->shape[1];
     int out_channels       = weight->shape[0];
     int weight_in_channels = weight->shape[1];
-
-    // Validate input channels match weight channels
     if (in_channels != weight_in_channels) {
         LOG_ERROR("Conv2d: input channels (%d) doesn't match weight in_channels (%d)", in_channels,
                   weight_in_channels);
         return NULL;
     }
-
-    // Validate weight channels match layer configuration
     if (in_channels != conv2d->in_channels || out_channels != conv2d->out_channels) {
         LOG_ERROR("Conv2d: weight dimensions don't match layer configuration");
         return NULL;
@@ -54,8 +47,6 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     int padding_w  = conv2d->padding[1];
     int dilation_h = conv2d->dilation[0];
     int dilation_w = conv2d->dilation[1];
-
-    // Use uop_conv2d for convolution
     Conv2DParams conv_params;
     int stride_arr[]   = {stride_h, stride_w};
     int padding_arr[]  = {padding_h, padding_w};
@@ -69,8 +60,6 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     if (conv2d->use_bias && bias_param && bias_param->tensor) {
         bias = bias_param->tensor;
     }
-
-    // Perform convolution using uop_conv2d
     Tensor* output = uop_conv2d(input, weight, bias, &conv_params);
 
     if (!output) {
@@ -97,8 +86,6 @@ static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int 
     float* data = (float*)tensor_data_ptr(tensor);
     if (!data)
         return;
-
-    // He initialization: std = sqrt(2.0 / (in_channels * kernel_size * kernel_size))
     float scale  = sqrtf(2.0f / (float)(in_channels * kernel_size * kernel_size));
     size_t numel = tensor->numel;
 
@@ -130,8 +117,6 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
     conv2d->dilation[1]    = dilation;
     conv2d->use_bias       = use_bias;
     conv2d->groups         = 1;
-
-    // Create weight tensor [out_channels, in_channels, kernel_h, kernel_w]
     int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -140,8 +125,6 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
         module_free((Module*)conv2d);
         return NULL;
     }
-
-    // Initialize with Kaiming/He initialization
     kaiming_init(weight, in_channels, out_channels, kernel_size);
 
     if (module_add_parameter((Module*)conv2d, weight, "weight", true) != 0) {
@@ -151,8 +134,6 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
     }
 
     conv2d->weight = module_get_parameter((Module*)conv2d, "weight");
-
-    // Create bias if needed
     if (use_bias) {
         int bias_shape[] = {out_channels};
         TensorConfig bias_config =
@@ -173,9 +154,6 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
     } else {
         conv2d->bias = NULL;
     }
-
-    LOG_DEBUG("Created Conv2d layer: %d -> %d, kernel=%d, stride=%d, padding=%d", in_channels,
-              out_channels, kernel_size, stride, padding);
 
     return conv2d;
 }

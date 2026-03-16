@@ -20,8 +20,6 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
 
     if (!in || !input)
         return NULL;
-
-    // Input shape: [batch, channels, height, width]
     if (input->ndim != 4) {
         LOG_ERROR("InstanceNorm2d expects 4D input [N, C, H, W], got %dD", input->ndim);
         return NULL;
@@ -37,16 +35,12 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
                   channels, in->num_features);
         return NULL;
     }
-
-    // Ensure input is executed
     tensor_ensure_executed(input);
     float* input_data = (float*)tensor_data_ptr(input);
     if (!input_data)
         return NULL;
 
     int spatial = height * width;
-
-    // Create output tensor
     TensorConfig config = (TensorConfig){.dtype      = input->dtype,
                                          .device     = input->device,
                                          .has_dtype  = true,
@@ -69,8 +63,6 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
         tensor_ensure_executed(in->bias->tensor);
         bias_data = (float*)tensor_data_ptr(in->bias->tensor);
     }
-
-    // Normalize each (batch, channel) pair independently
     for (int n = 0; n < batch; n++) {
         for (int c = 0; c < channels; c++) {
             int offset = (n * channels + c) * spatial;
@@ -81,8 +73,6 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
                 mean += input_data[offset + s];
             }
             mean /= (float)spatial;
-
-            // Compute variance
             float var = 0.0f;
             for (int s = 0; s < spatial; s++) {
                 float diff = input_data[offset + s] - mean;
@@ -91,8 +81,6 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
             var /= (float)spatial;
 
             float inv_std = 1.0f / sqrtf(var + in->eps);
-
-            // Normalize and apply affine if needed
             float w = weight_data ? weight_data[c] : 1.0f;
             float b = bias_data ? bias_data[c] : 0.0f;
 
@@ -109,8 +97,6 @@ static void instancenorm2d_free(Module* module) {
     InstanceNorm2d* in = (InstanceNorm2d*)module;
     if (!in)
         return;
-
-    // Parameters are freed by module system
     free(in);
 }
 

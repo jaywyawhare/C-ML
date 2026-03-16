@@ -5,14 +5,11 @@
 #include <stdlib.h>
 #include <math.h>
 
-// 1D Convolution forward pass
 static Tensor* conv1d_forward(Module* module, Tensor* input) {
     Conv1d* conv = (Conv1d*)module;
 
     if (!conv || !input)
         return NULL;
-
-    // Input shape: [batch, in_channels, length]
     if (input->ndim != 3) {
         LOG_ERROR("Conv1d expects 3D input [batch, in_channels, length], got %dD", input->ndim);
         return NULL;
@@ -28,25 +25,17 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
 
     int in_channels        = input->shape[1];
     int weight_in_channels = weight_param->tensor->shape[1];
-
-    // Validate input channels match weight channels
     if (in_channels != weight_in_channels) {
         LOG_ERROR("Conv1d: input channels (%d) doesn't match weight in_channels (%d)", in_channels,
                   weight_in_channels);
         return NULL;
     }
-
-    // Validate weight channels match layer configuration
     if (in_channels != conv->in_channels) {
         LOG_ERROR("Conv1d: input dimensions don't match layer configuration");
         return NULL;
     }
-
-    // Ensure tensors are executed
     tensor_ensure_executed(input);
     tensor_ensure_executed(weight_param->tensor);
-
-    // Get dimensions
     int batch   = input->shape[0];
     int in_ch   = input->shape[1];
     int length  = input->shape[2];
@@ -62,8 +51,6 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
                   out_len, length, ks, s, p, d);
         return NULL;
     }
-
-    // Create output tensor
     int out_shape[] = {batch, out_ch, out_len};
     TensorConfig config =
         (TensorConfig){.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
@@ -82,8 +69,6 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
         LOG_ERROR("Conv1d: failed to get data pointers");
         return NULL;
     }
-
-    // Direct 1D convolution
     for (int b = 0; b < batch; b++) {
         for (int oc = 0; oc < out_ch; oc++) {
             for (int ol = 0; ol < out_len; ol++) {
@@ -103,8 +88,6 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
             }
         }
     }
-
-    // Add bias
     if (conv->use_bias && bias_param && bias_param->tensor) {
         tensor_ensure_executed(bias_param->tensor);
         float* bias_data = (float*)tensor_data_ptr(bias_param->tensor);
@@ -137,8 +120,6 @@ static void kaiming_init_1d(Tensor* tensor, int in_channels, int kernel_size) {
     float* data = (float*)tensor_data_ptr(tensor);
     if (!data)
         return;
-
-    // He initialization: std = sqrt(2.0 / (in_channels * kernel_size))
     float scale  = sqrtf(2.0f / (float)(in_channels * kernel_size));
     size_t numel = tensor->numel;
 
@@ -166,8 +147,6 @@ Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride
     conv->dilation     = dilation;
     conv->use_bias     = use_bias;
     conv->groups       = 1;
-
-    // Create weight tensor [out_channels, in_channels, kernel_size]
     int weight_shape[] = {out_channels, in_channels, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -176,8 +155,6 @@ Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride
         module_free((Module*)conv);
         return NULL;
     }
-
-    // Initialize with Kaiming/He initialization
     kaiming_init_1d(weight, in_channels, kernel_size);
 
     if (module_add_parameter((Module*)conv, weight, "weight", true) != 0) {
@@ -187,8 +164,6 @@ Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride
     }
 
     conv->weight = module_get_parameter((Module*)conv, "weight");
-
-    // Create bias if needed
     if (use_bias) {
         int bias_shape[] = {out_channels};
         TensorConfig bias_config =
@@ -209,9 +184,6 @@ Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride
     } else {
         conv->bias = NULL;
     }
-
-    LOG_DEBUG("Created Conv1d layer: %d -> %d, kernel=%d, stride=%d, padding=%d", in_channels,
-              out_channels, kernel_size, stride, padding);
 
     return conv;
 }

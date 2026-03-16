@@ -19,8 +19,6 @@ int model_save(Module* model, const char* filepath) {
         LOG_ERROR("Failed to open file for writing: %s", filepath);
         return -1;
     }
-
-    // Write header
     fwrite("CML", 1, 4, f); // magic (includes null terminator)
     uint32_t version = CML_MODEL_VERSION;
     fwrite(&version, sizeof(uint32_t), 1, f);
@@ -34,14 +32,10 @@ int model_save(Module* model, const char* filepath) {
 
         Tensor* t = param->tensor;
         tensor_ensure_executed(t);
-
-        // Write name
         const char* name = param->name ? param->name : "";
         int32_t name_len = (int32_t)strlen(name);
         fwrite(&name_len, sizeof(int32_t), 1, f);
         fwrite(name, 1, (size_t)name_len, f);
-
-        // Write dtype and shape
         int32_t dtype = (int32_t)t->dtype;
         fwrite(&dtype, sizeof(int32_t), 1, f);
 
@@ -52,8 +46,6 @@ int model_save(Module* model, const char* filepath) {
             int32_t dim = t->shape[d];
             fwrite(&dim, sizeof(int32_t), 1, f);
         }
-
-        // Write data
         size_t elem_size = cml_dtype_size(t->dtype);
         uint64_t data_size = (uint64_t)(t->numel * elem_size);
         fwrite(&data_size, sizeof(uint64_t), 1, f);
@@ -65,7 +57,6 @@ int model_save(Module* model, const char* filepath) {
     }
 
     fclose(f);
-    LOG_DEBUG("Saved model to %s (%d parameters)", filepath, num_params);
     return 0;
 }
 
@@ -77,8 +68,6 @@ int model_load(Module* model, const char* filepath) {
         LOG_ERROR("Failed to open file for reading: %s", filepath);
         return -1;
     }
-
-    // Read and verify header
     char magic[4];
     fread(magic, 1, 4, f);
     if (memcmp(magic, "CML", 3) != 0) {
@@ -94,15 +83,12 @@ int model_load(Module* model, const char* filepath) {
     fread(&num_params, sizeof(int32_t), 1, f);
 
     for (int i = 0; i < num_params; i++) {
-        // Read name
         int32_t name_len;
         fread(&name_len, sizeof(int32_t), 1, f);
         char* name = malloc((size_t)(name_len + 1));
         if (!name) { fclose(f); return -1; }
         fread(name, 1, (size_t)name_len, f);
         name[name_len] = '\0';
-
-        // Read dtype and shape
         int32_t dtype;
         fread(&dtype, sizeof(int32_t), 1, f);
 
@@ -118,8 +104,6 @@ int model_load(Module* model, const char* filepath) {
 
         uint64_t data_size;
         fread(&data_size, sizeof(uint64_t), 1, f);
-
-        // Find matching parameter in model
         Parameter* param = module_get_parameter(model, name);
         if (param && param->tensor) {
             tensor_ensure_executed(param->tensor);
@@ -128,12 +112,10 @@ int model_load(Module* model, const char* filepath) {
             if (data && expected_size == (size_t)data_size) {
                 fread(data, 1, (size_t)data_size, f);
             } else {
-                // Skip data if sizes don't match
                 fseek(f, (long)data_size, SEEK_CUR);
                 LOG_WARNING("Parameter '%s' size mismatch, skipping", name);
             }
         } else {
-            // Skip data for unmatched parameters
             fseek(f, (long)data_size, SEEK_CUR);
             LOG_WARNING("Parameter '%s' not found in model, skipping", name);
         }
@@ -143,7 +125,6 @@ int model_load(Module* model, const char* filepath) {
     }
 
     fclose(f);
-    LOG_DEBUG("Loaded model from %s (%d parameters)", filepath, num_params);
     return 0;
 }
 
@@ -156,8 +137,6 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
         LOG_ERROR("Failed to open checkpoint file: %s", filepath);
         return -1;
     }
-
-    // Write checkpoint header
     fwrite("CKP", 1, 4, f);
     uint32_t version = CML_MODEL_VERSION;
     fwrite(&version, sizeof(uint32_t), 1, f);
@@ -165,8 +144,6 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
     int32_t ep = epoch;
     fwrite(&ep, sizeof(int32_t), 1, f);
     fwrite(&loss, sizeof(float), 1, f);
-
-    // Write model parameters (same format as model_save)
     int32_t num_params = model->num_parameters;
     fwrite(&num_params, sizeof(int32_t), 1, f);
 
@@ -197,8 +174,6 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
         void* data = tensor_data_ptr(t);
         if (data) fwrite(data, 1, (size_t)data_size, f);
     }
-
-    // Write optimizer state
     int32_t has_optim = optimizer ? 1 : 0;
     fwrite(&has_optim, sizeof(int32_t), 1, f);
 
@@ -213,7 +188,6 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
     }
 
     fclose(f);
-    LOG_DEBUG("Saved checkpoint to %s (epoch=%d, loss=%.4f)", filepath, epoch, (double)loss);
     return 0;
 }
 
@@ -245,8 +219,6 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
     float l;
     fread(&l, sizeof(float), 1, f);
     if (loss) *loss = l;
-
-    // Read model parameters
     int32_t num_params;
     fread(&num_params, sizeof(int32_t), 1, f);
 
@@ -282,8 +254,6 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
         }
         free(name);
     }
-
-    // Read optimizer state
     int32_t has_optim;
     fread(&has_optim, sizeof(int32_t), 1, f);
 
@@ -299,7 +269,6 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
             optimizer->param_groups[i].lr = lr;
             optimizer->param_groups[i].step_count = step;
         }
-        // Skip remaining groups if file has more
         for (int i = groups_to_read; i < num_groups; i++) {
             float lr; int32_t step;
             fread(&lr, sizeof(float), 1, f);
@@ -308,6 +277,5 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
     }
 
     fclose(f);
-    LOG_DEBUG("Loaded checkpoint from %s (epoch=%d)", filepath, ep);
     return 0;
 }

@@ -30,8 +30,6 @@ static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
         LOG_ERROR("ConvTranspose2d missing weight parameter");
         return NULL;
     }
-
-    // Ensure input is executed
     tensor_ensure_executed(input);
     tensor_ensure_executed(layer->weight->tensor);
 
@@ -83,8 +81,6 @@ static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
         tensor_free(output);
         return NULL;
     }
-
-    // Weight shape: [in_channels, out_channels, kernel_h, kernel_w]
     // Transposed conv: scatter each input pixel to output
     for (int b = 0; b < batch; b++) {
         for (int ic = 0; ic < in_channels; ic++) {
@@ -109,8 +105,6 @@ static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
             }
         }
     }
-
-    // Add bias
     if (layer->use_bias && layer->bias && layer->bias->tensor) {
         tensor_ensure_executed(layer->bias->tensor);
         float* bias_data = (float*)layer->bias->tensor->data;
@@ -180,8 +174,6 @@ ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kern
     layer->dilation[0]       = 1;
     layer->dilation[1]       = 1;
     layer->use_bias          = use_bias;
-
-    // Weight: [in_channels, out_channels, kernel_h, kernel_w]
     int weight_shape[] = {in_channels, out_channels, kernel_size, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -219,9 +211,6 @@ ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kern
     } else {
         layer->bias = NULL;
     }
-
-    LOG_DEBUG("Created ConvTranspose2d layer: %d -> %d, kernel=%d, stride=%d, padding=%d",
-              in_channels, out_channels, kernel_size, stride, padding);
 
     return layer;
 }

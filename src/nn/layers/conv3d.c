@@ -5,13 +5,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-// 3D Convolution forward pass
 static Tensor* conv3d_forward(Module* module, Tensor* input) {
     Conv3d* conv = (Conv3d*)module;
     if (!conv || !input)
         return NULL;
-
-    // Input shape: [batch, in_channels, depth, height, width]
     if (input->ndim != 5) {
         LOG_ERROR("Conv3d expects 5D input [batch, channels, depth, height, width], got %dD",
                   input->ndim);
@@ -80,8 +77,6 @@ static Tensor* conv3d_forward(Module* module, Tensor* input) {
             }
         }
     }
-
-    // Add bias
     if (conv->use_bias && conv->bias && conv->bias->tensor) {
         tensor_ensure_executed(conv->bias->tensor);
         float* bias_data = (float*)tensor_data_ptr(conv->bias->tensor);
@@ -117,8 +112,6 @@ static void kaiming_init_3d(Tensor* tensor, int in_channels, int kernel_size) {
     float* data = (float*)tensor_data_ptr(tensor);
     if (!data)
         return;
-
-    // He initialization: std = sqrt(2.0 / (in_channels * kd * kh * kw))
     float scale  = sqrtf(2.0f / (float)(in_channels * kernel_size * kernel_size * kernel_size));
     size_t numel = tensor->numel;
 
@@ -154,8 +147,6 @@ Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride
     conv3d->dilation[2]    = dilation;
     conv3d->use_bias       = use_bias;
     conv3d->groups         = 1;
-
-    // Create weight tensor [out_channels, in_channels, kd, kh, kw]
     int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -164,8 +155,6 @@ Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride
         module_free((Module*)conv3d);
         return NULL;
     }
-
-    // Initialize with Kaiming/He initialization
     kaiming_init_3d(weight, in_channels, kernel_size);
 
     if (module_add_parameter((Module*)conv3d, weight, "weight", true) != 0) {
@@ -175,8 +164,6 @@ Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride
     }
 
     conv3d->weight = module_get_parameter((Module*)conv3d, "weight");
-
-    // Create bias if needed
     if (use_bias) {
         int bias_shape[] = {out_channels};
         TensorConfig bias_config =
@@ -197,9 +184,6 @@ Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride
     } else {
         conv3d->bias = NULL;
     }
-
-    LOG_DEBUG("Created Conv3d layer: %d -> %d, kernel=%d, stride=%d, padding=%d", in_channels,
-              out_channels, kernel_size, stride, padding);
 
     return conv3d;
 }

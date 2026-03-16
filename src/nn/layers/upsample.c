@@ -349,8 +349,5 @@ Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output
         layer->num_output_dims = n;
     }
 
-    LOG_DEBUG("Created Upsample layer: mode=%d, scale=%.2f, align_corners=%d",
-              (int)mode, scale_factor, (int)align_corners);
-
     return layer;
 }

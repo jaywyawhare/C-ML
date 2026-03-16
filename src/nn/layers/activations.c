@@ -15,16 +15,10 @@
 #include <math.h>
 #include <stdio.h>
 
-// ReLU Forward - IR-based for autograd support
 static Tensor* relu_forward(Module* module, Tensor* input) {
-    (void)module; // ReLU is stateless
-
+    (void)module;
     if (!input)
         return NULL;
-
-    LOG_DEBUG("ReLU forward: Computing max(0, input) (IR-based)");
-
-    // Use IR-based ReLU for autograd support
     return uop_relu(input);
 }
 
@@ -72,16 +66,10 @@ LeakyReLU* nn_leaky_relu(float negative_slope, bool inplace) {
     return leaky_relu;
 }
 
-// Sigmoid Forward - IR-based for autograd support
 static Tensor* sigmoid_forward(Module* module, Tensor* input) {
-    (void)module; // Sigmoid is stateless
-
+    (void)module;
     if (!input)
         return NULL;
-
-    LOG_DEBUG("Sigmoid forward: Computing 1/(1+exp(-x)) (IR-based)");
-
-    // Use IR-based Sigmoid for autograd support
     return uop_sigmoid(input);
 }
 
@@ -105,16 +93,10 @@ Sigmoid* nn_sigmoid(void) {
     return sigmoid;
 }
 
-// Tanh Forward - IR-based for autograd support
 static Tensor* tanh_forward(Module* module, Tensor* input) {
-    (void)module; // Tanh is stateless
-
+    (void)module;
     if (!input)
         return NULL;
-
-    LOG_DEBUG("Tanh forward: Computing tanh(x) (IR-based)");
-
-    // Use IR-based Tanh for autograd support
     return uop_tanh(input);
 }
 
@@ -138,14 +120,11 @@ Tanh* nn_tanh(void) {
     return tanh;
 }
 
-// GELU Forward - Gaussian Error Linear Unit
 static Tensor* gelu_forward(Module* module, Tensor* input) {
     GELU* gelu = (GELU*)module;
 
     if (!gelu || !input)
         return NULL;
-
-    // GELU approximation: x * 0.5 * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x^3)))
     const float sqrt_2_pi = 0.7978845608f; // sqrt(2/π)
     Tensor* scaled        = NULL;
     Tensor* tanh_result   = NULL;
@@ -238,14 +217,12 @@ GELU* nn_gelu(bool approximate) {
     return gelu;
 }
 
-// Softmax Forward - Uses existing tensor_softmax function
 static Tensor* softmax_forward(Module* module, Tensor* input) {
     Softmax* softmax = (Softmax*)module;
 
     if (!softmax || !input)
         return NULL;
 
-    // Use existing tensor_softmax function which handles numerical stability
     return tensor_softmax(input, softmax->dim);
 }
 
@@ -265,7 +242,6 @@ Softmax* nn_softmax(int dim) {
     return softmax;
 }
 
-// LogSoftmax Forward - Log of softmax for numerical stability
 static Tensor* log_softmax_forward(Module* module, Tensor* input) {
     LogSoftmax* log_softmax = (LogSoftmax*)module;
 
@@ -276,7 +252,6 @@ static Tensor* log_softmax_forward(Module* module, Tensor* input) {
     if (!softmax_result)
         return NULL;
 
-    // Compute log of softmax
     Tensor* output = tensor_log(softmax_result);
     tensor_free(softmax_result);
 
@@ -304,7 +279,6 @@ Tensor* f_relu(Tensor* input) {
     if (!input) {
         return NULL;
     }
-    // Create a temporary ReLU module and use it
     Module* relu = (Module*)nn_relu(false);
     if (!relu) {
         return NULL;
@@ -353,14 +327,11 @@ Tensor* f_gelu(Tensor* input) {
     return output;
 }
 
-// ELU: x if x > 0, alpha * (exp(x) - 1) if x <= 0
 static Tensor* elu_forward(Module* module, Tensor* input) {
     ELU* elu = (ELU*)module;
 
     if (!elu || !input)
         return NULL;
-
-    LOG_DEBUG("ELU forward: Computing ELU with alpha=%f (IR-based)", elu->alpha);
 
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
@@ -369,19 +340,15 @@ static Tensor* elu_forward(Module* module, Tensor* input) {
     if (!zeros)
         return NULL;
 
-    // condition: input < 0
     Tensor* cond = uop_cmplt(input, zeros);
 
-    // exp(input) - 1
     Tensor* exp_x         = uop_exp(input);
     Tensor* ones          = tensor_ones(input->shape, input->ndim, &config);
     Tensor* exp_minus_one = uop_sub(exp_x, ones);
 
-    // alpha * (exp(x) - 1)
     Tensor* alpha_tensor = tensor_full(input->shape, input->ndim, &config, elu->alpha);
     Tensor* neg_part     = uop_mul(alpha_tensor, exp_minus_one);
 
-    // where(cond, neg_part, input)
     WhereParams wp = {.cond = cond, .a = neg_part, .b = input};
     return uop_where(&wp);
 }
@@ -408,14 +375,11 @@ ELU* nn_elu(float alpha, bool inplace) {
     return elu;
 }
 
-// SELU: scale * ELU(x, alpha) with fixed constants
 static Tensor* selu_forward(Module* module, Tensor* input) {
     (void)module;
 
     if (!input)
         return NULL;
-
-    LOG_DEBUG("SELU forward: Computing SELU (IR-based)");
 
     const float selu_lambda = 1.0507009873554804934f;
     const float selu_alpha  = 1.6732632423543772848f;
@@ -436,11 +400,9 @@ static Tensor* selu_forward(Module* module, Tensor* input) {
     Tensor* alpha_tensor = tensor_full(input->shape, input->ndim, &config, selu_alpha);
     Tensor* neg_part     = uop_mul(alpha_tensor, exp_minus_one);
 
-    // where(cond, neg_part, input) gives ELU result
     WhereParams wp     = {.cond = cond, .a = neg_part, .b = input};
     Tensor* elu_result = uop_where(&wp);
 
-    // Scale by lambda
     Tensor* lambda_tensor = tensor_full(input->shape, input->ndim, &config, selu_lambda);
     return uop_mul(lambda_tensor, elu_result);
 }
@@ -465,15 +427,10 @@ SELU* nn_selu(void) {
     return selu;
 }
 
-// SiLU (Swish): x * sigmoid(x)
 static Tensor* silu_forward(Module* module, Tensor* input) {
     (void)module;
-
     if (!input)
         return NULL;
-
-    LOG_DEBUG("SiLU forward: Computing x * sigmoid(x) (IR-based)");
-
     return uop_mul(input, uop_sigmoid(input));
 }
 
@@ -497,14 +454,10 @@ SiLU* nn_silu(void) {
     return silu;
 }
 
-// Mish: x * tanh(softplus(x)) where softplus(x) = log(1 + exp(x))
 static Tensor* mish_forward(Module* module, Tensor* input) {
     (void)module;
-
     if (!input)
         return NULL;
-
-    LOG_DEBUG("Mish forward: Computing x * tanh(log(1 + exp(x))) (IR-based)");
 
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
@@ -537,14 +490,10 @@ Mish* nn_mish(void) {
     return mish;
 }
 
-// HardSwish: x * relu6(x + 3) / 6 where relu6(x) = min(max(x, 0), 6)
 static Tensor* hardswish_forward(Module* module, Tensor* input) {
     (void)module;
-
     if (!input)
         return NULL;
-
-    LOG_DEBUG("HardSwish forward: Computing x * relu6(x + 3) / 6 (IR-based)");
 
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
@@ -553,20 +502,14 @@ static Tensor* hardswish_forward(Module* module, Tensor* input) {
     Tensor* six   = tensor_full(input->shape, input->ndim, &config, 6.0f);
     Tensor* zeros = tensor_zeros(input->shape, input->ndim, &config);
 
-    // x + 3
     Tensor* x_plus_3 = uop_add(input, three);
 
-    // clamp to [0, 6]: max(x+3, 0) then min with 6
     Tensor* clamped_low = uop_max(x_plus_3, zeros);
-    // min(a, 6) = where(a < 6, a, 6)
     Tensor* cmp_six = uop_cmplt(clamped_low, six);
     WhereParams wp  = {.cond = cmp_six, .a = clamped_low, .b = six};
     Tensor* clamped = uop_where(&wp);
 
-    // clamped / 6
     Tensor* scaled = uop_div(clamped, six);
-
-    // x * scaled
     return uop_mul(input, scaled);
 }
 

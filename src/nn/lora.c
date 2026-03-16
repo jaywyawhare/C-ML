@@ -16,8 +16,6 @@
 #include <string.h>
 #include <math.h>
 
-/* ===== LoRA Linear Layer ===== */
-
 CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha) {
     if (!base_weight) {
         LOG_ERROR("base_weight is NULL");
@@ -90,9 +88,6 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
         free(lora);
         return NULL;
     }
-
-    LOG_DEBUG("Created LoRA linear: in=%d, out=%d, rank=%d, alpha=%.1f, scaling=%.4f",
-              in_features, out_features, rank, alpha, lora->scaling);
 
     return lora;
 }
@@ -333,8 +328,6 @@ int cml_lora_linear_unmerge(CMLLoRALinear* lora) {
     return 0;
 }
 
-/* ===== LoRA Adapter ===== */
-
 CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha) {
     if (!name) {
         LOG_ERROR("Adapter name is NULL");
@@ -359,8 +352,6 @@ CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha)
     adapter->num_layers = 0;
     adapter->layers = NULL;
     adapter->merged = false;
-
-    LOG_DEBUG("Created LoRA adapter '%s' (rank=%d, alpha=%.1f)", name, rank, alpha);
     return adapter;
 }
 
@@ -393,8 +384,6 @@ int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer) {
     new_layers[adapter->num_layers] = layer;
     adapter->layers = new_layers;
     adapter->num_layers = new_count;
-
-    LOG_DEBUG("Added layer to adapter '%s' (total layers: %d)", adapter->name, new_count);
     return 0;
 }
 

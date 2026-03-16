@@ -16,8 +16,6 @@
 #include <string.h>
 #include <time.h>
 
-/* ===== Helpers ===== */
-
 /** Get wall-clock time in milliseconds (monotonic where available). */
 static double serving_time_ms(void) {
     struct timespec ts;
@@ -57,8 +55,6 @@ static void free_request(CMLSequenceRequest* req) {
     free(req->generated_tokens);
     free(req);
 }
-
-/* ===== Public API ===== */
 
 CMLServingConfig cml_serving_default_config(void) {
     CMLServingConfig config = {

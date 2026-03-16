@@ -199,8 +199,6 @@ PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
 
     layer->upscale_factor = upscale_factor;
 
-    LOG_DEBUG("Created PixelShuffle layer: upscale_factor=%d", upscale_factor);
-
     return layer;
 }
 
@@ -223,8 +221,6 @@ PixelUnshuffle* nn_pixel_unshuffle(int downscale_factor) {
     }
 
     layer->downscale_factor = downscale_factor;
-
-    LOG_DEBUG("Created PixelUnshuffle layer: downscale_factor=%d", downscale_factor);
 
     return layer;
 }

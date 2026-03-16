@@ -163,9 +163,6 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
         *params[i].b_ptr = module_get_parameter((Module*)mha, params[i].b_name);
     }
 
-    LOG_DEBUG("Created MultiHeadAttention: embed_dim=%d, num_heads=%d, head_dim=%d",
-              embed_dim, num_heads, mha->head_dim);
-
     return mha;
 }
 
@@ -372,8 +369,6 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
 
     linear_project(output_data, concat, wo_data, bo_data, total_q, embed_dim, embed_dim);
     free(concat);
-
-    // Create output tensor [batch, seq_q, embed_dim]
     int out_shape[] = {batch, seq_q, embed_dim};
     TensorConfig out_config = {.dtype = query->dtype, .device = query->device,
                                 .has_dtype = true, .has_device = true};
@@ -475,8 +470,6 @@ static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
     float* norm2_w = (float*)tensor_data_ptr(layer->norm2_weight->tensor);
     float* norm2_b = (float*)tensor_data_ptr(layer->norm2_bias->tensor);
     layer_norm_inplace(x, total, d_model, norm2_w, norm2_b, layer->norm_eps);
-
-    // Create output tensor
     int out_shape[] = {batch, seq_len, d_model};
     TensorConfig out_config = {.dtype = input->dtype, .device = input->device,
                                 .has_dtype = true, .has_device = true};
@@ -597,9 +590,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
         tensor_free(n2b); module_free((Module*)layer); return NULL;
     }
     layer->norm2_bias = module_get_parameter((Module*)layer, "norm2_bias");
-
-    LOG_DEBUG("Created TransformerEncoderLayer: d_model=%d, nhead=%d, dim_ff=%d",
-              d_model, nhead, dim_feedforward);
 
     return layer;
 }
@@ -1045,9 +1035,6 @@ KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim
         return NULL;
     }
 
-    LOG_DEBUG("Created KVCache: batch=%d, num_heads=%d, max_seq_len=%d, head_dim=%d",
-              batch, num_heads, max_seq_len, head_dim);
-
     return cache;
 }
 
@@ -1382,8 +1369,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
 
     linear_project(output_data, concat, wo_data, bo_data, total_q, embed_dim, embed_dim);
     free(concat);
-
-    // Create output tensor [batch, seq_q, embed_dim]
     int out_shape[] = {batch, seq_q, embed_dim};
     TensorConfig out_config = {.dtype = query->dtype, .device = query->device,
                                 .has_dtype = true, .has_device = true};
@@ -1659,8 +1644,6 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
 
     linear_project(output_data, concat, wo_data, bo_data, total_q, embed_dim, embed_dim);
     free(concat);
-
-    // Create output tensor [batch, seq_q, embed_dim]
     int out_shape[] = {batch, seq_q, embed_dim};
     TensorConfig out_config = {.dtype = query->dtype, .device = query->device,
                                 .has_dtype = true, .has_device = true};

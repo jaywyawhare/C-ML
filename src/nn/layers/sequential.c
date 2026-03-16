@@ -99,17 +99,10 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     }
 
     cache->valid = true;
-    LOG_DEBUG("Created cached graph: input[%zu], output[%zu], %zu nodes", cache->input_numel,
-              cache->output_numel, cache->plan->num_nodes);
 
     return cache;
 }
 
-// Execute using cached graph
-// The key insight is that we need to:
-// 1. Copy new input data into the cached graph's first node inputs
-// 2. Make intermediate nodes read from plan buffers (set by previous nodes)
-// 3. Execute nodes in order, writing to plan buffers
 static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
     if (!seq || !seq->cached_graph || !seq->cached_graph->plan) {
         return NULL;
@@ -180,7 +173,7 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
             in2_n = node->inputs[1]->numel;
         }
 
-        // Execute based on operation type (simplified inline execution)
+        // Execute based on operation type
         int exec_result = -1;
         switch (node->type) {
         case UOP_ADD:
@@ -364,8 +357,6 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
         memcpy(cache->output_buffer, plan->buffers[plan->num_nodes - 1],
                cache->output_numel * sizeof(float));
     }
-
-    // Create output tensor pointing to our cached output buffer
     // The tensor doesn't own the data - we manage it
     Tensor* output = tensor_empty(last_node->output->shape, last_node->output->ndim, NULL);
     if (output) {
@@ -381,25 +372,17 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
 
     if (!seq || !input)
         return NULL;
-
-    // FAST PATH: Try cached execution if enabled and shapes match
     if (seq->enable_graph_cache && seq->cached_graph && shapes_match(seq->cached_graph, input)) {
         Tensor* cached_output = execute_cached_forward(seq, input);
         if (cached_output) {
             return cached_output; // Cache hit!
         }
-        // Cache execution failed - invalidate and fall through to normal path
         LOG_WARNING("Cached execution failed, rebuilding graph");
         sequential_invalidate_cache(seq);
     }
-
-    // NORMAL PATH: Build IR graph and execute
-    // Reset global IR context to prevent accumulation
     cml_ir_reset_global_context();
 
     Tensor* output = input;
-
-    // Forward through all modules sequentially
     for (int i = 0; i < seq->num_modules; i++) {
         if (!seq->modules[i])
             continue;
@@ -416,8 +399,6 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
 
         output = next_output;
     }
-
-    // If graph caching is enabled but we don't have a cache, create one
     if (seq->enable_graph_cache && !seq->cached_graph) {
         CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
@@ -439,14 +420,10 @@ static void sequential_free(Module* module) {
     Sequential* seq = (Sequential*)module;
     if (!seq)
         return;
-
-    // Free cached graph if present
     if (seq->cached_graph) {
         free_cached_graph(seq->cached_graph);
         seq->cached_graph = NULL;
     }
-
-    // Free all child modules (they are NOT tracked by global cleanup individually)
     if (seq->modules) {
         for (int i = 0; i < seq->num_modules; i++) {
             if (seq->modules[i]) {
@@ -480,12 +457,8 @@ Sequential* nn_sequential(void) {
     seq->capacity           = 0;
     seq->cached_graph       = NULL;
     seq->enable_graph_cache = false; // Disabled by default
-
-    // Automatically track for cleanup
     extern void cml_track_module(Module*);
     cml_track_module((Module*)seq);
-
-    // Automatically register for metrics tracking
     extern void training_metrics_register_model(Module*);
     training_metrics_register_model((Module*)seq);
 
@@ -495,8 +468,6 @@ Sequential* nn_sequential(void) {
 int sequential_add(Sequential* seq, Module* module) {
     if (!seq || !module)
         return -1;
-
-    // Resize array if needed
     if (seq->num_modules >= seq->capacity) {
         int new_capacity     = seq->capacity == 0 ? 8 : seq->capacity * 2;
         Module** new_modules = realloc(seq->modules, (size_t)new_capacity * sizeof(Module*));
@@ -515,11 +486,8 @@ int sequential_add(Sequential* seq, Module* module) {
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) == 0) {
-        // Add parameters to Sequential with unique names based on module index
         for (int i = 0; i < num_params; i++) {
             if (params[i]) {
-                // Create unique parameter name: "module_index.module_name.param_name"
-                // This ensures each layer's parameters have unique names
                 char param_name[256];
                 snprintf(param_name, sizeof(param_name), "%d.%s.%s", module_index, module->name,
                          params[i]->name ? params[i]->name : "unnamed");

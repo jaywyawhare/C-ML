@@ -159,9 +159,6 @@ RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
         cell->bias_hh = NULL;
     }
 
-    LOG_DEBUG("Created RNNCell: input_size=%d, hidden_size=%d, bias=%d",
-              input_size, hidden_size, use_bias);
-
     return cell;
 }
 
@@ -332,9 +329,6 @@ LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
         cell->bias_hh = NULL;
     }
 
-    LOG_DEBUG("Created LSTMCell: input_size=%d, hidden_size=%d, bias=%d",
-              input_size, hidden_size, use_bias);
-
     return cell;
 }
 
@@ -484,9 +478,6 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
         cell->bias_ih = NULL;
         cell->bias_hh = NULL;
     }
-
-    LOG_DEBUG("Created GRUCell: input_size=%d, hidden_size=%d, bias=%d",
-              input_size, hidden_size, use_bias);
 
     return cell;
 }
@@ -679,9 +670,6 @@ RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
             register_cell_params((Module*)rnn, (Module*)rnn->cells[idx], l, d);
         }
     }
-
-    LOG_DEBUG("Created RNN: input=%d, hidden=%d, layers=%d, bidir=%d",
-              input_size, hidden_size, num_layers, bidirectional);
     return rnn;
 }
 
@@ -721,7 +709,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
     for (int l = 0; l < rnn->num_layers; l++) {
         (void)layer_input->shape[2]; // feature dim used implicitly by cells
 
-        /* --- Forward direction --- */
+
         RNNCell* fwd_cell = rnn->cells[l * nd + 0];
 
         /* Get initial hidden for this layer/direction from h_0 */
@@ -756,7 +744,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
         Tensor* layer_output;
 
         if (nd == 2) {
-            /* --- Reverse direction --- */
+
             RNNCell* rev_cell = rnn->cells[l * nd + 1];
 
             Tensor* h_rev = NULL;
@@ -868,9 +856,6 @@ LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectiona
             register_cell_params((Module*)lstm, (Module*)lstm->cells[idx], l, d);
         }
     }
-
-    LOG_DEBUG("Created LSTM: input=%d, hidden=%d, layers=%d, bidir=%d",
-              input_size, hidden_size, num_layers, bidirectional);
     return lstm;
 }
 
@@ -911,7 +896,7 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
 
     for (int l = 0; l < lstm->num_layers; l++) {
 
-        /* --- Forward direction --- */
+
         LSTMCell* fwd_cell = lstm->cells[l * nd + 0];
 
         Tensor* h_fwd = NULL;
@@ -952,7 +937,7 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
         Tensor* layer_output;
 
         if (nd == 2) {
-            /* --- Reverse direction --- */
+
             LSTMCell* rev_cell = lstm->cells[l * nd + 1];
 
             Tensor* h_rev = NULL;
@@ -1074,9 +1059,6 @@ GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
             register_cell_params((Module*)gru, (Module*)gru->cells[idx], l, d);
         }
     }
-
-    LOG_DEBUG("Created GRU: input=%d, hidden=%d, layers=%d, bidir=%d",
-              input_size, hidden_size, num_layers, bidirectional);
     return gru;
 }
 
@@ -1115,7 +1097,7 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
 
     for (int l = 0; l < gru->num_layers; l++) {
 
-        /* --- Forward direction --- */
+
         GRUCell* fwd_cell = gru->cells[l * nd + 0];
 
         Tensor* h_fwd = NULL;
@@ -1144,7 +1126,7 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
         Tensor* layer_output;
 
         if (nd == 2) {
-            /* --- Reverse direction --- */
+
             GRUCell* rev_cell = gru->cells[l * nd + 1];
 
             Tensor* h_rev = NULL;

@@ -41,12 +41,10 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     int G = gn->num_groups;
     int channels_per_group = C / G;
 
-    // Compute spatial size (everything after batch and channel dims)
     int spatial = 1;
     for (int i = 2; i < input->ndim; i++)
         spatial *= input->shape[i];
 
-    // Create output
     Tensor* output = tensor_clone(input);
     if (!output)
         return NULL;
@@ -60,12 +58,10 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    // For each sample and group, compute mean and var, then normalize
     for (int n = 0; n < N; n++) {
         for (int g = 0; g < G; g++) {
             int group_size = channels_per_group * spatial;
 
-            // Compute mean
             float mean = 0.0f;
             for (int c = 0; c < channels_per_group; c++) {
                 int ch = g * channels_per_group + c;
@@ -75,7 +71,6 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
             }
             mean /= (float)group_size;
 
-            // Compute variance
             float var = 0.0f;
             for (int c = 0; c < channels_per_group; c++) {
                 int ch = g * channels_per_group + c;
@@ -88,7 +83,6 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
 
             float inv_std = 1.0f / sqrtf(var + gn->eps);
 
-            // Normalize
             for (int c = 0; c < channels_per_group; c++) {
                 int ch = g * channels_per_group + c;
                 for (int s = 0; s < spatial; s++) {
@@ -99,7 +93,6 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
         }
     }
 
-    // Apply affine transform if enabled (per-channel scale and shift)
     if (gn->affine && gn->weight && gn->bias) {
         tensor_ensure_executed(gn->weight->tensor);
         tensor_ensure_executed(gn->bias->tensor);
@@ -155,7 +148,6 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine
         TensorConfig config = (TensorConfig){
             .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
-        // Weight (gamma) - initialized to ones
         Tensor* weight = tensor_ones(param_shape, 1, &config);
         if (!weight) {
             module_free((Module*)gn);
@@ -170,7 +162,6 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine
 
         gn->weight = module_get_parameter((Module*)gn, "weight");
 
-        // Bias (beta) - initialized to zeros
         Tensor* bias = tensor_zeros(param_shape, 1, &config);
         if (!bias) {
             module_free((Module*)gn);
@@ -188,9 +179,6 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine
         gn->weight = NULL;
         gn->bias   = NULL;
     }
-
-    LOG_DEBUG("Created GroupNorm layer: num_groups=%d, num_channels=%d, eps=%.6f, affine=%d",
-              num_groups, num_channels, (double)gn->eps, affine);
 
     return gn;
 }

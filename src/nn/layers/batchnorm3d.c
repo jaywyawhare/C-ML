@@ -19,8 +19,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
 
     if (!bn || !input)
         return NULL;
-
-    // Input shape: [batch, channels, depth, height, width]
     if (input->ndim != 5) {
         LOG_ERROR("BatchNorm3d expects 5D input [N, C, D, H, W], got %dD", input->ndim);
         return NULL;
@@ -46,8 +44,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
     bool training = module_is_training(module);
     int spatial = depth * height * width;
     int total_per_channel = batch * spatial;
-
-    // Compute per-channel mean and variance
     float* channel_mean = calloc((size_t)channels, sizeof(float));
     float* channel_var  = calloc((size_t)channels, sizeof(float));
     if (!channel_mean || !channel_var) {
@@ -57,7 +53,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
     }
 
     if (training) {
-        // Compute mean per channel
         for (int b = 0; b < batch; b++) {
             for (int c = 0; c < channels; c++) {
                 int offset = (b * channels + c) * spatial;
@@ -68,8 +63,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
         }
         for (int c = 0; c < channels; c++)
             channel_mean[c] /= (float)total_per_channel;
-
-        // Compute variance per channel
         for (int b = 0; b < batch; b++) {
             for (int c = 0; c < channels; c++) {
                 int offset = (b * channels + c) * spatial;
@@ -81,8 +74,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
         }
         for (int c = 0; c < channels; c++)
             channel_var[c] /= (float)total_per_channel;
-
-        // Update running stats
         if (bn->track_running_stats && bn->running_mean && bn->running_var) {
             float* rm = (float*)tensor_data_ptr(bn->running_mean);
             float* rv = (float*)tensor_data_ptr(bn->running_var);
@@ -94,7 +85,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
             }
         }
     } else {
-        // Use running stats in eval mode
         if (bn->running_mean && bn->running_var) {
             float* rm = (float*)tensor_data_ptr(bn->running_mean);
             float* rv = (float*)tensor_data_ptr(bn->running_var);
@@ -104,8 +94,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
             }
         }
     }
-
-    // Create output tensor
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* output = tensor_empty(input->shape, input->ndim, &config);

@@ -34,13 +34,9 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
                   last_dim, rn->normalized_shape);
         return NULL;
     }
-
-    // Compute input^2
     Tensor* input_sq = uop_mul(input, input);
     if (!input_sq)
         return NULL;
-
-    // Compute mean(input^2) over last dimension
     ReduceParams mean_params;
     int mean_dim         = input->ndim - 1;
     int mean_dims[]      = {mean_dim};
@@ -51,8 +47,6 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
     Tensor* mean_sq = uop_mean(input_sq, &mean_params);
     if (!mean_sq)
         return NULL;
-
-    // Add eps: mean(input^2) + eps
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* eps_tensor = tensor_zeros(mean_sq->shape, mean_sq->ndim, &config);
@@ -69,18 +63,12 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
     Tensor* mean_sq_eps = uop_add(mean_sq, eps_tensor);
     if (!mean_sq_eps)
         return NULL;
-
-    // sqrt(mean(input^2) + eps)
     Tensor* rms = uop_sqrt(mean_sq_eps);
     if (!rms)
         return NULL;
-
-    // Normalize: input / rms
     Tensor* normalized = uop_div(input, rms);
     if (!normalized)
         return NULL;
-
-    // Scale by weight (gain)
     Tensor* output = normalized;
     if (rn->weight && rn->weight->tensor) {
         ExpandParams expand_weight;
@@ -134,8 +122,6 @@ RMSNorm* nn_rmsnorm(int normalized_shape, float eps, DType dtype, DeviceType dev
     rn->normalized_shape = normalized_shape;
     rn->eps              = eps > 0.0f ? eps : 1e-5f;
     rn->weight           = NULL;
-
-    // Create weight (gain) initialized to ones
     int weight_shape[] = {normalized_shape};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -152,9 +138,6 @@ RMSNorm* nn_rmsnorm(int normalized_shape, float eps, DType dtype, DeviceType dev
     }
 
     rn->weight = module_get_parameter((Module*)rn, "weight");
-
-    LOG_DEBUG("Created RMSNorm layer: normalized_shape=%d, eps=%.6f", normalized_shape,
-              (double)rn->eps);
 
     return rn;
 }

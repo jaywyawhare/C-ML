@@ -32,8 +32,6 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
                   last_dim, ln->normalized_shape);
         return NULL;
     }
-
-    // Compute mean over last dimension using uops
     ReduceParams mean_params;
     int mean_dim         = input->ndim - 1; // Last dimension
     int mean_dims[]      = {mean_dim};
@@ -45,22 +43,16 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
     if (!mean_reduced) {
         return NULL;
     }
-
-    // Compute (input - mean)
     Tensor* centered = uop_sub(input, mean_reduced);
     tensor_free(mean_reduced);
     if (!centered) {
         return NULL;
     }
-
-    // Compute (input - mean)^2
     Tensor* diff_sq = uop_mul(centered, centered);
     if (!diff_sq) {
         tensor_free(centered);
         return NULL;
     }
-
-    // Compute variance: mean((input - mean)^2) over last dimension
     ReduceParams var_params;
     int var_dims[]      = {mean_dim};
     var_params.dims     = var_dims;
@@ -73,8 +65,6 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         tensor_free(centered);
         return NULL;
     }
-
-    // Create eps tensor matching var_reduced shape
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* eps_tensor = tensor_zeros(var_reduced->shape, var_reduced->ndim, &config);
@@ -83,16 +73,12 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         tensor_free(var_reduced);
         return NULL;
     }
-
-    // Fill eps_tensor with eps value
     float* eps_data = (float*)tensor_data_ptr(eps_tensor);
     if (eps_data) {
         for (size_t i = 0; i < eps_tensor->numel; i++) {
             eps_data[i] = ln->eps;
         }
     }
-
-    // var + eps
     Tensor* var_eps = uop_add(var_reduced, eps_tensor);
     tensor_free(var_reduced);
     tensor_free(eps_tensor);
@@ -100,28 +86,21 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         tensor_free(centered);
         return NULL;
     }
-
-    // sqrt(var + eps)
     Tensor* std_tensor = uop_sqrt(var_eps);
     tensor_free(var_eps);
     if (!std_tensor) {
         tensor_free(centered);
         return NULL;
     }
-
-    // Normalize: (input - mean) / sqrt(var + eps)
     Tensor* normalized = uop_div(centered, std_tensor);
     tensor_free(centered);
     tensor_free(std_tensor);
     if (!normalized) {
         return NULL;
     }
-
-    // Scale and shift: gamma * normalized + beta
     Tensor* output = normalized;
 
     if (ln->affine && ln->weight && ln->bias) {
-        // Broadcast weight and bias to input shape
         ExpandParams expand_weight;
         expand_weight.new_shape = input->shape;
         expand_weight.new_ndim  = input->ndim;
@@ -131,16 +110,12 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
             tensor_free(output);
             return NULL;
         }
-
-        // gamma * normalized
         Tensor* scaled = uop_mul(weight_broadcast, output);
         tensor_free(weight_broadcast);
         tensor_free(output);
         if (!scaled) {
             return NULL;
         }
-
-        // Broadcast bias
         ExpandParams expand_bias;
         expand_bias.new_shape = input->shape;
         expand_bias.new_ndim  = input->ndim;
@@ -150,8 +125,6 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
             tensor_free(scaled);
             return NULL;
         }
-
-        // gamma * normalized + beta
         output = uop_add(scaled, bias_broadcast);
         tensor_free(scaled);
         tensor_free(bias_broadcast);
@@ -159,8 +132,6 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
             return NULL;
         }
     }
-
-    // Setup autograd if needed
     if (autograd_is_grad_enabled() && input->requires_grad) {
         output->requires_grad = true;
     }
@@ -186,8 +157,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
     LayerNorm* ln = malloc(sizeof(LayerNorm));
     if (!ln)
         return NULL;
-
-    // Initialize base module
     if (module_init((Module*)ln, "LayerNorm", layernorm_forward, layernorm_free) != 0) {
         free(ln);
         return NULL;
@@ -197,8 +166,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
     ln->affine           = affine;
     ln->weight           = NULL;
     ln->bias             = NULL;
-
-    // Create learnable parameters if affine
     if (affine) {
         int weight_shape[] = {normalized_shape};
 
@@ -210,8 +177,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
             module_free((Module*)ln);
             return NULL;
         }
-
-        // Add weight parameter
         if (module_add_parameter((Module*)ln, weight, "weight", true) != 0) {
             tensor_free(weight);
             module_free((Module*)ln);
@@ -226,8 +191,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
             module_free((Module*)ln);
             return NULL;
         }
-
-        // Add bias parameter
         if (module_add_parameter((Module*)ln, bias, "bias", true) != 0) {
             tensor_free(bias);
             module_free((Module*)ln);
@@ -239,9 +202,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         ln->weight = NULL;
         ln->bias   = NULL;
     }
-
-    LOG_DEBUG("Created LayerNorm layer: normalized_shape=%d, eps=%.6f, affine=%d", normalized_shape,
-              (double)ln->eps, affine);
 
     return ln;
 }

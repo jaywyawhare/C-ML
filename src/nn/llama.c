@@ -24,8 +24,6 @@
 #include <math.h>
 #include <time.h>
 
-/* ===== Pre-defined Configs ===== */
-
 CMLLLaMAConfig cml_llama_config_7b(void) {
     CMLLLaMAConfig config = {
         .vocab_size        = 32000,
@@ -71,8 +69,6 @@ CMLLLaMAConfig cml_llama_config_70b(void) {
     return config;
 }
 
-/* ===== Generation Config Default ===== */
-
 CMLGenerationConfig cml_generation_default_config(void) {
     CMLGenerationConfig config = {
         .temperature   = 0.8f,
@@ -84,8 +80,6 @@ CMLGenerationConfig cml_generation_default_config(void) {
     };
     return config;
 }
-
-/* ===== RMSNorm (inline helper) ===== */
 
 /**
  * RMSNorm: norm(x) = x * rsqrt(mean(x^2) + eps) * weight
@@ -139,8 +133,6 @@ static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     return result;
 }
 
-/* ===== SwiGLU FFN ===== */
-
 /**
  * SwiGLU FFN:
  *   gate = silu(gate_proj(x))
@@ -182,8 +174,6 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
     return output;
 }
 
-/* ===== Layer Allocation / Free ===== */
-
 static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
     CMLLLaMALayer* layer = (CMLLLaMALayer*)calloc(1, sizeof(CMLLLaMALayer));
     if (!layer) return NULL;
@@ -220,8 +210,6 @@ static void llama_layer_free(CMLLLaMALayer* layer) {
 
     free(layer);
 }
-
-/* ===== Model Create / Free ===== */
 
 CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
     if (!config) {
@@ -292,8 +280,6 @@ void cml_llama_free(CMLLLaMAModel* model) {
 
     free(model);
 }
-
-/* ===== GGUF Weight Loading ===== */
 
 /**
  * Map GGUF tensor names to model weight pointers.
@@ -469,8 +455,6 @@ int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
     return 0;
 }
 
-/* ===== Embedding Lookup ===== */
-
 /**
  * Look up token embeddings from the embedding table.
  * token_ids: array of int token IDs
@@ -511,8 +495,6 @@ static Tensor* embed_tokens_lookup(Tensor* embed, const int* token_ids, int seq_
     return output;
 }
 
-/* ===== Layer Forward ===== */
-
 Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
                                  Tensor* hidden, int start_pos) {
     if (!model || !layer || !hidden) return NULL;
@@ -520,11 +502,9 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
     const CMLLLaMAConfig* cfg = &model->config;
     int head_dim = cfg->hidden_size / cfg->num_heads;
 
-    /* === Pre-attention RMSNorm === */
     Tensor* normed = rms_norm(hidden, layer->input_layernorm, cfg->rms_norm_eps);
     if (!normed) return NULL;
 
-    /* === Q, K, V projections === */
     Tensor* Q = uop_matmul(normed, layer->q_proj);
     Tensor* K = uop_matmul(normed, layer->k_proj);
     Tensor* V = uop_matmul(normed, layer->v_proj);
@@ -537,7 +517,6 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
         return NULL;
     }
 
-    /* === Apply RoPE to Q and K === */
     CMLRoPEConfig rope_cfg = {
         .dim         = head_dim,
         .max_seq_len = cfg->max_seq_len,
@@ -558,7 +537,6 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
         return NULL;
     }
 
-    /* === GQA with KV cache === */
     CMLGQAConfig gqa_cfg = {
         .num_heads    = cfg->num_heads,
         .num_kv_heads = cfg->num_kv_heads,
@@ -592,35 +570,28 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
     int out_2d[] = {attn_out->shape[1], attn_out->shape[2]};
     Tensor* attn_2d = tensor_reshape(attn_out, out_2d, 2);
 
-    /* === Output projection === */
     Tensor* attn_proj = uop_matmul(attn_2d, layer->o_proj);
     tensor_free(attn_2d);
     tensor_free(attn_out);
     if (!attn_proj) return NULL;
 
-    /* === Residual connection (attention) === */
     Tensor* residual1 = uop_add(hidden, attn_proj);
     tensor_free(attn_proj);
     if (!residual1) return NULL;
 
-    /* === Post-attention RMSNorm === */
     Tensor* normed2 = rms_norm(residual1, layer->post_attn_layernorm, cfg->rms_norm_eps);
     if (!normed2) { tensor_free(residual1); return NULL; }
 
-    /* === SwiGLU FFN === */
     Tensor* ffn_out = swiglu_ffn(normed2, layer->gate_proj, layer->up_proj, layer->down_proj);
     tensor_free(normed2);
     if (!ffn_out) { tensor_free(residual1); return NULL; }
 
-    /* === Residual connection (FFN) === */
     Tensor* output = uop_add(residual1, ffn_out);
     tensor_free(residual1);
     tensor_free(ffn_out);
 
     return output;
 }
-
-/* ===== Model Forward ===== */
 
 Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_len) {
     if (!model || !token_ids || seq_len <= 0) {
@@ -635,14 +606,12 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
 
     int start_pos = model->current_seq_len;
 
-    /* === Token embedding lookup === */
     Tensor* hidden = embed_tokens_lookup(model->embed_tokens, token_ids, seq_len);
     if (!hidden) {
         LOG_ERROR("cml_llama_forward: embedding lookup failed");
         return NULL;
     }
 
-    /* === Pass through transformer layers === */
     for (int i = 0; i < model->num_layers; i++) {
         Tensor* next_hidden = cml_llama_layer_forward(model, model->layers[i],
                                                        hidden, start_pos);
@@ -654,7 +623,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
         hidden = next_hidden;
     }
 
-    /* === Final RMSNorm === */
     if (model->norm) {
         Tensor* normed = rms_norm(hidden, model->norm, model->config.rms_norm_eps);
         tensor_free(hidden);
@@ -665,7 +633,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
         hidden = normed;
     }
 
-    /* === LM head projection === */
     Tensor* logits = NULL;
     if (model->lm_head && model->lm_head != model->embed_tokens) {
         logits = uop_matmul(hidden, model->lm_head);
@@ -693,8 +660,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
     model->current_seq_len = start_pos + seq_len;
     return logits;
 }
-
-/* ===== Sampling ===== */
 
 /**
  * Comparison function for sorting logit indices in descending order by value.
@@ -824,8 +789,6 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     return sampled_id;
 }
 
-/* ===== Generation ===== */
-
 CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt,
                                           const CMLGenerationConfig* config) {
     if (!model || !prompt || !config) {
@@ -838,7 +801,6 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
         return NULL;
     }
 
-    /* === Tokenize prompt === */
     int num_prompt_tokens = 0;
     int* prompt_tokens = NULL;
 
@@ -852,7 +814,6 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
         return NULL;
     }
 
-    /* === Allocate result === */
     int max_total = num_prompt_tokens + config->max_new_tokens;
     CMLGenerationResult* result = (CMLGenerationResult*)calloc(1, sizeof(CMLGenerationResult));
     if (!result) { free(prompt_tokens); return NULL; }
@@ -871,11 +832,9 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     /* Reset KV caches */
     cml_llama_reset(model);
 
-    /* === Timing === */
     struct timespec ts_start, ts_end;
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-    /* === Prefill: process all prompt tokens at once === */
     Tensor* logits = cml_llama_forward(model, prompt_tokens, num_prompt_tokens);
     free(prompt_tokens);
 
@@ -886,7 +845,6 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
         return NULL;
     }
 
-    /* === Autoregressive decode === */
     for (int step = 0; step < config->max_new_tokens; step++) {
         int next_token = cml_llama_sample_token(logits, config);
         tensor_free(logits);
@@ -922,7 +880,6 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
 
     if (logits) tensor_free(logits);
 
-    /* === Timing === */
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     double elapsed_ms = (ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
                         (ts_end.tv_nsec - ts_start.tv_nsec) / 1e6;
@@ -933,7 +890,6 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
         result->tokens_per_second = (float)(generated_tokens * 1000.0 / elapsed_ms);
     }
 
-    /* === Decode tokens to text === */
     if (model->tokenizer) {
         result->text = cml_tokenizer_decode(model->tokenizer,
                                              result->token_ids, result->num_tokens);
@@ -953,8 +909,6 @@ void cml_generation_result_free(CMLGenerationResult* result) {
     if (result->text) free(result->text);
     free(result);
 }
-
-/* ===== Utility ===== */
 
 void cml_llama_reset(CMLLLaMAModel* model) {
     if (!model) return;
