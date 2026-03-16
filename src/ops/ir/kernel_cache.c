@@ -251,9 +251,6 @@ int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash, CMLKernelBacke
 
     pthread_mutex_unlock(&cache->lock);
 
-    LOG_DEBUG("Cached kernel: hash=0x%016llx, backend=%d, size=%zu bytes", (unsigned long long)hash,
-              backend, memory_size);
-
     return 0;
 }
 
@@ -307,7 +304,6 @@ int cml_kernel_cache_remove(CMLKernelCache* cache, uint64_t hash) {
             free_entry(entry);
 
             pthread_mutex_unlock(&cache->lock);
-            LOG_DEBUG("Removed kernel from cache: hash=0x%016llx", (unsigned long long)hash);
             return 0;
         }
         pp = &(*pp)->next;
@@ -358,8 +354,6 @@ int cml_kernel_cache_evict_lru(CMLKernelCache* cache) {
     free_entry(lru_entry);
 
     pthread_mutex_unlock(&cache->lock);
-
-    LOG_DEBUG("Evicted LRU kernel: hash=0x%016llx", (unsigned long long)evicted_hash);
 
     return 0;
 }

@@ -260,7 +260,6 @@ int cml_wmma_matmul(const void* A, const void* B, void* C,
 
     cml_cuda_kernel_set_launch_config(kernel, grid_size, 1, 1, block_size, 1, 1);
 
-    /* Set up kernel arguments */
     int M_arg = M, N_arg = N, K_arg = K;
     void* args[] = {
         (void*)&A, (void*)&B, (void*)&C,

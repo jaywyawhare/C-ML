@@ -146,7 +146,6 @@ static void evict_lru_entry(CMLGraphCache* cache) {
         cml_free_execution_plan(oldest_entry->plan);
         free(oldest_entry);
         cache->count--;
-        LOG_DEBUG("LRU evicted entry with timestamp %lu", (unsigned long)oldest_time);
     }
 }
 

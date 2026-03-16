@@ -343,9 +343,6 @@ int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern,
     reg->rules[idx].priority = priority;
     reg->rules[idx].name     = name;
     reg->num_rules++;
-
-    LOG_DEBUG("Registered rewrite rule '%s' (priority %d, slot %d)",
-              name ? name : "<unnamed>", priority, idx);
     return 0;
 }
 
@@ -418,9 +415,6 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
 
                         rewrites_this_pass++;
                         matched = true;
-
-                        LOG_DEBUG("Rewrite '%s' applied (iter %d)",
-                                  rule->name ? rule->name : "?", iter);
                     } else if (replacement == node) {
                         /* Emit returned the same node -- no-op (pattern
                          * matched but replacement is identity). */
@@ -434,8 +428,6 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
         total_rewrites += rewrites_this_pass;
 
         if (rewrites_this_pass == 0) {
-            LOG_DEBUG("Rewrite converged after %d iteration(s), %d total rewrites",
-                      iter + 1, total_rewrites);
             break;
         }
     }
@@ -865,8 +857,6 @@ CMLRewriteRegistry* cml_rewrite_builtin_rules(void) {
         CMLPatternNode* pat = make_binop_pattern(UOP_MUL);
         if (pat) cml_rewrite_register(reg, pat, emit_sqrt_sq, 80, "sqrt_sq");
     }
-
-    LOG_DEBUG("Built-in rewrite registry created with %d rules", reg->num_rules);
     return reg;
 }
 
@@ -944,7 +934,6 @@ int cml_rewrite_dce(CMLGraph_t ir) {
     free(marked);
 
     if (removed > 0) {
-        LOG_DEBUG("DCE: removed %d dead nodes", removed);
     }
     return removed;
 }

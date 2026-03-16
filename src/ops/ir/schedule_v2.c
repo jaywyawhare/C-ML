@@ -317,10 +317,6 @@ CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph,
         : 0.0f;
     sched->memory_saved = total_memory_saved;
 
-    LOG_DEBUG("V2 schedule: %d ops -> %d groups (ratio %.2f, saved %zu bytes)",
-              total_ops, sched->num_groups,
-              (double)sched->fusion_ratio, total_memory_saved);
-
     return sched;
 }
 
@@ -387,8 +383,6 @@ int cml_ir_execute_v2(CMLGraph_t ir) {
         LOG_ERROR("Failed to create V2 schedule");
         return -1;
     }
-
-    LOG_DEBUG("Executing V2 schedule: %d groups", sched->num_groups);
 
     /* Execute each group in order */
     int rc = 0;
