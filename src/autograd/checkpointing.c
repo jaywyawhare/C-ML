@@ -191,24 +191,98 @@ Tensor* autograd_recompute(Tensor* tensor) {
             }
             break;
         case UOP_MAX:
+            if (checkpoint->num_inputs == 2) {
+                recomputed = uop_max(inputs[0], inputs[1]);
+            }
+            break;
         case UOP_CMPLT:
+            if (checkpoint->num_inputs == 2) {
+                recomputed = uop_cmplt(inputs[0], inputs[1]);
+            }
+            break;
         case UOP_RECIP:
+            if (checkpoint->num_inputs == 1) {
+                recomputed = uop_recip(inputs[0]);
+            }
+            break;
         case UOP_ABS:
+            if (checkpoint->num_inputs == 1) {
+                recomputed = uop_abs(inputs[0]);
+            }
+            break;
         case UOP_SIN:
+            if (checkpoint->num_inputs == 1) {
+                recomputed = uop_sin(inputs[0]);
+            }
+            break;
         case UOP_COS:
+            if (checkpoint->num_inputs == 1) {
+                recomputed = uop_cos(inputs[0]);
+            }
+            break;
         case UOP_TAN:
+            if (checkpoint->num_inputs == 1) {
+                recomputed = uop_tan(inputs[0]);
+            }
+            break;
         case UOP_POW:
+            if (checkpoint->num_inputs == 2) {
+                recomputed = uop_pow(inputs[0], inputs[1]);
+            }
+            break;
         case UOP_MAX_REDUCE:
+            if (checkpoint->num_inputs == 1) {
+                ReduceParams max_reduce_params = {0};
+                max_reduce_params.dims         = NULL;
+                max_reduce_params.num_dims     = 0;
+                max_reduce_params.keepdim      = false;
+                recomputed = uop_max_reduce(inputs[0], &max_reduce_params);
+            }
+            break;
         case UOP_RESHAPE:
+            if (checkpoint->num_inputs == 1 && node->output_shape) {
+                ReshapeParams reshape_params;
+                reshape_params.new_shape = node->output_shape;
+                reshape_params.new_ndim  = node->output_ndim;
+                recomputed = uop_reshape(inputs[0], &reshape_params);
+            }
+            break;
         case UOP_PERMUTE:
+            if (checkpoint->num_inputs == 1 && node->params) {
+                recomputed = uop_permute(inputs[0], (PermuteParams*)node->params);
+            }
+            break;
         case UOP_EXPAND:
+            if (checkpoint->num_inputs == 1 && node->params) {
+                recomputed = uop_expand(inputs[0], (ExpandParams*)node->params);
+            }
+            break;
         case UOP_STRIDE:
+            if (checkpoint->num_inputs == 1 && node->params) {
+                recomputed = uop_stride(inputs[0], (StrideParams*)node->params);
+            }
+            break;
         case UOP_SLICE:
+            if (checkpoint->num_inputs == 1 && node->params) {
+                recomputed = uop_slice(inputs[0], (SliceParams*)node->params);
+            }
+            break;
         case UOP_CONV2D:
+            if (checkpoint->num_inputs >= 2 && node->params) {
+                Tensor* bias = checkpoint->num_inputs >= 3 ? inputs[2] : NULL;
+                recomputed = uop_conv2d(inputs[0], inputs[1], bias, (Conv2DParams*)node->params);
+            }
+            break;
         case UOP_WHERE:
+            if (checkpoint->num_inputs == 3) {
+                WhereParams where_params;
+                where_params.cond = inputs[0];
+                where_params.a    = inputs[1];
+                where_params.b    = inputs[2];
+                recomputed = uop_where(&where_params);
+            }
+            break;
         case UOP_COUNT:
-            // Not implemented for checkpointing yet
-            LOG_DEBUG("UOpType %d not yet supported for recomputation", uop_type);
             break;
         default:
             // For unsupported operations, restore IR node only
