@@ -19,10 +19,6 @@
 
 #define FUSED_BUF_SIZE 16384
 
-/* ========================================================================
- * Public LinearProgram API (mirrors internal linearize.c but public)
- * ======================================================================== */
-
 CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0) return NULL;
 
@@ -188,10 +184,6 @@ void cml_linear_program_print(const CMLLinearProgram* prog) {
     printf("---\n");
 }
 
-/* ========================================================================
- * UOp -> C expression mapping
- * ======================================================================== */
-
 static const char* uop_to_c_binary(UOpType uop) {
     switch (uop) {
         case UOP_ADD: return "+";
@@ -212,10 +204,6 @@ static bool uop_is_unary(UOpType uop) {
            uop == UOP_ABS || uop == UOP_SIN || uop == UOP_COS || uop == UOP_TANH ||
            uop == UOP_SIGMOID || uop == UOP_RECIP || uop == UOP_SILU;
 }
-
-/* ========================================================================
- * C Backend codegen
- * ======================================================================== */
 
 static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = malloc(FUSED_BUF_SIZE);
@@ -344,10 +332,6 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     (void)work_size;
     return buf;
 }
-
-/* ========================================================================
- * PTX Backend codegen
- * ======================================================================== */
 
 char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = malloc(FUSED_BUF_SIZE);
@@ -516,13 +500,11 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
     return buf;
 }
 
-/* ========================================================================
  * SPIR-V Backend codegen
  *
  * Generates a valid SPIR-V 1.3 compute shader that implements the fused
  * kernel.  Each LOAD reads from a storage buffer, each COMPUTE performs
  * arithmetic, and each STORE writes to a storage buffer.
- * ======================================================================== */
 
 /* SPIR-V opcode helpers */
 #define SPIRV_OP(opcode, word_count) (((uint32_t)(word_count) << 16) | (uint32_t)(opcode))
@@ -661,11 +643,9 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     uint32_t vreg_base = next_id;
     next_id += (uint32_t)(prog->next_vreg + prog->num_ops * 4 + 16);
 
-    /* ── OpCapability Shader ── */
     emit(&w, SPIRV_OP(SpvOpCapability, 2));
     emit(&w, SpvCapabilityShader);
 
-    /* ── OpExtInstImport "GLSL.std.450" ── */
     /* "GLSL.std.450" = 12 chars + null = 13 bytes = 4 words */
     emit(&w, SPIRV_OP(SpvOpExtInstImport, 6));
     emit(&w, id_ext_glsl);
@@ -674,12 +654,10 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, 0x3035342E); /* .450 */
     emit(&w, 0x00000000); /* null terminator */
 
-    /* ── OpMemoryModel Logical GLSL450 ── */
     emit(&w, SPIRV_OP(SpvOpMemoryModel, 3));
     emit(&w, SpvAddressingModelLogical);
     emit(&w, SpvMemoryModelGLSL450);
 
-    /* ── OpEntryPoint GLCompute %main "main" %gl_invoc ── */
     /* "main" = 4 chars + null = 5 bytes = 2 words */
     emit(&w, SPIRV_OP(SpvOpEntryPoint, 6));
     emit(&w, SpvExecutionModelGLCompute);
@@ -688,7 +666,6 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, 0x00000000);
     emit(&w, id_gl_invoc);
 
-    /* ── OpExecutionMode %main LocalSize 256 1 1 ── */
     emit(&w, SPIRV_OP(SpvOpExecutionMode, 6));
     emit(&w, id_main);
     emit(&w, SpvExecutionModeLocalSize);
@@ -696,7 +673,6 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, 1);
     emit(&w, 1);
 
-    /* ── Decorations ── */
     /* RuntimeArray stride */
     emit(&w, SPIRV_OP(SpvOpDecorate, 4));
     emit(&w, id_rt_array);
@@ -734,7 +710,6 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, SpvDecorationBuiltIn);
     emit(&w, SpvBuiltInGlobalInvocationId);
 
-    /* ── Type declarations ── */
     emit(&w, SPIRV_OP(SpvOpTypeVoid, 2));
     emit(&w, id_void_type);
 
@@ -779,13 +754,11 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, SpvStorageClassInput);
     emit(&w, id_uint3_type);
 
-    /* ── Constants ── */
     emit(&w, SPIRV_OP(SpvOpConstant, 4));
     emit(&w, id_uint_type);
     emit(&w, id_uint_zero);
     emit(&w, 0);
 
-    /* ── Variables ── */
     for (int i = 0; i < num_buffers && i < 64; i++) {
         emit(&w, SPIRV_OP(SpvOpVariable, 4));
         emit(&w, id_ptr_sb);
@@ -798,7 +771,6 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, id_gl_invoc);
     emit(&w, SpvStorageClassInput);
 
-    /* ── Function ── */
     emit(&w, SPIRV_OP(SpvOpFunction, 5));
     emit(&w, id_void_type);
     emit(&w, id_main);
@@ -947,10 +919,6 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     return words;
 }
 
-/* ========================================================================
- * WGSL Backend codegen
- * ======================================================================== */
-
 static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = malloc(FUSED_BUF_SIZE);
     if (!buf) return NULL;
@@ -1079,10 +1047,6 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
     (void)work_size;
     return buf;
 }
-
-/* ========================================================================
- * High-level API
- * ======================================================================== */
 
 CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog,
                                     CMLFusedBackend backend,

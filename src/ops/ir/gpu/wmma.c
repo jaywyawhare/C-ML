@@ -16,15 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ========================================================================
- * CML_HAS_CUDA -- full implementation
- * ======================================================================== */
 #ifdef CML_HAS_CUDA
 
 #include "ops/ir/gpu/cuda_backend.h"
 #include "ops/ir/dispatch.h"
-
-/* ── Availability ── */
 
 static CMLCUDABackend* wmma_get_cuda_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_get_global();
@@ -43,13 +38,10 @@ bool cml_wmma_available(void) {
     return (major > 7) || (major == 7 && minor >= 0);
 }
 
-/* ── Configuration selection ── */
-
 int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
     if (!config) return -1;
     if (!cml_wmma_available()) return -1;
 
-    /* Zero out the config */
     memset(config, 0, sizeof(WMMAConfig));
 
     /*
@@ -62,7 +54,6 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
      * favours one of the rectangular variants.
      */
     if (M >= 16 && N >= 16) {
-        /* Default: 16x16x16 */
         config->fragment = WMMA_M16N16K16;
         config->M = 16;
         config->N = 16;
@@ -102,12 +93,6 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
     return 0;
 }
 
-/* ── Kernel generation ── */
-
-/*
- * Maximum generated source size.  The WMMA kernel template is around
- * 2-3 KB; we allocate generously.
- */
 #define WMMA_SRC_MAX 8192
 
 static void src_appendf(char** buf, size_t* cap, size_t* len,
@@ -148,7 +133,6 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
     int frag_n = config->N;
     int frag_k = config->K;
 
-    /* ── Includes and namespace ── */
     src_appendf(&src, &cap, &len,
         "#include <mma.h>\n"
         "#include <cuda_fp16.h>\n"
@@ -156,7 +140,6 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
         "using namespace nvcuda;\n"
         "\n");
 
-    /* ── Kernel function ── */
     src_appendf(&src, &cap, &len,
         "extern \"C\" __global__\n"
         "void wmma_matmul(const half* __restrict__ A,\n"
@@ -165,7 +148,6 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
         "                  int M_total, int N_total, int K_total) {\n"
         "\n");
 
-    /* ── Fragment declarations ── */
     src_appendf(&src, &cap, &len,
         "    // Fragment dimensions: %dx%dx%d\n"
         "    wmma::fragment<wmma::matrix_a, %d, %d, %d, half, wmma::row_major> frag_a;\n"
@@ -177,7 +159,6 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
         frag_m, frag_n, frag_k,
         frag_m, frag_n, frag_k);
 
-    /* ── Warp-level tile coordinates ── */
     src_appendf(&src, &cap, &len,
         "    // Each warp computes one %dx%d output tile\n"
         "    int warpId = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;\n"
@@ -193,13 +174,11 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
         frag_m,
         frag_n);
 
-    /* ── Zero the accumulator ── */
     src_appendf(&src, &cap, &len,
         "    // Zero the accumulator fragment\n"
         "    wmma::fill_fragment(frag_c, 0.0f);\n"
         "\n");
 
-    /* ── Tiled K loop ── */
     src_appendf(&src, &cap, &len,
         "    // Tiled loop over K dimension\n"
         "    for (int k = 0; k < K_total; k += %d) {\n"
@@ -219,7 +198,6 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
         frag_m, frag_k,
         frag_k, frag_n);
 
-    /* ── Store result ── */
     src_appendf(&src, &cap, &len,
         "    // Store the result tile to C[warpRow, warpCol]\n"
         "    float* c_ptr = C + warpRow * N_total + warpCol;\n"
@@ -231,8 +209,6 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
 
     return src;
 }
-
-/* ── Matrix multiply (compile + launch) ── */
 
 int cml_wmma_matmul(const void* A, const void* B, void* C,
                     int M, int N, int K) {
@@ -250,21 +226,18 @@ int cml_wmma_matmul(const void* A, const void* B, void* C,
         return -1;
     }
 
-    /* Select configuration */
     WMMAConfig config;
     if (cml_wmma_select_config(M, N, K, &config) != 0) {
         LOG_WARNING("WMMA config selection failed for %dx%dx%d", M, N, K);
         return -1;
     }
 
-    /* Generate the CUDA kernel source */
     char* kernel_src = cml_wmma_generate_kernel(&config, M, N, K);
     if (!kernel_src) {
         LOG_ERROR("WMMA kernel generation failed");
         return -1;
     }
 
-    /* Compile via NVRTC through the existing CUDA backend */
     CMLCUDAKernel* kernel = cml_cuda_compile_source(cuda, kernel_src, "wmma_matmul");
     free(kernel_src);
 

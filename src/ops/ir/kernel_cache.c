@@ -80,9 +80,6 @@ CMLKernelCache* cml_kernel_cache_create_with_limits(size_t max_entries, size_t m
         return NULL;
     }
     cache->lock_initialized = true;
-
-    LOG_DEBUG("Created kernel cache with max_entries=%zu, max_memory=%zu", max_entries, max_memory);
-
     return cache;
 }
 
@@ -135,8 +132,6 @@ void kernel_cache_clear(CMLKernelCache* cache) {
     cache->total_memory = 0;
 
     pthread_mutex_unlock(&cache->lock);
-
-    LOG_DEBUG("Cleared kernel cache");
 }
 
 uint64_t cml_kernel_cache_compute_hash(CMLGraph_t ir, Tensor** inputs, int num_inputs,
@@ -146,7 +141,6 @@ uint64_t cml_kernel_cache_compute_hash(CMLGraph_t ir, Tensor** inputs, int num_i
     // Hash backend type
     hash = fnv1a_hash_int(hash, (int)backend);
 
-    // Hash number of inputs
     hash = fnv1a_hash_int(hash, num_inputs);
 
     // Hash input tensor shapes and dtypes
@@ -198,7 +192,6 @@ CMLKernelEntry* cml_kernel_cache_lookup(CMLKernelCache* cache, uint64_t hash) {
             entry->last_used = ++cache->timestamp;
             cache->hits++;
             pthread_mutex_unlock(&cache->lock);
-            LOG_DEBUG("Kernel cache hit: hash=0x%016llx", (unsigned long long)hash);
             return entry;
         }
         entry = entry->next;

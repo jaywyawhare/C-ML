@@ -18,8 +18,6 @@
 #include <time.h>
 #include <math.h>
 
-/* ── FNV-1a hashing for LinearProgram ── */
-
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME  0x100000001b3ULL
 
@@ -49,8 +47,6 @@ static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
     }
     return h;
 }
-
-/* ── Public API ── */
 
 CMLRuntimeCompiler* cml_runtime_compiler_create(void) {
     CMLRuntimeCompiler* rc = calloc(1, sizeof(CMLRuntimeCompiler));
@@ -97,7 +93,6 @@ static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
             return k;
         }
     }
-    /* Cache full - evict slot 0 */
     CMLCompiledKernel* k = &rc->cache[hash % CML_COMPILED_CACHE_SIZE];
     free(k->source);
     free(k->binary);
@@ -115,7 +110,6 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
 
     uint64_t hash = hash_linear_program(prog);
 
-    /* Cache lookup */
     if (rc->enable_caching) {
         CMLCompiledKernel* cached = cache_lookup(rc, hash);
         if (cached) {
@@ -126,14 +120,12 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
 
     rc->compile_misses++;
 
-    /* Generate fused kernel */
     CMLFusedKernel* fused = cml_fused_codegen(prog, rc->preferred_backend, work_size);
     if (!fused) {
         LOG_ERROR("Runtime compiler: fused codegen failed");
         return NULL;
     }
 
-    /* Insert into cache */
     CMLCompiledKernel* entry = cache_insert(rc, hash);
     if (!entry) {
         cml_fused_kernel_free(fused);
@@ -142,7 +134,7 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
 
     entry->backend = fused->backend;
     entry->source = fused->source;
-    fused->source = NULL;  /* Transfer ownership */
+    fused->source = NULL;
     entry->binary = fused->spirv_words;
     entry->binary_size = fused->spirv_words
         ? (size_t)fused->spirv_num_words * sizeof(uint32_t) : 0;
@@ -151,7 +143,6 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
     entry->num_outputs = fused->num_outputs;
     entry->work_size = work_size;
 
-    /* Store linear program ops for CPU interpreter */
     if (prog->num_ops > 0) {
         entry->ops = malloc((size_t)prog->num_ops * sizeof(CMLLinearOp));
         if (entry->ops) {
@@ -182,7 +173,6 @@ const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
     CMLLinearProgram* prog = cml_linearize_group(group);
     if (!prog) return NULL;
 
-    /* Estimate work size */
     size_t work_size = 0;
     if (group->num_nodes > 0 && group->nodes[0] && group->nodes[0]->output) {
         Tensor* t = group->nodes[0]->output;
@@ -206,20 +196,12 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
         return -1;
     }
 
-    /* Execute fused kernel by interpreting the compiled source.
-     * For C backend: we directly apply the operations to tensor data.
-     * For GPU backends (PTX/SPIR-V): would need GPU runtime (CUDA/Vulkan).
-     *
-     * The C backend kernel is an elementwise loop over all elements.
-     * We execute it by iterating through the cached operation sequence. */
-
     if (kernel->backend == CML_FUSED_BACKEND_C && kernel->work_size > 0) {
         size_t n = kernel->work_size;
         int nregs = kernel->num_vregs > 0 ? kernel->num_vregs : 64;
         if (nregs > 256) nregs = 256;
 
         if (kernel->ops && kernel->num_ops > 0) {
-            /* Full interpreter: walk the linear program per element */
             for (size_t i = 0; i < n; i++) {
                 float vregs[256] = {0};
                 int input_idx = 0, output_idx = 0;
@@ -232,7 +214,6 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
                     if (d < 0 || d >= nregs) continue;
 
                     if (op->kind == LINOP_LOAD) {
-                        /* Load from input tensor */
                         if (input_idx < num_inputs && inputs[input_idx]
                             && inputs[input_idx]->data
                             && i < (size_t)inputs[input_idx]->numel) {
@@ -240,7 +221,6 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
                         }
                         input_idx++;
                     } else if (op->kind == LINOP_STORE) {
-                        /* Store to output tensor */
                         float val = (op->num_srcs > 0 && op->src_regs[0] >= 0
                                      && op->src_regs[0] < nregs)
                                     ? vregs[op->src_regs[0]] : 0.0f;
@@ -284,7 +264,6 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
                 }
             }
         } else {
-            /* Fallback: identity copy (no stored ops) */
             for (size_t i = 0; i < n; i++) {
                 float val = 0.0f;
                 if (num_inputs > 0 && inputs[0] && inputs[0]->data
@@ -312,7 +291,6 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     if (!rc || !ir) return -1;
 
-    /* Step 1: Create V2 schedule with fusion groups */
     CMLScheduleV2* sched = cml_schedule_v2_create(ir, NULL);
     if (!sched) {
         LOG_ERROR("Runtime compiler: failed to create schedule");
@@ -321,7 +299,6 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
 
     int rc_val = 0;
 
-    /* Step 2: For each fusion group, try fused compilation, fall back to CPU */
     for (int i = 0; i < sched->num_ordered && rc_val == 0; i++) {
         int idx = sched->execution_order[i];
         CMLFusionGroup* group = sched->groups[idx];

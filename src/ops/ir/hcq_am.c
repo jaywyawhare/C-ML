@@ -30,10 +30,6 @@
 
 extern CMLAMDriver* cml_dispatch_get_am_driver(void);
 
-/* ======================================================================
- * AQL barrier packet helpers
- * ====================================================================== */
-
 /**
  * @brief Build an AQL BARRIER_AND packet header.
  *
@@ -48,10 +44,6 @@ static uint16_t am_barrier_header(void) {
                     | (3 /* SYSTEM */ << 11);         /* release fence */
     return header;
 }
-
-/* ======================================================================
- * Queue lifecycle
- * ====================================================================== */
 
 int cml_hcq_am_queue_init(CMLHCQQueue* queue) {
     CMLAMDriver* drv = cml_dispatch_get_am_driver();
@@ -73,22 +65,13 @@ void cml_hcq_am_queue_destroy(CMLHCQQueue* queue) {
     queue->active = false;
 }
 
-/* ======================================================================
- * Kernel submission
- * ====================================================================== */
-
 int cml_hcq_am_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     (void)queue; (void)desc;
     /* Kernel dispatch is handled directly by am_driver.c via
      * cml_am_kernel_launch().  HCQ integration would record dispatch
      * packets into the AQL ring via the AM driver. */
-    LOG_DEBUG("AM HCQ: kernel submit (passthrough to AM driver)");
     return 0;
 }
-
-/* ======================================================================
- * Memcpy
- * ====================================================================== */
 
 int cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst,
                            const void* src, size_t bytes) {
@@ -102,7 +85,6 @@ int cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst,
 
     /* For HCQ, dst is a CMLAMBuffer*. In a fully integrated path,
      * we would enqueue a DMA copy via AQL.  For now, passthrough. */
-    LOG_DEBUG("AM HCQ: memcpy H2D passthrough (dst=%p, %zu bytes)", dst, bytes);
     (void)src;
     return 0;
 }
@@ -116,15 +98,9 @@ int cml_hcq_am_memcpy_d2h(CMLHCQQueue* queue, void* dst,
         LOG_ERROR("AM HCQ: no AM driver for memcpy D2H");
         return -1;
     }
-
-    LOG_DEBUG("AM HCQ: memcpy D2H passthrough (src=%p, %zu bytes)", src, bytes);
     (void)dst;
     return 0;
 }
-
-/* ======================================================================
- * Signals (AQL barrier packets for inter-queue synchronization)
- * ====================================================================== */
 
 /**
  * Signal create: allocates a CMLHCQSignal backed by a GTT memory region
@@ -145,9 +121,6 @@ int cml_hcq_am_signal_create(CMLHCQSignal* signal) {
     signal->native_handle = (void*)drv->signal;
     signal->timeline_value = drv->signal_value;
     signal->signaled = false;
-
-    LOG_DEBUG("AM HCQ: signal created (timeline=%lu)",
-              (unsigned long)signal->timeline_value);
     return 0;
 }
 
@@ -220,8 +193,6 @@ int cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     *q->doorbell = (uint32_t)(write_idx + 1);
 
     signal->signaled = true;
-    LOG_DEBUG("AM HCQ: signal recorded (timeline=%lu, slot=%u)",
-              (unsigned long)signal->timeline_value, slot);
     return 0;
 }
 
@@ -267,9 +238,6 @@ int cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     *q->write_dispatch_id = write_idx + 1;
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
     *q->doorbell = (uint32_t)(write_idx + 1);
-
-    LOG_DEBUG("AM HCQ: queue waiting on signal (timeline=%lu, slot=%u)",
-              (unsigned long)signal->timeline_value, slot);
     return 0;
 }
 
@@ -314,10 +282,6 @@ int cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms) {
     LOG_ERROR("AM HCQ: signal wait timed out after %lu ms", (unsigned long)timeout_ms);
     return -1;
 }
-
-/* ======================================================================
- * Synchronize
- * ====================================================================== */
 
 int cml_hcq_am_synchronize(CMLHCQQueue* queue) {
     (void)queue;

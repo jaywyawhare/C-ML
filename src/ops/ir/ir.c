@@ -267,7 +267,6 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->backward_head = NULL;
     ir->node_count    = 0;
 
-    // Execution state
     ir->is_executed                = false;
     ir->is_optimized               = false;
     ir->is_decomposed              = false;
@@ -275,7 +274,6 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->execution_results_count    = 0;
     ir->execution_results_capacity = 0;
 
-    // Tensor tracking
     ir->tensor_names         = NULL;
     ir->tensor_count         = 0;
     ir->tensor_capacity      = 0;
@@ -324,7 +322,6 @@ static void free_node_params(struct IRNode* node) {
     case UOP_RSQRT:
     case UOP_ERF:
     case UOP_COUNT:
-        // No params to free for these operations
         break;
     case UOP_CLAMP: {
         ClampParams* p = (ClampParams*)node->params;
@@ -472,7 +469,6 @@ static void free_node_params(struct IRNode* node) {
         if (p) free(p);
         break;
     }
-    // New reduction ops using ReduceParams
     case UOP_MIN_REDUCE:
     case UOP_VAR:
     case UOP_STD:
@@ -486,7 +482,6 @@ static void free_node_params(struct IRNode* node) {
         }
         break;
     }
-    // New movement ops
     case UOP_CAT: {
         CatParams* p = (CatParams*)node->params;
         if (p) free(p);
@@ -567,7 +562,6 @@ static void free_node_params(struct IRNode* node) {
         if (p) free(p);
         break;
     }
-    // Ops with no params to free
     case UOP_ERFC:
     case UOP_LERP:
     case UOP_TRACE:
@@ -621,7 +615,6 @@ static void free_ir_node(struct IRNode* node) {
     if (!node)
         return;
 
-    // Validate num_inputs is reasonable to prevent wild loop
     if (node->num_inputs < 0 || node->num_inputs > 1000) {
         fprintf(stderr,
                 "WARNING: free_ir_node: invalid num_inputs=%d, skipping input_names cleanup\n",
@@ -629,7 +622,6 @@ static void free_ir_node(struct IRNode* node) {
         node->input_names = NULL; // Prevent invalid access
     }
 
-    // Free input names
     if (node->input_names && node->num_inputs >= 0 && node->num_inputs <= 1000) {
         for (int i = 0; i < node->num_inputs; i++) {
             if (node->input_names[i]) {
@@ -640,30 +632,25 @@ static void free_ir_node(struct IRNode* node) {
         free(node->input_names);
         node->input_names = NULL;
     } else if (node->input_names) {
-        // Just free the array, skip individual names
         free(node->input_names);
         node->input_names = NULL;
     }
 
-    // Free output name
     if (node->output_name) {
         free(node->output_name);
         node->output_name = NULL;
     }
 
-    // Free users array
     if (node->users) {
         free(node->users);
         node->users = NULL;
     }
 
-    // Free inputs array (array of pointers, not the tensors themselves)
     if (node->inputs) {
         free(node->inputs);
         node->inputs = NULL;
     }
 
-    // Free shape tracking arrays
     if (node->input_shapes) {
         free(node->input_shapes);
         node->input_shapes = NULL;
@@ -677,7 +664,6 @@ static void free_ir_node(struct IRNode* node) {
         node->output_shape = NULL;
     }
 
-    // Free broadcast info
     if (node->broadcast) {
         if (node->broadcast->broadcast_dims) {
             free(node->broadcast->broadcast_dims);
@@ -689,25 +675,18 @@ static void free_ir_node(struct IRNode* node) {
         node->broadcast = NULL;
     }
 
-    // Free saved_for_backward
     if (node->saved_for_backward) {
         free(node->saved_for_backward);
         node->saved_for_backward = NULL;
     }
 
-    // Free fused kernel if this is the first node in the kernel (owns it)
-    // Note: free_fused_kernel clears fused_kernel pointers on all nodes in the kernel
     if (node->fused_kernel && node->fused_kernel->ops && node->fused_kernel->ops[0] == node) {
         free_fused_kernel(node->fused_kernel);
-        // fused_kernel is now NULL (set by free_fused_kernel)
     }
 
-    // Free params
     free_node_params(node);
 
-    // Note: execution_result points to tensor data, which is owned by the tensor
-    // Do NOT free it here - the tensor will free it when tensor_free is called
-
+    /* execution_result is owned by the tensor -- do not free here */
     free(node);
 }
 
@@ -715,24 +694,16 @@ void cml_ir_free(CMLGraph_t ir) {
     if (!ir)
         return;
 
-    // PHASE 1: Detach output tensors from IR (but DON'T free them!)
-    // Output tensors are returned to user code and managed by the user.
-    // We just clear the IR references so tensors know they're detached.
-    // Freeing them here would cause double-free when user code also frees them.
-
-    // Detach output tensors from forward graph
+    /* Phase 1: detach output tensors (owned by user code, not freed here) */
     struct IRNode* node = ir->head;
     int node_idx        = 0;
     while (node) {
-        // Safety check: validate node looks reasonable
         if (node->num_inputs < 0 || node->num_inputs > 1000) {
             fprintf(stderr, "WARNING: cml_ir_free phase 1: corrupt node %d, num_inputs=%d\n",
                     node_idx, node->num_inputs);
             break; // Stop traversing corrupt list
         }
         if (node->output) {
-            // Clear IR references so tensor knows it's detached
-            // But DON'T free - user code owns these tensors
             node->output->ir_node    = NULL;
             node->output->ir_context = NULL;
             node->output             = NULL;
@@ -741,7 +712,6 @@ void cml_ir_free(CMLGraph_t ir) {
         node_idx++;
     }
 
-    // Detach output tensors from backward graph
     node     = ir->backward_head;
     node_idx = 0;
     while (node) {
@@ -750,8 +720,6 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            // Clear IR references - gradients are stored in tensor->grad
-            // and managed by tensor lifecycle
             node->output->ir_node    = NULL;
             node->output->ir_context = NULL;
             node->output             = NULL;
@@ -760,15 +728,11 @@ void cml_ir_free(CMLGraph_t ir) {
         node_idx++;
     }
 
-    // Release tensor refs (external inputs) - decrement refcount
-    // These tensors were created by user code, IR just holds a reference
     if (ir->tensor_refs) {
         for (int i = 0; i < ir->tensor_refs_count; i++) {
             if (ir->tensor_refs[i]) {
                 ir->tensor_refs[i]->ir_node    = NULL;
                 ir->tensor_refs[i]->ir_context = NULL;
-                // Decrement refcount - IR incremented it when tensor was added
-                // This releases IR's reference, doesn't free if user still has one
                 tensor_free(ir->tensor_refs[i]);
                 ir->tensor_refs[i] = NULL;
             }
@@ -778,14 +742,11 @@ void cml_ir_free(CMLGraph_t ir) {
         ir->tensor_refs_count = 0;
     }
 
-    // PHASE 2: Free all nodes (now safe since tensor pointers are cleared)
-
-    // Free forward graph
+    /* Phase 2: free all nodes (safe now that tensor pointers are cleared) */
     node     = ir->head;
     node_idx = 0;
     while (node) {
         struct IRNode* next = node->next;
-        // Safety check
         if (node->num_inputs < 0 || node->num_inputs > 1000) {
             fprintf(stderr, "WARNING: cml_ir_free phase 2: corrupt node %d, stopping\n", node_idx);
             break;
@@ -798,7 +759,6 @@ void cml_ir_free(CMLGraph_t ir) {
     ir->tail       = NULL;
     ir->node_count = 0;
 
-    // Free backward graph
     node     = ir->backward_head;
     node_idx = 0;
     while (node) {
@@ -814,7 +774,6 @@ void cml_ir_free(CMLGraph_t ir) {
     }
     ir->backward_head = NULL;
 
-    // PHASE 3: Free tensor names
     if (ir->tensor_names) {
         for (int i = 0; i < ir->tensor_count; i++) {
             if (ir->tensor_names[i]) {
@@ -827,7 +786,6 @@ void cml_ir_free(CMLGraph_t ir) {
         ir->tensor_count = 0;
     }
 
-    // Free execution results array (array of pointers, not the data itself)
     if (ir->execution_results) {
         free(ir->execution_results);
         ir->execution_results       = NULL;
@@ -838,7 +796,6 @@ void cml_ir_free(CMLGraph_t ir) {
 }
 
 int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params) {
-    // Allow source nodes (like UOP_FILL) with 0 inputs
     if (!ir || (num_inputs > 0 && !inputs) || num_inputs < 0) {
         LOG_ERROR("Invalid parameters for cml_ir_add_uop");
         return -1;
@@ -851,7 +808,6 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     node->type       = type;
     node->num_inputs = num_inputs;
 
-    // Handle source nodes with no inputs
     if (num_inputs == 0) {
         node->input_names = NULL;
     } else {
@@ -862,8 +818,6 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         }
     }
 
-    // Ensure capacity for tensor refs and names (for external inputs)
-    // We might add up to num_inputs new external tensors
     if (ir->tensor_count + num_inputs > ir->tensor_capacity) {
         int new_capacity = ir->tensor_capacity == 0 ? 16 : ir->tensor_capacity * 2;
         while (new_capacity < ir->tensor_count + num_inputs) {
@@ -886,20 +840,17 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         ir->tensor_refs          = new_refs;
         ir->tensor_names         = new_names;
         ir->tensor_capacity      = new_capacity;
-        ir->tensor_refs_capacity = new_capacity; // Keep sync
+        ir->tensor_refs_capacity = new_capacity;
     }
 
-    // Process inputs
     for (int i = 0; i < num_inputs; i++) {
         Tensor* t  = inputs[i];
         char* name = NULL;
 
         if (t) {
-            // Case 1: Internal node output (already has a name in this IR)
             if (t->ir_node && t->ir_context == ir && t->ir_node->output_name) {
                 name = strdup(t->ir_node->output_name);
             }
-            // Case 2: External tensor (check if already registered)
             else {
                 for (int j = 0; j < ir->tensor_count; j++) {
                     if (ir->tensor_refs[j] == t) {
@@ -908,14 +859,10 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
                     }
                 }
 
-                // Case 3: New external tensor
                 if (!name) {
-                    // Register new external tensor
                     ir->tensor_refs[ir->tensor_count] = t;
-                    t->ref_count++; // Increment ref count as we hold a reference in IR
+                    t->ref_count++;
 
-                    // Generate unique name
-                    // Unique ID = tensor_count (external) + node_count (internal)
                     char* new_name = malloc(32);
                     if (new_name) {
                         snprintf(new_name, 32, "t%d", ir->tensor_count + ir->node_count);
@@ -923,7 +870,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
                         name                               = strdup(new_name);
 
                         ir->tensor_count++;
-                        ir->tensor_refs_count = ir->tensor_count; // Keep sync
+                        ir->tensor_refs_count = ir->tensor_count;
                     }
                 }
             }
@@ -941,7 +888,6 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         node->input_names[i] = name;
     }
 
-    // Generate output name
     char* output_name = malloc(32);
     if (!output_name) {
         for (int i = 0; i < num_inputs; i++)
@@ -950,14 +896,12 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         free(node);
         return -1;
     }
-    // Unique ID = tensor_count (external) + node_count (internal)
     snprintf(output_name, 32, "t%d", ir->tensor_count + ir->node_count);
     node->output_name = output_name;
 
     node->params = params;
     node->next   = NULL;
 
-    // Initialize tensor references
     if (num_inputs > 0) {
         node->inputs = malloc((size_t)num_inputs * sizeof(Tensor*));
         if (!node->inputs) {
@@ -970,22 +914,19 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         }
         memcpy(node->inputs, inputs, (size_t)num_inputs * sizeof(Tensor*));
     } else {
-        node->inputs = NULL; // Source node with no inputs
+        node->inputs = NULL;
     }
-    node->output = NULL; // Will be set when tensor is created
+    node->output = NULL;
 
-    // Initialize broadcasting fields
     node->input_shapes = NULL;
     node->input_ndims  = NULL;
     node->output_shape = NULL;
     node->output_ndim  = 0;
     node->broadcast    = NULL;
 
-    // Initialize autograd fields
     node->requires_grad = false;
     memset(node->needs_input_grad, 0, sizeof(node->needs_input_grad));
 
-    // Check if any input requires gradient
     for (int i = 0; i < num_inputs; i++) {
         if (inputs[i] && inputs[i]->requires_grad) {
             node->requires_grad       = true;
@@ -997,11 +938,9 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     node->forward_node       = NULL;
     node->saved_for_backward = NULL;
 
-    // Initialize execution state
     node->is_executed      = false;
     node->execution_result = NULL;
 
-    // Initialize optimization fields
     node->is_used        = false;
     node->is_fused       = false;
     node->fusion_type    = FUSION_NONE;
@@ -1076,7 +1015,6 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     if (!node || node->num_inputs < 2)
         return -1;
 
-    // Get input shapes from input tensors
     int** input_shapes = malloc((size_t)node->num_inputs * sizeof(int*));
     if (!input_shapes)
         return -1;
@@ -1097,7 +1035,6 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
         input_ndims[i]  = node->inputs[i]->ndim;
     }
 
-    // Compute broadcasted output shape (NumPy-style)
     int max_ndim = 0;
     for (int i = 0; i < node->num_inputs; i++) {
         if (input_ndims[i] > max_ndim)
@@ -1118,7 +1055,6 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
             if (dim_idx >= 0) {
                 int dim = input_shapes[i][dim_idx];
                 if (dim != 1 && max_dim != 1 && dim != max_dim) {
-                    // Incompatible shapes
                     free(output_shape);
                     free(input_shapes);
                     free(input_ndims);
@@ -1131,7 +1067,6 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
         output_shape[d] = max_dim;
     }
 
-    // Store in IR node
     node->output_shape = output_shape;
     node->output_ndim  = max_ndim;
     node->input_shapes = input_shapes;

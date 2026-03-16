@@ -22,26 +22,7 @@ int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
         return -1;
     }
 
-    LOG_DEBUG("Building backward graph for IR");
-
-    // Mark all nodes that require gradients
-    struct IRNode* node = ir->head;
-    while (node) {
-        if (node->requires_grad) {
-            LOG_DEBUG("Node %s requires gradient",
-                      node->output_name ? node->output_name : "unnamed");
-        }
-        node = node->next;
-    }
-
-    // Mark the output node as used (needed for dead code elimination)
     output_node->is_used = true;
-
-    // Backward pass uses CPU interpreter (the symbolic differentiation logic
-    // already creates standard UOps — the LLVM JIT handles those during
-    // forward execution of the backward IR graph)
-
-    LOG_DEBUG("Backward graph structure prepared (CPU fallback will handle gradients)");
     return 0;
 }
 
@@ -855,9 +836,6 @@ static int cpu_execute_backward(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
-    LOG_DEBUG("Executing backward pass using CPU interpreter");
-
-    // Count nodes to build reverse traversal order
     int node_count   = 0;
     struct IRNode* n = ir->head;
     while (n) {
@@ -868,7 +846,6 @@ static int cpu_execute_backward(CMLGraph_t ir) {
     if (node_count == 0)
         return 0;
 
-    // Build array of nodes for reverse traversal
     struct IRNode** nodes = malloc(node_count * sizeof(struct IRNode*));
     if (!nodes) {
         LOG_ERROR("Failed to allocate node array for backward pass");
@@ -881,7 +858,6 @@ static int cpu_execute_backward(CMLGraph_t ir) {
         n        = n->next;
     }
 
-    // Initialize loss gradient to 1
     struct IRNode* loss_node = ir->tail;
     if (loss_node && loss_node->output && loss_node->output->requires_grad) {
         Tensor* loss = loss_node->output;
@@ -897,14 +873,11 @@ static int cpu_execute_backward(CMLGraph_t ir) {
         }
     }
 
-    // Traverse in reverse order (from loss to inputs)
     for (int i = node_count - 1; i >= 0; i--) {
         cpu_backward_node(nodes[i]);
     }
 
     free(nodes);
-
-    LOG_DEBUG("CPU backward pass completed");
     return 0;
 }
 
@@ -914,20 +887,14 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
         return -1;
     }
 
-    LOG_DEBUG("Executing backward pass");
-
-    // Start from the tail node (loss) and set gradient to 1 if needed
     struct IRNode* node = ir->tail;
     if (!node) {
         LOG_ERROR("No tail node in IR graph");
         return -1;
     }
 
-    // Initialize gradient for the output node (loss)
     if (node->output && node->output->requires_grad) {
-        // Allocate grad tensor if not already present
         if (!node->output->grad) {
-            // Create a proper gradient tensor (same shape as output)
             Tensor* output      = node->output;
             TensorConfig config = {.dtype      = output->dtype,
                                    .device     = output->device,
@@ -939,7 +906,6 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
                 return -1;
             }
         }
-        // Set gradient to 1 for scalar loss
         if (node->output->numel == 1) {
             if (node->output->dtype == DTYPE_FLOAT32) {
                 *(float*)node->output->grad->data = 1.0f;
@@ -947,7 +913,5 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
         }
     }
 
-    // Backward pass uses CPU interpreter (each backward op is a standard UOp
-    // that the LLVM JIT handles during forward execution of backward graph)
     return cpu_execute_backward(ir);
 }

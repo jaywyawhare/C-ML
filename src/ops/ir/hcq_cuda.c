@@ -20,10 +20,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Queue lifecycle
- * ══════════════════════════════════════════════════════════════════════════ */
-
 CMLHCQQueue* cml_hcq_cuda_queue_create(void) {
     CMLCUDABackend* cuda = cml_dispatch_get_cuda_backend();
     if (!cuda) {
@@ -66,10 +62,6 @@ void cml_hcq_cuda_queue_destroy(CMLHCQQueue* queue) {
     free(queue);
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Kernel submission
- * ══════════════════════════════════════════════════════════════════════════ */
-
 int cml_hcq_cuda_submit_kernel(CMLHCQQueue* queue,
                                const CMLHCQKernelDesc* desc) {
     if (!queue || !desc) return -1;
@@ -103,10 +95,6 @@ int cml_hcq_cuda_submit_kernel(CMLHCQQueue* queue,
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Memcpy
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_cuda_memcpy_h2d(CMLHCQQueue* queue, void* dst,
                              const void* src, size_t bytes) {
@@ -155,10 +143,6 @@ int cml_hcq_cuda_memcpy_d2h(CMLHCQQueue* queue, void* dst,
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Signals  (CUevent wrappers)
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQSignal* cml_hcq_cuda_signal_create(void) {
     CMLCUDABackend* cuda = cml_dispatch_get_cuda_backend();
@@ -264,10 +248,6 @@ int cml_hcq_cuda_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Synchronize
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_cuda_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue) return -1;

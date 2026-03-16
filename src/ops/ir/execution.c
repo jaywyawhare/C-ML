@@ -27,7 +27,6 @@
 #include <immintrin.h>
 #endif
 
-// Global BLAS context for fast matmul
 static CMLBlasContext* g_exec_blas_ctx = NULL;
 
 #ifdef CML_HAS_LLVM_BACKEND
@@ -40,9 +39,6 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
     return g_llvm_backend;
 }
 #endif
-
-// Simple buffer cache using power-of-2 size buckets for O(1) lookup
-// This avoids malloc/free overhead during repeated forward passes
 
 #define BUFFER_CACHE_MIN_BUCKET 6  // 64 bytes (2^6)
 #define BUFFER_CACHE_MAX_BUCKET 26 // 64 MB (2^26)
@@ -71,12 +67,10 @@ typedef struct {
 
 static BufferCache g_buffer_cache = {0};
 
-// Get bucket index for a size (rounds up to next power of 2)
 static int get_bucket_index(size_t size) {
     if (size == 0)
         return -1;
 
-    // Find the highest set bit position (log2)
     int bucket = 0;
     size_t s   = size - 1;
     while (s > 0) {
@@ -84,7 +78,6 @@ static int get_bucket_index(size_t size) {
         bucket++;
     }
 
-    // Clamp to valid range
     if (bucket < BUFFER_CACHE_MIN_BUCKET)
         bucket = BUFFER_CACHE_MIN_BUCKET;
     if (bucket > BUFFER_CACHE_MAX_BUCKET)
@@ -93,7 +86,6 @@ static int get_bucket_index(size_t size) {
     return bucket - BUFFER_CACHE_MIN_BUCKET;
 }
 
-// Initialize buffer cache (lazy)
 static void init_buffer_cache(void) {
     if (g_buffer_cache.initialized)
         return;
@@ -106,7 +98,6 @@ static void init_buffer_cache(void) {
     g_buffer_cache.initialized = true;
 }
 
-// Allocate from cache or malloc
 void* cml_buffer_cache_alloc(size_t size) {
     if (size == 0)
         return NULL;
@@ -115,7 +106,6 @@ void* cml_buffer_cache_alloc(size_t size) {
 
     int bucket_idx = get_bucket_index(size);
     if (bucket_idx < 0) {
-        // Too large for cache, use direct malloc
         g_buffer_cache.cache_misses++;
         g_buffer_cache.bytes_allocated += size;
         return calloc(1, size);
@@ -124,7 +114,6 @@ void* cml_buffer_cache_alloc(size_t size) {
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
 
     if (bucket->free_list) {
-        // Cache hit: reuse existing buffer
         CachedBuffer* cached = bucket->free_list;
         bucket->free_list    = cached->next;
         bucket->count--;
@@ -135,18 +124,15 @@ void* cml_buffer_cache_alloc(size_t size) {
         g_buffer_cache.cache_hits++;
         g_buffer_cache.bytes_cached -= bucket->bucket_size;
 
-        // Zero the buffer for safety
         memset(data, 0, size);
         return data;
     }
 
-    // Cache miss: allocate new buffer with bucket size
     g_buffer_cache.cache_misses++;
     g_buffer_cache.bytes_allocated += bucket->bucket_size;
     return calloc(1, bucket->bucket_size);
 }
 
-// Return buffer to cache or free
 void cml_buffer_cache_free(void* ptr, size_t size) {
     if (!ptr)
         return;
@@ -155,20 +141,17 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
 
     int bucket_idx = get_bucket_index(size);
     if (bucket_idx < 0) {
-        // Too large for cache, just free
         free(ptr);
         return;
     }
 
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
 
-    // Check if bucket is full
     if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
         free(ptr);
         return;
     }
 
-    // Add to free list
     CachedBuffer* cached = (CachedBuffer*)malloc(sizeof(CachedBuffer));
     if (!cached) {
         free(ptr);
@@ -229,7 +212,6 @@ void cml_print_buffer_cache_stats(void) {
     printf("  Total alloc:   %.2f KB\n", g_buffer_cache.bytes_allocated / 1024.0f);
 }
 
-// Initialize BLAS for execution (called lazily)
 CMLBlasContext* get_blas_context(void) {
     if (!g_exec_blas_ctx) {
         g_exec_blas_ctx = cml_blas_init();
@@ -293,16 +275,13 @@ static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
     return idx;
 }
 
-// Execute a single IR node on CPU
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
     }
 
-    // Get output tensor
     Tensor* out = node->output;
 
-    // Allocate output data if needed (using buffer cache for reuse)
     if (!out->data && out->numel > 0) {
         size_t size = out->numel * cml_dtype_size(out->dtype);
         out->data   = cml_buffer_cache_alloc(size);
@@ -315,7 +294,6 @@ int cpu_execute_node(struct IRNode* node) {
 
     float* out_data = (float*)out->data;
 
-    // Get input data
     float* in1_data  = NULL;
     float* in2_data  = NULL;
     size_t in1_numel = 0;
@@ -330,7 +308,6 @@ int cpu_execute_node(struct IRNode* node) {
         in2_numel = node->inputs[1]->numel;
     }
 
-// Execute based on operation type
 // Helper macro for numpy-style broadcast indexing
 // For output flat index i, compute the corresponding flat index in a tensor
 // with potentially fewer elements (broadcast dimensions have size 1)
@@ -340,7 +317,6 @@ int cpu_execute_node(struct IRNode* node) {
     case UOP_ADD:
         if (!in1_data || !in2_data)
             return -1;
-        // Fast path: same size - direct SIMD
         if (in1_numel == in2_numel && in1_numel == out->numel) {
             simd_add_f32(in1_data, in2_data, out_data, out->numel);
         } else {

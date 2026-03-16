@@ -14,9 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ========================================================================
- * CML_HAS_Z3 -- full implementation via dynamic loading
- * ======================================================================== */
 #ifdef CML_HAS_Z3
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -27,7 +24,6 @@
 #define Z3_LIB_NAME "libz3.dll"
 #endif
 
-/* Opaque Z3 handle types */
 typedef void* Z3_context;
 typedef void* Z3_solver;
 typedef void* Z3_ast;
@@ -40,7 +36,6 @@ typedef int   Z3_lbool;
 #define Z3_L_UNDEF 0
 #define Z3_L_TRUE  1
 
-/* Function pointer types for the Z3 C API */
 typedef Z3_config  (*z3_mk_config_fn)(void);
 typedef void       (*z3_del_config_fn)(Z3_config);
 typedef void       (*z3_set_param_value_fn)(Z3_config, const char*, const char*);
@@ -70,7 +65,6 @@ typedef Z3_ast     (*z3_mk_const_fn)(Z3_context, void*, Z3_sort);
 typedef void*      (*z3_mk_string_symbol_fn)(Z3_context, const char*);
 typedef Z3_ast     (*z3_mk_int_fn)(Z3_context, int, Z3_sort);
 
-/* Loaded symbols */
 static struct {
     void* lib;
     z3_mk_config_fn         mk_config;
@@ -169,7 +163,6 @@ static bool z3_try_load(void) {
         return false;
     }
 
-    LOG_DEBUG("Z3 loaded successfully");
     return true;
 }
 
@@ -184,7 +177,6 @@ CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
 
     if (!z3_try_load()) return v;
 
-    /* Create Z3 context with timeout */
     Z3_config cfg = z3.mk_config();
     if (cfg && z3.set_param_value) {
         char buf[32];
@@ -218,10 +210,6 @@ void cml_z3_verifier_free(CMLZ3Verifier* v) {
     free(v);
 }
 
-/**
- * Build a symbolic Z3 AST for a single IR node, given symbolic inputs.
- * Returns NULL for unsupported ops.
- */
 static Z3_ast z3_build_node_expr(Z3_context ctx, struct IRNode* node,
                                   Z3_ast* input_exprs, int num_inputs) {
     if (!node || !input_exprs || num_inputs < 1) return NULL;
@@ -255,10 +243,6 @@ static Z3_ast z3_build_node_expr(Z3_context ctx, struct IRNode* node,
     }
 }
 
-/**
- * Walk an IR graph and build a Z3 expression for the output.
- * Only handles simple linear chains of arithmetic ops.
- */
 static Z3_ast z3_build_graph_expr(Z3_context ctx, CMLGraph_t ir,
                                    Z3_ast* leaf_vars, int max_vars,
                                    int* num_vars_used) {
@@ -327,7 +311,6 @@ CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v,
 
     v->num_checks++;
 
-    /* Build symbolic expressions for both graphs */
     Z3_ast vars_orig[32] = {0}, vars_opt[32] = {0};
     int nv_orig = 0, nv_opt = 0;
 
@@ -357,7 +340,6 @@ CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v,
     if (result == Z3_L_FALSE) {
         /* UNSAT means no counterexample exists -> graphs are equivalent */
         v->num_passed++;
-        LOG_DEBUG("Z3: equivalence verified (UNSAT)");
         return CML_VERIFY_PASS;
     } else if (result == Z3_L_TRUE) {
         /* SAT means a counterexample exists -> graphs differ */
@@ -456,9 +438,6 @@ void cml_z3_verifier_stats(const CMLZ3Verifier* v,
 }
 
 #else /* !CML_HAS_Z3 */
-/* ========================================================================
- * Stubs -- when CML_HAS_Z3 is NOT defined
- * ======================================================================== */
 
 bool cml_z3_available(void) { return false; }
 

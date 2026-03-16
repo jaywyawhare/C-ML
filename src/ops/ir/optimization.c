@@ -13,7 +13,6 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Helper: Find node by output name
 static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* output_name) {
     if (!ir || !output_name)
         return NULL;
@@ -28,12 +27,10 @@ static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* output_name
     return NULL;
 }
 
-// Helper: Build dependency graph - track which nodes use which outputs
 static int build_dependency_graph(CMLGraph_t ir) {
     if (!ir)
         return -1;
 
-    // First pass: initialize use counts
     struct IRNode* node = ir->head;
     while (node) {
         node->use_count = 0;
@@ -45,14 +42,11 @@ static int build_dependency_graph(CMLGraph_t ir) {
         node = node->next;
     }
 
-    // Second pass: build dependencies
     node = ir->head;
     while (node) {
-        // For each input of this node, find the node that produces it
         for (int i = 0; i < node->num_inputs; i++) {
             struct IRNode* producer = find_node_by_output(ir, node->input_names[i]);
             if (producer) {
-                // Add this node to producer's users list
                 if (producer->use_count >= producer->users_capacity) {
                     int new_capacity =
                         producer->users_capacity == 0 ? 4 : producer->users_capacity * 2;
@@ -72,34 +66,27 @@ static int build_dependency_graph(CMLGraph_t ir) {
     return 0;
 }
 
-// Helper: Mark reachable nodes starting from outputs
 static void mark_reachable_nodes(CMLGraph_t ir) {
     if (!ir)
         return;
 
-    // Mark all nodes as unused initially
     struct IRNode* node = ir->head;
     while (node) {
         node->is_used = false;
         node          = node->next;
     }
 
-    // Start from tail (last output) and mark all reachable nodes
-    // Use DFS to mark all nodes that contribute to outputs
     struct IRNode* stack[256]; // Stack for DFS
     int stack_top = 0;
 
-    // Start with tail node (final output)
     if (ir->tail) {
         stack[stack_top++] = ir->tail;
         ir->tail->is_used  = true;
     }
 
-    // DFS to mark all reachable nodes
     while (stack_top > 0) {
         struct IRNode* current = stack[--stack_top];
 
-        // Mark all input producers as used
         for (int i = 0; i < current->num_inputs; i++) {
             struct IRNode* producer = find_node_by_output(ir, current->input_names[i]);
             if (producer && !producer->is_used) {
@@ -112,7 +99,6 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
     }
 }
 
-// Helper: Remove dead nodes
 static int remove_dead_nodes(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -124,10 +110,7 @@ static int remove_dead_nodes(CMLGraph_t ir) {
     while (node) {
         struct IRNode* next = node->next;
 
-        // Don't remove nodes that are used by other nodes (part of computation chain)
-        // or nodes that are marked as used
         if (!node->is_used && node->use_count == 0) {
-            // Remove this node
             if (prev) {
                 prev->next = next;
             } else {
@@ -145,7 +128,6 @@ static int remove_dead_nodes(CMLGraph_t ir) {
                 node->output->ir_context = NULL;
             }
 
-            // Free node resources
             if (node->input_names) {
                 for (int i = 0; i < node->num_inputs; i++) {
                     if (node->input_names[i]) {
@@ -202,7 +184,6 @@ static int remove_dead_nodes(CMLGraph_t ir) {
     return 0;
 }
 
-// Helper: Check if node2 uses node1's output
 static bool node_uses_output(struct IRNode* node1, struct IRNode* node2) {
     if (!node1 || !node2 || !node1->output_name)
         return false;
@@ -215,7 +196,6 @@ static bool node_uses_output(struct IRNode* node1, struct IRNode* node2) {
     return false;
 }
 
-// Helper: Check if two operations can be fused
 static bool can_fuse_operations(struct IRNode* node1, struct IRNode* node2,
                                 FusionType* fusion_type) {
     if (!node1 || !node2 || !fusion_type)
@@ -326,7 +306,6 @@ static bool can_fuse_operations(struct IRNode* node1, struct IRNode* node2,
     return false;
 }
 
-// Helper: Create fused kernel
 static FusedKernel* create_fused_kernel(struct IRNode** ops, int num_ops, FusionType fusion_type) {
     if (!ops || num_ops < 2)
         return NULL;
@@ -350,7 +329,6 @@ static FusedKernel* create_fused_kernel(struct IRNode** ops, int num_ops, Fusion
     return kernel;
 }
 
-// Helper: Free fused kernel
 void free_fused_kernel(FusedKernel* kernel) {
     if (!kernel)
         return;
@@ -367,7 +345,6 @@ void free_fused_kernel(FusedKernel* kernel) {
     free(kernel);
 }
 
-// Helper: Find other input (not the producer's output)
 static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) {
     if (!producer || !consumer || !producer->output_name)
         return NULL;
@@ -381,7 +358,6 @@ static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) 
     return NULL;
 }
 
-// Helper: Apply fusion transformation
 static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType fusion_type) {
     if (!node1 || !node2)
         return -1;
@@ -539,7 +515,6 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
     return 0;
 }
 
-// Helper: Find longest chain of fusable operations
 static int find_fusable_chain(struct IRNode* start, struct IRNode** chain, int max_chain) {
     if (!start || !chain || max_chain < 1)
         return 0;
@@ -548,23 +523,18 @@ static int find_fusable_chain(struct IRNode* start, struct IRNode** chain, int m
     int chain_len          = 1;
     struct IRNode* current = start;
 
-    // Follow the chain as long as operations can be fused
-    // Ensure we only follow true linear chains (each node uses previous node's output)
     while (chain_len < max_chain && current->use_count == 1) {
         struct IRNode* next = current->users[0];
         if (!next || next->is_fused)
             break;
 
-        // Verify that next actually uses current's output (not just connected in graph)
         if (!node_uses_output(current, next)) {
             break;
         }
 
         FusionType fusion_type;
         if (can_fuse_operations(current, next, &fusion_type)) {
-            // Only allow elementwise chains (not other fusion types in chain)
             if (fusion_type == FUSION_CHAIN_ELEMENTWISE || chain_len == 1) {
-                // Don't fuse identical operations (e.g., ADD -> ADD) as it's not useful
                 if (current->type == next->type && fusion_type == FUSION_CHAIN_ELEMENTWISE) {
                     break;
                 }
@@ -581,7 +551,6 @@ static int find_fusable_chain(struct IRNode* start, struct IRNode** chain, int m
     return chain_len;
 }
 
-// Helper: Fuse operations
 static int fuse_operations(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -595,14 +564,10 @@ static int fuse_operations(CMLGraph_t ir) {
             continue;
         }
 
-// Try to find longest chain first (for fused kernels)
-// No limit on chain length - fuse as many operations as possible
 #define MAX_FUSION_CHAIN 1024
         struct IRNode* chain[MAX_FUSION_CHAIN];
         int chain_len = find_fusable_chain(node, chain, MAX_FUSION_CHAIN);
 
-        // Fuse chains of 2 or more operations (no upper limit)
-        // Also skip chains where all operations are identical (not useful)
         bool all_same = true;
         if (chain_len >= 2) {
             for (int i = 1; i < chain_len; i++) {
@@ -614,7 +579,6 @@ static int fuse_operations(CMLGraph_t ir) {
         }
 
         if (chain_len >= 2 && !all_same) {
-            // Create fused kernel for the chain
             FusedKernel* kernel = create_fused_kernel(chain, chain_len, FUSION_CHAIN_ELEMENTWISE);
             if (kernel) {
                 for (int i = 0; i < chain_len; i++) {
@@ -626,22 +590,18 @@ static int fuse_operations(CMLGraph_t ir) {
                 fused++;
                 LOG_DEBUG("Created fused kernel with %d chained operations", chain_len);
             }
-            // Skip nodes in the chain
             node = chain[chain_len - 1]->next;
             continue;
         } else if (all_same && chain_len >= 2) {
-            // Skip chains with identical operations
             LOG_DEBUG("Skipping fusion for chain of %d identical %s operations", chain_len,
                       uop_type_to_string(chain[0]->type));
         }
 
-        // Try pairwise fusion
         for (int i = 0; i < node->use_count; i++) {
             struct IRNode* user = node->users[i];
             if (!user || user->is_fused)
                 continue;
 
-            // Skip fusing identical operations (not useful)
             if (node->type == user->type) {
                 continue;
             }
@@ -665,21 +625,14 @@ static int fuse_operations(CMLGraph_t ir) {
     return 0;
 }
 
-// Helper: Reorder operations for better cache locality
 static int reorder_for_cache_locality(CMLGraph_t ir) {
     if (!ir || ir->node_count <= 0)
         return -1;
 
-    // Topological sort using Kahn's algorithm
-    // This ensures operations are executed in dependency order
-    // which helps with cache locality (producer-consumer pairs stay close)
-
-    // Allocate arrays for topological sort
     int* in_degree = calloc((size_t)ir->node_count, sizeof(int));
     if (!in_degree)
         return -1;
 
-    // Build array of all nodes for easier indexing
     struct IRNode** all_nodes = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
     if (!all_nodes) {
         free(in_degree);
@@ -693,7 +646,6 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
         node             = node->next;
     }
 
-    // Calculate in-degrees (number of dependencies) for each node
     for (int i = 0; i < ir->node_count; i++) {
         in_degree[i] = 0;
         for (int j = 0; j < all_nodes[i]->num_inputs; j++) {
@@ -704,7 +656,6 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
         }
     }
 
-    // Queue for nodes with no dependencies
     struct IRNode** queue = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
     if (!queue) {
         free(in_degree);
@@ -715,14 +666,12 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
     int queue_front = 0;
     int queue_back  = 0;
 
-    // Add nodes with no dependencies to queue
     for (int i = 0; i < ir->node_count; i++) {
         if (in_degree[i] == 0) {
             queue[queue_back++] = all_nodes[i];
         }
     }
 
-    // Topologically sorted result
     struct IRNode** sorted = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
     if (!sorted) {
         free(in_degree);
@@ -733,15 +682,12 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
 
     int sorted_count = 0;
 
-    // Process queue
     while (queue_front < queue_back) {
         struct IRNode* current = queue[queue_front++];
         sorted[sorted_count++] = current;
 
-        // Decrease in-degree of nodes that depend on current
         for (int i = 0; i < ir->node_count; i++) {
             if (in_degree[i] > 0) {
-                // Check if all_nodes[i] depends on current
                 for (int j = 0; j < all_nodes[i]->num_inputs; j++) {
                     if (all_nodes[i]->input_names[j] && current->output_name &&
                         strcmp(all_nodes[i]->input_names[j], current->output_name) == 0) {
@@ -755,7 +701,6 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
         }
     }
 
-    // Rebuild linked list in topological order
     if (sorted_count == ir->node_count) {
         ir->head = sorted[0];
         ir->tail = sorted[sorted_count - 1];
@@ -764,8 +709,6 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
             sorted[i]->next = sorted[i + 1];
         }
         sorted[sorted_count - 1]->next = NULL;
-
-        LOG_DEBUG("Reordered %d nodes for better cache locality (topological sort)", sorted_count);
     } else {
         LOG_WARNING("Topological sort incomplete: %d/%d nodes sorted (possible cycle?)",
                     sorted_count, ir->node_count);
@@ -788,38 +731,28 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
 int cml_ir_optimize(CMLGraph_t ir) {
     if (!ir)
         return -1;
-
-    LOG_DEBUG("Starting IR optimization passes...");
-
-    // Pass 1: Build dependency graph
     if (build_dependency_graph(ir) != 0) {
         LOG_ERROR("Failed to build dependency graph");
         return -1;
     }
 
-    // Pass 2: Mark reachable nodes (dead code elimination)
     mark_reachable_nodes(ir);
 
-    // Pass 3: Remove dead nodes
     if (remove_dead_nodes(ir) != 0) {
         LOG_ERROR("Failed to remove dead nodes");
         return -1;
     }
 
-    // Rebuild dependency graph after dead node removal
     if (build_dependency_graph(ir) != 0) {
         LOG_ERROR("Failed to rebuild dependency graph");
         return -1;
     }
 
-    // Pass 3.5: Pattern-matcher algebraic rewrites
     {
         CMLRewriteRegistry* builtin = cml_rewrite_builtin_rules();
         if (builtin) {
             int rewrites = cml_rewrite_apply(builtin, ir, 0);
             if (rewrites > 0) {
-                LOG_DEBUG("Pattern matcher applied %d rewrites", rewrites);
-                /* Rebuild deps after rewrites */
                 build_dependency_graph(ir);
                 mark_reachable_nodes(ir);
                 remove_dead_nodes(ir);
@@ -829,16 +762,12 @@ int cml_ir_optimize(CMLGraph_t ir) {
         }
     }
 
-    // Pass 4: Fuse operations
     if (fuse_operations(ir) != 0) {
         LOG_WARNING("Operation fusion encountered issues, continuing...");
     }
 
-    // Pass 5: Optimize memory access patterns
     if (reorder_for_cache_locality(ir) != 0) {
         LOG_WARNING("Cache locality optimization encountered issues, continuing...");
     }
-
-    LOG_DEBUG("IR optimization completed: %d nodes remaining", ir->node_count);
     return 0;
 }

@@ -88,7 +88,6 @@ bool cml_cuda_available(void) {
     if (!lib)
         return false;
 
-    // Try to get cuInit
     void* cuInit = get_symbol(lib, "cuInit");
     unload_library(lib);
 
@@ -165,7 +164,6 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
 
 #undef LOAD_FUNC
 
-    // Optionally load NVRTC for runtime compilation
     if (NVRTC_LIB_NAME) {
         backend->nvrtc_lib = load_library(NVRTC_LIB_NAME);
         if (backend->nvrtc_lib) {
@@ -193,19 +191,16 @@ int cml_cuda_backend_init(CMLCUDABackend* backend, int device_ordinal) {
         return 0;
     }
 
-    // Load CUDA functions
     if (load_cuda_functions(backend) != 0) {
         return -1;
     }
 
-    // Initialize CUDA
     CUresult err = backend->cuInit(0);
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuInit failed with error %d", err);
         return -1;
     }
 
-    // Get device count
     int device_count = 0;
     err              = backend->cuDeviceGetCount(&device_count);
     if (err != CUDA_SUCCESS || device_count == 0) {
@@ -218,14 +213,12 @@ int cml_cuda_backend_init(CMLCUDABackend* backend, int device_ordinal) {
         return -1;
     }
 
-    // Get device
     err = backend->cuDeviceGet(&backend->device, device_ordinal);
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuDeviceGet failed");
         return -1;
     }
 
-    // Get device info
     backend->cuDeviceGetName(backend->device_name, sizeof(backend->device_name), backend->device);
     backend->cuDeviceTotalMem(&backend->total_memory, backend->device);
     backend->cuDeviceGetAttribute(&backend->compute_capability_major,
@@ -243,14 +236,12 @@ int cml_cuda_backend_init(CMLCUDABackend* backend, int device_ordinal) {
     LOG_INFO("  Total memory: %.2f GB", backend->total_memory / (1024.0 * 1024.0 * 1024.0));
     LOG_INFO("  Multiprocessors: %d", backend->multiprocessor_count);
 
-    // Create context
     err = backend->cuCtxCreate(&backend->context, 0, backend->device);
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuCtxCreate failed with error %d", err);
         return -1;
     }
 
-    // Create default stream
     err = backend->cuStreamCreate(&backend->stream, 0);
     if (err != CUDA_SUCCESS) {
         LOG_WARNING("cuStreamCreate failed, using default stream");
@@ -306,7 +297,6 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
         return NULL;
     }
 
-    // Load PTX module
     CUresult err = backend->cuModuleLoadData(&kernel->module, ptx_code);
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuModuleLoadData failed with error %d", err);
@@ -314,7 +304,6 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
         return NULL;
     }
 
-    // Get kernel function
     err = backend->cuModuleGetFunction(&kernel->function, kernel->module, kernel_name);
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuModuleGetFunction failed for '%s' with error %d", kernel_name, err);
@@ -325,15 +314,12 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
 
     kernel->kernel_name = strdup(kernel_name);
 
-    // Default launch configuration
     kernel->grid_dim[0]  = 1;
     kernel->grid_dim[1]  = 1;
     kernel->grid_dim[2]  = 1;
     kernel->block_dim[0] = 256;
     kernel->block_dim[1] = 1;
     kernel->block_dim[2] = 1;
-
-    LOG_DEBUG("Compiled CUDA kernel: %s", kernel_name);
 
     return kernel;
 }
@@ -344,13 +330,11 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
         return NULL;
     }
 
-    // Check if NVRTC is available
     if (!backend->nvrtcCreateProgram || !backend->nvrtcCompileProgram) {
         LOG_ERROR("NVRTC not available for runtime compilation");
         return NULL;
     }
 
-    // Create NVRTC program
     void* prog = NULL;
     backend->nvrtcCreateProgram(&prog, cuda_code, "cml_kernel.cu", 0, NULL, NULL);
     if (!prog) {
@@ -358,7 +342,6 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
         return NULL;
     }
 
-    // Compile with target compute capability
     char arch_flag[32];
     snprintf(arch_flag, sizeof(arch_flag), "--gpu-architecture=compute_%d%d",
              backend->compute_capability_major, backend->compute_capability_minor);
@@ -366,7 +349,6 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
     const char* options[] = {arch_flag, "-default-device"};
     void* result          = backend->nvrtcCompileProgram(prog, 2, options);
 
-    // Check for compilation errors
     if (result) {
         size_t log_size = 0;
         backend->nvrtcGetProgramLogSize(prog, &log_size);
@@ -380,14 +362,12 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
         return NULL;
     }
 
-    // Get PTX
     size_t ptx_size = 0;
     backend->nvrtcGetPTXSize(prog, &ptx_size);
     char* ptx = malloc(ptx_size);
     backend->nvrtcGetPTX(prog, ptx);
     backend->nvrtcDestroyProgram(&prog);
 
-    // Compile PTX to kernel
     CMLCUDAKernel* kernel = cml_cuda_compile_ptx(backend, ptx, kernel_name);
     free(ptx);
 
@@ -498,7 +478,6 @@ int cml_cuda_upload_tensor(CMLCUDABackend* backend, Tensor* tensor) {
 
     size_t size = tensor->numel * cml_dtype_size(tensor->dtype);
 
-    // Allocate device memory if not already allocated
     if (!tensor->buffer_handle) {
         CUdeviceptr ptr = cml_cuda_malloc(backend, size);
         if (!ptr)
@@ -506,7 +485,6 @@ int cml_cuda_upload_tensor(CMLCUDABackend* backend, Tensor* tensor) {
         tensor->buffer_handle = (void*)ptr;
     }
 
-    // Copy data to device
     return cml_cuda_memcpy_h2d(backend, (CUdeviceptr)tensor->buffer_handle, tensor->data, size);
 }
 
@@ -517,7 +495,6 @@ int cml_cuda_download_tensor(CMLCUDABackend* backend, Tensor* tensor) {
 
     size_t size = tensor->numel * cml_dtype_size(tensor->dtype);
 
-    // Allocate host memory if needed
     if (!tensor->data) {
         tensor->data = malloc(size);
         if (!tensor->data)
@@ -525,6 +502,5 @@ int cml_cuda_download_tensor(CMLCUDABackend* backend, Tensor* tensor) {
         tensor->owns_data = true;
     }
 
-    // Copy data from device
     return cml_cuda_memcpy_d2h(backend, tensor->data, (CUdeviceptr)tensor->buffer_handle, size);
 }

@@ -23,18 +23,15 @@ int cml_ir_enable_auto_capture(CMLGraph_t ir) {
     }
 
     atomic_store(&g_auto_capture_ir, ir);
-    LOG_DEBUG("Auto-capture enabled for IR target: %d", ir->target);
     return 0;
 }
 
 void cml_ir_disable_auto_capture(void) {
     atomic_store(&g_auto_capture_ir, NULL);
-    LOG_DEBUG("Auto-capture disabled");
 }
 
 CMLGraph_t cml_ir_get_auto_capture_context(void) { return atomic_load(&g_auto_capture_ir); }
 
-// Convert OpType (from autograd) to UOpType (for IR)
 UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     switch (op_type) {
     case OP_NONE:
@@ -73,7 +70,6 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
         return UOP_COS;
     case OP_TAN:
         return UOP_TAN;
-    // Binary operations
     case OP_ADD:
         return UOP_ADD;
     case OP_SUB:
@@ -85,7 +81,6 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     case OP_MATMUL:
         return UOP_MATMUL;
 
-    // Unary operations
     case OP_NEG:
         return UOP_NEG;
     case OP_EXP:
@@ -95,49 +90,34 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     case OP_SQRT:
         return UOP_SQRT;
 
-    // Reductions
     case OP_SUM:
         return UOP_SUM;
     case OP_MEAN:
         return UOP_MEAN;
     case OP_MAX:
-        // OP_MAX can be elementwise (2 inputs) or reduction (1 input)
         return (num_inputs >= 2) ? UOP_MAX : UOP_MAX_REDUCE;
 
-    // Shape operations
     case OP_RESHAPE:
         return UOP_RESHAPE;
     case OP_PERMUTE:
         return UOP_PERMUTE;
 
-    // No direct mapping for other operations
     default:
         return UOP_COUNT; // Invalid/unknown
     }
 }
 
-// Helper function to automatically capture tensor operations to IR
-// This is called from tensor_* functions when auto-capture is enabled
 int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_inputs, void* params) {
     CMLGraph_t ir = cml_ir_get_auto_capture_context();
-    if (!ir) {
-        // Auto-capture not enabled, silently skip
+    if (!ir)
         return 0;
-    }
 
-    // Convert OpType to UOpType
     UOpType uop_type = cml_ir_optype_to_uoptype(op_type, num_inputs);
-    if (uop_type == UOP_COUNT) {
-        // No mapping available, skip this operation
-        LOG_DEBUG("No UOp mapping for OpType %d, skipping auto-capture", op_type);
+    if (uop_type == UOP_COUNT)
         return 0;
-    }
 
-    // Add to IR
     int result = cml_ir_add_uop(ir, uop_type, inputs, num_inputs, params);
-    if (result == 0) {
-        LOG_DEBUG("Auto-captured operation %d as UOp %d", op_type, uop_type);
-    } else {
+    if (result != 0) {
         LOG_WARNING("Failed to auto-capture operation %d", op_type);
     }
 
@@ -145,15 +125,11 @@ int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_input
 }
 
 CMLGraph_t cml_ir_get_or_create_context(void) {
-    // First check if auto-capture is enabled
     CMLGraph_t auto_capture_ir = cml_ir_get_auto_capture_context();
-    if (auto_capture_ir) {
+    if (auto_capture_ir)
         return auto_capture_ir;
-    }
 
-    // Otherwise use/create global context
     if (!g_global_ir_context) {
-        // Default to CPU target, can be changed
         g_global_ir_context = cml_ir_new(IR_TARGET_C);
         if (!g_global_ir_context) {
             LOG_ERROR("Failed to create global IR context");

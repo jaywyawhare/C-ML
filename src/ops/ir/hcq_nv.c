@@ -38,10 +38,6 @@ typedef struct {
     uint64_t target_value;   /* snapshot of submit_count at record time */
 } NVSignalData;
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Queue lifecycle
- * ══════════════════════════════════════════════════════════════════════════ */
-
 CMLHCQQueue* cml_hcq_nv_queue_create(void) {
     CMLNVDriver* nv = cml_dispatch_get_nv_driver();
     if (!nv || !nv->initialized) {
@@ -65,8 +61,6 @@ CMLHCQQueue* cml_hcq_nv_queue_create(void) {
     queue->backend       = CML_HCQ_NV;
     queue->native_handle = (void*)qd;
     queue->active        = true;
-
-    LOG_DEBUG("NV HCQ: queue created");
     return queue;
 }
 
@@ -79,13 +73,7 @@ void cml_hcq_nv_queue_destroy(CMLHCQQueue* queue) {
     }
     queue->active = false;
     free(queue);
-
-    LOG_DEBUG("NV HCQ: queue destroyed");
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Kernel submission
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_nv_submit_kernel(CMLHCQQueue* queue,
                               const CMLHCQKernelDesc* desc) {
@@ -126,10 +114,6 @@ int cml_hcq_nv_submit_kernel(CMLHCQQueue* queue,
     return ret;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Memcpy via host-visible buffer staging
- * ══════════════════════════════════════════════════════════════════════════ */
-
 int cml_hcq_nv_memcpy_h2d(CMLHCQQueue* queue, void* dst,
                             const void* src, size_t bytes) {
     if (!queue || !dst || !src) return -1;
@@ -143,8 +127,6 @@ int cml_hcq_nv_memcpy_h2d(CMLHCQQueue* queue, void* dst,
     /* In a real driver we would enqueue a DMA copy on the channel.
      * For host-visible buffers, the upload was already a memcpy in
      * cml_nv_buffer_upload().  Here we log and return success. */
-    LOG_DEBUG("NV HCQ: memcpy H2D %zu bytes (passthrough)", bytes);
-
     NVQueueData* qd = (NVQueueData*)queue->native_handle;
     if (qd) qd->submit_count++;
 
@@ -160,18 +142,11 @@ int cml_hcq_nv_memcpy_d2h(CMLHCQQueue* queue, void* dst,
         LOG_ERROR("NV HCQ: no NV driver for memcpy D2H");
         return -1;
     }
-
-    LOG_DEBUG("NV HCQ: memcpy D2H %zu bytes (passthrough)", bytes);
-
     NVQueueData* qd = (NVQueueData*)queue->native_handle;
     if (qd) qd->submit_count++;
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Signals (semaphore-based)
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQSignal* cml_hcq_nv_signal_create(void) {
     CMLNVDriver* nv = cml_dispatch_get_nv_driver();
@@ -196,8 +171,6 @@ CMLHCQSignal* cml_hcq_nv_signal_create(void) {
     signal->backend       = CML_HCQ_NV;
     signal->native_handle = (void*)sd;
     signal->signaled      = false;
-
-    LOG_DEBUG("NV HCQ: signal created");
     return signal;
 }
 
@@ -209,8 +182,6 @@ void cml_hcq_nv_signal_destroy(CMLHCQSignal* signal) {
         signal->native_handle = NULL;
     }
     free(signal);
-
-    LOG_DEBUG("NV HCQ: signal destroyed");
 }
 
 int cml_hcq_nv_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
@@ -235,9 +206,6 @@ int cml_hcq_nv_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
             nv->semaphore_value = sd->target_value;
         }
     }
-
-    LOG_DEBUG("NV HCQ: signal recorded at value %llu",
-              (unsigned long long)sd->target_value);
     return 0;
 }
 
@@ -252,8 +220,6 @@ int cml_hcq_nv_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
      * reaches the target value.
      *
      * Here we record the dependency for bookkeeping. */
-    LOG_DEBUG("NV HCQ: queue wait on signal value %llu",
-              (unsigned long long)sd->target_value);
     return 0;
 }
 
@@ -288,10 +254,6 @@ int cml_hcq_nv_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return ret;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Synchronize
- * ══════════════════════════════════════════════════════════════════════════ */
-
 int cml_hcq_nv_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue) return -1;
 
@@ -306,10 +268,6 @@ int cml_hcq_nv_queue_synchronize(CMLHCQQueue* queue) {
 }
 
 #else /* !CML_HAS_NV_DRIVER */
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Stubs when NV driver is not compiled in
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQQueue* cml_hcq_nv_queue_create(void) { return NULL; }
 void         cml_hcq_nv_queue_destroy(CMLHCQQueue* q) { (void)q; }

@@ -32,19 +32,16 @@ int cml_hcq_vulkan_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* des
     /* Kernel dispatch is handled directly by vulkan_backend.c
      * via cml_vulkan_kernel_dispatch(). HCQ integration would
      * record into a persistent command buffer instead. */
-    LOG_DEBUG("HCQ Vulkan kernel submit (passthrough to Vulkan backend)");
     return 0;
 }
 
 int cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     (void)queue; (void)dst; (void)src; (void)bytes;
-    LOG_DEBUG("HCQ Vulkan memcpy H2D (passthrough)");
     return 0;
 }
 
 int cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     (void)queue; (void)dst; (void)src; (void)bytes;
-    LOG_DEBUG("HCQ Vulkan memcpy D2H (passthrough)");
     return 0;
 }
 

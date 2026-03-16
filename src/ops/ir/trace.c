@@ -13,8 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── Thread-local active trace ── */
-
 static _Thread_local CMLTrace* g_active_trace = NULL;
 
 CMLTrace* cml_trace_get_active(void) {
@@ -25,14 +23,10 @@ void cml_trace_set_active(CMLTrace* trace) {
     g_active_trace = trace;
 }
 
-/* ── FNV-1a constants ── */
-
 #define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
 #define FNV_PRIME        0x100000001b3ULL
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  Trace lifecycle                                                        */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 CMLTrace *cml_trace_create(void)
 {
@@ -46,9 +40,7 @@ void cml_trace_free(CMLTrace *trace)
     free(trace);
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  Recording control                                                      */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 int cml_trace_begin(CMLTrace *trace, uint64_t graph_hash)
 {
@@ -75,9 +67,7 @@ int cml_trace_end(CMLTrace *trace)
     return 0;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  Recording helpers                                                      */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 int cml_trace_record_kernel(CMLTrace *trace, uint64_t kernel_hash,
                             void *compiled_kernel, const size_t grid[3],
@@ -136,9 +126,7 @@ int cml_trace_record_memcpy(CMLTrace *trace, CMLTraceEntryType type,
     return 0;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  Replay                                                                 */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /**
  * Kernel function pointer type used during replay.
@@ -205,9 +193,7 @@ int cml_trace_replay(CMLTrace *trace, void **tensor_ptrs, int num_tensors)
     return 0;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  Trace cache                                                            */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 CMLTraceCache *cml_trace_cache_create(void)
 {
@@ -280,9 +266,7 @@ int cml_trace_cache_insert(CMLTraceCache *cache, uint64_t graph_hash,
     return -2; /* should not reach here if count < size */
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  Graph hashing (FNV-1a over node types + shapes)                        */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len)
 {
@@ -321,9 +305,7 @@ static uint64_t compute_graph_hash(CMLGraph_t ir)
     return hash;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
 /*  High-level traced execution                                            */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /**
  * Global trace cache.  Lazily initialised on first call.
@@ -347,7 +329,6 @@ int cml_ir_execute_traced(CMLGraph_t ir)
     CMLTrace *trace = cml_trace_cache_lookup(g_trace_cache, hash);
 
     if (trace && trace->is_complete) {
-        /* ---- Fast path: replay the cached trace ---- */
 
         /*
          * Build a tensor_ptrs array from the current graph.
@@ -368,8 +349,6 @@ int cml_ir_execute_traced(CMLGraph_t ir)
 
         return cml_trace_replay(trace, tensor_ptrs, n);
     }
-
-    /* ---- Slow path: record a new trace while executing ---- */
 
     trace = cml_trace_create();
     if (!trace) return -3;

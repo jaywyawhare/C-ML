@@ -13,12 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ──────────────────────────────────────────────────────────────────────────
- * Forward declarations for backend-specific implementations (weak symbols
- * or separate TUs).  If the backend is not compiled in the corresponding
- * function will not be linked and we fall through to the CPU path.
- * ────────────────────────────────────────────────────────────────────────── */
-
 #ifdef CML_HAS_CUDA
 extern CMLHCQQueue*  cml_hcq_cuda_queue_create(void);
 extern void          cml_hcq_cuda_queue_destroy(CMLHCQQueue* queue);
@@ -59,19 +53,13 @@ extern int           cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal,
 extern int           cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue);
 #endif
 
-/* ──────────────────────────────────────────────────────────────────────────
  * CPU kernel function pointer type.
  *
  * On the CPU backend the compiled_kernel field of CMLHCQKernelDesc is cast
  * to this signature.  The function receives the args array and arg count
  * and is expected to execute synchronously.
- * ────────────────────────────────────────────────────────────────────────── */
 
 typedef void (*cml_cpu_kernel_fn)(void** args, int num_args);
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Queue lifecycle
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     /* Dispatch to backend-specific creation when available. */
@@ -101,8 +89,6 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     queue->native_handle    = NULL;
     queue->num_wait_signals = 0;
     queue->active           = true;
-
-    LOG_DEBUG("Created CPU HCQ queue %p", (void*)queue);
     return queue;
 }
 
@@ -123,15 +109,9 @@ void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
     default:
         break;
     }
-
-    LOG_DEBUG("Destroying CPU HCQ queue %p", (void*)queue);
     queue->active = false;
     free(queue);
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Kernel submission
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc) {
@@ -162,15 +142,9 @@ int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     }
 
     cml_cpu_kernel_fn fn = (cml_cpu_kernel_fn)desc->compiled_kernel;
-    LOG_DEBUG("CPU HCQ: executing kernel %p with %d args", desc->compiled_kernel,
-              desc->num_args);
     fn(desc->args, desc->num_args);
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Memcpy
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
                         const void* src_host, size_t bytes) {
@@ -201,7 +175,6 @@ int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
         return -1;
     }
     memcpy(dst_device, src_host, bytes);
-    LOG_DEBUG("CPU HCQ: memcpy_h2d %zu bytes", bytes);
     return 0;
 }
 
@@ -233,13 +206,8 @@ int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
         return -1;
     }
     memcpy(dst_host, src_device, bytes);
-    LOG_DEBUG("CPU HCQ: memcpy_d2h %zu bytes", bytes);
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Signals
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
     switch (backend) {
@@ -267,8 +235,6 @@ CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
     signal->timeline_value = 0;
     signal->native_handle  = NULL;
     signal->signaled       = false;
-
-    LOG_DEBUG("Created CPU HCQ signal %p", (void*)signal);
     return signal;
 }
 
@@ -289,8 +255,6 @@ void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
     default:
         break;
     }
-
-    LOG_DEBUG("Destroying CPU HCQ signal %p", (void*)signal);
     free(signal);
 }
 
@@ -319,8 +283,6 @@ int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     /* CPU: everything is synchronous, so the signal is immediately ready. */
     signal->signaled = true;
     signal->timeline_value++;
-    LOG_DEBUG("CPU HCQ: signal %p recorded (timeline=%lu)", (void*)signal,
-              (unsigned long)signal->timeline_value);
     return 0;
 }
 
@@ -360,9 +322,6 @@ int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (queue->num_wait_signals < CML_HCQ_MAX_WAIT_SIGNALS) {
         queue->wait_signals[queue->num_wait_signals++] = signal;
     }
-
-    LOG_DEBUG("CPU HCQ: queue %p waiting on signal %p (signaled=%d)",
-              (void*)queue, (void*)signal, signal->signaled);
     return 0;
 }
 
@@ -399,15 +358,8 @@ int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
                     (void*)signal);
         return -1;
     }
-
-    LOG_DEBUG("CPU HCQ: signal_wait_cpu on signal %p -- already signaled",
-              (void*)signal);
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Synchronize
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue) {
@@ -433,14 +385,9 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
     }
 
     /* CPU: synchronous -- nothing to wait for. */
-    LOG_DEBUG("CPU HCQ: queue_synchronize (no-op for CPU)");
     queue->num_wait_signals = 0;
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Pipeline
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQPipeline* cml_hcq_pipeline_create(void) {
     CMLHCQPipeline* pipeline =
@@ -507,10 +454,6 @@ int cml_hcq_pipeline_execute(CMLHCQPipeline* pipeline) {
         LOG_WARNING("Pipeline has no stages to execute");
         return 0;
     }
-
-    LOG_DEBUG("Executing HCQ pipeline %p with %d stages", (void*)pipeline,
-              pipeline->num_stages);
-
     for (int i = 0; i < pipeline->num_stages; i++) {
         CMLHCQQueue*  stage  = pipeline->stages[i];
         CMLHCQSignal* signal = pipeline->stage_signals[i];
@@ -563,7 +506,5 @@ int cml_hcq_pipeline_synchronize(CMLHCQPipeline* pipeline) {
             return ret;
         }
     }
-
-    LOG_DEBUG("Pipeline %p: synchronized", (void*)pipeline);
     return 0;
 }

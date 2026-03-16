@@ -120,11 +120,9 @@ CMLDispatchContext* cml_dispatch_create(void) {
         ctx->backends[i].supports_unified_mem = false;
     }
 
-    // CPU fallback is always available
     ctx->backends[CML_BACKEND_CPU_FALLBACK].status       = CML_BACKEND_STATUS_AVAILABLE;
     ctx->backends[CML_BACKEND_CPU_FALLBACK].device_count = 1;
 
-    // Default fallback chain (highest priority first)
     ctx->fallback_chain[0] = CML_BACKEND_NV;
     ctx->fallback_chain[1] = CML_BACKEND_CUDA;
     ctx->fallback_chain[2] = CML_BACKEND_AM;
@@ -150,11 +148,9 @@ int cml_dispatch_init(CMLDispatchContext* ctx) {
 
     cml_dispatch_detect_backends(ctx);
 
-    // Set active backend to best available
     ctx->active = cml_dispatch_get_best_backend(ctx);
     ctx->initialized = true;
 
-    // Check env var
     cml_dispatch_set_from_env(ctx);
 
     LOG_INFO("Dispatch initialized. Active backend: %s", backend_names[ctx->active]);
@@ -228,7 +224,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     LOG_INFO("LLVM JIT backend available");
 #endif
 
-    // CUDA detection (only attempt once)
     if (!g_cuda_init_attempted && cml_cuda_available()) {
         g_cuda_init_attempted = true;
         g_cuda_backend = cml_cuda_backend_create();
@@ -251,7 +246,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
         available++;
     }
 
-    // ROCm detection (only attempt once)
     if (!g_rocm_init_attempted && cml_rocm_available()) {
         g_rocm_init_attempted = true;
         g_rocm_backend = cml_rocm_backend_create();
@@ -274,7 +268,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
         available++;
     }
 
-    // Vulkan detection
 #ifdef CML_HAS_VULKAN
     if (!g_vulkan_init_attempted && cml_vulkan_available()) {
         g_vulkan_init_attempted = true;
@@ -299,7 +292,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     }
 #endif
 
-    // NV userspace driver detection
 #ifdef CML_HAS_NV_DRIVER
     if (!g_nv_init_attempted && cml_nv_driver_available()) {
         g_nv_init_attempted = true;
@@ -322,7 +314,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     }
 #endif
 
-    // AM (AMD) userspace driver detection
 #ifdef CML_HAS_AM_DRIVER
     if (!g_am_init_attempted && cml_am_driver_available()) {
         g_am_init_attempted = true;
@@ -345,7 +336,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     }
 #endif
 
-    // NIR/Mesa detection
 #ifdef CML_HAS_NIR
     if (cml_nir_available()) {
         ctx->backends[CML_BACKEND_NIR].status        = CML_BACKEND_STATUS_AVAILABLE;
@@ -355,7 +345,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     }
 #endif
 
-    // Metal detection
 #ifdef CML_HAS_METAL
     if (cml_metal_available()) {
         CMLMetalBackend* metal = cml_metal_backend_create();
@@ -378,7 +367,6 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     }
 #endif
 
-    // WebGPU detection
 #ifdef CML_HAS_WEBGPU
     if (cml_webgpu_available()) {
         CMLWebGPUBackend* wgpu = cml_webgpu_backend_create();
@@ -431,7 +419,6 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
     if (!ctx)
         return CML_BACKEND_CPU_FALLBACK;
 
-    // Prefer GPU backends (highest priority first)
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_NV))
         return CML_BACKEND_NV;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CUDA))
@@ -459,7 +446,6 @@ const char* cml_dispatch_backend_name(CMLBackendType backend) {
     return backend_names[backend];
 }
 
-// Execute on a specific backend
 int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CMLGraph_t ir,
                             Tensor** inputs, int nin, Tensor** outputs, int nout) {
     (void)inputs; (void)nin; (void)outputs; (void)nout;
@@ -654,12 +640,10 @@ int cml_dispatch_execute(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs
         return -1;
     }
 
-    // Try active backend first
     int result = cml_dispatch_execute_on(ctx, ctx->active, ir, inputs, nin, outputs, nout);
     if (result == 0)
         return 0;
 
-    // Fallback through the chain
     for (int i = 0; i < ctx->fallback_count; i++) {
         CMLBackendType fallback = ctx->fallback_chain[i];
         if (fallback == ctx->active)
@@ -789,8 +773,6 @@ void cml_dispatch_synchronize(CMLDispatchContext* ctx) {
 #endif
 }
 
-/* ── Backend accessors ──────────────────────────────────────────────────── */
-
 struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void) {
     return g_cuda_backend;
 }
@@ -818,8 +800,6 @@ struct CMLAMDriver* cml_dispatch_get_am_driver(void) {
     return NULL;
 #endif
 }
-
-/* ── JIT dispatch ──────────────────────────────────────────────────────── */
 
 int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
                              Tensor** inputs, int num_inputs,

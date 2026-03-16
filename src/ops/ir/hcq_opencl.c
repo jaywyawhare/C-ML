@@ -23,8 +23,6 @@
 #include <CL/cl.h>
 #endif
 
-/* ── File-local OpenCL context ──────────────────────────────────────────── */
-
 static struct {
     cl_platform_id platform;
     cl_device_id   device;
@@ -70,10 +68,6 @@ static int ensure_ocl_init(void) {
     return 0;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Queue lifecycle
- * ══════════════════════════════════════════════════════════════════════════ */
-
 CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
     if (ensure_ocl_init() != 0) {
         return NULL;
@@ -114,10 +108,6 @@ void cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue) {
     free(queue);
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Kernel submission
- * ══════════════════════════════════════════════════════════════════════════ */
-
 int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue,
                                  const CMLHCQKernelDesc* desc) {
     if (!queue || !desc) return -1;
@@ -143,10 +133,6 @@ int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue,
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Memcpy
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst,
                                const void* src, size_t bytes) {
@@ -193,10 +179,6 @@ int cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst,
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Signals  (cl_event wrappers)
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLHCQSignal* cml_hcq_opencl_signal_create(void) {
     CMLHCQSignal* signal = (CMLHCQSignal*)calloc(1, sizeof(CMLHCQSignal));
@@ -285,10 +267,6 @@ int cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 
     return 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Synchronize
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue) return -1;

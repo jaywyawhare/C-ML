@@ -394,12 +394,10 @@ static char* generate_fused_kernel_code(FusedKernel* kernel) {
     return code;
 }
 
-// Simple usage analysis (DCE)
 static void analyze_usage(CMLGraph_t ir) {
     if (!ir || !ir->head)
         return;
 
-    // Count nodes
     int count           = 0;
     struct IRNode* node = ir->head;
     while (node) {
@@ -412,7 +410,6 @@ static void analyze_usage(CMLGraph_t ir) {
     if (count == 0)
         return;
 
-    // Collect nodes for backward traversal
     struct IRNode** nodes = malloc(count * sizeof(struct IRNode*));
     if (!nodes)
         return;
@@ -423,12 +420,10 @@ static void analyze_usage(CMLGraph_t ir) {
         node     = node->next;
     }
 
-    // Mark tail as used (critical output)
     // Also mark any node that has no users? No, that's opposite.
     // We assume the last node is the output (loss).
     nodes[count - 1]->is_used = true;
 
-    // Iterate backwards
     for (int i = count - 1; i >= 0; i--) {
         struct IRNode* curr = nodes[i];
 

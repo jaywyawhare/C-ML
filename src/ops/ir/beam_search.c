@@ -21,8 +21,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── Tuning parameter space ──────────────────────────────────────────────── */
-
 static const int BLOCK_SIZES[]   = {32, 64, 128, 256, 512, 1024};
 static const int UNROLL_FACTORS[] = {1, 2, 4};
 static const int VEC_WIDTHS[]    = {1, 2, 4};
@@ -31,18 +29,12 @@ static const int VEC_WIDTHS[]    = {1, 2, 4};
 #define NUM_UNROLL_FACTORS (int)(sizeof(UNROLL_FACTORS) / sizeof(UNROLL_FACTORS[0]))
 #define NUM_VEC_WIDTHS    (int)(sizeof(VEC_WIDTHS)    / sizeof(VEC_WIDTHS[0]))
 
-/* ── Cache hash helpers ──────────────────────────────────────────────────── */
-
 /**
  * Map a kernel hash to a cache slot index (simple modular hash).
  */
 static int cache_slot(uint64_t hash) {
     return (int)(hash % 256);
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Public API
- * ══════════════════════════════════════════════════════════════════════════ */
 
 bool cml_beam_search_enabled(void) {
     const char* env = getenv("CML_BEAM");
@@ -85,11 +77,8 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
 
 void cml_beam_search_free(CMLBeamSearchCtx* ctx) {
     if (!ctx) return;
-    LOG_DEBUG("Freeing BEAM search context %p", (void*)ctx);
     free(ctx);
 }
-
-/* ── Cache lookup ────────────────────────────────────────────────────────── */
 
 int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                            CMLBeamConfig* best_out) {
@@ -118,8 +107,6 @@ int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     return -1; /* Cache full and key not found. */
 }
-
-/* ── Cache store ─────────────────────────────────────────────────────────── */
 
 int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                           const CMLBeamConfig* config, double time_us) {
@@ -165,8 +152,6 @@ int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                 (unsigned long long)kernel_hash);
     return -1;
 }
-
-/* ── Heuristic scoring ───────────────────────────────────────────────────── */
 
 /**
  * Compute a heuristic score for a candidate configuration.
@@ -219,8 +204,6 @@ static double estimate_time_cpu(const CMLBeamConfig* cfg,
     return (double)total_elements / throughput;
 }
 
-/* ── Comparison function for qsort ───────────────────────────────────────── */
-
 /**
  * Sort helper -- used to rank candidates by their heuristic score.
  * We stash the score in time_us temporarily during candidate generation.
@@ -232,8 +215,6 @@ static int cmp_beam_result(const void* a, const void* b) {
     if (ra->time_us > rb->time_us) return  1;
     return 0;
 }
-
-/* ── Main tune entry point ───────────────────────────────────────────────── */
 
 int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                          size_t total_elements, int ndim, const int* shape,
@@ -345,8 +326,6 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
     return 0;
 }
 
-/* ── Hardware timing tune ────────────────────────────────────────────────── */
-
 int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                              size_t total_elements,
                              CMLBeamTimingFn timing_fn, void* user_data,
@@ -443,8 +422,6 @@ int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     return 0;
 }
-
-/* ── Disk persistence ────────────────────────────────────────────────────── */
 
 int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path)
 {

@@ -19,8 +19,6 @@
 
 #ifdef CML_HAS_NIR
 
-/* ── Forward declarations for hcq_vulkan functions ───────────────────── */
-
 extern int  cml_hcq_vulkan_queue_init(CMLHCQQueue* queue);
 extern void cml_hcq_vulkan_queue_destroy(CMLHCQQueue* queue);
 extern int  cml_hcq_vulkan_submit_kernel(CMLHCQQueue* queue,
@@ -34,17 +32,11 @@ extern void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* signal);
 extern int  cml_hcq_vulkan_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
 extern int  cml_hcq_vulkan_synchronize(CMLHCQQueue* queue);
 
-/* ══════════════════════════════════════════════════════════════════════════
- * NIR HCQ API -- forwards to Vulkan HCQ
- * ══════════════════════════════════════════════════════════════════════════ */
-
 int cml_hcq_nir_queue_init(CMLHCQQueue* queue) {
-    LOG_DEBUG("HCQ NIR: queue init (forwarding to Vulkan HCQ)");
     return cml_hcq_vulkan_queue_init(queue);
 }
 
 void cml_hcq_nir_queue_destroy(CMLHCQQueue* queue) {
-    LOG_DEBUG("HCQ NIR: queue destroy (forwarding to Vulkan HCQ)");
     cml_hcq_vulkan_queue_destroy(queue);
 }
 
@@ -81,8 +73,6 @@ int cml_hcq_nir_synchronize(CMLHCQQueue* queue) {
 }
 
 #else /* !CML_HAS_NIR */
-
-/* ── Stubs when NIR is not compiled in ─────────────────────────────────── */
 
 int  cml_hcq_nir_queue_init(CMLHCQQueue* q)    { (void)q; return -1; }
 void cml_hcq_nir_queue_destroy(CMLHCQQueue* q)  { (void)q; }

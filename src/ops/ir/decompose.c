@@ -17,10 +17,8 @@
 #include <math.h>
 #include <stdatomic.h>
 
-// Counter for generating unique intermediate names
 static atomic_int g_decompose_counter = 0;
 
-// Forward declaration
 static char* decompose_unique_name(void);
 static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
                                             Tensor** inputs, int num_inputs,
@@ -29,8 +27,6 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
 static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, float value);
 static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
                                     struct IRNode* chain_head, struct IRNode* chain_tail);
-
-// Helpers
 
 static char* decompose_unique_name(void) {
     int id = atomic_fetch_add(&g_decompose_counter, 1);

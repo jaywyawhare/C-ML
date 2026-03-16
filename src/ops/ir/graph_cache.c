@@ -29,20 +29,16 @@ static uint64_t hash_combine(uint64_t h, uint64_t val) {
     return h;
 }
 
-// Hash graph structure (NOT data pointers)
 uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
     if (!ir)
         return 0;
 
     uint64_t hash = FNV_OFFSET;
 
-    // Hash each node's structure
     struct IRNode* node = ir->head;
     while (node) {
-        // Hash operation type
         hash = hash_combine(hash, (uint64_t)node->type);
 
-        // Hash output shape
         if (node->output) {
             hash = hash_combine(hash, (uint64_t)node->output->ndim);
             for (int i = 0; i < node->output->ndim; i++) {
@@ -50,7 +46,6 @@ uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
             }
         }
 
-        // Hash number of inputs
         hash = hash_combine(hash, (uint64_t)node->num_inputs);
 
         node = node->next;
@@ -122,7 +117,6 @@ static void evict_lru_entry(CMLGraphCache* cache) {
     if (!cache || cache->count == 0)
         return;
 
-    // Find LRU entry across all buckets
     uint64_t oldest_time             = UINT64_MAX;
     size_t oldest_bucket             = 0;
     CMLGraphCacheEntry* oldest_entry = NULL;
@@ -143,7 +137,6 @@ static void evict_lru_entry(CMLGraphCache* cache) {
         }
     }
 
-    // Remove oldest entry
     if (oldest_entry) {
         if (oldest_prev) {
             oldest_prev->next = oldest_entry->next;
@@ -161,7 +154,6 @@ int cml_graph_cache_insert(CMLGraphCache* cache, uint64_t signature, CMLExecutio
     if (!cache || !plan)
         return -1;
 
-    // Evict LRU entry if at capacity
     if (cache->count >= cache->max_entries) {
         evict_lru_entry(cache);
     }
@@ -215,13 +207,11 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
         return NULL;
     }
 
-    // Collect nodes in order (already topologically sorted)
     struct IRNode* node = ir->head;
     size_t idx          = 0;
     while (node && idx < plan->num_nodes) {
         plan->nodes[idx] = node;
 
-        // Pre-allocate output buffer
         if (node->output && node->output->numel > 0) {
             plan->buffer_sizes[idx] = node->output->numel;
             plan->buffers[idx]      = aligned_alloc(32, node->output->numel * sizeof(float));
@@ -446,7 +436,6 @@ static int execute_node_fast(struct IRNode* node, float* out_buf) {
         break;
     }
 
-    // Movement operations - just copy data (views are handled elsewhere)
     case UOP_RESHAPE:
     case UOP_PERMUTE:
     case UOP_EXPAND:
@@ -454,16 +443,13 @@ static int execute_node_fast(struct IRNode* node, float* out_buf) {
     case UOP_SLICE:
         if (!in1)
             return -1;
-        // For fast path, just copy data - proper striding handled by tensor
         if (in1_n == out_n) {
             memcpy(out_buf, in1, out_n * sizeof(float));
         } else if (in1_n == 1) {
-            // Broadcast scalar
             for (size_t i = 0; i < out_n; i++) {
                 out_buf[i] = in1[0];
             }
         } else {
-            // Generic copy with modulo wrapping
             for (size_t i = 0; i < out_n; i++) {
                 out_buf[i] = in1[i % in1_n];
             }
@@ -517,7 +503,6 @@ static int execute_node_fast(struct IRNode* node, float* out_buf) {
     case UOP_MAX_REDUCE: {
         if (!in1)
             return -1;
-        // Simple global max reduce
         float max_val = in1[0];
         for (size_t i = 1; i < in1_n; i++) {
             if (in1[i] > max_val)
@@ -528,7 +513,6 @@ static int execute_node_fast(struct IRNode* node, float* out_buf) {
     }
 
     case UOP_WHERE: {
-        // where(cond, a, b) - needs 3 inputs
         if (node->num_inputs < 3)
             return -1;
         float* cond = (float*)node->inputs[0]->data;
@@ -561,19 +545,16 @@ int cml_execute_plan(CMLExecutionPlan* plan, Tensor** inputs, size_t num_inputs)
     (void)inputs;
     (void)num_inputs;
 
-    // Execute each node in order
     for (size_t i = 0; i < plan->num_nodes; i++) {
         struct IRNode* node = plan->nodes[i];
         float* out_buf      = plan->buffers[i];
 
-        // Execute node
         int ret = execute_node_fast(node, out_buf);
         if (ret != 0) {
             LOG_ERROR("Failed to execute node %zu (type %d)", i, node->type);
             return -1;
         }
 
-        // Update tensor data pointer to use our buffer
         if (node->output) {
             node->output->data        = out_buf;
             node->output->is_executed = true;

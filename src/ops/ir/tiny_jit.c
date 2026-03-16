@@ -16,12 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── FNV-1a constants ── */
-
 #define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
 #define FNV_PRIME        0x100000001b3ULL
-
-/* ── Graph hashing ── */
 
 static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len)
 {
@@ -54,8 +50,6 @@ static uint64_t jit_compute_hash(CMLGraph_t ir)
     return hash;
 }
 
-/* ── Shape signature ── */
-
 static void compute_shape_sig(CMLGraph_t ir, int *sig, int *sig_len, int max_len)
 {
     *sig_len = 0;
@@ -74,10 +68,6 @@ static bool shape_matches(const CMLJitEntry *entry, const int *sig, int sig_len)
     if (entry->shape_len != sig_len) return false;
     return memcmp(entry->shape_sig, sig, sizeof(int) * (size_t)sig_len) == 0;
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
- * Public API
- * ══════════════════════════════════════════════════════════════════════════ */
 
 CMLTinyJit *cml_tinyjit_create(void)
 {

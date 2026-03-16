@@ -24,10 +24,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* -----------------------------------------------------------------------
- * Internal helpers
- * ----------------------------------------------------------------------- */
-
 /** Classify a UOp into a schedule item type (mirrors schedule.c) */
 static CMLScheduleItemType classify_op_v2(UOpType type) {
     if (type == UOP_MATMUL)  return SCHED_MATMUL;
@@ -60,10 +56,6 @@ static size_t tensor_elems(const Tensor* t) {
     }
     return n;
 }
-
-/* -----------------------------------------------------------------------
- * Fusion group lifecycle
- * ----------------------------------------------------------------------- */
 
 static CMLFusionGroup* fusion_group_create(void) {
     CMLFusionGroup* g = calloc(1, sizeof(CMLFusionGroup));
@@ -154,10 +146,6 @@ static void fusion_group_free(CMLFusionGroup* g) {
     free(g);
 }
 
-/* -----------------------------------------------------------------------
- * Fusion analysis
- * ----------------------------------------------------------------------- */
-
 CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a,
                                                struct IRNode* b) {
     CMLFusionAnalysis result = {0};
@@ -182,10 +170,6 @@ CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a,
 
     return result;
 }
-
-/* -----------------------------------------------------------------------
- * V2 schedule creation
- * ----------------------------------------------------------------------- */
 
 CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph,
                                        const CMLScheduleOptions* opts) {
@@ -340,10 +324,6 @@ CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph,
     return sched;
 }
 
-/* -----------------------------------------------------------------------
- * Free
- * ----------------------------------------------------------------------- */
-
 void cml_schedule_v2_free(CMLScheduleV2* sched) {
     if (!sched) return;
 
@@ -354,10 +334,6 @@ void cml_schedule_v2_free(CMLScheduleV2* sched) {
     free(sched->execution_order);
     free(sched);
 }
-
-/* -----------------------------------------------------------------------
- * Printing
- * ----------------------------------------------------------------------- */
 
 static const char* sched_type_name_v2(CMLScheduleItemType type) {
     switch (type) {
@@ -402,10 +378,6 @@ void cml_schedule_v2_print(const CMLScheduleV2* sched) {
     }
     printf("===============================\n");
 }
-
-/* -----------------------------------------------------------------------
- * V2 execution entry-point (stub -- dispatches to per-group execution)
- * ----------------------------------------------------------------------- */
 
 int cml_ir_execute_v2(CMLGraph_t ir) {
     if (!ir) return -1;

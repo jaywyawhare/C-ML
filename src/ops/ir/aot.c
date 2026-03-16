@@ -92,8 +92,6 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         return cml_aot_generate_header(ir, output_path, func_name);
     }
 
-    /* ---- C code generation from IR graph ---- */
-
     /* Count inputs/outputs by scanning nodes */
     int num_inputs = 0, num_outputs = 0;
     {
@@ -156,7 +154,6 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             n = node->inputs[0]->numel;
 
         switch (node->type) {
-        /* ---- Binary ops ---- */
         case UOP_ADD:
             fprintf(cf, "    /* ADD */\n");
             fprintf(cf, "    for (int64_t i = 0; i < %lld; i++)\n", (long long)n);
@@ -178,7 +175,6 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             fprintf(cf, "        output0->aligned[i] = input0->aligned[i] / input1->aligned[i];\n");
             break;
 
-        /* ---- Unary ops ---- */
         case UOP_NEG:
             fprintf(cf, "    /* NEG */\n");
             fprintf(cf, "    for (int64_t i = 0; i < %lld; i++)\n", (long long)n);
@@ -230,7 +226,6 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             fprintf(cf, "        output0->aligned[i] = 1.0f / input0->aligned[i];\n");
             break;
 
-        /* ---- MatMul ---- */
         case UOP_MATMUL:
             fprintf(cf, "    /* MATMUL (naive) */\n");
             fprintf(cf, "    {\n");
@@ -269,7 +264,6 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     fprintf(cf, "}\n");
     fclose(cf);
 
-    /* ---- Emit or compile based on format ---- */
     if (opts.format == AOT_FORMAT_LLVM_IR) {
         /* For LLVM_IR format, just copy the generated C source to output_path */
         FILE* src = fopen(tmp_c_path, "r");

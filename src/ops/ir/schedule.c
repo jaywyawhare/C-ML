@@ -14,10 +14,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* -----------------------------------------------------------------------
- * Classification helpers
- * ----------------------------------------------------------------------- */
-
 bool cml_schedule_is_elementwise(UOpType type) {
     switch (type) {
         /* Core binary */
@@ -121,10 +117,6 @@ bool cml_schedule_can_fuse(UOpType a, UOpType b) {
     return false;
 }
 
-/* -----------------------------------------------------------------------
- * Default options
- * ----------------------------------------------------------------------- */
-
 CMLScheduleOptions cml_schedule_default_options(void) {
     CMLScheduleOptions opts;
     opts.enable_fusion       = true;
@@ -134,10 +126,6 @@ CMLScheduleOptions cml_schedule_default_options(void) {
     opts.topological_sort    = true;
     return opts;
 }
-
-/* -----------------------------------------------------------------------
- * Schedule item helpers
- * ----------------------------------------------------------------------- */
 
 static CMLScheduleItem* sched_item_create(CMLScheduleItemType type) {
     CMLScheduleItem* item = calloc(1, sizeof(CMLScheduleItem));
@@ -177,10 +165,6 @@ static void sched_item_free(CMLScheduleItem* item) {
     free(item->outputs);
     free(item);
 }
-
-/* -----------------------------------------------------------------------
- * Input / output tracking for a schedule item
- * ----------------------------------------------------------------------- */
 
 /**
  * For a given schedule item, figure out which tensors are *external* inputs
@@ -244,10 +228,6 @@ static void compute_item_io(CMLScheduleItem* item) {
     item->outputs     = produced;
     item->num_outputs = num_produced;
 }
-
-/* -----------------------------------------------------------------------
- * Cost estimation
- * ----------------------------------------------------------------------- */
 
 /** Estimate total elements for a tensor (returns 0 if unknown). */
 static size_t tensor_total_elements(const Tensor* t) {
@@ -346,10 +326,6 @@ static void estimate_item_cost(CMLScheduleItem* item) {
         : 0.0f;
 }
 
-/* -----------------------------------------------------------------------
- * Dependency tracking
- * ----------------------------------------------------------------------- */
-
 /**
  * Build dependency lists: item i depends on item j if any input tensor of
  * item i is an output tensor of item j.
@@ -398,10 +374,6 @@ static void build_dependencies(CMLSchedule* sched) {
     }
 }
 
-/* -----------------------------------------------------------------------
- * Schedule creation
- * ----------------------------------------------------------------------- */
-
 CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opts) {
     CMLScheduleOptions default_opts;
     if (!opts) {
@@ -446,7 +418,6 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
 
         CMLScheduleItemType kind = classify_op(node->type);
 
-        /* ----- movement: fold into current or skip ----- */
         if (kind == SCHED_MOVEMENT) {
             if (opts->enable_movement_fold && cur) {
                 /* Absorb movement into current item */
@@ -470,7 +441,6 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
             continue;
         }
 
-        /* ----- elementwise: extend current or start new ----- */
         if (kind == SCHED_ELEMENTWISE && opts->enable_fusion) {
             if (cur &&
                 (cur->type == SCHED_ELEMENTWISE ||
@@ -498,7 +468,6 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
             continue;
         }
 
-        /* ----- reduction: finish current, make dedicated item ----- */
         if (kind == SCHED_REDUCE) {
             /* Flush current */
             if (cur) {
@@ -581,7 +550,6 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
             continue;
         }
 
-        /* ----- matmul / conv: flush current, make dedicated item ----- */
         if (kind == SCHED_MATMUL || kind == SCHED_CONV) {
             if (cur) {
                 if (sched->num_items >= sched->item_capacity) {
@@ -599,7 +567,6 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
             continue;
         }
 
-        /* ----- custom / unknown: flush and create standalone ----- */
         if (cur) {
             if (sched->num_items >= sched->item_capacity) {
                 int nc = sched->item_capacity * 2;
@@ -668,10 +635,6 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
     return sched;
 }
 
-/* -----------------------------------------------------------------------
- * Accessors
- * ----------------------------------------------------------------------- */
-
 int cml_schedule_num_kernels(const CMLSchedule* sched) {
     return sched ? sched->num_items : 0;
 }
@@ -680,10 +643,6 @@ const CMLScheduleItem* cml_schedule_get_item(const CMLSchedule* sched, int index
     if (!sched || index < 0 || index >= sched->num_items) return NULL;
     return sched->items[index];
 }
-
-/* -----------------------------------------------------------------------
- * Printing / string conversion
- * ----------------------------------------------------------------------- */
 
 static const char* sched_type_name(CMLScheduleItemType type) {
     switch (type) {
@@ -790,10 +749,6 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
                     "==============================\n");
     return buf;
 }
-
-/* -----------------------------------------------------------------------
- * Free
- * ----------------------------------------------------------------------- */
 
 void cml_schedule_free(CMLSchedule* sched) {
     if (!sched) return;

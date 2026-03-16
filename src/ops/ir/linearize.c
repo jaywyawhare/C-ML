@@ -15,10 +15,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* -----------------------------------------------------------------------
- * Virtual register file
- * ----------------------------------------------------------------------- */
-
 #define MAX_VIRTUAL_REGS 64
 
 typedef enum {
@@ -43,10 +39,6 @@ typedef struct {
     int capacity;
     int next_vreg;           /* Next free virtual register */
 } LinearProgram;
-
-/* -----------------------------------------------------------------------
- * Helpers
- * ----------------------------------------------------------------------- */
 
 static LinearProgram* linear_program_create(void) {
     LinearProgram* prog = calloc(1, sizeof(LinearProgram));
@@ -86,10 +78,6 @@ static int alloc_vreg(LinearProgram* prog) {
     return prog->next_vreg++;
 }
 
-/* -----------------------------------------------------------------------
- * Check if a node index is in the eliminated list
- * ----------------------------------------------------------------------- */
-
 static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     if (!g) return false;
     for (int i = 0; i < g->num_eliminated; i++) {
@@ -98,10 +86,6 @@ static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     }
     return false;
 }
-
-/* -----------------------------------------------------------------------
- * Linearize a fusion group
- * ----------------------------------------------------------------------- */
 
 /**
  * Convert a CMLFusionGroup into a linear instruction sequence.
@@ -212,10 +196,6 @@ static LinearProgram* linearize_group(const CMLFusionGroup* g) {
     return prog;
 }
 
-/* -----------------------------------------------------------------------
- * Debug printing
- * ----------------------------------------------------------------------- */
-
 static const char* linop_name(LinearOpKind k) {
     switch (k) {
         case LINOP_LOAD:    return "LOAD";
@@ -246,10 +226,6 @@ static void linear_program_print(const LinearProgram* prog) {
     }
     printf("---\n");
 }
-
-/* -----------------------------------------------------------------------
- * Public interface: linearize and print a fusion group
- * ----------------------------------------------------------------------- */
 
 void cml_linearize_group_print(const CMLFusionGroup* g) {
     if (!g) return;
