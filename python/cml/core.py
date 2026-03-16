@@ -57,13 +57,10 @@ def cleanup():
 def seed(s):
     """Set random seed for reproducibility.
 
-    Note: This is a placeholder - the actual seed function may not exist.
-
     Args:
         s: Random seed value
     """
-    # Seed function may not exist in current API
-    # Use numpy's random seed instead
+    lib.cml_seed(int(s))
     np.random.seed(s)
 
 
@@ -581,10 +578,15 @@ class Tensor:
             # For 1D tensors, return scalar
             if len(shape) == 1:
                 return lib.tensor_get_float(self._tensor, idx)
-            # For multi-D tensors, return row (not fully supported yet)
-            raise NotImplementedError(
-                "Slicing multi-dimensional tensors not yet supported"
-            )
+            # For multi-D tensors, compute flat offset for the row start
+            # and return a view/slice as a new Tensor
+            row_size = 1
+            for d in range(1, len(shape)):
+                row_size *= shape[d]
+            flat_start = idx * row_size
+            # Return each element as a sub-tensor by creating from numpy
+            arr = self.numpy()[idx]
+            return Tensor.from_numpy(arr)
         elif isinstance(idx, tuple):
             # Multi-dimensional indexing
             shape = self.shape
@@ -630,9 +632,23 @@ class Tensor:
             if len(shape) == 1:
                 lib.tensor_set_float(self._tensor, idx, float(value))
             else:
-                raise NotImplementedError(
-                    "Setting multi-dimensional indices not yet supported"
-                )
+                # For multi-D tensors with single int index, set entire row
+                row_size = 1
+                for d in range(1, len(shape)):
+                    row_size *= shape[d]
+                flat_start = idx * row_size
+                if isinstance(value, (int, float)):
+                    # Fill the entire row with the value
+                    for j in range(row_size):
+                        lib.tensor_set_float(self._tensor, flat_start + j, float(value))
+                elif hasattr(value, '_tensor'):
+                    # Copy from another tensor
+                    lib.tensor_ensure_executed(value._tensor)
+                    for j in range(row_size):
+                        v = lib.tensor_get_float(value._tensor, j)
+                        lib.tensor_set_float(self._tensor, flat_start + j, v)
+                else:
+                    raise TypeError(f"Cannot set tensor elements from {type(value)}")
         elif isinstance(idx, tuple):
             shape = self.shape
             if len(idx) != len(shape):
@@ -830,7 +846,10 @@ class Tensor:
         Returns:
             New random tensor
         """
-        return Tensor.randn(shape)  # Placeholder
+        if isinstance(shape, int):
+            shape = [shape]
+        arr = np.random.rand(*shape).astype(np.float32)
+        return Tensor.from_numpy(arr)
 
     @staticmethod
     def full(shape, value):
@@ -845,9 +864,8 @@ class Tensor:
         """
         if isinstance(shape, int):
             shape = [shape]
-        # Use zeros and add value
-        result = Tensor.zeros(shape)
-        return result
+        arr = np.full(shape, float(value), dtype=np.float32)
+        return Tensor.from_numpy(arr)
 
     @staticmethod
     def empty(shape):
@@ -1033,8 +1051,12 @@ def set_device(device: int):
     Args:
         device: Device type (DEVICE_CPU, DEVICE_CUDA, etc.)
     """
-    # Would need to add cml_set_default_device to C API
-    pass
+    try:
+        lib.cml_set_default_device(device)
+    except (AttributeError, Exception):
+        if device != DEVICE_CPU:
+            import warnings
+            warnings.warn(f"Device {DEVICE_NAMES.get(device, device)} not available, using CPU")
 
 
 def is_device_available(device: int) -> bool:
@@ -1046,8 +1068,9 @@ def is_device_available(device: int) -> bool:
     Returns:
         True if device is available
     """
-    # For now, only CPU is always available
     if device == DEVICE_CPU:
         return True
-    # Would need device detection in C
-    return False
+    try:
+        return bool(lib.cml_is_device_available(device))
+    except (AttributeError, Exception):
+        return False

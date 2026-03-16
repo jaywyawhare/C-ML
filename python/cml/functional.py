@@ -96,8 +96,13 @@ def disable_grad():
         >>> with disable_grad():
         ...     output = model(X)  # No gradients
     """
-    # Placeholder - would implement grad disabling
-    yield
+    from cml.core import no_grad as _no_grad
+    ctx = _no_grad()
+    ctx.__enter__()
+    try:
+        yield
+    finally:
+        ctx.__exit__(None, None, None)
 
 
 @contextmanager
@@ -108,7 +113,13 @@ def enable_grad():
         >>> with enable_grad():
         ...     output = model(X)  # Gradients enabled
     """
-    yield
+    from cml.core import enable_grad as _enable_grad
+    ctx = _enable_grad()
+    ctx.__enter__()
+    try:
+        yield
+    finally:
+        ctx.__exit__(None, None, None)
 
 
 def timer(fn: Callable) -> Callable:

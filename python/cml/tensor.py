@@ -47,8 +47,13 @@ class Tensor(BaseTensor):
         return Tensor(lib.tensor_power(self._tensor, float(power)))
 
     def __mod__(self, other: Union[int, float]) -> "Tensor":
-        """Modulo operation (not typically used for tensors)."""
-        raise NotImplementedError("Modulo not implemented for tensors")
+        """Modulo operation: remainder after floor division."""
+        if isinstance(other, (int, float)):
+            # x % y = x - floor(x / y) * y
+            return self - (self / Tensor.full(self.shape or [self.size], float(other))) * Tensor.full(self.shape or [self.size], float(other))
+        if isinstance(other, Tensor):
+            return self - (self / other) * other
+        raise TypeError(f"Cannot compute modulo of Tensor and {type(other)}")
 
     def __floordiv__(self, other: Union[int, float]) -> "Tensor":
         """Floor division."""
@@ -61,40 +66,74 @@ class Tensor(BaseTensor):
         return Tensor(lib.tensor_multiply(self._tensor, -1.0))
 
     def __abs__(self) -> "Tensor":
-        """Absolute value."""
-        # Could use tensor_power(x, 2) then sqrt, but for now:
-        zero = lib.tensor_zeros(ffi.NULL, 0, ffi.NULL)
-        result = lib.tensor_max(self._tensor)  # Simplified
-        lib.tensor_free(zero)
-        return Tensor(result)
+        """Element-wise absolute value."""
+        arr = np.abs(self.numpy())
+        return Tensor.from_numpy(arr.astype(np.float32))
 
-    # Comparison operators (return boolean for now)
-    def __lt__(self, other: Union[int, float]) -> bool:
-        """Less than."""
+    # Comparison operators (return Tensor of 0s/1s)
+    def __lt__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Less than (element-wise)."""
         if isinstance(other, (int, float)):
-            max_val = self.max()
-            return True  # Placeholder
+            result = (self.numpy() < other).astype(np.float32)
+            return Tensor.from_numpy(result)
+        if isinstance(other, Tensor):
+            result = (self.numpy() < other.numpy()).astype(np.float32)
+            return Tensor.from_numpy(result)
         return NotImplemented
 
-    def __gt__(self, other: Union[int, float]) -> bool:
-        """Greater than."""
+    def __gt__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Greater than (element-wise)."""
+        if isinstance(other, (int, float)):
+            result = (self.numpy() > other).astype(np.float32)
+            return Tensor.from_numpy(result)
+        if isinstance(other, Tensor):
+            result = (self.numpy() > other.numpy()).astype(np.float32)
+            return Tensor.from_numpy(result)
         return NotImplemented
 
-    def __le__(self, other: Union[int, float]) -> bool:
-        """Less than or equal."""
+    def __le__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Less than or equal (element-wise)."""
+        if isinstance(other, (int, float)):
+            result = (self.numpy() <= other).astype(np.float32)
+            return Tensor.from_numpy(result)
+        if isinstance(other, Tensor):
+            result = (self.numpy() <= other.numpy()).astype(np.float32)
+            return Tensor.from_numpy(result)
         return NotImplemented
 
-    def __ge__(self, other: Union[int, float]) -> bool:
-        """Greater than or equal."""
+    def __ge__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Greater than or equal (element-wise)."""
+        if isinstance(other, (int, float)):
+            result = (self.numpy() >= other).astype(np.float32)
+            return Tensor.from_numpy(result)
+        if isinstance(other, Tensor):
+            result = (self.numpy() >= other.numpy()).astype(np.float32)
+            return Tensor.from_numpy(result)
         return NotImplemented
 
-    def __eq__(self, other: Union[int, float]) -> bool:
-        """Equal comparison."""
+    def __eq__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Equal comparison (element-wise)."""
+        if isinstance(other, (int, float)):
+            result = (self.numpy() == other).astype(np.float32)
+            return Tensor.from_numpy(result)
+        if isinstance(other, Tensor):
+            result = (self.numpy() == other.numpy()).astype(np.float32)
+            return Tensor.from_numpy(result)
         return NotImplemented
 
-    def __ne__(self, other: Union[int, float]) -> bool:
-        """Not equal comparison."""
+    def __ne__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Not equal comparison (element-wise)."""
+        if isinstance(other, (int, float)):
+            result = (self.numpy() != other).astype(np.float32)
+            return Tensor.from_numpy(result)
+        if isinstance(other, Tensor):
+            result = (self.numpy() != other.numpy()).astype(np.float32)
+            return Tensor.from_numpy(result)
         return NotImplemented
+
+    def __hash__(self):
+        """Hash based on C tensor pointer (needed since __eq__ is overridden)."""
+        return hash(int(ffi.cast("uintptr_t", self._tensor)))
 
     # Convenience properties
     @property
@@ -109,9 +148,9 @@ class Tensor(BaseTensor):
 
     @property
     def shape(self) -> Optional[Tuple]:
-        """Get tensor shape (placeholder - requires C extension)."""
-        # In a full implementation, you'd track shape in Python
-        return None
+        """Get tensor shape."""
+        # Delegate to parent class which reads from the C tensor
+        return super().shape
 
     def squeeze(self, dim: Optional[int] = None) -> "Tensor":
         """Remove dimensions of size 1.
@@ -126,8 +165,7 @@ class Tensor(BaseTensor):
             >>> x = Tensor.zeros([1, 10, 1])
             >>> y = x.squeeze()  # [10]
         """
-        # Placeholder - would need C support
-        return self
+        return super().squeeze(dim)
 
     def unsqueeze(self, dim: int) -> "Tensor":
         """Add a dimension of size 1.
@@ -142,8 +180,7 @@ class Tensor(BaseTensor):
             >>> x = Tensor.zeros([10])
             >>> y = x.unsqueeze(0)  # [1, 10]
         """
-        # Placeholder - would need C support
-        return self
+        return super().unsqueeze(dim)
 
     def expand(self, *shape: int) -> "Tensor":
         """Expand tensor to new shape.
@@ -194,10 +231,8 @@ class Tensor(BaseTensor):
         Returns:
             Scalar std tensor
         """
-        # std = sqrt(mean((x - mean)^2))
-        mean_val = self.mean()
-        # Placeholder - full implementation would subtract mean
-        return mean_val
+        result = np.std(self.numpy())
+        return Tensor.from_numpy(np.array([result], dtype=np.float32))
 
     def var(self) -> "Tensor":
         """Variance of all elements.
@@ -205,8 +240,8 @@ class Tensor(BaseTensor):
         Returns:
             Scalar variance tensor
         """
-        # var = mean((x - mean)^2)
-        return self.std()  # Placeholder
+        result = np.var(self.numpy())
+        return Tensor.from_numpy(np.array([result], dtype=np.float32))
 
     def clamp(self, min_val: float = 0, max_val: float = 1) -> "Tensor":
         """Clamp values to range [min_val, max_val].
@@ -222,8 +257,8 @@ class Tensor(BaseTensor):
             >>> x = Tensor.randn([10, 10])
             >>> clamped = x.clamp(0, 1)
         """
-        # Would need custom C function
-        return self
+        result = np.clip(self.numpy(), min_val, max_val)
+        return Tensor.from_numpy(result)
 
     def clip(self, min_val: float, max_val: float) -> "Tensor":
         """Alias for clamp."""
@@ -239,8 +274,8 @@ class Tensor(BaseTensor):
 
     def sign(self) -> "Tensor":
         """Sign function (returns -1, 0, or 1)."""
-        # Placeholder - would need C function
-        return self
+        result = np.sign(self.numpy())
+        return Tensor.from_numpy(result)
 
     def round(self, decimals: int = 0) -> "Tensor":
         """Round to specified decimals.
@@ -251,15 +286,18 @@ class Tensor(BaseTensor):
         Returns:
             Rounded tensor
         """
-        return self
+        result = np.round(self.numpy(), decimals)
+        return Tensor.from_numpy(result)
 
     def ceil(self) -> "Tensor":
         """Ceiling function."""
-        return self
+        result = np.ceil(self.numpy())
+        return Tensor.from_numpy(result)
 
     def floor(self) -> "Tensor":
         """Floor function."""
-        return self
+        result = np.floor(self.numpy())
+        return Tensor.from_numpy(result)
 
     def sqrt(self) -> "Tensor":
         """Square root."""
@@ -271,29 +309,28 @@ class Tensor(BaseTensor):
 
     def exp(self) -> "Tensor":
         """Exponential (e^x)."""
-        # Would need C function
-        return self
+        return Tensor(lib.cml_exp(self._tensor))
 
     def log(self) -> "Tensor":
         """Natural logarithm."""
-        # Would need C function
-        return self
+        return Tensor(lib.cml_log(self._tensor))
 
     def log10(self) -> "Tensor":
         """Base-10 logarithm."""
-        return self.log()
+        result = np.log10(self.numpy())
+        return Tensor.from_numpy(result)
 
     def sin(self) -> "Tensor":
         """Sine function."""
-        return self
+        return Tensor(lib.cml_sin(self._tensor))
 
     def cos(self) -> "Tensor":
         """Cosine function."""
-        return self
+        return Tensor(lib.cml_cos(self._tensor))
 
     def tan(self) -> "Tensor":
         """Tangent function."""
-        return self
+        return Tensor(lib.cml_tan(self._tensor))
 
     # Chainable operations
     def apply(self, fn) -> "Tensor":
@@ -342,20 +379,31 @@ class Tensor(BaseTensor):
         return Tensor(result)
 
     def normalized(self) -> "Tensor":
-        """Normalize to [0, 1] range (simplified)."""
-        # full implementation would compute (x - min) / (max - min)
-        return self
+        """Normalize to [0, 1] range (min-max normalization)."""
+        arr = self.numpy()
+        min_val = arr.min()
+        max_val = arr.max()
+        denom = max_val - min_val
+        if denom == 0:
+            return Tensor.from_numpy(np.zeros_like(arr))
+        result = (arr - min_val) / denom
+        return Tensor.from_numpy(result)
 
     def standardized(self) -> "Tensor":
         """Standardize to mean=0, std=1."""
-        # (x - mean) / std
-        return self
+        arr = self.numpy()
+        mean = arr.mean()
+        std = arr.std()
+        if std == 0:
+            return Tensor.from_numpy(np.zeros_like(arr))
+        result = (arr - mean) / std
+        return Tensor.from_numpy(result)
 
     # Dimension operations
     @property
-    def ndim(self) -> Optional[int]:
+    def ndim(self) -> int:
         """Number of dimensions."""
-        return None  # Would need C extension
+        return super().ndim
 
     @property
     def numel(self) -> int:
@@ -404,9 +452,8 @@ class Tensor(BaseTensor):
         """
         if m is None:
             m = n
-        # Create zeros then set diagonal to 1
-        # Placeholder - would need C extension
-        return Tensor.zeros([n, m])
+        result = np.eye(n, m, dtype=np.float32)
+        return Tensor.from_numpy(result)
 
     @staticmethod
     def arange(start: float, end: float, step: float = 1.0) -> "Tensor":
@@ -423,9 +470,8 @@ class Tensor(BaseTensor):
         Example:
             >>> x = Tensor.arange(0, 10, 1)  # [0, 1, 2, ..., 9]
         """
-        # Placeholder - would need C extension
-        count = int((end - start) / step)
-        return Tensor.zeros([count])
+        result = np.arange(start, end, step, dtype=np.float32)
+        return Tensor.from_numpy(result)
 
     @staticmethod
     def linspace(start: float, end: float, steps: int = 100) -> "Tensor":
@@ -442,7 +488,8 @@ class Tensor(BaseTensor):
         Example:
             >>> x = Tensor.linspace(0, 1, 11)
         """
-        return Tensor.zeros([steps])
+        result = np.linspace(start, end, steps, dtype=np.float32)
+        return Tensor.from_numpy(result)
 
     @staticmethod
     def logspace(start: float, end: float, steps: int = 50) -> "Tensor":
@@ -456,7 +503,8 @@ class Tensor(BaseTensor):
         Returns:
             1D tensor with log-spaced values
         """
-        return Tensor.zeros([steps])
+        result = np.logspace(start, end, steps, dtype=np.float32)
+        return Tensor.from_numpy(result)
 
     # Convenience stacking operations
     @staticmethod
@@ -477,7 +525,8 @@ class Tensor(BaseTensor):
         """
         if not tensors:
             raise ValueError("Need at least one tensor to stack")
-        return tensors[0]  # Placeholder
+        result = np.stack([t.numpy() for t in tensors], axis=dim)
+        return Tensor.from_numpy(result)
 
     @staticmethod
     def cat(tensors: list, dim: int = 0) -> "Tensor":
@@ -497,4 +546,5 @@ class Tensor(BaseTensor):
         """
         if not tensors:
             raise ValueError("Need at least one tensor")
-        return tensors[0]  # Placeholder
+        result = np.concatenate([t.numpy() for t in tensors], axis=dim)
+        return Tensor.from_numpy(result)

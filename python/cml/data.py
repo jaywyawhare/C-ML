@@ -86,7 +86,7 @@ class DataLoader:
             dataset: Dataset or feature tensor
             batch_size: Batch size
             shuffle: Whether to shuffle data
-            num_workers: Number of workers (placeholder)
+            num_workers: Number of workers (reserved for future use)
         """
         if isinstance(dataset, Tensor):
             self.dataset = Dataset(dataset)
@@ -99,8 +99,8 @@ class DataLoader:
         self.indices = list(range(len(self.dataset)))
 
         if shuffle:
-            # Simple shuffle (would need better implementation)
-            pass
+            import random
+            random.shuffle(self.indices)
 
     def __iter__(self):
         """Iterate through batches."""
@@ -209,8 +209,19 @@ def normalize(
     Example:
         >>> X_normalized = normalize(X)
     """
-    # (X - mean) / std
-    return X
+    import numpy as np
+    arr = X.numpy()
+    if mean is None:
+        mean_val = np.mean(arr, axis=0)
+    else:
+        mean_val = mean.numpy() if hasattr(mean, 'numpy') else mean
+    if std is None:
+        std_val = np.std(arr, axis=0)
+        std_val = np.where(std_val == 0, 1.0, std_val)  # avoid division by zero
+    else:
+        std_val = std.numpy() if hasattr(std, 'numpy') else std
+    result = (arr - mean_val) / std_val
+    return Tensor.from_numpy(result.astype(np.float32))
 
 
 def standardize(X: Tensor) -> Tensor:
@@ -232,8 +243,15 @@ def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tenso
     Example:
         >>> X_scaled = minmax_scale(X, 0, 1)
     """
-    # (X - X_min) / (X_max - X_min) * (max - min) + min
-    return X
+    import numpy as np
+    arr = X.numpy()
+    x_min = np.min(arr, axis=0)
+    x_max = np.max(arr, axis=0)
+    denom = x_max - x_min
+    denom = np.where(denom == 0, 1.0, denom)
+    scaled = (arr - x_min) / denom
+    result = scaled * (max_val - min_val) + min_val
+    return Tensor.from_numpy(result.astype(np.float32))
 
 
 def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
@@ -250,8 +268,11 @@ def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
         >>> labels = cml.randn([100])
         >>> one_hot = one_hot_encode(labels, num_classes=10)
     """
-    # Placeholder - would need custom C function
-    return cml.zeros([labels.size, num_classes])
+    import numpy as np
+    arr = labels.numpy().flatten().astype(int)
+    one_hot = np.zeros((len(arr), num_classes), dtype=np.float32)
+    one_hot[np.arange(len(arr)), arr] = 1.0
+    return Tensor.from_numpy(one_hot)
 
 
 def split_into_batches(
@@ -284,39 +305,126 @@ def split_into_batches(
     return batches
 
 
+def _try_sklearn_load(name: str):
+    """Try to load a dataset from scikit-learn."""
+    try:
+        import sklearn.datasets
+        loader = getattr(sklearn.datasets, f"load_{name}", None)
+        if loader:
+            data = loader()
+            return data.data, data.target
+    except ImportError:
+        pass
+    return None, None
+
+
 def load_iris() -> Tuple[Tensor, Tensor]:
-    """Load Iris dataset (placeholder).
+    """Load Iris dataset.
 
     Returns:
-        (X, y) tensors
+        (X, y) tensors where X is (150, 4) features and y is (150,) labels
+
+    Note:
+        Requires scikit-learn for actual data. Falls back to synthetic data
+        if scikit-learn is not installed.
     """
-    # Would load actual iris data
-    X = cml.randn([150, 4])
-    y = cml.zeros([150, 3])
+    import numpy as np
+
+    X_np, y_np = _try_sklearn_load("iris")
+    if X_np is not None:
+        X = Tensor.from_numpy(np.array(X_np, dtype=np.float32))
+        y = Tensor.from_numpy(np.array(y_np, dtype=np.float32))
+        return X, y
+
+    # Fallback: generate synthetic iris-like data
+    np.random.seed(42)
+    X_np = np.random.randn(150, 4).astype(np.float32) * 0.5
+    X_np[:50] += np.array([5.0, 3.4, 1.4, 0.2])
+    X_np[50:100] += np.array([5.9, 2.8, 4.3, 1.3])
+    X_np[100:] += np.array([6.6, 3.0, 5.6, 2.0])
+    y_np = np.array([0]*50 + [1]*50 + [2]*50, dtype=np.float32)
+
+    X = Tensor.from_numpy(X_np)
+    y = Tensor.from_numpy(y_np)
     return X, y
 
 
 def load_mnist() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
-    """Load MNIST dataset (placeholder).
+    """Load MNIST dataset.
 
     Returns:
         ((X_train, y_train), (X_test, y_test))
+
+    Note:
+        Requires scikit-learn (fetch_openml) or a local cache for actual data.
+        Falls back to synthetic data if not available.
     """
-    X_train = cml.randn([60000, 784])
-    y_train = cml.zeros([60000, 10])
-    X_test = cml.randn([10000, 784])
-    y_test = cml.zeros([10000, 10])
+    import numpy as np
+
+    try:
+        from sklearn.datasets import fetch_openml
+        mnist = fetch_openml('mnist_784', version=1, as_frame=False, parser='auto')
+        X = np.array(mnist.data, dtype=np.float32) / 255.0
+        y = np.array(mnist.target, dtype=np.float32)
+        X_train = Tensor.from_numpy(X[:60000])
+        y_train = Tensor.from_numpy(y[:60000])
+        X_test = Tensor.from_numpy(X[60000:])
+        y_test = Tensor.from_numpy(y[60000:])
+        return (X_train, y_train), (X_test, y_test)
+    except (ImportError, Exception):
+        pass
+
+    # Fallback: small synthetic data
+    np.random.seed(42)
+    X_train = Tensor.from_numpy(np.random.randn(1000, 784).astype(np.float32) * 0.1)
+    y_train = Tensor.from_numpy(np.random.randint(0, 10, 1000).astype(np.float32))
+    X_test = Tensor.from_numpy(np.random.randn(200, 784).astype(np.float32) * 0.1)
+    y_test = Tensor.from_numpy(np.random.randint(0, 10, 200).astype(np.float32))
     return (X_train, y_train), (X_test, y_test)
 
 
 def load_cifar10() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
-    """Load CIFAR-10 dataset (placeholder).
+    """Load CIFAR-10 dataset.
 
     Returns:
         ((X_train, y_train), (X_test, y_test))
+
+    Note:
+        Requires a local cache or network access for actual data.
+        Falls back to synthetic data if not available.
     """
-    X_train = cml.randn([50000, 3, 32, 32])
-    y_train = cml.zeros([50000, 10])
-    X_test = cml.randn([10000, 3, 32, 32])
-    y_test = cml.zeros([10000, 10])
+    import numpy as np
+
+    try:
+        import pickle, os, gzip
+        cache_dir = os.path.expanduser("~/.cml/datasets/cifar10")
+        if os.path.exists(os.path.join(cache_dir, "data_batch_1")):
+            X_batches, y_batches = [], []
+            for i in range(1, 6):
+                with open(os.path.join(cache_dir, f"data_batch_{i}"), 'rb') as f:
+                    batch = pickle.load(f, encoding='bytes')
+                X_batches.append(batch[b'data'])
+                y_batches.append(batch[b'labels'])
+            X_train_np = np.concatenate(X_batches).astype(np.float32) / 255.0
+            y_train_np = np.concatenate(y_batches).astype(np.float32)
+
+            with open(os.path.join(cache_dir, "test_batch"), 'rb') as f:
+                test = pickle.load(f, encoding='bytes')
+            X_test_np = np.array(test[b'data'], dtype=np.float32) / 255.0
+            y_test_np = np.array(test[b'labels'], dtype=np.float32)
+
+            X_train = Tensor.from_numpy(X_train_np.reshape(-1, 3, 32, 32))
+            y_train = Tensor.from_numpy(y_train_np)
+            X_test = Tensor.from_numpy(X_test_np.reshape(-1, 3, 32, 32))
+            y_test = Tensor.from_numpy(y_test_np)
+            return (X_train, y_train), (X_test, y_test)
+    except Exception:
+        pass
+
+    # Fallback: small synthetic data
+    np.random.seed(42)
+    X_train = Tensor.from_numpy(np.random.randn(1000, 3, 32, 32).astype(np.float32) * 0.1)
+    y_train = Tensor.from_numpy(np.random.randint(0, 10, 1000).astype(np.float32))
+    X_test = Tensor.from_numpy(np.random.randn(200, 3, 32, 32).astype(np.float32) * 0.1)
+    y_test = Tensor.from_numpy(np.random.randint(0, 10, 200).astype(np.float32))
     return (X_train, y_train), (X_test, y_test)
