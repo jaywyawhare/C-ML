@@ -22,7 +22,7 @@ from pathlib import Path
 
 # Configuration
 HERE = Path(__file__).resolve().parent
-VIZ_SERVER_SCRIPT = HERE / "fastapi_server.py"
+VIZ_SERVER_SCRIPT = HERE.parent / "viz" / "serve.py"
 DEFAULT_PORT = 8001
 SERVER_TIMEOUT = 10  # seconds
 
@@ -60,12 +60,12 @@ def start_viz_server(port: int = DEFAULT_PORT) -> tuple:
     env["PORT"] = str(port)
 
     try:
+        server_log = open("/tmp/cml_viz_server.log", "w")
         process = subprocess.Popen(
             [sys.executable, str(VIZ_SERVER_SCRIPT)],
             env=env,
-            stdout=subprocess.PIPE,
+            stdout=server_log,
             stderr=subprocess.STDOUT,
-            text=True,
         )
     except Exception as e:
         print(f"Failed to start server: {e}", file=sys.stderr)
@@ -79,14 +79,6 @@ def start_viz_server(port: int = DEFAULT_PORT) -> tuple:
 
     # Server failed to start
     print("Server failed to start (timeout)", file=sys.stderr)
-
-    # Print any output from the server
-    if process.poll() is not None:
-        output = process.stdout.read()
-        if output:
-            print("Server output:", file=sys.stderr)
-            for line in output.splitlines():
-                print(f"  {line}", file=sys.stderr)
 
     try:
         process.terminate()
@@ -212,8 +204,9 @@ Examples:
                 while True:
                     time.sleep(1)
                     # Check if server is still running
-                    if server_process.poll() is not None:
-                        print("Server stopped unexpectedly", file=sys.stderr)
+                    rc = server_process.poll()
+                    if rc is not None:
+                        print(f"Server stopped unexpectedly (exit code {rc})", file=sys.stderr)
                         break
             except KeyboardInterrupt:
                 print("\nShutting down...", file=sys.stderr)

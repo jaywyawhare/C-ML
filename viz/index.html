@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C-ML Visualizer</title>
+  <link rel="stylesheet" href="viz.css">
+  <link rel="stylesheet" href="assets/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="app">
+    <div class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="topbar-logo">
+          <div class="topbar-logo-icon">
+            <!-- Activity icon (lucide) -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <div class="title">C-ML Visualizer</div>
+        </div>
+
+        <div class="topbar-buttons">
+          <button class="topbar-button active" data-tab="graph">
+            <!-- GitBranch icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>
+            </svg>
+            <span>Computational Blueprint</span>
+          </button>
+          <button class="topbar-button" data-tab="training">
+            <!-- TrendingUp icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+            </svg>
+            <span>Training</span>
+          </button>
+          <button class="topbar-button" data-tab="codegen">
+            <!-- Code icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+            <span>Kernel Studio</span>
+          </button>
+        </div>
+
+        <div style="width: 140px;"></div>
+      </div>
+
+      <!-- Panel -->
+      <div class="panel">
+        <div class="panel-body">
+          <!-- Graph Tab -->
+          <div id="tab-graph" class="tab-content active"></div>
+          <!-- Training Tab -->
+          <div id="tab-training" class="tab-content"></div>
+          <!-- CodeGen Tab -->
+          <div id="tab-codegen" class="tab-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendored libs -->
+  <script src="assets/cytoscape.min.js"></script>
+  <script src="assets/dagre.min.js"></script>
+  <script src="assets/cytoscape-dagre.js"></script>
+  <script src="assets/elk.bundled.js"></script>
+  <script src="assets/cytoscape-elk.js"></script>
+  <script src="assets/d3.min.js"></script>
+  <script src="assets/highlight.min.js"></script>
+  <script src="assets/languages/c.min.js"></script>
+
+  <!-- App code -->
+  <script src="viz-charts.js"></script>
+  <script src="viz.js"></script>
+</body>
+</html>
