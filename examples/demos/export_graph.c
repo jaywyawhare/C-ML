@@ -40,7 +40,7 @@ int main(void) {
     Tensor* loss       = tensor_mse_loss(Y, target);
     tensor_backward(loss, NULL, false, false);
 
-    const char* out_path = "viz-ui/public/graph.json";
+    const char* out_path = "graph.json";
     int rc               = autograd_export_json(Y, out_path);
     printf("Export graph -> %s (rc=%d)\n", out_path, rc);
 
