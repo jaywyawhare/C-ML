@@ -151,11 +151,28 @@ class DistributedDataParallel:
         """Synchronize gradients across all processes.
 
         Call this after backward() and before optimizer.step().
+        Uses all-reduce (sum) on each parameter's gradient tensor.
         """
-        # In the C implementation, this does bucketed all-reduce
-        # For the Python wrapper, we call into the C DDP sync
         _ensure_bindings()
-        # Placeholder: actual implementation calls cml_ddp_sync_gradients
+        lib = _get_lib()
+        try:
+            all_reduce = lib.cml_dist_all_reduce
+        except AttributeError:
+            # All-reduce not available in this build; gradients remain local
+            return
+
+        for param in self.parameters():
+            if hasattr(param, 'grad') and param.grad is not None:
+                all_reduce(param.grad._tensor, DIST_REDUCE_SUM)
+                # Average across world size
+                ws = get_world_size()
+                if ws > 1:
+                    import numpy as np
+                    grad_arr = param.grad.numpy() / float(ws)
+                    from cml.core import Tensor
+                    averaged = Tensor.from_numpy(grad_arr.astype(np.float32))
+                    # Copy averaged data back
+                    param.grad = averaged
 
     def parameters(self):
         """Get module parameters."""
