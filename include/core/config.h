@@ -14,7 +14,7 @@ extern "C" {
 #define CML_VERSION_MAJOR 0
 #define CML_VERSION_MINOR 0
 #define CML_VERSION_PATCH 2
-#define CML_VERSION_STRING "0.0.2"
+#define CML_VERSION_STRING "0.0.3"
 
 /**
  * @brief Encode version components into a single integer for comparison
@@ -34,7 +34,7 @@ int cml_version(void);
 
 /**
  * @brief Get library version as a string
- * @return Version string (e.g., "0.0.2")
+ * @return Version string (e.g., "0.0.3")
  */
 const char* cml_version_string(void);
 

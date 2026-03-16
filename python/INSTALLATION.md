@@ -427,7 +427,7 @@ python3 02_neural_network.py
 
 ## Version Information
 
-- **CML Python Bindings**: v0.0.2
+- **CML Python Bindings**: v0.0.3
 - **Minimum Python**: 3.8
 - **CFFI Requirement**: 1.14.0+
 - **C Standard**: C11

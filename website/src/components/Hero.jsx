@@ -34,7 +34,7 @@ export default function Hero() {
       <div ref={inner} className="hero-inner">
         <div className="hero-badge" style={{ opacity: 0 }}>
           <span className="hero-dot" />
-          v0.0.2 shipped
+          v0.0.3 shipped
         </div>
 
         <h1 className="hero-h1" style={{ opacity: 0 }}>

@@ -20,7 +20,7 @@ import sys
 import os
 
 # Get version from __init__.py
-version = "0.0.2"
+version = "0.0.3"
 
 # Read long description
 with open("README.md", "r", encoding="utf-8") as f:

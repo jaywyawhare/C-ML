@@ -22,7 +22,7 @@ export default function Navbar() {
     <nav ref={ref} className="nav" style={{ opacity: 0 }}>
       <Link className="nav-logo" to="/">
         <img className="nav-logo-icon" src="https://raw.githubusercontent.com/jaywyawhare/C-ML/master/docs/light-mode.svg" alt="C-ML" />
-        <span className="nav-ver">0.0.2</span>
+        <span className="nav-ver">0.0.3</span>
       </Link>
 
       <ul className="nav-links">

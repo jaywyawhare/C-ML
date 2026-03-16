@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(C-ML VERSION 0.0.2 LANGUAGES C CXX)
+project(C-ML VERSION 0.0.3 LANGUAGES C CXX)
 
 # Set C standard
 set(CMAKE_C_STANDARD 11)

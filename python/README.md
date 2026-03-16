@@ -636,7 +636,7 @@ TL;DR: Use it, modify it, share it. Just don't be a jerk about it.
   - IR context properly detaches tensors before cleanup
   - Module free now calls specialized destructors
 
-### v0.0.2
+### v0.0.3
 
 - Initial Python bindings
 - CFFI implementation

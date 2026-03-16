@@ -9,7 +9,7 @@
 <p align="center">Machine learning in pure C. No frameworks. No runtime. Just code.</p>
 
 <p align="center">
-  <a href="https://github.com/jaywyawhare/C-ML/releases"><img src="https://img.shields.io/badge/version-0.0.2-blue.svg" alt="Version"></a>
+  <a href="https://github.com/jaywyawhare/C-ML/releases"><img src="https://img.shields.io/badge/version-0.0.3-blue.svg" alt="Version"></a>
   <img src="https://img.shields.io/badge/C11-compatible-blue.svg" alt="C11">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform">
 </p>

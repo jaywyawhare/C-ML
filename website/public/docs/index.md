@@ -1,7 +1,7 @@
 
 # C-ML Documentation
 
-**Version 0.0.2** | [GitHub](https://github.com/jaywyawhare/C-ML) | [Issues](https://github.com/jaywyawhare/C-ML/issues)
+**Version 0.0.3** | [GitHub](https://github.com/jaywyawhare/C-ML) | [Issues](https://github.com/jaywyawhare/C-ML/issues)
 
 ---
 
