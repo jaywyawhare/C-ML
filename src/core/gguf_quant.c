@@ -10,9 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* ── GGUF tensor type numeric IDs for quantized formats ──────────────────
- * These follow the GGUF spec and may not yet be present in the project's
- * GGUFTensorType enum, so we use the raw integer values directly.         */
+/* Raw GGUF spec type IDs (may not be in the project's GGUFTensorType enum) */
 #define GGUF_TENSOR_TYPE_Q4_0  2
 #define GGUF_TENSOR_TYPE_Q4_1  3
 #define GGUF_TENSOR_TYPE_Q8_0  7
@@ -20,15 +18,7 @@
 #define GGUF_TENSOR_TYPE_Q5_K  13
 #define GGUF_TENSOR_TYPE_Q6_K  14
 
-/* ── fp16 -> fp32 conversion (pure bit manipulation, no HW intrinsics) ── */
-
-/**
- * Convert an IEEE-754 half-precision (binary16) value stored in a uint16_t
- * to a single-precision float using only integer bit manipulation.
- *
- * Layout of binary16:  1 sign | 5 exponent | 10 mantissa
- * Layout of binary32:  1 sign | 8 exponent | 23 mantissa
- */
+/* fp16 -> fp32: pure bit manipulation, no HW intrinsics */
 static float fp16_to_fp32(uint16_t h) {
     const uint32_t sign = (uint32_t)(h & 0x8000u) << 16;   /* bit 31          */
     const uint32_t exp  = (h >> 10) & 0x1Fu;                /* 5-bit exponent  */
@@ -74,13 +64,6 @@ static float fp16_to_fp32(uint16_t h) {
     memcpy(&r, &v, sizeof(r));
     return r;
 }
-
-/* ── Per-type dequantization kernels ─────────────────────────────────────
- *
- * Every kernel takes a source buffer of packed blocks, a destination float
- * buffer, and the total number of blocks.  The caller (gguf_dequantize)
- * has already validated alignment of numel to the block size.
- * ----------------------------------------------------------------------- */
 
 /**
  * Q4_0: 32 elements per block.
@@ -334,8 +317,6 @@ static void dequantize_q6_k(const void *src, float *dst, size_t num_blocks) {
         }
     }
 }
-
-/* ── Public API ──────────────────────────────────────────────────────────── */
 
 bool gguf_type_is_quantized(GGUFTensorType type) {
     switch ((int)type) {

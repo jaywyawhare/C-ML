@@ -6,23 +6,8 @@
 
 LogLevel g_log_level = LOG_LEVEL_ERROR;
 
-/**
- * @brief Set the global log level
- *
- * @param level The log level to set
- */
 void cml_set_log_level(LogLevel level) { g_log_level = level; }
 
-/**
- * @brief Core logging function
- *
- * @param level Log level
- * @param file Source file name
- * @param line Line number
- * @param func Function name
- * @param format Format string
- * @param ... Variable arguments
- */
 void cml_log_message(LogLevel level, const char* file, int line, const char* func,
                      const char* format, ...) {
     if (level < g_log_level) {

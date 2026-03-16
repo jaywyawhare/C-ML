@@ -441,9 +441,6 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     free(visited);
 
     backward_graph->built = true;
-    LOG_DEBUG("Backward graph construction: %zu nodes created (for visualization)",
-              backward_graph->num_nodes);
-
     return backward_graph;
 }
 
@@ -471,7 +468,7 @@ static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params) {
     if (node->tensor && !node->tensor->data) {
         // If tensor exists but not executed, this is a graph mode node
         // In graph mode, execution would happen here, but we use IR mode by default
-        LOG_DEBUG("Graph mode operation %d (IR mode used for actual execution)", node->op_type);
+        /* graph mode is visualization-only; IR handles actual execution */
     }
 
     return 0;
@@ -596,10 +593,7 @@ int cml_graph_optimize(CMLComputationGraph_t graph) {
     if (!graph)
         return -1;
 
-    // Remove dead nodes
     cml_graph_remove_dead_nodes(graph);
-
-    // Fuse operations
     cml_graph_fuse_ops(graph);
 
     return 0;
@@ -698,18 +692,13 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
                     }
 
                     fused_count++;
-                    LOG_DEBUG("Fused operations: node %zu (%d) + node %zu (%d)", i, node1->op_type,
-                              consumer_idx, consumer->op_type);
+                    /* fused */
                 }
             }
         }
     }
 
     free(fused);
-
-    if (fused_count > 0) {
-        LOG_DEBUG("Graph fusion: fused %d operation pairs", fused_count);
-    }
 
     return 0;
 }
@@ -718,13 +707,10 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
     if (!graph)
         return -1;
 
-    // Mark all nodes as unreachable initially
     for (size_t i = 0; i < graph->num_nodes; i++) {
         graph->nodes[i]->visited = false;
     }
 
-    // Mark reachable nodes by traversing from output nodes
-    // Output nodes are those that are not inputs to any other node
     for (size_t i = 0; i < graph->num_nodes; i++) {
         CMLGraphNode_t node = graph->nodes[i];
 
@@ -751,7 +737,6 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
         }
     }
 
-    // Remove unreachable nodes
     size_t write_idx = 0;
     for (size_t i = 0; i < graph->num_nodes; i++) {
         if (graph->nodes[i]->visited) {
@@ -779,7 +764,6 @@ static void graph_mark_reachable(CMLGraphNode_t node) {
 
     node->visited = true;
 
-    // Mark all input nodes as reachable
     for (int i = 0; i < node->num_inputs; i++) {
         graph_mark_reachable(node->inputs[i]);
     }

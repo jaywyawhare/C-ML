@@ -11,9 +11,6 @@
 static CMLComputationGraph_t g_current_graph = NULL;
 static bool g_graph_context_initialized      = false;
 
-/**
- * @brief Free current graph
- */
 void cml_free_current_graph(void) {
     if (g_current_graph) {
         cml_graph_free(g_current_graph);
@@ -21,18 +18,12 @@ void cml_free_current_graph(void) {
     }
 }
 
-/**
- * @brief Initialize graph context
- */
 void cml_graph_context_init(void) {
     if (g_graph_context_initialized)
         return;
     g_graph_context_initialized = true;
 }
 
-/**
- * @brief Cleanup graph context
- */
 void cml_graph_context_cleanup(void) {
     cml_free_current_graph();
     g_graph_context_initialized = false;

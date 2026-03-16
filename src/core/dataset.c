@@ -1,9 +1,6 @@
 /**
  * @file dataset.c
- * @brief Implementation of high-level dataset API
- *
- * This file implements the dataset interface that
- * provides easy data management and loading.
+ * @brief High-level dataset API
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -44,7 +41,6 @@ typedef struct WorkerContext {
     ThreadPool* thread_pool;
 } WorkerContext;
 
-// Helper: Create prefetch queue
 static PrefetchQueue* prefetch_queue_create(int capacity) {
     PrefetchQueue* queue = malloc(sizeof(PrefetchQueue));
     if (!queue)
@@ -74,7 +70,6 @@ static PrefetchQueue* prefetch_queue_create(int capacity) {
     return queue;
 }
 
-// Helper: Free prefetch queue
 static void prefetch_queue_free(PrefetchQueue* queue) {
     if (!queue)
         return;
@@ -85,7 +80,6 @@ static void prefetch_queue_free(PrefetchQueue* queue) {
     pthread_cond_broadcast(&queue->not_full);
     pthread_mutex_unlock(&queue->mutex);
 
-    // Free remaining batches
     while (queue->size > 0) {
         Batch* batch = queue->batches[queue->front];
         if (batch) {
@@ -110,7 +104,6 @@ static void prefetch_queue_free(PrefetchQueue* queue) {
     free(queue);
 }
 
-// Helper: Enqueue batch
 static int prefetch_queue_enqueue(PrefetchQueue* queue, Batch* batch, int batch_idx) {
     if (!queue || !batch)
         return -1;
@@ -137,7 +130,6 @@ static int prefetch_queue_enqueue(PrefetchQueue* queue, Batch* batch, int batch_
     return 0;
 }
 
-// Helper: Dequeue batch
 static Batch* prefetch_queue_dequeue(PrefetchQueue* queue, int* batch_idx) {
     if (!queue)
         return NULL;
@@ -166,13 +158,11 @@ static Batch* prefetch_queue_dequeue(PrefetchQueue* queue, int* batch_idx) {
     return batch;
 }
 
-// Helper: Load a single batch (used by workers)
 static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
     if (!loader || !loader->dataset || batch_idx >= loader->total_batches) {
         return NULL;
     }
 
-    // Calculate batch indices
     int start_idx = batch_idx * loader->batch_size;
     int end_idx   = start_idx + loader->batch_size;
     if (end_idx > loader->dataset->num_samples) {
@@ -184,7 +174,6 @@ static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
 
     int actual_batch_size = end_idx - start_idx;
 
-    // Create batch
     Batch* batch = malloc(sizeof(Batch));
     if (!batch)
         return NULL;
@@ -209,7 +198,6 @@ static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
         return NULL;
     }
 
-    // Copy data from dataset
     float* X_data    = (float*)tensor_data_ptr(batch->X);
     float* y_data    = (float*)tensor_data_ptr(batch->y);
     float* dataset_X = (float*)tensor_data_ptr(loader->dataset->X);
@@ -277,15 +265,12 @@ static void* worker_prefetch_batches(void* arg) {
 }
 
 Dataset* dataset_create(void) {
-    LOG_DEBUG("Creating new dataset");
-
     Dataset* dataset = malloc(sizeof(Dataset));
     if (!dataset) {
         LOG_ERROR("Failed to allocate memory for Dataset");
         return NULL;
     }
 
-    // Initialize basic fields
     dataset->name        = "Dataset";
     dataset->X           = NULL;
     dataset->y           = NULL;
@@ -293,49 +278,39 @@ Dataset* dataset_create(void) {
     dataset->input_size  = 0;
     dataset->output_size = 0;
 
-    // Initialize data properties
     dataset->dtype         = DTYPE_FLOAT32;
     dataset->device        = DEVICE_CPU;
     dataset->is_normalized = false;
     dataset->is_shuffled   = false;
 
-    // Initialize statistics arrays
     dataset->feature_means = NULL;
     dataset->feature_stds  = NULL;
     dataset->feature_mins  = NULL;
     dataset->feature_maxs  = NULL;
 
-    // Initialize metadata
     dataset->feature_names = NULL;
     dataset->class_names   = NULL;
     dataset->num_classes   = 0;
 
-    // Initialize internal state
     dataset->indices   = NULL;
     dataset->is_loaded = false;
     dataset->filepath  = NULL;
     dataset->user_data = NULL;
 
-    LOG_DEBUG("Dataset created successfully at %p", dataset);
     return dataset;
 }
 
 Dataset* dataset_from_arrays(float* X, float* y, int num_samples, int input_size, int output_size) {
-    LOG_DEBUG("Creating dataset from arrays: %d samples, %d->%d", num_samples, input_size,
-              output_size);
-
     Dataset* dataset = dataset_create();
     if (!dataset)
         return NULL;
 
-    // Load data into dataset
     if (dataset_load_arrays(dataset, X, y, num_samples, input_size, output_size) != 0) {
         LOG_ERROR("Failed to load arrays into dataset");
         dataset_free(dataset);
         return NULL;
     }
 
-    // Automatically track for cleanup
     extern void cml_track_dataset(Dataset*);
     cml_track_dataset(dataset);
 
@@ -349,10 +324,6 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
         return -1;
     }
 
-    LOG_DEBUG("Loading arrays into dataset: %d samples, %d->%d", num_samples, input_size,
-              output_size);
-
-    // Create input tensor
     int X_shape[2]      = {num_samples, input_size};
     TensorConfig config = {
         .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
@@ -362,7 +333,6 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
         return -1;
     }
 
-    // Create target tensor
     int y_shape[2] = {num_samples, output_size};
     dataset->y     = tensor_from_data(y, y_shape, 2, &config);
     if (!dataset->y) {
@@ -372,13 +342,11 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
         return -1;
     }
 
-    // Set dataset properties
     dataset->num_samples = num_samples;
     dataset->input_size  = input_size;
     dataset->output_size = output_size;
     dataset->is_loaded   = true;
 
-    // Initialize indices for shuffling
     dataset->indices = malloc((size_t)num_samples * sizeof(int));
     if (!dataset->indices) {
         LOG_WARNING("Failed to allocate indices array, shuffling will be disabled");
@@ -388,7 +356,6 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
         }
     }
 
-    LOG_DEBUG("Arrays loaded successfully into dataset");
     return 0;
 }
 
@@ -397,8 +364,6 @@ int dataset_load_file(Dataset* dataset, const char* filepath, const char* format
         LOG_ERROR("Invalid parameters for dataset_load_file");
         return -1;
     }
-
-    LOG_DEBUG("Loading dataset from file: %s (format: %s)", filepath, format);
 
     if (strcmp(format, "csv") == 0 || strcmp(format, "CSV") == 0) {
         float* X = NULL;
@@ -431,7 +396,7 @@ int dataset_load_file(Dataset* dataset, const char* filepath, const char* format
 
         cml_dataset_compute_stats(dataset);
 
-        LOG_DEBUG("CSV file loaded: %d samples, %d features, %d classes",
+        LOG_INFO("CSV file loaded: %d samples, %d features, %d classes",
                   num_samples, num_features, num_classes);
         return 0;
     }
@@ -476,15 +441,11 @@ void dataset_free(Dataset* dataset) {
     if (!dataset)
         return;
 
-    LOG_DEBUG("Freeing dataset at %p", dataset);
-
-    // Free tensors
     if (dataset->X)
         tensor_free(dataset->X);
     if (dataset->y)
         tensor_free(dataset->y);
 
-    // Free statistics arrays
     if (dataset->feature_means)
         free(dataset->feature_means);
     if (dataset->feature_stds)
@@ -494,7 +455,6 @@ void dataset_free(Dataset* dataset) {
     if (dataset->feature_maxs)
         free(dataset->feature_maxs);
 
-    // Free metadata
     if (dataset->feature_names) {
         for (int i = 0; i < dataset->input_size; i++) {
             if (dataset->feature_names[i])
@@ -511,16 +471,12 @@ void dataset_free(Dataset* dataset) {
         free(dataset->class_names);
     }
 
-    // Free internal arrays
     if (dataset->indices)
         free(dataset->indices);
     if (dataset->filepath)
         free(dataset->filepath);
 
-    // Free the dataset itself
     free(dataset);
-
-    LOG_DEBUG("Dataset freed successfully");
 }
 
 int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
@@ -535,19 +491,15 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
         return -1;
     }
 
-    LOG_DEBUG("Splitting dataset with train_ratio %.2f", (double)train_ratio);
-
     int train_size = (int)((float)dataset->num_samples * train_ratio);
     int val_size   = dataset->num_samples - train_size;
 
-    // Create training dataset
     *train_dataset = dataset_create();
     if (!*train_dataset) {
         LOG_ERROR("Failed to create training dataset");
         return -1;
     }
 
-    // Create validation dataset
     *val_dataset = dataset_create();
     if (!*val_dataset) {
         LOG_ERROR("Failed to create validation dataset");
@@ -607,7 +559,6 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
         }
     }
 
-    // Copy data from source dataset tensors if available
     if (dataset->X && dataset->y) {
         // Copy training data
         int train_input_shape[]  = {train_size, dataset->input_size};
@@ -719,7 +670,6 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
         (*val_dataset)->is_loaded   = false;
     }
 
-    LOG_DEBUG("Dataset split successfully: train=%d, val=%d", train_size, val_size);
     return 0;
 }
 
@@ -746,21 +696,17 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
         return -1;
     }
 
-    LOG_DEBUG("Splitting dataset with train_ratio %.2f, val_ratio %.2f", (double)train_ratio,
-              (double)val_ratio);
 
     int train_size = (int)((float)dataset->num_samples * train_ratio);
     int val_size   = (int)((float)dataset->num_samples * val_ratio);
     int test_size  = dataset->num_samples - train_size - val_size;
 
-    // Create training dataset
     *train_dataset = dataset_create();
     if (!*train_dataset) {
         LOG_ERROR("Failed to create training dataset");
         return -1;
     }
 
-    // Create validation dataset
     *val_dataset = dataset_create();
     if (!*val_dataset) {
         LOG_ERROR("Failed to create validation dataset");
@@ -769,7 +715,6 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
         return -1;
     }
 
-    // Create test dataset
     *test_dataset = dataset_create();
     if (!*test_dataset) {
         LOG_ERROR("Failed to create test dataset");
@@ -780,7 +725,6 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
         return -1;
     }
 
-    // Copy data from source dataset tensors if available
     if (dataset->X && dataset->y) {
         // Copy training data
         int train_input_shape[]  = {train_size, dataset->input_size};
@@ -914,8 +858,7 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
     (*test_dataset)->device      = dataset->device;
     (*test_dataset)->is_loaded   = true;
 
-    LOG_DEBUG("Dataset split successfully: train=%d, val=%d, test=%d", train_size, val_size,
-              test_size);
+
     return 0;
 }
 
@@ -925,7 +868,6 @@ int dataset_normalize(Dataset* dataset, const char* method) {
         return -1;
     }
 
-    LOG_DEBUG("Normalizing dataset using method: %s", method);
 
     if (strcmp(method, "zscore") == 0) {
         // Z-score normalization: (x - mean) / std
@@ -958,7 +900,7 @@ int dataset_normalize(Dataset* dataset, const char* method) {
         }
 
         dataset->is_normalized = true;
-        LOG_DEBUG("Z-score normalization completed");
+
 
     } else if (strcmp(method, "minmax") == 0) {
         // Min-Max normalization: (x - min) / (max - min)
@@ -992,7 +934,7 @@ int dataset_normalize(Dataset* dataset, const char* method) {
         }
 
         dataset->is_normalized = true;
-        LOG_DEBUG("Min-Max normalization completed");
+
 
     } else {
         LOG_ERROR("Unknown normalization method: %s", method);
@@ -1008,9 +950,7 @@ int dataset_shuffle(Dataset* dataset, unsigned int seed) {
         return -1;
     }
 
-    LOG_DEBUG("Shuffling dataset with seed %u", seed);
 
-    // Set random seed
     srand(seed);
 
     // Fisher-Yates shuffle
@@ -1022,7 +962,6 @@ int dataset_shuffle(Dataset* dataset, unsigned int seed) {
     }
 
     dataset->is_shuffled = true;
-    LOG_DEBUG("Dataset shuffled successfully");
     return 0;
 }
 
@@ -1055,7 +994,6 @@ size_t dataset_get_memory_usage(Dataset* dataset) {
 
     size_t usage = sizeof(Dataset);
 
-    // Add tensor memory usage
     if (dataset->X) {
         usage += dataset->X->numel * cml_dtype_size(dataset->X->dtype);
     }
@@ -1095,11 +1033,9 @@ bool dataset_is_valid(Dataset* dataset) {
     if (dataset->output_size <= 0)
         return false;
 
-    // Check tensors
     if (!dataset->X || !dataset->y)
         return false;
 
-    // Check tensor dimensions
     if (dataset->X->ndim != 2 || dataset->y->ndim != 2)
         return false;
     if (dataset->X->shape[0] != dataset->num_samples)
@@ -1118,13 +1054,11 @@ Dataset* dataset_copy(Dataset* dataset) {
     if (!dataset)
         return NULL;
 
-    LOG_DEBUG("Copying dataset");
 
     Dataset* copy = dataset_create();
     if (!copy)
         return NULL;
 
-    // Copy basic properties
     copy->name          = dataset->name;
     copy->num_samples   = dataset->num_samples;
     copy->input_size    = dataset->input_size;
@@ -1134,7 +1068,6 @@ Dataset* dataset_copy(Dataset* dataset) {
     copy->is_normalized = dataset->is_normalized;
     copy->is_shuffled   = dataset->is_shuffled;
 
-    // Copy tensors if available
     if (dataset->X && dataset->y) {
         // Clone tensors
         copy->X = tensor_clone(dataset->X);
@@ -1157,7 +1090,6 @@ Dataset* dataset_copy(Dataset* dataset) {
         copy->is_loaded = false;
     }
 
-    // Copy indices if available
     if (dataset->indices) {
         copy->indices = malloc((size_t)dataset->num_samples * sizeof(int));
         if (copy->indices) {
@@ -1165,7 +1097,6 @@ Dataset* dataset_copy(Dataset* dataset) {
         }
     }
 
-    LOG_DEBUG("Dataset copied successfully");
     return copy;
 }
 
@@ -1175,7 +1106,6 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
         return NULL;
     }
 
-    LOG_DEBUG("Creating DataLoader: batch_size=%d, shuffle=%d", batch_size, shuffle);
 
     DataLoader* loader = malloc(sizeof(DataLoader));
     if (!loader)
@@ -1196,7 +1126,6 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     loader->on_batch_start = NULL;
     loader->on_batch_end   = NULL;
 
-    // Initialize shuffled indices
     loader->shuffled_indices = malloc((size_t)dataset->num_samples * sizeof(int));
     if (!loader->shuffled_indices) {
         free(loader);
@@ -1218,7 +1147,6 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     loader->current_epoch = 0;
     loader->user_data     = NULL;
 
-    LOG_DEBUG("DataLoader created successfully");
     return loader;
 }
 
@@ -1298,7 +1226,6 @@ Batch* dataloader_next_batch(DataLoader* loader) {
     }
 
     // Single-threaded batch loading (fallback or default)
-    // Calculate batch indices
     int start_idx = loader->current_batch * loader->batch_size;
     int end_idx   = start_idx + loader->batch_size;
     if (end_idx > loader->dataset->num_samples) {
@@ -1308,7 +1235,6 @@ Batch* dataloader_next_batch(DataLoader* loader) {
         end_idx = loader->dataset->num_samples;
     }
 
-    // Load batch using helper function
     Batch* batch = load_batch_at_index(loader, loader->current_batch);
     if (batch) {
         // Call callbacks
@@ -1408,19 +1334,16 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
         return NULL;
     }
 
-    // Create DataLoader
     DataLoader* loader = dataloader_create(dataset, batch_size, shuffle);
     if (!loader) {
         return NULL;
     }
 
-    // Initialize multi-worker fields
     loader->prefetch_queue     = NULL;
     loader->worker_threads     = NULL;
     loader->worker_contexts    = NULL;
     loader->num_active_workers = 0;
 
-    // Set number of workers
     if (num_workers > 0) {
         loader->num_workers = num_workers;
 
@@ -1469,11 +1392,10 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
             }
         }
 
-        LOG_DEBUG("DataLoader created with %d active workers (prefetch queue capacity: %d)",
-                  loader->num_active_workers, queue_capacity);
+        /* workers ready */
     } else {
         loader->num_workers = 0;
-        LOG_DEBUG("DataLoader created with single-threaded loading");
+        /* single-threaded fallback */
     }
 
     return loader;
@@ -1660,7 +1582,7 @@ int transform_normalize(Dataset* dataset, float* mean, float* std) {
     }
 
     dataset->is_normalized = true;
-    LOG_DEBUG("Custom normalization with provided mean/std completed");
+
 
     return 0;
 }

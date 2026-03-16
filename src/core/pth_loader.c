@@ -320,10 +320,8 @@ int cml_pth_load_into_module(const CMLPthStateDict* sd, struct Module* module) {
         Parameter* param = module->parameters[i];
         if (!param || !param->name) continue;
 
-        /* Try exact match first */
         Tensor* t = cml_pth_get_tensor(sd, param->name);
 
-        /* Try suffix match: "layer.weight" matches "model.layer.weight" */
         if (!t) {
             size_t pname_len = strlen(param->name);
             for (int j = 0; j < sd->num_entries; j++) {
@@ -342,10 +340,8 @@ int cml_pth_load_into_module(const CMLPthStateDict* sd, struct Module* module) {
 
         if (!t) continue;
 
-        /* Verify shapes match */
         if (!param->tensor || param->tensor->numel != t->numel) continue;
 
-        /* Copy data from state dict tensor to parameter tensor */
         void* dst = tensor_data_ptr(param->tensor);
         void* src = tensor_data_ptr(t);
         if (dst && src) {

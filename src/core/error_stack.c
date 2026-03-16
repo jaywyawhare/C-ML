@@ -1,9 +1,6 @@
 /**
  * @file error_stack.c
- * @brief Global error stack implementation
- *
- * This module provides a global error stack that automatically tracks errors
- * without requiring explicit null checks in user code.
+ * @brief Global error stack for automatic error tracking
  */
 
 #include "core/error_stack.h"
@@ -42,7 +39,6 @@ void error_stack_init(void) {
     g_error_stack_initialized = true;
     g_message_buffer_index    = 0;
 
-    LOG_DEBUG("Error stack initialized");
 }
 
 void error_stack_cleanup(void) {
@@ -60,7 +56,6 @@ void error_stack_cleanup(void) {
     g_error_stack_initialized = false;
     g_message_buffer_index    = 0;
 
-    LOG_DEBUG("Error stack cleaned up");
 }
 
 void error_stack_push(int code, const char* message, const char* file, int line,
@@ -76,18 +71,15 @@ void error_stack_push(int code, const char* message, const char* file, int line,
         return;
     }
 
-    // Check if stack is full
     if (g_error_stack_size >= g_error_stack_capacity) {
-        // Remove oldest error (FIFO behavior)
+        /* FIFO eviction: drop oldest error */
         memmove(&g_error_stack[0], &g_error_stack[1],
                 sizeof(ErrorEntry) * (g_error_stack_size - 1));
         g_error_stack_size--;
     }
 
-    // Get buffer for message, file, and function strings
     size_t msg_idx = g_message_buffer_index % MAX_ERROR_STACK_SIZE;
 
-    // Copy message
     if (message) {
         strncpy(g_error_message_buffer[msg_idx], message, MAX_ERROR_MESSAGE_LEN - 1);
         g_error_message_buffer[msg_idx][MAX_ERROR_MESSAGE_LEN - 1] = '\0';
@@ -95,7 +87,6 @@ void error_stack_push(int code, const char* message, const char* file, int line,
         g_error_message_buffer[msg_idx][0] = '\0';
     }
 
-    // Copy file
     if (file) {
         strncpy(g_error_file_buffer[msg_idx], file, 255);
         g_error_file_buffer[msg_idx][255] = '\0';
@@ -103,7 +94,6 @@ void error_stack_push(int code, const char* message, const char* file, int line,
         g_error_file_buffer[msg_idx][0] = '\0';
     }
 
-    // Copy function
     if (function) {
         strncpy(g_error_function_buffer[msg_idx], function, 127);
         g_error_function_buffer[msg_idx][127] = '\0';
@@ -111,7 +101,6 @@ void error_stack_push(int code, const char* message, const char* file, int line,
         g_error_function_buffer[msg_idx][0] = '\0';
     }
 
-    // Add error to stack
     ErrorEntry* entry = &g_error_stack[g_error_stack_size];
     entry->code       = code;
     entry->message    = g_error_message_buffer[msg_idx];
@@ -122,8 +111,6 @@ void error_stack_push(int code, const char* message, const char* file, int line,
     g_error_stack_size++;
     g_message_buffer_index++;
 
-    LOG_DEBUG("Error pushed: %s (code: %d) at %s:%d in %s", entry->message, entry->code,
-              entry->file, entry->line, entry->function);
 }
 
 ErrorEntry* error_stack_peek(void) {
