@@ -10,10 +10,6 @@
 #include "core/protobuf_mini.h"
 #include <string.h>
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Reader initialisation                                                  */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 void pb_reader_init(PBReader *reader, const uint8_t *data, size_t length)
 {
     if (!reader) return;
@@ -21,10 +17,6 @@ void pb_reader_init(PBReader *reader, const uint8_t *data, size_t length)
     reader->length = length;
     reader->pos    = 0;
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Primitive readers                                                      */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 uint64_t pb_read_varint(PBReader *reader)
 {
@@ -95,10 +87,6 @@ double pb_read_double(PBReader *reader)
     return d;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Field-level API                                                        */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 bool pb_read_field(PBReader *reader, PBField *field)
 {
     if (!reader || !field) return false;
@@ -149,10 +137,6 @@ bool pb_read_field(PBReader *reader, PBField *field)
     return true;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Sub-reader                                                             */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 PBReader pb_reader_sub(const PBField *field)
 {
     PBReader sub;
@@ -167,10 +151,6 @@ PBReader pb_reader_sub(const PBField *field)
     return sub;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  String helper                                                          */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 const char *pb_field_string(const PBField *field, size_t *out_len)
 {
     if (!field || field->wire_type != PB_WIRE_LEN) {
@@ -180,10 +160,6 @@ const char *pb_field_string(const PBField *field, size_t *out_len)
     if (out_len) *out_len = field->value.bytes.length;
     return (const char *)field->value.bytes.data;
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Status / skip                                                          */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 bool pb_reader_has_data(const PBReader *reader)
 {
@@ -201,8 +177,8 @@ void pb_skip_field(PBReader *reader, const PBField *field)
      * fixed64, LEN).  There is nothing more to skip -- this function is
      * provided for explicitness in calling code.
      *
-     * For wire types 3/4 (start/end group, deprecated) we would need to
-     * recurse, but ONNX never uses groups.
+     * Wire types 3/4 (start/end group, deprecated) require recursion,
+     * but ONNX never uses groups.
      */
     (void)reader;
     (void)field;

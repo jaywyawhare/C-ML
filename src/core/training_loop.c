@@ -860,9 +860,6 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
                                                0.0f, 0.0f, 0.0f);
         }
 
-        // Set model to evaluation mode (if supported)
-        // For now, we'll just run validation
-
         dataloader_reset(val_loader);
 
         float val_loss      = 0.0f;

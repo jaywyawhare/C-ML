@@ -21,21 +21,18 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
         return -1;
     }
 
-    // Collect all parameters
     Parameter** params = NULL;
     int total_params   = 0;
     if (module_collect_parameters(module, &params, &total_params, true) != 0) {
         return -1;
     }
 
-    // Allocate named parameters array
     NamedParameter* np = malloc((size_t)total_params * sizeof(NamedParameter));
     if (!np) {
         free(params);
         return -1;
     }
 
-    // Create names for parameters
     int idx = 0;
     char name_buf[256];
 
@@ -73,7 +70,6 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
             idx++;
         }
     } else {
-        // Generic module
         for (int i = 0; i < total_params; i++) {
             snprintf(name_buf, sizeof(name_buf), "param_%d", i);
             np[idx].name      = strdup(name_buf);
@@ -119,7 +115,6 @@ int module_save_stream(Module* module, FILE* file) {
         return -1;
     }
 
-    // Get named parameters
     NamedParameter* named_params = NULL;
     int num_params               = 0;
     if (module_named_parameters(module, &named_params, &num_params) != 0) {
@@ -207,7 +202,7 @@ int module_save(Module* module, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        LOG_DEBUG("Successfully saved model to %s", filepath);
+        /* saved */
     }
 
     return result;
@@ -389,7 +384,7 @@ int module_load(Module* module, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        LOG_DEBUG("Successfully loaded model from %s", filepath);
+        /* loaded */
     }
 
     return result;
@@ -536,7 +531,7 @@ int tensor_write_file(Tensor* tensor, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        LOG_DEBUG("Successfully saved tensor to %s", filepath);
+        /* saved */
     }
 
     return result;
@@ -682,7 +677,7 @@ Tensor* tensor_read_file(const char* filepath) {
     fclose(file);
 
     if (tensor) {
-        LOG_DEBUG("Successfully loaded tensor from %s", filepath);
+        /* loaded */
     }
 
     return tensor;
@@ -927,7 +922,7 @@ int optimizer_save(Optimizer* optimizer, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        LOG_DEBUG("Successfully saved optimizer to %s", filepath);
+        /* saved */
     }
 
     return result;
@@ -1251,7 +1246,7 @@ int optimizer_load(Optimizer* optimizer, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        LOG_DEBUG("Successfully loaded optimizer from %s", filepath);
+        /* loaded */
     }
 
     return result;

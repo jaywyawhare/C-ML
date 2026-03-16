@@ -131,7 +131,6 @@ Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParam
         qp = *params;
     } else {
         qp = cml_quantize_compute_params(tensor, false);
-        // Adjust for uint8 range [0, 255]
         float min_val = FLT_MAX;
         float max_val = -FLT_MAX;
         for (size_t i = 0; i < tensor->numel; i++) {
@@ -197,17 +196,12 @@ Tensor* cml_dequantize_uint8(Tensor* tensor, const QuantParams* params) {
     return dequantized;
 }
 
-/* ===== NF4 Quantization ===== */
 
 const float CML_NF4_TABLE[16] = {
     -1.0f, -0.6962f, -0.5251f, -0.3949f, -0.2844f, -0.1848f, -0.0911f, 0.0f,
      0.0796f, 0.1609f, 0.2461f, 0.3379f, 0.4407f, 0.5626f, 0.7230f, 1.0f
 };
 
-/**
- * Find the nearest NF4 table index for a normalized value in [-1, 1].
- * Uses linear scan over the 16-entry table.
- */
 static int nf4_find_nearest(float normalized) {
     int best_idx = 0;
     float best_dist = fabsf(normalized - CML_NF4_TABLE[0]);

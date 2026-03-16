@@ -229,7 +229,6 @@ CMLGraphNode_t cml_graph_node_op(CMLComputationGraph_t graph, CMLOpType op_type,
 
     if (op_params) {
         // Store op_params pointer (caller retains ownership)
-        // For deep copy, would need operation-specific size information
         node->op_params = op_params;
     }
 
@@ -271,11 +270,6 @@ void cml_graph_build_forward(CMLComputationGraph_t graph, CMLGraphNode_t output)
     }
 
     // Mark graph as built
-    // In a full implementation, this would:
-    // 1. Perform topological sort from output
-    // 2. Mark all reachable nodes
-    // 3. Remove unreachable nodes (dead code elimination)
-    // For now, mark all nodes as part of forward graph
     graph->built = true;
 }
 

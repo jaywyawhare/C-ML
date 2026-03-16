@@ -17,10 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Helper: copy a protobuf string field into a fixed-size C buffer        */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 static void copy_pb_string(char *dst, size_t dst_size, const PBField *field)
 {
     size_t len = 0;
@@ -51,10 +47,6 @@ static char *dup_pb_string(const PBField *field)
     return s;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  ONNX DType mapping                                                     */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 static DType onnx_dtype_to_cml(int onnx_dtype)
 {
     switch (onnx_dtype) {
@@ -72,10 +64,6 @@ static DType onnx_dtype_to_cml(int onnx_dtype)
     default: return DTYPE_FLOAT32;
     }
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse AttributeProto                                                   */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /*
  * AttributeProto field numbers (onnx.proto):
@@ -178,10 +166,6 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
     }
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse NodeProto                                                        */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 /*
  * NodeProto field numbers:
  *   1: input     (repeated string)
@@ -234,10 +218,6 @@ static void parse_node(PBReader *rd, CMLONNXNode *node)
         }
     }
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse TensorProto (initializer)                                        */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /*
  * TensorProto field numbers:
@@ -330,10 +310,6 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
 
     free(float_data);
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse ValueInfoProto (graph input/output)                              */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /*
  * ValueInfoProto:
@@ -435,10 +411,6 @@ static void parse_value_info(PBReader *rd, CMLONNXTensorInfo *info)
     }
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse GraphProto                                                       */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 /*
  * GraphProto field numbers:
  *   1: node         (repeated NodeProto, LEN)
@@ -511,10 +483,6 @@ static int parse_graph(PBReader *rd, CMLONNXGraph *graph)
     return 0;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse OpsetIdProto                                                     */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 /*
  * OpsetIdProto:
  *   1: domain   (string, "" = default ai.onnx)
@@ -532,10 +500,6 @@ static int64_t parse_opset(PBReader *rd)
     }
     return version;
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Parse ModelProto (top level)                                           */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /*
  * ModelProto field numbers:
@@ -611,10 +575,6 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
     return model;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  File loading                                                           */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 CMLONNXModel *cml_onnx_load(const char *filepath)
 {
     if (!filepath) return NULL;
@@ -655,10 +615,6 @@ CMLONNXModel *cml_onnx_load(const char *filepath)
     free(buf);
     return model;
 }
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Free                                                                   */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 void cml_onnx_free(CMLONNXModel *model)
 {

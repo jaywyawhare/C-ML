@@ -1063,7 +1063,7 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
 
     // Update expected epochs (original plan)
     g_global_metrics->expected_epochs = num_epochs;
-    // Update num_epochs to reflect expected epochs (for now, actual may be less if early stopped)
+    // Update num_epochs to reflect expected epochs (actual may be less if early stopped)
     g_global_metrics->num_epochs = num_epochs;
     // Initially actual equals expected
     if (g_global_metrics->actual_epochs == 0 || g_global_metrics->actual_epochs > num_epochs) {

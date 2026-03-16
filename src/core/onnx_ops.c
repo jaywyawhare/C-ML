@@ -15,10 +15,6 @@
 #include <string.h>
 #include <math.h>
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Name-to-tensor map (simple open-addressing hash table)                 */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 #define TENSOR_MAP_SIZE 2048
 
 typedef struct {
@@ -76,10 +72,6 @@ static void tensor_map_set(TensorMap *map, const char *name, Tensor *t)
     LOG_ERROR("onnx_ops: tensor map full");
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Attribute lookup helpers                                               */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 static const CMLONNXAttribute *find_attr(const CMLONNXNode *node,
                                           const char *name)
 {
@@ -119,19 +111,11 @@ static const int64_t *attr_ints(const CMLONNXNode *node, const char *name,
     return NULL;
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Op handler type                                                        */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 /**
  * Each handler receives the ONNX node, a function to look up tensors by
  * name, and stores the output tensor(s) into the map.
  */
 typedef Tensor *(*onnx_op_fn)(const CMLONNXNode *node, TensorMap *map);
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Individual operator implementations                                    */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 /* Convenience: fetch input tensor by index */
 static Tensor *inp(const CMLONNXNode *node, TensorMap *map, int idx)
@@ -141,7 +125,6 @@ static Tensor *inp(const CMLONNXNode *node, TensorMap *map, int idx)
     return tensor_map_get(map, node->inputs[idx]);
 }
 
-/* ---- Binary elementwise ---- */
 
 static Tensor *op_add(const CMLONNXNode *n, TensorMap *m)
 { return uop_add(inp(n,m,0), inp(n,m,1)); }
@@ -155,12 +138,10 @@ static Tensor *op_mul(const CMLONNXNode *n, TensorMap *m)
 static Tensor *op_div(const CMLONNXNode *n, TensorMap *m)
 { return uop_div(inp(n,m,0), inp(n,m,1)); }
 
-/* ---- MatMul ---- */
 
 static Tensor *op_matmul(const CMLONNXNode *n, TensorMap *m)
 { return uop_matmul(inp(n,m,0), inp(n,m,1)); }
 
-/* ---- Unary activations ---- */
 
 static Tensor *op_relu(const CMLONNXNode *n, TensorMap *m)
 { return uop_relu(inp(n,m,0)); }
@@ -171,7 +152,6 @@ static Tensor *op_sigmoid(const CMLONNXNode *n, TensorMap *m)
 static Tensor *op_tanh(const CMLONNXNode *n, TensorMap *m)
 { return uop_tanh(inp(n,m,0)); }
 
-/* ---- Unary math ---- */
 
 static Tensor *op_exp(const CMLONNXNode *n, TensorMap *m)
 { return uop_exp(inp(n,m,0)); }
@@ -188,7 +168,6 @@ static Tensor *op_neg(const CMLONNXNode *n, TensorMap *m)
 static Tensor *op_abs(const CMLONNXNode *n, TensorMap *m)
 { return uop_abs(inp(n,m,0)); }
 
-/* ---- Softmax ---- */
 
 static Tensor *op_softmax(const CMLONNXNode *n, TensorMap *m)
 {
@@ -196,7 +175,6 @@ static Tensor *op_softmax(const CMLONNXNode *n, TensorMap *m)
     return uop_softmax(inp(n,m,0), axis);
 }
 
-/* ---- Reshape ---- */
 
 static Tensor *op_reshape(const CMLONNXNode *n, TensorMap *m)
 {
@@ -236,7 +214,6 @@ static Tensor *op_reshape(const CMLONNXNode *n, TensorMap *m)
     return uop_reshape(x, &p);
 }
 
-/* ---- Transpose ---- */
 
 static Tensor *op_transpose(const CMLONNXNode *n, TensorMap *m)
 {
@@ -259,7 +236,6 @@ static Tensor *op_transpose(const CMLONNXNode *n, TensorMap *m)
     return uop_permute(x, &p);
 }
 
-/* ---- Concat ---- */
 
 static Tensor *op_concat(const CMLONNXNode *n, TensorMap *m)
 {
@@ -274,7 +250,6 @@ static Tensor *op_concat(const CMLONNXNode *n, TensorMap *m)
     return uop_cat(tensors, num, axis);
 }
 
-/* ---- Gemm: alpha*A*B + beta*C ---- */
 
 static Tensor *op_gemm(const CMLONNXNode *n, TensorMap *m)
 {
@@ -321,7 +296,6 @@ static Tensor *op_gemm(const CMLONNXNode *n, TensorMap *m)
     return result;
 }
 
-/* ---- Conv ---- */
 
 static Tensor *op_conv(const CMLONNXNode *n, TensorMap *m)
 {
@@ -379,7 +353,6 @@ static Tensor *op_conv(const CMLONNXNode *n, TensorMap *m)
     return uop_conv2d(x, w, b, &params);
 }
 
-/* ---- BatchNormalization ---- */
 /* Decomposed: y = (x - mean) / sqrt(var + eps) * scale + bias */
 
 static Tensor *op_batchnorm(const CMLONNXNode *n, TensorMap *m)
@@ -409,7 +382,6 @@ static Tensor *op_batchnorm(const CMLONNXNode *n, TensorMap *m)
     return uop_add(scaled, bias);
 }
 
-/* ---- MaxPool / AveragePool ---- */
 /* Implemented via reshape+reduce since we don't have dedicated pool UOps.
  * For simple cases we use uop_max_reduce / uop_mean on reshaped spatial. */
 
@@ -418,15 +390,14 @@ static Tensor *op_maxpool(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* Simplified: use clamp + reduce approach.
-     * For a proper implementation we would need strided windowing.
-     * Here we approximate with global reduce if kernel covers entire spatial. */
+    /* Reduce-based approach: approximates with global reduce when kernel
+     * covers entire spatial extent. Strided windowing not yet implemented. */
     int kcount = 0;
     const int64_t *kernel_shape = attr_ints(n, "kernel_shape", &kcount);
 
     /* If we have spatial dims, reduce over them. NCHW format assumed. */
     if (x->ndim == 4 && kernel_shape && kcount >= 2) {
-        /* For now use a reduce-based approach over spatial dims */
+        /* Reduce over spatial dims */
         int reduce_dims[2] = {2, 3};
         ReduceParams rp = {
             .dims = reduce_dims,
@@ -460,7 +431,6 @@ static Tensor *op_avgpool(const CMLONNXNode *n, TensorMap *m)
     return x;
 }
 
-/* ---- GlobalAveragePool ---- */
 
 static Tensor *op_global_avg_pool(const CMLONNXNode *n, TensorMap *m)
 {
@@ -482,7 +452,6 @@ static Tensor *op_global_avg_pool(const CMLONNXNode *n, TensorMap *m)
     return uop_mean(x, &rp);
 }
 
-/* ---- Flatten ---- */
 
 static Tensor *op_flatten(const CMLONNXNode *n, TensorMap *m)
 {
@@ -493,7 +462,6 @@ static Tensor *op_flatten(const CMLONNXNode *n, TensorMap *m)
     return uop_flatten(x, axis, x->ndim - 1);
 }
 
-/* ---- Squeeze / Unsqueeze ---- */
 
 static Tensor *op_squeeze(const CMLONNXNode *n, TensorMap *m)
 {
@@ -607,7 +575,6 @@ static Tensor *op_unsqueeze(const CMLONNXNode *n, TensorMap *m)
     return uop_reshape(x, &p);
 }
 
-/* ---- Clip ---- */
 
 static Tensor *op_clip(const CMLONNXNode *n, TensorMap *m)
 {
@@ -639,7 +606,6 @@ static Tensor *op_clip(const CMLONNXNode *n, TensorMap *m)
     return uop_clamp(x, min_val, max_val);
 }
 
-/* ---- Gather ---- */
 
 static Tensor *op_gather(const CMLONNXNode *n, TensorMap *m)
 {
@@ -650,7 +616,6 @@ static Tensor *op_gather(const CMLONNXNode *n, TensorMap *m)
     return uop_gather(x, indices, axis);
 }
 
-/* ---- Pad ---- */
 
 static Tensor *op_pad(const CMLONNXNode *n, TensorMap *m)
 {
@@ -688,7 +653,6 @@ static Tensor *op_pad(const CMLONNXNode *n, TensorMap *m)
     return uop_pad(x, pad_widths, pad_ndim, constant_value);
 }
 
-/* ---- Slice ---- */
 
 static Tensor *op_slice(const CMLONNXNode *n, TensorMap *m)
 {
@@ -754,7 +718,6 @@ static Tensor *op_slice(const CMLONNXNode *n, TensorMap *m)
     return uop_slice(x, &sp);
 }
 
-/* ---- Cast ---- */
 
 static Tensor *op_cast(const CMLONNXNode *n, TensorMap *m)
 {
@@ -778,7 +741,6 @@ static Tensor *op_cast(const CMLONNXNode *n, TensorMap *m)
     return tensor_cast(x, target);
 }
 
-/* ---- Identity / Dropout (eval passthrough) ---- */
 
 static Tensor *op_identity(const CMLONNXNode *n, TensorMap *m)
 { return inp(n, m, 0); }
@@ -789,7 +751,6 @@ static Tensor *op_dropout(const CMLONNXNode *n, TensorMap *m)
     return inp(n, m, 0);
 }
 
-/* ---- Shape ---- */
 
 static Tensor *op_shape(const CMLONNXNode *n, TensorMap *m)
 {
@@ -808,7 +769,6 @@ static Tensor *op_shape(const CMLONNXNode *n, TensorMap *m)
     return out;
 }
 
-/* ---- Constant ---- */
 
 static Tensor *op_constant(const CMLONNXNode *n, TensorMap *m)
 {
@@ -856,10 +816,6 @@ static Tensor *op_constant(const CMLONNXNode *n, TensorMap *m)
     return tensor_full((int[]){1}, 1, NULL, 0.0f);
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Op dispatch table                                                      */
-/* ──────────────────────────────────────────────────────────────────────── */
-
 typedef struct {
     const char *name;
     onnx_op_fn  fn;
@@ -904,10 +860,6 @@ static const OnnxOpEntry g_op_table[] = {
 };
 
 #define NUM_SUPPORTED_OPS ((int)(sizeof(g_op_table) / sizeof(g_op_table[0])))
-
-/* ──────────────────────────────────────────────────────────────────────── */
-/*  Public API                                                             */
-/* ──────────────────────────────────────────────────────────────────────── */
 
 bool cml_onnx_op_supported(const char *op_type)
 {

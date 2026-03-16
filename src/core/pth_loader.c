@@ -247,7 +247,7 @@ CMLPthStateDict* cml_pth_load(const char* path) {
             entry->num_elements = data_sizes[data_idx] / sizeof(float);
             entry->storage_offset = data_offsets[data_idx];
 
-            /* Create 1D tensor for now (shape unknown from minimal parsing) */
+            /* 1D tensor (shape unknown from minimal parsing) */
             int shape[1] = { (int)entry->num_elements };
             TensorConfig tc = {0};
             entry->tensor = tensor_empty(shape, 1, &tc);

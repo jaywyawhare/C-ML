@@ -36,7 +36,6 @@ CleanupContext* cleanup_context_create(void) {
     ctx->num_memory_ptrs = 0;
     ctx->memory_capacity = 0;
 
-    // Automatically register with global cleanup system
     cml_register_cleanup_context(ctx);
 
     return ctx;
@@ -116,7 +115,6 @@ void cleanup_clear_all(CleanupContext* ctx) {
         ctx->optimizer = NULL;
     }
 
-    // Free tensors
     for (size_t i = 0; i < ctx->num_tensors; i++) {
         if (ctx->tensors[i]) {
             tensor_free(ctx->tensors[i]);
@@ -129,7 +127,6 @@ void cleanup_clear_all(CleanupContext* ctx) {
     ctx->num_tensors     = 0;
     ctx->tensor_capacity = 0;
 
-    // Free datasets
     for (size_t i = 0; i < ctx->num_datasets; i++) {
         if (ctx->datasets[i]) {
             dataset_free(ctx->datasets[i]);
@@ -142,7 +139,6 @@ void cleanup_clear_all(CleanupContext* ctx) {
     ctx->num_datasets     = 0;
     ctx->dataset_capacity = 0;
 
-    // Free memory pointers
     for (size_t i = 0; i < ctx->num_memory_ptrs; i++) {
         if (ctx->memory_ptrs[i]) {
             free(ctx->memory_ptrs[i]);

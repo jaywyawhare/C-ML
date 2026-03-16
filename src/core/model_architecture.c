@@ -47,14 +47,12 @@ static int extract_layer_info(Module* module, int layer_idx, LayerInfo* info) {
     info->type        = module->name;
     info->layer_index = layer_idx;
 
-    // Extract layer-specific information
     if (strcmp(module->name, "Linear") == 0) {
         Linear* linear     = (Linear*)module;
         info->in_features  = linear->in_features;
         info->out_features = linear->out_features;
         info->has_bias     = linear->use_bias;
 
-        // Count parameters
         if (linear->weight) {
             info->num_params += (int)linear->weight->tensor->numel;
         }
@@ -62,16 +60,12 @@ static int extract_layer_info(Module* module, int layer_idx, LayerInfo* info) {
             info->num_params += (int)linear->bias->tensor->numel;
         }
     } else if (strcmp(module->name, "Conv2d") == 0) {
-        // Extract Conv2d information if available
-        // Note: This would need Conv2d structure access
         info->num_params =
             module->num_parameters > 0 ? (int)module->parameters[0]->tensor->numel : 0;
     } else if (strcmp(module->name, "ReLU") == 0 || strcmp(module->name, "Sigmoid") == 0 ||
                strcmp(module->name, "Tanh") == 0) {
-        // Activation layers have no parameters
         info->num_params = 0;
     } else {
-        // For other layers, count parameters
         for (int i = 0; i < module->num_parameters; i++) {
             if (module->parameters[i] && module->parameters[i]->tensor) {
                 info->num_params += (int)module->parameters[i]->tensor->numel;
@@ -88,7 +82,6 @@ static int extract_from_sequential(Sequential* seq, ModelArchitecture* arch) {
 
     int num_modules = sequential_get_length(seq);
 
-    // Resize array if needed
     if ((size_t)arch->num_layers + (size_t)num_modules > arch->capacity) {
         size_t new_capacity = arch->capacity == 0 ? 16 : arch->capacity * 2;
         while (new_capacity < (size_t)arch->num_layers + (size_t)num_modules) {
@@ -103,7 +96,6 @@ static int extract_from_sequential(Sequential* seq, ModelArchitecture* arch) {
         arch->capacity = new_capacity;
     }
 
-    // Extract each layer
     for (int i = 0; i < num_modules; i++) {
         Module* child = sequential_get(seq, i);
         if (!child)
@@ -122,14 +114,12 @@ int model_architecture_extract(Module* module, ModelArchitecture* arch) {
     if (!module || !arch)
         return -1;
 
-    // Handle Sequential models
     if (strcmp(module->name, "Sequential") == 0) {
         Sequential* seq = (Sequential*)module;
         if (extract_from_sequential(seq, arch) != 0) {
             return -1;
         }
     } else {
-        // Single layer
         if (arch->num_layers >= arch->capacity) {
             size_t new_capacity   = arch->capacity == 0 ? 8 : arch->capacity * 2;
             LayerInfo* new_layers = realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
@@ -145,7 +135,6 @@ int model_architecture_extract(Module* module, ModelArchitecture* arch) {
         }
     }
 
-    // Count total parameters
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) == 0) {
