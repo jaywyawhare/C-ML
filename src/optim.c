@@ -1,22 +1,7 @@
 /**
  * @file optim.c
- * @brief Optimizer implementation for neural network training - PRODUCTION-READY
- *
- * This file provides optimizer implementations (SGD, Adam, etc.) that work
- * with the training API. The implementations support:
- * - **Per-group hyperparameters** (learning rate, weight decay)
- * - Parameter groups with different learning rates
- * - Momentum and adaptive learning rates
- * - Weight decay (L2 regularization)
- * - State management for advanced optimizers like Adam
- * - Dynamic parameter group storage with automatic resizing
- *
- * - Each parameter group can have its own learning rate and weight decay
- * - Groups are stored in a dynamically allocated array
- * - Efficient parameter management across multiple groups
- * - Memory-safe implementation with proper cleanup
- *
- * Additional optimizer variants (RMSprop, AdamW, etc.) can be added as needed.
+ * @brief Optimizer implementations (SGD, Adam, etc.) with per-group
+ *        hyperparameters, momentum, weight decay, and state management.
  */
 
 #include "optim.h"

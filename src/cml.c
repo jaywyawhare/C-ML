@@ -215,7 +215,6 @@ static void cml_auto_cleanup(void) {
 
     autograd_shutdown();
 
-    // Check and print errors
     if (CML_HAS_ERRORS()) {
         printf("\n=== Errors occurred during execution ===\n");
         error_stack_print_all();
@@ -267,7 +266,6 @@ static void check_and_launch_viz(void) {
     const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("CML_VIZ_SCRIPT"),
                                NULL};
     // On Windows, we might look in Program Files or similar if we had a standard install location
-    // For now, rely on local scripts or env var
 #else
     const char* try_paths[] = {
         "scripts/viz.py",        "../scripts/viz.py",      "/usr/local/share/cml/viz.py",
@@ -307,7 +305,6 @@ static void check_and_launch_viz(void) {
     // For viz, blocking might be annoying if it doesn't return.
     // However, the python script spawns subprocesses, so it might be okay
     // if it returns quickly or if we want to block until viz is closed.
-    // For now, system() is simple.
 
 #elif defined(__APPLE__)
     // macOS implementation
@@ -354,7 +351,6 @@ static void check_and_launch_viz(void) {
         }
     }
 
-    // Get executable path
     ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
     if (len == -1 || len >= (ssize_t)sizeof(exe_path)) {
         const char* env_exe = getenv("_");
@@ -408,13 +404,10 @@ int cml_init(void) {
 
     int result = 0;
 
-    // Initialize error stack first
     error_stack_init();
 
     cml_set_log_level(LOG_LEVEL_ERROR);
 
-    // Initialize global configuration
-    // Set defaults: device=CPU, dtype=FLOAT32
     cml_set_default_device(DEVICE_CPU);
     cml_set_default_dtype(DTYPE_FLOAT32);
 
@@ -425,7 +418,6 @@ int cml_init(void) {
 
     training_metrics_init_global();
 
-    // Initialize graph context
     cml_graph_context_init();
 
     // Register automatic cleanup with atexit (only once)
@@ -521,7 +513,6 @@ int cml_cleanup(void) {
 
     autograd_shutdown();
 
-    // Check and print errors before cleanup
     if (CML_HAS_ERRORS()) {
         printf("\n=== Errors occurred during execution ===\n");
         error_stack_print_all();

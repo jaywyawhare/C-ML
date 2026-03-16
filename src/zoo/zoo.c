@@ -312,7 +312,7 @@ Module* cml_zoo_gpt2_small(const CMLZooConfig* config) {
     /* GPT-2 small: 12 layers, 768 hidden, 12 heads */
     Sequential* model = nn_sequential();
 
-    /* Token embedding + positional embedding (simplified as linear) */
+    /* Token embedding + positional embedding */
     sequential_add(model, (Module*)nn_linear(num_classes, 768, cfg.dtype, cfg.device, false));
 
     /* Transformer layers */

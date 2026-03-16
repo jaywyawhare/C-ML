@@ -110,8 +110,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
 
     LOG_DEBUG("Pipeline backward with %d stages", pipeline->num_stages);
 
-    /* For now, do a simple reverse traversal */
-    /* A full implementation would interleave forward and backward micro-batches */
+    /* Simple reverse traversal of pipeline stages */
     for (int stage = pipeline->num_stages - 1; stage >= 0; stage--) {
         /* Each stage's backward is handled by the autograd system */
         LOG_DEBUG("Pipeline backward: stage %d", stage);

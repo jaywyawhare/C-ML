@@ -14,10 +14,8 @@
 #include <string.h>
 #include <math.h>
 
-/* ---------------------------------------------------------------------------
- * Static transform matrices for F(2x2, 3x3)
- * tile_size = 4, output_tile = 2, kernel = 3
- * -------------------------------------------------------------------------*/
+/* Static transform matrices for F(2x2, 3x3)
+ * tile_size = 4, output_tile = 2, kernel = 3 */
 
 /* G: weight transform matrix (4x3) */
 static const float G_2x2[4][3] = {
@@ -41,10 +39,8 @@ static const float AT_2x2[2][4] = {
     { 0,  1, -1, -1}
 };
 
-/* ---------------------------------------------------------------------------
- * Static transform matrices for F(4x4, 3x3)
- * tile_size = 6, output_tile = 4, kernel = 3
- * -------------------------------------------------------------------------*/
+/* Static transform matrices for F(4x4, 3x3)
+ * tile_size = 6, output_tile = 4, kernel = 3 */
 
 /* G: weight transform matrix (6x3) */
 static const float G_4x4[6][3] = {
@@ -74,11 +70,9 @@ static const float AT_4x4[4][6] = {
     { 0,  1, -1,  8, -8,  1}
 };
 
-/* ---------------------------------------------------------------------------
- * Helper: small matrix multiply  C[m x n] = A[m x k] * B[k x n]
+/* Helper: small matrix multiply  C[m x n] = A[m x k] * B[k x n]
  * All matrices stored as flat row-major arrays.
- * Designed for tile-sized matrices (up to 6x6).
- * -------------------------------------------------------------------------*/
+ * Designed for tile-sized matrices (up to 6x6). */
 static void mat_mul_small(const float *A, const float *B, float *C,
                           int m, int k, int n)
 {
@@ -93,10 +87,8 @@ static void mat_mul_small(const float *A, const float *B, float *C,
     }
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: triple matrix multiply  D[m x n] = A[m x k1] * B[k1 x k2] * C[k2 x n]
- * Uses a caller-provided temporary buffer for the intermediate result.
- * -------------------------------------------------------------------------*/
+/* Helper: triple matrix multiply  D[m x n] = A[m x k1] * B[k1 x k2] * C[k2 x n]
+ * Uses a caller-provided temporary buffer for the intermediate result. */
 static void mat_mul_triple(const float *A, const float *B, const float *C,
                            float *D, int m, int k1, int k2, int n, float *tmp)
 {
@@ -106,9 +98,7 @@ static void mat_mul_triple(const float *A, const float *B, const float *C,
     mat_mul_small(tmp, C, D, m, k2, n);
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: transpose a row-major matrix  B[n x m] = A^T where A is [m x n]
- * -------------------------------------------------------------------------*/
+/* Helper: transpose a row-major matrix  B[n x m] = A^T where A is [m x n] */
 static void mat_transpose(const float *A, float *B, int m, int n)
 {
     for (int i = 0; i < m; i++) {
@@ -118,8 +108,7 @@ static void mat_transpose(const float *A, float *B, int m, int n)
     }
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: extract a tile from a (possibly padded) 2D plane
+/* Helper: extract a tile from a (possibly padded) 2D plane
  *
  * src:      pointer to the start of the channel plane [src_h x src_w]
  * tile:     output buffer [tile_size x tile_size]
@@ -129,8 +118,7 @@ static void mat_transpose(const float *A, float *B, int m, int n)
  * src_w:    spatial width of src (un-padded)
  * pad_h:    padding applied on each side vertically
  * pad_w:    padding applied on each side horizontally
- * tile_size: side length of the tile
- * -------------------------------------------------------------------------*/
+ * tile_size: side length of the tile */
 static void extract_tile(const float *src, float *tile,
                          int tile_row, int tile_col,
                          int src_h, int src_w,
@@ -150,16 +138,14 @@ static void extract_tile(const float *src, float *tile,
     }
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: apply input transform  V = B^T * d * B
+/* Helper: apply input transform  V = B^T * d * B
  *
  * BT_flat:  flattened B^T matrix [ts x ts]
  * B_flat:   flattened B matrix [ts x ts]  (transpose of B^T)
  * tile:     input tile [ts x ts]
  * V:        output buffer [ts x ts]
  * ts:       tile size (4 or 6)
- * tmp:      scratch buffer [ts x ts]
- * -------------------------------------------------------------------------*/
+ * tmp:      scratch buffer [ts x ts] */
 static void transform_input_tile(const float *BT_flat, const float *B_flat,
                                  const float *tile, float *V,
                                  int ts, float *tmp)
@@ -168,8 +154,7 @@ static void transform_input_tile(const float *BT_flat, const float *B_flat,
     mat_mul_triple(BT_flat, tile, B_flat, V, ts, ts, ts, ts, tmp);
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: apply output transform  Y = A^T * M * A
+/* Helper: apply output transform  Y = A^T * M * A
  *
  * AT_flat:   flattened A^T matrix [out_tile x ts]
  * A_flat:    flattened A matrix [ts x out_tile]  (transpose of A^T)
@@ -177,8 +162,7 @@ static void transform_input_tile(const float *BT_flat, const float *B_flat,
  * Y:         output buffer [out_tile x out_tile]
  * out_tile:  output tile size (2 or 4)
  * ts:        tile size (4 or 6)
- * tmp:       scratch buffer [out_tile x ts]  (at least)
- * -------------------------------------------------------------------------*/
+ * tmp:       scratch buffer [out_tile x ts]  (at least) */
 static void transform_output_tile(const float *AT_flat, const float *A_flat,
                                   const float *M, float *Y,
                                   int out_tile, int ts, float *tmp)
@@ -187,8 +171,7 @@ static void transform_output_tile(const float *AT_flat, const float *A_flat,
     mat_mul_triple(AT_flat, M, A_flat, Y, out_tile, ts, ts, out_tile, tmp);
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: write an output tile into the output plane, accumulating values
+/* Helper: write an output tile into the output plane, accumulating values
  *
  * dst:      pointer to the start of the output channel plane [dst_h x dst_w]
  * tile:     the output tile [out_tile x out_tile]
@@ -196,8 +179,7 @@ static void transform_output_tile(const float *AT_flat, const float *A_flat,
  * out_col:  top-left output col position
  * dst_h:    height of the output plane
  * dst_w:    width of the output plane
- * out_tile: side length of the output tile
- * -------------------------------------------------------------------------*/
+ * out_tile: side length of the output tile */
 static void write_output_tile(float *dst, const float *tile,
                               int out_row, int out_col,
                               int dst_h, int dst_w,
@@ -214,17 +196,13 @@ static void write_output_tile(float *dst, const float *tile,
     }
 }
 
-/* ---------------------------------------------------------------------------
- * Helper: flatten a 2D static array into a contiguous row-major buffer
- * -------------------------------------------------------------------------*/
+/* Helper: flatten a 2D static array into a contiguous row-major buffer */
 static void flatten_G(const float *src, float *dst, int rows, int cols)
 {
     memcpy(dst, src, (size_t)rows * cols * sizeof(float));
 }
 
-/* =========================================================================
- * Public API
- * ========================================================================*/
+/* Public API */
 
 bool winograd_applicable(int kernel_h, int kernel_w,
                          int stride_h, int stride_w,
@@ -255,15 +233,13 @@ WinogradConfig winograd_select_variant(int height, int width)
     return cfg;
 }
 
-/* -------------------------------------------------------------------------
- * winograd_transform_weight
+/* winograd_transform_weight
  *
  * For every (oc, ic) pair, compute:
  *   U[oc][ic] = G * g * G^T
  * where g is the [3x3] filter and U is [tile_size x tile_size].
  *
- * Output layout: transformed[oc * in_channels * ts*ts + ic * ts*ts + ...]
- * -----------------------------------------------------------------------*/
+ * Output layout: transformed[oc * in_channels * ts*ts + ic * ts*ts + ...] */
 int winograd_transform_weight(const float *weight, int out_channels,
                               int in_channels, const WinogradConfig *config,
                               float *transformed)
@@ -301,8 +277,7 @@ int winograd_transform_weight(const float *weight, int out_channels,
     return 0;
 }
 
-/* -------------------------------------------------------------------------
- * winograd_conv2d
+/* winograd_conv2d
  *
  * Full Winograd convolution pipeline:
  *   1. Transform weights to Winograd domain: U = G * w * G^T
@@ -314,8 +289,7 @@ int winograd_transform_weight(const float *weight, int out_channels,
  *   4. Write Y into the output plane
  *   5. Add bias if present
  *
- * Supports grouped convolution (groups > 1).
- * -----------------------------------------------------------------------*/
+ * Supports grouped convolution (groups > 1). */
 int winograd_conv2d(const float *input, const float *weight, const float *bias,
                     float *output, int batch, int in_channels, int out_channels,
                     int height, int width, int padding_h, int padding_w,
@@ -343,12 +317,10 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
     int in_channels_per_group  = in_channels  / groups;
     int out_channels_per_group = out_channels / groups;
 
-    /* -------------------------------------------------------------------
-     * Step 1: Transform all weight kernels to Winograd domain
+    /* Step 1: Transform all weight kernels to Winograd domain
      *
      * Layout: U[oc][ic_within_group][ts][ts]
-     * Stored as: U[(oc * in_channels_per_group + ic_g) * ts * ts + ...]
-     * -----------------------------------------------------------------*/
+     * Stored as: U[(oc * in_channels_per_group + ic_g) * ts * ts + ...] */
     size_t U_size = (size_t)out_channels * in_channels_per_group * ts * ts;
     float *U = (float *)malloc(U_size * sizeof(float));
     if (!U) return -1;
@@ -387,9 +359,7 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         }
     }
 
-    /* -------------------------------------------------------------------
-     * Flatten B^T, B, A^T, A for the chosen variant
-     * -----------------------------------------------------------------*/
+    /* Flatten B^T, B, A^T, A for the chosen variant */
     float BT_flat[6 * 6];
     float B_flat[6 * 6];   /* B = (B^T)^T */
     float AT_flat[4 * 6];
@@ -421,9 +391,7 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         mat_transpose(AT_flat, A_flat, 4, 6);   /* A is 6x4 */
     }
 
-    /* -------------------------------------------------------------------
-     * Allocate per-tile working buffers
-     * -----------------------------------------------------------------*/
+    /* Allocate per-tile working buffers */
     size_t ts2  = (size_t)ts * ts;
     size_t ot2  = (size_t)out_tile * out_tile;
 
@@ -443,16 +411,12 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         return -1;
     }
 
-    /* -------------------------------------------------------------------
-     * Zero the output buffer
-     * -----------------------------------------------------------------*/
+    /* Zero the output buffer */
     size_t output_size = (size_t)batch * out_channels * out_h * out_w;
     memset(output, 0, output_size * sizeof(float));
 
-    /* -------------------------------------------------------------------
-     * Step 2: For each batch element, group, output channel, and tile,
-     *         perform the Winograd convolution pipeline.
-     * -----------------------------------------------------------------*/
+    /* Step 2: For each batch element, group, output channel, and tile,
+     *         perform the Winograd convolution pipeline. */
     for (int b = 0; b < batch; b++) {
         for (int g = 0; g < groups; g++) {
             int ic_start = g * in_channels_per_group;
@@ -530,9 +494,7 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         }
     }
 
-    /* -------------------------------------------------------------------
-     * Cleanup
-     * -----------------------------------------------------------------*/
+    /* Cleanup */
     free(U);
     free(tile_buf);
     free(V_buf);

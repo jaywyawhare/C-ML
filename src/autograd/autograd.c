@@ -12,7 +12,6 @@
 
 AutogradEngine* global_autograd_engine = NULL;
 
-/* Thread-safe singleton initialization via pthread_once */
 static pthread_once_t g_autograd_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_hook_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -36,7 +35,6 @@ static void autograd_init_once(void) {
     pthread_mutex_init(&global_autograd_engine->lock, NULL);
     global_autograd_engine->lock_initialized = true;
 
-    LOG_INFO("Autograd engine initialized successfully");
 }
 
 void autograd_init(void) {
@@ -53,7 +51,6 @@ void autograd_shutdown(void) {
         global_autograd_engine = NULL;
         /* Reset pthread_once so re-init is possible (e.g., in tests) */
         g_autograd_once = (pthread_once_t)PTHREAD_ONCE_INIT;
-        LOG_INFO("Autograd engine shut down");
     }
 }
 
@@ -67,7 +64,6 @@ void autograd_set_grad_mode(bool enabled) {
     if (engine->lock_initialized) pthread_mutex_lock(&engine->lock);
     engine->grad_mode = enabled;
     if (engine->lock_initialized) pthread_mutex_unlock(&engine->lock);
-    LOG_DEBUG("Gradient mode set to %s", enabled ? "enabled" : "disabled");
 }
 
 bool autograd_is_grad_enabled(void) {
@@ -93,7 +89,6 @@ void tensor_set_requires_grad(Tensor* t, bool requires_grad) {
     if (!t)
         return;
     t->requires_grad = requires_grad;
-    LOG_DEBUG("Set requires_grad=%s for tensor %p", requires_grad ? "true" : "false", (void*)t);
 }
 
 bool tensor_is_leaf(Tensor* t) { return t && (t->ir_node == NULL); }
@@ -102,9 +97,6 @@ Tensor* tensor_detach(Tensor* t) {
     if (!t)
         return NULL;
 
-    LOG_DEBUG("Detaching tensor %p", (void*)t);
-
-    // Create a new tensor that shares data but has no IR node
     Tensor* detached = tensor_clone(t);
     if (!detached)
         return NULL;
@@ -121,8 +113,6 @@ void tensor_detach_inplace(Tensor* t) {
     if (!t)
         return;
 
-    LOG_DEBUG("In-place detaching tensor %p", (void*)t);
-
     t->requires_grad = false;
     t->ir_node       = NULL;
     t->ir_context    = NULL;
@@ -132,7 +122,6 @@ void tensor_retain_grad(Tensor* t) {
     if (!t)
         return;
 
-    LOG_DEBUG("Retaining gradient for tensor %p", (void*)t);
     t->requires_grad = true;
 }
 
@@ -163,7 +152,6 @@ int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
     }
 
     hooks->hooks[hooks->num_hooks++] = hook;
-    LOG_DEBUG("Registered backward hook for tensor %p", (void*)t);
     return 0;
 }
 
@@ -174,7 +162,6 @@ void tensor_remove_hooks(Tensor* t) {
 
     TensorHookList* hooks = (TensorHookList*)t->user_data;
     hooks->num_hooks      = 0;
-    LOG_DEBUG("Removed all hooks for tensor %p", (void*)t);
 }
 
 int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook) {
@@ -183,7 +170,6 @@ int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook
         return -1;
     }
 
-    // Store hook in module's user_data
     if (!module->user_data) {
         module->user_data = malloc(sizeof(ModuleBackwardHook));
         if (!module->user_data) {
@@ -193,15 +179,12 @@ int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook
     }
 
     *(ModuleBackwardHook*)module->user_data = hook;
-    LOG_DEBUG("Registered backward hook for module %s", module->name ? module->name : "unknown");
     return 0;
 }
 
 void tensor_zero_grad(Tensor* tensor) {
     if (!tensor)
         return;
-
-    LOG_DEBUG("Zeroing gradient for tensor %p", (void*)tensor);
 
     if (tensor->grad) {
         tensor_free(tensor->grad);
@@ -213,22 +196,12 @@ void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
     if (!tensor || !new_grad)
         return;
 
-    // Only accumulate gradients for tensors that require them
-    if (!tensor->requires_grad) {
-        LOG_DEBUG("Skipping gradient accumulation for tensor %p (requires_grad=false)",
-                  (void*)tensor);
+    if (!tensor->requires_grad)
         return;
-    }
 
     if (!tensor->grad) {
-        // First gradient, just assign it
         tensor->grad = tensor_clone(new_grad);
-        LOG_DEBUG("Initialized gradient for tensor %p", (void*)tensor);
     } else {
-        // Accumulate gradient (add new_grad to existing grad)
-        LOG_DEBUG("Accumulating gradient for tensor %p", (void*)tensor);
-
-        // Element-wise addition
         for (size_t i = 0; i < tensor->grad->numel && i < new_grad->numel; i++) {
             float old_val = tensor_get_float(tensor->grad, i);
             float new_val = tensor_get_float(new_grad, i);
@@ -236,19 +209,16 @@ void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
         }
     }
 
-    // Check for anomalies if enabled
     if (autograd_get_engine()->anomaly_detection) {
         autograd_check_anomaly(tensor->grad, "gradient accumulation");
     }
 
-    // CRITICAL: If this tensor is an IR facade (has ir_node and ir_context),
-    // also propagate the gradient to ir_node->output so the next backward node can find it
+    /* Propagate gradient to ir_node->output so the next backward node can find it */
     if (tensor->ir_node && tensor->ir_node->output && tensor->ir_node->output != tensor) {
         fflush(stdout);
         if (!tensor->ir_node->output->grad) {
             tensor->ir_node->output->grad = tensor_clone(tensor->grad);
         }
-        // Note: we don't accumulate here since we just set tensor->grad above
     }
 }
 
@@ -273,23 +243,15 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         return;
     }
 
-    // Ensure tensor is executed before backward pass
-    // This is critical for lazy execution: we need the forward pass values to compute gradients!
-
+    /* Lazy execution: forward pass values needed before computing gradients */
     if (tensor_ensure_executed(tensor) != 0) {
         LOG_ERROR("Failed to execute tensor for backward pass");
         return;
     }
 
-    // Auto-capture loss (if this is a scalar loss tensor)
-    // Must be called AFTER tensor_ensure_executed so the loss value is available
     training_metrics_auto_capture_loss(tensor);
 
-    LOG_INFO("Starting backward pass for tensor %p", (void*)tensor);
-
-    // Initialize gradient if not provided
     if (!gradient) {
-        // For scalar tensors, initialize gradient to ones
         TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
                                              .device     = tensor->device,
                                              .has_dtype  = true,
@@ -301,34 +263,27 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         }
     }
 
-    // Set root gradient
     if (!tensor->grad) {
         tensor->grad = tensor_clone(gradient);
     } else {
         tensor_accumulate_grad(tensor, gradient);
     }
 
-    // Build backward graph in IR
     if (cml_ir_build_backward(tensor->ir_context, tensor->ir_node) != 0) {
         LOG_ERROR("Failed to build backward graph");
         return;
     }
 
-    // Execute backward pass
     if (cml_ir_execute_backward(tensor->ir_context) != 0) {
         LOG_ERROR("Failed to execute backward pass");
         LOG_ERROR("Aborting training run to avoid repeated failing executions");
-        // Hard fail so main/training_loop don't keep looping on the same error.
         exit(1);
     }
-    LOG_INFO("Backward pass completed using IR for tensor %p", (void*)tensor);
 
     const char* viz     = getenv("CML_VIZ");
     const char* viz_env = getenv("VIZ");
     if ((viz && viz[0] != '\0') ||
         (viz_env && (viz_env[0] == '1' || strcmp(viz_env, "true") == 0))) {
-
-        // CRITICAL: Optimize IR before exporting to show fusion and dead code elimination
         if (tensor->ir_context) {
             cml_ir_optimize(tensor->ir_context);
         }
@@ -340,8 +295,6 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         } else {
             LOG_INFO("CML_VIZ exported graph to %s", out_path);
         }
-
-        // Export kernel analysis for both raw and optimized views
         if (tensor->ir_context) {
             char* kernel_json_raw = cml_ir_export_kernel_analysis(tensor->ir_context, false);
             char* kernel_json_opt = cml_ir_export_kernel_analysis(tensor->ir_context, true);
@@ -359,11 +312,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             if (kernel_json_opt) {
                 free(kernel_json_opt);
             }
-
-            // Ensure loss tensor data is materialized before resetting IR
             tensor_ensure_executed(tensor);
-
-            // Ensure gradients are materialized before resetting IR
             cml_ir_ensure_gradients_executed(tensor->ir_context);
 
             tensor->ir_context = NULL;
@@ -375,49 +324,29 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     }
 }
 
-/**
- * @brief Check if two shapes can be broadcast together (NumPy-style rules)
- *
- * NumPy broadcasting rules:
- * 1. Shapes are aligned from the right (trailing dimensions)
- * 2. Two dimensions are compatible if:
- *    - They are equal, OR
- *    - One of them is 1
- * 3. Empty dimensions (for scalars) are treated as size 1
- *
- * @param shape1 First shape array
- * @param ndim1 Number of dimensions in shape1
- * @param shape2 Second shape array
- * @param ndim2 Number of dimensions in shape2
- * @return true if shapes can be broadcast, false otherwise
- */
+/* NumPy-style broadcasting: shapes aligned from the right, dims compatible if equal or 1 */
 bool tensor_can_broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2) {
     if (!shape1 || !shape2)
         return false;
 
-    // Handle scalar cases (0D tensors)
     if (ndim1 == 0 && ndim2 == 0)
         return true;
     if (ndim1 == 0 || ndim2 == 0)
-        return true; // Scalar can broadcast with any shape
+        return true;
 
     int max_ndim = ndim1 > ndim2 ? ndim1 : ndim2;
 
-    // Check from right to left (trailing dimensions)
     for (int i = 0; i < max_ndim; i++) {
-        // Get dimensions from right (trailing)
         int idx1 = ndim1 - 1 - i;
         int idx2 = ndim2 - 1 - i;
 
         int dim1 = (idx1 >= 0 && idx1 < ndim1) ? shape1[idx1] : 1;
         int dim2 = (idx2 >= 0 && idx2 < ndim2) ? shape2[idx2] : 1;
 
-        // Check compatibility: equal OR one is 1
         if (dim1 != dim2 && dim1 != 1 && dim2 != 1) {
             return false;
         }
 
-        // Check for invalid dimensions (negative or zero sizes)
         if (dim1 < 0 || dim2 < 0) {
             return false;
         }
@@ -426,37 +355,21 @@ bool tensor_can_broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2)
     return true;
 }
 
-/**
- * @brief Compute output shape after broadcasting (NumPy-style)
- *
- * The output shape has the maximum number of dimensions, and each dimension
- * is the maximum of the corresponding input dimensions.
- *
- * @param shape1 First shape array
- * @param ndim1 Number of dimensions in shape1
- * @param shape2 Second shape array
- * @param ndim2 Number of dimensions in shape2
- * @param out_ndim Output: number of dimensions in result
- * @return Output shape array (caller must free), or NULL on failure
- */
 int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_ndim) {
     if (!shape1 || !shape2 || !out_ndim)
         return NULL;
 
-    // Handle scalar cases
     if (ndim1 == 0 && ndim2 == 0) {
         *out_ndim = 0;
-        return NULL; // Scalar result
+        return NULL;
     }
     if (ndim1 == 0) {
-        // Broadcast scalar to shape2
         int* result = tensor_shape_copy(shape2, ndim2);
         if (result)
             *out_ndim = ndim2;
         return result;
     }
     if (ndim2 == 0) {
-        // Broadcast scalar to shape1
         int* result = tensor_shape_copy(shape1, ndim1);
         if (result)
             *out_ndim = ndim1;
@@ -468,7 +381,6 @@ int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_n
     if (!result)
         return NULL;
 
-    // Compute output shape from right to left
     for (int i = 0; i < max_ndim; i++) {
         int idx1 = ndim1 - 1 - i;
         int idx2 = ndim2 - 1 - i;
@@ -476,7 +388,6 @@ int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_n
         int dim1 = (idx1 >= 0 && idx1 < ndim1) ? shape1[idx1] : 1;
         int dim2 = (idx2 >= 0 && idx2 < ndim2) ? shape2[idx2] : 1;
 
-        // Output dimension is max of the two (NumPy rule)
         result[max_ndim - 1 - i] = dim1 > dim2 ? dim1 : dim2;
     }
 
@@ -484,15 +395,6 @@ int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_n
     return result;
 }
 
-/**
- * @brief Broadcast multiple shapes together (NumPy-style)
- *
- * @param shapes Array of shape arrays
- * @param ndims Array of dimension counts
- * @param num_shapes Number of shapes to broadcast
- * @param out_ndim Output: number of dimensions in result
- * @return Output shape array (caller must free), or NULL on failure
- */
 int* broadcast_multi_shapes(int** shapes, int* ndims, int num_shapes, int* out_ndim) {
     if (!shapes || !ndims || num_shapes <= 0 || !out_ndim)
         return NULL;
@@ -501,14 +403,12 @@ int* broadcast_multi_shapes(int** shapes, int* ndims, int num_shapes, int* out_n
         return tensor_shape_copy(shapes[0], ndims[0]);
     }
 
-    // Start with first shape
     int* result      = tensor_shape_copy(shapes[0], ndims[0]);
     int current_ndim = ndims[0];
 
     if (!result)
         return NULL;
 
-    // Broadcast each subsequent shape
     for (int i = 1; i < num_shapes; i++) {
         int* new_result =
             broadcast_shapes(result, current_ndim, shapes[i], ndims[i], &current_ndim);
@@ -529,10 +429,6 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
     if (!grad_output || !original_shape || !grad_input)
         return;
 
-    LOG_DEBUG("Computing gradient for broadcast: grad_output ndim=%d, original ndim=%d",
-              grad_output->ndim, ndim);
-
-    // Check if shapes match (no broadcasting occurred)
     if (grad_output->ndim == ndim) {
         bool shapes_match = true;
         for (int i = 0; i < ndim; i++) {
@@ -547,7 +443,6 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
         }
     }
 
-    // Create gradient tensor with original shape
     TensorConfig config = (TensorConfig){.dtype      = grad_output->dtype,
                                          .device     = grad_output->device,
                                          .has_dtype  = true,
@@ -561,7 +456,6 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
     float* grad_out_data = (float*)grad_output->data;
     float* grad_in_data  = (float*)(*grad_input)->data;
 
-    // Compute strides for both tensors
     size_t* out_strides = malloc((size_t)grad_output->ndim * sizeof(size_t));
     size_t* in_strides  = malloc((size_t)ndim * sizeof(size_t));
 
@@ -573,7 +467,6 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
         return;
     }
 
-    // Calculate strides
     out_strides[grad_output->ndim - 1] = 1;
     for (int i = grad_output->ndim - 2; i >= 0; i--) {
         out_strides[i] = out_strides[i + 1] * (size_t)grad_output->shape[i + 1];
@@ -584,9 +477,7 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
         in_strides[i] = in_strides[i + 1] * (size_t)original_shape[i + 1];
     }
 
-    // Iterate over all elements of grad_output
     for (size_t i = 0; i < grad_output->numel; i++) {
-        // Calculate multi-dimensional index for grad_output
         size_t temp   = i;
         size_t in_idx = 0;
 
@@ -594,27 +485,22 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
             size_t coord = temp % (size_t)grad_output->shape[d];
             temp /= (size_t)grad_output->shape[d];
 
-            // Map to input dimension (handle dimension mismatch)
             int in_d = d - (grad_output->ndim - ndim);
             if (in_d >= 0 && in_d < ndim) {
-                // If input dimension is 1, always use index 0
                 if (original_shape[in_d] == 1) {
-                    // Don't add anything (stays at 0)
+                    /* broadcast dim: accumulate at index 0 */
                 } else if (original_shape[in_d] == grad_output->shape[d]) {
                     in_idx += coord * in_strides[in_d];
                 }
             }
         }
 
-        // Accumulate gradient
         grad_in_data[in_idx] += grad_out_data[i];
     }
 
     free(out_strides);
     free(in_strides);
 
-    LOG_DEBUG("Unbroadcast gradient: output numel=%zu, input numel=%zu", grad_output->numel,
-              (*grad_input)->numel);
 }
 
 void autograd_check_anomaly(Tensor* tensor, const char* operation) {
@@ -661,7 +547,6 @@ void autograd_print_graph(Tensor* tensor) {
 
 #include <inttypes.h>
 
-// simple map using parallel arrays for small graphs
 typedef struct {
     const void** keys; // Stores const pointers for comparison only
     int* ids;
@@ -735,11 +620,9 @@ int autograd_export_json(Tensor* root, const char* path) {
     PtrIdMap idmap;
     map_init(&idmap);
 
-    // Map to track which nodes are reachable from output (for dead code detection)
     PtrIdMap reachable;
     map_init(&reachable);
 
-    // First pass: assign IDs to ALL nodes in the IR context (including dead code)
     int next_id         = 1;
     struct IRNode* node = root->ir_context->head;
     while (node) {
@@ -747,7 +630,6 @@ int autograd_export_json(Tensor* root, const char* path) {
         node = node->next;
     }
 
-    // Second pass: mark nodes reachable from output (backward traversal via DFS)
     int stack_cap         = 256;
     struct IRNode** stack = malloc(stack_cap * sizeof(struct IRNode*));
     int stack_size        = 0;
@@ -764,13 +646,10 @@ int autograd_export_json(Tensor* root, const char* path) {
                 struct IRNode* input = n->inputs[j]->ir_node;
                 int already          = map_get_or_insert(&reachable, (const void*)input, 1);
                 if (already == 1) {
-                    // Newly added - push to stack
                     if (stack_size >= stack_cap) {
                         stack_cap *= 2;
                         struct IRNode** new_stack = realloc(stack, stack_cap * sizeof(struct IRNode*));
                         if (!new_stack) {
-                            // Realloc failed - break out of loop to avoid memory corruption
-                            LOG_WARNING("Failed to realloc stack in autograd_export_json, graph may be incomplete");
                             stack_ok = false;
                             break;
                         }
@@ -783,7 +662,6 @@ int autograd_export_json(Tensor* root, const char* path) {
         free(stack);
     }
 
-    // Third pass: export all nodes
     fputs("{\n", f);
     bool first_node   = true;
     bool is_optimized = root->ir_context->is_optimized;
@@ -805,30 +683,23 @@ int autograd_export_json(Tensor* root, const char* path) {
 
         fprintf(f, "  \"%d\": { ", my_id);
 
-        // label
         fputs("\"label\": ", f);
         const char* name = uop_type_to_string(node->type);
         write_json_escaped(f, name);
 
-        // flags - mark as dead if:
-        // 1. After optimization: not used flag
-        // 2. Before optimization: not reachable from output
         bool is_dead;
         if (is_optimized) {
             is_dead = !node->is_used && node->use_count == 0;
         } else {
-            // Check if node is reachable from output
             int reach_check = map_get_or_insert(&reachable, (const void*)node, 0);
-            is_dead         = (reach_check == 0); // Not in reachable set = dead
+            is_dead         = (reach_check == 0);
         }
 
         fprintf(f, ", \"is_dead\": %s", is_dead ? "true" : "false");
         fprintf(f, ", \"is_fused\": %s", node->is_fused ? "true" : "false");
 
-        // Export fusedKernelId for grouping in UI
         fprintf(f, ", \"fusedKernelId\": \"%p\"", (void*)node->fused_kernel);
 
-        // src edges
         fputs(", \"src\": [", f);
         bool first_edge = true;
         for (int j = 0; j < node->num_inputs; j++) {
@@ -838,7 +709,6 @@ int autograd_export_json(Tensor* root, const char* path) {
             struct IRNode* input_node = node->inputs[j]->ir_node;
             int src_id                = map_get_or_insert(&idmap, (const void*)input_node, 0);
 
-            // Only add edge if input node exists in our map and map operation succeeded
             if (src_id >= 0 && src_id > 0) {
                 if (!first_edge) {
                     fputs(", ", f);
@@ -885,14 +755,10 @@ void tensor_register_hook(Tensor* tensor, TensorHookFn hook_fn) {
         return;
     }
 
-    // Add hook to registry
     g_tensor_hooks[g_tensor_hook_count].tensor  = tensor;
     g_tensor_hooks[g_tensor_hook_count].hook_fn = hook_fn;
     g_tensor_hooks[g_tensor_hook_count].active  = true;
     g_tensor_hook_count++;
 
     pthread_mutex_unlock(&g_hook_lock);
-
-    LOG_DEBUG("Registered tensor hook for tensor %p (total hooks: %d)", (void*)tensor,
-              g_tensor_hook_count);
 }

@@ -15,9 +15,7 @@
 #include <string.h>
 #include <math.h>
 
-/* ========================================================================
- * Internal helpers
- * ======================================================================== */
+/* Internal helpers */
 
 /**
  * Perform output[M, N] = input[M, K] @ weight[N, K]^T
@@ -40,9 +38,7 @@ static void matmul_weight_transposed(const float* input, int M, int K,
     }
 }
 
-/* ========================================================================
- * Weight sharding utility
- * ======================================================================== */
+/* Weight sharding utility */
 
 Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
 {
@@ -124,9 +120,7 @@ Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
     }
 }
 
-/* ========================================================================
- * Column-parallel linear
- * ======================================================================== */
+/* Column-parallel linear */
 
 CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
                                                      Tensor* full_bias,
@@ -289,9 +283,7 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
     return output;
 }
 
-/* ========================================================================
- * Row-parallel linear
- * ======================================================================== */
+/* Row-parallel linear */
 
 CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
                                                Tensor* full_bias,
@@ -457,9 +449,7 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
     return output;
 }
 
-/* ========================================================================
- * All-reduce (simulated)
- * ======================================================================== */
+/* All-reduce (simulated) */
 
 Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
 {

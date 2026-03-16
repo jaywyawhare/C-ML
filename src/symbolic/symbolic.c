@@ -11,9 +11,6 @@
 
 static int g_var_id_counter = 0;
 
-// ============================================================================
-// Internal helpers
-// ============================================================================
 
 static SymExpr* sym_alloc(SymExprType type) {
     SymExpr* e = (SymExpr*)calloc(1, sizeof(SymExpr));
@@ -26,9 +23,6 @@ static SymExpr* sym_alloc(SymExprType type) {
 static int64_t i64_min(int64_t a, int64_t b) { return a < b ? a : b; }
 static int64_t i64_max(int64_t a, int64_t b) { return a > b ? a : b; }
 
-// ============================================================================
-// Expression Creation
-// ============================================================================
 
 SymExpr* sym_const(int64_t value) {
     SymExpr* e = sym_alloc(SYM_CONST);
@@ -48,9 +42,6 @@ SymExpr* sym_var(const char* name, int64_t vmin, int64_t vmax) {
     return e;
 }
 
-// ============================================================================
-// Arithmetic with constant folding
-// ============================================================================
 
 static SymExpr* sym_binop(SymExprType type, SymExpr* a, SymExpr* b) {
     if (!a || !b) return NULL;
@@ -92,9 +83,6 @@ SymExpr* sym_mod(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MOD, a, b); }
 SymExpr* sym_min_expr(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MIN, a, b); }
 SymExpr* sym_max_expr(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MAX, a, b); }
 
-// ============================================================================
-// Bounds Inference
-// ============================================================================
 
 int64_t sym_expr_min(const SymExpr* e) {
     if (!e) return 0;
@@ -175,9 +163,6 @@ int64_t sym_expr_max(const SymExpr* e) {
     return 0;
 }
 
-// ============================================================================
-// Evaluation
-// ============================================================================
 
 int64_t sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, int num_vars) {
     if (!e) return 0;
@@ -212,9 +197,6 @@ int64_t sym_eval(const SymExpr* e, const char** var_names, const int64_t* values
     return 0;
 }
 
-// ============================================================================
-// Simplification
-// ============================================================================
 
 SymExpr* sym_simplify(SymExpr* e) {
     if (!e) return NULL;
@@ -326,9 +308,6 @@ SymExpr* sym_simplify(SymExpr* e) {
     return out;
 }
 
-// ============================================================================
-// Memory Management
-// ============================================================================
 
 void sym_expr_retain(SymExpr* e) {
     if (e) e->ref_count++;
@@ -346,9 +325,6 @@ void sym_expr_release(SymExpr* e) {
     free(e);
 }
 
-// ============================================================================
-// Debug / String Conversion
-// ============================================================================
 
 int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
     if (!e || !buf || buf_size <= 0) return 0;
@@ -382,9 +358,6 @@ int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
     }
 }
 
-// ============================================================================
-// SymDim / SymShape
-// ============================================================================
 
 SymDim sym_dim_concrete(int value) {
     SymDim d;

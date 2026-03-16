@@ -1,26 +1,7 @@
 /**
  * @file nn.c
- * @brief Neural network module implementation - PRODUCTION-READY
- *
- * This file provides the base Module structure and related functionality
- * for building neural networks. The implementation supports:
- * - Full named parameter management with add/get/set operations
- * - Dynamic parameter storage with automatic resizing
- * - Training/evaluation mode switching
- * - Gradient zeroing for all parameters
- * - Module composition and containers (Sequential, etc.)
- * - Forward pass execution
- * - Parameter iteration for model save/load
- *
- * **Production Features**:
- * - Parameters are stored with unique names
- * - Parameters can be retrieved, updated, and iterated by name
- * - Memory-safe implementation with proper cleanup
- * - Duplicate parameter names are rejected
- * - Supports arbitrary number of parameters with dynamic allocation
- *
- * Specific layer implementations (Linear, Conv2d, etc.) are in the
- * nn/layers/ directory and build upon this base module system.
+ * @brief Neural network base module -- named parameter management, forward pass,
+ *        training/eval mode, module composition.
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -73,7 +54,6 @@ void module_free(Module* module) {
     // Remove from tracking list to prevent double-free during cleanup
     cml_untrack_module(module);
 
-    // Save the specialized free function before clearing
     // Specialized free functions (e.g., sequential_free) handle their own cleanup
     // and call free(module) themselves
     void (*specialized_free)(Module*) = module->free;
@@ -81,7 +61,6 @@ void module_free(Module* module) {
     // Clear the free pointer to prevent re-entry if specialized_free calls module_free
     module->free = NULL;
 
-    // Free module name (we own it via strdup)
     if (module->name) {
         free(module->name);
         module->name = NULL;
@@ -316,7 +295,6 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
         return 0;
     }
 
-    // Allocate output array (with some extra space for safety)
     Parameter** params = malloc((size_t)total_params * sizeof(Parameter*));
     if (!params) {
         LOG_ERROR("Failed to allocate memory for parameter collection");

@@ -3095,7 +3095,6 @@ void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** ou
     *out_std = uop_std(a, params);
 }
 
-// --- New Activation UOps ---
 
 Tensor* uop_elu(Tensor* x, float alpha) {
     if (!x) return NULL;
@@ -3195,7 +3194,6 @@ Tensor* uop_hardswish(Tensor* x) {
     return tensor_from_ir_node(node, ir);
 }
 
-// --- New Tensor Operation UOps ---
 
 Tensor* uop_masked_select(Tensor* a, Tensor* mask) {
     if (!a || !mask) return NULL;

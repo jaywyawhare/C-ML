@@ -16,12 +16,10 @@ static AutocastContext g_autocast_ctx = {
 void autocast_enter(DType target_dtype) {
     g_autocast_ctx.enabled      = true;
     g_autocast_ctx.target_dtype = target_dtype;
-    LOG_DEBUG("Autocast entered: target_dtype=%d", (int)target_dtype);
 }
 
 void autocast_exit(void) {
     g_autocast_ctx.enabled = false;
-    LOG_DEBUG("Autocast exited");
 }
 
 bool autocast_is_enabled(void) {
@@ -67,10 +65,6 @@ GradScaler* grad_scaler_create(float init_scale, float growth_factor,
     scaler->growth_step     = 0;
     scaler->found_inf       = false;
 
-    LOG_DEBUG("Created GradScaler: scale=%.1f, growth=%.2f, backoff=%.2f, interval=%d",
-              scaler->scale_factor, scaler->growth_factor, scaler->backoff_factor,
-              scaler->growth_interval);
-
     return scaler;
 }
 
@@ -88,7 +82,6 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
 
     tensor_ensure_executed(loss);
 
-    /* Create a scalar tensor with the scale factor and multiply */
     int scalar_shape[] = {1};
     TensorConfig config = (TensorConfig){
         .dtype = loss->dtype, .device = loss->device, .has_dtype = true, .has_device = true};
@@ -98,11 +91,8 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
         return NULL;
     }
 
-    /* Perform element-wise multiplication: scaled_loss = loss * scale_factor
-     * We do this manually to avoid needing tensor_mul which may involve autograd. */
     tensor_ensure_executed(scale_tensor);
 
-    /* Create output tensor matching loss shape */
     Tensor* scaled = tensor_empty(loss->shape, loss->ndim, &config);
     if (!scaled) {
         tensor_free(scale_tensor);
@@ -125,7 +115,6 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
 
     tensor_free(scale_tensor);
 
-    LOG_DEBUG("grad_scaler_scale: scaled loss by %.1f", sf);
     return scaled;
 }
 
@@ -154,7 +143,6 @@ void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params)
         for (size_t i = 0; i < grad->numel; i++) {
             grad_data[i] *= inv_scale;
 
-            /* Check for inf/nan */
             if (isinf(grad_data[i]) || isnan(grad_data[i])) {
                 scaler->found_inf = true;
             }
@@ -177,7 +165,6 @@ void grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimize
         return;
     }
 
-    /* Safe to step: no inf/nan found */
     step_fn(optimizer);
 }
 
@@ -186,7 +173,6 @@ void grad_scaler_update(GradScaler* scaler) {
         return;
 
     if (scaler->found_inf) {
-        /* Backoff: reduce scale factor */
         scaler->scale_factor *= scaler->backoff_factor;
         scaler->growth_step = 0;
 
@@ -196,22 +182,18 @@ void grad_scaler_update(GradScaler* scaler) {
 
         LOG_INFO("GradScaler: reduced scale to %.1f after inf/nan", scaler->scale_factor);
     } else {
-        /* Increment growth counter */
         scaler->growth_step++;
 
         if (scaler->growth_step >= scaler->growth_interval) {
             scaler->scale_factor *= scaler->growth_factor;
             scaler->growth_step = 0;
 
-            /* Cap at a reasonable maximum */
             if (scaler->scale_factor > 65536.0f * 65536.0f) {
                 scaler->scale_factor = 65536.0f * 65536.0f;
             }
 
-            LOG_DEBUG("GradScaler: grew scale to %.1f", scaler->scale_factor);
         }
     }
 
-    /* Reset found_inf for the next iteration */
     scaler->found_inf = false;
 }
