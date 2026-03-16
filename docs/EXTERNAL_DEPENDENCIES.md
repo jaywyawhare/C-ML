@@ -63,10 +63,12 @@ High-accuracy SIMD math library. Provides vectorized exp, log, sin, cos, etc. C-
 # Ubuntu/Debian
 sudo apt-get install libsleef-dev
 
-# Arch Linux
-sudo pacman -S sleef
+# Arch Linux (build from source, not in repos)
+git clone https://github.com/shibatch/sleef.git
+cd sleef && mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local && make -j$(nproc) && sudo make install
 
-# Build from source
+# Build from source (other distros)
 git clone https://github.com/shibatch/sleef.git
 cd sleef && mkdir build && cd build
 cmake .. && make -j$(nproc) && sudo make install
