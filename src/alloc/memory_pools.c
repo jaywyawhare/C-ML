@@ -34,7 +34,6 @@ MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype) {
         return NULL;
     }
 
-    // Allocate all blocks
     for (int i = 0; i < num_blocks; i++) {
         pool->blocks[i] = malloc(block_size);
         if (!pool->blocks[i]) {
@@ -57,7 +56,6 @@ MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype) {
     pool->block_size = block_size;
     pool->dtype      = dtype;
 
-    LOG_DEBUG("Created memory pool: %d blocks of %zu bytes", num_blocks, block_size);
     return pool;
 }
 
@@ -85,7 +83,6 @@ void* memory_pool_alloc(MemoryPool* pool) {
     if (!pool)
         return NULL;
 
-    // Find first available block
     for (int i = 0; i < pool->num_blocks; i++) {
         if (!pool->used[i]) {
             pool->used[i] = 1;
@@ -93,7 +90,6 @@ void* memory_pool_alloc(MemoryPool* pool) {
         }
     }
 
-    LOG_DEBUG("Memory pool exhausted");
     return NULL;
 }
 
@@ -101,7 +97,6 @@ int memory_pool_free_block(MemoryPool* pool, void* block) {
     if (!pool || !block)
         return -1;
 
-    // Find block and mark as unused
     for (int i = 0; i < pool->num_blocks; i++) {
         if (pool->blocks[i] == block) {
             pool->used[i] = 0;
@@ -139,7 +134,6 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
         return NULL;
     }
 
-    // Pre-allocate all tensors
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     for (size_t i = 0; i < num_tensors; i++) {
         pool->tensors[i] = tensor_empty(shape, ndim, &config);
@@ -163,7 +157,6 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
     pool->dtype       = dtype;
     pool->device      = device;
 
-    LOG_DEBUG("Created tensor pool: %zu tensors with shape", num_tensors);
     return pool;
 }
 

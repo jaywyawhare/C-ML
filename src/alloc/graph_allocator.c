@@ -128,7 +128,6 @@ void cml_graph_allocator_free(CMLGraphAllocator_t galloc) {
         free(galloc->buffers);
     }
 
-    // Free memory pools
     if (galloc->memory_pools) {
         for (int i = 0; i < galloc->num_buffers; i++) {
             if (galloc->memory_pools[i]) {
@@ -148,7 +147,6 @@ void cml_graph_allocator_free(CMLGraphAllocator_t galloc) {
     free(galloc);
 }
 
-// Helper: Calculate tensor memory size
 static size_t calculate_tensor_size(Tensor* tensor) {
     if (!tensor)
         return 0;
@@ -158,16 +156,10 @@ static size_t calculate_tensor_size(Tensor* tensor) {
 
 static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph);
 
-// Helper: Perform full liveness analysis to find peak memory usage
-// This function performs complete liveness analysis by:
-// 1. Building a dependency graph from the computation graph
-// 2. Using topological sort to determine execution order
-// 3. Tracking exact liveness intervals for each tensor:
-//    - Leaf nodes (inputs/parameters) are always alive
-//    - Intermediate nodes are alive from creation until all consumers finish
-// 4. Calculating peak = max(sum of alive tensor sizes) at each execution step
-// This provides accurate memory estimates by simulating actual execution order
-// and tracking which tensors are alive at each step.
+/*
+ * Full liveness analysis: topo-sort the graph, track exact lifetime
+ * intervals, and return peak(sum of alive tensor sizes) across all steps.
+ */
 static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     if (!graph)
         return 0;
@@ -391,8 +383,7 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     return peak_memory;
 }
 
-// Fallback: Adaptive liveness analysis (used if full analysis fails)
-// Uses adaptive liveness factor (30-50%) based on graph complexity
+/* Fallback: adaptive liveness factor (30-50%) based on graph complexity */
 static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
     if (!graph)
         return 0;
@@ -616,14 +607,12 @@ size_t cml_graph_allocator_get_buffer_size(CMLGraphAllocator_t galloc, int buffe
     return galloc->buffer_sizes[buffer_id];
 }
 
-// Enable/disable memory pooling
 void cml_graph_allocator_enable_pooling(CMLGraphAllocator_t galloc, bool enable) {
     if (!galloc)
         return;
     galloc->use_pooling = enable;
 }
 
-// Dynamic reallocation: resize buffer if needed
 bool cml_graph_allocator_realloc_buffer(CMLGraphAllocator_t galloc, int buffer_id,
                                         size_t new_size) {
     if (!galloc || buffer_id < 0 || buffer_id >= galloc->num_buffers)
@@ -650,12 +639,9 @@ bool cml_graph_allocator_realloc_buffer(CMLGraphAllocator_t galloc, int buffer_i
         return false;
     }
 
-    LOG_DEBUG("Reallocated buffer %d from %zu to %zu bytes", buffer_id,
-              galloc->buffer_sizes[buffer_id], new_size);
     return true;
 }
 
-// Initialize memory pool for a buffer (for reuse)
 bool cml_graph_allocator_init_pool(CMLGraphAllocator_t galloc, int buffer_id, size_t block_size,
                                    int num_blocks, DType dtype) {
     if (!galloc || buffer_id < 0 || buffer_id >= galloc->num_buffers)
@@ -675,8 +661,6 @@ bool cml_graph_allocator_init_pool(CMLGraphAllocator_t galloc, int buffer_id, si
     }
 
     galloc->use_pooling = true;
-    LOG_DEBUG("Initialized memory pool for buffer %d: %d blocks of %zu bytes", buffer_id,
-              num_blocks, block_size);
     return true;
 }
 
@@ -719,7 +703,6 @@ int cml_tensor_allocator_alloc(CMLTensorAllocator* talloc, Tensor* tensor) {
     return 0;
 }
 
-// Context-based Allocation
 struct CMLContext {
     CMLBackendBuffer_t buffer; // Use backend buffer for unified device operations
     CMLTensorAllocator tensor_allocator;
@@ -742,8 +725,7 @@ CMLContext_t cml_context_new(CMLContextParams params) {
     ctx->mem_size         = 0;
 
     if (params.mem_buffer) {
-        // Use provided buffer - for now, allocate a new buffer and copy
-        // In a full implementation, we'd have a function to wrap existing memory
+        // Allocate a new buffer and copy from the provided one
         CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(ctx->device);
         if (!buft) {
             free(ctx);

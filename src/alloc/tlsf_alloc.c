@@ -23,10 +23,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ========================================================================= */
-/*  Bit manipulation helpers                                                  */
-/* ========================================================================= */
-
 static inline int tlsf_fls(uint32_t x)
 {
     if (x == 0) return -1;
@@ -39,9 +35,6 @@ static inline int tlsf_ffs(uint32_t x)
     return __builtin_ctz(x);
 }
 
-/* ========================================================================= */
-/*  Block layout constants                                                    */
-/* ========================================================================= */
 
 /*
  * A block in memory looks like:
@@ -71,10 +64,6 @@ static inline int tlsf_ffs(uint32_t x)
 #define FLAG_FREE     ((size_t)1)
 #define FLAG_PREVFREE ((size_t)2)
 #define FLAG_MASK     (FLAG_FREE | FLAG_PREVFREE)
-
-/* ========================================================================= */
-/*  Block accessors                                                           */
-/* ========================================================================= */
 
 static inline size_t block_get_size(const TLSFBlock* b)
 {
@@ -139,18 +128,10 @@ static inline bool block_in_pool(const CMLTLSFAllocator* a, const TLSFBlock* b)
            (const char*)b < (const char*)a->pool + a->pool_size;
 }
 
-/* ========================================================================= */
-/*  Alignment                                                                 */
-/* ========================================================================= */
-
 static inline size_t align_up(size_t x, size_t a)
 {
     return (x + a - 1) & ~(a - 1);
 }
-
-/* ========================================================================= */
-/*  FL/SL index mapping                                                       */
-/* ========================================================================= */
 
 static void mapping_insert(size_t size, int* fl, int* sl)
 {
@@ -178,10 +159,6 @@ static void mapping_search(size_t size, int* fl, int* sl)
     }
     mapping_insert(size, fl, sl);
 }
-
-/* ========================================================================= */
-/*  Free list operations                                                      */
-/* ========================================================================= */
 
 static void freelist_insert(CMLTLSFAllocator* a, TLSFBlock* block)
 {
@@ -225,9 +202,6 @@ static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block)
     block->prev_free = NULL;
 }
 
-/* ========================================================================= */
-/*  Block splitting and merging                                               */
-/* ========================================================================= */
 
 /**
  * Try to split 'block' so that the first part has exactly 'wanted' bytes of
@@ -307,10 +281,6 @@ static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block)
     return block;
 }
 
-/* ========================================================================= */
-/*  Find a suitable free block                                                */
-/* ========================================================================= */
-
 static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size)
 {
     int fl, sl;
@@ -336,9 +306,6 @@ static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size)
     return block;
 }
 
-/* ========================================================================= */
-/*  Pool initialization helper                                                */
-/* ========================================================================= */
 
 /**
  * Initialize the pool memory: create one large free block + a sentinel.
@@ -388,10 +355,6 @@ static int init_pool(CMLTLSFAllocator* a)
 
     return 0;
 }
-
-/* ========================================================================= */
-/*  Public API: TLSF Allocator                                                */
-/* ========================================================================= */
 
 CMLTLSFAllocator* cml_tlsf_create(size_t pool_size)
 {
@@ -755,10 +718,6 @@ bool cml_tlsf_check(const CMLTLSFAllocator* a)
 
     return true;
 }
-
-/* ========================================================================= */
-/*  Timeline Planner                                                          */
-/* ========================================================================= */
 
 CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity)
 {
