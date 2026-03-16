@@ -1,24 +1,14 @@
-"""
-CML Distributed Training - Python bindings for distributed/data_parallel.h
-
-Provides distributed training utilities:
-- Process group management
-- All-reduce, broadcast, barrier
-- DistributedDataParallel (DDP) wrapper
-- Pipeline parallel wrapper
-"""
+"""Python bindings for distributed / data-parallel training."""
 
 import ctypes
 from ctypes import c_int, c_float, c_bool, c_void_p, c_size_t, POINTER, Structure
 
 from cml.core import Tensor, _get_lib
 
-# Backend types
 DIST_BACKEND_NCCL = 0
 DIST_BACKEND_MPI = 1
 DIST_BACKEND_GLOO = 2
 
-# Reduce ops
 DIST_REDUCE_SUM = 0
 DIST_REDUCE_PRODUCT = 1
 DIST_REDUCE_MAX = 2
@@ -27,7 +17,6 @@ DIST_REDUCE_AVG = 4
 
 
 def _setup_distributed_bindings(lib):
-    """Set up ctypes bindings for distributed functions."""
     try:
         lib.cml_dist_init.argtypes = [c_int, c_int, c_int]
         lib.cml_dist_init.restype = c_int
@@ -64,13 +53,7 @@ def _ensure_bindings():
 
 
 def init_process_group(backend="gloo", world_size=-1, rank=-1):
-    """Initialize distributed training.
-
-    Args:
-        backend: Communication backend ("nccl", "mpi", "gloo")
-        world_size: Number of processes (-1 = auto from env)
-        rank: This process's rank (-1 = auto from env)
-    """
+    """Initialize distributed training with the given backend."""
     _ensure_bindings()
     lib = _get_lib()
 
@@ -83,31 +66,26 @@ def init_process_group(backend="gloo", world_size=-1, rank=-1):
 
 
 def get_rank():
-    """Get this process's rank."""
     _ensure_bindings()
     return _get_lib().cml_dist_get_rank()
 
 
 def get_world_size():
-    """Get total number of processes."""
     _ensure_bindings()
     return _get_lib().cml_dist_get_world_size()
 
 
 def is_initialized():
-    """Check if distributed training is initialized."""
     _ensure_bindings()
     return _get_lib().cml_dist_is_initialized()
 
 
 def destroy_process_group():
-    """Shutdown distributed training."""
     _ensure_bindings()
     _get_lib().cml_dist_destroy()
 
 
 def barrier():
-    """Synchronize all processes."""
     _ensure_bindings()
     result = _get_lib().cml_dist_barrier()
     if result != 0:
@@ -115,28 +93,9 @@ def barrier():
 
 
 class DistributedDataParallel:
-    """Wrapper for distributed data parallel training.
-
-    Usage:
-        model = cml.Sequential()
-        model.add(cml.Linear(10, 20))
-        ddp_model = cml.distributed.DistributedDataParallel(model)
-
-        for epoch in range(num_epochs):
-            output = ddp_model(input_data)
-            loss = cml.mse_loss(output, target)
-            cml.backward(loss)
-            ddp_model.sync_gradients()
-            optimizer.step()
-    """
+    """Wraps a module for data-parallel training with gradient synchronisation."""
 
     def __init__(self, module, bucket_size_mb=25):
-        """Wrap a module for distributed data parallel.
-
-        Args:
-            module: CML module to wrap
-            bucket_size_mb: Gradient bucket size in MB
-        """
         self.module = module
         self.bucket_size_mb = bucket_size_mb
 
@@ -144,15 +103,10 @@ class DistributedDataParallel:
             raise RuntimeError("Distributed not initialized. Call init_process_group() first.")
 
     def __call__(self, input_tensor):
-        """Forward pass through the wrapped module."""
         return self.module(input_tensor)
 
     def sync_gradients(self):
-        """Synchronize gradients across all processes.
-
-        Call this after backward() and before optimizer.step().
-        Uses all-reduce (sum) on each parameter's gradient tensor.
-        """
+        """All-reduce and average gradients across processes."""
         _ensure_bindings()
         lib = _get_lib()
         try:
@@ -175,28 +129,17 @@ class DistributedDataParallel:
                     param.grad = averaged
 
     def parameters(self):
-        """Get module parameters."""
         return self.module.parameters() if hasattr(self.module, 'parameters') else []
 
 
 class PipelineParallel:
-    """GPipe-style pipeline parallel wrapper.
-
-    Splits a list of modules into stages and processes micro-batches.
-    """
+    """GPipe-style pipeline parallel wrapper over a list of module stages."""
 
     def __init__(self, modules, num_micro_batches=4):
-        """Create pipeline parallel wrapper.
-
-        Args:
-            modules: List of modules (one per pipeline stage)
-            num_micro_batches: Number of micro-batches
-        """
         self.modules = modules
         self.num_micro_batches = num_micro_batches
 
     def __call__(self, input_tensor):
-        """Forward pass through the pipeline."""
         x = input_tensor
         for mod in self.modules:
             x = mod(x)

@@ -1,8 +1,4 @@
-"""
-FastAPI server for C-ML visualization.
-
-Serves the static UI and provides JSON endpoints for graph/training/kernel data.
-"""
+"""FastAPI server for C-ML visualization dashboard."""
 
 import json
 from pathlib import Path
@@ -19,24 +15,20 @@ except ImportError:
         "  pip install cml[viz]"
     )
 
-# Paths
 PACKAGE_DIR = Path(__file__).parent
 STATIC_DIR = PACKAGE_DIR / "static"
 
 app = FastAPI(title="C-ML Visualizer", version="0.1.0")
 
-# Working directory for JSON files (where C library exports them)
 _working_dir: Path = Path.cwd()
 
 
 def set_working_dir(path: str | Path):
-    """Set the directory where JSON files are located."""
     global _working_dir
     _working_dir = Path(path)
 
 
 def _read_json(filename: str) -> dict:
-    """Read JSON file from working directory."""
     filepath = _working_dir / filename
     if filepath.exists():
         try:
@@ -48,31 +40,25 @@ def _read_json(filename: str) -> dict:
 
 @app.get("/graph")
 def get_graph():
-    """Get computational graph data."""
     return JSONResponse(_read_json("graph.json"))
 
 
 @app.get("/training")
 def get_training():
-    """Get training metrics data."""
     return JSONResponse(_read_json("training.json"))
 
 
 @app.get("/kernels")
 def get_kernels():
-    """Get kernel/IR data for Kernel Studio."""
     return JSONResponse(_read_json("kernels.json"))
 
 
 @app.get("/model_architecture")
 def get_model_architecture():
-    """Get model architecture data."""
     return JSONResponse(_read_json("model_architecture.json"))
 
 
-# Check if static files exist
 if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
-    # Serve static UI files
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 else:
 
@@ -99,16 +85,6 @@ def launch(
     working_dir: Optional[str | Path] = None,
     reload: bool = False,
 ):
-    """
-    Launch the visualization server.
-
-    Args:
-        port: Port to run server on (default: 8001)
-        host: Host to bind to (default: 0.0.0.0)
-        open_browser: Open browser automatically (default: True)
-        working_dir: Directory containing JSON files (default: current directory)
-        reload: Enable auto-reload for development (default: False)
-    """
     if working_dir:
         set_working_dir(working_dir)
 
@@ -137,7 +113,6 @@ def launch(
 
 
 def main():
-    """CLI entry point."""
     import argparse
 
     parser = argparse.ArgumentParser(description="C-ML Visualization Server")

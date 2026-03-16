@@ -1,13 +1,4 @@
-"""
-Data loading and batch processing utilities.
-
-Provides convenient functions for:
-- Creating datasets
-- Batching data
-- Data augmentation
-- Splitting data
-- Loading common datasets
-"""
+"""Data loading and batch processing utilities."""
 
 from typing import Tuple, List, Optional, Union
 import cml
@@ -15,39 +6,17 @@ from cml.core import Tensor
 
 
 class Dataset:
-    """Simple dataset wrapper.
-
-    Provides an interface for datasets with features and targets.
-
-    Example:
-        >>> dataset = Dataset(X, y)
-        >>> X_batch, y_batch = dataset[0:32]
-    """
+    """Dataset wrapper pairing features with optional targets."""
 
     def __init__(self, X: Tensor, y: Optional[Tensor] = None):
-        """Initialize dataset.
-
-        Args:
-            X: Features
-            y: Targets (optional)
-        """
         self.X = X
         self.y = y
         self.size = X.size
 
     def __len__(self) -> int:
-        """Get dataset size."""
         return self.size
 
     def __getitem__(self, idx: Union[int, slice]) -> Tuple[Tensor, Optional[Tensor]]:
-        """Get item by index or slice.
-
-        Args:
-            idx: Index or slice
-
-        Returns:
-            (X, y) tuple
-        """
         if isinstance(idx, slice):
             start = idx.start or 0
             stop = idx.stop or self.size
@@ -62,16 +31,7 @@ class Dataset:
 
 
 class DataLoader:
-    """Batch data loader.
-
-    Iterates through dataset in batches.
-
-    Example:
-        >>> loader = DataLoader(dataset, batch_size=32)
-        >>> for X_batch, y_batch in loader:
-        ...     output = model(X_batch)
-        ...     loss = loss_fn(output, y_batch)
-    """
+    """Iterates through a dataset in batches."""
 
     def __init__(
         self,
@@ -80,14 +40,6 @@ class DataLoader:
         shuffle: bool = False,
         num_workers: int = 0,
     ):
-        """Initialize data loader.
-
-        Args:
-            dataset: Dataset or feature tensor
-            batch_size: Batch size
-            shuffle: Whether to shuffle data
-            num_workers: Number of workers (reserved for future use)
-        """
         if isinstance(dataset, Tensor):
             self.dataset = Dataset(dataset)
         else:
@@ -103,53 +55,24 @@ class DataLoader:
             random.shuffle(self.indices)
 
     def __iter__(self):
-        """Iterate through batches."""
         for i in range(0, len(self.dataset), self.batch_size):
             batch_size = min(self.batch_size, len(self.dataset) - i)
             X_batch, y_batch = self.dataset[i : i + batch_size]
             yield X_batch, y_batch
 
     def __len__(self) -> int:
-        """Get number of batches."""
         return (len(self.dataset) + self.batch_size - 1) // self.batch_size
 
 
 def create_dataset(X: Tensor, y: Optional[Tensor] = None) -> Dataset:
-    """Create a dataset from tensors.
-
-    Args:
-        X: Features
-        y: Targets (optional)
-
-    Returns:
-        Dataset instance
-
-    Example:
-        >>> X = cml.randn([100, 10])
-        >>> y = cml.zeros([100, 1])
-        >>> dataset = create_dataset(X, y)
-    """
+    """Create a dataset from tensors."""
     return Dataset(X, y)
 
 
 def create_dataloader(
     dataset: Union[Dataset, Tensor], batch_size: int = 32, shuffle: bool = False
 ) -> DataLoader:
-    """Create a data loader.
-
-    Args:
-        dataset: Dataset or features tensor
-        batch_size: Batch size
-        shuffle: Whether to shuffle
-
-    Returns:
-        DataLoader instance
-
-    Example:
-        >>> loader = create_dataloader(dataset, batch_size=32)
-        >>> for X_batch, y_batch in loader:
-        ...     # Process batch
-    """
+    """Create a data loader."""
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
@@ -159,22 +82,7 @@ def train_test_split(
     test_size: float = 0.2,
     random_state: Optional[int] = None,
 ) -> Tuple:
-    """Split dataset into train and test sets.
-
-    Args:
-        X: Features
-        y: Targets (optional)
-        test_size: Fraction for test set (0-1)
-        random_state: Random seed
-
-    Returns:
-        (X_train, X_test) or (X_train, X_test, y_train, y_test)
-
-    Example:
-        >>> X_train, X_test, y_train, y_test = train_test_split(
-        ...     X, y, test_size=0.2, random_state=42
-        ... )
-    """
+    """Split data into train and test sets, returning (X_train, X_test[, y_train, y_test])."""
     if random_state is not None:
         cml.seed(random_state)
 
@@ -196,19 +104,7 @@ def train_test_split(
 def normalize(
     X: Tensor, mean: Optional[Tensor] = None, std: Optional[Tensor] = None
 ) -> Tensor:
-    """Normalize features to mean=0, std=1.
-
-    Args:
-        X: Features to normalize
-        mean: Mean (computed if None)
-        std: Standard deviation (computed if None)
-
-    Returns:
-        Normalized features
-
-    Example:
-        >>> X_normalized = normalize(X)
-    """
+    """Normalize features to zero mean and unit variance."""
     import numpy as np
     arr = X.numpy()
     if mean is None:
@@ -230,19 +126,7 @@ def standardize(X: Tensor) -> Tensor:
 
 
 def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tensor:
-    """Scale features to [min_val, max_val] range.
-
-    Args:
-        X: Features to scale
-        min_val: Minimum value
-        max_val: Maximum value
-
-    Returns:
-        Scaled features
-
-    Example:
-        >>> X_scaled = minmax_scale(X, 0, 1)
-    """
+    """Scale features to [min_val, max_val] range."""
     import numpy as np
     arr = X.numpy()
     x_min = np.min(arr, axis=0)
@@ -255,19 +139,7 @@ def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tenso
 
 
 def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
-    """Convert class labels to one-hot encoding.
-
-    Args:
-        labels: Class label tensor
-        num_classes: Number of classes
-
-    Returns:
-        One-hot encoded tensor
-
-    Example:
-        >>> labels = cml.randn([100])
-        >>> one_hot = one_hot_encode(labels, num_classes=10)
-    """
+    """Convert class labels to one-hot encoding."""
     import numpy as np
     arr = labels.numpy().flatten().astype(int)
     one_hot = np.zeros((len(arr), num_classes), dtype=np.float32)
@@ -278,21 +150,7 @@ def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
 def split_into_batches(
     X: Tensor, y: Optional[Tensor] = None, batch_size: int = 32
 ) -> List[Tuple]:
-    """Split data into batches.
-
-    Args:
-        X: Features
-        y: Targets (optional)
-        batch_size: Batch size
-
-    Returns:
-        List of (X_batch, y_batch) tuples
-
-    Example:
-        >>> batches = split_into_batches(X, y, batch_size=32)
-        >>> for X_batch, y_batch in batches:
-        ...     # Process batch
-    """
+    """Split data into a list of (X_batch, y_batch) tuples."""
     batches = []
     num_samples = X.size
 
@@ -306,7 +164,6 @@ def split_into_batches(
 
 
 def _try_sklearn_load(name: str):
-    """Try to load a dataset from scikit-learn."""
     try:
         import sklearn.datasets
         loader = getattr(sklearn.datasets, f"load_{name}", None)
@@ -319,15 +176,7 @@ def _try_sklearn_load(name: str):
 
 
 def load_iris() -> Tuple[Tensor, Tensor]:
-    """Load Iris dataset.
-
-    Returns:
-        (X, y) tensors where X is (150, 4) features and y is (150,) labels
-
-    Note:
-        Requires scikit-learn for actual data. Falls back to synthetic data
-        if scikit-learn is not installed.
-    """
+    """Load Iris dataset as (X, y) tensors. Falls back to synthetic data."""
     import numpy as np
 
     X_np, y_np = _try_sklearn_load("iris")
@@ -350,15 +199,7 @@ def load_iris() -> Tuple[Tensor, Tensor]:
 
 
 def load_mnist() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
-    """Load MNIST dataset.
-
-    Returns:
-        ((X_train, y_train), (X_test, y_test))
-
-    Note:
-        Requires scikit-learn (fetch_openml) or a local cache for actual data.
-        Falls back to synthetic data if not available.
-    """
+    """Load MNIST dataset as ((X_train, y_train), (X_test, y_test)). Falls back to synthetic data."""
     import numpy as np
 
     try:
@@ -384,15 +225,7 @@ def load_mnist() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
 
 
 def load_cifar10() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
-    """Load CIFAR-10 dataset.
-
-    Returns:
-        ((X_train, y_train), (X_test, y_test))
-
-    Note:
-        Requires a local cache or network access for actual data.
-        Falls back to synthetic data if not available.
-    """
+    """Load CIFAR-10 dataset as ((X_train, y_train), (X_test, y_test)). Falls back to synthetic data."""
     import numpy as np
 
     try:
