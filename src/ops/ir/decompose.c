@@ -228,6 +228,13 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
         cur = cur->next;
     }
 
+    // Count chain length to update node_count
+    int chain_len = 0;
+    for (struct IRNode* n = chain_head; n; n = n->next) {
+        chain_len++;
+        if (n == chain_tail) break;
+    }
+
     // Link chain into the list
     chain_tail->next = original->next;
 
@@ -241,6 +248,9 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
     if (ir->tail == original) {
         ir->tail = chain_tail;
     }
+
+    // Update node_count: replaced 1 node with chain_len nodes
+    ir->node_count += (chain_len - 1);
 
     // Free the original node (but NOT its output tensor — we kept it)
     original->output = NULL; // Prevent double-free
