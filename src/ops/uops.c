@@ -2008,14 +2008,15 @@ Tensor* uop_argsort(Tensor* a, int dim, bool descending) {
 
 Tensor* uop_topk(Tensor* a, int k, int dim, bool largest, Tensor** indices_out) {
     if (!a || k <= 0) return NULL;
-    (void)indices_out; // TODO: indices output
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) return NULL;
+
+    int resolved_dim = dim < 0 ? a->ndim + dim : dim;
 
     TopkParams* params = malloc(sizeof(TopkParams));
     if (!params) return NULL;
     params->k = k;
-    params->dim = dim < 0 ? a->ndim + dim : dim;
+    params->dim = resolved_dim;
     params->largest = largest;
 
     Tensor* inputs[] = {a};
@@ -2024,16 +2025,52 @@ Tensor* uop_topk(Tensor* a, int k, int dim, bool largest, Tensor** indices_out) 
     }
 
     struct IRNode* node = cml_ir_get_tail(ir);
+    int* out_shape;
+    int out_ndim;
     if (a->ndim == 1) {
-        int out_shape[] = {k};
-        node->output_shape = tensor_shape_copy(out_shape, 1);
-        node->output_ndim = 1;
+        int shape[] = {k};
+        out_shape = tensor_shape_copy(shape, 1);
+        out_ndim = 1;
     } else {
-        node->output_shape = tensor_shape_copy(a->shape, a->ndim);
-        node->output_shape[a->ndim - 1] = k;
-        node->output_ndim = a->ndim;
+        out_shape = tensor_shape_copy(a->shape, a->ndim);
+        out_shape[resolved_dim] = k;
+        out_ndim = a->ndim;
     }
-    return tensor_from_ir_node(node, ir);
+    node->output_shape = out_shape;
+    node->output_ndim = out_ndim;
+
+    Tensor* values = tensor_from_ir_node(node, ir);
+
+    /* Produce the indices output tensor */
+    if (indices_out) {
+        SortParams* sort_params = malloc(sizeof(SortParams));
+        if (sort_params) {
+            sort_params->dim = resolved_dim;
+            sort_params->descending = largest;
+
+            Tensor* sort_inputs[] = {a};
+            if (cml_ir_add_uop(ir, UOP_ARGSORT, sort_inputs, 1, sort_params) == 0) {
+                struct IRNode* idx_node = cml_ir_get_tail(ir);
+                if (a->ndim == 1) {
+                    int idx_shape[] = {k};
+                    idx_node->output_shape = tensor_shape_copy(idx_shape, 1);
+                    idx_node->output_ndim = 1;
+                } else {
+                    idx_node->output_shape = tensor_shape_copy(a->shape, a->ndim);
+                    idx_node->output_shape[resolved_dim] = k;
+                    idx_node->output_ndim = a->ndim;
+                }
+                *indices_out = tensor_from_ir_node(idx_node, ir);
+            } else {
+                free(sort_params);
+                *indices_out = NULL;
+            }
+        } else {
+            *indices_out = NULL;
+        }
+    }
+
+    return values;
 }
 
 Tensor* uop_cumprod(Tensor* a, int dim) {
