@@ -44,16 +44,13 @@ Create a file called `hello.c`:
 int main(void) {
     cml_init();
 
-    // Create a simple neural network: 10 -> 5 -> 2
     Sequential* model = cml_nn_sequential();
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(10, 5, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(5, 2, DTYPE_FLOAT32, DEVICE_CPU, true));
 
-    // Print model summary
     cml_summary((Module*)model);
 
-    // Create an input tensor and run forward pass
     float input_data[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     int shape[] = {1, 10};
     Tensor* input = cml_tensor(input_data, shape, 2, NULL);
@@ -89,7 +86,6 @@ This example trains a 3-class MLP classifier on the built-in Iris dataset:
 int main(void) {
     cml_init();
 
-    // Load and prepare data
     Dataset* ds = cml_dataset_load("iris");
     dataset_normalize(ds, "minmax");
     Dataset *train, *test;
@@ -109,7 +105,6 @@ int main(void) {
     int y_shape[] = {n_train, nc};
     Tensor* y_oh = cml_tensor(onehot, y_shape, 2, NULL);
 
-    // Build model: 4 -> 16 -> ReLU -> 8 -> ReLU -> 3 -> Sigmoid
     Sequential* model = cml_nn_sequential();
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(train->input_size, 16,
                           DTYPE_FLOAT32, DEVICE_CPU, true));
@@ -119,10 +114,8 @@ int main(void) {
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(8, nc, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(model, (Module*)cml_nn_sigmoid());
 
-    // Adam optimizer
     Optimizer* opt = cml_optim_adam_for_model((Module*)model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
-    // Training loop
     for (int epoch = 1; epoch <= 100; epoch++) {
         Tensor* pred = cml_nn_sequential_forward(model, train->X);
         Tensor* loss = cml_nn_bce_loss(pred, y_oh);
@@ -135,7 +128,6 @@ int main(void) {
             printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
     }
 
-    // Evaluate on test set
     Tensor* test_pred = cml_nn_sequential_forward(model, test->X);
     tensor_ensure_executed(test_pred);
     float* test_y = (float*)tensor_data_ptr(test->y);
@@ -169,7 +161,7 @@ After building with `-DBUILD_EXAMPLES=ON`, all example binaries are in `build/bi
 ./build/bin/hello_cml            # Smoke test
 ```
 
-See [examples/README.md](../examples/README.md) for the full list of 15+ examples covering linear regression, autoencoders, CNNs, RNNs, LSTMs, transformers, GANs, and more.
+See [examples/README.md](examples.md) for the full list of 15+ examples covering linear regression, autoencoders, CNNs, RNNs, LSTMs, transformers, GANs, and more.
 
 ## Python Bindings
 
@@ -182,7 +174,7 @@ python cml/build_cffi.py
 python -c "import cml; cml.init(); print('OK'); cml.cleanup()"
 ```
 
-See [python/INSTALLATION.md](../python/INSTALLATION.md) for full setup instructions and usage examples.
+See [python/INSTALLATION.md](python_installation.md) for full setup instructions and usage examples.
 
 ## Next Steps
 

@@ -556,17 +556,16 @@ section {
   gap: 6px;
 }
 
-.arch-row-3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.arch-row-6 {
-  grid-template-columns: repeat(6, 1fr);
-}
+.arch-row-3 { grid-template-columns: repeat(3, 1fr); }
+.arch-row-4 { grid-template-columns: repeat(4, 1fr); }
+.arch-row-6 { grid-template-columns: repeat(6, 1fr); }
+.arch-row-7 { grid-template-columns: repeat(7, 1fr); }
 
 @media (max-width: 640px) {
   .arch-row-3 { grid-template-columns: 1fr; }
+  .arch-row-4 { grid-template-columns: repeat(2, 1fr); }
   .arch-row-6 { grid-template-columns: repeat(3, 1fr); }
+  .arch-row-7 { grid-template-columns: repeat(3, 1fr); }
   .arch-diagram { max-width: 100%; }
 }
 
@@ -1199,16 +1198,54 @@ section {
   .docs-layout { max-width: 960px; }
 }
 
+.docs-sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 66px;
+  left: 14px;
+  z-index: 998;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.docs-sidebar-overlay {
+  display: none;
+}
 @media (max-width: 768px) {
-  .docs-layout { flex-direction: column; gap: 24px; padding: 72px 16px 40px; }
+  .docs-sidebar-toggle { display: flex; }
+  .docs-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+  }
+  .docs-layout { padding: 72px 16px 40px; }
   .docs-sidebar {
-    width: 100%;
-    position: static;
-    max-height: none;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding-right: 0;
-    padding-bottom: 16px;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 280px;
+    height: calc(100dvh - 56px);
+    max-height: calc(100dvh - 56px);
+    z-index: 1000;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .docs-sidebar.open {
+    transform: translateX(0);
   }
   .docs-prevnext { flex-direction: column; }
   .docs-prevnext-link { max-width: 100%; }

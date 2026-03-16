@@ -142,7 +142,7 @@ dataset_split(iris, 0.8f, &train, &test);
   gpu: {
     plain: `#include "cml.h"
 
-// Automatic GPU dispatch: CUDA -> ROCm -> Metal -> WebGPU -> LLVM -> CPU
+// Automatic GPU dispatch: CUDA -> ROCm -> Vulkan -> Metal -> WebGPU -> CPU
 DeviceType dev = cml_get_default_device();  // Auto-detects best backend
 
 // Create tensors on GPU
@@ -160,7 +160,7 @@ ir_graph_execute(graph);`,
     jsx: (
       <>
         <span className="pp">#include</span> <span className="str">"cml.h"</span>{'\n\n'}
-        <span className="cm">{'// Automatic GPU dispatch: CUDA -> ROCm -> Metal -> WebGPU -> LLVM -> CPU'}</span>{'\n'}
+        <span className="cm">{'// Automatic GPU dispatch: CUDA -> ROCm -> Vulkan -> Metal -> WebGPU -> CPU'}</span>{'\n'}
         <span className="type">DeviceType</span> dev = <span className="fn">cml_get_default_device</span>();{'  '}<span className="cm">{'// Auto-detects best backend'}</span>{'\n\n'}
         <span className="cm">// Create tensors on GPU</span>{'\n'}
         <span className="type">Tensor</span>* a = <span className="fn">tensor_randn</span>((<span className="type">int</span>[]){'{'}

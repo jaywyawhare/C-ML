@@ -41,34 +41,44 @@ const sections = [
       { slug: 'nn_layers', label: 'Neural Network Layers', file: 'nn_layers.md' },
       { slug: 'autograd', label: 'Autograd', file: 'autograd.md' },
       { slug: 'datasets', label: 'Datasets', file: 'datasets.md' },
+      { slug: 'advanced_nn', label: 'Advanced NN & LLM', file: 'advanced_nn.md' },
+      { slug: 'model_io', label: 'Model I/O', file: 'model_io.md' },
     ],
   },
   {
-    group: 'Advanced',
+    group: 'Compiler & GPU',
     icon: '\u2302',
     items: [
       { slug: 'graph_mode', label: 'Graph Mode', file: 'graph_mode.md' },
-      { slug: 'ir_graph_management', label: 'IR Graph Management', file: 'ir_graph_management.md' },
+      { slug: 'compiler_pipeline', label: 'Compiler Pipeline', file: 'compiler_pipeline.md' },
       { slug: 'optimizations', label: 'Optimizations', file: 'optimizations.md' },
       { slug: 'linearization', label: 'Linearization & Fused Codegen', file: 'linearization.md' },
+      { slug: 'gpu_backends', label: 'GPU Backends', file: 'gpu_backends.md' },
+      { slug: 'ir_graph_management', label: 'IR Graph Management', file: 'ir_graph_management.md' },
       { slug: 'beam_search', label: 'BEAM Search Auto-Tuning', file: 'beam_search.md' },
-      { slug: 'speculative_decoding', label: 'Speculative Decoding', file: 'speculative_decoding.md' },
     ],
   },
   {
-    group: 'Tools',
+    group: 'Infrastructure',
     icon: '\u2261',
+    items: [
+      { slug: 'distributed', label: 'Distributed Training', file: 'distributed.md' },
+      { slug: 'memory_management', label: 'Memory Management', file: 'memory_management.md' },
+      { slug: 'speculative_decoding', label: 'Speculative Decoding', file: 'speculative_decoding.md' },
+      { slug: 'miscellaneous', label: 'Miscellaneous', file: 'miscellaneous.md' },
+    ],
+  },
+  {
+    group: 'Tools & Reference',
+    icon: '\u2764',
     items: [
       { slug: 'kernel_studio', label: 'Kernel Studio', file: 'kernel_studio.md' },
       { slug: 'kernel_studio_quickref', label: 'Kernel Studio Quick Ref', file: 'kernel_studio_quickref.md' },
       { slug: 'benchmarks', label: 'Benchmarks', file: 'benchmarks.md' },
-    ],
-  },
-  {
-    group: 'Reference',
-    icon: '\u2764',
-    items: [
       { slug: 'EXTERNAL_DEPENDENCIES', label: 'External Dependencies', file: 'EXTERNAL_DEPENDENCIES.md' },
+      { slug: 'examples', label: 'Examples', file: 'examples.md' },
+      { slug: 'python_installation', label: 'Python Bindings', file: 'python_installation.md' },
+      { slug: 'license', label: 'License', file: 'license.md' },
     ],
   },
 ]
@@ -202,6 +212,7 @@ export default function DocsPage() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const contentRef = useRef(null)
 
   const active = slug || 'index'
@@ -239,6 +250,7 @@ export default function DocsPage() {
       return
     }
     loadDoc(active)
+    setSidebarOpen(false)
   }, [active, slug, navigate, loadDoc])
 
   // Track active heading for ToC highlight
@@ -274,7 +286,15 @@ export default function DocsPage() {
 
   return (
     <div className="docs-layout">
-      <aside className="docs-sidebar">
+      <button
+        className="docs-sidebar-toggle"
+        onClick={() => setSidebarOpen(o => !o)}
+        aria-label="Toggle navigation"
+      >
+        {sidebarOpen ? '\u2715' : '\u2630'}
+      </button>
+      {sidebarOpen && <div className="docs-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`docs-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="docs-sidebar-title">Documentation</div>
         <nav className="docs-nav">
           {sections.map(section => (

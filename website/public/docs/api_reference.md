@@ -19,24 +19,27 @@ Complete API reference for the C-ML library.
 - [Memory Management](#memory-management)
 - [Kernel Cache](#kernel-cache)
 - [Error Handling](#error-handling)
+- [Error Stack](#error-stack)
+- [Gradient Checkpointing](#gradient-checkpointing)
+- [Profiling](#profiling)
 
-______________________________________________________________________
+---
 
 ## Initialization
 
 ```c
 #include "cml.h"
 
-int  cml_init(void);               // Initialize library (call first)
-int  cml_cleanup(void);            // Cleanup (auto-called via atexit)
-int  cml_force_cleanup(void);      // Force cleanup ignoring refcount
-bool cml_is_initialized(void);     // Check if library is initialized
+int  cml_init(void);
+int  cml_cleanup(void);
+int  cml_force_cleanup(void);
+bool cml_is_initialized(void);
 
 void cml_get_version(int* major, int* minor, int* patch,
                      const char** version_string);
 const char* cml_get_build_info(void);
 
-void cml_seed(int seed);           // Set global random seed
+void cml_seed(int seed);
 ```
 
 ### Typical Usage
@@ -48,14 +51,14 @@ int main(void) {
 
     // ... your code ...
 
-    cml_cleanup();  // Also registered with atexit
+    cml_cleanup();
     return 0;
 }
 ```
 
 `cml_init()` must be called before any other library function. `cml_cleanup()` is automatically registered via `atexit`, so explicit calls are optional but recommended for clarity. If the library was initialized multiple times (nested init), `cml_cleanup()` decrements a refcount; use `cml_force_cleanup()` to tear down regardless.
 
-______________________________________________________________________
+---
 
 ## Tensor Creation
 
@@ -125,7 +128,7 @@ float data[] = {1, 2, 3, 4, 5, 6};
 Tensor* e = cml_tensor_2d(data, 2, 3);
 ```
 
-______________________________________________________________________
+---
 
 ## Tensor Operations
 
@@ -193,7 +196,7 @@ Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim);
 
 ```c
 float* tensor_data_ptr(Tensor* t);  // Materialize lazy tensor, return data pointer
-void   tensor_free(Tensor* t);      // Free tensor and associated resources
+void   tensor_free(Tensor* t);
 ```
 
 ### Example
@@ -214,7 +217,7 @@ tensor_free(b);
 tensor_free(a);
 ```
 
-______________________________________________________________________
+---
 
 ## Neural Network Layers
 
@@ -318,8 +321,8 @@ Tensor* cml_nn_module_forward(Module* module, Tensor* input);
 void    cml_nn_module_set_training(Module* module, bool training);
 void    cml_nn_module_eval(Module* module);    // Shorthand: set training=false
 void    cml_nn_module_train(Module* module);   // Shorthand: set training=true
-void    cml_summary(Module* module);           // Print layer summary
-void    module_free(Module* module);           // Free module and parameters
+void    cml_summary(Module* module);
+void    module_free(Module* module);
 ```
 
 ### Example
@@ -336,7 +339,7 @@ cml_summary((Module*)model);
 Tensor* output = cml_nn_module_forward((Module*)model, input);
 ```
 
-______________________________________________________________________
+---
 
 ## Optimizers
 
@@ -380,9 +383,9 @@ Optimizer* cml_optim_sgd_for_model(Module* model, float lr,
 
 ```c
 void cml_optim_zero_grad(Optimizer* opt);    // Zero all parameter gradients
-void cml_optim_step(Optimizer* opt);         // Apply one optimization step
-void optimizer_set_lr(Optimizer* opt, float lr); // Manually set learning rate
-void optimizer_free(Optimizer* opt);         // Free optimizer state
+void cml_optim_step(Optimizer* opt);
+void optimizer_set_lr(Optimizer* opt, float lr);
+void optimizer_free(Optimizer* opt);
 ```
 
 ### Example
@@ -407,7 +410,7 @@ for (int epoch = 0; epoch < 100; epoch++) {
 optimizer_free(opt);
 ```
 
-______________________________________________________________________
+---
 
 ## LR Schedulers
 
@@ -439,7 +442,7 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* opt, int* milestones,
 ```c
 void  lr_scheduler_step_epoch(LRScheduler* scheduler);            // Call after each epoch
 void  lr_scheduler_step_metric(LRScheduler* scheduler, float metric); // For ReduceOnPlateau
-float lr_scheduler_get_lr(LRScheduler* scheduler);                // Get current LR
+float lr_scheduler_get_lr(LRScheduler* scheduler);
 void  lr_scheduler_free(LRScheduler* scheduler);
 ```
 
@@ -457,7 +460,7 @@ for (int epoch = 0; epoch < 50; epoch++) {
 lr_scheduler_free(sched);
 ```
 
-______________________________________________________________________
+---
 
 ## Loss Functions
 
@@ -480,9 +483,36 @@ Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamm
 Tensor* tensor_smooth_l1_loss(Tensor* input, Tensor* target, float beta);
 ```
 
+### Sparse Cross-Entropy, Triplet, Cosine Embedding, and NLL Losses
+
+```c
+// Numerically stable cross entropy from logits via log-sum-exp
+// (targets are integer class indices, not one-hot)
+Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target);
+
+// Triplet margin loss: loss = mean(max(||anchor-positive|| - ||anchor-negative|| + margin, 0))
+Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive,
+                                   Tensor* negative, float margin);
+
+// Cosine embedding loss: penalizes dissimilar pairs (target=+1/-1)
+Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2,
+                                     Tensor* target, float margin);
+
+// Negative log-likelihood: loss = -mean(log_probs[i, targets[i]])
+// Expects log-probabilities (e.g., output of log_softmax)
+Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets);
+```
+
+| Function                             | Description                                             |
+| ------------------------------------ | ------------------------------------------------------- |
+| `tensor_sparse_cross_entropy_loss`   | Cross-entropy from raw logits with integer class labels  |
+| `tensor_triplet_margin_loss`         | Triplet loss for metric/contrastive learning             |
+| `tensor_cosine_embedding_loss`       | Cosine-based loss for similarity/dissimilarity pairs     |
+| `tensor_nll_loss`                    | NLL loss over log-probabilities                          |
+
 All loss functions return a scalar tensor. Call `cml_backward()` on the result to compute gradients.
 
-______________________________________________________________________
+---
 
 ## Autograd
 
@@ -493,9 +523,9 @@ void cml_backward(Tensor* tensor, Tensor* gradient,
                   bool retain_graph, bool create_graph);
 void cml_zero_grad(Tensor* tensor);    // Zero gradient for a single tensor
 
-void cml_no_grad(void);               // Disable gradient tracking globally
-void cml_enable_grad(void);           // Re-enable gradient tracking
-bool cml_is_grad_enabled(void);       // Check if grad is enabled
+void cml_no_grad(void);
+void cml_enable_grad(void);
+bool cml_is_grad_enabled(void);
 
 bool cml_requires_grad(Tensor* t);
 void cml_set_requires_grad(Tensor* t, bool requires_grad);
@@ -525,7 +555,7 @@ tensor_free(y);
 tensor_free(x);
 ```
 
-______________________________________________________________________
+---
 
 ## Dataset Hub
 
@@ -584,7 +614,7 @@ dataset_free(test);
 dataset_free(ds);
 ```
 
-______________________________________________________________________
+---
 
 ## Model Zoo
 
@@ -630,7 +660,7 @@ Tensor* out = cml_nn_module_forward(model, input);
 module_free(model);
 ```
 
-______________________________________________________________________
+---
 
 ## Model I/O
 
@@ -660,7 +690,6 @@ Checkpoints include model weights, optimizer state, current epoch, and loss valu
 ### Example
 
 ```c
-// Save checkpoint
 model_save_checkpoint(model, opt, epoch, loss_val, "checkpoint.cml");
 
 // Resume training
@@ -670,7 +699,7 @@ model_load_checkpoint(model, opt, &resume_epoch, &resume_loss, "checkpoint.cml")
 printf("Resuming from epoch %d (loss=%.4f)\n", resume_epoch, resume_loss);
 ```
 
-______________________________________________________________________
+---
 
 ## Device Management
 
@@ -685,7 +714,7 @@ DEVICE_AUTO     // Auto-detect best available
 
 Device selection is specified through `TensorConfig` when creating tensors, or through the `DType`/`DeviceType` arguments in layer constructors.
 
-______________________________________________________________________
+---
 
 ## Memory Management
 
@@ -732,14 +761,14 @@ cml_track_dataset(ds);
 for (int epoch = 0; epoch < 100; epoch++) {
     for (int batch = 0; batch < num_batches; batch++) {
         // ... forward, backward, step ...
-        cml_reset_ir_context();  // Free IR nodes each batch
+        cml_reset_ir_context();
     }
 }
 
-cml_cleanup();  // Frees tracked resources
+cml_cleanup();
 ```
 
-______________________________________________________________________
+---
 
 ## Kernel Cache
 
@@ -760,7 +789,7 @@ void   cml_kernel_cache_print_stats(void);
 | `cml_kernel_cache_hit_rate`    | Returns hit rate as a value in \[0.0, 1.0\]    |
 | `cml_kernel_cache_print_stats` | Print formatted cache statistics to stdout     |
 
-______________________________________________________________________
+---
 
 ## Error Handling
 
@@ -785,7 +814,187 @@ cml_set_error_handler(my_handler);
 
 When set, the global error handler is invoked on any library error, giving you the opportunity to log, abort, or recover.
 
-______________________________________________________________________
+---
+
+## Error Stack
+
+The error stack provides structured error tracking with source location information. It complements the global error handler with a stack-based model that captures multiple errors and their call sites.
+
+```c
+#include "core/error_stack.h"
+```
+
+### Types
+
+```c
+typedef struct {
+    int code;             // Error code
+    const char* message;  // Error message
+    const char* file;     // Source file where error occurred
+    int line;             // Line number
+    const char* function; // Function name
+} ErrorEntry;
+```
+
+### Functions
+
+```c
+void        error_stack_init(void);
+void        error_stack_cleanup(void);
+void        error_stack_push(int code, const char* message,
+                             const char* file, int line, const char* function);
+ErrorEntry* error_stack_peek(void);
+bool        error_stack_has_errors(void);
+void        error_stack_print_all(void);
+const char* error_stack_get_last_message(void);     // Last error message (or NULL)
+int         error_stack_get_last_code(void);        // Last error code (or CM_SUCCESS)
+```
+
+### Convenience Macros
+
+```c
+// Wrap any pointer-returning call -- pushes an error if result is NULL
+Tensor* t = CML_CHECK(cml_zeros_2d(3, 3), "Failed to create tensor");
+
+// Same, with an auto-generated message from the expression
+Tensor* t = CML_CHECK_AUTO(cml_zeros_2d(3, 3));
+
+// Query / inspect
+if (CML_HAS_ERRORS()) {
+    printf("Last error: %s (code %d)\n", CML_LAST_ERROR(), CML_LAST_ERROR_CODE());
+    error_stack_print_all();
+}
+```
+
+---
+
+## Gradient Checkpointing
+
+Gradient checkpointing trades compute for memory by recomputing activations during the backward pass instead of storing them. This is essential for training large models that would otherwise exceed GPU memory.
+
+```c
+#include "autograd/checkpointing.h"
+```
+
+### Global Toggle
+
+```c
+void autograd_set_checkpointing(bool enabled);
+bool autograd_is_checkpointing_enabled(void);
+```
+
+### Per-Tensor Checkpointing
+
+```c
+int     autograd_checkpoint(Tensor* tensor);   // Mark tensor for recomputation (0 on success)
+Tensor* autograd_recompute(Tensor* tensor);    // Recompute a checkpointed tensor
+void    autograd_checkpointing_cleanup(void);
+```
+
+### Module-Level Checkpointing
+
+```c
+// Run forward pass through a module; output is marked for recomputation during backward
+Tensor* checkpoint_forward(Module* module, Tensor* input);
+
+// Automatically checkpoint every N layers in a Sequential model (0 to disable)
+void sequential_apply_checkpointing(Sequential* seq, int every_n);
+```
+
+### Configuration
+
+```c
+typedef struct CheckpointConfig {
+    bool enabled;           // Whether checkpointing is active
+    int checkpoint_every_n; // Checkpoint every N layers in sequential models
+} CheckpointConfig;
+```
+
+### Example
+
+```c
+Sequential* model = cml_nn_sequential();
+// ... add layers ...
+
+// Checkpoint every 3 layers to reduce peak memory
+sequential_apply_checkpointing(model, 3);
+
+// Or wrap individual forward passes
+Tensor* out = checkpoint_forward((Module*)expensive_layer, input);
+```
+
+---
+
+## Profiling
+
+The profiling API provides named timers for measuring operation performance.
+
+```c
+#include "backend/profiling.h"
+```
+
+### Types
+
+```c
+typedef struct Timer {
+    struct timespec start_time;
+    struct timespec end_time;
+    double elapsed_ms;
+    bool is_running;
+    char* name;
+} Timer;
+
+typedef struct Profiler {
+    Timer** timers;
+    int num_timers;
+    int capacity;
+    bool enabled;
+} Profiler;
+```
+
+### Timer Functions
+
+```c
+Timer* profiler_timer_create(const char* name);
+void   profiler_timer_free(Timer* timer);
+int    profiler_timer_start(Timer* timer);       // 0 on success
+double profiler_timer_stop(Timer* timer);
+double profiler_timer_elapsed(Timer* timer);     // Peek without stopping
+void   profiler_timer_reset(Timer* timer);
+```
+
+### Profiler Functions
+
+```c
+Profiler* profiler_create(void);
+void      profiler_free(Profiler* profiler);
+void      profiler_set_enabled(Profiler* profiler, bool enabled);
+int       profiler_start(Profiler* profiler, const char* name);
+double    profiler_stop(Profiler* profiler, int timer_id);
+void      profiler_print_report(Profiler* profiler);
+double    profiler_get_total_time(Profiler* profiler, const char* name);
+```
+
+### Example
+
+```c
+Profiler* prof = profiler_create();
+
+for (int epoch = 0; epoch < 10; epoch++) {
+    int fwd = profiler_start(prof, "forward");
+    Tensor* out = cml_nn_module_forward((Module*)model, input);
+    profiler_stop(prof, fwd);
+
+    int bwd = profiler_start(prof, "backward");
+    cml_backward(loss, NULL, false, false);
+    profiler_stop(prof, bwd);
+}
+
+profiler_print_report(prof);
+profiler_free(prof);
+```
+
+---
 
 ## See Also
 
@@ -794,3 +1003,4 @@ ______________________________________________________________________
 - [Graph Mode](graph_mode.md) -- Lazy execution and IR
 - [Getting Started](getting_started.md) -- Build, install, first program
 - [Datasets](datasets.md) -- Dataset hub and loading
+- [Miscellaneous APIs](miscellaneous.md) -- Sparse tensors, image dtypes, augmentation, Winograd, symbolic shapes, SIMD, disk backend, CMake integration

@@ -1,6 +1,6 @@
 # Benchmarks
 
-C-ML includes several benchmark programs to measure performance of key operations.
+C-ML includes benchmark programs to measure performance of key operations.
 
 ## Running Benchmarks
 
@@ -15,61 +15,105 @@ cmake --build build -j$(nproc)
 
 # GEMM (matrix multiplication) benchmark
 ./build/bin/bench_gemm
+
+# Backend comparison benchmark
+./build/bin/bench_backends
 ```
 
 ## Available Benchmarks
 
 ### bench_forward
 
-Measures forward pass latency for common layer configurations:
+Measures end-to-end forward pass latency for a simple neural network:
 
-- **Linear layers**: Various input/output sizes (128x256, 512x1024, etc.)
-- **Conv2d layers**: Different kernel sizes and channel counts
-- **Activation functions**: ReLU, Sigmoid, Tanh
-- **Normalization**: BatchNorm2d, LayerNorm
+- **Model**: Linear(784, 128) -> ReLU -> Linear(128, 10)
+- **Batch size**: 64
+- **Iterations**: 100 (with 5 warmup iterations)
+- **Reports**: Total time, per-forward latency, throughput (samples/sec)
+- Also prints SIMD capabilities, BLAS library info, graph cache stats, and execution stats
 
 ### bench_gemm
 
-Measures matrix multiplication (GEMM) performance:
+Measures matrix multiplication (GEMM) throughput, comparing multiple implementations:
 
-- **Square matrices**: 128x128 through 2048x2048
-- **Rectangular matrices**: Common ML shapes (batch x features)
-- **Backend comparison**: CPU vs LLVM JIT (when available)
+- **Naive**: Triple-loop implementation (only for small sizes)
+- **Raw BLAS**: Direct `cblas_sgemm` call
+- **CML tensor_matmul**: CML's tensor matmul path (sizes up to 1024)
+- **Fused**: matmul + bias + relu chain, comparing BLAS unfused vs CML fused (sizes up to 1024)
+- **Matrix sizes**: 2048x2048 and 4096x4096 (square only)
+- **Reports**: GFLOPS (billions of floating-point operations per second)
 
-Reports GFLOPS (billions of floating-point operations per second).
+### bench_backends
+
+Comprehensive backend comparison benchmark (located in `tests/`):
+
+- **Operations**: Matrix multiplication, kernel cache, element-wise ops
+- **Backends**: CPU fallback, BLAS, CPU LLVM JIT, CUDA
+- **Also measures**: Dispatch overhead
 
 ## Methodology
 
-- Each operation is run multiple times with a warm-up phase
-- Timing uses `clock_gettime(CLOCK_MONOTONIC)` for high-resolution measurements
-- Results report median latency to reduce variance from system noise
-- Memory allocation is excluded from timing where possible
-
-## Operations Benchmarked
-
-| Category | Operations |
-|----------|-----------|
-| Element-wise | add, mul, exp, log, sqrt, relu, sigmoid, tanh |
-| Reduction | sum, mean, max, min |
-| Linear algebra | matmul (GEMM), transpose |
-| Convolution | conv2d forward, conv2d backward |
-| Normalization | batchnorm2d, layernorm |
+- Each benchmark includes a warm-up phase before timed iterations
+- Timing uses `clock_gettime(CLOCK_MONOTONIC)` for high-resolution wall-clock measurements
+- Results report average latency (total time / iterations)
 
 ## Reference Numbers
 
-Performance varies significantly by hardware. Below are placeholder numbers
-from a typical development machine (update with your own results):
+Performance varies between runs and across hardware. These numbers were measured
+on an AVX-512 capable CPU with OpenBLAS:
 
-| Operation | Size | CPU (ms) | LLVM JIT (ms) |
-|-----------|------|----------|----------------|
-| matmul | 512x512 | ~5 | ~2 |
-| matmul | 1024x1024 | ~35 | ~12 |
-| conv2d | 32x3x224x224, k=3 | ~15 | ~8 |
-| relu | 1M elements | ~0.5 | ~0.3 |
-| batchnorm2d | 32x64x56x56 | ~2 | ~1 |
+### Forward Pass (bench_forward)
 
-*Note: These are approximate and should be updated with actual measurements
-on your target hardware.*
+| Model | Batch | Per-forward (ms) | Throughput (samples/sec) |
+|-------|-------|-------------------|--------------------------|
+| Linear(784,128)->ReLU->Linear(128,10) | 64 | ~5.5 | ~11,627 |
+
+### GEMM Throughput (bench_gemm)
+
+| Implementation | N=2048 (ms) | GFLOPS | N=4096 (ms) | GFLOPS |
+|----------------|-------------|--------|-------------|--------|
+| Raw BLAS (cblas_sgemm) | ~276 | ~62 | ~1,694 | ~81 |
+| BLAS + manual bias+relu | ~435 | ~40 | ~2,139 | ~64 |
+
+*Note: CML tensor paths (tensor_matmul, fused) are benchmarked only for sizes
+up to 1024 due to IR/graph overhead at larger sizes. Run the benchmarks on your
+own hardware for complete results.*
+
+### Backend Comparison (bench_backends)
+
+**Dispatch Overhead** (1,000 iterations):
+
+| Operation | Latency (us/op) |
+|-----------|-----------------|
+| Context create/free | ~0.4 |
+| Context init | ~165 |
+| Backend detection | ~86 |
+
+**Kernel Cache** (10,000 iterations):
+
+| Operation | Latency (us/op) |
+|-----------|-----------------|
+| Insert | ~6.1 |
+| Lookup hit | ~0.03 |
+| Lookup miss | ~0.12 |
+
+**Matrix Multiply** (256x256, 10 iterations):
+
+| Backend | Avg Latency (ms) |
+|---------|-------------------|
+| CPU Fallback | ~1.4 |
+| BLAS (OpenBLAS) | ~4.4 |
+
+*Note: At small sizes (256x256), CPU fallback can be faster than BLAS due to
+library call overhead. BLAS outperforms CPU at larger sizes (2048+).*
+
+**Element-wise Ops** (100,000 elements, 10 iterations):
+
+| Operation | Avg Latency (ms) |
+|-----------|-------------------|
+| Add | ~0.95 |
+| Mul | ~0.67 |
+| Exp | ~2.0 |
 
 ## Adding New Benchmarks
 
@@ -79,19 +123,27 @@ Create a new file in `examples/benchmarks/` following the existing pattern:
 #include "cml.h"
 #include <time.h>
 
+static double get_time_sec(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+
 int main(void) {
     cml_init();
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    // ... warmup: run operation a few times ...
 
-    // ... operation to benchmark ...
+    double start = get_time_sec();
+    int iters = 100;
+    for (int i = 0; i < iters; i++) {
+        // ... operation under test ...
+    }
+    double elapsed = get_time_sec() - start;
 
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double elapsed_ms = (end.tv_sec - start.tv_sec) * 1000.0
-                      + (end.tv_nsec - start.tv_nsec) / 1e6;
+    printf("Operation: %.3f ms\n", (elapsed / iters) * 1000);
 
-    printf("Operation: %.3f ms\n", elapsed_ms);
+    cml_cleanup();
     return 0;
 }
 ```

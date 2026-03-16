@@ -22,16 +22,16 @@ autograd_shutdown();
 
 ```c
 // High-level API (cml_* prefix)
-cml_no_grad();                    // Enter no-gradient mode
-cml_enable_grad();                // Exit no-gradient mode
-bool enabled = cml_is_grad_enabled();  // Check if gradient tracking enabled
+cml_no_grad();
+cml_enable_grad();
+bool enabled = cml_is_grad_enabled();
 
 // Low-level API
-autograd_set_grad_mode(true);     // Enable gradient tracking
-autograd_set_grad_mode(false);    // Disable gradient tracking
+autograd_set_grad_mode(true);
+autograd_set_grad_mode(false);
 bool enabled = autograd_is_grad_enabled();
-autograd_no_grad_enter();         // Enter no-gradient mode
-autograd_no_grad_exit();          // Exit no-gradient mode
+autograd_no_grad_enter();
+autograd_no_grad_exit();
 ```
 
 ### Backward Pass
@@ -83,10 +83,9 @@ tensor_accumulate_grad(tensor, new_grad);  // Accumulate gradients
 
 ```c
 // Anomaly detection (debugging)
-autograd_set_anomaly_detection(true);  // Enable NaN/Inf detection
+autograd_set_anomaly_detection(true);
 
-// Graph visualization
-autograd_print_graph(tensor);  // Print computation graph for debugging
+autograd_print_graph(tensor);
 ```
 
 ## Usage Example

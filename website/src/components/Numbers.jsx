@@ -22,7 +22,7 @@ export default function Numbers() {
   return (
     <div id="numbers" ref={ref} className="numbers">
       <div className="num-item" style={{ opacity: 0 }}>
-        <div className="num-val">20+</div>
+        <div className="num-val">28</div>
         <div className="num-label">NN Layers</div>
       </div>
       <div className="num-item" style={{ opacity: 0 }}>
@@ -30,7 +30,7 @@ export default function Numbers() {
         <div className="num-label">Optimizers</div>
       </div>
       <div className="num-item" style={{ opacity: 0 }}>
-        <div className="num-val">5</div>
+        <div className="num-val">7</div>
         <div className="num-label">GPU Backends</div>
       </div>
       <div className="num-item" style={{ opacity: 0 }}>

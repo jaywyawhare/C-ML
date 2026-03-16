@@ -13,7 +13,7 @@ This document describes the Intermediate Representation (IR) graph management sy
 1. [API Reference](#api-reference)
 1. [Best Practices](#best-practices)
 
-______________________________________________________________________
+---
 
 ## IR Graph Lifecycle
 
@@ -22,7 +22,6 @@ ______________________________________________________________________
 The IR graph is created automatically during the forward pass when operations are performed on tensors:
 
 ```c
-// Forward pass creates IR nodes
 Tensor* output = cml_nn_sequential_forward(model, input);
 Tensor* loss = cml_nn_mse_loss(output, target);
 ```
@@ -64,7 +63,7 @@ After each training iteration, the IR graph is automatically reset to prevent me
 // This prevents node accumulation across epochs
 ```
 
-______________________________________________________________________
+---
 
 ## Memory Management
 
@@ -140,7 +139,7 @@ This ensures that:
 
 This prevents double-free errors and ensures data remains valid after IR reset.
 
-______________________________________________________________________
+---
 
 ## Usage Analysis
 
@@ -193,7 +192,7 @@ For a typical XOR training graph:
 - **Dead nodes:** 0
 - **Use count:** Varies by node (inputs used more than outputs)
 
-______________________________________________________________________
+---
 
 ## Kernel Export
 
@@ -259,7 +258,7 @@ for (int i = 0; i < n; i++) {
 
 Operations without code generation show a placeholder comment.
 
-______________________________________________________________________
+---
 
 ## API Reference
 
@@ -285,7 +284,7 @@ void cml_ir_reset_global_context(void);
 - Sets `g_global_ir_context` to NULL
 - Next operation will create a new context
 
-______________________________________________________________________
+---
 
 #### `cml_ir_ensure_gradients_executed()`
 
@@ -313,7 +312,7 @@ cml_ir_ensure_gradients_executed(tensor->ir_context);
 cml_ir_reset_global_context();
 ```
 
-______________________________________________________________________
+---
 
 #### `cml_ir_export_kernel_analysis()`
 
@@ -347,7 +346,7 @@ free(raw_json);
 free(opt_json);
 ```
 
-______________________________________________________________________
+---
 
 ### Internal Functions
 
@@ -367,7 +366,7 @@ static void analyze_usage(CMLGraph_t ir);
 - Updates `use_count` for each node
 - Enables dead node detection
 
-______________________________________________________________________
+---
 
 ## Best Practices
 
@@ -388,13 +387,11 @@ VIZ=1 ./my_training_program
 If you need to access tensor values after `cml_backward()`, ensure they're executed first:
 
 ```c
-// Forward pass
 Tensor* loss = compute_loss(output, target);
 
 // Materialize loss value BEFORE backward
 float loss_value = tensor_get_float(loss, 0);
 
-// Backward pass (will reset IR)
 cml_backward(loss, NULL, false, false);
 
 // loss_value is still valid
@@ -445,7 +442,7 @@ Monitor IR memory usage:
 // After optimization: ~14KB constant (reset each epoch)
 ```
 
-______________________________________________________________________
+---
 
 ## Troubleshooting
 
@@ -455,7 +452,7 @@ ______________________________________________________________________
 
 **Solution:** Ensure `cml_ir_ensure_gradients_executed()` is called before reset.
 
-______________________________________________________________________
+---
 
 ### Issue: Loss value is garbage after backward pass
 
@@ -463,7 +460,7 @@ ______________________________________________________________________
 
 **Solution:** Call `tensor_ensure_executed(loss)` before backward pass, or read loss value before calling `cml_backward()`.
 
-______________________________________________________________________
+---
 
 ### Issue: Validation metrics show as 0 in UI
 
@@ -475,7 +472,7 @@ ______________________________________________________________________
 - Check that `g_current_epoch` indexing is correct (1-indexed vs 0-indexed)
 - Verify validation is called within the training loop
 
-______________________________________________________________________
+---
 
 ### Issue: Memory keeps growing across epochs
 
@@ -486,7 +483,7 @@ ______________________________________________________________________
 - Set `VIZ=1` environment variable
 - Or manually call `cml_ir_reset_global_context()` after each iteration
 
-______________________________________________________________________
+---
 
 ## Performance Considerations
 
@@ -511,7 +508,7 @@ IR reset adds minimal overhead:
 - **Disable** for production training (no VIZ)
 - **Profile** if training on very large graphs (millions of nodes)
 
-______________________________________________________________________
+---
 
 ## Future Enhancements
 
@@ -544,27 +541,23 @@ ______________________________________________________________________
 The IR system is designed to be extensible:
 
 ```c
-// Add new optimization pass
 void my_optimization_pass(CMLGraph_t ir) {
-    // Traverse graph
-    // Apply transformations
-    // Update nodes
+    // Traverse graph and apply transformations
 }
 
 // Register with export system
 // Will be reflected in "optimized" view
 ```
 
-______________________________________________________________________
+---
 
 ## References
 
 - [Autograd Documentation](autograd.md)
-- [Tensor Operations](tensor_ops.md)
-- [Visualization Guide](visualization.md)
-- [Training Metrics](training_metrics.md)
+- [API Reference](api_reference.md)
+- [Training Guide](training.md)
 
-______________________________________________________________________
+---
 
 ## Changelog
 
@@ -589,7 +582,7 @@ ______________________________________________________________________
 - 1000x reduction in memory usage for long training runs
 - Constant memory footprint regardless of epoch count
 
-______________________________________________________________________
+---
 
 ## License
 

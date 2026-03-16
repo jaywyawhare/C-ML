@@ -96,10 +96,10 @@ Optimizer* opt = optim_adam(params, num_params, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8
 ### Optimizer Operations
 
 ```c
-cml_optim_zero_grad(optimizer);     // Zero all gradients
-cml_optim_step(optimizer);          // Update parameters
-optimizer_set_lr(optimizer, 0.01f); // Change learning rate
-optimizer_free(optimizer);          // Free optimizer
+cml_optim_zero_grad(optimizer);
+cml_optim_step(optimizer);
+optimizer_set_lr(optimizer, 0.01f);
+optimizer_free(optimizer);
 ```
 
 ## LR Schedulers
@@ -111,19 +111,11 @@ Learning rate schedulers adjust the learning rate during training.
 ```c
 #include "optim/lr_scheduler.h"
 
-// Step decay: lr *= gamma every step_size epochs
 LRScheduler* sched = lr_scheduler_step(optimizer, 30, 0.1f);
-
-// Exponential decay: lr *= gamma every epoch
 LRScheduler* sched = lr_scheduler_exponential(optimizer, 0.95f);
-
-// Cosine annealing: lr oscillates between initial_lr and eta_min
 LRScheduler* sched = lr_scheduler_cosine_annealing(optimizer, 100, 1e-6f);
-
-// Reduce on plateau: lr *= factor when metric stops improving
 LRScheduler* sched = lr_scheduler_reduce_on_plateau(optimizer, 0.1f, 10, 1e-4f, true);
 
-// Multi-step: lr *= gamma at specified milestones
 int milestones[] = {30, 60, 90};
 LRScheduler* sched = lr_scheduler_multi_step(optimizer, milestones, 3, 0.1f);
 ```
@@ -134,13 +126,9 @@ LRScheduler* sched = lr_scheduler_multi_step(optimizer, milestones, 3, 0.1f);
 for (int epoch = 0; epoch < num_epochs; epoch++) {
     // ... training loop ...
 
-    // Step the scheduler
     lr_scheduler_step_epoch(sched);
+    lr_scheduler_step_metric(sched, val_loss);  // for ReduceOnPlateau
 
-    // For ReduceOnPlateau, pass the metric
-    lr_scheduler_step_metric(sched, val_loss);
-
-    // Check current LR
     float current_lr = lr_scheduler_get_lr(sched);
 }
 
@@ -173,12 +161,12 @@ Tensor* loss = tensor_smooth_l1_loss(outputs, targets, beta);
 Load datasets with one line:
 
 ```c
-Dataset* ds = cml_dataset_load("iris");        // Classification
-Dataset* ds = cml_dataset_load("boston");       // Regression
-Dataset* ds = cml_dataset_load("mnist");       // Image classification
-Dataset* ds = cml_dataset_from_csv("data.csv", -1);  // Custom CSV
+Dataset* ds = cml_dataset_load("iris");
+Dataset* ds = cml_dataset_load("boston");
+Dataset* ds = cml_dataset_load("mnist");
+Dataset* ds = cml_dataset_from_csv("data.csv", -1);
 
-dataset_normalize(ds, "minmax");  // or "zscore"
+dataset_normalize(ds, "minmax");
 
 Dataset *train, *test;
 dataset_split(ds, 0.8f, &train, &test);
@@ -189,8 +177,8 @@ See [docs/datasets.md](datasets.md) for the full list of supported datasets.
 ## Training Mode
 
 ```c
-cml_nn_module_set_training((Module*)model, true);   // Training mode
-cml_nn_module_eval((Module*)model);                  // Evaluation mode
+cml_nn_module_set_training((Module*)model, true);
+cml_nn_module_eval((Module*)model);
 ```
 
 Layers that behave differently in training vs evaluation:
@@ -221,7 +209,6 @@ cleanup_register_optimizer(cleanup, optimizer);
 cleanup_register_tensor(cleanup, tensor);
 cleanup_register_dataset(cleanup, dataset);
 
-// Auto-freed on cml_cleanup() via atexit
 cml_register_cleanup_context(cleanup);
 ```
 

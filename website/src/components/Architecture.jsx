@@ -5,67 +5,95 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 gsap.registerPlugin(ScrollTrigger)
 
 const layers = [
+  // Layer 1: User-facing bindings
   {
     label: 'Python CFFI',
-    sub: 'Zero-copy bindings',
+    sub: 'NumPy integration, zero-copy bindings',
     tier: 'top',
     cols: 1,
     items: null,
   },
+  // Layer 2: Public C API
   {
-    label: 'Public API',
-    sub: 'cml.h',
+    label: 'Public API (cml.h)',
+    sub: 'Tensor creation, forward pass, backward, training loop',
     tier: 'top',
     cols: 1,
     items: null,
   },
+  // Layer 3: High-level ML components
   {
     label: null,
     sub: null,
     tier: 'mid',
-    cols: 3,
+    cols: 4,
     items: [
-      { label: 'NN Layers', sub: '20+ layers, containers' },
-      { label: 'Optimizers', sub: 'Adam, SGD, schedulers' },
-      { label: 'Loss Functions', sub: '9 differentiable losses' },
+      { label: 'NN Layers', sub: '28 layers, containers' },
+      { label: 'LLM Ops', sub: 'LoRA, GQA, RoPE, MoE' },
+      { label: 'Optimizers', sub: 'Adam, SGD, 6 schedulers' },
+      { label: 'Loss Functions', sub: '13 differentiable losses' },
     ],
   },
+  // Layer 4: Training infrastructure
   {
-    label: 'Autograd Engine',
-    sub: 'Dynamic computation graphs, backward pass',
+    label: null,
+    sub: null,
     tier: 'mid',
-    cols: 1,
-    items: null,
+    cols: 4,
+    items: [
+      { label: 'Autograd', sub: 'Dynamic graphs, checkpointing' },
+      { label: 'Distributed', sub: 'DDP, pipeline, tensor parallel' },
+      { label: 'Serving', sub: 'Batching, KV cache, speculative' },
+      { label: 'Model I/O', sub: 'GGUF, ONNX, SafeTensors, .pth' },
+    ],
   },
+  // Layer 5: Tensor runtime
   {
     label: 'Tensor Operations',
-    sub: 'Broadcasting, SIMD, BLAS integration',
+    sub: 'Broadcasting, SIMD (SSE/AVX/AVX-512/NEON), BLAS',
     tier: 'mid',
     cols: 1,
     items: null,
   },
+  // Layer 6: Compiler pipeline
   {
     label: null,
     sub: null,
     tier: 'low',
-    cols: 3,
+    cols: 4,
     items: [
-      { label: 'IR Graph', sub: 'DAG optimizer' },
-      { label: 'Pattern Matcher', sub: 'Fusion rules' },
-      { label: 'Scheduler', sub: 'Execution planner' },
+      { label: 'IR Graph', sub: 'DCE, fusion, Z3 verify' },
+      { label: 'Linearizer', sub: 'Virtual register alloc' },
+      { label: 'Codegen', sub: 'C, PTX, SPIR-V, WGSL, MSL' },
+      { label: 'Kernel Cache', sub: 'LRU, AOT, JIT' },
     ],
   },
+  // Layer 7: Device abstraction
+  {
+    label: null,
+    sub: null,
+    tier: 'low',
+    cols: 4,
+    items: [
+      { label: 'Memory', sub: 'TLSF, pools, graph alloc' },
+      { label: 'HCQ', sub: 'Hardware command queues' },
+      { label: 'NV Driver', sub: 'RM ioctl, GPFIFO rings' },
+      { label: 'AM Driver', sub: 'KFD ioctl, AQL dispatch' },
+    ],
+  },
+  // Layer 8: Hardware backends
   {
     label: null,
     sub: null,
     tier: 'bottom',
-    cols: 6,
+    cols: 7,
     items: [
       { label: 'CUDA' },
       { label: 'ROCm' },
+      { label: 'Vulkan' },
       { label: 'Metal' },
       { label: 'WebGPU' },
-      { label: 'LLVM' },
+      { label: 'OpenCL' },
       { label: 'CPU' },
     ],
   },
