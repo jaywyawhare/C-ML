@@ -33,7 +33,6 @@ static int tests_passed = 0;
 #define SKIP(reason) \
     do { \
         printf("SKIP (%s)\n", reason); \
-        tests_passed++; \
         return 1; \
     } while(0)
 
@@ -326,16 +325,24 @@ static int test_kernel_compile_null(void) {
 }
 
 /**
- * cml_nv_execute_graph stub must return -1.
+ * cml_nv_execute_graph with NULL args must return -1.
  */
 static int test_execute_graph_stub(void) {
     CMLNVDriver* drv = cml_nv_driver_create();
     if (!drv) return 0;
 
-    /* Graph execution is a stub -- should return -1 */
+    /* NULL graph should return -1 */
     int ret = cml_nv_execute_graph(drv, NULL);
     if (ret != -1) {
-        printf("(expected -1, got %d) ", ret);
+        printf("(expected -1 for NULL graph, got %d) ", ret);
+        cml_nv_driver_free(drv);
+        return 0;
+    }
+
+    /* NULL driver should also return -1 */
+    ret = cml_nv_execute_graph(NULL, NULL);
+    if (ret != -1) {
+        printf("(expected -1 for NULL driver, got %d) ", ret);
         cml_nv_driver_free(drv);
         return 0;
     }

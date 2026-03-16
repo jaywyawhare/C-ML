@@ -287,12 +287,13 @@ static bool test_synchronize_null(void) {
 }
 
 /**
- * Test: execute_graph returns -1 (stub).
+ * Test: execute_graph with NULL graph returns -1.
  */
 static bool test_execute_graph_stub(void) {
     CMLAMDriver* drv = cml_am_driver_create();
     if (!drv) return false;
 
+    /* NULL graph must return -1 */
     int ret = cml_am_execute_graph(drv, NULL);
     cml_am_driver_free(drv);
     return (ret == -1);
