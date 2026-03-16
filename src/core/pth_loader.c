@@ -310,10 +310,52 @@ const char** cml_pth_list_keys(const CMLPthStateDict* sd, int* count) {
 }
 
 int cml_pth_load_into_module(const CMLPthStateDict* sd, struct Module* module) {
-    (void)sd; (void)module;
-    /* Full implementation would match state dict keys to module parameters.
-     * This requires the Module to expose a parameter iterator API. */
-    return -1; /* Not yet implemented */
+    if (!sd || !module) return -1;
+    if (!module->parameters || module->num_parameters == 0) return -1;
+
+    int loaded = 0;
+
+    /* Match state dict keys to module parameters by name */
+    for (int i = 0; i < module->num_parameters; i++) {
+        Parameter* param = module->parameters[i];
+        if (!param || !param->name) continue;
+
+        /* Try exact match first */
+        Tensor* t = cml_pth_get_tensor(sd, param->name);
+
+        /* Try suffix match: "layer.weight" matches "model.layer.weight" */
+        if (!t) {
+            size_t pname_len = strlen(param->name);
+            for (int j = 0; j < sd->num_entries; j++) {
+                const char* key = sd->entries[j].key;
+                size_t klen = strlen(key);
+                if (klen >= pname_len) {
+                    const char* suffix = key + klen - pname_len;
+                    if (strcmp(suffix, param->name) == 0 &&
+                        (suffix == key || *(suffix - 1) == '.')) {
+                        t = sd->entries[j].tensor;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!t) continue;
+
+        /* Verify shapes match */
+        if (!param->tensor || param->tensor->numel != t->numel) continue;
+
+        /* Copy data from state dict tensor to parameter tensor */
+        void* dst = tensor_data_ptr(param->tensor);
+        void* src = tensor_data_ptr(t);
+        if (dst && src) {
+            size_t data_size = t->numel * cml_dtype_size(t->dtype);
+            memcpy(dst, src, data_size);
+            loaded++;
+        }
+    }
+
+    return loaded > 0 ? 0 : -1;
 }
 
 void cml_pth_print(const CMLPthStateDict* sd) {
