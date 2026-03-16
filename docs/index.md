@@ -26,9 +26,30 @@ C-ML is a production-ready machine learning library written in pure C, providing
 
 - **[API Reference](api_reference.md)** - Complete API documentation with examples
 - **[Autograd](autograd.md)** - Automatic differentiation system
-- **[Neural Network Layers](nn_layers.md)** - Layer API reference
+- **[Neural Network Layers](nn_layers.md)** - All 28 layers: linear, conv, recurrent, normalization, pooling, activations, utility
 - **[Training](training.md)** - Training API and best practices
 - **[Graph Mode](graph_mode.md)** - Lazy execution and optimization
+
+### Advanced Features
+
+- **[Advanced NN & LLM](advanced_nn.md)** - LoRA, QLoRA, Flash Attention, Paged Attention, LLaMA, Serving, Speculative Decoding
+- **[Compiler Pipeline](compiler_pipeline.md)** - IR scheduling, linearization, fused codegen, AOT, JIT, Z3 verification
+- **[GPU Backends](gpu_backends.md)** - CUDA, ROCm, Vulkan, WebGPU, Metal, OpenCL, Adreno, Hexagon
+- **[Distributed Training](distributed.md)** - DDP, Pipeline Parallel, Tensor Parallel, collective ops
+- **[Model I/O](model_io.md)** - GGUF, SafeTensors, ONNX, PyTorch .pth, quantization
+- **[Memory Management](memory_management.md)** - TLSF allocator, graph allocator, memory pools, timeline planner
+
+### Reference
+
+- **[Datasets](datasets.md)** - Built-in datasets and data loading
+- **[Optimizations](optimizations.md)** - IR optimizations and SIMD
+- **[Linearization](linearization.md)** - IR linearization details
+- **[BEAM Search](beam_search.md)** - GPU kernel auto-tuning
+- **[Speculative Decoding](speculative_decoding.md)** - Draft-verify generation
+- **[Kernel Studio](kernel_studio.md)** - Visualization and debugging
+- **[Benchmarks](benchmarks.md)** - Performance benchmarks
+- **[Miscellaneous](miscellaneous.md)** - Sparse tensors, SIMD, Winograd, augmentation, symbolic, CMake integration
+- **[External Dependencies](EXTERNAL_DEPENDENCIES.md)** - Build dependencies
 
 ## Quick Start
 
@@ -173,12 +194,42 @@ cml_set_default_device(DEVICE_METAL);          // Use Metal (macOS)
 
 ## Examples
 
-See the `examples/` directory for complete working examples:
+See the `examples/` directory for 29 complete working examples:
 
-- **Basic Training**: `main.c` - Simple XOR classification
-- **Comprehensive Training**: `tests/test_training_loop.c` - Full training pipeline with metrics
-- **Autograd**: `examples/demos/autograd_example.c` - Gradient computation examples
-- **Advanced Features**: `examples/demos/early_stopping_lr_scheduler.c` - Early stopping and LR scheduling
+### Tutorials
+- `hello_cml.c` - First program
+- `simple_xor.c` - XOR classification
+- `ex01_tensor_ops.c` - Tensor operations
+- `ex02_linear_regression.c` - Linear regression
+- `ex03_logistic_regression.c` - Logistic regression
+- `ex04_mlp_classifier.c` - MLP classifier
+- `ex05_autoencoder.c` - Autoencoder
+- `ex06_conv_net.c` - Convolutional network
+- `ex07_rnn_sequence.c` - RNN sequence modeling
+- `ex08_lstm_timeseries.c` - LSTM time series
+- `ex09_gru_classifier.c` - GRU classifier
+- `ex10_embedding.c` - Embedding layers
+- `ex11_gan.c` - Generative adversarial network
+- `ex12_multi_task.c` - Multi-task learning
+- `ex13_transformer.c` - Transformer model
+- `ex14_lr_scheduler.c` - Learning rate scheduling
+- `ex15_activations_showcase.c` - All activation functions
+
+### Demos
+- `autograd_example.c` - Gradient computation
+- `auto_capture_example.c` - Graph capture
+- `comprehensive_fusion_example.c` - Kernel fusion
+- `dead_code_example.c` - Dead code elimination
+- `early_stopping_lr_scheduler.c` - Early stopping
+- `export_graph.c` - IR graph export
+- `mnist_example.c` - MNIST digit recognition
+- `print_kernels.c` - Kernel visualization
+- `training_loop_example.c` - Full training pipeline
+- `llama_inference.c` - LLaMA model inference
+
+### Benchmarks
+- `bench_forward.c` - Forward pass benchmarks
+- `bench_gemm.c` - Matrix multiply benchmarks
 
 ## Platform Support
 

@@ -19,6 +19,9 @@ Complete API reference for the C-ML library.
 - [Memory Management](#memory-management)
 - [Kernel Cache](#kernel-cache)
 - [Error Handling](#error-handling)
+- [Error Stack](#error-stack)
+- [Gradient Checkpointing](#gradient-checkpointing)
+- [Profiling](#profiling)
 
 ______________________________________________________________________
 
@@ -480,6 +483,33 @@ Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamm
 Tensor* tensor_smooth_l1_loss(Tensor* input, Tensor* target, float beta);
 ```
 
+### Sparse Cross-Entropy, Triplet, Cosine Embedding, and NLL Losses
+
+```c
+// Numerically stable cross entropy from logits via log-sum-exp
+// (targets are integer class indices, not one-hot)
+Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target);
+
+// Triplet margin loss: loss = mean(max(||anchor-positive|| - ||anchor-negative|| + margin, 0))
+Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive,
+                                   Tensor* negative, float margin);
+
+// Cosine embedding loss: penalizes dissimilar pairs (target=+1/-1)
+Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2,
+                                     Tensor* target, float margin);
+
+// Negative log-likelihood: loss = -mean(log_probs[i, targets[i]])
+// Expects log-probabilities (e.g., output of log_softmax)
+Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets);
+```
+
+| Function                             | Description                                             |
+| ------------------------------------ | ------------------------------------------------------- |
+| `tensor_sparse_cross_entropy_loss`   | Cross-entropy from raw logits with integer class labels  |
+| `tensor_triplet_margin_loss`         | Triplet loss for metric/contrastive learning             |
+| `tensor_cosine_embedding_loss`       | Cosine-based loss for similarity/dissimilarity pairs     |
+| `tensor_nll_loss`                    | NLL loss over log-probabilities                          |
+
 All loss functions return a scalar tensor. Call `cml_backward()` on the result to compute gradients.
 
 ______________________________________________________________________
@@ -787,6 +817,186 @@ When set, the global error handler is invoked on any library error, giving you t
 
 ______________________________________________________________________
 
+## Error Stack
+
+The error stack provides structured error tracking with source location information. It complements the global error handler with a stack-based model that captures multiple errors and their call sites.
+
+```c
+#include "core/error_stack.h"
+```
+
+### Types
+
+```c
+typedef struct {
+    int code;             // Error code
+    const char* message;  // Error message
+    const char* file;     // Source file where error occurred
+    int line;             // Line number
+    const char* function; // Function name
+} ErrorEntry;
+```
+
+### Functions
+
+```c
+void        error_stack_init(void);                // Initialize (called by cml_init)
+void        error_stack_cleanup(void);             // Cleanup (called by cml_cleanup)
+void        error_stack_push(int code, const char* message,
+                             const char* file, int line, const char* function);
+ErrorEntry* error_stack_peek(void);                // Get last error (NULL if empty)
+bool        error_stack_has_errors(void);           // Check for errors
+void        error_stack_print_all(void);            // Print full stack to stderr
+const char* error_stack_get_last_message(void);     // Last error message (or NULL)
+int         error_stack_get_last_code(void);        // Last error code (or CM_SUCCESS)
+```
+
+### Convenience Macros
+
+```c
+// Wrap any pointer-returning call -- pushes an error if result is NULL
+Tensor* t = CML_CHECK(cml_zeros_2d(3, 3), "Failed to create tensor");
+
+// Same, with an auto-generated message from the expression
+Tensor* t = CML_CHECK_AUTO(cml_zeros_2d(3, 3));
+
+// Query / inspect
+if (CML_HAS_ERRORS()) {
+    printf("Last error: %s (code %d)\n", CML_LAST_ERROR(), CML_LAST_ERROR_CODE());
+    error_stack_print_all();
+}
+```
+
+______________________________________________________________________
+
+## Gradient Checkpointing
+
+Gradient checkpointing trades compute for memory by recomputing activations during the backward pass instead of storing them. This is essential for training large models that would otherwise exceed GPU memory.
+
+```c
+#include "autograd/checkpointing.h"
+```
+
+### Global Toggle
+
+```c
+void autograd_set_checkpointing(bool enabled);
+bool autograd_is_checkpointing_enabled(void);
+```
+
+### Per-Tensor Checkpointing
+
+```c
+int     autograd_checkpoint(Tensor* tensor);   // Mark tensor for recomputation (0 on success)
+Tensor* autograd_recompute(Tensor* tensor);    // Recompute a checkpointed tensor
+void    autograd_checkpointing_cleanup(void);  // Free all checkpointing state
+```
+
+### Module-Level Checkpointing
+
+```c
+// Run forward pass through a module; output is marked for recomputation during backward
+Tensor* checkpoint_forward(Module* module, Tensor* input);
+
+// Automatically checkpoint every N layers in a Sequential model (0 to disable)
+void sequential_apply_checkpointing(Sequential* seq, int every_n);
+```
+
+### Configuration
+
+```c
+typedef struct CheckpointConfig {
+    bool enabled;           // Whether checkpointing is active
+    int checkpoint_every_n; // Checkpoint every N layers in sequential models
+} CheckpointConfig;
+```
+
+### Example
+
+```c
+Sequential* model = cml_nn_sequential();
+// ... add layers ...
+
+// Checkpoint every 3 layers to reduce peak memory
+sequential_apply_checkpointing(model, 3);
+
+// Or wrap individual forward passes
+Tensor* out = checkpoint_forward((Module*)expensive_layer, input);
+```
+
+______________________________________________________________________
+
+## Profiling
+
+The profiling API provides named timers for measuring operation performance.
+
+```c
+#include "backend/profiling.h"
+```
+
+### Types
+
+```c
+typedef struct Timer {
+    struct timespec start_time;
+    struct timespec end_time;
+    double elapsed_ms;
+    bool is_running;
+    char* name;
+} Timer;
+
+typedef struct Profiler {
+    Timer** timers;
+    int num_timers;
+    int capacity;
+    bool enabled;
+} Profiler;
+```
+
+### Timer Functions
+
+```c
+Timer* profiler_timer_create(const char* name);
+void   profiler_timer_free(Timer* timer);
+int    profiler_timer_start(Timer* timer);       // 0 on success
+double profiler_timer_stop(Timer* timer);        // Returns elapsed ms
+double profiler_timer_elapsed(Timer* timer);     // Peek without stopping
+void   profiler_timer_reset(Timer* timer);
+```
+
+### Profiler Functions
+
+```c
+Profiler* profiler_create(void);
+void      profiler_free(Profiler* profiler);
+void      profiler_set_enabled(Profiler* profiler, bool enabled);
+int       profiler_start(Profiler* profiler, const char* name);   // Returns timer ID
+double    profiler_stop(Profiler* profiler, int timer_id);        // Returns elapsed ms
+void      profiler_print_report(Profiler* profiler);
+double    profiler_get_total_time(Profiler* profiler, const char* name);
+```
+
+### Example
+
+```c
+Profiler* prof = profiler_create();
+
+for (int epoch = 0; epoch < 10; epoch++) {
+    int fwd = profiler_start(prof, "forward");
+    Tensor* out = cml_nn_module_forward((Module*)model, input);
+    profiler_stop(prof, fwd);
+
+    int bwd = profiler_start(prof, "backward");
+    cml_backward(loss, NULL, false, false);
+    profiler_stop(prof, bwd);
+}
+
+profiler_print_report(prof);
+profiler_free(prof);
+```
+
+______________________________________________________________________
+
 ## See Also
 
 - [Neural Network Layers](nn_layers.md) -- Detailed layer reference
@@ -794,3 +1004,4 @@ ______________________________________________________________________
 - [Graph Mode](graph_mode.md) -- Lazy execution and IR
 - [Getting Started](getting_started.md) -- Build, install, first program
 - [Datasets](datasets.md) -- Dataset hub and loading
+- [Miscellaneous APIs](miscellaneous.md) -- Sparse tensors, image dtypes, augmentation, Winograd, symbolic shapes, SIMD, disk backend, CMake integration

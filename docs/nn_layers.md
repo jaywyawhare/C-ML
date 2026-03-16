@@ -19,6 +19,10 @@ ______________________________________________________________________
   - [Conv1d](#conv1d)
   - [Conv2d](#conv2d)
   - [Conv3d](#conv3d)
+- [Transposed Convolutions](#transposed-convolutions)
+  - [ConvTranspose1d](#convtranspose1d)
+  - [ConvTranspose2d](#convtranspose2d)
+  - [ConvTranspose3d](#convtranspose3d)
 - [Recurrent Layers](#recurrent-layers)
   - [RNNCell](#rnncell)
   - [LSTMCell](#lstmcell)
@@ -28,16 +32,27 @@ ______________________________________________________________________
   - [TransformerEncoderLayer](#transformerencoderlayer)
 - [Embedding](#embedding)
 - [Normalization](#normalization)
+  - [BatchNorm1d](#batchnorm1d)
   - [BatchNorm2d](#batchnorm2d)
+  - [BatchNorm3d](#batchnorm3d)
   - [LayerNorm](#layernorm)
+  - [LayerNorm2d](#layernorm2d)
   - [GroupNorm](#groupnorm)
+  - [InstanceNorm2d](#instancenorm2d)
+  - [RMSNorm](#rmsnorm)
 - [Pooling](#pooling)
   - [MaxPool2d](#maxpool2d)
   - [AvgPool2d](#avgpool2d)
 - [Activation Layers](#activation-layers)
   - [Module Form](#module-form)
   - [Functional Form](#functional-form)
+  - [PReLU](#prelu)
 - [Dropout](#dropout)
+- [Utility Layers](#utility-layers)
+  - [Flatten](#flatten)
+  - [Identity](#identity)
+  - [PixelShuffle](#pixelshuffle)
+  - [Upsample](#upsample)
 - [Complete Example](#complete-example)
 
 ______________________________________________________________________
@@ -220,6 +235,8 @@ ______________________________________________________________________
 
 ## Convolutions
 
+All convolution layers use the same parameter convention: a single integer `kernel_size` is applied uniformly across all spatial dimensions.
+
 ### Conv1d
 
 1D convolution over a temporal/sequential input.
@@ -290,6 +307,127 @@ When `kernel_size` is a single integer, it is applied uniformly across all three
 ```c
 Conv3d* conv = nn_conv3d(3, 32, 3, 1, 1, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
 Tensor* output = cml_nn_module_forward((Module*)conv, input);
+// input shape: [batch, in_channels, depth, height, width]
+```
+
+______________________________________________________________________
+
+## Transposed Convolutions
+
+Transposed convolutions (sometimes called deconvolutions) perform upsampling by reversing the spatial transformation of a regular convolution. They are commonly used in decoder networks, generative models, and semantic segmentation.
+
+### ConvTranspose1d
+
+1D transposed convolution over a temporal/sequential input.
+
+```c
+ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
+                                      int stride, int padding, int output_padding,
+                                      bool use_bias, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter        | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `in_channels`    | Number of input channels                             |
+| `out_channels`   | Number of output channels                            |
+| `kernel_size`    | Size of the convolving kernel                        |
+| `stride`         | Stride of the transposed convolution                 |
+| `padding`        | Zero-padding added to input                          |
+| `output_padding` | Additional size added to one side of the output      |
+| `use_bias`       | If `true`, adds a learnable bias                     |
+
+**Weight shapes:**
+
+- `weight`: `[in_channels, out_channels, kernel_size]`
+- `bias`: `[out_channels]` (if enabled)
+
+**Example:**
+
+```c
+ConvTranspose1d* deconv = nn_conv_transpose1d(16, 1, 3, 2, 1, 1,
+                                               true, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)deconv, input);
+// input shape: [batch, in_channels, length]
+// output shape: [batch, out_channels, output_length]
+```
+
+### ConvTranspose2d
+
+2D transposed convolution over spatial input. Commonly used for learnable upsampling in image generation and segmentation.
+
+```c
+ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
+                                      int stride, int padding, int output_padding,
+                                      bool use_bias, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter        | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `in_channels`    | Number of input channels                             |
+| `out_channels`   | Number of output channels                            |
+| `kernel_size`    | Size of the convolving kernel (square)               |
+| `stride`         | Stride of the transposed convolution                 |
+| `padding`        | Zero-padding added to input                          |
+| `output_padding` | Additional size added to one side of the output      |
+| `use_bias`       | If `true`, adds a learnable bias                     |
+
+When `kernel_size` is a single integer, it is applied uniformly to both height and width. Internally, `stride`, `padding`, `output_padding`, and `dilation` are stored per-dimension as arrays of length 2.
+
+**Weight shapes:**
+
+- `weight`: `[in_channels, out_channels, kernel_h, kernel_w]`
+- `bias`: `[out_channels]` (if enabled)
+
+**Example:**
+
+```c
+// Upsample by 2x: stride=2, kernel=4, padding=1
+ConvTranspose2d* deconv = nn_conv_transpose2d(64, 32, 4, 2, 1, 0,
+                                               true, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)deconv, input);
+// input shape: [batch, 64, height, width]
+// output shape: [batch, 32, height*2, width*2]
+```
+
+### ConvTranspose3d
+
+3D transposed convolution over volumetric input (video, 3D data).
+
+```c
+ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
+                                      int stride, int padding, int output_padding,
+                                      bool use_bias, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter        | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `in_channels`    | Number of input channels                             |
+| `out_channels`   | Number of output channels                            |
+| `kernel_size`    | Size of the convolving kernel (cubic)                |
+| `stride`         | Stride of the transposed convolution                 |
+| `padding`        | Zero-padding added to input                          |
+| `output_padding` | Additional size added to one side of the output      |
+| `use_bias`       | If `true`, adds a learnable bias                     |
+
+When `kernel_size` is a single integer, it is applied uniformly across depth, height, and width. Internally, `stride`, `padding`, `output_padding`, and `dilation` are stored per-dimension as arrays of length 3.
+
+**Weight shapes:**
+
+- `weight`: `[in_channels, out_channels, kd, kh, kw]`
+- `bias`: `[out_channels]` (if enabled)
+
+**Example:**
+
+```c
+ConvTranspose3d* deconv = nn_conv_transpose3d(32, 16, 4, 2, 1, 0,
+                                               true, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)deconv, input);
 // input shape: [batch, in_channels, depth, height, width]
 ```
 
@@ -511,6 +649,36 @@ ______________________________________________________________________
 
 ## Normalization
 
+### BatchNorm1d
+
+Batch normalization over 2D or 3D input (batch, features) or (batch, channels, length). Normalizes across the batch dimension per feature/channel.
+
+```c
+BatchNorm1d* nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
+                             bool track_running_stats, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter             | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `num_features`        | Number of features or channels (C)                       |
+| `eps`                 | Small constant for numerical stability (typical: `1e-5`) |
+| `momentum`            | Running mean/variance update factor (typical: `0.1`)     |
+| `affine`              | If `true`, learnable scale (gamma) and shift (beta)      |
+| `track_running_stats` | If `true`, tracks running mean/variance for eval mode    |
+
+**Example:**
+
+```c
+BatchNorm1d* bn = nn_batchnorm1d(128, 1e-5f, 0.1f, true, true,
+                                  DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)bn, input);
+// input shape: [batch, 128] or [batch, 128, length]
+```
+
+**Note:** During training, statistics are computed from the current batch. During evaluation, running statistics are used if `track_running_stats` is enabled.
+
 ### BatchNorm2d
 
 Batch normalization over 4D input (batch, channels, height, width). Normalizes across the batch dimension per channel.
@@ -540,6 +708,34 @@ Tensor* output = cml_nn_module_forward((Module*)bn, input);
 // input shape: [batch, 64, height, width]
 ```
 
+### BatchNorm3d
+
+Batch normalization over 5D input (batch, channels, depth, height, width). Normalizes across the batch dimension per channel. Follows the same API pattern as BatchNorm2d.
+
+```c
+BatchNorm3d* nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
+                             bool track_running_stats, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter             | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `num_features`        | Number of channels (C)                                   |
+| `eps`                 | Small constant for numerical stability (typical: `1e-5`) |
+| `momentum`            | Running mean/variance update factor (typical: `0.1`)     |
+| `affine`              | If `true`, learnable scale (gamma) and shift (beta)      |
+| `track_running_stats` | If `true`, tracks running mean/variance for eval mode    |
+
+**Example:**
+
+```c
+BatchNorm3d* bn = nn_batchnorm3d(32, 1e-5f, 0.1f, true, true,
+                                  DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)bn, input);
+// input shape: [batch, 32, depth, height, width]
+```
+
 ### LayerNorm
 
 Layer normalization over the last dimension. Normalizes each sample independently.
@@ -563,6 +759,36 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine,
 LayerNorm* ln = nn_layernorm(512, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
 Tensor* output = cml_nn_module_forward((Module*)ln, input);
 // input shape: [batch, seq_len, 512]
+```
+
+### LayerNorm2d
+
+Layer normalization for 2D spatial inputs. Normalizes over the (C, H, W) dimensions per sample. Useful in vision architectures where standard LayerNorm does not account for spatial structure.
+
+```c
+LayerNorm2d* nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
+                             DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter      | Description                                              |
+| -------------- | -------------------------------------------------------- |
+| `num_channels` | Number of channels to normalize                          |
+| `eps`          | Small constant for numerical stability (typical: `1e-5`) |
+| `affine`       | If `true`, learnable scale and shift per channel         |
+
+**Weight shapes** (if affine):
+
+- `weight`: `[num_channels]`
+- `bias`: `[num_channels]`
+
+**Example:**
+
+```c
+LayerNorm2d* ln2d = nn_layernorm2d(64, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)ln2d, input);
+// input shape: [batch, 64, height, width]
 ```
 
 ### GroupNorm
@@ -595,6 +821,69 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps,
 GroupNorm* gn = nn_groupnorm(32, 256, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
 Tensor* output = cml_nn_module_forward((Module*)gn, input);
 ```
+
+### InstanceNorm2d
+
+Instance normalization over 4D input (batch, channels, height, width). Normalizes each channel of each sample independently. Commonly used in style transfer and generative models where batch-level statistics are undesirable.
+
+```c
+InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
+                                   DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter      | Description                                              |
+| -------------- | -------------------------------------------------------- |
+| `num_features` | Number of channels (C) in input                         |
+| `eps`          | Small constant for numerical stability (typical: `1e-5`) |
+| `affine`       | If `true`, learnable scale and shift per channel         |
+
+**Weight shapes** (if affine):
+
+- `weight`: `[num_features]`
+- `bias`: `[num_features]`
+
+**Example:**
+
+```c
+InstanceNorm2d* inorm = nn_instancenorm2d(64, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)inorm, input);
+// input shape: [batch, 64, height, width]
+```
+
+**Note:** Unlike BatchNorm2d, InstanceNorm2d does not track running statistics and normalizes per-instance rather than per-batch.
+
+### RMSNorm
+
+Root Mean Square Layer Normalization. Normalizes by the RMS of the input without mean subtraction. Used in modern transformer architectures (e.g., LLaMA) as a more efficient alternative to LayerNorm.
+
+Formula: `output = input / RMS(input) * weight` where `RMS(x) = sqrt(mean(x^2) + eps)`.
+
+```c
+RMSNorm* nn_rmsnorm(int normalized_shape, float eps, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter          | Description                                              |
+| ------------------ | -------------------------------------------------------- |
+| `normalized_shape` | Number of features to normalize                          |
+| `eps`              | Small constant for numerical stability (typical: `1e-5`) |
+
+**Weight shape:**
+
+- `weight`: `[normalized_shape]` (learnable gain parameter)
+
+**Example:**
+
+```c
+RMSNorm* rms = nn_rmsnorm(512, 1e-5f, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)rms, input);
+// input shape: [batch, seq_len, 512]
+```
+
+**Note:** RMSNorm has no bias parameter and no mean subtraction, making it computationally cheaper than LayerNorm while achieving comparable performance in many settings.
 
 ______________________________________________________________________
 
@@ -706,6 +995,38 @@ Tensor* h = f_relu(cml_nn_module_forward((Module*)linear, input));
 Tensor* probs = f_sigmoid(h);
 ```
 
+### PReLU
+
+Parametric ReLU with a learnable slope for negative values. Each channel (or a single shared parameter) learns its own slope, allowing the network to adapt the activation shape during training.
+
+```c
+PReLU* nn_prelu(int num_parameters, float init, DType dtype, DeviceType device);
+```
+
+**Parameters:**
+
+| Parameter        | Description                                                           |
+| ---------------- | --------------------------------------------------------------------- |
+| `num_parameters` | Number of learnable slopes; `1` for a single shared slope, or number of channels for per-channel slopes |
+| `init`           | Initial value of the learnable slope (typical: `0.25`)                |
+
+**Weight shape:**
+
+- `alpha`: `[num_parameters]`
+
+**Example:**
+
+```c
+// Per-channel PReLU for a 64-channel feature map
+PReLU* prelu = nn_prelu(64, 0.25f, DTYPE_FLOAT32, DEVICE_CPU);
+Tensor* output = cml_nn_module_forward((Module*)prelu, input);
+
+// Or a single shared parameter
+PReLU* prelu_shared = nn_prelu(1, 0.25f, DTYPE_FLOAT32, DEVICE_CPU);
+```
+
+**Note:** Unlike LeakyReLU which has a fixed slope, PReLU learns the optimal negative slope during training via backpropagation.
+
 ______________________________________________________________________
 
 ## Dropout
@@ -736,6 +1057,157 @@ Tensor* train_out = cml_nn_module_forward((Module*)drop, input);
 cml_nn_module_eval((Module*)drop);   // Dropout disabled
 Tensor* eval_out = cml_nn_module_forward((Module*)drop, input);
 ```
+
+______________________________________________________________________
+
+## Utility Layers
+
+### Flatten
+
+Flattens a contiguous range of dimensions into a single dimension. Essential for connecting convolutional feature extractors to linear classifier heads.
+
+```c
+Flatten* nn_flatten(int start_dim, int end_dim);
+```
+
+**Parameters:**
+
+| Parameter   | Description                                                    |
+| ----------- | -------------------------------------------------------------- |
+| `start_dim` | First dimension to flatten (typically `1` to keep batch dim)   |
+| `end_dim`   | Last dimension to flatten (use `-1` for the last dimension)    |
+
+**Example:**
+
+```c
+// Flatten all spatial dimensions, keeping batch dimension
+Flatten* flat = nn_flatten(1, -1);
+Tensor* output = cml_nn_module_forward((Module*)flat, input);
+// input shape: [batch, 64, 7, 7]
+// output shape: [batch, 3136]
+
+// Use in a Sequential to bridge conv layers and linear layers
+sequential_add(model, (Module*)nn_conv2d(32, 64, 3, 1, 1, 1, true, dtype, device));
+sequential_add(model, (Module*)nn_relu(false));
+sequential_add(model, (Module*)nn_flatten(1, -1));
+sequential_add(model, (Module*)nn_linear(64 * 7 * 7, 128, dtype, device, true));
+```
+
+### Identity
+
+A pass-through layer that returns its input unchanged. Useful as a placeholder or no-op in conditional architectures, or to replace a layer without changing the model structure.
+
+```c
+Identity* nn_identity(void);
+```
+
+**Example:**
+
+```c
+Identity* skip = nn_identity();
+Tensor* output = cml_nn_module_forward((Module*)skip, input);
+// output is the same as input
+
+// Useful as a placeholder in conditional architectures
+Module* maybe_norm;
+if (use_normalization) {
+    maybe_norm = (Module*)nn_batchnorm2d(64, 1e-5f, 0.1f, true, true, dtype, device);
+} else {
+    maybe_norm = (Module*)nn_identity();
+}
+sequential_add(model, maybe_norm);
+```
+
+### PixelShuffle
+
+Rearranges elements in a tensor of shape `[N, C*r^2, H, W]` to `[N, C, H*r, W*r]`, where `r` is the upscale factor. This is an efficient sub-pixel convolution technique for learned upsampling. Also provides `PixelUnshuffle` for the inverse operation.
+
+```c
+PixelShuffle*   nn_pixel_shuffle(int upscale_factor);
+PixelUnshuffle* nn_pixel_unshuffle(int downscale_factor);
+
+// Functional versions (stateless, no module required)
+Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor);
+Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor);
+```
+
+**Parameters:**
+
+| Parameter          | Description                                   |
+| ------------------ | --------------------------------------------- |
+| `upscale_factor`   | Factor by which to increase spatial resolution |
+| `downscale_factor` | Factor by which to decrease spatial resolution |
+
+**Example:**
+
+```c
+// Upscale by 2x: channels must be divisible by r^2 = 4
+PixelShuffle* ps = nn_pixel_shuffle(2);
+Tensor* output = cml_nn_module_forward((Module*)ps, input);
+// input shape: [batch, 64, 8, 8]  (64 = 16 * 2^2)
+// output shape: [batch, 16, 16, 16]
+
+// Inverse operation
+PixelUnshuffle* pus = nn_pixel_unshuffle(2);
+Tensor* downscaled = cml_nn_module_forward((Module*)pus, output);
+// downscaled shape: [batch, 64, 8, 8]
+
+// Functional form
+Tensor* upscaled = f_pixel_shuffle(input, 2);
+```
+
+**Note:** PixelShuffle is commonly paired with a preceding convolution that expands channels by `r^2`, providing a learnable upsampling alternative to transposed convolutions.
+
+### Upsample
+
+Upsamples spatial data using nearest-neighbor, bilinear, or bicubic interpolation. Either a `scale_factor` or explicit `output_size` must be specified.
+
+```c
+Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
+                       UpsampleMode mode, bool align_corners);
+
+// Functional interpolation (stateless, no module required)
+Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims,
+                      UpsampleMode mode, bool align_corners);
+```
+
+**Interpolation modes:**
+
+| Mode                | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| `UPSAMPLE_NEAREST`  | Nearest-neighbor interpolation                   |
+| `UPSAMPLE_BILINEAR` | Bilinear interpolation (2D spatial)              |
+| `UPSAMPLE_BICUBIC`  | Bicubic interpolation (2D spatial, smoother)     |
+
+**Parameters:**
+
+| Parameter         | Description                                                        |
+| ----------------- | ------------------------------------------------------------------ |
+| `scale_factor`    | Multiplier for spatial size; set to `0` to use `output_size` instead |
+| `output_size`     | Explicit output spatial dimensions; ignored if `scale_factor > 0`  |
+| `num_output_dims` | Number of spatial dimensions in `output_size`                      |
+| `mode`            | Interpolation algorithm                                            |
+| `align_corners`   | If `true`, align corner pixels of input and output                 |
+
+**Example:**
+
+```c
+// Scale-based upsampling: 2x with bilinear interpolation
+Upsample* up = nn_upsample(2.0f, NULL, 0, UPSAMPLE_BILINEAR, false);
+Tensor* output = cml_nn_module_forward((Module*)up, input);
+// input shape: [batch, channels, 16, 16]
+// output shape: [batch, channels, 32, 32]
+
+// Size-based upsampling to exact dimensions
+int target[] = {64, 64};
+Upsample* up_exact = nn_upsample(0, target, 2, UPSAMPLE_NEAREST, false);
+
+// Functional form
+int out_size[] = {128, 128};
+Tensor* resized = f_interpolate(input, out_size, 2, UPSAMPLE_BICUBIC, true);
+```
+
+**Note:** `align_corners` only applies to bilinear and bicubic modes. When `true`, the corner pixels of input and output are exactly aligned, which can produce different results at boundaries.
 
 ______________________________________________________________________
 
