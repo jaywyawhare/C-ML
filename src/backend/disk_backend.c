@@ -245,7 +245,7 @@ Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt) {
 
 int cml_disk_async_read(CMLDiskBackend* backend, const char* name,
                          void* buffer, size_t size) {
-    /* For now, fall back to synchronous read */
+    /* Fall back to synchronous read */
     if (!backend || !name || !buffer) return -1;
 
     char* path = make_tensor_path(backend, name);

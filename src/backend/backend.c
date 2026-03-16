@@ -53,7 +53,6 @@ static inline void backend_unlock(void) {
 
 static Backend* g_current_backend = NULL;
 
-// Scalar backend implementation (default)
 static void scalar_matmul(const void* a, const void* b, void* out, int m, int n, int k,
                           DType dtype) {
     if (!a || !b || !out || m <= 0 || n <= 0 || k <= 0) {
@@ -66,8 +65,7 @@ static void scalar_matmul(const void* a, const void* b, void* out, int m, int n,
         const float* b_f = (const float*)b;
         float* out_f     = (float*)out;
 
-        // C = A @ B where A is [m, k] and B is [k, n], C is [m, n]
-        for (int i = 0; i < m; i++) {
+            for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 float sum = 0.0f;
                 for (int l = 0; l < k; l++) {
@@ -148,8 +146,7 @@ static void scalar_sigmoid(const void* a, void* out, size_t n, DType dtype) {
         float* out_f     = (float*)out;
 
         for (size_t i = 0; i < n; i++) {
-            // sigmoid(x) = 1 / (1 + exp(-x))
-            float x  = a_f[i];
+                    float x  = a_f[i];
             out_f[i] = 1.0f / (1.0f + expf(-x));
         }
     } else {
@@ -204,10 +201,8 @@ static void scalar_matmul_add(const void* a, const void* b, const void* c, void*
         return;
     }
 
-    // First compute matmul: out = a @ b
     scalar_matmul(a, b, out, m, n, k, dtype);
 
-    // Then add c: out = out + c
     if (dtype == DTYPE_FLOAT32) {
         const float* c_f = (const float*)c;
         float* out_f     = (float*)out;
@@ -227,12 +222,10 @@ static BackendOps scalar_ops = {.matmul     = scalar_matmul,
                                 .sum        = scalar_sum,
                                 .mean       = scalar_mean};
 
-// SIMD-optimized backend implementations (AVX-256)
 #ifdef __SSE__
 #include <immintrin.h>
 #include <emmintrin.h>
 
-// SIMD-optimized add
 static void simd_add(const void* a, const void* b, void* out, size_t n, DType dtype) {
     if (!a || !b || !out || n == 0) {
         LOG_ERROR("Invalid parameters for simd_add");
@@ -245,7 +238,6 @@ static void simd_add(const void* a, const void* b, void* out, size_t n, DType dt
         float* out_f     = (float*)out;
 
 #ifdef __AVX__
-        // AVX-256: process 8 floats at a time
         size_t simd_end = (n / 8) * 8;
         size_t i        = 0;
         for (; i < simd_end; i += 8) {
@@ -254,12 +246,10 @@ static void simd_add(const void* a, const void* b, void* out, size_t n, DType dt
             __m256 vout = _mm256_add_ps(va, vb);
             _mm256_storeu_ps(&out_f[i], vout);
         }
-        // Scalar remainder
         for (; i < n; i++) {
             out_f[i] = a_f[i] + b_f[i];
         }
 #else
-        // SSE: process 4 floats at a time
         size_t simd_end = (n / 4) * 4;
         size_t i        = 0;
         for (; i < simd_end; i += 4) {
@@ -268,7 +258,6 @@ static void simd_add(const void* a, const void* b, void* out, size_t n, DType dt
             __m128 vout = _mm_add_ps(va, vb);
             _mm_storeu_ps(&out_f[i], vout);
         }
-        // Scalar remainder
         for (; i < n; i++) {
             out_f[i] = a_f[i] + b_f[i];
         }
@@ -278,7 +267,6 @@ static void simd_add(const void* a, const void* b, void* out, size_t n, DType dt
     }
 }
 
-// SIMD-optimized mul
 static void simd_mul(const void* a, const void* b, void* out, size_t n, DType dtype) {
     if (!a || !b || !out || n == 0) {
         LOG_ERROR("Invalid parameters for simd_mul");
@@ -320,7 +308,6 @@ static void simd_mul(const void* a, const void* b, void* out, size_t n, DType dt
     }
 }
 
-// SIMD-optimized relu
 static void simd_relu(const void* x, void* out, size_t n, DType dtype) {
     if (!x || !out || n == 0) {
         LOG_ERROR("Invalid parameters for simd_relu");
@@ -361,7 +348,6 @@ static void simd_relu(const void* x, void* out, size_t n, DType dtype) {
     }
 }
 
-// SIMD-optimized sigmoid
 static void simd_sigmoid(const void* x, void* out, size_t n, DType dtype) {
     if (!x || !out || n == 0) {
         LOG_ERROR("Invalid parameters for simd_sigmoid");
@@ -375,7 +361,6 @@ static void simd_sigmoid(const void* x, void* out, size_t n, DType dtype) {
         // Use scalar for sigmoid (exp is complex, SIMD exp approximation can be added later)
         for (size_t i = 0; i < n; i++) {
             float val = x_f[i];
-            // Clamp to prevent overflow
             val      = val > 88.0f ? 88.0f : (val < -88.0f ? -88.0f : val);
             out_f[i] = 1.0f / (1.0f + expf(-val));
         }
@@ -384,7 +369,6 @@ static void simd_sigmoid(const void* x, void* out, size_t n, DType dtype) {
     }
 }
 
-// SIMD-optimized sum
 static void simd_sum(const void* x, void* out, size_t n, DType dtype) {
     if (!x || !out || n == 0) {
         LOG_ERROR("Invalid parameters for simd_sum");
@@ -401,7 +385,6 @@ static void simd_sum(const void* x, void* out, size_t n, DType dtype) {
     }
 }
 
-// SIMD-optimized mean
 static void simd_mean(const void* x, void* out, size_t n, DType dtype) {
     if (!x || !out || n == 0) {
         LOG_ERROR("Invalid parameters for simd_mean");
@@ -418,7 +401,6 @@ static void simd_mean(const void* x, void* out, size_t n, DType dtype) {
     }
 }
 
-// SIMD-optimized matmul (tiled approach)
 static void simd_matmul(const void* a, const void* b, void* out, int m, int n, int k, DType dtype) {
     if (!a || !b || !out || m <= 0 || n <= 0 || k <= 0) {
         LOG_ERROR("Invalid parameters for simd_matmul");
@@ -431,10 +413,8 @@ static void simd_matmul(const void* a, const void* b, void* out, int m, int n, i
         float* out_f     = (float*)out;
 
 #ifdef __AVX__
-        // AVX-256 optimized matmul with tiling
         const int TILE_SIZE = 64; // Tile size for cache optimization
 
-        // Initialize output to zero
         memset(out_f, 0, m * n * sizeof(float));
 
         for (int i = 0; i < m; i++) {
@@ -452,8 +432,7 @@ static void simd_matmul(const void* a, const void* b, void* out, int m, int n, i
                         sum_vec = _mm256_add_ps(sum_vec, _mm256_mul_ps(a_vec, b_vec));
 #endif
                     } else {
-                        // Handle remainder
-                        for (int jj = j; jj < j_end; jj++) {
+                                        for (int jj = j; jj < j_end; jj++) {
                             out_f[i * n + jj] += a_f[i * k + kk] * b_f[kk * n + jj];
                         }
                     }
@@ -465,8 +444,6 @@ static void simd_matmul(const void* a, const void* b, void* out, int m, int n, i
             }
         }
 #else
-        // SSE optimized matmul
-        // Initialize output to zero
         memset(out_f, 0, (size_t)m * (size_t)n * sizeof(float));
 
         for (int i = 0; i < m; i++) {
@@ -497,13 +474,10 @@ static void simd_matmul(const void* a, const void* b, void* out, int m, int n, i
     }
 }
 
-// SIMD-optimized matmul_add
 static void simd_matmul_add(const void* a, const void* b, const void* c, void* out, int m, int n,
                             int k, DType dtype) {
-    // First compute matmul
     simd_matmul(a, b, out, m, n, k, dtype);
 
-    // Then add bias
     if (dtype == DTYPE_FLOAT32 && c) {
         const float* c_f = (const float*)c;
         float* out_f     = (float*)out;
@@ -591,7 +565,6 @@ int backend_init(BackendType type) {
     g_current_backend->type    = type;
     g_current_backend->context = NULL;
 
-    // Set operations based on backend type
     switch (type) {
     case BACKEND_SCALAR:
         g_current_backend->ops = scalar_ops;
@@ -599,16 +572,9 @@ int backend_init(BackendType type) {
 #ifdef __SSE__
     case BACKEND_SSE:
     case BACKEND_AVX:
-        // Use SIMD-optimized operations
         g_current_backend->ops = simd_ops;
-        LOG_DEBUG("Backend %d using SIMD-optimized operations", type);
         break;
     case BACKEND_METAL:
-        // Metal backend enhancement:
-        // - Uses unified memory architecture on Apple Silicon (M1/M2/M3+)
-        // - SIMD operations leverage CPU SIMD on unified memory (very efficient)
-        // - Future: Can integrate Metal Performance Shaders (MPS) for GPU acceleration
-        // - Future: Can use Metal compute shaders for custom kernels
         if (device_metal_available()) {
             g_current_backend->ops = simd_ops;
 
@@ -636,11 +602,6 @@ int backend_init(BackendType type) {
         }
         break;
     case BACKEND_ROCM:
-        // ROCm backend enhancement:
-        // - Uses HIP runtime for GPU memory management
-        // - SIMD operations run on CPU (data copied from GPU if needed)
-        // - Future: Can integrate rocBLAS for optimized matrix operations
-        // - Future: Can use HIP kernels for custom GPU operations
         if (device_rocm_available()) {
             g_current_backend->ops = simd_ops;
 
@@ -682,9 +643,7 @@ int backend_init(BackendType type) {
         break;
     case BACKEND_BLAS:
     case BACKEND_CUDA:
-        // BLAS and CUDA use scalar fallback for now (can be enhanced with BLAS/CUBLAS)
         g_current_backend->ops = scalar_ops;
-        LOG_DEBUG("Backend %d using scalar fallback (optimized version not available)", type);
         break;
     case BACKEND_OPENCL:
         if (opencl_backend_init() == 0) {
@@ -704,7 +663,6 @@ int backend_init(BackendType type) {
     case BACKEND_ROCM:
         // SIMD not available, use scalar fallback
         g_current_backend->ops = scalar_ops;
-        LOG_DEBUG("Backend %d using scalar fallback (SIMD not available)", type);
         break;
     case BACKEND_OPENCL:
         if (opencl_backend_init() == 0) {

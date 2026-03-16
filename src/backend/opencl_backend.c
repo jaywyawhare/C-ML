@@ -285,7 +285,6 @@ static void opencl_matmul_add(const void* a, const void* b, const void* bias, vo
 }
 
 int opencl_backend_init(void) {
-    /* Double-checked locking for mutex initialization */
     if (!g_lock_initialized) {
         pthread_mutex_init(&g_opencl_lock, NULL);
         g_lock_initialized = true;
@@ -300,7 +299,6 @@ int opencl_backend_init(void) {
 
     cl_int err;
 
-    // Get platform
     cl_uint num_platforms = 0;
     err = clGetPlatformIDs(0, NULL, &num_platforms);
     if (err != CL_SUCCESS || num_platforms == 0) {
@@ -314,7 +312,6 @@ int opencl_backend_init(void) {
     g_platform = platforms[0];
     free(platforms);
 
-    // Get GPU device (fall back to any device)
     err = clGetDeviceIDs(g_platform, CL_DEVICE_TYPE_GPU, 1, &g_device, NULL);
     if (err != CL_SUCCESS) {
         err = clGetDeviceIDs(g_platform, CL_DEVICE_TYPE_ALL, 1, &g_device, NULL);
@@ -325,7 +322,6 @@ int opencl_backend_init(void) {
         }
     }
 
-    // Create context and queue
     g_context = clCreateContext(NULL, 1, &g_device, NULL, NULL, &err);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL: failed to create context");
@@ -345,7 +341,6 @@ int opencl_backend_init(void) {
         return -1;
     }
 
-    // Build kernels
     size_t src_len = strlen(g_kernels_src);
     g_program = clCreateProgramWithSource(g_context, 1, &g_kernels_src, &src_len, &err);
     if (err != CL_SUCCESS) {

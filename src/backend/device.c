@@ -73,7 +73,6 @@ static int g_sim_gpu_count = 0;
 static int g_sim_gpu_current = 0;
 static SimGPUDevice g_sim_gpus[SIM_GPU_MAX_DEVICES];
 
-// CUDA detection function pointers (loaded dynamically)
 typedef int (*cudaRuntimeGetVersion_fn)(int*);
 typedef int (*cudaGetDeviceCount_fn)(int*);
 typedef int (*cudaMalloc_fn)(void**, size_t);
@@ -95,7 +94,6 @@ static void* g_cuda_lib                               = NULL;
 #define cudaMemcpyDeviceToHost 2
 #define cudaMemcpyDeviceToDevice 3
 
-// ROCm detection function pointers (loaded dynamically)
 typedef int (*hipMalloc_fn)(void**, size_t);
 typedef int (*hipFree_fn)(void*);
 typedef int (*hipMemcpy_fn)(void*, const void*, size_t, int);
@@ -113,8 +111,6 @@ static void* g_rocm_lib                             = NULL;
 #define hipMemcpyDeviceToHost 2
 #define hipMemcpyDeviceToDevice 3
 
-// Metal detection (macOS/iOS) - handled in check_metal_available()
-// Metal uses Objective-C runtime, so we'll use a simpler approach
 
 static bool try_load_cuda(void) {
     const char* lib_paths[] = {
@@ -232,7 +228,6 @@ static bool try_load_rocm(void) {
         return false;
     }
 
-    // Load ROCm functions
     hipMalloc = (hipMalloc_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipMalloc");
     hipFree   = (hipFree_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipFree");
     hipMemcpy = (hipMemcpy_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipMemcpy");
@@ -275,13 +270,10 @@ bool device_metal_available(void) { return g_metal_available; }
 bool device_rocm_available(void) { return g_rocm_available; }
 
 int device_rocm_get_count(void) {
-    // ROCm doesn't have a get device count loaded currently
-    // Return 1 if ROCm is available (could be extended later)
     return g_rocm_available ? 1 : 0;
 }
 
 DeviceType device_get_best_available(void) {
-    // Priority order: CUDA > Metal > ROCm > CPU
     if (g_cuda_available) {
         return DEVICE_CUDA;
     } else if (g_metal_available) {
@@ -294,12 +286,10 @@ DeviceType device_get_best_available(void) {
 }
 
 bool device_detect_available(void) {
-    // Check for all available accelerators
     g_cuda_available  = check_cuda_available();
     g_metal_available = check_metal_available();
     g_rocm_available  = check_rocm_available();
 
-    // Set default device based on best available accelerator
     g_default_device = device_get_best_available();
     g_current_device = g_default_device;
 
@@ -319,7 +309,6 @@ void device_init(void) {
         g_device_lock_initialized = true;
     }
 
-    LOG_DEBUG("Initializing device management system");
     device_detect_available();
     g_device_initialized = true;
 }
@@ -384,7 +373,6 @@ void device_set_current(DeviceType device) {
     device_lock();
     g_current_device = device;
     device_unlock();
-    LOG_DEBUG("Set current device to: %s", device_get_name(device));
 }
 
 const char* device_get_name(DeviceType device) {
@@ -443,7 +431,6 @@ void device_print_info(void) {
     printf("========================\n\n");
 }
 
-// Automatic device-aware wrappers
 Tensor* tensor_empty_auto(int* shape, int ndim, int dtype) {
     TensorConfig config = {.dtype      = (DType)dtype,
                            .device     = device_get_default(),
@@ -499,12 +486,7 @@ void* device_alloc(size_t size, DeviceType device) {
 
     case DEVICE_METAL:
 #ifdef __APPLE__
-        // Metal on Apple Silicon uses unified memory architecture
-        // Allocate aligned memory for better Metal performance
-        // Metal prefers 256-byte alignment for optimal performance
         if (g_metal_available) {
-            // Use posix_memalign for aligned allocation (Metal prefers 256-byte alignment)
-            // On Apple Silicon, unified memory is automatically accessible by GPU
             size_t alignment = 256; // Metal preferred alignment
             if (size % alignment != 0) {
                 size = ((size / alignment) + 1) * alignment; // Round up to alignment
@@ -516,7 +498,6 @@ void* device_alloc(size_t size, DeviceType device) {
                           size, result);
                 ptr = NULL;
             } else {
-                LOG_DEBUG("Metal: allocated %zu bytes using aligned unified memory", size);
             }
         } else {
             LOG_WARNING("Metal not available, falling back to CPU");
@@ -535,7 +516,6 @@ void* device_alloc(size_t size, DeviceType device) {
                 LOG_ERROR("Failed to allocate %zu bytes on ROCm device (error: %d)", size, result);
                 ptr = NULL;
             } else {
-                LOG_DEBUG("ROCm: allocated %zu bytes", size);
             }
         } else {
             if (!g_rocm_available) {
@@ -602,12 +582,9 @@ void device_free(void* ptr, DeviceType device) {
 
     case DEVICE_METAL:
 #ifdef __APPLE__
-        // Metal uses aligned unified memory (allocated with posix_memalign)
-        // Use free() for posix_memalign-allocated memory
         if (ptr) {
-            free(ptr); // posix_memalign requires free(), not free
-            LOG_DEBUG("Metal: freed aligned unified memory");
-        }
+            free(ptr);
+                }
 #else
         free(ptr);
 #endif
@@ -619,7 +596,6 @@ void device_free(void* ptr, DeviceType device) {
             if (result != 0) {
                 LOG_ERROR("Failed to free ROCm memory (error: %d)", result);
             } else {
-                LOG_DEBUG("ROCm: freed memory");
             }
         } else {
             free(ptr);
@@ -651,7 +627,6 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
         return -1;
     }
 
-    // Same device - direct copy
     if (dst_device == src_device) {
         if (dst_device == DEVICE_CPU) {
             memcpy(dst, src, size);
@@ -663,18 +638,14 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
             int result = hipMemcpy(dst, src, size, hipMemcpyDeviceToDevice);
             return (result == 0) ? 0 : -1;
         } else if (dst_device == DEVICE_METAL) {
-            // Metal uses unified memory, so we can use memcpy
-            memcpy(dst, src, size);
+                memcpy(dst, src, size);
             return 0;
         } else if (dst_device == DEVICE_SIM_GPU) {
-            // SimGPU uses CPU memory
             memcpy(dst, src, size);
             return 0;
         }
-        // For other devices, fall through to cross-device copy
     }
 
-    // Cross-device copy
     if (src_device == DEVICE_CPU && dst_device == DEVICE_CUDA) {
         if (g_cuda_available && cudaMemcpy) {
             int result = cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice);
@@ -708,11 +679,9 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
             return -1;
         }
     } else if (src_device == DEVICE_CPU && dst_device == DEVICE_METAL) {
-        // Metal uses unified memory, so we can use memcpy
         memcpy(dst, src, size);
         return 0;
     } else if (src_device == DEVICE_METAL && dst_device == DEVICE_CPU) {
-        // Metal uses unified memory, so we can use memcpy
         memcpy(dst, src, size);
         return 0;
     } else if (src_device == DEVICE_CPU && dst_device == DEVICE_SIM_GPU) {
@@ -726,30 +695,27 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
         return 0;
     } else if (src_device == DEVICE_CPU) {
         // CPU to other device - copy to CPU first, then to device
-        // For now, just copy to CPU buffer
+        // Copy via CPU buffer
         memcpy(dst, src, size);
         return 0;
     } else if (dst_device == DEVICE_CPU) {
         // Other device to CPU - copy from device to CPU
-        // For now, just copy from CPU buffer
+        // Copy via CPU buffer
         memcpy(dst, src, size);
         return 0;
     } else {
-        // Device to device - use staging buffer
         void* staging = malloc(size);
         if (!staging) {
             LOG_ERROR("Failed to allocate staging buffer for device copy");
             return -1;
         }
 
-        // Copy from source device to CPU
         int result1 = device_copy(staging, src, size, DEVICE_CPU, src_device);
         if (result1 != 0) {
             free(staging);
             return -1;
         }
 
-        // Copy from CPU to destination device
         int result2 = device_copy(dst, staging, size, dst_device, DEVICE_CPU);
         free(staging);
 
@@ -771,21 +737,18 @@ int device_move_tensor(Tensor* tensor, DeviceType device) {
         return -1;
     }
 
-    // If already on target device, nothing to do
     if (tensor->device == device) {
         return 0;
     }
 
     size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
 
-    // Allocate new memory on target device
     void* new_data = device_alloc(data_size, device);
     if (!new_data) {
         LOG_ERROR("Failed to allocate memory on target device");
         return -1;
     }
 
-    // Copy data from old device to new device
     int result = device_copy(new_data, tensor->data, data_size, device, tensor->device);
     if (result != 0) {
         device_free(new_data, device);
@@ -793,12 +756,10 @@ int device_move_tensor(Tensor* tensor, DeviceType device) {
         return -1;
     }
 
-    // Free old memory
     if (tensor->owns_data && tensor->data) {
         device_free(tensor->data, tensor->device);
     }
 
-    // Update tensor
     tensor->data      = new_data;
     tensor->device    = device;
     tensor->owns_data = true;

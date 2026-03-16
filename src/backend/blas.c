@@ -40,9 +40,6 @@ static inline void blas_unlock(void) {
 
 static CMLBlasContext* g_blas_ctx = NULL;
 
-// List of BLAS libraries to try loading
-// Order: MKL (fastest) -> OpenBLAS -> ATLAS -> Reference
-// Set CML_BLAS_LIB environment variable to override (e.g., "libcblas.so.3")
 static const char* blas_library_paths[] = {
 #ifdef __linux__
     "libmkl_rt.so",
@@ -65,11 +62,9 @@ static const char* blas_library_paths[] = {
     NULL};
 
 bool cml_blas_available(void) {
-    // Try to load any BLAS library
     for (int i = 0; blas_library_paths[i] != NULL; i++) {
         void* lib = LIB_LOAD(blas_library_paths[i]);
         if (lib) {
-            // Check for CBLAS or Fortran BLAS symbols
             void* sgemm_cblas = LIB_SYM(lib, "cblas_sgemm");
             void* sgemm_f     = LIB_SYM(lib, "sgemm_");
             LIB_CLOSE(lib);
@@ -86,7 +81,6 @@ static void load_cblas_functions(CMLBlasContext* ctx) {
     if (!ctx || !ctx->lib_handle)
         return;
 
-    // Try CBLAS-style functions first
     ctx->cblas_sgemm = LIB_SYM(ctx->lib_handle, "cblas_sgemm");
     ctx->cblas_sgemv = LIB_SYM(ctx->lib_handle, "cblas_sgemv");
     ctx->cblas_saxpy = LIB_SYM(ctx->lib_handle, "cblas_saxpy");
@@ -95,7 +89,6 @@ static void load_cblas_functions(CMLBlasContext* ctx) {
     ctx->cblas_snrm2 = LIB_SYM(ctx->lib_handle, "cblas_snrm2");
     ctx->cblas_dgemm = LIB_SYM(ctx->lib_handle, "cblas_dgemm");
 
-    // Try Fortran-style if CBLAS not available
     if (!ctx->cblas_sgemm) {
         ctx->sgemm_ = LIB_SYM(ctx->lib_handle, "sgemm_");
     }
@@ -108,7 +101,6 @@ CMLBlasContext* cml_blas_init(void) {
         return NULL;
     }
 
-    // Check for user-specified BLAS library override
     const char* env_blas = getenv("CML_BLAS_LIB");
     if (env_blas && env_blas[0] != '\0') {
         ctx->lib_handle = LIB_LOAD(env_blas);
@@ -126,7 +118,6 @@ CMLBlasContext* cml_blas_init(void) {
         LOG_WARNING("Failed to load BLAS from CML_BLAS_LIB=%s, trying defaults", env_blas);
     }
 
-    // Try to load BLAS libraries in order
     for (int i = 0; blas_library_paths[i] != NULL; i++) {
         ctx->lib_handle = LIB_LOAD(blas_library_paths[i]);
         if (ctx->lib_handle) {
