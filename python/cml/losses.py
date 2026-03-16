@@ -15,13 +15,13 @@ def mae_loss(predictions, targets):
 
 
 def cross_entropy_loss(logits, labels):
-    """Applies softmax internally before computing cross-entropy."""
+    """Applies softmax internally."""
     result = lib.cml_nn_cross_entropy_loss(logits._tensor, labels._tensor)
     return Tensor(result)
 
 
 def bce_loss(predictions, targets):
-    """Expects predictions already passed through sigmoid."""
+    """Expects pre-sigmoid predictions."""
     result = lib.cml_nn_bce_loss(predictions._tensor, targets._tensor)
     return Tensor(result)
 

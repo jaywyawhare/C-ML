@@ -1,4 +1,4 @@
-"""Interactive visualization dashboard for computational graphs, training metrics, and kernels."""
+"""Visualization dashboard."""
 
 from .server import launch, main
 

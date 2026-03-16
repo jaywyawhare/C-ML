@@ -5,7 +5,6 @@ from cml.core import Tensor
 
 
 def backward(loss, grad=None, clear_grads=False, retain_graph=False):
-    """Compute gradients via backpropagation."""
     grad_ptr = grad._tensor if grad is not None else ffi.NULL
     lib.cml_backward(loss._tensor, grad_ptr, clear_grads, retain_graph)
 
@@ -26,8 +25,6 @@ def disable_grad(tensor):
 
 
 class no_grad:
-    """Context manager to disable gradient computation."""
-
     def __enter__(self):
         self._grads_enabled = True
         return self

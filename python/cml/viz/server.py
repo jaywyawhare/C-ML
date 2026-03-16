@@ -1,4 +1,4 @@
-"""FastAPI server for C-ML visualization dashboard."""
+"""Visualization dashboard server."""
 
 import json
 from pathlib import Path

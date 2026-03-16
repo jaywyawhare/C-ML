@@ -5,8 +5,6 @@ from cml.core import Tensor, DTYPE_FLOAT32, DEVICE_CPU
 
 
 class Module:
-    """Base class for neural network modules."""
-
     def __init__(self, c_module):
         self._module = c_module
 
@@ -26,8 +24,6 @@ class Module:
 
 
 class Sequential(Module):
-    """Applies modules in sequence: y = module_n(...module_2(module_1(x)))."""
-
     def __init__(self):
         seq = lib.cml_nn_sequential()
         super().__init__(seq)
@@ -46,8 +42,6 @@ class Sequential(Module):
 
 
 class Linear(Module):
-    """Fully connected layer: y = xW + b."""
-
     def __init__(
         self,
         in_features,

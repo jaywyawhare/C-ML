@@ -1,6 +1,4 @@
-"""
-Core CML functionality - Tensor, initialization, and device management.
-"""
+"""Core CML functionality."""
 
 from __future__ import annotations
 from typing import Union, Optional, Tuple
@@ -67,8 +65,6 @@ def get_dtype():
 
 
 class Tensor:
-    """Python wrapper for CML tensor with automatic memory management and NumPy integration."""
-
     _shape_cache: Optional[Tuple[int, ...]] = None
 
     def __init__(self, c_tensor):
@@ -252,7 +248,6 @@ class Tensor:
         return Tensor(result)
 
     def numpy(self) -> np.ndarray:
-        """Triggers execution if the tensor is lazy."""
         if self._tensor is None or self._tensor == ffi.NULL:
             raise RuntimeError("Cannot convert null tensor to numpy")
 
@@ -559,7 +554,7 @@ class Tensor:
 
 
 class _TensorView(Tensor):
-    """Non-owning wrapper that won't free the underlying C tensor on deletion."""
+    """Non-owning view; does not free the underlying C tensor."""
 
     def __init__(self, c_tensor):
         self._tensor = c_tensor
@@ -570,8 +565,6 @@ class _TensorView(Tensor):
 
 
 class init_context:
-    """RAII-style context manager for CML initialization and cleanup."""
-
     def __init__(self):
         self._initialized = False
 
@@ -587,8 +580,6 @@ class init_context:
 
 
 class no_grad:
-    """Context manager to disable gradient computation."""
-
     def __init__(self):
         self._prev_grad_enabled = True
 
@@ -604,8 +595,6 @@ class no_grad:
 
 
 class enable_grad:
-    """Context manager to force-enable gradient computation."""
-
     def __init__(self):
         self._prev_grad_enabled = True
 
@@ -621,8 +610,6 @@ class enable_grad:
 
 
 class set_grad_enabled:
-    """Context manager to explicitly set gradient computation on or off."""
-
     def __init__(self, mode: bool):
         self._mode = mode
         self._prev_grad_enabled = True

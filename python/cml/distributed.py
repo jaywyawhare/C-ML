@@ -1,4 +1,4 @@
-"""Python bindings for distributed / data-parallel training."""
+"""Distributed and data-parallel training."""
 
 import ctypes
 from ctypes import c_int, c_float, c_bool, c_void_p, c_size_t, POINTER, Structure
@@ -53,7 +53,6 @@ def _ensure_bindings():
 
 
 def init_process_group(backend="gloo", world_size=-1, rank=-1):
-    """Initialize distributed training with the given backend."""
     _ensure_bindings()
     lib = _get_lib()
 
@@ -93,8 +92,6 @@ def barrier():
 
 
 class DistributedDataParallel:
-    """Wraps a module for data-parallel training with gradient synchronisation."""
-
     def __init__(self, module, bucket_size_mb=25):
         self.module = module
         self.bucket_size_mb = bucket_size_mb
@@ -106,7 +103,6 @@ class DistributedDataParallel:
         return self.module(input_tensor)
 
     def sync_gradients(self):
-        """All-reduce and average gradients across processes."""
         _ensure_bindings()
         lib = _get_lib()
         try:
@@ -133,8 +129,6 @@ class DistributedDataParallel:
 
 
 class PipelineParallel:
-    """GPipe-style pipeline parallel wrapper over a list of module stages."""
-
     def __init__(self, modules, num_micro_batches=4):
         self.modules = modules
         self.num_micro_batches = num_micro_batches

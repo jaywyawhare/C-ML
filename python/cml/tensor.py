@@ -1,4 +1,4 @@
-"""Enhanced Tensor class with convenience methods and operators."""
+"""Extended Tensor with operator overloads and math methods."""
 
 from typing import Tuple, Optional, Union, List
 import numpy as np
@@ -245,7 +245,6 @@ class Tensor(BaseTensor):
 
     @staticmethod
     def eye(n: int, m: Optional[int] = None) -> "Tensor":
-        """Create an identity matrix."""
         if m is None:
             m = n
         result = np.eye(n, m, dtype=np.float32)
@@ -253,25 +252,21 @@ class Tensor(BaseTensor):
 
     @staticmethod
     def arange(start: float, end: float, step: float = 1.0) -> "Tensor":
-        """Create a 1D tensor with evenly spaced values."""
         result = np.arange(start, end, step, dtype=np.float32)
         return Tensor.from_numpy(result)
 
     @staticmethod
     def linspace(start: float, end: float, steps: int = 100) -> "Tensor":
-        """Create a 1D tensor with linearly spaced values."""
         result = np.linspace(start, end, steps, dtype=np.float32)
         return Tensor.from_numpy(result)
 
     @staticmethod
     def logspace(start: float, end: float, steps: int = 50) -> "Tensor":
-        """Create a 1D tensor with logarithmically spaced values."""
         result = np.logspace(start, end, steps, dtype=np.float32)
         return Tensor.from_numpy(result)
 
     @staticmethod
     def stack(tensors: list, dim: int = 0) -> "Tensor":
-        """Stack tensors along a new dimension."""
         if not tensors:
             raise ValueError("Need at least one tensor to stack")
         result = np.stack([t.numpy() for t in tensors], axis=dim)
@@ -279,7 +274,6 @@ class Tensor(BaseTensor):
 
     @staticmethod
     def cat(tensors: list, dim: int = 0) -> "Tensor":
-        """Concatenate tensors along an existing dimension."""
         if not tensors:
             raise ValueError("Need at least one tensor")
         result = np.concatenate([t.numpy() for t in tensors], axis=dim)

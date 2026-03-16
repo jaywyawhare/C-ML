@@ -1,4 +1,4 @@
-"""Functional API -- decorators and helpers for training."""
+"""Training decorators and helpers."""
 
 from typing import Callable, Optional, Dict, Any
 from contextlib import contextmanager
@@ -6,7 +6,7 @@ import cml
 
 
 class TrainingContext:
-    """Context manager that sets device and dtype for a block, restoring on exit."""
+    """Sets device/dtype for a block, restoring on exit."""
 
     def __init__(self, device: Optional[str] = None, dtype: Optional[str] = None):
         self.device = device
@@ -44,7 +44,6 @@ class TrainingContext:
 
 @contextmanager
 def training_mode(model, training: bool = True):
-    """Temporarily set a model's training/inference mode."""
     old_training = None  # Would track actual mode
     try:
         model.set_training(training)
@@ -56,7 +55,6 @@ def training_mode(model, training: bool = True):
 
 @contextmanager
 def disable_grad():
-    """Context manager to disable gradient computation."""
     from cml.core import no_grad as _no_grad
     ctx = _no_grad()
     ctx.__enter__()
@@ -68,7 +66,6 @@ def disable_grad():
 
 @contextmanager
 def enable_grad():
-    """Context manager to enable gradient computation."""
     from cml.core import enable_grad as _enable_grad
     ctx = _enable_grad()
     ctx.__enter__()
@@ -79,7 +76,6 @@ def enable_grad():
 
 
 def timer(fn: Callable) -> Callable:
-    """Decorator that prints function execution time."""
     import time
 
     def wrapper(*args, **kwargs):
@@ -93,8 +89,6 @@ def timer(fn: Callable) -> Callable:
 
 
 def suppress_output(fn: Callable) -> Callable:
-    """Decorator to suppress stdout during function execution."""
-
     def wrapper(*args, **kwargs):
         import sys
         from io import StringIO
@@ -113,8 +107,6 @@ def suppress_output(fn: Callable) -> Callable:
 
 
 def profile_memory(fn: Callable) -> Callable:
-    """Decorator to profile memory usage."""
-
     def wrapper(*args, **kwargs):
         # Memory profiling would go here
         return fn(*args, **kwargs)
@@ -123,8 +115,6 @@ def profile_memory(fn: Callable) -> Callable:
 
 
 def requires_grad(fn: Callable) -> Callable:
-    """Decorator to ensure gradients are enabled."""
-
     def wrapper(*args, **kwargs):
         # Would enable gradients
         return fn(*args, **kwargs)
@@ -133,8 +123,6 @@ def requires_grad(fn: Callable) -> Callable:
 
 
 class MetricsTracker:
-    """Accumulates and summarizes named training metrics."""
-
     def __init__(self):
         self.metrics: Dict[str, list] = {}
 
@@ -166,8 +154,6 @@ class MetricsTracker:
 
 
 class EarlyStopping:
-    """Stops training when loss has not improved for `patience` epochs."""
-
     def __init__(self, patience: int = 10, min_delta: float = 0.0):
         self.patience = patience
         self.min_delta = min_delta
@@ -175,7 +161,6 @@ class EarlyStopping:
         self.wait_count = 0
 
     def __call__(self, loss: float) -> bool:
-        """Return True if training should stop."""
         if loss < self.best_loss - self.min_delta:
             self.best_loss = loss
             self.wait_count = 0
@@ -188,8 +173,6 @@ class EarlyStopping:
 
 
 class LearningRateScheduler:
-    """Adjusts learning rate each epoch (step, exponential, or linear decay)."""
-
     def __init__(self, optimizer, schedule: str = "step", **kwargs):
         self.optimizer = optimizer
         self.schedule = schedule

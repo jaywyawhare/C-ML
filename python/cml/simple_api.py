@@ -9,7 +9,6 @@ from cml.nn import Sequential, Linear, ReLU, Dropout
 def build_model(
     layer_sizes: List[int], dropout: float = 0.0, activation: str = "relu"
 ) -> Sequential:
-    """Build a feedforward network with activation and optional dropout between layers."""
     if len(layer_sizes) < 2:
         raise ValueError("Need at least 2 layer sizes (input and output)")
 
@@ -49,7 +48,6 @@ def train_model(
     optimizer: str = "adam",
     verbose: bool = True,
 ) -> List[float]:
-    """Run a full training loop, returning per-epoch losses."""
     loss_function = get_loss_function(loss_fn)
     opt = create_optimizer(model, optimizer, learning_rate)
 
@@ -134,7 +132,6 @@ def get_loss_function(loss_fn: str) -> Callable:
 
 
 def batch_iterator(X: Tensor, y: Tensor, batch_size: int):
-    """Yield (X_batch, y_batch) tuples over the dataset."""
     num_samples = X.size
 
     for i in range(0, num_samples, batch_size):

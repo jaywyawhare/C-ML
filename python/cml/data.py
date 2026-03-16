@@ -1,4 +1,4 @@
-"""Data loading and batch processing utilities."""
+"""Data loading and preprocessing."""
 
 from typing import Tuple, List, Optional, Union
 import cml
@@ -6,8 +6,6 @@ from cml.core import Tensor
 
 
 class Dataset:
-    """Dataset wrapper pairing features with optional targets."""
-
     def __init__(self, X: Tensor, y: Optional[Tensor] = None):
         self.X = X
         self.y = y
@@ -31,8 +29,6 @@ class Dataset:
 
 
 class DataLoader:
-    """Iterates through a dataset in batches."""
-
     def __init__(
         self,
         dataset: Union[Dataset, Tensor],
@@ -65,14 +61,12 @@ class DataLoader:
 
 
 def create_dataset(X: Tensor, y: Optional[Tensor] = None) -> Dataset:
-    """Create a dataset from tensors."""
     return Dataset(X, y)
 
 
 def create_dataloader(
     dataset: Union[Dataset, Tensor], batch_size: int = 32, shuffle: bool = False
 ) -> DataLoader:
-    """Create a data loader."""
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
@@ -82,11 +76,10 @@ def train_test_split(
     test_size: float = 0.2,
     random_state: Optional[int] = None,
 ) -> Tuple:
-    """Split data into train and test sets, returning (X_train, X_test[, y_train, y_test])."""
     if random_state is not None:
         cml.seed(random_state)
 
-    num_samples = X.size  # Simplified
+    num_samples = X.size
     num_test = int(num_samples * test_size)
     num_train = num_samples - num_test
 
@@ -104,7 +97,6 @@ def train_test_split(
 def normalize(
     X: Tensor, mean: Optional[Tensor] = None, std: Optional[Tensor] = None
 ) -> Tensor:
-    """Normalize features to zero mean and unit variance."""
     import numpy as np
     arr = X.numpy()
     if mean is None:
@@ -121,12 +113,10 @@ def normalize(
 
 
 def standardize(X: Tensor) -> Tensor:
-    """Standardize features (alias for normalize)."""
     return normalize(X)
 
 
 def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tensor:
-    """Scale features to [min_val, max_val] range."""
     import numpy as np
     arr = X.numpy()
     x_min = np.min(arr, axis=0)
@@ -139,7 +129,6 @@ def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tenso
 
 
 def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
-    """Convert class labels to one-hot encoding."""
     import numpy as np
     arr = labels.numpy().flatten().astype(int)
     one_hot = np.zeros((len(arr), num_classes), dtype=np.float32)
@@ -150,7 +139,6 @@ def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
 def split_into_batches(
     X: Tensor, y: Optional[Tensor] = None, batch_size: int = 32
 ) -> List[Tuple]:
-    """Split data into a list of (X_batch, y_batch) tuples."""
     batches = []
     num_samples = X.size
 
@@ -176,7 +164,7 @@ def _try_sklearn_load(name: str):
 
 
 def load_iris() -> Tuple[Tensor, Tensor]:
-    """Load Iris dataset as (X, y) tensors. Falls back to synthetic data."""
+    """Falls back to synthetic data if sklearn is unavailable."""
     import numpy as np
 
     X_np, y_np = _try_sklearn_load("iris")
@@ -199,7 +187,7 @@ def load_iris() -> Tuple[Tensor, Tensor]:
 
 
 def load_mnist() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
-    """Load MNIST dataset as ((X_train, y_train), (X_test, y_test)). Falls back to synthetic data."""
+    """Falls back to synthetic data if sklearn is unavailable."""
     import numpy as np
 
     try:
@@ -225,7 +213,7 @@ def load_mnist() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
 
 
 def load_cifar10() -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
-    """Load CIFAR-10 dataset as ((X_train, y_train), (X_test, y_test)). Falls back to synthetic data."""
+    """Falls back to synthetic data if cached files are unavailable."""
     import numpy as np
 
     try:

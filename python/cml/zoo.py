@@ -1,4 +1,4 @@
-"""Pre-built model architectures with optional pretrained weights."""
+"""Pre-built model architectures."""
 
 from cml.core import _get_lib, DEVICE_CPU, DTYPE_FLOAT32
 from cml.nn import Sequential, Linear, ReLU, Sigmoid, BatchNorm2d, LayerNorm, Conv2d, MaxPool2d, AvgPool2d, Dropout
@@ -15,7 +15,6 @@ BERT_TINY = 8
 
 
 def mlp_mnist(num_classes=10, pretrained=False, dtype=DTYPE_FLOAT32, device=DEVICE_CPU):
-    """784 -> 256 -> 128 -> num_classes."""
     model = Sequential()
     model.add(Linear(784, 256, dtype=dtype, device=device))
     model.add(ReLU())
@@ -30,7 +29,6 @@ def mlp_mnist(num_classes=10, pretrained=False, dtype=DTYPE_FLOAT32, device=DEVI
 
 
 def mlp_cifar10(num_classes=10, pretrained=False, dtype=DTYPE_FLOAT32, device=DEVICE_CPU):
-    """3072 -> 512 -> 256 -> num_classes."""
     model = Sequential()
     model.add(Linear(3072, 512, dtype=dtype, device=device))
     model.add(ReLU())
@@ -67,7 +65,6 @@ def vgg16(num_classes=1000, pretrained=False, dtype=DTYPE_FLOAT32, device=DEVICE
 
 
 def gpt2_small(vocab_size=50257, pretrained=False, dtype=DTYPE_FLOAT32, device=DEVICE_CPU):
-    """GPT-2 small: 124M params, 12 layers, 768 hidden."""
     model = Sequential()
     model.add(Linear(vocab_size, 768, dtype=dtype, device=device, bias=False))
 
@@ -87,7 +84,6 @@ def gpt2_small(vocab_size=50257, pretrained=False, dtype=DTYPE_FLOAT32, device=D
 
 
 def bert_tiny(vocab_size=30522, pretrained=False, dtype=DTYPE_FLOAT32, device=DEVICE_CPU):
-    """BERT-tiny: 4M params, 2 layers, 128 hidden."""
     model = Sequential()
     model.add(Linear(vocab_size, 128, dtype=dtype, device=device, bias=False))
 
@@ -184,7 +180,6 @@ def _try_load_pretrained(model, name):
 
 
 def download_weights(model_name, weights_dir=None):
-    """Download pretrained weights from the CML weights server."""
     import os
     import urllib.request
 

@@ -4,8 +4,6 @@ from cml._cml_lib import ffi, lib
 
 
 class Optimizer:
-    """Base class for optimizers."""
-
     def __init__(self, c_optimizer):
         self._optimizer = c_optimizer
 
