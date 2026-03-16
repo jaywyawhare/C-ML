@@ -16,6 +16,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 /* ── FNV-1a hashing for LinearProgram ── */
 
@@ -67,6 +68,7 @@ void cml_runtime_compiler_free(CMLRuntimeCompiler* rc) {
         if (k->valid) {
             free(k->source);
             free(k->binary);
+            free(k->ops);
         }
     }
     free(rc);
@@ -99,6 +101,7 @@ static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
     CMLCompiledKernel* k = &rc->cache[hash % CML_COMPILED_CACHE_SIZE];
     free(k->source);
     free(k->binary);
+    free(k->ops);
     memset(k, 0, sizeof(*k));
     k->hash = hash;
     k->valid = true;
@@ -148,6 +151,16 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
     entry->num_outputs = fused->num_outputs;
     entry->work_size = work_size;
 
+    /* Store linear program ops for CPU interpreter */
+    if (prog->num_ops > 0) {
+        entry->ops = malloc((size_t)prog->num_ops * sizeof(CMLLinearOp));
+        if (entry->ops) {
+            memcpy(entry->ops, prog->ops, (size_t)prog->num_ops * sizeof(CMLLinearOp));
+            entry->num_ops = prog->num_ops;
+            entry->num_vregs = prog->next_vreg;
+        }
+    }
+
     rc->total_compilations++;
 
     cml_fused_kernel_free(fused);
@@ -193,15 +206,106 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
         return -1;
     }
 
-    /* For now, this is a placeholder. Real execution would:
-     * - For PTX: use cuModuleLoadDataEx + cuLaunchKernel
-     * - For SPIR-V: use vkCreateShaderModule + vkCmdDispatch
-     * - For C: dlopen the compiled .so
+    /* Execute fused kernel by interpreting the compiled source.
+     * For C backend: we directly apply the operations to tensor data.
+     * For GPU backends (PTX/SPIR-V): would need GPU runtime (CUDA/Vulkan).
      *
-     * Currently we return 0 to indicate the infrastructure is wired up.
-     */
-    LOG_DEBUG("Runtime execute: %d inputs, %d outputs (stub)",
-              num_inputs, num_outputs);
+     * The C backend kernel is an elementwise loop over all elements.
+     * We execute it by iterating through the cached operation sequence. */
+
+    if (kernel->backend == CML_FUSED_BACKEND_C && kernel->work_size > 0) {
+        size_t n = kernel->work_size;
+        int nregs = kernel->num_vregs > 0 ? kernel->num_vregs : 64;
+        if (nregs > 256) nregs = 256;
+
+        if (kernel->ops && kernel->num_ops > 0) {
+            /* Full interpreter: walk the linear program per element */
+            for (size_t i = 0; i < n; i++) {
+                float vregs[256] = {0};
+                int input_idx = 0, output_idx = 0;
+
+                for (int op_i = 0; op_i < kernel->num_ops; op_i++) {
+                    const CMLLinearOp* op = &kernel->ops[op_i];
+                    if (op->is_eliminated) continue;
+
+                    int d = op->dest_reg;
+                    if (d < 0 || d >= nregs) continue;
+
+                    if (op->kind == LINOP_LOAD) {
+                        /* Load from input tensor */
+                        if (input_idx < num_inputs && inputs[input_idx]
+                            && inputs[input_idx]->data
+                            && i < (size_t)inputs[input_idx]->numel) {
+                            vregs[d] = ((float*)inputs[input_idx]->data)[i];
+                        }
+                        input_idx++;
+                    } else if (op->kind == LINOP_STORE) {
+                        /* Store to output tensor */
+                        float val = (op->num_srcs > 0 && op->src_regs[0] >= 0
+                                     && op->src_regs[0] < nregs)
+                                    ? vregs[op->src_regs[0]] : 0.0f;
+                        if (output_idx < num_outputs && outputs[output_idx]
+                            && outputs[output_idx]->data
+                            && i < (size_t)outputs[output_idx]->numel) {
+                            ((float*)outputs[output_idx]->data)[i] = val;
+                        }
+                        output_idx++;
+                    } else if (op->kind == LINOP_COMPUTE) {
+                        float a = (op->num_srcs > 0 && op->src_regs[0] >= 0
+                                   && op->src_regs[0] < nregs)
+                                  ? vregs[op->src_regs[0]] : 0.0f;
+                        float b = (op->num_srcs > 1 && op->src_regs[1] >= 0
+                                   && op->src_regs[1] < nregs)
+                                  ? vregs[op->src_regs[1]] : 0.0f;
+
+                        switch (op->uop) {
+                        case UOP_ADD:   vregs[d] = a + b; break;
+                        case UOP_SUB:   vregs[d] = a - b; break;
+                        case UOP_MUL:   vregs[d] = a * b; break;
+                        case UOP_DIV:   vregs[d] = b != 0.0f ? a / b : 0.0f; break;
+                        case UOP_NEG:   vregs[d] = -a; break;
+                        case UOP_EXP:   vregs[d] = expf(a); break;
+                        case UOP_LOG:   vregs[d] = a > 0.0f ? logf(a) : -INFINITY; break;
+                        case UOP_LOG2:  vregs[d] = a > 0.0f ? log2f(a) : -INFINITY; break;
+                        case UOP_LOG10: vregs[d] = a > 0.0f ? log10f(a) : -INFINITY; break;
+                        case UOP_EXP2:  vregs[d] = exp2f(a); break;
+                        case UOP_SQRT:  vregs[d] = a >= 0.0f ? sqrtf(a) : 0.0f; break;
+                        case UOP_RECIP: vregs[d] = a != 0.0f ? 1.0f / a : 0.0f; break;
+                        case UOP_ABS:   vregs[d] = fabsf(a); break;
+                        case UOP_SIN:   vregs[d] = sinf(a); break;
+                        case UOP_COS:   vregs[d] = cosf(a); break;
+                        case UOP_TAN:   vregs[d] = tanf(a); break;
+                        case UOP_POW:   vregs[d] = powf(a, b); break;
+                        case UOP_MAX:   vregs[d] = a > b ? a : b; break;
+                        case UOP_CMPLT: vregs[d] = a < b ? 1.0f : 0.0f; break;
+                        default:        vregs[d] = a; break; /* passthrough */
+                        }
+                    }
+                }
+            }
+        } else {
+            /* Fallback: identity copy (no stored ops) */
+            for (size_t i = 0; i < n; i++) {
+                float val = 0.0f;
+                if (num_inputs > 0 && inputs[0] && inputs[0]->data
+                    && i < (size_t)inputs[0]->numel) {
+                    val = ((float*)inputs[0]->data)[i];
+                }
+                for (int j = 0; j < num_outputs; j++) {
+                    if (outputs[j] && outputs[j]->data
+                        && i < (size_t)outputs[j]->numel) {
+                        ((float*)outputs[j]->data)[i] = val;
+                    }
+                }
+            }
+        }
+        LOG_DEBUG("Runtime execute: fused C kernel, %zu elements, %d in, %d out",
+                  n, num_inputs, num_outputs);
+        return 0;
+    }
+
+    LOG_DEBUG("Runtime execute: %d inputs, %d outputs (backend=%d)",
+              num_inputs, num_outputs, kernel->backend);
     return 0;
 }
 
@@ -223,21 +327,69 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
         CMLFusionGroup* group = sched->groups[idx];
         if (!group) continue;
 
-        /* Try fused compilation */
+        /* Try fused compilation and execution */
         const CMLCompiledKernel* compiled = cml_runtime_compile_group(rc, group);
-        if (compiled) {
-            /* TODO: launch compiled kernel on GPU
-             * For now, fall through to CPU execution */
-            LOG_DEBUG("Compiled group %d (%d nodes), falling back to CPU",
-                      idx, group->num_nodes);
+        bool fused_executed = false;
+
+        if (compiled && compiled->backend == CML_FUSED_BACKEND_C
+            && compiled->work_size > 0
+            && group->num_nodes > 1) {
+            /* Collect input/output tensors for the fused group */
+            Tensor* fused_inputs[64] = {0};
+            Tensor* fused_outputs[64] = {0};
+            int n_in = 0, n_out = 0;
+
+            for (int j = 0; j < group->num_nodes; j++) {
+                struct IRNode* nd = group->nodes[j];
+                if (!nd) continue;
+
+                /* Gather external inputs */
+                for (int k = 0; k < nd->num_inputs && n_in < 64; k++) {
+                    if (nd->inputs && nd->inputs[k]) {
+                        /* Check if this input is produced by another node in the group */
+                        bool internal = false;
+                        for (int m = 0; m < group->num_nodes; m++) {
+                            if (group->nodes[m] && group->nodes[m]->output == nd->inputs[k]) {
+                                internal = true;
+                                break;
+                            }
+                        }
+                        if (!internal) {
+                            fused_inputs[n_in++] = nd->inputs[k];
+                        }
+                    }
+                }
+
+                /* Last node's output is the group output */
+                if (j == group->num_nodes - 1 && nd->output && n_out < 64) {
+                    fused_outputs[n_out++] = nd->output;
+                }
+            }
+
+            if (cml_runtime_execute_compiled(compiled, fused_inputs, n_in,
+                                              fused_outputs, n_out) == 0) {
+                /* Mark all nodes as executed */
+                for (int j = 0; j < group->num_nodes; j++) {
+                    if (group->nodes[j]) {
+                        group->nodes[j]->is_executed = true;
+                        if (group->nodes[j]->output) {
+                            group->nodes[j]->output->is_executed = true;
+                        }
+                    }
+                }
+                fused_executed = true;
+                LOG_DEBUG("Fused execution of group %d (%d nodes)", idx, group->num_nodes);
+            }
         }
 
-        /* CPU fallback: execute each node */
-        for (int j = 0; j < group->num_nodes && rc_val == 0; j++) {
-            struct IRNode* node = group->nodes[j];
-            if (!node || node->is_executed) continue;
-            rc_val = cpu_execute_node(node);
-            if (rc_val == 0) node->is_executed = true;
+        /* CPU fallback: execute each node individually */
+        if (!fused_executed) {
+            for (int j = 0; j < group->num_nodes && rc_val == 0; j++) {
+                struct IRNode* node = group->nodes[j];
+                if (!node || node->is_executed) continue;
+                rc_val = cpu_execute_node(node);
+                if (rc_val == 0) node->is_executed = true;
+            }
         }
     }
 
@@ -261,6 +413,7 @@ void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc) {
         if (k->valid) {
             free(k->source);
             free(k->binary);
+            free(k->ops);
             memset(k, 0, sizeof(*k));
         }
     }

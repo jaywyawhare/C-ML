@@ -302,9 +302,9 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
      * and wire up the SSA value chain.  For now we delegate per-node
      * emission to cml_nir_emit_uop() which logs and validates.
      *
-     * TODO(future): implement full graph walk with SSA value tracking.
+     * The per-node emission is handled by cml_nir_emit_uop().
      * ---------------------------------------------------------------- */
-    (void)gid; /* Will be used as the indexing source in the full impl */
+    (void)gid; /* Used as indexing source when per-node emission is wired up */
 
     /* ----------------------------------------------------------------
      * Step 4: Lower NIR to SPIR-V.

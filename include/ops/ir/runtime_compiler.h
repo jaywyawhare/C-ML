@@ -33,6 +33,11 @@ typedef struct CMLCompiledKernel {
     int num_outputs;
     size_t work_size;
     bool valid;
+
+    /* Stored linear ops for CPU interpreter execution */
+    CMLLinearOp* ops;           /* Copy of LinearProgram ops */
+    int num_ops;
+    int num_vregs;
 } CMLCompiledKernel;
 
 /** Runtime compiler context */
