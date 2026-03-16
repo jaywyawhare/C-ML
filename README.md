@@ -18,11 +18,15 @@
 
 C-ML is a from-scratch C11 ML library. Tensors, autograd, 28 layers, optimizers, a compiler that fuses ops and emits GPU kernels (PTX/SPIR-V/WGSL/MSL), distributed training, LLM inference, and model I/O for GGUF/ONNX/SafeTensors. Zero required dependencies.
 
+## Build
+
 ```bash
 git clone https://github.com/jaywyawhare/C-ML.git
 cd C-ML && mkdir -p build && cd build
 cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON .. && make -j$(nproc)
 ```
+
+## Usage
 
 ```c
 #include "cml.h"
@@ -61,6 +65,8 @@ int main(void) {
 
 ---
 
+## Features
+
 | | |
 |:--|:--|
 | **Layers** | 28: Linear, Conv1d/2d/3d, ConvTranspose, RNN/LSTM/GRU, Transformer, BatchNorm, LayerNorm, RMSNorm, Pooling, Dropout, PixelShuffle, ... |
@@ -73,6 +79,8 @@ int main(void) {
 | **Python** | CFFI bindings, NumPy integration, operator overloading |
 
 ---
+
+## Architecture
 
 ```
 user code       C or Python
