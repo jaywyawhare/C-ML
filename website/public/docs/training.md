@@ -135,7 +135,7 @@ for (int epoch = 0; epoch < num_epochs; epoch++) {
 lr_scheduler_free(sched);
 ```
 
-See `examples/tutorials/ex14_lr_scheduler.c` for a comparison of all schedulers.
+See `examples/tutorials/lr_scheduler.c` for a comparison of all schedulers.
 
 ## Loss Functions
 

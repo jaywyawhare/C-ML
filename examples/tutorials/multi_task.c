@@ -1,12 +1,3 @@
-/**
- * Example 12: Multi-Head Architecture
- *
- * Shared backbone with two separate task heads:
- *   Task A: Wine type classification (3 classes -> binary: class 1 vs rest)
- *   Task B: Alcohol content regression (feature 0 of original data)
- *
- * Dataset: Wine (178 samples, 13 features, 3 classes).
- */
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,24 +14,20 @@ int main(void) {
     int n = ds->num_samples;
     int nf = ds->input_size;
 
-    /* Save raw labels before normalization */
     float* raw_y = malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
         raw_y[i] = tensor_get_float(ds->y, i);
 
-    /* Save first feature (related to alcohol) as regression target */
     float* reg_target = malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
         reg_target[i] = tensor_get_float(ds->X, i * nf + 0);
 
     dataset_normalize(ds, "minmax");
 
-    /* Binary classification: class 1 vs rest */
     float* cls_target = malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
         cls_target[i] = (raw_y[i] == 1.0f) ? 1.0f : 0.0f;
 
-    /* Normalize regression target */
     float reg_min = reg_target[0], reg_max = reg_target[0];
     for (int i = 1; i < n; i++) {
         if (reg_target[i] < reg_min) reg_min = reg_target[i];
@@ -59,19 +46,16 @@ int main(void) {
     printf("Task A: Wine type classification (binary)\n");
     printf("Task B: Alcohol content regression\n\n");
 
-    /* Shared backbone */
     Sequential* backbone = cml_nn_sequential();
     cml_nn_sequential_add(backbone, (Module*)cml_nn_linear(nf, 16, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(backbone, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(backbone, (Module*)cml_nn_linear(16, 8, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(backbone, (Module*)cml_nn_relu(false));
 
-    /* Head A: classification */
     Sequential* head_cls = cml_nn_sequential();
     cml_nn_sequential_add(head_cls, (Module*)cml_nn_linear(8, 1, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(head_cls, (Module*)cml_nn_sigmoid());
 
-    /* Head B: regression */
     Sequential* head_reg = cml_nn_sequential();
     cml_nn_sequential_add(head_reg, (Module*)cml_nn_linear(8, 1, DTYPE_FLOAT32, DEVICE_CPU, true));
 
@@ -105,7 +89,6 @@ int main(void) {
                    epoch, tensor_get_float(loss_cls, 0), tensor_get_float(loss_reg, 0));
     }
 
-    /* Final evaluation */
     Tensor* features = cml_nn_sequential_forward(backbone, X);
     Tensor* pred_cls = cml_nn_sequential_forward(head_cls, features);
     Tensor* pred_reg = cml_nn_sequential_forward(head_reg, features);

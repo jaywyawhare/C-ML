@@ -1,9 +1,3 @@
-/**
- * Example 08: LSTM Time Series Prediction
- *
- * Predicts next value in the Airline Passengers time series using an LSTM cell.
- * Dataset: Airline Passengers (144 monthly values, 1949-1960).
- */
 #include "cml.h"
 #include <stdio.h>
 
@@ -78,7 +72,6 @@ int main(void) {
             printf("Epoch %3d  Avg Loss: %.6f\n", epoch, total_loss / (train_steps - 1));
     }
 
-    /* Test: warm up on training data, then predict test portion */
     printf("\nTest predictions:\n");
     Tensor* h = cml_zeros(h_shape, 2, NULL);
     Tensor* c_state = cml_zeros(h_shape, 2, NULL);

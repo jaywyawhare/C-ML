@@ -1,10 +1,3 @@
-/**
- * Example 04: Multi-Layer Perceptron (3-class classification)
- *
- * Architecture: Input(4) -> Dense(16) -> ReLU -> Dense(8) -> ReLU -> Dense(3) -> Sigmoid
- * Dataset: Iris (150 samples, 4 features, 3 classes).
- * Uses per-class BCE with one-hot targets (avoids cross-entropy gather backward).
- */
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +20,6 @@ int main(void) {
     int n_test = test->num_samples;
     int nc = 3;
 
-    /* Create one-hot targets for BCE-based training */
     float* train_y_raw = (float*)tensor_data_ptr(train->y);
     float* onehot = calloc(n_train * nc, sizeof(float));
     for (int i = 0; i < n_train; i++) {
@@ -63,7 +55,6 @@ int main(void) {
             printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
     }
 
-    /* Test evaluation: argmax over 3 outputs */
     float* test_y_raw = (float*)tensor_data_ptr(test->y);
     Tensor* test_pred = cml_nn_sequential_forward(model, test->X);
     tensor_ensure_executed(test_pred);

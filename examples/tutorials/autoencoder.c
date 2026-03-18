@@ -1,10 +1,3 @@
-/**
- * Example 05: Autoencoder
- *
- * Encoder: 64 -> 32 -> 8 (latent)
- * Decoder: 8 -> 32 -> 64
- * Dataset: Digits 8x8 (1797 samples, 64 features) - learns to reconstruct digit images.
- */
 #include "cml.h"
 #include <stdio.h>
 
@@ -17,10 +10,8 @@ int main(void) {
     Dataset* ds = cml_dataset_load("digits");
     if (!ds) { printf("Failed to load digits dataset\n"); return 1; }
 
-    /* Normalize pixel values to [0, 1] (digits range is 0-16) */
     dataset_normalize(ds, "minmax");
 
-    /* Use a subset for speed (full dataset = 1797 samples) */
     int n = 200;
     if (n > ds->num_samples) n = ds->num_samples;
     int feat = ds->input_size;
@@ -31,14 +22,11 @@ int main(void) {
     int sub_shape[] = {n, feat};
     Tensor* X = cml_tensor(tensor_data_ptr(ds->X), sub_shape, 2, NULL);
 
-    /* Full autoencoder as single sequential */
     Sequential* autoenc = cml_nn_sequential();
-    /* Encoder */
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_linear(64, 32, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_linear(32, LATENT_DIM, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_relu(false));
-    /* Decoder */
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_linear(LATENT_DIM, 32, DTYPE_FLOAT32, DEVICE_CPU, true));
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(autoenc, (Module*)cml_nn_linear(32, 64, DTYPE_FLOAT32, DEVICE_CPU, true));
@@ -60,7 +48,6 @@ int main(void) {
             printf("Epoch %4d  Reconstruction Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
     }
 
-    /* Show reconstruction quality for first 5 samples */
     printf("\nReconstructed vs original (first 5, showing 8 pixels):\n");
     Tensor* recon = cml_nn_sequential_forward(autoenc, X);
     for (int i = 0; i < 5; i++) {

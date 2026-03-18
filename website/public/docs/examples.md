@@ -37,7 +37,7 @@ Classic XOR problem with a full training loop. Demonstrates the complete train-e
 Basic tensor creation, element-wise arithmetic, reductions, and shape manipulation. No dataset required.
 
 ```bash
-./build/ex01_tensor_ops
+./build/tensor_ops
 ```
 
 ### ex02 -- Linear Regression
@@ -45,7 +45,7 @@ Basic tensor creation, element-wise arithmetic, reductions, and shape manipulati
 Linear regression trained with SGD on the Boston Housing dataset. Demonstrates `cml_dataset_load()`, `dataset_normalize()`, and `dataset_split()`.
 
 ```bash
-./build/ex02_linear_regression
+./build/linear_regression
 ```
 
 ### ex03 -- Logistic Regression
@@ -53,7 +53,7 @@ Linear regression trained with SGD on the Boston Housing dataset. Demonstrates `
 Binary classification using sigmoid + BCE loss on the Breast Cancer dataset.
 
 ```bash
-./build/ex03_logistic_regression
+./build/logistic_regression
 ```
 
 ### ex04 -- MLP Classifier
@@ -61,7 +61,7 @@ Binary classification using sigmoid + BCE loss on the Breast Cancer dataset.
 Multi-class classification with a 2-layer MLP on the Iris dataset. Shows Sequential model building and MSE training.
 
 ```bash
-./build/ex04_mlp_classifier
+./build/mlp_classifier
 ```
 
 ### ex05 -- Autoencoder
@@ -69,7 +69,7 @@ Multi-class classification with a 2-layer MLP on the Iris dataset. Shows Sequent
 Autoencoder with an encoder-decoder architecture and bottleneck layer. Trained on Digits 8x8 images.
 
 ```bash
-./build/ex05_autoencoder
+./build/autoencoder
 ```
 
 ### ex06 -- Image Classification
@@ -77,7 +77,7 @@ Autoencoder with an encoder-decoder architecture and bottleneck layer. Trained o
 Image classification MLP that processes 8x8 digit images using raw pixel features. Uses Digits dataset with BCE loss.
 
 ```bash
-./build/ex06_conv_net
+./build/conv_net
 ```
 
 ### ex07 -- RNN Sequence Prediction
@@ -85,7 +85,7 @@ Image classification MLP that processes 8x8 digit images using raw pixel feature
 RNN-based time series prediction on the Airline passengers dataset. Demonstrates `cml_nn_rnn_cell()` with sliding window input.
 
 ```bash
-./build/ex07_rnn_sequence
+./build/rnn_sequence
 ```
 
 ### ex08 -- LSTM Time Series
@@ -93,7 +93,7 @@ RNN-based time series prediction on the Airline passengers dataset. Demonstrates
 LSTM-based time series forecasting on Airline data. Shows `cml_nn_lstm_cell()` with hidden and cell state management.
 
 ```bash
-./build/ex08_lstm_timeseries
+./build/lstm_timeseries
 ```
 
 ### ex09 -- GRU Classifier
@@ -101,7 +101,7 @@ LSTM-based time series forecasting on Airline data. Shows `cml_nn_lstm_cell()` w
 GRU-based sequence classifier on the Iris dataset. Demonstrates `cml_nn_gru_cell()` processing features as a sequence.
 
 ```bash
-./build/ex09_gru_classifier
+./build/gru_classifier
 ```
 
 ### ex10 -- Embedding
@@ -109,7 +109,7 @@ GRU-based sequence classifier on the Iris dataset. Demonstrates `cml_nn_gru_cell
 Embedding lookup table demo. Shows `cml_nn_embedding()` for mapping integer indices to dense vectors.
 
 ```bash
-./build/ex10_embedding
+./build/embedding
 ```
 
 ### ex11 -- GAN
@@ -117,7 +117,7 @@ Embedding lookup table demo. Shows `cml_nn_embedding()` for mapping integer indi
 Generative Adversarial Network with separate generator and discriminator networks. Trained on Digits 8x8.
 
 ```bash
-./build/ex11_gan
+./build/gan
 ```
 
 ### ex12 -- Multi-Task Learning
@@ -125,7 +125,7 @@ Generative Adversarial Network with separate generator and discriminator network
 Multi-task learning with shared layers and task-specific heads. Uses the Wine dataset with two prediction targets.
 
 ```bash
-./build/ex12_multi_task
+./build/multi_task
 ```
 
 ### ex13 -- Transformer Encoder
@@ -133,7 +133,7 @@ Multi-task learning with shared layers and task-specific heads. Uses the Wine da
 Demonstrates `cml_nn_multihead_attention()` and `cml_nn_transformer_encoder_layer()` with self-attention on synthetic sequences.
 
 ```bash
-./build/ex13_transformer
+./build/transformer
 ```
 
 ### ex14 -- LR Scheduler Comparison
@@ -141,7 +141,7 @@ Demonstrates `cml_nn_multihead_attention()` and `cml_nn_transformer_encoder_laye
 Compares learning rate schedulers (Step, Exponential, Cosine, ReduceOnPlateau) side-by-side on Boston Housing regression.
 
 ```bash
-./build/ex14_lr_scheduler
+./build/lr_scheduler
 ```
 
 ### ex15 -- Activation Functions Showcase
@@ -149,7 +149,7 @@ Compares learning rate schedulers (Step, Exponential, Cosine, ReduceOnPlateau) s
 Trains separate networks using all 12 activation functions (ReLU, Sigmoid, Tanh, LeakyReLU, GELU, ELU, SELU, SiLU, Mish, HardSwish, Softmax, LogSoftmax) and compares convergence.
 
 ```bash
-./build/ex15_activations_showcase
+./build/activations
 ```
 
 ## Benchmarks

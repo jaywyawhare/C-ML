@@ -156,8 +156,8 @@ int main(void) {
 After building with `-DBUILD_EXAMPLES=ON`, all example binaries are in `build/bin/`:
 
 ```bash
-./build/bin/ex01_tensor_ops      # Basic tensor operations
-./build/bin/ex04_mlp_classifier  # Iris classification
+./build/bin/tensor_ops      # Basic tensor operations
+./build/bin/mlp_classifier  # Iris classification
 ./build/bin/hello_cml            # Smoke test
 ```
 

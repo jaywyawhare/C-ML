@@ -1,10 +1,3 @@
-/**
- * Example 07: RNN Cell - Sequence Processing
- *
- * Uses RNNCell to process the Airline Passengers time series step-by-step.
- * Creates sliding windows of length 5 to predict the next value.
- * Dataset: Airline Passengers (144 monthly values, 1949-1960).
- */
 #include "cml.h"
 #include <stdio.h>
 #include <string.h>
@@ -19,10 +12,8 @@ int main(void) {
     Dataset* ds = cml_dataset_load("airline");
     if (!ds) { printf("Failed to load airline dataset\n"); return 1; }
 
-    /* Normalize to [0,1] for better training */
     dataset_normalize(ds, "minmax");
 
-    /* Create sliding window sequences */
     int total = ds->num_samples;
     int n_seqs = total - SEQ_LEN;
     float* seqs = (float*)tensor_data_ptr(ds->X);
@@ -76,7 +67,6 @@ int main(void) {
             printf("Epoch %3d  Avg Loss: %.6f\n", epoch, total_loss / train_seqs);
     }
 
-    /* Test on remaining sequences */
     printf("\nPredictions (last 10 test sequences):\n");
     float test_mse = 0;
     int test_count = 0;

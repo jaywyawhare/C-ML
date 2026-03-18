@@ -1,9 +1,3 @@
-/**
- * Example 14: Training with Learning Rate Schedulers
- *
- * Trains an MLP with different LR schedulers: StepLR, Exponential, Cosine,
- * ReduceOnPlateau. Uses the Boston Housing dataset for regression.
- */
 #include "cml.h"
 #include "core/training_loop.h"
 #include <stdio.h>
@@ -52,7 +46,6 @@ int main(void) {
 
     printf("Samples: %d, Features: %d\n", ds->num_samples, nf);
 
-    /* 1. StepLR */
     {
         Sequential* m = make_model(nf);
         Optimizer* opt = cml_optim_adam_for_model((Module*)m, 0.05f, 0.0f, 0.9f, 0.999f, 1e-8f);
@@ -61,7 +54,6 @@ int main(void) {
         lr_scheduler_free(sched);
     }
 
-    /* 2. Exponential decay */
     {
         Sequential* m = make_model(nf);
         Optimizer* opt = cml_optim_adam_for_model((Module*)m, 0.05f, 0.0f, 0.9f, 0.999f, 1e-8f);
@@ -70,7 +62,6 @@ int main(void) {
         lr_scheduler_free(sched);
     }
 
-    /* 3. Cosine annealing */
     {
         Sequential* m = make_model(nf);
         Optimizer* opt = cml_optim_adam_for_model((Module*)m, 0.05f, 0.0f, 0.9f, 0.999f, 1e-8f);
@@ -79,7 +70,6 @@ int main(void) {
         lr_scheduler_free(sched);
     }
 
-    /* 4. ReduceOnPlateau */
     {
         Sequential* m = make_model(nf);
         Optimizer* opt = cml_optim_adam_for_model((Module*)m, 0.05f, 0.0f, 0.9f, 0.999f, 1e-8f);

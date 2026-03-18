@@ -1,10 +1,3 @@
-/**
- * Example 15: Activation Functions Showcase
- *
- * Part 1: Demonstrates all available activation functions on a sample input.
- * Part 2: Trains small networks on the Breast Cancer dataset with different
- *          activations to compare convergence (200 epochs).
- */
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +17,6 @@ int main(void) {
     cml_init();
     printf("Example 15: Activation Functions\n\n");
 
-    /* Part 1: Show activation outputs */
     float data[] = {-2.0f, -1.0f, -0.5f, 0.0f, 0.5f, 1.0f, 2.0f};
     int shape[] = {1, 7};
     int n = 7;
@@ -48,7 +40,6 @@ int main(void) {
     show_activation("Mish",       module_forward((Module*)nn_mish(), x), n);
     show_activation("HardSwish",  module_forward((Module*)nn_hardswish(), x), n);
 
-    /* Part 2: Train on Breast Cancer dataset */
     printf("\nBreast Cancer classification (%d epochs):\n", N_EPOCHS);
 
     Dataset* ds = cml_dataset_load("breast_cancer");

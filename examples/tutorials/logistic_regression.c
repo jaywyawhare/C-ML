@@ -1,9 +1,3 @@
-/**
- * Example 03: Logistic Regression (Binary Classification)
- *
- * Classify breast cancer tumors (malignant vs benign) using Linear + Sigmoid + BCE.
- * Dataset: Wisconsin Breast Cancer (569 samples, 30 features, 2 classes).
- */
 #include "cml.h"
 #include <stdio.h>
 
@@ -40,7 +34,6 @@ int main(void) {
             printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
     }
 
-    /* Evaluate on test set */
     Tensor* pred = cml_nn_sequential_forward(model, test->X);
     int correct = 0;
     for (int i = 0; i < test->num_samples; i++) {

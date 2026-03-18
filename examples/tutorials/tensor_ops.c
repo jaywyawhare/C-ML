@@ -1,8 +1,3 @@
-/**
- * Example 01: Basic Tensor Operations
- *
- * Demonstrates: tensor creation, add, sub, mul, matmul, relu, transpose
- */
 #include "cml.h"
 #include <stdio.h>
 

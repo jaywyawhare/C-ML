@@ -1,9 +1,3 @@
-/**
- * Example 09: GRU Sequence Classifier
- *
- * Classifies Iris samples by feeding 4 features as a 4-step sequence into a GRU.
- * Dataset: Iris (150 samples, 4 features as 4 timesteps, 3 classes).
- */
 #include "cml.h"
 #include <stdio.h>
 
@@ -47,7 +41,6 @@ int main(void) {
     Optimizer* gru_opt = cml_optim_adam(params, np, 0.005f, 0.0f, 0.9f, 0.999f, 1e-8f);
     Optimizer* head_opt = cml_optim_adam_for_model((Module*)head, 0.005f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
-    /* Simplify to binary: class 0 vs classes 1+2 */
     float* train_X = (float*)tensor_data_ptr(train->X);
     float* train_y = (float*)tensor_data_ptr(train->y);
     float* test_X = (float*)tensor_data_ptr(test->X);
@@ -79,7 +72,6 @@ int main(void) {
             printf("Epoch %3d  Avg Loss: %.6f\n", epoch, total_loss / train->num_samples);
     }
 
-    /* Test evaluation */
     printf("\nTest predictions:\n");
     int correct = 0;
     for (int s = 0; s < test->num_samples; s++) {

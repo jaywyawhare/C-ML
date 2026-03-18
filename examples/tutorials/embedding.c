@@ -1,10 +1,3 @@
-/**
- * Example 10: Embedding Layer
- *
- * Demonstrates nn_embedding for token lookup tables.
- * Creates a small vocabulary, looks up embeddings, and shows
- * how embeddings can be used as input to downstream layers.
- */
 #include "cml.h"
 #include <stdio.h>
 
@@ -18,8 +11,7 @@ int main(void) {
     printf("Embedding: vocab=%d, dim=%d\n", vocab_size, embed_dim);
     printf("Weight shape: [%d, %d]\n\n", vocab_size, embed_dim);
 
-    // Show the embedding table
-    printf("Embedding table (randomly initialized):\n");
+    printf("Embedding table:\n");
     Tensor* weight = emb->weight->tensor;
     for (int i = 0; i < vocab_size; i++) {
         printf("  token %d: [", i);
@@ -30,14 +22,12 @@ int main(void) {
         printf("]\n");
     }
 
-    // Feed embeddings into a classifier: embed -> linear -> softmax
     Sequential* classifier = cml_nn_sequential();
     cml_nn_sequential_add(classifier, (Module*)cml_nn_linear(embed_dim, 3, DTYPE_FLOAT32, DEVICE_CPU, true));
 
     printf("\nClassifier: embed(%d) -> linear(%d, 3)\n", embed_dim, embed_dim);
     cml_summary((Module*)classifier);
 
-    // Simulate: look up token 2's embedding and classify
     printf("\nLooking up token 2 and classifying:\n");
     int tok_shape[] = {1, embed_dim};
     float tok_data[4];

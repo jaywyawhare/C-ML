@@ -128,21 +128,21 @@ See the `examples/` directory for 29 complete working examples:
 ### Tutorials
 - `hello_cml.c` - First program
 - `simple_xor.c` - XOR classification
-- `ex01_tensor_ops.c` - Tensor operations
-- `ex02_linear_regression.c` - Linear regression
-- `ex03_logistic_regression.c` - Logistic regression
-- `ex04_mlp_classifier.c` - MLP classifier
-- `ex05_autoencoder.c` - Autoencoder
-- `ex06_conv_net.c` - Convolutional network
-- `ex07_rnn_sequence.c` - RNN sequence modeling
-- `ex08_lstm_timeseries.c` - LSTM time series
-- `ex09_gru_classifier.c` - GRU classifier
-- `ex10_embedding.c` - Embedding layers
-- `ex11_gan.c` - Generative adversarial network
-- `ex12_multi_task.c` - Multi-task learning
-- `ex13_transformer.c` - Transformer model
-- `ex14_lr_scheduler.c` - Learning rate scheduling
-- `ex15_activations_showcase.c` - All activation functions
+- `tensor_ops.c` - Tensor operations
+- `linear_regression.c` - Linear regression
+- `logistic_regression.c` - Logistic regression
+- `mlp_classifier.c` - MLP classifier
+- `autoencoder.c` - Autoencoder
+- `conv_net.c` - Convolutional network
+- `rnn_sequence.c` - RNN sequence modeling
+- `lstm_timeseries.c` - LSTM time series
+- `gru_classifier.c` - GRU classifier
+- `embedding.c` - Embedding layers
+- `gan.c` - Generative adversarial network
+- `multi_task.c` - Multi-task learning
+- `transformer.c` - Transformer model
+- `lr_scheduler.c` - Learning rate scheduling
+- `activations.c` - All activation functions
 
 ### Demos
 - `autograd_example.c` - Gradient computation

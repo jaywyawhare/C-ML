@@ -1,9 +1,3 @@
-/**
- * Example 02: Linear Regression
- *
- * Fit a linear model on the Boston Housing dataset (13 features -> price).
- * Uses dataset hub: auto-downloads + caches from UCI repository.
- */
 #include "cml.h"
 #include <stdio.h>
 
@@ -39,7 +33,6 @@ int main(void) {
             printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
     }
 
-    /* Evaluate on test set */
     Tensor* test_pred = cml_nn_sequential_forward(model, test->X);
     float mse = 0;
     for (int i = 0; i < test->num_samples; i++) {
