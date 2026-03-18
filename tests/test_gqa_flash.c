@@ -1,8 +1,3 @@
-/**
- * @file test_gqa_flash.c
- * @brief Tests for Flash Attention GQA and Sliding Window
- */
-
 #include "nn/llm_ops.h"
 #include "tensor/tensor.h"
 #include <stdio.h>
@@ -46,7 +41,6 @@ static Tensor* make_rand_tensor(int b, int s, int d) {
     return t;
 }
 
-/* Test: flash attention produces same result as standard GQA */
 static void test_flash_vs_standard(void) {
     printf("test_flash_vs_standard...\n");
 
@@ -98,7 +92,6 @@ static void test_flash_vs_standard(void) {
     printf("  PASS\n");
 }
 
-/* Test: flash attention with KV cache */
 static void test_flash_cached(void) {
     printf("test_flash_cached...\n");
 
@@ -139,7 +132,6 @@ static void test_flash_cached(void) {
     printf("  PASS\n");
 }
 
-/* Test: sliding window attention masks correctly */
 static void test_sliding_window(void) {
     printf("test_sliding_window...\n");
 
@@ -213,7 +205,6 @@ static void test_sliding_window(void) {
     printf("  PASS\n");
 }
 
-/* Test: flash attention with large tile sizes (> seq_len) */
 static void test_flash_large_tiles(void) {
     printf("test_flash_large_tiles...\n");
 

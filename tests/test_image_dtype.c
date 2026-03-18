@@ -1,8 +1,3 @@
-/**
- * @file test_image_dtype.c
- * @brief Tests for image dtype system
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

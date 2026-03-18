@@ -1,8 +1,3 @@
-/**
- * @file test_onnx.c
- * @brief Tests for ONNX runtime operator support
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

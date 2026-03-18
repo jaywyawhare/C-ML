@@ -1,20 +1,3 @@
-/**
- * @file mnist_example.c
- * @brief MNIST digit classification example using C-ML
- *
- * This example demonstrates training a neural network on the MNIST dataset.
- *
- * To run this example, you need to download the MNIST dataset:
- *   wget http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
- *   wget http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz
- *   wget http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz
- *   wget http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz
- *   gunzip *.gz
- *
- * Then run:
- *   ./mnist_example [data_dir]
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +6,6 @@
 #include <math.h>
 #include <time.h>
 
-// Wall-clock time helper (clock() measures CPU time which is wrong for multi-threaded code)
 static double get_time_sec(void) {
 #if defined(__linux__) || defined(__APPLE__)
     struct timespec ts;
@@ -34,7 +16,6 @@ static double get_time_sec(void) {
 #endif
 }
 
-// IDX file format helpers
 static uint32_t read_uint32_be(FILE* f) {
     uint8_t bytes[4];
     if (fread(bytes, 1, 4, f) != 4)
@@ -43,7 +24,6 @@ static uint32_t read_uint32_be(FILE* f) {
            (uint32_t)bytes[3];
 }
 
-// Load MNIST images from IDX file
 static float* load_mnist_images(const char* filename, int* num_images, int* rows, int* cols) {
     FILE* f = fopen(filename, "rb");
     if (!f) {
@@ -71,7 +51,6 @@ static float* load_mnist_images(const char* filename, int* num_images, int* rows
         return NULL;
     }
 
-    // Read and normalize pixel values
     uint8_t* buffer = (uint8_t*)malloc(image_size);
     for (int i = 0; i < *num_images; i++) {
         if (fread(buffer, 1, image_size, f) != (size_t)image_size) {
@@ -81,7 +60,6 @@ static float* load_mnist_images(const char* filename, int* num_images, int* rows
             fclose(f);
             return NULL;
         }
-        // Normalize to [0, 1]
         for (int j = 0; j < image_size; j++) {
             data[i * image_size + j] = buffer[j] / 255.0f;
         }
@@ -92,7 +70,6 @@ static float* load_mnist_images(const char* filename, int* num_images, int* rows
     return data;
 }
 
-// Load MNIST labels from IDX file as one-hot encoded (for MSE loss - faster)
 static float* load_mnist_labels(const char* filename, int* num_labels) {
     FILE* f = fopen(filename, "rb");
     if (!f) {
@@ -110,7 +87,6 @@ static float* load_mnist_labels(const char* filename, int* num_labels) {
     *num_labels = (int)read_uint32_be(f);
     printf("Loading %d labels...\n", *num_labels);
 
-    // One-hot encode for MSE loss (faster than cross-entropy which breaks lazy eval)
     float* data = (float*)calloc((*num_labels) * 10, sizeof(float));
     if (!data) {
         fclose(f);
@@ -134,7 +110,6 @@ static float* load_mnist_labels(const char* filename, int* num_labels) {
     return data;
 }
 
-// Calculate accuracy: argmax of predictions vs one-hot targets
 static float calculate_accuracy(Tensor* predictions, Tensor* targets, int num_samples) {
     float* pred_data   = (float*)tensor_data_ptr(predictions);
     float* target_data = (float*)tensor_data_ptr(targets); // One-hot [N, 10]
@@ -169,12 +144,10 @@ static float calculate_accuracy(Tensor* predictions, Tensor* targets, int num_sa
 int main(int argc, char** argv) {
     const char* data_dir = argc > 1 ? argv[1] : ".";
 
-    // Force line buffering for immediate output
     setvbuf(stdout, NULL, _IOLBF, 0);
 
     printf("=== MNIST Classification with C-ML ===\n\n");
 
-    // Build file paths
     char train_images_path[512], train_labels_path[512];
     char test_images_path[512], test_labels_path[512];
     snprintf(train_images_path, sizeof(train_images_path), "%s/train-images-idx3-ubyte", data_dir);
@@ -182,7 +155,6 @@ int main(int argc, char** argv) {
     snprintf(test_images_path, sizeof(test_images_path), "%s/t10k-images-idx3-ubyte", data_dir);
     snprintf(test_labels_path, sizeof(test_labels_path), "%s/t10k-labels-idx1-ubyte", data_dir);
 
-    // Load training data
     printf("Loading training data...\n");
     int num_train, rows, cols;
     float* train_images = load_mnist_images(train_images_path, &num_train, &rows, &cols);
@@ -203,41 +175,34 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Load test data
     printf("\nLoading test data...\n");
     int num_test, test_rows, test_cols;
     float* test_images = load_mnist_images(test_images_path, &num_test, &test_rows, &test_cols);
     int num_test_labels;
     float* test_labels = test_images ? load_mnist_labels(test_labels_path, &num_test_labels) : NULL;
 
-    // Use a subset of training data (increase for better accuracy)
-    int train_subset = 10000; // Use 10k samples (increase to 60000 for full training)
+    int train_subset = 10000;
     if (train_subset > num_train)
         train_subset = num_train;
     printf("\nUsing %d training samples (out of %d)\n", train_subset, num_train);
 
-    // Initialize C-ML
     cml_init();
     cml_seed(42);
 
-    // Create tensors
-    int input_size  = rows * cols; // 784 for MNIST
+    int input_size  = rows * cols;
     int num_classes = 10;
 
     int x_shape[]       = {train_subset, input_size};
-    int y_shape[]       = {train_subset, num_classes}; // 2D: one-hot for MSE
+    int y_shape[]       = {train_subset, num_classes};
     TensorConfig config = {
         .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     Tensor* X_train = tensor_from_data(train_images, x_shape, 2, &config);
-    Tensor* y_train = tensor_from_data(train_labels, y_shape, 2, &config); // 2D one-hot
+    Tensor* y_train = tensor_from_data(train_labels, y_shape, 2, &config);
 
     printf("\nX_train shape: [%d, %d]\n", x_shape[0], x_shape[1]);
     printf("y_train shape: [%d, %d] (one-hot)\n", y_shape[0], y_shape[1]);
 
-    // Build model: Simple MLP for MNIST
-    // Input (784) -> Linear(128) -> ReLU -> Linear(64) -> ReLU -> Linear(10) -> Sigmoid
-    // Using sigmoid + MSE (fully IR-based, much faster than cross-entropy)
     printf("\nBuilding model...\n");
     Sequential* model = cml_nn_sequential();
     DeviceType device = cml_get_default_device();
@@ -250,25 +215,22 @@ int main(int argc, char** argv) {
     model = cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
     model =
         cml_nn_sequential_add(model, (Module*)cml_nn_linear(64, num_classes, dtype, device, true));
-    model = cml_nn_sequential_add(model, (Module*)cml_nn_sigmoid()); // Sigmoid for MSE
+    model = cml_nn_sequential_add(model, (Module*)cml_nn_sigmoid());
 
     cml_summary((Module*)model);
     cml_nn_module_set_training((Module*)model, true);
 
-    // Create optimizer
     Optimizer* optimizer =
         cml_optim_adam_for_model((Module*)model, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
     printf("\nOptimizer: Adam (lr=0.001)\n");
 
-    // Training loop
-    int num_epochs  = 10; // Train for 10 epochs
+    int num_epochs  = 10;
     int batch_size  = 64;
     int num_batches = (train_subset + batch_size - 1) / batch_size;
 
     printf("\nTraining for %d epochs (batch_size=%d, batches=%d)...\n\n", num_epochs, batch_size,
            num_batches);
 
-    // Set up training metrics for visualization
     training_metrics_set_expected_epochs(num_epochs);
     training_metrics_register_model((Module*)model);
 
@@ -286,30 +248,26 @@ int main(int argc, char** argv) {
                 end_idx = train_subset;
             int current_batch_size = end_idx - start_idx;
 
-            // Create batch tensors (slice from full data)
             int batch_x_shape[] = {current_batch_size, input_size};
-            int batch_y_shape[] = {current_batch_size, num_classes}; // 2D one-hot
+            int batch_y_shape[] = {current_batch_size, num_classes};
 
             Tensor* X_batch =
                 tensor_from_data(&train_images[start_idx * input_size], batch_x_shape, 2, &config);
             Tensor* y_batch =
                 tensor_from_data(&train_labels[start_idx * num_classes], batch_y_shape, 2, &config);
 
-            // Zero gradients
             if (epoch == 0 && batch % 10 == 0) {
                 printf("\r  Batch %d/%d", batch, num_batches);
                 fflush(stdout);
             }
             cml_optim_zero_grad(optimizer);
 
-            // Forward pass
             Tensor* outputs = cml_nn_module_forward((Module*)model, X_batch);
             if (!outputs) {
                 printf("Error: Forward pass failed at epoch %d, batch %d\n", epoch, batch);
                 break;
             }
 
-            // Compute MSE loss (fully IR-based, no eager execution)
             Tensor* loss = cml_nn_mse_loss(outputs, y_batch);
             if (!loss) {
                 printf("Error: Loss computation failed\n");
@@ -319,14 +277,11 @@ int main(int argc, char** argv) {
             float batch_loss = tensor_get_float(loss, 0);
             epoch_loss += batch_loss;
 
-            // Calculate batch accuracy
             float batch_acc = calculate_accuracy(outputs, y_batch, current_batch_size);
             total_correct += (int)(batch_acc * current_batch_size);
 
-            // Backward pass
             cml_backward(loss, NULL, false, false);
 
-            // Export graph and kernels on first batch for visualization
             if (epoch == 0 && batch == 0) {
                 autograd_export_json(loss, "graph.json");
                 if (loss->ir_context) {
@@ -347,17 +302,13 @@ int main(int argc, char** argv) {
                 }
             }
 
-            // Optimizer step
             cml_optim_step(optimizer);
 
-            // Free batch tensors and intermediate results
             tensor_free(loss);
             tensor_free(outputs);
             tensor_free(X_batch);
             tensor_free(y_batch);
 
-            // Reset IR context every batch to prevent memory growth
-            // This trades JIT compilation speed for memory stability
             cml_reset_ir_context();
         }
 
@@ -365,7 +316,6 @@ int main(int argc, char** argv) {
         float train_acc   = (float)total_correct / train_subset * 100.0f;
         double epoch_time = get_time_sec() - epoch_start;
 
-        // Capture metrics for visualization (accuracy as 0-1 fraction)
         training_metrics_auto_capture_train_accuracy(train_acc / 100.0f);
         training_metrics_complete_epoch();
 
@@ -377,12 +327,11 @@ int main(int argc, char** argv) {
     printf("\nTotal training time: %.2fs (%.2f samples/sec)\n", total_time,
            (num_epochs * train_subset) / total_time);
 
-    // Test evaluation
     if (test_images && test_labels) {
         printf("\n=== Testing on %d samples ===\n", num_test);
 
         int test_x_shape[] = {num_test, input_size};
-        int test_y_shape[] = {num_test, num_classes}; // 2D one-hot
+        int test_y_shape[] = {num_test, num_classes};
 
         Tensor* X_test = tensor_from_data(test_images, test_x_shape, 2, &config);
         Tensor* y_test = tensor_from_data(test_labels, test_y_shape, 2, &config);
@@ -399,7 +348,6 @@ int main(int argc, char** argv) {
         tensor_free(y_test);
     }
 
-    // Cleanup
     printf("\n=== Done ===\n");
     free(train_images);
     free(train_labels);

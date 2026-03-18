@@ -1,8 +1,3 @@
-/**
- * @file model_architecture.c
- * @brief Model architecture visualization export implementation
- */
-
 #include "core/model_architecture.h"
 #include "nn.h"
 #include "nn/layers/sequential.h"

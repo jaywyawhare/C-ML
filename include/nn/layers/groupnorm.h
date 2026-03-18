@@ -1,8 +1,3 @@
-/**
- * @file groupnorm.h
- * @brief Group Normalization layer
- */
-
 #ifndef CML_NN_LAYERS_GROUPNORM_H
 #define CML_NN_LAYERS_GROUPNORM_H
 

@@ -1,8 +1,3 @@
-/**
- * @file test_webgpu_backend.c
- * @brief Tests for WebGPU backend and WGSL code generation
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

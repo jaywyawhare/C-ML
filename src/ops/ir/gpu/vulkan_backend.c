@@ -1,11 +1,3 @@
-/**
- * @file vulkan_backend.c
- * @brief Vulkan compute backend implementation
- *
- * All Vulkan API calls loaded at runtime via dlopen("libvulkan.so.1").
- * No compile-time Vulkan SDK dependency.
- */
-
 #include "ops/ir/gpu/vulkan_backend.h"
 #include "ops/ir/gpu/spirv_codegen.h"
 #include "ops/ir/ir.h"
@@ -648,7 +640,6 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
     VkMemoryAllocateInfo_t alloc_info = {0};
     alloc_info.sType = 5; /* VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO */
     alloc_info.allocationSize = mem_reqs.size;
-    /* Use cached memory types from backend */
     alloc_info.memoryTypeIndex = device_local ?
         backend->memory_type_device_local : backend->memory_type_host_visible;
 
@@ -667,7 +658,6 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
         return NULL;
     }
 
-    /* Map host-visible memory persistently */
     if (!device_local) {
         res = backend->vkMapMemory(backend->device, buf->memory, 0, size, 0, &buf->mapped);
         if (res != VK_SUCCESS) {
@@ -695,18 +685,15 @@ int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst,
     if (!backend || !dst || !src) return -1;
 
     if (dst->mapped) {
-        /* Host-visible: direct memcpy */
         memcpy(dst->mapped, src, size);
         return 0;
     }
 
-    /* Device-local: use staging buffer */
     CMLVulkanBuffer* staging = cml_vulkan_buffer_create(backend, size, false);
     if (!staging) return -1;
 
     memcpy(staging->mapped, src, size);
 
-    /* Record and submit copy command */
     VkCommandBufferAllocateInfo_t alloc_info = {0};
     alloc_info.sType = 40;
     alloc_info.commandPool = backend->command_pool;
@@ -748,7 +735,6 @@ int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
         return 0;
     }
 
-    /* Device-local: use staging buffer */
     CMLVulkanBuffer* staging = cml_vulkan_buffer_create(backend, size, false);
     if (!staging) return -1;
 
@@ -807,7 +793,6 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
                                                    &kernel->shader_module);
     if (res != VK_SUCCESS) goto fail;
 
-    /* Create descriptor set layout: N storage buffers */
     VkDescriptorSetLayoutBinding_t* bindings =
         (VkDescriptorSetLayoutBinding_t*)calloc(num_buffers,
                                                   sizeof(VkDescriptorSetLayoutBinding_t));
@@ -942,7 +927,6 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
 
     backend->vkCmdDispatch(cmd, gx, gy, gz);
 
-    /* Memory barrier for shader writes */
     VkMemoryBarrier_t barrier = {0};
     barrier.sType = 46;
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -976,7 +960,6 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized || !ir) return -1;
 
-    /* Walk the IR graph and execute each node via SPIR-V codegen + Vulkan dispatch */
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
     if (!cg) return -1;
 
@@ -986,13 +969,11 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
 
     while (node && result == 0) {
         if (!node->output || !node->output->data) {
-            /* Allocate output if needed */
             if (node->output && node->output->numel > 0 && !node->output->data) {
                 node->output->data = calloc(node->output->numel, sizeof(float));
             }
         }
 
-        /* Determine operation and generate SPIR-V */
         size_t spirv_size = 0;
         uint32_t* spirv = NULL;
         int num_bufs = 0;
@@ -1010,12 +991,10 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
         }
 
         if (!spirv) {
-            /* Fall back to CPU for unsupported ops */
             node = node->next;
             continue;
         }
 
-        /* Create kernel and execute */
         CMLVulkanKernel* kernel = cml_vulkan_kernel_create(backend, spirv, spirv_size,
                                                              "main", num_bufs);
         free(spirv);
@@ -1024,7 +1003,6 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
             continue;
         }
 
-        /* Create GPU buffers, upload data, bind, dispatch, download */
         size_t n = node->output->numel;
         uint32_t groups = ((uint32_t)n + local_size - 1) / local_size;
 

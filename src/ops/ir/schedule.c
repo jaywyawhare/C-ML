@@ -1,12 +1,3 @@
-/**
- * @file schedule.c
- * @brief Automatic kernel scheduling and fusion implementation
- *
- * Walks the IR graph and groups ops into fused kernels based on fusibility
- * rules. Elementwise chains are fused greedily; reductions, matmuls, and
- * convolutions break the fusion boundary and get their own schedule items.
- */
-
 #include "ops/ir/schedule.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
@@ -662,13 +653,13 @@ void cml_schedule_print(const CMLSchedule* sched) {
         printf("Schedule: (null)\n");
         return;
     }
-    printf("=== CML Execution Schedule ===\n");
+    printf("CML Execution Schedule\n");
     printf("  Total ops:    %d\n", sched->total_ops);
     printf("  Kernels:      %d\n", sched->total_kernels);
     printf("  Fusion ratio: %.2f\n", (double)sched->fusion_ratio);
     printf("  Total FLOPs:  %zu\n", sched->total_flops);
     printf("  Peak memory:  %zu bytes\n", sched->peak_memory);
-    printf("  ---\n");
+    printf("\n");
 
     for (int i = 0; i < sched->num_items; i++) {
         const CMLScheduleItem* it = sched->items[i];
@@ -698,7 +689,7 @@ void cml_schedule_print(const CMLSchedule* sched) {
             printf("]\n");
         }
     }
-    printf("==============================\n");
+    printf("\n");
 }
 
 char* cml_schedule_to_string(const CMLSchedule* sched) {
@@ -717,7 +708,7 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
 
     int off = 0;
     off += snprintf(buf + off, buf_size - (size_t)off,
-                    "=== CML Execution Schedule ===\n"
+                    "CML Execution Schedule\n"
                     "  Total ops:    %d\n"
                     "  Kernels:      %d\n"
                     "  Fusion ratio: %.2f\n"
@@ -745,8 +736,7 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
             }
         }
     }
-    off += snprintf(buf + off, buf_size - (size_t)off,
-                    "==============================\n");
+    off += snprintf(buf + off, buf_size - (size_t)off, "\n");
     return buf;
 }
 

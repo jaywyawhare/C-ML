@@ -1,7 +1,5 @@
-/**
- * @file trace.h
- * @brief Trace-and-Replay JIT
- *
+/*
+ * Trace-and-Replay JIT.
  * Capture kernel launch sequence on first run, replay without
  * re-scheduling on subsequent runs.
  */
@@ -22,22 +20,17 @@ extern "C" {
 #define CML_TRACE_MAX_ARGS    16
 #define CML_TRACE_CACHE_SIZE  64
 
-/* ── Trace entry types ── */
-
 typedef enum {
     CML_TRACE_KERNEL = 0,
     CML_TRACE_MEMCPY_H2D,
     CML_TRACE_MEMCPY_D2H,
 } CMLTraceEntryType;
 
-/* ── Single trace entry ── */
-
 typedef struct {
     CMLTraceEntryType type;
     uint64_t kernel_hash;
     void* compiled_kernel;       /* cached compiled kernel pointer */
 
-    /* Launch config */
     size_t grid[3];
     size_t block[3];
 
@@ -45,13 +38,10 @@ typedef struct {
     int arg_indices[CML_TRACE_MAX_ARGS];
     int num_args;
 
-    /* Memcpy info */
     size_t memcpy_bytes;
     int src_slot;
     int dst_slot;
 } CMLTraceEntry;
-
-/* ── Trace: a recorded sequence of operations ── */
 
 typedef struct {
     CMLTraceEntry entries[CML_TRACE_MAX_ENTRIES];
@@ -61,13 +51,10 @@ typedef struct {
     void* tensor_slots[CML_TRACE_MAX_ENTRIES];
     int num_slots;
 
-    /* State */
     bool is_recording;
     bool is_complete;
     uint64_t graph_hash;    /* hash of the IR graph that produced this trace */
 } CMLTrace;
-
-/* ── Trace cache: maps graph hash -> trace ── */
 
 typedef struct {
     struct {
@@ -77,8 +64,6 @@ typedef struct {
     } entries[CML_TRACE_CACHE_SIZE];
     int count;
 } CMLTraceCache;
-
-/* ── API ── */
 
 CMLTrace* cml_trace_create(void);
 void cml_trace_free(CMLTrace* trace);
@@ -93,24 +78,15 @@ int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash,
 int cml_trace_record_memcpy(CMLTrace* trace, CMLTraceEntryType type,
                             int src_slot, int dst_slot, size_t bytes);
 
-/**
- * @brief Replay a recorded trace with updated tensor pointers
- */
 int cml_trace_replay(CMLTrace* trace, void** tensor_ptrs, int num_tensors);
-
-/* ── Cache ── */
 
 CMLTraceCache* cml_trace_cache_create(void);
 void cml_trace_cache_free(CMLTraceCache* cache);
 CMLTrace* cml_trace_cache_lookup(CMLTraceCache* cache, uint64_t graph_hash);
 int cml_trace_cache_insert(CMLTraceCache* cache, uint64_t graph_hash, CMLTrace* trace);
 
-/* ── Active trace (thread-local) ── */
-
 CMLTrace* cml_trace_get_active(void);
 void cml_trace_set_active(CMLTrace* trace);
-
-/* ── High-level traced execution ── */
 
 int cml_ir_execute_traced(CMLGraph_t ir);
 

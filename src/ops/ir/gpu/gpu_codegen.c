@@ -1,15 +1,3 @@
-/**
- * @file gpu_codegen.c
- * @brief GPU kernel code generation via LLVM NVPTX/AMDGPU targets
- *
- * Mirrors the CPU LLVM backend (llvm_backend.c) but replaces loops with
- * GPU thread indexing. Emits PTX (CUDA) or HSACO (ROCm) via LLVM target
- * machines, then uses the existing runtime backends for execution.
- *
- * ABI: All kernels use addrspace(1) float* pointers (global memory).
- * Sizes are i32 (adequate for practical tensor dimensions).
- */
-
 #ifdef CML_HAS_LLVM_BACKEND
 
 #include "ops/ir/gpu/gpu_codegen.h"
@@ -89,7 +77,6 @@ void cml_gpu_codegen_destroy(CMLGPUCodegen* cg) {
 // AMDGPU calling convention for kernels
 #define CC_AMDGPU_KERNEL 91
 
-// Get global thread ID: gid = blockIdx.x * blockDim.x + threadIdx.x
 static LLVMValueRef emit_global_thread_id(LLVMBuilderRef bld, LLVMModuleRef mod,
                                            LLVMContextRef ctx, GPUTarget target) {
     LLVMTypeRef i32 = LLVMInt32TypeInContext(ctx);
@@ -133,7 +120,6 @@ static LLVMValueRef emit_global_thread_id(LLVMBuilderRef bld, LLVMModuleRef mod,
     }
 }
 
-// Set up module with target triple and data layout, configure function as kernel
 static void configure_gpu_module(LLVMModuleRef mod, LLVMValueRef fn,
                                   CMLGPUCodegen* cg) {
     LLVMSetTarget(mod, cg->target_triple);
@@ -162,7 +148,6 @@ static void configure_gpu_module(LLVMModuleRef mod, LLVMValueRef fn,
     }
 }
 
-// Emit bounds check: if (gid >= n) return;
 static LLVMBasicBlockRef emit_bounds_check(LLVMBuilderRef bld, LLVMContextRef ctx,
                                             LLVMValueRef fn, LLVMValueRef gid,
                                             LLVMValueRef n) {
@@ -1265,7 +1250,6 @@ static bool is_reduction(UOpType type) {
            type == UOP_MIN_REDUCE;
 }
 
-// Upload tensor data to GPU, returning device pointer
 static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
     size_t size = numel * sizeof(float);
     if (cg->target == GPU_TARGET_CUDA) {
@@ -1287,7 +1271,6 @@ static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
     }
 }
 
-// Allocate zero-initialized GPU memory
 static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
     size_t size = numel * sizeof(float);
     float* zeros = calloc(numel, sizeof(float));
@@ -1311,7 +1294,6 @@ static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
     return dptr;
 }
 
-// Allocate GPU memory filled with a constant value
 static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
     size_t size = numel * sizeof(float);
     float* buf = malloc(size);
@@ -1336,7 +1318,6 @@ static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
     return dptr;
 }
 
-// Download GPU data to host
 static int gpu_download(CMLGPUCodegen* cg, void* dptr, float* host_data, size_t numel) {
     size_t size = numel * sizeof(float);
     if (cg->target == GPU_TARGET_CUDA) {

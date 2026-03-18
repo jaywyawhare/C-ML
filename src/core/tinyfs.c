@@ -1,8 +1,3 @@
-/**
- * @file tinyfs.c
- * @brief TinyFS distributed tensor storage implementation
- */
-
 #include "core/tinyfs.h"
 #include <stdlib.h>
 #include <string.h>
@@ -46,11 +41,9 @@ int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {
         hash = hash * 31 + (unsigned)*p;
     int shard_id = (int)(hash % (unsigned)fs->num_shards);
 
-    /* Build file path within shard directory */
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.tfs", fs->shards[shard_id].path, name);
 
-    /* For this implementation, we just save to a single file */
     char actual_path[512];
     snprintf(actual_path, sizeof(actual_path), "%s/%s.tfs", fs->base_path, name);
 
@@ -138,10 +131,10 @@ size_t cml_tinyfs_used_bytes(const CMLTinyFS* fs) {
 
 void cml_tinyfs_print(const CMLTinyFS* fs) {
     if (!fs) { printf("TinyFS: NULL\n"); return; }
-    printf("=== TinyFS ===\n");
+    printf("TinyFS\n");
     printf("Base path: %s\n", fs->base_path);
     printf("Shards: %d, Shard size: %zu bytes\n", fs->num_shards, fs->shard_size);
     printf("Replication: %d\n", fs->replication_factor);
     printf("Used: %zu bytes\n", cml_tinyfs_used_bytes(fs));
-    printf("==============\n");
+    printf("\n");
 }

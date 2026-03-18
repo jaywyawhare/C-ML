@@ -1,15 +1,3 @@
-/**
- * @file onnx.c
- * @brief ONNX protobuf parsing
- *
- * Parses an ONNX ModelProto from a file or memory buffer using the minimal
- * protobuf decoder (protobuf_mini.h).  Produces a CMLONNXModel that the
- * ONNX operator mapping layer (onnx_ops.c) can execute.
- *
- * Protobuf field numbers follow the official ONNX IR specification:
- *   https://github.com/onnx/onnx/blob/main/onnx/onnx.proto
- */
-
 #include "core/onnx.h"
 #include "core/protobuf_mini.h"
 #include "core/logging.h"
@@ -30,10 +18,6 @@ static void copy_pb_string(char *dst, size_t dst_size, const PBField *field)
     dst[len] = '\0';
 }
 
-/**
- * Allocate a NUL-terminated heap copy of a protobuf string field.
- * The caller must free() the result.
- */
 static char *dup_pb_string(const PBField *field)
 {
     size_t len = 0;
@@ -424,7 +408,6 @@ static int parse_graph(PBReader *rd, CMLONNXGraph *graph)
 {
     memset(graph, 0, sizeof(*graph));
 
-    /* Pre-allocate arrays */
     graph->nodes        = (CMLONNXNode *)calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXNode));
     graph->inputs       = (CMLONNXTensorInfo *)calloc(CML_ONNX_MAX_INPUTS, sizeof(CMLONNXTensorInfo));
     graph->outputs      = (CMLONNXTensorInfo *)calloc(CML_ONNX_MAX_OUTPUTS, sizeof(CMLONNXTensorInfo));
@@ -585,7 +568,6 @@ CMLONNXModel *cml_onnx_load(const char *filepath)
         return NULL;
     }
 
-    /* Determine file size */
     fseek(fp, 0, SEEK_END);
     long fsize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
@@ -622,7 +604,6 @@ void cml_onnx_free(CMLONNXModel *model)
 
     CMLONNXGraph *g = &model->graph;
 
-    /* Free node strings */
     if (g->nodes) {
         for (int i = 0; i < g->num_nodes; i++) {
             CMLONNXNode *nd = &g->nodes[i];
@@ -632,7 +613,6 @@ void cml_onnx_free(CMLONNXModel *model)
             for (int j = 0; j < nd->num_outputs; j++) {
                 free(nd->outputs[j]);
             }
-            /* Free attribute heap data */
             for (int j = 0; j < nd->num_attrs; j++) {
                 CMLONNXAttribute *a = &nd->attrs[j];
                 if (a->type == CML_ONNX_ATTR_INTS) {
@@ -647,7 +627,6 @@ void cml_onnx_free(CMLONNXModel *model)
         free(g->nodes);
     }
 
-    /* Free initializer tensors */
     if (g->initializers) {
         for (int i = 0; i < g->num_initializers; i++) {
             if (g->initializers[i].tensor) {

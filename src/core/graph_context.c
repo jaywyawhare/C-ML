@@ -1,8 +1,3 @@
-/**
- * @file graph_context.c
- * @brief Global graph context for lazy execution
- */
-
 #include "core/computation_graph.h"
 #include "core/graph_context.h"
 #include "core/logging.h"

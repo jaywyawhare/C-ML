@@ -1,8 +1,3 @@
-/**
- * @file rocm_backend.c
- * @brief AMD ROCm/HIP backend implementation via dynamic loading
- */
-
 #include "ops/ir/gpu/rocm_backend.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"

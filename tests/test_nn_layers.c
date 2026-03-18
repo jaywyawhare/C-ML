@@ -1,8 +1,3 @@
-/**
- * @file test_nn_layers.c
- * @brief Unit tests for all neural network layer types
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -291,9 +286,9 @@ int main(void) {
     TEST(module_list);
     TEST(module_dict);
 
-    printf("\n=========================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=========================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

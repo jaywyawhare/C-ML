@@ -1,11 +1,3 @@
-/**
- * @file beam_cuda_timing.c
- * @brief CUDA hardware timing callback for BEAM search
- *
- * Implements cml_beam_cuda_timing_fn() which compiles and times a kernel
- * variant on actual CUDA hardware using cuEventRecord / cuEventElapsedTime.
- */
-
 #ifdef CML_HAS_CUDA
 
 #include "ops/ir/beam_search.h"
@@ -31,7 +23,6 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         return -1.0;
     }
 
-    /* Check that event functions are loaded */
     if (!cuda->cuEventCreate || !cuda->cuEventRecord ||
         !cuda->cuEventSynchronize || !cuda->cuEventElapsedTime ||
         !cuda->cuEventDestroy) {
@@ -39,7 +30,6 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         return -1.0;
     }
 
-    /* Compile the variant source code via NVRTC */
     CMLCUDAKernel* kernel = cml_cuda_compile_source(cuda, variant->source_code,
                                                      "cml_kernel");
     if (!kernel) {
@@ -47,7 +37,6 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         return -1.0;
     }
 
-    /* Set launch configuration from the variant */
     cml_cuda_kernel_set_launch_config(
         kernel,
         (int)variant->config.grid[0], (int)variant->config.grid[1],
@@ -55,7 +44,6 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         (int)variant->config.block[0], (int)variant->config.block[1],
         (int)variant->config.block[2]);
 
-    /* Create start and stop events */
     CUevent start = NULL, stop = NULL;
     CUresult err;
 
@@ -71,7 +59,6 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         return -1.0;
     }
 
-    /* Warmup runs (no timing) */
     for (int w = 0; w < CML_BEAM_DEFAULT_WARMUP; w++) {
         cuda->cuLaunchKernel(
             kernel->function,
@@ -87,7 +74,6 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         cuda->cuCtxSynchronize();
     }
 
-    /* Timed runs */
     cuda->cuEventRecord(start, cuda->stream);
 
     for (int t = 0; t < CML_BEAM_DEFAULT_TIMING; t++) {
@@ -106,12 +92,10 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
     float elapsed_ms = 0.0f;
     cuda->cuEventElapsedTime(&elapsed_ms, start, stop);
 
-    /* Cleanup */
     cuda->cuEventDestroy(start);
     cuda->cuEventDestroy(stop);
     cml_cuda_kernel_free(cuda, kernel);
 
-    /* Average time per run in microseconds */
     double avg_us = (double)(elapsed_ms * 1000.0f) / (double)CML_BEAM_DEFAULT_TIMING;
 
     LOG_DEBUG("BEAM CUDA timing: %.2f us/launch (block=%d,%d,%d)",

@@ -1,11 +1,3 @@
-/**
- * @file ptx_codegen.c
- * @brief Standalone PTX assembly code generation (no LLVM dependency)
- *
- * Direct PTX assembly text generation via snprintf into dynamic buffers.
- * Uses IEEE 754 hex float format (0fHHHHHHHH) for float literals.
- */
-
 #include "ops/ir/gpu/ptx_codegen.h"
 #include "ops/ir/gpu/cuda_backend.h"
 #include "ops/ir/internal.h"
@@ -19,13 +11,8 @@
 #include <stdint.h>
 #include <math.h>
 
-// Maximum PTX buffer size per kernel
 #define PTX_BUF_SIZE 8192
-
-// Larger buffer for CUDA C source (tiled matmul, conv2d)
 #define CUDA_SRC_BUF_SIZE 16384
-
-// Default block size for kernel launches
 #define PTX_BLOCK_SIZE 256
 
 /** Convert float to PTX hex literal (0fHHHHHHHH) */
@@ -35,7 +22,6 @@ static void float_to_ptx_hex(float val, char* buf, int buf_size) {
     snprintf(buf, (size_t)buf_size, "0f%08X", bits);
 }
 
-/** Write PTX header: version, target, address_size */
 static int ptx_write_header(char* buf, int buf_size, int sm_version) {
     return snprintf(buf, (size_t)buf_size,
         ".version 7.0\n"
@@ -71,7 +57,6 @@ static int ptx_write_prologue_unary(char* buf, int buf_size, const char* kernel_
         kernel_name);
 }
 
-/** Prologue for binary kernels (two input pointers) */
 static int ptx_write_prologue_binary(char* buf, int buf_size, const char* kernel_name) {
     return snprintf(buf, (size_t)buf_size,
         ".visible .entry %s(\n"
@@ -94,7 +79,6 @@ static int ptx_write_prologue_binary(char* buf, int buf_size, const char* kernel
         kernel_name);
 }
 
-/** Load element from pointer at gid offset (unary pattern) */
 static int ptx_write_load_unary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
         "    // Load input\n"
@@ -105,7 +89,6 @@ static int ptx_write_load_unary(char* buf, int buf_size) {
         "    ld.global.f32 %%f0, [%%rd3];\n\n");
 }
 
-/** Store result to output pointer at gid offset (unary pattern) */
 static int ptx_write_store_unary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
         "    // Store output\n"
@@ -116,7 +99,6 @@ static int ptx_write_store_unary(char* buf, int buf_size) {
         "}\n");
 }
 
-/** Load two elements for binary ops */
 static int ptx_write_load_binary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
         "    // Load inputs\n"
@@ -130,7 +112,6 @@ static int ptx_write_load_binary(char* buf, int buf_size) {
         "    ld.global.f32 %%f1, [%%rd5];\n\n");
 }
 
-/** Store result for binary ops */
 static int ptx_write_store_binary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
         "    // Store output\n"
@@ -141,7 +122,6 @@ static int ptx_write_store_binary(char* buf, int buf_size) {
         "}\n");
 }
 
-/** Classify op as unary for PTX codegen dispatch */
 static bool ptx_is_unary_op(UOpType t) {
     switch (t) {
     case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
@@ -155,7 +135,6 @@ static bool ptx_is_unary_op(UOpType t) {
     }
 }
 
-/** Classify op as binary for PTX codegen dispatch */
 static bool ptx_is_binary_op(UOpType t) {
     switch (t) {
     case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV:
@@ -167,7 +146,6 @@ static bool ptx_is_binary_op(UOpType t) {
     }
 }
 
-/** Classify op as reduction for PTX codegen dispatch */
 static bool ptx_is_reduction(UOpType t) {
     switch (t) {
     case UOP_SUM: case UOP_MEAN: case UOP_MAX_REDUCE:
@@ -203,7 +181,6 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
     pos += ptx_write_prologue_unary(ptx + pos, PTX_BUF_SIZE - pos, kernel_name);
     pos += ptx_write_load_unary(ptx + pos, PTX_BUF_SIZE - pos);
 
-    // Emit the operation: input is %f0, output is %f1
     pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos), "    // Compute\n");
 
     switch (op) {
@@ -359,7 +336,6 @@ char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name)
     pos += ptx_write_prologue_binary(ptx + pos, PTX_BUF_SIZE - pos, kernel_name);
     pos += ptx_write_load_binary(ptx + pos, PTX_BUF_SIZE - pos);
 
-    // Emit the operation: inputs are %f0, %f1; output is %f2
     pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos), "    // Compute\n");
 
     switch (op) {
@@ -849,17 +825,12 @@ char* cml_ptx_gen_conv2d(CMLPTXCodegen* cg, const char* kernel_name) {
     return src;
 }
 
-/**
- * Execute a single IR node using PTX codegen.
- * Returns 0 on success, -1 on failure (caller should use CPU fallback).
- */
 static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
     if (!node || !node->output || !cg->cuda || !cg->cuda->initialized) return -1;
 
     Tensor* out = node->output;
     UOpType type = node->type;
 
-    // Allocate output host memory if needed
     if (!out->data && out->numel > 0) {
         size_t sz = out->numel * sizeof(float);
         out->data = cml_buffer_cache_alloc(sz);
@@ -870,7 +841,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         out->owns_data = true;
     }
 
-    // Build unique kernel name
     char fn_name[64];
     snprintf(fn_name, sizeof(fn_name), "ptx_k%d", cg->kernel_count);
 
@@ -878,7 +848,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
     char* ptx_code = NULL;
     int result = -1;
 
-    // Unary ops
     if (ptx_is_unary_op(type)) {
         if (node->num_inputs < 1 || !node->inputs[0] || !node->inputs[0]->data)
             return -1;
@@ -916,7 +885,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // Binary ops
     if (ptx_is_binary_op(type)) {
         if (node->num_inputs < 2 || !node->inputs[0] || !node->inputs[1] ||
             !node->inputs[0]->data || !node->inputs[1]->data)
@@ -959,7 +927,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // Reduction ops
     if (ptx_is_reduction(type)) {
         if (node->num_inputs < 1 || !node->inputs[0] || !node->inputs[0]->data)
             return -1;
@@ -1012,7 +979,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // Fill
     if (type == UOP_FILL) {
         FillParams* p = (FillParams*)node->params;
         float fill_val = p ? p->value : 0.0f;
@@ -1045,7 +1011,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // Where
     if (type == UOP_WHERE) {
         if (node->num_inputs < 3 || !node->inputs[0] || !node->inputs[1] ||
             !node->inputs[2] || !node->inputs[0]->data ||
@@ -1093,7 +1058,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // Matmul
     if (type == UOP_MATMUL) {
         if (node->num_inputs < 2 || !node->inputs[0] || !node->inputs[1] ||
             !node->inputs[0]->data || !node->inputs[1]->data)
@@ -1144,7 +1108,6 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         return result;
     }
 
-    // Unsupported op
     return -1;
 }
 

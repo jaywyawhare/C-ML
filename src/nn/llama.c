@@ -1,16 +1,3 @@
-/**
- * @file llama.c
- * @brief LLaMA model inference implementation
- *
- * Implements the LLaMA architecture with:
- * - RMSNorm pre-normalization
- * - Grouped Query Attention (GQA) with RoPE
- * - SwiGLU FFN
- * - KV cache for autoregressive generation
- * - Top-k / top-p sampling
- * - GGUF weight loading
- */
-
 #include "nn/llama.h"
 #include "nn/llm_ops.h"
 #include "core/gguf.h"
@@ -81,13 +68,6 @@ CMLGenerationConfig cml_generation_default_config(void) {
     return config;
 }
 
-/**
- * RMSNorm: norm(x) = x * rsqrt(mean(x^2) + eps) * weight
- *
- * x:      [seq_len, hidden_size]
- * weight: [hidden_size]
- * Returns: [seq_len, hidden_size]
- */
 static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     if (!x || !weight) return NULL;
 
@@ -133,18 +113,6 @@ static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     return result;
 }
 
-/**
- * SwiGLU FFN:
- *   gate = silu(gate_proj(x))
- *   up   = up_proj(x)
- *   ffn  = down_proj(gate * up)
- *
- * x:          [seq_len, hidden_size]
- * gate_proj:  [hidden_size, intermediate_size]
- * up_proj:    [hidden_size, intermediate_size]
- * down_proj:  [intermediate_size, hidden_size]
- * Returns:    [seq_len, hidden_size]
- */
 static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor* down_proj) {
     if (!x || !gate_proj || !up_proj || !down_proj) return NULL;
 
@@ -281,23 +249,6 @@ void cml_llama_free(CMLLLaMAModel* model) {
     free(model);
 }
 
-/**
- * Map GGUF tensor names to model weight pointers.
- *
- * Expected GGUF key patterns:
- *   model.embed_tokens.weight
- *   model.norm.weight
- *   lm_head.weight
- *   model.layers.N.self_attn.q_proj.weight
- *   model.layers.N.self_attn.k_proj.weight
- *   model.layers.N.self_attn.v_proj.weight
- *   model.layers.N.self_attn.o_proj.weight
- *   model.layers.N.mlp.gate_proj.weight
- *   model.layers.N.mlp.up_proj.weight
- *   model.layers.N.mlp.down_proj.weight
- *   model.layers.N.input_layernorm.weight
- *   model.layers.N.post_attention_layernorm.weight
- */
 static int load_tensor_by_name(CMLLLaMAModel* model, GGUFContext* ctx, const char* name) {
     Tensor* t = gguf_read_tensor(ctx, name);
     if (!t) {
@@ -455,13 +406,6 @@ int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
     return 0;
 }
 
-/**
- * Look up token embeddings from the embedding table.
- * token_ids: array of int token IDs
- * seq_len:   number of tokens
- * embed:     [vocab_size, hidden_size]
- * Returns:   [seq_len, hidden_size]
- */
 static Tensor* embed_tokens_lookup(Tensor* embed, const int* token_ids, int seq_len) {
     if (!embed || !token_ids || seq_len <= 0) return NULL;
 
@@ -661,9 +605,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
     return logits;
 }
 
-/**
- * Comparison function for sorting logit indices in descending order by value.
- */
 typedef struct {
     float value;
     int index;

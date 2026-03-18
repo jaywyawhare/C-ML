@@ -1,7 +1,5 @@
-/**
- * @file fusion_patterns.h
- * @brief Pluggable fusion pattern registry for backend-specific optimizations
- *
+/*
+ * Pluggable fusion pattern registry for backend-specific optimizations.
  * Each pattern has match() and emit() functions, registered per backend target.
  * Built-in patterns: MatMul+Bias+ReLU, Conv+BN+ReLU, Softmax+Mask, LayerNorm+Residual.
  */
@@ -16,13 +14,9 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
 struct IRNode;
 struct CMLGraph;
 
-/**
- * @brief Fusion pattern kind
- */
 typedef enum {
     FUSION_PATTERN_MATMUL_BIAS_RELU = 0,
     FUSION_PATTERN_CONV_BN_RELU,
@@ -34,9 +28,6 @@ typedef enum {
     FUSION_PATTERN_COUNT
 } FusionPatternKind;
 
-/**
- * @brief Backend target for pattern matching
- */
 typedef enum {
     FUSION_TARGET_CPU = 0,
     FUSION_TARGET_CUDA,
@@ -44,12 +35,9 @@ typedef enum {
     FUSION_TARGET_COUNT
 } FusionTarget;
 
-/**
- * @brief Result of a pattern match
- */
 typedef struct {
     struct IRNode** matched_nodes; /* Array of matched nodes (owned) */
-    int num_matched;               /* Number of matched nodes */
+    int num_matched;
     void* match_data;              /* Pattern-specific data for emit */
 } FusionMatch;
 

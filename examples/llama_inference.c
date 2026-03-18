@@ -1,27 +1,3 @@
-/**
- * @file llama_inference.c
- * @brief CLI example for LLaMA model inference using C-ML
- *
- * Usage:
- *   ./llama_inference <model.gguf> [options]
- *
- * Options:
- *   -p, --prompt <text>     Input prompt (default: "Hello, world!")
- *   -t, --temperature <f>   Sampling temperature (default: 0.8)
- *   -n, --max-tokens <n>    Maximum tokens to generate (default: 256)
- *   -k, --top-k <n>         Top-k sampling (default: 40)
- *   --top-p <f>             Nucleus sampling threshold (default: 0.9)
- *   --greedy                Use greedy decoding (no sampling)
- *   -s, --seed <n>          Random seed
- *   --7b                    Use 7B model config (default)
- *   --13b                   Use 13B model config
- *   --70b                   Use 70B model config
- *   -h, --help              Show this help message
- *
- * Example:
- *   ./llama_inference model.gguf -p "Once upon a time" -t 0.7 -n 128
- */
-
 #include "cml.h"
 #include "nn/llama.h"
 #include <stdio.h>
@@ -54,7 +30,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    /* Check for help */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
@@ -62,7 +37,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    /* Defaults */
     const char* model_path = argv[1];
     const char* prompt = "Hello, world!";
     float temperature = 0.8f;
@@ -71,9 +45,8 @@ int main(int argc, char* argv[]) {
     float top_p = 0.9f;
     bool greedy = false;
     unsigned int seed = (unsigned int)time(NULL);
-    int model_size = 7; /* 7, 13, or 70 */
+    int model_size = 7;
 
-    /* Parse arguments */
     for (int i = 2; i < argc; i++) {
         if ((strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--prompt") == 0) && i + 1 < argc) {
             prompt = argv[++i];
@@ -102,17 +75,14 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    /* Set random seed */
     srand(seed);
     tensor_manual_seed((uint64_t)seed);
 
-    /* Initialize C-ML */
     if (cml_init() != 0) {
         fprintf(stderr, "Error: Failed to initialize C-ML\n");
         return 1;
     }
 
-    /* Select model config */
     CMLLLaMAConfig config;
     switch (model_size) {
         case 13:  config = cml_llama_config_13b(); break;
@@ -124,7 +94,6 @@ int main(int argc, char* argv[]) {
     cml_llama_print_config(&config);
     printf("\n");
 
-    /* Create model */
     printf("Creating model...\n");
     CMLLLaMAModel* model = cml_llama_create(&config);
     if (!model) {
@@ -133,7 +102,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    /* Load weights */
     printf("Loading weights from: %s\n", model_path);
     if (cml_llama_load_gguf(model, model_path) != 0) {
         fprintf(stderr, "Error: Failed to load GGUF weights from '%s'\n", model_path);
@@ -143,7 +111,6 @@ int main(int argc, char* argv[]) {
     }
     printf("Weights loaded successfully.\n\n");
 
-    /* Configure generation */
     CMLGenerationConfig gen_config = cml_generation_default_config();
     gen_config.temperature = temperature;
     gen_config.top_k = top_k;
@@ -151,7 +118,6 @@ int main(int argc, char* argv[]) {
     gen_config.max_new_tokens = max_tokens;
     gen_config.do_sample = !greedy;
 
-    /* Print generation settings */
     printf("Generation settings:\n");
     printf("  Prompt:      \"%s\"\n", prompt);
     printf("  Temperature: %.2f\n", gen_config.temperature);
@@ -162,7 +128,6 @@ int main(int argc, char* argv[]) {
     printf("  Seed:        %u\n", seed);
     printf("\n");
 
-    /* Generate */
     printf("--- Output ---\n");
     CMLGenerationResult* result = cml_llama_generate(model, prompt, &gen_config);
 
@@ -173,7 +138,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    /* Print generated text */
     if (result->text) {
         printf("%s\n", result->text);
     } else {
@@ -188,13 +152,11 @@ int main(int argc, char* argv[]) {
         printf("\n");
     }
 
-    /* Print statistics */
     printf("\n--- Statistics ---\n");
     printf("  Total tokens:     %d\n", result->num_tokens);
     printf("  Total time:       %.1f ms\n", result->total_time_ms);
     printf("  Tokens/second:    %.1f\n", result->tokens_per_second);
 
-    /* Cleanup */
     cml_generation_result_free(result);
     cml_llama_free(model);
     cml_cleanup();

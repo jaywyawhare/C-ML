@@ -1,8 +1,3 @@
-/**
- * @file quantization.c
- * @brief Int8/uint8 quantization and dequantization implementation
- */
-
 #include "core/quantization.h"
 #include "core/logging.h"
 #include <stdlib.h>

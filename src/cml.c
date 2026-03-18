@@ -65,8 +65,6 @@ static Dataset** g_tracked_datasets = NULL;
 static size_t g_num_datasets        = 0;
 static size_t g_datasets_capacity   = 0;
 
-// Helper functions to track resources for automatic cleanup
-// Made non-static so they can be called from other files
 void cml_track_module(Module* module) {
     if (!module || !g_cml_initialized)
         return;
@@ -86,7 +84,6 @@ void cml_untrack_module(Module* module) {
     if (!module || !g_tracked_modules)
         return;
 
-    // Find and remove the module from the tracking list
     for (size_t i = 0; i < g_num_modules; i++) {
         if (g_tracked_modules[i] == module) {
             g_tracked_modules[i] = NULL;
@@ -115,7 +112,6 @@ void cml_untrack_optimizer(Optimizer* optimizer) {
     if (!optimizer || !g_tracked_optimizers)
         return;
 
-    // Find and remove the optimizer from the tracking list
     for (size_t i = 0; i < g_num_optimizers; i++) {
         if (g_tracked_optimizers[i] == optimizer) {
             g_tracked_optimizers[i] = NULL;
@@ -140,9 +136,7 @@ void cml_track_dataset(Dataset* dataset) {
     g_tracked_datasets[g_num_datasets++] = dataset;
 }
 
-// Automatic cleanup function registered with atexit
 static void cml_auto_cleanup(void) {
-    // Only cleanup if not already cleaned up
     if (!g_cml_initialized) {
         return;
     }
@@ -151,7 +145,6 @@ static void cml_auto_cleanup(void) {
     // This must happen before freeing any tensors to prevent dangling pointers
     cml_ir_reset_global_context();
 
-    // Cleanup all registered cleanup contexts
     if (g_cleanup_contexts) {
         for (size_t i = 0; i < g_num_cleanup_contexts; i++) {
             if (g_cleanup_contexts[i]) {
@@ -164,7 +157,6 @@ static void cml_auto_cleanup(void) {
         g_cleanup_contexts_capacity = 0;
     }
 
-    // Cleanup all tracked datasets
     if (g_tracked_datasets) {
         for (size_t i = 0; i < g_num_datasets; i++) {
             if (g_tracked_datasets[i]) {
@@ -177,7 +169,6 @@ static void cml_auto_cleanup(void) {
         g_datasets_capacity = 0;
     }
 
-    // Cleanup all tracked optimizers
     if (g_tracked_optimizers) {
         for (size_t i = 0; i < g_num_optimizers; i++) {
             if (g_tracked_optimizers[i]) {
@@ -190,7 +181,6 @@ static void cml_auto_cleanup(void) {
         g_optimizers_capacity = 0;
     }
 
-    // Cleanup all tracked modules
     if (g_tracked_modules) {
         for (size_t i = 0; i < g_num_modules; i++) {
             if (g_tracked_modules[i]) {
@@ -203,27 +193,22 @@ static void cml_auto_cleanup(void) {
         g_modules_capacity = 0;
     }
 
-    // Call device_cleanup
     device_cleanup();
 
-    // Cleanup graph context
     cml_graph_context_cleanup();
 
-    // Call cml_cleanup which handles error printing
-    // Note: We call it directly here, bypassing reference counting for atexit
     training_metrics_cleanup_global();
 
     autograd_shutdown();
 
     if (CML_HAS_ERRORS()) {
-        printf("\n=== Errors occurred during execution ===\n");
+        printf("\nErrors occurred during execution\n");
         error_stack_print_all();
         printf("Last error: %s (code: %d)\n", CML_LAST_ERROR(), CML_LAST_ERROR_CODE());
     } else {
-        printf("\n=== Execution completed successfully ===\n");
+        printf("\nExecution completed successfully\n");
     }
 
-    // Cleanup error stack
     error_stack_cleanup();
 
     g_cml_initialized = false;
@@ -234,7 +219,6 @@ void cml_register_cleanup_context(CleanupContext* ctx) {
     if (!ctx)
         return;
 
-    // Resize array if needed
     if (g_num_cleanup_contexts >= g_cleanup_contexts_capacity) {
         size_t new_capacity =
             g_cleanup_contexts_capacity == 0 ? 16 : g_cleanup_contexts_capacity * 2;
@@ -261,11 +245,9 @@ static void check_and_launch_viz(void) {
         return;
     }
 
-    // Platform-specific paths
 #ifdef _WIN32
     const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("CML_VIZ_SCRIPT"),
                                NULL};
-    // On Windows, we might look in Program Files or similar if we had a standard install location
 #else
     const char* try_paths[] = {
         "scripts/viz.py",        "../scripts/viz.py",      "/usr/local/share/cml/viz.py",
@@ -289,13 +271,10 @@ static void check_and_launch_viz(void) {
     char exe_path[1024] = {0};
 
 #ifdef _WIN32
-    // Windows implementation
     GetModuleFileName(NULL, exe_path, sizeof(exe_path));
     _putenv_s("CML_VIZ_LAUNCHED", "1");
     _putenv_s("CML_VIZ", "1");
 
-    // Construct command for Windows
-    // We use python directly
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "python \"%s\" \"%s\"", script_path, exe_path);
     system(cmd);
@@ -307,10 +286,8 @@ static void check_and_launch_viz(void) {
     // if it returns quickly or if we want to block until viz is closed.
 
 #elif defined(__APPLE__)
-    // macOS implementation
     uint32_t size = sizeof(exe_path);
     if (_NSGetExecutablePath(exe_path, &size) != 0) {
-        // Buffer too small
         return;
     }
 
@@ -329,7 +306,6 @@ static void check_and_launch_viz(void) {
     execvp("python3", viz_argv);
 
 #else
-    // Linux implementation - read full command line from /proc/self/cmdline
     char cmdline[4096] = {0};
     char* args[64]     = {0}; // Max 64 arguments
     int argc           = 0;
@@ -339,7 +315,6 @@ static void check_and_launch_viz(void) {
         size_t cmdlen = fread(cmdline, 1, sizeof(cmdline) - 1, f);
         fclose(f);
 
-        // Parse null-separated arguments
         char* p   = cmdline;
         char* end = cmdline + cmdlen;
         while (p < end && argc < 62) { // Leave room for python3 and script
@@ -369,7 +344,6 @@ static void check_and_launch_viz(void) {
     setenv("CML_VIZ_LAUNCHED", "1", 1);
     setenv("CML_VIZ", "1", 1);
 
-    // Build argv for Python: python3 script.py exe_path [original_args...]
     char python_cmd[] = "python3";
     char script_buf[1024];
     strncpy(script_buf, script_path, sizeof(script_buf) - 1);
@@ -379,7 +353,6 @@ static void check_and_launch_viz(void) {
     viz_argv[1]                        = script_buf;
     viz_argv[2]                        = exe_path;
 
-    // Add original arguments (skip argv[0] which is the exe itself)
     int vi = 3;
     for (int i = 1; i < argc && vi < 66; i++) {
         viz_argv[vi++] = args[i];
@@ -411,7 +384,6 @@ int cml_init(void) {
     cml_set_default_device(DEVICE_CPU);
     cml_set_default_dtype(DTYPE_FLOAT32);
 
-    // Seed RNG
     cml_random_seed();
 
     autograd_init();
@@ -420,7 +392,6 @@ int cml_init(void) {
 
     cml_graph_context_init();
 
-    // Register automatic cleanup with atexit (only once)
     if (!g_cml_atexit_registered) {
         atexit(cml_auto_cleanup);
         g_cml_atexit_registered = true;
@@ -452,7 +423,6 @@ int cml_cleanup(void) {
 
     LOG_INFO("Cleaning up C-ML Library");
 
-    // Mark as not initialized FIRST to prevent atexit from double-freeing
     g_cml_initialized = false;
     g_cml_init_count  = 0;
 
@@ -460,10 +430,8 @@ int cml_cleanup(void) {
     // This must happen before freeing any tensors to prevent dangling pointers
     cml_ir_reset_global_context();
 
-    // Cleanup graph context
     cml_graph_context_cleanup();
 
-    // Cleanup all tracked datasets
     if (g_tracked_datasets) {
         for (size_t i = 0; i < g_num_datasets; i++) {
             if (g_tracked_datasets[i]) {
@@ -477,7 +445,6 @@ int cml_cleanup(void) {
         g_datasets_capacity = 0;
     }
 
-    // Cleanup all tracked optimizers
     if (g_tracked_optimizers) {
         for (size_t i = 0; i < g_num_optimizers; i++) {
             if (g_tracked_optimizers[i]) {
@@ -491,7 +458,6 @@ int cml_cleanup(void) {
         g_optimizers_capacity = 0;
     }
 
-    // Cleanup all tracked modules
     if (g_tracked_modules) {
         for (size_t i = 0; i < g_num_modules; i++) {
             if (g_tracked_modules[i]) {
@@ -505,8 +471,6 @@ int cml_cleanup(void) {
         g_modules_capacity = 0;
     }
 
-    // Note: device_cleanup is called automatically by cml_auto_cleanup via atexit
-    // But we can also call it here if cleanup is done manually
     device_cleanup();
 
     training_metrics_cleanup_global();
@@ -514,14 +478,13 @@ int cml_cleanup(void) {
     autograd_shutdown();
 
     if (CML_HAS_ERRORS()) {
-        printf("\n=== Errors occurred during execution ===\n");
+        printf("\nErrors occurred during execution\n");
         error_stack_print_all();
         printf("Last error: %s (code: %d)\n", CML_LAST_ERROR(), CML_LAST_ERROR_CODE());
     } else {
-        printf("\n=== Execution completed successfully ===\n");
+        printf("\nExecution completed successfully\n");
     }
 
-    // Cleanup error stack last
     error_stack_cleanup();
 
     LOG_INFO("C-ML Library cleanup completed");
@@ -656,7 +619,6 @@ void cml_summary(Module* module) {
         printf("=");
     printf("\n\n");
 
-    // Export architecture to JSON if VIZ is enabled
     const char* viz_env     = getenv("VIZ");
     const char* cml_viz_env = getenv("CML_VIZ");
     bool viz_enabled = (viz_env && (strcmp(viz_env, "1") == 0 || strcmp(viz_env, "true") == 0)) ||
@@ -911,7 +873,6 @@ void cml_set_requires_grad(Tensor* t, bool requires_grad) {
 bool cml_is_leaf(Tensor* t) { return tensor_is_leaf(t); }
 void cml_reset_ir_context(void) { cml_ir_reset_global_context(); }
 
-// Forward declarations for kernel cache functions (defined in kernel_cache.h)
 struct CMLKernelCache;
 struct CMLKernelCache* cml_kernel_cache_get_default(void);
 void cml_kernel_cache_clear_impl(struct CMLKernelCache* cache);
@@ -1312,7 +1273,6 @@ Tensor* cml_sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
 SparseCOOData* cml_sparse_coalesce(SparseCOOData* sparse) { return sparse_coalesce(sparse); }
 void cml_sparse_free(SparseCOOData* sparse) { sparse_free(sparse); }
 
-// New tensor operations
 Tensor* cml_sort(Tensor* a, int dim, bool descending) { return tensor_sort(a, dim, descending); }
 Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
     return tensor_topk(a, k, dim, largest, sorted);
@@ -1328,7 +1288,6 @@ Tensor* cml_lerp(Tensor* a, Tensor* b, float weight) { return tensor_lerp(a, b, 
 Tensor* cml_idiv(Tensor* a, Tensor* b) { return tensor_idiv(a, b); }
 Tensor* cml_mod(Tensor* a, Tensor* b) { return tensor_mod(a, b); }
 
-// LR Scheduler wrappers
 LRScheduler* cml_lr_scheduler_step(Optimizer* opt, int step_size, float gamma) {
     return lr_scheduler_step(opt, step_size, gamma);
 }

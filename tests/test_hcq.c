@@ -1,8 +1,3 @@
-/**
- * @file test_hcq.c
- * @brief Tests for Hardware Command Queues (HCQ)
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,8 +1,3 @@
-/**
- * @file containers.c
- * @brief ModuleList and ModuleDict container implementations
- */
-
 #include "nn/layers/containers.h"
 #include "nn.h"
 #include "core/logging.h"

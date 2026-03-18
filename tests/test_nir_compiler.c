@@ -1,8 +1,3 @@
-/**
- * @file test_nir_compiler.c
- * @brief Tests for NIR/Mesa multi-vendor GPU compiler
- */
-
 #include "ops/ir/nir_compiler.h"
 #include "ops/uops.h"
 #include <stdio.h>
@@ -23,7 +18,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ── Test: cml_nir_available() never crashes ─────────────────────────── */
 
 static int test_nir_available(void) {
     /* Must not crash regardless of whether Mesa is installed. */
@@ -32,7 +26,6 @@ static int test_nir_available(void) {
     return 1; /* Always passes -- just reports availability */
 }
 
-/* ── Test: target name table ─────────────────────────────────────────── */
 
 static int test_target_names(void) {
     /* Verify every enum value maps to a non-NULL name */
@@ -53,7 +46,6 @@ static int test_target_names(void) {
     return 1;
 }
 
-/* ── Test: new enum values exist ─────────────────────────────────────── */
 
 static int test_new_targets(void) {
     /* Verify the three new targets are accessible */
@@ -72,7 +64,6 @@ static int test_new_targets(void) {
     return 1;
 }
 
-/* ── Test: create / free lifecycle ───────────────────────────────────── */
 
 static int test_create_free(void) {
     /* Create a compiler for each target -- must not crash even without Mesa */
@@ -99,7 +90,6 @@ static int test_create_free(void) {
     return 1;
 }
 
-/* ── Test: create / free sets fields correctly ───────────────────────── */
 
 static int test_create_fields(void) {
     CMLNIRCompiler* c = cml_nir_compiler_create(NIR_TARGET_RADEONSI);
@@ -119,7 +109,6 @@ static int test_create_fields(void) {
     return 1;
 }
 
-/* ── Test: compile without Mesa gracefully fails ─────────────────────── */
 
 static int test_compile_unavailable(void) {
     if (cml_nir_available()) {
@@ -142,7 +131,6 @@ static int test_compile_unavailable(void) {
     return 1;
 }
 
-/* ── Test: emit_uop without init returns error ───────────────────────── */
 
 static int test_emit_uop_uninit(void) {
     /* NULL compiler */
@@ -164,7 +152,6 @@ static int test_emit_uop_uninit(void) {
     return 1;
 }
 
-/* ── Test: binary accessors with NULL ─────────────────────────────────── */
 
 static int test_binary_null(void) {
     if (cml_nir_binary_size(NULL) != 0)   return 0;
@@ -172,7 +159,6 @@ static int test_binary_null(void) {
     return 1;
 }
 
-/* ── Test: double free safety ─────────────────────────────────────────── */
 
 static int test_double_free(void) {
     /* cml_nir_compiler_free(NULL) should be safe */
@@ -180,7 +166,6 @@ static int test_double_free(void) {
     return 1;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════ */
 
 int main(void) {
     printf("=== NIR Compiler Tests ===\n\n");

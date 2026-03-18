@@ -1,8 +1,3 @@
-/**
- * @file cleanup.c
- * @brief Centralized cleanup helper implementation
- */
-
 #include "core/cleanup.h"
 #include "cml.h"
 #include "nn.h"

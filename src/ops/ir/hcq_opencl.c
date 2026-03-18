@@ -1,14 +1,3 @@
-/**
- * @file hcq_opencl.c
- * @brief Hardware Command Queues -- OpenCL backend
- *
- * Guarded by CML_HAS_OPENCL.  When the flag is not defined this translation
- * unit compiles to nothing.  When it *is* defined the functions below are
- * linked in and called from the dispatcher in hcq.c.
- *
- * Queue wraps cl_command_queue, Signal wraps cl_event.
- */
-
 #ifdef CML_HAS_OPENCL
 
 #include "ops/ir/hcq.h"
@@ -30,10 +19,6 @@ static struct {
     bool           initialized;
 } g_ocl_ctx = {0};
 
-/**
- * @brief Lazily initialise the shared OpenCL platform / device / context.
- * @return 0 on success, -1 on failure.
- */
 static int ensure_ocl_init(void) {
     if (g_ocl_ctx.initialized) return 0;
 

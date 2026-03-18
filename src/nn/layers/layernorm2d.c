@@ -1,11 +1,3 @@
-/**
- * @file layernorm2d.c
- * @brief Layer Normalization 2D implementation
- *
- * Normalizes over (C, H, W) for 4D inputs [N, C, H, W].
- * Per-channel learnable affine parameters (weight, bias) applied after normalization.
- */
-
 #include "nn/layers/layernorm2d.h"
 #include "nn.h"
 #include "tensor/tensor.h"

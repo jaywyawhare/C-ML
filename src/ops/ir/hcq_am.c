@@ -1,20 +1,6 @@
 /* Feature test macros for POSIX APIs: usleep */
 #define _GNU_SOURCE
 
-/**
- * @file hcq_am.c
- * @brief HCQ backend for AMD AM driver -- AQL barrier packets for signals
- *
- * Guarded by CML_HAS_AM_DRIVER.  When the flag is not defined this
- * translation unit compiles to stubs that return -1.  When it *is*
- * defined the functions below use the AM driver's AQL ring to submit
- * barrier packets for signal/wait operations and dispatch packets for
- * kernel submission.
- *
- * Same pattern as hcq_vulkan.c: real implementation behind an #ifdef
- * guard, unconditional stubs in the #else branch.
- */
-
 #include "ops/ir/hcq.h"
 #include "core/logging.h"
 
@@ -30,13 +16,8 @@
 
 extern CMLAMDriver* cml_dispatch_get_am_driver(void);
 
-/**
- * @brief Build an AQL BARRIER_AND packet header.
- *
- * A barrier-AND packet causes the command processor to wait until all
- * dependent signals have been decremented before it processes subsequent
- * packets.  We use these for signal_record and queue_wait operations.
- */
+/* AQL BARRIER_AND: waits until all dependent signals are decremented
+ * before processing subsequent packets. */
 static uint16_t am_barrier_header(void) {
     uint16_t header = (2 /* BARRIER_AND */ << 0)   /* packet type */
                     | (1 << 8)                      /* barrier bit */

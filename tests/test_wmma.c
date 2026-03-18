@@ -1,8 +1,3 @@
-/**
- * @file test_wmma.c
- * @brief Tests for WMMA (Tensor Core) support
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

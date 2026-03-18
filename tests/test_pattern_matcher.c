@@ -1,8 +1,3 @@
-/**
- * @file test_pattern_matcher.c
- * @brief Tests for the declarative pattern matcher / IR rewrite system
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,8 +1,3 @@
-/**
- * @file simd_views.c
- * @brief SIMD-optimized view operations: transpose, gather, scatter, slice copy
- */
-
 #include "ops/simd_views.h"
 #include <string.h>
 #include <stdlib.h>

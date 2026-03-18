@@ -1,8 +1,3 @@
-/**
- * @file pooling.c
- * @brief Pooling layers implementation using stride-based views
- */
-
 #include "nn/layers/pooling.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -20,7 +15,6 @@ static Tensor* create_pooling_window_view(Tensor* input, int b, int c, int oh, i
     int start_h = oh * stride_h - padding_h;
     int start_w = ow * stride_w - padding_w;
     int window_shape[] = {kernel_h, kernel_w};
-    // The window strides should step by dilation in the input
     size_t* window_strides = malloc(2 * sizeof(size_t));
     if (!window_strides)
         return NULL;
@@ -92,7 +86,6 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
         for (int c = 0; c < channels; c++) {
             for (int oh = 0; oh < out_height; oh++) {
                 for (int ow = 0; ow < out_width; ow++) {
-                    // Create strided view for this pooling window
                     Tensor* window = create_pooling_window_view(
                         input, b, c, oh, ow, kernel_h, kernel_w, stride_h, stride_w, padding_h,
                         padding_w, dilation_h, dilation_w, in_height, in_width);
@@ -101,7 +94,7 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
                         return NULL;
                     }
                     ReduceParams reduce_params;
-                    int dims[]             = {0, 1}; // Reduce over both spatial dimensions
+                    int dims[]             = {0, 1};
                     reduce_params.dims     = dims;
                     reduce_params.num_dims = 2;
                     reduce_params.keepdim  = false;
@@ -200,17 +193,16 @@ static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
         for (int c = 0; c < channels; c++) {
             for (int oh = 0; oh < out_height; oh++) {
                 for (int ow = 0; ow < out_width; ow++) {
-                    // Create strided view for this pooling window
                     Tensor* window = create_pooling_window_view(
                         input, b, c, oh, ow, kernel_h, kernel_w, stride_h, stride_w, padding_h,
-                        padding_w, 1, 1, // No dilation for avg pool
+                        padding_w, 1, 1,
                         in_height, in_width);
                     if (!window) {
                         tensor_free(output);
                         return NULL;
                     }
                     ReduceParams reduce_params;
-                    int dims[]             = {0, 1}; // Reduce over both spatial dimensions
+                    int dims[]             = {0, 1};
                     reduce_params.dims     = dims;
                     reduce_params.num_dims = 2;
                     reduce_params.keepdim  = false;

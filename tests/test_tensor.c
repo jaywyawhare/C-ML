@@ -1,8 +1,3 @@
-/**
- * @file test_tensor.c
- * @brief Unit tests for tensor creation, basic ops, and shape manipulation
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -241,9 +236,9 @@ int main(void) {
     printf("\nEdge Cases:\n");
     TEST(null_safety);
 
-    printf("\n============================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("============================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

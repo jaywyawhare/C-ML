@@ -1,8 +1,3 @@
-/**
- * @file test_autograd.c
- * @brief Unit tests for autograd: forward ops, backward, requires_grad, no_grad
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -198,9 +193,9 @@ int main(void) {
     TEST(no_grad);
     TEST(is_leaf);
 
-    printf("\n============================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("============================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

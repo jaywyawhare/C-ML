@@ -1,12 +1,3 @@
-/**
- * @file tlsf_alloc.h
- * @brief TLSF (Two-Level Segregated Fit) memory allocator with timeline planning
- *
- * Provides O(1) allocation and deallocation with minimal fragmentation.
- * Includes timeline-based memory planning for computation graphs where
- * tensor lifetimes are known ahead of time.
- */
-
 #ifndef CML_TLSF_ALLOC_H
 #define CML_TLSF_ALLOC_H
 
@@ -76,64 +67,42 @@ typedef struct CMLTimelinePlanner {
     int num_steps;             /* Total computation steps */
 } CMLTimelinePlanner;
 
-/* ===== TLSF Allocator API ===== */
-
-/** Create TLSF allocator with given pool size */
 CMLTLSFAllocator* cml_tlsf_create(size_t pool_size);
 
-/** Create TLSF allocator on user-provided memory */
 CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size);
 
-/** Destroy TLSF allocator */
 void cml_tlsf_destroy(CMLTLSFAllocator* alloc);
 
-/** Allocate memory (O(1) time) */
 void* cml_tlsf_alloc(CMLTLSFAllocator* alloc, size_t size);
 
-/** Allocate aligned memory */
 void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* alloc, size_t size, size_t alignment);
 
-/** Free memory (O(1) time) */
 void cml_tlsf_free(CMLTLSFAllocator* alloc, void* ptr);
 
-/** Reallocate memory */
 void* cml_tlsf_realloc(CMLTLSFAllocator* alloc, void* ptr, size_t new_size);
 
-/** Get allocation size for a pointer */
 size_t cml_tlsf_alloc_size(CMLTLSFAllocator* alloc, void* ptr);
 
-/** Get allocator statistics */
 void cml_tlsf_stats(const CMLTLSFAllocator* alloc, size_t* used, size_t* peak,
                      size_t* num_allocs, size_t* num_frees);
 
-/** Check allocator integrity (debug) */
 bool cml_tlsf_check(const CMLTLSFAllocator* alloc);
 
-/* ===== Timeline Planner API ===== */
-
-/** Create timeline planner */
 CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity);
 
-/** Destroy timeline planner */
 void cml_timeline_planner_destroy(CMLTimelinePlanner* planner);
 
-/** Add tensor lifetime to planner */
 int cml_timeline_planner_add(CMLTimelinePlanner* planner, int tensor_id,
                               size_t size, int alloc_time, int free_time);
 
-/** Solve the timeline allocation problem (assign offsets) */
 int cml_timeline_planner_solve(CMLTimelinePlanner* planner);
 
-/** Get assignment for a tensor */
 const CMLTimelineRecord* cml_timeline_planner_get(const CMLTimelinePlanner* planner, int tensor_id);
 
-/** Get total memory required after solving */
 size_t cml_timeline_planner_total_memory(const CMLTimelinePlanner* planner);
 
-/** Get peak concurrent memory usage */
 size_t cml_timeline_planner_peak_usage(const CMLTimelinePlanner* planner);
 
-/** Print timeline plan */
 void cml_timeline_planner_print(const CMLTimelinePlanner* planner);
 
 #ifdef __cplusplus

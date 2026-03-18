@@ -1,11 +1,3 @@
-/**
- * @file data_parallel.c
- * @brief Distributed Data Parallel (DDP) implementation
- *
- * PyTorch-style DDP: broadcast params from rank 0, bucketed gradient
- * all-reduce (25MB buckets), average by world_size.
- */
-
 #include "distributed/data_parallel.h"
 #include "distributed/distributed.h"
 #include "core/logging.h"
@@ -169,8 +161,6 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
         if (ddp->buckets[b] && offset > 0) {
             /* Create a temporary tensor for the bucket */
             int shape[1] = {(int)offset};
-            TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                                .has_dtype = true, .has_device = true};
             Tensor bucket_tensor = {
                 .data = ddp->buckets[b],
                 .shape = shape,

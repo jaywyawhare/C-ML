@@ -1,12 +1,3 @@
-/**
- * @file protobuf_mini.c
- * @brief Minimal C11 protobuf wire-format decoder
- *
- * Implements the subset of the Protocol Buffers binary encoding needed to
- * parse ONNX model files: varint, fixed32, fixed64, and length-delimited
- * fields.  No code generation -- everything is decoded on the fly.
- */
-
 #include "core/protobuf_mini.h"
 #include <string.h>
 
@@ -27,11 +18,11 @@ uint64_t pb_read_varint(PBReader *reader)
         uint8_t byte = reader->data[reader->pos++];
         result |= (uint64_t)(byte & 0x7F) << shift;
         if ((byte & 0x80) == 0) {
-            break; /* MSB clear -> last byte */
+            break;
         }
         shift += 7;
         if (shift >= 64) {
-            break; /* overflow guard */
+            break;
         }
     }
 
@@ -49,7 +40,6 @@ uint32_t pb_read_fixed32(PBReader *reader)
 {
     if (reader->pos + 4 > reader->length) return 0;
 
-    /* Little-endian read, portable across architectures */
     uint32_t v = 0;
     v |= (uint32_t)reader->data[reader->pos + 0];
     v |= (uint32_t)reader->data[reader->pos + 1] << 8;
@@ -92,15 +82,12 @@ bool pb_read_field(PBReader *reader, PBField *field)
     if (!reader || !field) return false;
     if (reader->pos >= reader->length) return false;
 
-    /* Read tag (varint) -> field_number and wire_type */
     uint64_t tag = pb_read_varint(reader);
     field->field_number = (uint32_t)(tag >> 3);
     field->wire_type    = (PBWireType)(tag & 7);
 
-    /* A field_number of 0 is invalid in protobuf */
     if (field->field_number == 0) return false;
 
-    /* Read the value based on wire type */
     switch (field->wire_type) {
 
     case PB_WIRE_VARINT:
@@ -112,10 +99,8 @@ bool pb_read_field(PBReader *reader, PBField *field)
         break;
 
     case PB_WIRE_LEN: {
-        /* Length-delimited: read length, then store pointer + length */
         uint64_t len = pb_read_varint(reader);
         if (reader->pos + len > reader->length) {
-            /* Corrupted data: length exceeds remaining bytes */
             reader->pos = reader->length;
             return false;
         }
@@ -130,7 +115,6 @@ bool pb_read_field(PBReader *reader, PBField *field)
         break;
 
     default:
-        /* Unknown wire type -- we cannot safely skip it */
         return false;
     }
 

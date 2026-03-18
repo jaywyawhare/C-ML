@@ -1,8 +1,3 @@
-/**
- * @file model_io.h
- * @brief Model save and load API
- */
-
 #ifndef CML_NN_MODEL_IO_H
 #define CML_NN_MODEL_IO_H
 

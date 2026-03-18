@@ -1,17 +1,9 @@
-/**
- * @file ring_allreduce.c
- * @brief Ring all-reduce algorithm implementation
- */
-
 #include "distributed/ring_allreduce.h"
 #include "tensor/tensor.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
-/**
- * Apply reduce operation element-wise: dst = op(dst, src)
- */
 static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp op) {
     for (size_t i = 0; i < n; i++) {
         switch (op) {

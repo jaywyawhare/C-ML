@@ -1,11 +1,3 @@
-/**
- * @file test_nv_driver.c
- * @brief Tests for the NVIDIA userspace driver (direct ioctl interface)
- *
- * All tests pass even without NVIDIA hardware present.  Tests that require
- * a live driver are skipped when cml_nv_driver_available() returns false.
- */
-
 #include "ops/ir/gpu/nv_driver.h"
 #include "core/logging.h"
 
@@ -13,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── Test harness ─────────────────────────────────────────────────────── */
 
 static int tests_run    = 0;
 static int tests_passed = 0;
@@ -36,14 +27,7 @@ static int tests_passed = 0;
         return 1; \
     } while(0)
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Tests
- * ══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * cml_nv_driver_available() must not crash regardless of environment.
- * The return value depends on whether /dev/nvidia0 exists.
- */
 static int test_driver_available(void) {
     bool avail = cml_nv_driver_available();
     printf("(available=%s) ", avail ? "true" : "false");
@@ -51,10 +35,6 @@ static int test_driver_available(void) {
     return 1;
 }
 
-/**
- * Create and immediately free a driver context without initialising.
- * Must not leak or crash.
- */
 static int test_create_free_no_init(void) {
     CMLNVDriver* drv = cml_nv_driver_create();
     if (!drv) {
@@ -76,18 +56,11 @@ static int test_create_free_no_init(void) {
     return 1;
 }
 
-/**
- * Free NULL must be a safe no-op.
- */
 static int test_free_null(void) {
     cml_nv_driver_free(NULL);
     return 1;
 }
 
-/**
- * Full lifecycle: create -> init -> free.
- * Skipped when the driver is not available.
- */
 static int test_full_lifecycle(void) {
     if (!cml_nv_driver_available()) {
         SKIP("no NVIDIA device");
@@ -118,9 +91,6 @@ static int test_full_lifecycle(void) {
     return 1;
 }
 
-/**
- * Double-init must be idempotent.
- */
 static int test_double_init(void) {
     if (!cml_nv_driver_available()) {
         SKIP("no NVIDIA device");
@@ -146,9 +116,6 @@ static int test_double_init(void) {
     return 1;
 }
 
-/**
- * Buffer create/free with a live driver.
- */
 static int test_buffer_create_free(void) {
     if (!cml_nv_driver_available()) {
         SKIP("no NVIDIA device");
@@ -202,9 +169,6 @@ static int test_buffer_create_free(void) {
     return 1;
 }
 
-/**
- * Buffer upload/download round-trip for a host-visible buffer.
- */
 static int test_buffer_upload_download(void) {
     if (!cml_nv_driver_available()) {
         SKIP("no NVIDIA device");
@@ -275,9 +239,6 @@ static int test_buffer_upload_download(void) {
     return ok;
 }
 
-/**
- * Null/edge-case buffer operations must not crash.
- */
 static int test_buffer_null_safety(void) {
     /* All of these should return -1 or be no-ops, not crash */
     cml_nv_buffer_free(NULL, NULL);
@@ -297,17 +258,11 @@ static int test_buffer_null_safety(void) {
     return 1;
 }
 
-/**
- * Kernel free on NULL must not crash.
- */
 static int test_kernel_free_null(void) {
     cml_nv_kernel_free(NULL, NULL);
     return 1;
 }
 
-/**
- * cml_nv_kernel_compile_ptx with NULL arguments must return NULL.
- */
 static int test_kernel_compile_null(void) {
     CMLNVKernel* k1 = cml_nv_kernel_compile_ptx(NULL, NULL, NULL);
     if (k1 != NULL) {
@@ -324,9 +279,6 @@ static int test_kernel_compile_null(void) {
     return 1;
 }
 
-/**
- * cml_nv_execute_graph with NULL args must return -1.
- */
 static int test_execute_graph_stub(void) {
     CMLNVDriver* drv = cml_nv_driver_create();
     if (!drv) return 0;
@@ -351,9 +303,6 @@ static int test_execute_graph_stub(void) {
     return 1;
 }
 
-/**
- * cml_nv_synchronize on uninitialized driver must return -1.
- */
 static int test_synchronize_not_init(void) {
     CMLNVDriver* drv = cml_nv_driver_create();
     if (!drv) return 0;
@@ -369,9 +318,6 @@ static int test_synchronize_not_init(void) {
     return 1;
 }
 
-/**
- * cml_nv_kernel_launch on NULL/uninitialized driver must return -1.
- */
 static int test_kernel_launch_not_init(void) {
     CMLNVDriver* drv = cml_nv_driver_create();
     if (!drv) return 0;
@@ -390,9 +336,6 @@ static int test_kernel_launch_not_init(void) {
     return 1;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * Main
- * ══════════════════════════════════════════════════════════════════════════ */
 
 int main(void) {
     printf("\n=== NV Driver Tests ===\n\n");

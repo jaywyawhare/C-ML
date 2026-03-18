@@ -1,8 +1,3 @@
-/**
- * @file test_ptx_codegen.c
- * @brief Tests for standalone PTX code generation (string-based, no GPU needed)
- */
-
 #include "ops/ir/gpu/ptx_codegen.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,10 +25,6 @@ static int tests_failed = 0;
         FAIL(_msg); free(ptx); return; \
     }} while(0)
 
-// ============================================================================
-// Common checks
-// ============================================================================
-
 static void assert_ptx_common(const char* ptx, const char* kernel_name) {
     // Every PTX kernel must have these
     if (!strstr(ptx, ".version")) { FAIL("Missing .version"); return; }
@@ -47,10 +38,6 @@ static void assert_ptx_common(const char* ptx, const char* kernel_name) {
         return;
     }
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 static void test_create_destroy(void) {
     TEST(create_destroy);
@@ -360,16 +347,11 @@ static void test_bounds_check(void) {
     PASS();
 }
 
-// ============================================================================
-// Main
-// ============================================================================
-
 int main(void) {
     printf("\n=== PTX Codegen Tests ===\n\n");
 
     test_create_destroy();
 
-    // Unary ops
     test_unary_neg();
     test_unary_exp();
     test_unary_log();
@@ -380,21 +362,18 @@ int main(void) {
     test_unary_sigmoid();
     test_unary_tanh();
 
-    // Binary ops
     test_binary_add();
     test_binary_mul();
     test_binary_max();
     test_binary_cmplt();
     test_binary_pow();
 
-    // Special kernels
     test_fill();
     test_where();
     test_reduction_sum();
     test_reduction_mean();
     test_matmul();
 
-    // Meta / edge cases
     test_sm_version();
     test_kernel_count();
     test_invalid_unary_op();

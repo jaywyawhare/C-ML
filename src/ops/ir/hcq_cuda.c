@@ -1,15 +1,3 @@
-/**
- * @file hcq_cuda.c
- * @brief Hardware Command Queues -- CUDA backend
- *
- * Guarded by CML_HAS_CUDA.  When the flag is not defined this translation
- * unit compiles to nothing.  When it *is* defined the functions below are
- * linked in and called from the dispatcher in hcq.c.
- *
- * Uses the CMLCUDABackend infrastructure from ops/ir/gpu/cuda_backend.h
- * which provides dynamically loaded CUDA driver API function pointers.
- */
-
 #ifdef CML_HAS_CUDA
 
 #include "ops/ir/hcq.h"

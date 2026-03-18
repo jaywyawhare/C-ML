@@ -395,7 +395,7 @@ const char* device_get_name(DeviceType device) {
 }
 
 void device_print_info(void) {
-    printf("\n=== Device Information ===\n");
+    printf("\nDevice Information\n");
     printf("Default device: %s\n", device_get_name(device_get_default()));
     printf("Current device: %s\n", device_get_name(device_get_current()));
     printf("\nAvailable accelerators:\n");
@@ -428,7 +428,7 @@ void device_print_info(void) {
         }
     }
 
-    printf("========================\n\n");
+    printf("\n");
 }
 
 Tensor* tensor_empty_auto(int* shape, int ndim, int dtype) {

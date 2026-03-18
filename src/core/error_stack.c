@@ -1,8 +1,3 @@
-/**
- * @file error_stack.c
- * @brief Global error stack for automatic error tracking
- */
-
 #include "core/error_stack.h"
 #include "core/logging.h"
 #include <stdio.h>
@@ -30,7 +25,6 @@ void error_stack_init(void) {
     g_error_stack_capacity = MAX_ERROR_STACK_SIZE;
     g_error_stack          = (ErrorEntry*)malloc(sizeof(ErrorEntry) * g_error_stack_capacity);
     if (!g_error_stack) {
-        // Can't use error stack if allocation fails
         fprintf(stderr, "FATAL: Failed to initialize error stack\n");
         return;
     }
@@ -134,13 +128,13 @@ void error_stack_print_all(void) {
         return;
     }
 
-    fprintf(stderr, "\n=== Error Stack (%zu error(s)) ===\n", g_error_stack_size);
+    fprintf(stderr, "\nError Stack (%zu error(s))\n", g_error_stack_size);
     for (size_t i = 0; i < g_error_stack_size; i++) {
         ErrorEntry* entry = &g_error_stack[i];
         fprintf(stderr, "[%zu] Error %d: %s\n", i + 1, entry->code, entry->message);
         fprintf(stderr, "    at %s:%d in %s\n", entry->file, entry->line, entry->function);
     }
-    fprintf(stderr, "================================\n\n");
+    fprintf(stderr, "\n");
 }
 
 const char* error_stack_get_last_message(void) {

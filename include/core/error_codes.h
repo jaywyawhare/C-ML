@@ -1,7 +1,6 @@
 #ifndef CML_ERROR_CODES_H
 #define CML_ERROR_CODES_H
 
-// Error codes
 #define CM_SUCCESS 0
 #define CM_MEMORY_ALLOCATION_ERROR -1
 #define CM_INVALID_ARGUMENT -2

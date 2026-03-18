@@ -1,12 +1,3 @@
-/**
- * @file hcq.c
- * @brief Hardware Command Queues -- CPU/generic fallback implementation
- *
- * This is the portable fallback that uses synchronous execution for the CPU
- * backend.  For GPU backends (CUDA, OpenCL, ...) the public API dispatches
- * to backend-specific translation units (hcq_cuda.c, hcq_opencl.c, ...).
- */
-
 #include "ops/ir/hcq.h"
 #include "core/logging.h"
 
@@ -53,6 +44,55 @@ extern int           cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal,
 extern int           cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue);
 #endif
 
+/* Vulkan HCQ backend (init-style API — dispatcher wraps into create/destroy) */
+extern int  cml_hcq_vulkan_queue_init(CMLHCQQueue* queue);
+extern void cml_hcq_vulkan_queue_destroy(CMLHCQQueue* queue);
+extern int  cml_hcq_vulkan_submit_kernel(CMLHCQQueue* queue,
+                                          const CMLHCQKernelDesc* desc);
+extern int  cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* queue, void* dst,
+                                       const void* src, size_t bytes);
+extern int  cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* queue, void* dst,
+                                       const void* src, size_t bytes);
+extern int  cml_hcq_vulkan_signal_create(CMLHCQSignal* signal);
+extern void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* signal);
+extern int  cml_hcq_vulkan_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
+extern int  cml_hcq_vulkan_synchronize(CMLHCQQueue* queue);
+
+/* NV userspace driver HCQ backend (create-style API) */
+extern CMLHCQQueue*  cml_hcq_nv_queue_create(void);
+extern void          cml_hcq_nv_queue_destroy(CMLHCQQueue* queue);
+extern int           cml_hcq_nv_submit_kernel(CMLHCQQueue* queue,
+                                               const CMLHCQKernelDesc* desc);
+extern int           cml_hcq_nv_memcpy_h2d(CMLHCQQueue* queue, void* dst,
+                                            const void* src, size_t bytes);
+extern int           cml_hcq_nv_memcpy_d2h(CMLHCQQueue* queue, void* dst,
+                                            const void* src, size_t bytes);
+extern CMLHCQSignal* cml_hcq_nv_signal_create(void);
+extern void          cml_hcq_nv_signal_destroy(CMLHCQSignal* signal);
+extern int           cml_hcq_nv_signal_record(CMLHCQQueue* queue,
+                                               CMLHCQSignal* signal);
+extern int           cml_hcq_nv_queue_wait(CMLHCQQueue* queue,
+                                            CMLHCQSignal* signal);
+extern int           cml_hcq_nv_signal_wait_cpu(CMLHCQSignal* signal,
+                                                 uint64_t timeout_ms);
+extern int           cml_hcq_nv_queue_synchronize(CMLHCQQueue* queue);
+
+/* AMD AM driver HCQ backend (init-style API) */
+extern int  cml_hcq_am_queue_init(CMLHCQQueue* queue);
+extern void cml_hcq_am_queue_destroy(CMLHCQQueue* queue);
+extern int  cml_hcq_am_submit_kernel(CMLHCQQueue* queue,
+                                      const CMLHCQKernelDesc* desc);
+extern int  cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst,
+                                   const void* src, size_t bytes);
+extern int  cml_hcq_am_memcpy_d2h(CMLHCQQueue* queue, void* dst,
+                                   const void* src, size_t bytes);
+extern int  cml_hcq_am_signal_create(CMLHCQSignal* signal);
+extern void cml_hcq_am_signal_destroy(CMLHCQSignal* signal);
+extern int  cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
+extern int  cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
+extern int  cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
+extern int  cml_hcq_am_synchronize(CMLHCQQueue* queue);
+
 /*
  * CPU kernel function pointer type.
  * On the CPU backend the compiled_kernel field of CMLHCQKernelDesc is cast
@@ -72,6 +112,22 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_queue_create();
 #endif
+    case CML_HCQ_VULKAN: {
+        CMLHCQQueue* vq = calloc(1, sizeof(CMLHCQQueue));
+        if (!vq) return NULL;
+        vq->backend = CML_HCQ_VULKAN;
+        if (cml_hcq_vulkan_queue_init(vq) != 0) { free(vq); return NULL; }
+        return vq;
+    }
+    case CML_HCQ_NV:
+        return cml_hcq_nv_queue_create();
+    case CML_HCQ_AM: {
+        CMLHCQQueue* aq = calloc(1, sizeof(CMLHCQQueue));
+        if (!aq) return NULL;
+        aq->backend = CML_HCQ_AM;
+        if (cml_hcq_am_queue_init(aq) != 0) { free(aq); return NULL; }
+        return aq;
+    }
     case CML_HCQ_CPU:
         break; /* handled below */
     default:
@@ -106,6 +162,17 @@ void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
         cml_hcq_opencl_queue_destroy(queue);
         return;
 #endif
+    case CML_HCQ_VULKAN:
+        cml_hcq_vulkan_queue_destroy(queue);
+        free(queue);
+        return;
+    case CML_HCQ_NV:
+        cml_hcq_nv_queue_destroy(queue);
+        return;
+    case CML_HCQ_AM:
+        cml_hcq_am_queue_destroy(queue);
+        free(queue);
+        return;
     default:
         break;
     }
@@ -128,6 +195,12 @@ int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_submit_kernel(queue, desc);
 #endif
+    case CML_HCQ_VULKAN:
+        return cml_hcq_vulkan_submit_kernel(queue, desc);
+    case CML_HCQ_NV:
+        return cml_hcq_nv_submit_kernel(queue, desc);
+    case CML_HCQ_AM:
+        return cml_hcq_am_submit_kernel(queue, desc);
     case CML_HCQ_CPU:
         break;
     default:
@@ -162,6 +235,12 @@ int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_memcpy_h2d(queue, dst_device, src_host, bytes);
 #endif
+    case CML_HCQ_VULKAN:
+        return cml_hcq_vulkan_memcpy_h2d(queue, dst_device, src_host, bytes);
+    case CML_HCQ_NV:
+        return cml_hcq_nv_memcpy_h2d(queue, dst_device, src_host, bytes);
+    case CML_HCQ_AM:
+        return cml_hcq_am_memcpy_h2d(queue, dst_device, src_host, bytes);
     case CML_HCQ_CPU:
         break;
     default:
@@ -194,6 +273,12 @@ int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_memcpy_d2h(queue, dst_host, src_device, bytes);
 #endif
+    case CML_HCQ_VULKAN:
+        return cml_hcq_vulkan_memcpy_d2h(queue, dst_host, src_device, bytes);
+    case CML_HCQ_NV:
+        return cml_hcq_nv_memcpy_d2h(queue, dst_host, src_device, bytes);
+    case CML_HCQ_AM:
+        return cml_hcq_am_memcpy_d2h(queue, dst_host, src_device, bytes);
     case CML_HCQ_CPU:
         break;
     default:
@@ -219,6 +304,22 @@ CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_signal_create();
 #endif
+    case CML_HCQ_VULKAN: {
+        CMLHCQSignal* vs = calloc(1, sizeof(CMLHCQSignal));
+        if (!vs) return NULL;
+        vs->backend = CML_HCQ_VULKAN;
+        if (cml_hcq_vulkan_signal_create(vs) != 0) { free(vs); return NULL; }
+        return vs;
+    }
+    case CML_HCQ_NV:
+        return cml_hcq_nv_signal_create();
+    case CML_HCQ_AM: {
+        CMLHCQSignal* as = calloc(1, sizeof(CMLHCQSignal));
+        if (!as) return NULL;
+        as->backend = CML_HCQ_AM;
+        if (cml_hcq_am_signal_create(as) != 0) { free(as); return NULL; }
+        return as;
+    }
     case CML_HCQ_CPU:
         break;
     default:
@@ -252,6 +353,17 @@ void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
         cml_hcq_opencl_signal_destroy(signal);
         return;
 #endif
+    case CML_HCQ_VULKAN:
+        cml_hcq_vulkan_signal_destroy(signal);
+        free(signal);
+        return;
+    case CML_HCQ_NV:
+        cml_hcq_nv_signal_destroy(signal);
+        return;
+    case CML_HCQ_AM:
+        cml_hcq_am_signal_destroy(signal);
+        free(signal);
+        return;
     default:
         break;
     }
@@ -273,6 +385,11 @@ int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_signal_record(queue, signal);
 #endif
+    case CML_HCQ_NV:
+        return cml_hcq_nv_signal_record(queue, signal);
+    case CML_HCQ_AM:
+        return cml_hcq_am_signal_record(queue, signal);
+    case CML_HCQ_VULKAN: /* Vulkan has no separate signal_record; sync via synchronize */
     case CML_HCQ_CPU:
         break;
     default:
@@ -280,7 +397,7 @@ int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
         return -1;
     }
 
-    /* CPU: everything is synchronous, so the signal is immediately ready. */
+    /* CPU/Vulkan: everything is synchronous, so the signal is immediately ready. */
     signal->signaled = true;
     signal->timeline_value++;
     return 0;
@@ -301,6 +418,11 @@ int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_queue_wait(queue, signal);
 #endif
+    case CML_HCQ_NV:
+        return cml_hcq_nv_queue_wait(queue, signal);
+    case CML_HCQ_AM:
+        return cml_hcq_am_queue_wait(queue, signal);
+    case CML_HCQ_VULKAN: /* Vulkan synchronization is via cml_hcq_vulkan_synchronize */
     case CML_HCQ_CPU:
         break;
     default:
@@ -340,6 +462,12 @@ int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_signal_wait_cpu(signal, timeout_ms);
 #endif
+    case CML_HCQ_VULKAN:
+        return cml_hcq_vulkan_signal_wait(signal, timeout_ms);
+    case CML_HCQ_NV:
+        return cml_hcq_nv_signal_wait_cpu(signal, timeout_ms);
+    case CML_HCQ_AM:
+        return cml_hcq_am_signal_wait(signal, timeout_ms);
     case CML_HCQ_CPU:
         break;
     default:
@@ -376,6 +504,12 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
     case CML_HCQ_OPENCL:
         return cml_hcq_opencl_queue_synchronize(queue);
 #endif
+    case CML_HCQ_VULKAN:
+        return cml_hcq_vulkan_synchronize(queue);
+    case CML_HCQ_NV:
+        return cml_hcq_nv_queue_synchronize(queue);
+    case CML_HCQ_AM:
+        return cml_hcq_am_synchronize(queue);
     case CML_HCQ_CPU:
         break;
     default:

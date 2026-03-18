@@ -1,18 +1,3 @@
-/**
- * @file beam_search.c
- * @brief BEAM search kernel optimization
- *
- * Parametric kernel tuning: generate candidate launch configurations
- * (block size, unroll factor, vectorization width), score them with a
- * heuristic and pick the best.  Results are cached so repeated calls
- * with the same kernel hash are cheap.
- *
- * Enable via the CML_BEAM environment variable:
- *   CML_BEAM=4   -- beam width 4 (default)
- *   CML_BEAM=8   -- wider search
- *   CML_BEAM=0   -- disabled
- */
-
 #include "ops/ir/beam_search.h"
 #include "core/logging.h"
 

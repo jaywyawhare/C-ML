@@ -1,8 +1,3 @@
-/**
- * @file symbolic.c
- * @brief Symbolic shapes implementation
- */
-
 #include "symbolic/symbolic.h"
 #include <stdlib.h>
 #include <string.h>

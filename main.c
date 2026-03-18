@@ -1,15 +1,3 @@
-/**
- * @file main.c
- * @brief Training example using C-ML with PyTorch-like API
- *
- * This trains a simple neural network on the XOR dataset using:
- * - PyTorch-like API (cml_* functions)
- * - Sensible defaults (device, dtype)
- * - Fluent/builder API for models
- * - Automatic parameter collection
- * - Built-in datasets (dataset_xor)
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>

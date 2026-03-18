@@ -1,13 +1,7 @@
-/**
- * @file pth_loader.c
- * @brief PyTorch .pth/.pt file loader implementation
- *
+/*
  * PyTorch saves models as ZIP archives containing:
  *   - archive/data.pkl (pickle-serialized state dict structure)
  *   - archive/data/0, archive/data/1, ... (raw tensor storage)
- *
- * This is a minimal loader that handles common float32 state dicts.
- * For full pickle support, consider using an external pickle parser.
  */
 
 #include "core/pth_loader.h"
@@ -19,7 +13,6 @@
 #include <stdio.h>
 #include <stdint.h>
 
-/* Minimal ZIP local file header parsing */
 #define ZIP_LOCAL_HEADER_SIG 0x04034b50
 #define ZIP_CENTRAL_DIR_SIG  0x02014b50
 #define ZIP_END_CENTRAL_SIG  0x06054b50
@@ -38,7 +31,6 @@ typedef struct {
     uint16_t extra_len;
 } __attribute__((packed)) ZipLocalHeader;
 
-/* Read little-endian uint32 */
 static uint32_t read_u32_le(const uint8_t* p) {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
            ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -48,22 +40,15 @@ static uint16_t read_u16_le(const uint8_t* p) {
     return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
 }
 
-/* Simple pickle opcode scanner for state dict keys */
 typedef struct {
     char** keys;
     int num_keys;
     int key_capacity;
-    /* Storage info: maps storage index to dtype + size */
     int* storage_dtypes;
     size_t* storage_sizes;
     int num_storages;
 } PickleScanResult;
 
-/*
- * Minimal pickle scanner: looks for SHORT_BINUNICODE opcodes
- * to extract parameter name strings from the pickle stream.
- * This handles the common case of torch.save(model.state_dict(), path).
- */
 static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
     PickleScanResult* result = (PickleScanResult*)calloc(1, sizeof(PickleScanResult));
     if (!result) return NULL;
@@ -150,7 +135,6 @@ CMLPthStateDict* cml_pth_load(const char* path) {
     FILE* f = fopen(path, "rb");
     if (!f) return NULL;
 
-    /* Read entire file */
     fseek(f, 0, SEEK_END);
     long file_size = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -167,7 +151,6 @@ CMLPthStateDict* cml_pth_load(const char* path) {
     fclose(f);
     if (read_size != (size_t)file_size) { free(file_data); return NULL; }
 
-    /* Create state dict */
     CMLPthStateDict* sd = (CMLPthStateDict*)calloc(1, sizeof(CMLPthStateDict));
     if (!sd) { free(file_data); return NULL; }
 
@@ -175,11 +158,9 @@ CMLPthStateDict* cml_pth_load(const char* path) {
     sd->entries = (CMLPthEntry*)calloc((size_t)sd->entry_capacity, sizeof(CMLPthEntry));
     if (!sd->entries) { free(sd); free(file_data); return NULL; }
 
-    /* Scan for ZIP entries */
     PickleScanResult* pickle_keys = NULL;
     int data_file_count = 0;
 
-    /* Track raw data file positions */
     size_t data_offsets[256];
     size_t data_sizes[256];
     memset(data_offsets, 0, sizeof(data_offsets));
@@ -206,12 +187,10 @@ CMLPthStateDict* cml_pth_load(const char* path) {
         memcpy(fname, &file_data[pos + header_size], copy_len);
         fname[copy_len] = '\0';
 
-        /* Look for pickle file */
         if (strstr(fname, ".pkl") && compression == 0 && uncomp_size > 0) {
             pickle_keys = scan_pickle_keys(&file_data[data_start], uncomp_size);
         }
 
-        /* Look for raw data files (archive/data/0, archive/data/1, ...) */
         char* data_part = strstr(fname, "data/");
         if (data_part && compression == 0 && uncomp_size > 0) {
             char* num_str = data_part + 5;
@@ -226,7 +205,6 @@ CMLPthStateDict* cml_pth_load(const char* path) {
         pos = data_start + (comp_size > 0 ? comp_size : uncomp_size);
     }
 
-    /* Match keys to data files */
     if (pickle_keys) {
         int data_idx = 0;
         for (int i = 0; i < pickle_keys->num_keys && data_idx < data_file_count; i++) {
@@ -247,7 +225,6 @@ CMLPthStateDict* cml_pth_load(const char* path) {
             entry->num_elements = data_sizes[data_idx] / sizeof(float);
             entry->storage_offset = data_offsets[data_idx];
 
-            /* 1D tensor (shape unknown from minimal parsing) */
             int shape[1] = { (int)entry->num_elements };
             TensorConfig tc = {0};
             entry->tensor = tensor_empty(shape, 1, &tc);
@@ -315,7 +292,6 @@ int cml_pth_load_into_module(const CMLPthStateDict* sd, struct Module* module) {
 
     int loaded = 0;
 
-    /* Match state dict keys to module parameters by name */
     for (int i = 0; i < module->num_parameters; i++) {
         Parameter* param = module->parameters[i];
         if (!param || !param->name) continue;
@@ -360,7 +336,7 @@ void cml_pth_print(const CMLPthStateDict* sd) {
         return;
     }
 
-    printf("=== PyTorch State Dict ===\n");
+    printf("PyTorch State Dict\n");
     printf("Entries: %d\n", sd->num_entries);
     printf("Total params: %zu\n", cml_pth_total_params(sd));
     printf("Total bytes: %.2f MB\n", (double)cml_pth_total_bytes(sd) / (1024.0 * 1024.0));
@@ -369,7 +345,7 @@ void cml_pth_print(const CMLPthStateDict* sd) {
         CMLPthEntry* e = &sd->entries[i];
         printf("  %-40s elements=%zu\n", e->key, e->num_elements);
     }
-    printf("==========================\n");
+    printf("\n");
 }
 
 size_t cml_pth_total_params(const CMLPthStateDict* sd) {

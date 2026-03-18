@@ -1,10 +1,3 @@
-/**
- * @file test_llama.c
- * @brief Tests for LLaMA model implementation
- *
- * Uses small random weights (no GGUF download required).
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -29,7 +22,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== Helper: Create a tiny config for testing ===== */
 
 static CMLLLaMAConfig tiny_test_config(void) {
     CMLLLaMAConfig config = {
@@ -46,9 +38,6 @@ static CMLLLaMAConfig tiny_test_config(void) {
     return config;
 }
 
-/**
- * Initialize layer weights with random values for testing.
- */
 static int init_layer_random(CMLLLaMALayer* layer, const CMLLLaMAConfig* config) {
     int hidden = config->hidden_size;
     int inter = config->intermediate_size;
@@ -84,9 +73,6 @@ static int init_layer_random(CMLLLaMALayer* layer, const CMLLLaMAConfig* config)
     return 0;
 }
 
-/**
- * Initialize full model with random weights for testing.
- */
 static int init_model_random(CMLLLaMAModel* model) {
     const CMLLLaMAConfig* config = &model->config;
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
@@ -110,7 +96,6 @@ static int init_model_random(CMLLLaMAModel* model) {
     return 0;
 }
 
-/* ===== Config Tests ===== */
 
 static int test_config_7b(void) {
     CMLLLaMAConfig cfg = cml_llama_config_7b();
@@ -147,7 +132,6 @@ static int test_config_70b(void) {
     return 1;
 }
 
-/* ===== Model Create / Free Tests ===== */
 
 static int test_model_create_free(void) {
     CMLLLaMAConfig cfg = tiny_test_config();
@@ -176,7 +160,6 @@ static int test_model_free_null(void) {
     return 1;
 }
 
-/* ===== Forward Pass Tests ===== */
 
 static int test_forward_basic(void) {
     CMLLLaMAConfig cfg = tiny_test_config();
@@ -270,7 +253,6 @@ static int test_forward_invalid_args(void) {
     return 1;
 }
 
-/* ===== Sampling Tests ===== */
 
 static int test_sample_greedy(void) {
     /* Create 1D logits with a clear maximum */
@@ -356,7 +338,6 @@ static int test_sample_null_args(void) {
     return 1;
 }
 
-/* ===== Generation Config Tests ===== */
 
 static int test_generation_default_config(void) {
     CMLGenerationConfig cfg = cml_generation_default_config();
@@ -369,7 +350,6 @@ static int test_generation_default_config(void) {
     return 1;
 }
 
-/* ===== Reset Test ===== */
 
 static int test_model_reset(void) {
     CMLLLaMAConfig cfg = tiny_test_config();
@@ -405,7 +385,6 @@ static int test_model_reset(void) {
     return 1;
 }
 
-/* ===== Print Config Test ===== */
 
 static int test_print_config(void) {
     CMLLLaMAConfig cfg = cml_llama_config_7b();
@@ -415,7 +394,6 @@ static int test_print_config(void) {
     return 1;
 }
 
-/* ===== Generation Result Free Test ===== */
 
 static int test_generation_result_free(void) {
     /* Should handle NULL gracefully */
@@ -432,7 +410,6 @@ static int test_generation_result_free(void) {
     return 1;
 }
 
-/* ===== GQA Config in Model Test ===== */
 
 static int test_model_gqa_config(void) {
     /* Verify a model with GQA (num_kv_heads < num_heads) creates properly */
@@ -460,7 +437,6 @@ static int test_model_gqa_config(void) {
     return 1;
 }
 
-/* ===== Main ===== */
 
 int main(void) {
     printf("test_llama\n\n");

@@ -1,7 +1,5 @@
-/**
- * @file spirv_codegen.h
- * @brief SPIR-V binary code generation for Vulkan compute shaders
- *
+/*
+ * SPIR-V binary code generation for Vulkan compute shaders.
  * Generates SPIR-V binary modules from UOps IR. Emits compute shaders with
  * storage buffer bindings and GlobalInvocationID-based thread indexing.
  */
@@ -20,8 +18,6 @@ extern "C" {
 
 struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
-
-/* ── SPIR-V builder (dynamic uint32_t array) ── */
 
 typedef struct SPIRVBuilder {
     uint32_t* words;
@@ -43,11 +39,8 @@ typedef struct SPIRVBuilder {
     uint32_t id_void_fn;  /* void(void) function type */
     uint32_t id_glsl_ext; /* GLSL.std.450 extended instruction set */
 
-    /* Built-in variable IDs */
     uint32_t id_global_invocation_id;
 } SPIRVBuilder;
-
-/* ── SPIR-V codegen context ── */
 
 typedef struct CMLSPIRVCodegen {
     int  local_size_x;  /* workgroup size X (default: 256) */
@@ -57,18 +50,11 @@ typedef struct CMLSPIRVCodegen {
     bool initialized;
 } CMLSPIRVCodegen;
 
-/* ── Codegen lifecycle ── */
-
 CMLSPIRVCodegen* cml_spirv_codegen_create(void);
 void             cml_spirv_codegen_destroy(CMLSPIRVCodegen* cg);
 
-/* ── Generate SPIR-V binary for specific operations ──
- *
- * Each function returns a heap-allocated uint32_t array of SPIR-V words.
- * Caller must free() the returned pointer.
- * out_size is set to the size in bytes.
- */
-
+/* Each function returns a heap-allocated uint32_t array of SPIR-V words.
+   Caller must free(). out_size is set to the size in bytes. */
 uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
                                size_t* out_size);
 uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
@@ -78,8 +64,6 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
 uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* out_size);
 uint32_t* cml_spirv_gen_fill(CMLSPIRVCodegen* cg, float value, const char* name,
                               size_t* out_size);
-
-/* ── SPIR-V builder utilities ── */
 
 SPIRVBuilder* spirv_builder_create(void);
 void          spirv_builder_destroy(SPIRVBuilder* b);

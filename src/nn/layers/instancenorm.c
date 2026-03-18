@@ -1,12 +1,3 @@
-/**
- * @file instancenorm.c
- * @brief Instance Normalization 2D layer implementation
- *
- * InstanceNorm normalizes each channel of each sample independently:
- * y = (x - mean(x)) / sqrt(var(x) + eps) * weight + bias
- * where mean/var are computed per (batch, channel) pair over (H, W).
- */
-
 #include "nn/layers/instancenorm.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -67,7 +58,6 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
         for (int c = 0; c < channels; c++) {
             int offset = (n * channels + c) * spatial;
 
-            // Compute mean
             float mean = 0.0f;
             for (int s = 0; s < spatial; s++) {
                 mean += input_data[offset + s];

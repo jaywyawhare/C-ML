@@ -1,10 +1,8 @@
-/**
- * @file ir_internal.h
- * @brief Internal IR structure definitions (for ops module only)
- *
- * This header exposes the internal structure of IRNode and CMLGraph
- * for use within the ops module (ir.c and uops.c).
- * External code should use the opaque types and accessor functions.
+/*
+ * Internal IR structure definitions (for ops module only).
+ * Exposes the internal structure of IRNode and CMLGraph for use
+ * within the ops module. External code should use the opaque types
+ * and accessor functions.
  */
 
 #ifndef CML_OPS_IR_INTERNAL_H
@@ -15,7 +13,6 @@
 #include "tensor/tensor.h"
 #include <stdbool.h>
 
-// Fusion types
 typedef enum {
     FUSION_NONE = 0,
     FUSION_FMA,               // MUL + ADD -> FMA
@@ -28,25 +25,20 @@ typedef enum {
     FUSION_REDUCE_ELEMENTWISE // Reduction + elementwise
 } FusionType;
 
-// Fused kernel structure
 typedef struct FusedKernel {
     struct IRNode** ops;    // Operations in this fused kernel
-    int num_ops;            // Number of operations
-    int capacity;           // Capacity of ops array
-    FusionType fusion_type; // Type of fusion
-    bool is_chained;        // Whether operations are chained
+    int num_ops;
+    int capacity;
+    FusionType fusion_type;
+    bool is_chained;
 } FusedKernel;
 
-// Broadcasting info structure
 typedef struct BroadcastInfo {
     int* broadcast_dims; // Which dimensions need broadcasting
     int num_broadcast_dims;
-    size_t* broadcast_strides; // Strides for broadcasting
+    size_t* broadcast_strides;
 } BroadcastInfo;
 
-/**
- * @brief IR Node structure (internal)
- */
 struct IRNode {
     UOpType type;
     char** input_names;
@@ -55,42 +47,34 @@ struct IRNode {
     void* params;
     struct IRNode* next;
 
-    // Tensor references (for lazy evaluation)
     Tensor** inputs; // Input tensors (lazy)
     Tensor* output;  // Output tensor (lazy facade)
 
-    // Broadcasting (semantic rule - computed, not executed)
     int** input_shapes;
     int* input_ndims;
     int* output_shape; // Computed from broadcasting rule
     int output_ndim;
-    BroadcastInfo* broadcast; // Broadcasting metadata
+    BroadcastInfo* broadcast;
 
-    // Autograd (graph structure, not execution)
     bool requires_grad;
     bool needs_input_grad[8];     // Which inputs need gradients
     struct IRNode* backward_node; // Backward pass node (lazy)
     struct IRNode* forward_node;  // Forward pass node (for backward execution)
-    void* saved_for_backward;     // Saved values for backward
+    void* saved_for_backward;
 
-    // Execution state
-    bool is_executed;       // Has this node been executed?
-    void* execution_result; // Cached result (if executed)
+    bool is_executed;
+    void* execution_result;
 
-    // Optimization
     bool is_used;              // For dead code elimination
     bool is_fused;             // For operation fusion
-    FusionType fusion_type;    // Type of fusion applied
-    FusedKernel* fused_kernel; // If part of fused kernel
+    FusionType fusion_type;
+    FusedKernel* fused_kernel;
     int use_count;             // Number of nodes using this output
-    struct IRNode** users;     // Array of nodes that use this output
-    int users_capacity;        // Capacity of users array
+    struct IRNode** users;
+    int users_capacity;
     int chain_id;              // ID for chained callables
 };
 
-/**
- * @brief IR Structure (internal)
- */
 struct CMLGraph {
     IRTarget target;
     struct IRNode* head; // Forward graph (lazy)
@@ -98,45 +82,26 @@ struct CMLGraph {
     struct IRNode* backward_head; // Backward graph (lazy)
     int node_count;
 
-    // Execution state
-    bool is_executed;           // Has graph been executed?
-    bool is_optimized;          // Has graph been optimized?
-    Tensor** execution_results; // Cached execution results
+    bool is_executed;
+    bool is_optimized;
+    Tensor** execution_results;
     int execution_results_count;
     int execution_results_capacity;
 
-    // Tensor tracking
     char** tensor_names;
     int tensor_count;
     int tensor_capacity;
-    Tensor** tensor_refs; // Track actual tensors for proper name generation
+    Tensor** tensor_refs;
     int tensor_refs_count;
     int tensor_refs_capacity;
 
-    // Decomposition state
-    bool is_decomposed;         // Has decomposition pass been run?
+    bool is_decomposed;
 
     // (Using LLVM backend directly)
 };
 
-/**
- * @brief Get string name for UOpType
- * @param type The UOp type
- * @return String representation of the UOp type
- */
 const char* uop_type_to_string(UOpType type);
-
-/**
- * @brief Free a fused kernel structure
- * @param kernel The fused kernel to free
- */
 void free_fused_kernel(FusedKernel* kernel);
-
-/**
- * @brief Execute a single IR node on CPU
- * @param node The IR node to execute
- * @return 0 on success, -1 on failure
- */
 int cpu_execute_node(struct IRNode* node);
 
 #endif // CML_OPS_IR_INTERNAL_H

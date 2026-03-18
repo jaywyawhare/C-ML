@@ -1,11 +1,3 @@
-/**
- * @file simd_math.c
- * @brief SIMD-optimized math operations implementation
- *
- * Implements vectorized math functions for SSE, AVX, AVX-512, and ARM NEON.
- * Uses SLEEF library when available, custom polynomial approximations otherwise.
- */
-
 #include "ops/simd_math.h"
 #include "ops/simd_utils.h"
 #include <math.h>
@@ -58,8 +50,6 @@
 #define LIB_SYM(handle, name) NULL
 #define LIB_CLOSE(handle) ((void)0)
 #endif
-
-// SLEEF Function Pointers (dynamically loaded)
 
 static void* g_sleef_handle = NULL;
 static int g_sleef_loaded   = 0;
@@ -237,7 +227,7 @@ const CMLSimdCaps* cml_get_simd_caps(void) {
 
 void cml_print_simd_caps(void) {
     const CMLSimdCaps* caps = cml_get_simd_caps();
-    printf("\n=== SIMD Capabilities ===\n");
+    printf("\nSIMD Capabilities\n");
     printf("SSE:     %s\n", caps->has_sse ? "Yes" : "No");
     printf("SSE4.1:  %s\n", caps->has_sse4 ? "Yes" : "No");
     printf("AVX:     %s\n", caps->has_avx ? "Yes" : "No");
@@ -245,10 +235,9 @@ void cml_print_simd_caps(void) {
     printf("AVX-512: %s\n", caps->has_avx512 ? "Yes" : "No");
     printf("NEON:    %s\n", caps->has_neon ? "Yes" : "No");
     printf("SLEEF:   %s\n", caps->has_sleef ? "Yes" : "No");
-    printf("=========================\n\n");
+    printf("\n");
 }
 
-// Constants for exp approximation
 #define EXP_LN2 0.6931471805599453f
 #define EXP_INV_LN2 1.4426950408889634f
 #define EXP_C0 1.0f
@@ -2066,8 +2055,6 @@ void simd_div_f32(const float* a, const float* b, float* out, size_t n) {
     simd_div_f32_scalar(a, b, out, n);
 }
 
-// Matrix Transpose (Cache-Blocked)
-
 void simd_transpose_f32(const float* in, float* out, int rows, int cols) {
     if (!in || !out || rows <= 0 || cols <= 0)
         return;
@@ -2087,8 +2074,6 @@ void simd_transpose_f32(const float* in, float* out, int rows, int cols) {
         }
     }
 }
-
-// Broadcast Operations (SIMD-accelerated)
 
 void simd_add_scalar_f32(const float* a, float scalar, float* out, size_t n) {
     if (!a || !out || n == 0)

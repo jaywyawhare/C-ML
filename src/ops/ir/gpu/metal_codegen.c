@@ -1,12 +1,3 @@
-/**
- * @file metal_codegen.c
- * @brief MSL (Metal Shading Language) code generation from IR nodes
- *
- * Translates IR nodes into MSL compute kernel source strings.
- * The generated kernels use device float* buffers and a
- * thread_position_in_grid index for elementwise operations.
- */
-
 #include "ops/ir/gpu/metal_backend.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
@@ -17,13 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Maximum size for a generated MSL kernel source string */
 #define MSL_BUF_SIZE 4096
 
-/* Tile size for tiled matmul */
 #define TILE_SIZE 16
 
-/** Append a formatted string to a dynamically-growing buffer. */
 static void buf_appendf(char** buf, size_t* cap, size_t* len,
                          const char* fmt, ...) {
     va_list ap;
@@ -81,20 +69,6 @@ static const char* msl_unary_expr(UOpType type) {
     }
 }
 
-/**
- * @brief Generate Metal Shading Language source for a compute kernel
- *        corresponding to a single IR node.
- *
- * Supported UOp types:
- *   Binary:  ADD, SUB, MUL, DIV, POW, CMPLT, MOD, IDIV
- *   Unary:   NEG, EXP, LOG, SQRT, RECIP, ABS, SIN, COS, TAN, FLOOR, CEIL
- *   Activations: RELU6, SIGMOID, TANH, ELU, SELU, SILU, MISH, HARDSWISH
- *   Reductions: SUM, MAX_REDUCE, MIN_REDUCE, MEAN, PROD
- *   Special: MATMUL (tiled), CONV2D, FILL, WHERE, GATHER, MAX
- *
- * @param node  IR node to translate
- * @return Heap-allocated MSL source string (caller must free), or NULL
- */
 char* cml_metal_generate_msl(struct IRNode* node) {
     if (!node) {
         LOG_ERROR("metal_codegen: NULL node");
@@ -528,18 +502,6 @@ char* cml_metal_generate_msl(struct IRNode* node) {
     return NULL;
 }
 
-/**
- * @brief Execute an entire IR graph on the Metal backend.
- *
- * Walks every node in the graph, generates MSL, compiles it, copies tensor
- * data into Metal buffers, launches the kernel, and copies results back.
- * Metal uses unified memory so copies are cheap but still explicit through
- * the cml_metal_upload / cml_metal_download API.
- *
- * @param backend  Initialized Metal backend context
- * @param graph    IR graph to execute
- * @return 0 on success, negative on failure
- */
 #ifdef CML_HAS_METAL
 int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
     if (!backend || !backend->initialized) {
@@ -554,7 +516,6 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
     struct IRNode* node = graph->head;
 
     while (node) {
-        /* Skip already-executed or movement-only nodes */
         if (node->is_executed) {
             node = node->next;
             continue;
@@ -576,7 +537,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             return -1;
         }
 
-            int max_bufs = node->num_inputs + 8; /* inputs + output + scalar params */
+            int max_bufs = node->num_inputs + 8;
         void** metal_buffers = (void**)calloc((size_t)max_bufs, sizeof(void*));
         if (!metal_buffers) {
             cml_metal_kernel_free(kernel);
@@ -591,7 +552,6 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
             void* mbuf = cml_metal_alloc(backend, bytes);
             if (!mbuf) {
                 LOG_ERROR("metal_execute_graph: alloc failed for input %d", i);
-                /* Cleanup previously allocated buffers */
                 for (int j = 0; j < buf_count; j++) {
                     cml_metal_free(backend, metal_buffers[j]);
                 }

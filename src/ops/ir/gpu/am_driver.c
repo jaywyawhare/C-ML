@@ -1,18 +1,4 @@
-/* Feature test macros for POSIX APIs: open(O_CLOEXEC), strdup, usleep, mmap */
 #define _GNU_SOURCE
-
-/**
- * @file am_driver.c
- * @brief AMD userspace driver implementation -- direct KFD ioctl, AQL dispatch
- *
- * Opens /dev/kfd and /dev/dri/renderD128 via open(), uses ioctl() for KFD
- * operations (CREATE_QUEUE, ALLOC_MEMORY_OF_GPU, MAP_MEMORY_TO_GPU), submits
- * AQL (Architected Queuing Language) dispatch packets via ring buffer + doorbell,
- * and polls completion signals for synchronization.
- *
- * Guarded by __linux__ for ioctl/mmap includes.  Gracefully returns failure
- * codes when AMD KFD hardware is not present.
- */
 
 #include "ops/ir/gpu/am_driver.h"
 #include "ops/ir/internal.h"
@@ -608,7 +594,6 @@ int cml_am_buffer_upload(CMLAMDriver* drv, CMLAMBuffer* dst,
     if (!drv || !drv->initialized || !dst || !src || n == 0) return -1;
 
     if (dst->cpu_addr) {
-        /* If the buffer is host-visible (GTT or PUBLIC VRAM), memcpy directly */
         memcpy(dst->cpu_addr, src, n);
         am_mb();
         return 0;
@@ -667,7 +652,6 @@ int cml_am_buffer_download(CMLAMDriver* drv, CMLAMBuffer* src,
         return -1;
     }
 
-    /* Issue a synchronization to ensure all prior GPU work is complete */
     cml_am_synchronize(drv);
 
     /* The source data may have been uploaded via the staging path,
@@ -730,7 +714,6 @@ CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object,
         return NULL;
     }
 
-    /* Keep a local copy of the code object for reference */
     kernel->code_object = malloc(code_size);
     if (kernel->code_object) {
         memcpy(kernel->code_object, code_object, code_size);
@@ -1050,7 +1033,6 @@ int cml_am_kernel_launch(CMLAMDriver* drv, CMLAMKernel* kernel,
 
     am_mb();
 
-    /* Ring the doorbell to notify the GPU */
     *q->doorbell = (uint32_t)(write_idx + 1);
 
     LOG_DEBUG("AM driver: kernel '%s' launched, grid=[%u,%u,%u] block=[%u,%u,%u] slot=%u",
@@ -1082,8 +1064,8 @@ int cml_am_synchronize(CMLAMDriver* drv) {
         return 0;
     }
 
-    /* Poll the completion signal until it reaches the expected value */
-    uint64_t timeout_us = 5000000; /* 5 seconds */
+    uint64_t timeout_us = 5000000;
+
     uint64_t poll_interval_us = 10;
     uint64_t elapsed = 0;
 

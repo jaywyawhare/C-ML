@@ -1,11 +1,5 @@
-/**
- * @file fused_codegen.c
- * @brief Fused kernel code generation from LinearProgram
- *
- * Walks a LinearProgram and emits fused kernel source for multiple backends.
- * LOAD -> global memory read, COMPUTE -> register arithmetic, STORE -> global write.
- * Eliminated buffers stay in registers (no memory traffic).
- */
+/* LOAD -> global memory read, COMPUTE -> register arithmetic, STORE -> global write.
+ * Eliminated buffers stay in registers (no memory traffic). */
 
 #include "ops/ir/fused_codegen.h"
 #include "ops/ir/ir.h"
@@ -1134,16 +1128,16 @@ void cml_fused_kernel_print(const CMLFusedKernel* kernel) {
     if (!kernel) { printf("FusedKernel: (null)\n"); return; }
 
     const char* backend_names[] = {"C", "PTX", "SPIR-V", "WGSL", "Metal"};
-    printf("=== Fused Kernel (%s) ===\n", backend_names[kernel->backend]);
+    printf("Fused Kernel (%s)\n", backend_names[kernel->backend]);
     printf("  inputs: %d, outputs: %d, vregs: %d, work_size: %zu\n",
            kernel->num_inputs, kernel->num_outputs,
            kernel->num_vregs, kernel->work_size);
 
     if (kernel->source) {
-        printf("--- Source ---\n%s\n", kernel->source);
+        printf("Source\n%s\n", kernel->source);
     }
     if (kernel->spirv_words) {
         printf("  SPIR-V: %d words\n", kernel->spirv_num_words);
     }
-    printf("===\n");
+    printf("\n");
 }

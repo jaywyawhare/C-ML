@@ -1,14 +1,3 @@
-/**
- * @file bench_gemm.c
- * @brief GEMM throughput benchmark: Naive vs raw BLAS vs CML Tensor vs fused chain
- *
- * Compares GFLOPS for square matrix multiplication at various sizes.
- * Shows where raw BLAS wins (single op) and where CML's fusion
- * pipeline pays off (chained ops: matmul + add + relu).
- *
- * Usage:  ./build/bin/bench_gemm
- */
-
 #include "cml.h"
 #include "backend/blas.h"
 #include "ops/simd_math.h"
@@ -47,7 +36,6 @@ static float* alloc_random(int n) {
 
 static double gemm_flops(int N) { return 2.0 * N * N * N; }
 
-// matmul + bias_add + relu: 2N^3 + 2N^2
 static double fused_flops(int N) { return 2.0 * N * N * N + 2.0 * N * N; }
 
 typedef struct {
@@ -129,7 +117,6 @@ static BenchResult bench_tensor_matmul(int N, int iters) {
     return (BenchResult){.gflops = flop / elapsed / 1e9, .time_ms = elapsed / iters * 1e3};
 }
 
-// BLAS + separate bias+relu pass (no fusion, extra memory traffic)
 static BenchResult bench_blas_unfused(CMLBlasContext* blas, int N, int iters) {
     int n2      = N * N;
     float* A    = alloc_random(n2);
@@ -158,8 +145,6 @@ static BenchResult bench_blas_unfused(CMLBlasContext* blas, int N, int iters) {
     return (BenchResult){.gflops = flop / elapsed / 1e9, .time_ms = elapsed / iters * 1e3};
 }
 
-// CML fused: tensor_relu(tensor_add(tensor_matmul(A,B), bias))
-// The IR optimizer can fuse the add+relu into the matmul epilogue
 static BenchResult bench_tensor_fused(int N, int iters) {
     int mat_shape[]  = {N, N};
     int bias_shape[] = {1, N};
@@ -227,7 +212,6 @@ int main(void) {
         if (have_blas)
             print_row("Raw BLAS (cblas_sgemm)", bench_blas(blas, N, iters));
 
-        // CML tensor paths have JIT compilation overhead — skip above 1024
         if (N <= 1024)
             print_row("CML tensor_matmul", bench_tensor_matmul(N, iters));
 

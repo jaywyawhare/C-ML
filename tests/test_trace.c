@@ -1,8 +1,3 @@
-/**
- * @file test_trace.c
- * @brief Tests for trace-and-replay JIT system
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,8 +1,3 @@
-/**
- * @file compiler_viz.c
- * @brief Compiler visualization/debugger implementation
- */
-
 #include "ops/ir/compiler_viz.h"
 #include <stdlib.h>
 #include <string.h>
@@ -62,7 +57,6 @@ int cml_compiler_viz_record(CMLCompilerViz* viz, CMLVizEventType type,
         event->ir_snapshot = cml_ir_to_string(ir);
     }
 
-    /* Append to list */
     if (viz->tail) {
         viz->tail->next = event;
     } else {

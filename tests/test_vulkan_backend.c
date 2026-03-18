@@ -1,8 +1,3 @@
-/**
- * @file test_vulkan_backend.c
- * @brief Tests for Vulkan/SPIR-V backend
- */
-
 #include "ops/ir/gpu/vulkan_backend.h"
 #include "ops/ir/gpu/spirv_codegen.h"
 #include "ops/uops.h"
@@ -26,7 +21,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ── SPIR-V codegen tests (always run — no GPU needed) ── */
 
 static int test_spirv_codegen_create(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
@@ -134,7 +128,6 @@ static int test_spirv_builder(void) {
     return 1;
 }
 
-/* ── Vulkan backend tests (skip if Vulkan unavailable) ── */
 
 static int test_vulkan_available(void) {
     /* Just test that the function doesn't crash */

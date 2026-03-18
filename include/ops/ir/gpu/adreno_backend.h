@@ -1,9 +1,6 @@
-/**
- * @file adreno_backend.h
- * @brief Qualcomm Adreno GPU backend
- *
- * Provides GPU acceleration via Qualcomm's Adreno GPU using OpenCL/Vulkan.
- * Targets Snapdragon SoCs for mobile inference.
+/*
+ * Qualcomm Adreno GPU backend.
+ * GPU acceleration via OpenCL/Vulkan on Snapdragon SoCs for mobile inference.
  */
 
 #ifndef CML_ADRENO_BACKEND_H
@@ -28,22 +25,11 @@ typedef struct CMLAdrenoBackend {
     void* cl_queue;           /* OpenCL command queue */
 } CMLAdrenoBackend;
 
-/** Check if Adreno GPU is available */
 bool cml_adreno_available(void);
-
-/** Create Adreno backend */
 CMLAdrenoBackend* cml_adreno_backend_create(void);
-
-/** Initialize Adreno backend */
 int cml_adreno_backend_init(CMLAdrenoBackend* backend);
-
-/** Free Adreno backend */
 void cml_adreno_backend_free(CMLAdrenoBackend* backend);
-
-/** Execute IR graph on Adreno GPU */
 int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir);
-
-/** Get device info string */
 const char* cml_adreno_device_info(const CMLAdrenoBackend* backend);
 
 #ifdef __cplusplus

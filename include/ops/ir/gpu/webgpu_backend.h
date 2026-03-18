@@ -1,7 +1,5 @@
-/**
- * @file webgpu_backend.h
- * @brief WebGPU backend via wgpu-native (dynamic loading)
- *
+/*
+ * WebGPU backend via wgpu-native (dynamic loading).
  * WGSL codegen + wgpu-native C bindings. Cross-platform via dlopen.
  */
 
@@ -16,12 +14,9 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
 struct IRNode;
 struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
-
-/* ── WebGPU backend context ── */
 
 typedef struct CMLWebGPUBackend {
     void* instance;     /* WGPUInstance */
@@ -60,8 +55,6 @@ typedef struct CMLWebGPUBackend {
     void* fn_instance_release;
 } CMLWebGPUBackend;
 
-/* ── WebGPU kernel ── */
-
 typedef struct CMLWebGPUKernel {
     void* pipeline;         /* WGPUComputePipeline */
     void* bind_group_layout; /* WGPUBindGroupLayout */
@@ -70,30 +63,20 @@ typedef struct CMLWebGPUKernel {
     char name[64];
 } CMLWebGPUKernel;
 
-/* ── Availability ── */
-
 bool cml_webgpu_available(void);
-
-/* ── Lifecycle ── */
 
 CMLWebGPUBackend* cml_webgpu_backend_create(void);
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend);
 void cml_webgpu_backend_free(CMLWebGPUBackend* backend);
-
-/* ── Compilation ── */
 
 CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
                                            const char* wgsl_source,
                                            const char* entry_point);
 void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel);
 
-/* ── Execution ── */
-
 int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
                              size_t workgroup_count[3],
                              void** buffers, size_t* buffer_sizes, int num_buffers);
-
-/* ── Memory ── */
 
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size);
 void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer);
@@ -102,11 +85,7 @@ int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer,
 int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host,
                         void* src_buffer, size_t size);
 
-/* ── WGSL codegen ── */
-
 char* cml_wgsl_generate(struct IRNode* node);
-
-/* ── Graph execution ── */
 
 int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph);
 

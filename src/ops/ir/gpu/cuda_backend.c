@@ -1,8 +1,3 @@
-/**
- * @file cuda_backend.c
- * @brief CUDA backend implementation via dynamic loading
- */
-
 #include "ops/ir/gpu/cuda_backend.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"

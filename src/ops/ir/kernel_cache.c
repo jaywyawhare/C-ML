@@ -1,8 +1,3 @@
-/**
- * @file kernel_cache.c
- * @brief In-memory LRU kernel cache implementation
- */
-
 #include "ops/ir/kernel_cache.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
@@ -350,7 +345,6 @@ int cml_kernel_cache_evict_lru(CMLKernelCache* cache) {
     cache->total_memory -= lru_entry->memory_size;
     cache->evictions++;
 
-    uint64_t evicted_hash = lru_entry->hash;
     free_entry(lru_entry);
 
     pthread_mutex_unlock(&cache->lock);

@@ -1,8 +1,3 @@
-/**
- * @file opcheck.c
- * @brief Deterministic op checks to compare C-ML with PyTorch in CI.
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <math.h>

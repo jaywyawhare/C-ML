@@ -1,8 +1,3 @@
-/**
- * @file test_pth_loader.c
- * @brief Tests for PyTorch .pth file loader
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

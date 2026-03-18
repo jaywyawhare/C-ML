@@ -1,14 +1,3 @@
-/**
- * @file wgsl_codegen.c
- * @brief WGSL (WebGPU Shading Language) code generation from IR nodes
- *
- * Translates IR nodes into WGSL compute shader source strings.
- * Each generated shader uses:
- *   @group(0) @binding(N) for storage buffers
- *   @compute @workgroup_size(256) fn main(...)
- *   @builtin(global_invocation_id) for thread indexing
- */
-
 #include "ops/ir/gpu/webgpu_backend.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
@@ -19,13 +8,10 @@
 #include <string.h>
 #include <stdarg.h>
 
-/* Initial allocation size for the WGSL source buffer */
 #define WGSL_BUF_INIT_SIZE 4096
 
-/* Tile size for tiled matmul */
 #define TILE_SIZE 16
 
-/** Append a formatted string to a dynamically-growing buffer. */
 static void wgsl_appendf(char** buf, size_t* cap, size_t* len,
                           const char* fmt, ...) {
     va_list ap;
@@ -753,19 +739,6 @@ static char* wgsl_conv2d_kernel(void) {
 }
 
 
-/**
- * @brief Generate WGSL compute shader source for a single IR node.
- *
- * Supported UOp types:
- *   Binary:      ADD, SUB, MUL, DIV, MAX, POW, CMPLT, MOD, IDIV
- *   Unary:       NEG, EXP, LOG, SQRT, ABS, SIN, COS, TAN, RECIP, FLOOR, CEIL
- *   Activations: SIGMOID, TANH, ELU, SELU, SILU, MISH, HARDSWISH
- *   Reductions:  SUM, MAX_REDUCE, MIN_REDUCE, MEAN, PROD
- *   Special:     MATMUL, CONV2D, FILL, WHERE, GATHER
- *
- * @param node  IR node to translate
- * @return Heap-allocated WGSL source string (caller must free), or NULL
- */
 char* cml_wgsl_generate(struct IRNode* node) {
     if (!node) {
         LOG_ERROR("wgsl_codegen: NULL node");
@@ -774,7 +747,6 @@ char* cml_wgsl_generate(struct IRNode* node) {
 
     UOpType type = node->type;
 
-    /* Binary ops */
     switch (type) {
     case UOP_ADD:
     case UOP_SUB:
@@ -790,7 +762,6 @@ char* cml_wgsl_generate(struct IRNode* node) {
         break;
     }
 
-    /* Unary ops (simple expression) */
     switch (type) {
     case UOP_NEG:
     case UOP_EXP:
@@ -808,7 +779,6 @@ char* cml_wgsl_generate(struct IRNode* node) {
         break;
     }
 
-    /* Activations */
     if (type == UOP_SIGMOID)   return wgsl_sigmoid_kernel();
     if (type == UOP_TANH)      return wgsl_tanh_kernel();
     if (type == UOP_ELU)       return wgsl_elu_kernel();
@@ -817,14 +787,12 @@ char* cml_wgsl_generate(struct IRNode* node) {
     if (type == UOP_MISH)      return wgsl_mish_kernel();
     if (type == UOP_HARDSWISH) return wgsl_hardswish_kernel();
 
-    /* Reductions */
     if (type == UOP_SUM)        return wgsl_sum_kernel();
     if (type == UOP_MAX_REDUCE) return wgsl_max_reduce_kernel();
     if (type == UOP_MIN_REDUCE) return wgsl_min_reduce_kernel();
     if (type == UOP_MEAN)       return wgsl_mean_kernel();
     if (type == UOP_PROD)       return wgsl_prod_kernel();
 
-    /* Special ops */
     if (type == UOP_MATMUL) return wgsl_matmul_kernel();
     if (type == UOP_CONV2D) return wgsl_conv2d_kernel();
     if (type == UOP_FILL)   return wgsl_fill_kernel();
@@ -836,17 +804,6 @@ char* cml_wgsl_generate(struct IRNode* node) {
 }
 
 
-/**
- * @brief Execute a full IR graph on the WebGPU backend.
- *
- * Walks each node in the graph, generates a WGSL shader via
- * cml_wgsl_generate(), compiles it, uploads input data, launches
- * the kernel, and downloads the result.
- *
- * @param backend  Initialised WebGPU backend context
- * @param graph    IR graph to execute
- * @return 0 on success, negative on failure
- */
 int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
     if (!backend || !backend->initialized) {
         LOG_ERROR("webgpu_execute_graph: backend not initialised");
@@ -859,7 +816,6 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
 
     struct IRNode* node = graph->head;
     while (node) {
-        /* 1. Generate WGSL source for this node */
         char* wgsl_src = cml_wgsl_generate(node);
         if (!wgsl_src) {
             LOG_ERROR("webgpu_execute_graph: codegen failed for UOp %d",
@@ -867,7 +823,6 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
             return -1;
         }
 
-        /* 2. Compile the WGSL source into a kernel */
         CMLWebGPUKernel* kernel =
             cml_webgpu_compile_wgsl(backend, wgsl_src, "main");
         free(wgsl_src);
@@ -877,7 +832,6 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
             return -1;
         }
 
-        /* 3. Upload input tensors to GPU buffers */
         int num_inputs = node->num_inputs;
         void** gpu_buffers = NULL;
         size_t* buffer_sizes = NULL;
@@ -926,7 +880,6 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
             if (!gpu_buffers[num_inputs]) ok = -1;
         }
 
-        /* 4. Launch kernel */
         if (ok == 0) {
             size_t n_elements = out_size / sizeof(float);
             size_t workgroups[3] = { (n_elements + 255) / 256, 1, 1 };
@@ -935,13 +888,11 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
                                           total_buffers);
         }
 
-        /* 5. Download result */
         if (ok == 0 && out_size > 0 && node->output && node->output->data) {
             ok = cml_webgpu_download(backend, node->output->data,
                                      gpu_buffers[num_inputs], out_size);
         }
 
-        /* Cleanup GPU buffers */
         for (int i = 0; i < total_buffers; i++) {
             if (gpu_buffers[i]) {
                 cml_webgpu_free(backend, gpu_buffers[i]);

@@ -1,12 +1,3 @@
-/**
- * @file qlora.c
- * @brief QLoRA (Quantized Low-Rank Adaptation) implementation
- *
- * Implements QLoRA layers combining NF4-quantized base weights with
- * trainable LoRA adapters. Uses explicit data loops for matmul operations
- * to avoid dependency on higher-level tensor ops.
- */
-
 #include "nn/qlora.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"

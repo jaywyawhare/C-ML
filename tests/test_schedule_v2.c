@@ -1,8 +1,3 @@
-/**
- * @file test_schedule_v2.c
- * @brief Tests for the V2 fusion scheduler
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +17,6 @@ static int tests_passed = 0;
     else { printf("FAIL\n"); } \
 } while(0)
 
-/* ---------- helpers ---------- */
 
 static Tensor* make_tensor(int d0, int d1) {
     int shape[2] = { d0, d1 };
@@ -30,7 +24,6 @@ static Tensor* make_tensor(int d0, int d1) {
     return tensor_empty(shape, 2, &cfg);
 }
 
-/* ---------- create / free tests ---------- */
 
 static int test_v2_create_empty(void) {
     CMLGraph_t g = cml_ir_new(IR_TARGET_C);
@@ -80,7 +73,6 @@ static int test_v2_single_op(void) {
     return ok;
 }
 
-/* ---------- fusion analysis tests ---------- */
 
 static int test_analyze_fusion_elem_elem(void) {
     /* Two elementwise ops should be fuseable */
@@ -132,7 +124,6 @@ static int test_analyze_fusion_null(void) {
     return (analysis.can_fuse == false && analysis.benefit == 0.0f);
 }
 
-/* ---------- elementwise chain fusion ---------- */
 
 static int test_v2_elementwise_chain_fused(void) {
     /* add -> mul -> neg should fuse into 1 group */
@@ -162,7 +153,6 @@ static int test_v2_elementwise_chain_fused(void) {
     return ok;
 }
 
-/* ---------- movement tests ---------- */
 
 static int test_v2_movement_no_kernel(void) {
     /* reshape between two elem ops: absorbed, no extra kernel */
@@ -211,7 +201,6 @@ static int test_v2_movement_only(void) {
     return ok;
 }
 
-/* ---------- reduce breaks fusion ---------- */
 
 static int test_v2_reduce_breaks_fusion(void) {
     /* add -> sum -> mul: add+sum fuse, mul starts a new group */
@@ -244,7 +233,6 @@ static int test_v2_reduce_breaks_fusion(void) {
     return ok;
 }
 
-/* ---------- matmul + bias fusion ---------- */
 
 static int test_v2_matmul_bias_fused(void) {
     /* matmul -> add (bias) should fuse */
@@ -273,7 +261,6 @@ static int test_v2_matmul_bias_fused(void) {
     return ok;
 }
 
-/* ---------- fusion ratio tests ---------- */
 
 static int test_v2_fusion_ratio_gt_1(void) {
     /* 6 elem ops -> 1 group => ratio = 6.0 (well above 1.0) */
@@ -327,7 +314,6 @@ static int test_v2_fusion_ratio_value(void) {
     return ok;
 }
 
-/* ---------- execution order ---------- */
 
 static int test_v2_execution_order(void) {
     CMLGraph_t g = cml_ir_new(IR_TARGET_C);
@@ -357,7 +343,6 @@ static int test_v2_execution_order(void) {
     return ok;
 }
 
-/* ---------- print does not crash ---------- */
 
 static int test_v2_print(void) {
     CMLGraph_t g = cml_ir_new(IR_TARGET_C);
@@ -374,7 +359,6 @@ static int test_v2_print(void) {
     return 1;
 }
 
-/* ---------- graph coloring: distinct colors ---------- */
 
 static int test_v2_group_colors(void) {
     /* Two separate groups should have distinct colors */
@@ -401,7 +385,6 @@ static int test_v2_group_colors(void) {
     return ok;
 }
 
-/* ---------- main ---------- */
 
 int main(void) {
     printf("\n=== test_schedule_v2 ===\n\n");

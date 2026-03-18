@@ -1,11 +1,3 @@
-/**
- * @file test_speculative.c
- * @brief Tests for speculative decoding
- *
- * Uses mock draft/target models with predictable forward and sample
- * functions so that acceptance / rejection behaviour is deterministic.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -30,24 +22,14 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===================================================================
- * Mock models
- *
- * Both mock models ignore the actual token content and simply return
- * logits tensors where a specific token index has the highest value.
- * This lets us control exactly which tokens are "predicted" and thus
- * whether the target agrees or disagrees with the draft.
- * =================================================================== */
 
 #define MOCK_VOCAB_SIZE 32
 
-/* ---------- Mock context ------------------------------------------ */
 
 typedef struct MockModelCtx {
     int predict_token;   /* The token this model always predicts. */
 } MockModelCtx;
 
-/* ---------- Forward: returns [seq_len, MOCK_VOCAB_SIZE] logits ----- */
 
 static Tensor* mock_forward(void* model_ctx, const int* token_ids, int seq_len) {
     (void)token_ids;  /* Not used by the mock. */
@@ -77,7 +59,6 @@ static Tensor* mock_forward(void* model_ctx, const int* token_ids, int seq_len) 
     return logits;
 }
 
-/* ---------- Sample: argmax of last row ----------------------------- */
 
 static int mock_sample(void* model_ctx, Tensor* logits, float temperature) {
     (void)model_ctx;
@@ -106,13 +87,6 @@ static int mock_sample(void* model_ctx, Tensor* logits, float temperature) {
 
 /* ---------- Position-aware forward for partial-agree tests -------- */
 
-/**
- * A forward function whose prediction depends on the sequence length.
- * It agrees with token 7 for the first N positions, then predicts
- * token 13 for the rest (simulating a disagreement after N tokens).
- *
- * The context's predict_token stores the "agree count" N.
- */
 typedef struct PartialAgreeCtx {
     int agree_count;     /* Number of draft positions to agree with. */
     int agree_token;     /* Token to agree on. */
@@ -160,11 +134,6 @@ static int partial_agree_sample(void* model_ctx, Tensor* logits,
     return mock_sample(model_ctx, logits, temperature);
 }
 
-/* ===================================================================
- * Tests
- * =================================================================== */
-
-/* ----- 1. Create / free decoder ----------------------------------- */
 
 static int test_create_free(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -215,7 +184,6 @@ static int test_result_free_null(void) {
     return 1;
 }
 
-/* ----- 2. Default config values ----------------------------------- */
 
 static int test_default_config(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -227,7 +195,6 @@ static int test_default_config(void) {
     return 1;
 }
 
-/* ----- 3. Full agreement: draft and target predict the same token -- */
 
 static int test_full_agreement(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -281,7 +248,6 @@ static int test_full_agreement(void) {
     return 1;
 }
 
-/* ----- 4. Full disagreement: target always disagrees --------------- */
 
 static int test_full_disagreement(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -328,7 +294,6 @@ static int test_full_disagreement(void) {
     return 1;
 }
 
-/* ----- 5. Partial agreement: target agrees on first 3, rejects 4th - */
 
 static int test_partial_agreement(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -397,7 +362,6 @@ static int test_partial_agreement(void) {
     return 1;
 }
 
-/* ----- 6. Lifetime acceptance rate statistics --------------------- */
 
 static int test_acceptance_rate_stats(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -455,7 +419,6 @@ static int test_acceptance_rate_stats(void) {
     return 1;
 }
 
-/* ----- 7. Edge case: K = 1 ---------------------------------------- */
 
 static int test_k_equals_1_agree(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -533,7 +496,6 @@ static int test_k_equals_1_disagree(void) {
     return 1;
 }
 
-/* ----- 8. Decode step with no callbacks set ----------------------- */
 
 static int test_decode_no_callbacks(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -553,7 +515,6 @@ static int test_decode_no_callbacks(void) {
     return 1;
 }
 
-/* ----- 9. Decode step with invalid prefix ------------------------- */
 
 static int test_decode_invalid_prefix(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -581,7 +542,6 @@ static int test_decode_invalid_prefix(void) {
     return 1;
 }
 
-/* ----- 10. Timing fields are populated ----------------------------- */
 
 static int test_timing_fields(void) {
     CMLSpeculativeConfig cfg = cml_speculative_default_config();
@@ -617,7 +577,6 @@ static int test_timing_fields(void) {
     return 1;
 }
 
-/* ----- 11. Set model on NULL decoder ------------------------------ */
 
 static int test_set_model_null_decoder(void) {
     /* Should not crash. */
@@ -626,7 +585,6 @@ static int test_set_model_null_decoder(void) {
     return 1;
 }
 
-/* ----- 12. Acceptance rate on NULL / fresh decoder ----------------- */
 
 static int test_acceptance_rate_null(void) {
     if (fabsf(cml_speculative_acceptance_rate(NULL)) > 1e-5f) return 0;
@@ -645,9 +603,6 @@ static int test_acceptance_rate_null(void) {
     return 1;
 }
 
-/* ===================================================================
- * Main
- * =================================================================== */
 
 int main(void) {
     printf("test_speculative\n\n");

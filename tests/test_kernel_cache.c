@@ -1,8 +1,3 @@
-/**
- * @file test_kernel_cache.c
- * @brief Unit tests for the kernel cache
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +11,6 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 
-// Test counters
 static int tests_run = 0;
 static int tests_passed = 0;
 
@@ -31,7 +25,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-// Test: Cache Creation
 
 static int test_cache_create(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -41,7 +34,6 @@ static int test_cache_create(void) {
     return 1;
 }
 
-// Test: Cache Creation with Zero Size
 
 static int test_cache_create_zero(void) {
     // Zero means unlimited
@@ -52,7 +44,6 @@ static int test_cache_create_zero(void) {
     return 1;
 }
 
-// Test: Hash Computation
 
 static int test_hash_computation(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
@@ -90,7 +81,6 @@ static int test_hash_computation(void) {
     return success;
 }
 
-// Test: Cache Insert and Lookup
 
 static int test_insert_lookup(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -125,7 +115,6 @@ static int test_insert_lookup(void) {
     return 1;
 }
 
-// Test: Cache Miss
 
 static int test_cache_miss(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -142,7 +131,6 @@ static int test_cache_miss(void) {
     return 1;
 }
 
-// Test: Cache Clear
 
 static int test_cache_clear(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -176,7 +164,6 @@ static int test_cache_clear(void) {
     return 1;
 }
 
-// Test: LRU Eviction
 
 static int test_lru_eviction(void) {
     // Create cache with max 3 entries
@@ -209,7 +196,6 @@ static int test_lru_eviction(void) {
     return has_1111 && has_3333 && has_4444 && !has_2222;
 }
 
-// Test: Statistics
 
 static int test_cache_statistics(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -233,7 +219,6 @@ static int test_cache_statistics(void) {
     return success;
 }
 
-// Test: Multiple Backends Same Hash
 
 static int test_multiple_backends(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -258,7 +243,6 @@ static int test_multiple_backends(void) {
     return success;
 }
 
-// Test: Entry Update
 
 static int test_entry_update(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);
@@ -279,7 +263,6 @@ static int test_entry_update(void) {
     return success;
 }
 
-// Test: Large Number of Entries
 
 static int test_large_cache(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(1000);
@@ -306,7 +289,6 @@ static int test_large_cache(void) {
     return success;
 }
 
-// Main
 
 int main(void) {
     printf("\n=== Kernel Cache Unit Tests ===\n\n");
@@ -323,9 +305,9 @@ int main(void) {
     TEST(entry_update);
     TEST(large_cache);
 
-    printf("\n===============================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("===============================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

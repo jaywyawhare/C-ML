@@ -1,10 +1,3 @@
-/**
- * @file conv_transpose1d.c
- * @brief 1D Transposed Convolution layer implementation
- *
- * Output shape: L_out = (L_in - 1) * stride - 2*padding + dilation*(kernel-1) + output_padding + 1
- */
-
 #include "nn/layers/conv_transpose1d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -72,7 +65,6 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
         tensor_free(output);
         return NULL;
     }
-    // Transposed conv: scatter each input element to output
     for (int b = 0; b < batch; b++) {
         for (int ic = 0; ic < in_channels; ic++) {
             for (int il = 0; il < in_length; il++) {

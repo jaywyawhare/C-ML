@@ -1,8 +1,3 @@
-/**
- * @file augmentation.c
- * @brief Data augmentation implementation
- */
-
 #include "core/augmentation.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
@@ -58,7 +53,6 @@ void augmentation_config_free(AugmentationConfig* config) {
     free(config);
 }
 
-// Random number generator (simple linear congruential)
 static unsigned int rng_seed = 1;
 static void set_seed(unsigned int seed) { rng_seed = seed; }
 static float rand_float(void) {

@@ -1,9 +1,6 @@
-/**
- * @file vulkan_backend.h
- * @brief Vulkan compute backend via dynamic loading
- *
- * Provides GPU compute execution through the Vulkan API without compile-time
- * dependencies. All Vulkan functions are loaded at runtime via dlopen/dlsym.
+/*
+ * Vulkan compute backend via dynamic loading.
+ * All Vulkan functions are loaded at runtime via dlopen/dlsym.
  */
 
 #ifndef CML_GPU_VULKAN_BACKEND_H
@@ -17,14 +14,12 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
 struct Tensor;
 typedef struct Tensor Tensor;
 struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
 
-/* ── Vulkan type aliases (avoid requiring vulkan.h) ── */
-
+/* Vulkan type aliases (avoid requiring vulkan.h) */
 typedef uint32_t VkFlags;
 typedef uint32_t VkBool32;
 typedef uint64_t VkDeviceSize;
@@ -48,8 +43,6 @@ typedef int32_t  VkResult;
 #define VK_SUCCESS 0
 #define VK_MAX_BUFFERS_PER_KERNEL 16
 
-/* ── Vulkan buffer ── */
-
 typedef struct CMLVulkanBuffer {
     VkBuffer       buffer;
     VkDeviceMemory memory;
@@ -57,8 +50,6 @@ typedef struct CMLVulkanBuffer {
     bool           is_device_local;  /* true = GPU-only, false = host-visible staging */
     void*          mapped;           /* non-NULL if persistently mapped (staging only) */
 } CMLVulkanBuffer;
-
-/* ── Vulkan compiled kernel ── */
 
 typedef struct CMLVulkanKernel {
     VkShaderModule        shader_module;
@@ -71,13 +62,10 @@ typedef struct CMLVulkanKernel {
     int                   num_buffers;
 } CMLVulkanKernel;
 
-/* ── Vulkan backend context ── */
-
 typedef struct CMLVulkanBackend {
     void* vulkan_lib;  /* libvulkan.so.1 handle */
     bool  initialized;
 
-    /* Vulkan objects */
     VkInstance       instance;
     VkPhysicalDevice physical_device;
     VkDevice         device;
@@ -85,7 +73,6 @@ typedef struct CMLVulkanBackend {
     uint32_t         compute_queue_family;
     VkCommandPool    command_pool;
 
-    /* Device info */
     char     device_name[256];
     uint32_t api_version;
     size_t   total_memory;
@@ -95,14 +82,12 @@ typedef struct CMLVulkanBackend {
     uint32_t memory_type_device_local;
     uint32_t memory_type_host_visible;
 
-    /* ── Vulkan function pointers (loaded via dlsym) ── */
+    /* Vulkan function pointers (loaded via dlsym) */
 
-    /* Instance */
     VkResult (*vkCreateInstance)(const void* pCreateInfo, const void* pAllocator,
                                  VkInstance* pInstance);
     void     (*vkDestroyInstance)(VkInstance instance, const void* pAllocator);
 
-    /* Physical device */
     VkResult (*vkEnumeratePhysicalDevices)(VkInstance instance, uint32_t* pCount,
                                            VkPhysicalDevice* pDevices);
     void     (*vkGetPhysicalDeviceProperties)(VkPhysicalDevice dev, void* pProps);
@@ -110,14 +95,12 @@ typedef struct CMLVulkanBackend {
     void     (*vkGetPhysicalDeviceQueueFamilyProperties)(VkPhysicalDevice dev, uint32_t* pCount,
                                                           void* pProps);
 
-    /* Logical device */
     VkResult (*vkCreateDevice)(VkPhysicalDevice phys, const void* pCreateInfo,
                                 const void* pAllocator, VkDevice* pDevice);
     void     (*vkDestroyDevice)(VkDevice device, const void* pAllocator);
     void     (*vkGetDeviceQueue)(VkDevice device, uint32_t family, uint32_t index,
                                   VkQueue* pQueue);
 
-    /* Memory */
     VkResult (*vkAllocateMemory)(VkDevice device, const void* pAllocInfo,
                                   const void* pAllocator, VkDeviceMemory* pMemory);
     void     (*vkFreeMemory)(VkDevice device, VkDeviceMemory memory, const void* pAllocator);
@@ -125,7 +108,6 @@ typedef struct CMLVulkanBackend {
                              VkDeviceSize size, VkFlags flags, void** ppData);
     void     (*vkUnmapMemory)(VkDevice device, VkDeviceMemory memory);
 
-    /* Buffers */
     VkResult (*vkCreateBuffer)(VkDevice device, const void* pCreateInfo,
                                 const void* pAllocator, VkBuffer* pBuffer);
     void     (*vkDestroyBuffer)(VkDevice device, VkBuffer buffer, const void* pAllocator);
@@ -133,7 +115,6 @@ typedef struct CMLVulkanBackend {
     VkResult (*vkBindBufferMemory)(VkDevice device, VkBuffer buffer, VkDeviceMemory memory,
                                     VkDeviceSize offset);
 
-    /* Command buffers */
     VkResult (*vkCreateCommandPool)(VkDevice device, const void* pCreateInfo,
                                      const void* pAllocator, VkCommandPool* pPool);
     void     (*vkDestroyCommandPool)(VkDevice device, VkCommandPool pool,
@@ -146,12 +127,10 @@ typedef struct CMLVulkanBackend {
     VkResult (*vkEndCommandBuffer)(VkCommandBuffer buf);
     VkResult (*vkResetCommandBuffer)(VkCommandBuffer buf, VkFlags flags);
 
-    /* Queue submit */
     VkResult (*vkQueueSubmit)(VkQueue queue, uint32_t submitCount, const void* pSubmits,
                                VkFence fence);
     VkResult (*vkQueueWaitIdle)(VkQueue queue);
 
-    /* Fences */
     VkResult (*vkCreateFence)(VkDevice device, const void* pCreateInfo,
                                const void* pAllocator, VkFence* pFence);
     void     (*vkDestroyFence)(VkDevice device, VkFence fence, const void* pAllocator);
@@ -159,7 +138,6 @@ typedef struct CMLVulkanBackend {
                                  VkBool32 waitAll, uint64_t timeout);
     VkResult (*vkResetFences)(VkDevice device, uint32_t count, const VkFence* pFences);
 
-    /* Shader / pipeline */
     VkResult (*vkCreateShaderModule)(VkDevice device, const void* pCreateInfo,
                                       const void* pAllocator, VkShaderModule* pModule);
     void     (*vkDestroyShaderModule)(VkDevice device, VkShaderModule module,
@@ -173,7 +151,6 @@ typedef struct CMLVulkanBackend {
     void     (*vkDestroyPipelineLayout)(VkDevice device, VkPipelineLayout layout,
                                          const void* pAllocator);
 
-    /* Descriptors */
     VkResult (*vkCreateDescriptorSetLayout)(VkDevice device, const void* pCreateInfo,
                                               const void* pAllocator,
                                               VkDescriptorSetLayout* pLayout);
@@ -189,7 +166,6 @@ typedef struct CMLVulkanBackend {
                                         const void* pWrites, uint32_t copyCount,
                                         const void* pCopies);
 
-    /* Dispatch */
     void (*vkCmdBindPipeline)(VkCommandBuffer buf, int bindPoint, VkPipeline pipeline);
     void (*vkCmdBindDescriptorSets)(VkCommandBuffer buf, int bindPoint,
                                      VkPipelineLayout layout, uint32_t firstSet,
@@ -207,14 +183,10 @@ typedef struct CMLVulkanBackend {
     VkResult (*vkDeviceWaitIdle)(VkDevice device);
 } CMLVulkanBackend;
 
-/* ── Backend lifecycle ── */
-
 bool              cml_vulkan_available(void);
 CMLVulkanBackend* cml_vulkan_backend_create(void);
 int               cml_vulkan_backend_init(CMLVulkanBackend* backend);
 void              cml_vulkan_backend_free(CMLVulkanBackend* backend);
-
-/* ── Buffer management ── */
 
 CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSize size,
                                            bool device_local);
@@ -223,8 +195,6 @@ int              cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBu
                                           const void* src, size_t size);
 int              cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
                                              void* dst, size_t size);
-
-/* ── Kernel management ── */
 
 CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint32_t* spirv,
                                             size_t spirv_size, const char* entry_point,
@@ -236,8 +206,6 @@ int              cml_vulkan_kernel_bind_buffer(CMLVulkanBackend* backend,
 int              cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend,
                                              CMLVulkanKernel* kernel,
                                              uint32_t gx, uint32_t gy, uint32_t gz);
-
-/* ── Graph execution ── */
 
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir);
 int cml_vulkan_synchronize(CMLVulkanBackend* backend);

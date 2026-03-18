@@ -1,12 +1,3 @@
-/**
- * @file lr_scheduler.c
- * @brief Extended LR scheduler implementations
- *
- * Provides additional scheduler constructors (cosine_annealing alias,
- * multi_step) and epoch/metric stepping helpers that wrap the canonical
- * lr_scheduler_update() from training_loop.c.
- */
-
 #include "optim/lr_scheduler.h"
 #include "core/logging.h"
 #include <stdlib.h>

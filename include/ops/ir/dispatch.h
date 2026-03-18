@@ -1,7 +1,5 @@
-/**
- * @file dispatch.h
- * @brief Unified dispatch layer for multi-backend execution
- *
+/*
+ * Unified dispatch layer for multi-backend execution.
  * Handles backend detection, selection, fallback, and kernel cache integration.
  * Backends: CPU interpreter, LLVM JIT, CUDA (NVPTX), ROCm (AMDGPU).
  */
@@ -16,16 +14,12 @@
 extern "C" {
 #endif
 
-// Forward declarations
 struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
 struct Tensor;
 typedef struct Tensor Tensor;
 struct CMLKernelCache;
 
-/**
- * @brief Execution backend types
- */
 typedef enum CMLBackendType {
     CML_BACKEND_CPU_FALLBACK = 0, // CPU interpreter (no JIT, always available)
     CML_BACKEND_CPU_LLVM,         // LLVM JIT (requires LLVM)
@@ -37,12 +31,9 @@ typedef enum CMLBackendType {
     CML_BACKEND_METAL,            // Metal GPU (macOS)
     CML_BACKEND_VULKAN,           // Vulkan/SPIR-V compute
     CML_BACKEND_WEBGPU,           // WebGPU via wgpu-native
-    CML_BACKEND_COUNT             // Number of backends
+    CML_BACKEND_COUNT
 } CMLBackendType;
 
-/**
- * @brief Backend status
- */
 typedef enum CMLBackendStatus {
     CML_BACKEND_STATUS_UNAVAILABLE = 0,
     CML_BACKEND_STATUS_AVAILABLE,
@@ -50,9 +41,6 @@ typedef enum CMLBackendStatus {
     CML_BACKEND_STATUS_ERROR
 } CMLBackendStatus;
 
-/**
- * @brief Backend information
- */
 typedef struct CMLBackendInfo {
     CMLBackendType type;
     CMLBackendStatus status;
@@ -64,9 +52,6 @@ typedef struct CMLBackendInfo {
     bool supports_unified_mem;
 } CMLBackendInfo;
 
-/**
- * @brief Dispatch context for managing backend execution
- */
 typedef struct CMLDispatchContext {
     CMLBackendType preferred;
     CMLBackendType active;
@@ -86,13 +71,11 @@ typedef struct CMLDispatchContext {
     void* backend_contexts[CML_BACKEND_COUNT];
 } CMLDispatchContext;
 
-// Initialization and Cleanup
 CMLDispatchContext* cml_dispatch_create(void);
 int cml_dispatch_init(CMLDispatchContext* ctx);
 void cml_dispatch_free(CMLDispatchContext* ctx);
 CMLDispatchContext* cml_dispatch_get_global(void);
 
-// Backend Management
 int cml_dispatch_detect_backends(CMLDispatchContext* ctx);
 int cml_dispatch_set_preferred(CMLDispatchContext* ctx, CMLBackendType backend);
 const CMLBackendInfo* cml_dispatch_get_backend_info(CMLDispatchContext* ctx,
@@ -101,25 +84,21 @@ bool cml_dispatch_backend_available(CMLDispatchContext* ctx, CMLBackendType back
 CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx);
 const char* cml_dispatch_backend_name(CMLBackendType backend);
 
-// Execution
 int cml_dispatch_execute(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs, int num_inputs,
                          Tensor** outputs, int num_outputs);
 int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CMLGraph_t ir,
                             Tensor** inputs, int num_inputs, Tensor** outputs, int num_outputs);
 CMLBackendType cml_dispatch_select_backend(CMLDispatchContext* ctx, CMLGraph_t ir);
 
-// Cache Management
 int cml_dispatch_enable_cache(CMLDispatchContext* ctx, size_t max_entries);
 void cml_dispatch_disable_cache(CMLDispatchContext* ctx);
 void cml_dispatch_clear_cache(CMLDispatchContext* ctx);
 void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* misses, size_t* size);
 
-// Async Execution
 int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
                                Tensor** inputs, int num_inputs,
                                Tensor** outputs, int num_outputs);
 
-// Backend Accessors
 struct CMLCUDABackend;
 struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void);
 struct CMLVulkanBackend;
@@ -129,12 +108,10 @@ struct CMLNVDriver* cml_dispatch_get_nv_driver(void);
 struct CMLAMDriver;
 struct CMLAMDriver* cml_dispatch_get_am_driver(void);
 
-// JIT Dispatch
 int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
                              Tensor** inputs, int num_inputs,
                              Tensor** outputs, int num_outputs);
 
-// Utility
 void cml_dispatch_print_status(CMLDispatchContext* ctx);
 void cml_dispatch_synchronize(CMLDispatchContext* ctx);
 int cml_dispatch_set_from_env(CMLDispatchContext* ctx);

@@ -1,8 +1,3 @@
-/**
- * @file graph_allocator.c
- * @brief Graph allocator implementation
- */
-
 #include "alloc/graph_allocator.h"
 #include "alloc/memory_pools.h"
 #include "backend/backend_buffer.h"

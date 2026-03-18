@@ -1,8 +1,3 @@
-/**
- * @file fusion_patterns.c
- * @brief Pluggable fusion pattern registry implementation
- */
-
 #include "ops/ir/fusion_patterns.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"

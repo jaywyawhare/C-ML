@@ -1,8 +1,3 @@
-/**
- * @file test_graph_capture.c
- * @brief Tests for GPU graph capture and replay
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

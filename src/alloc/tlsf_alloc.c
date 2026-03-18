@@ -1,20 +1,16 @@
-/**
- * @file tlsf_alloc.c
- * @brief TLSF (Two-Level Segregated Fit) memory allocator with timeline planning
+/*
+ * TLSF (Two-Level Segregated Fit) memory allocator with timeline planning.
  *
- * O(1) allocation and deallocation with bounded fragmentation.
- * The two-level segregated free list maps each free block into a
- * first-level index (FL = floor(log2(size))) and a second-level index
- * (SL = subdivision within that power-of-two range).
+ * O(1) alloc/free with bounded fragmentation. The two-level segregated free
+ * list maps each free block into FL = floor(log2(size)) and SL = subdivision
+ * within that power-of-two range.
  *
- * Memory layout within the pool:
- *   [Block Header | User Data] [Block Header | User Data] ... [Sentinel Header]
+ * Memory layout: [Block Header | User Data] ... [Sentinel Header]
+ * Block headers store prev_phys pointer and size (flag bits in 2 LSBs).
+ * Free blocks store next_free/prev_free pointers in the user data area.
  *
- * Each block header stores: prev_phys pointer, size (with flag bits in LSBs).
- * Free blocks additionally store next_free and prev_free pointers in the user data area.
- *
- * Timeline planner uses a greedy first-fit-by-offset algorithm to pack
- * tensor lifetimes into the smallest contiguous memory region.
+ * Timeline planner uses greedy first-fit-by-offset to pack tensor lifetimes
+ * into the smallest contiguous memory region.
  */
 
 #include "alloc/tlsf_alloc.h"
@@ -115,13 +111,11 @@ static inline TLSFBlock* user_to_block(void* ptr)
     return (TLSFBlock*)((char*)ptr - BLOCK_HEADER_SIZE);
 }
 
-/** Get next physical block. The next block starts at (this block's start + header + user_size). */
 static inline TLSFBlock* block_next_phys(TLSFBlock* b)
 {
     return (TLSFBlock*)((char*)b + BLOCK_HEADER_SIZE + block_get_size(b));
 }
 
-/** Check if a block pointer is within the valid pool range. */
 static inline bool block_in_pool(const CMLTLSFAllocator* a, const TLSFBlock* b)
 {
     return (const char*)b >= (const char*)a->pool &&
@@ -203,11 +197,6 @@ static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block)
 }
 
 
-/**
- * Try to split 'block' so that the first part has exactly 'wanted' bytes of
- * user area. If the remainder is large enough for a new block, create and
- * return it. Otherwise return NULL (no split).
- */
 static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted)
 {
     size_t cur = block_get_size(block);
@@ -239,7 +228,6 @@ static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted
     return rest;
 }
 
-/** Merge 'block' with its previous physical neighbor if free. Returns the merged block. */
 static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block)
 {
     if (!block_prev_is_free(block)) return block;
@@ -260,7 +248,6 @@ static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block)
     return prev;
 }
 
-/** Merge 'block' with its next physical neighbor if free. Returns the merged block. */
 static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block)
 {
     TLSFBlock* next = block_next_phys(block);
@@ -307,10 +294,6 @@ static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size)
 }
 
 
-/**
- * Initialize the pool memory: create one large free block + a sentinel.
- * Returns 0 on success, -1 on failure (pool too small).
- */
 static int init_pool(CMLTLSFAllocator* a)
 {
     /* We need at least: one real block (header + min user) + sentinel (header only) */
@@ -768,7 +751,6 @@ int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id,
     return 0;
 }
 
-/** Sort by alloc_time ascending, then by size descending (large first). */
 static int timeline_cmp(const void* a, const void* b)
 {
     const CMLTimelineRecord* ra = (const CMLTimelineRecord*)a;
@@ -861,7 +843,7 @@ void cml_timeline_planner_print(const CMLTimelinePlanner* p)
 {
     if (!p) { printf("Timeline planner: (null)\n"); return; }
 
-    printf("=== Timeline Memory Plan ===\n");
+    printf("Timeline Memory Plan\n");
     printf("Records: %d, Steps: %d\n", p->num_records, p->num_steps);
     printf("Total memory required: %zu bytes\n", p->total_required);
     printf("Peak concurrent usage: %zu bytes\n", p->peak_usage);
@@ -890,5 +872,5 @@ void cml_timeline_planner_print(const CMLTimelinePlanner* p)
         }
     }
 
-    printf("============================\n");
+    printf("\n");
 }

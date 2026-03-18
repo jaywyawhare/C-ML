@@ -1,11 +1,3 @@
-/**
- * @file spirv_codegen.c
- * @brief SPIR-V binary code generation
- *
- * Emits binary SPIR-V compute shaders: OpCapability Shader, storage buffers,
- * GlobalInvocationID for thread index, GLSL.std.450 for math ops.
- */
-
 #include "ops/ir/gpu/spirv_codegen.h"
 #include "core/logging.h"
 
@@ -166,7 +158,6 @@ uint32_t spirv_builder_alloc_id(SPIRVBuilder* b) {
     return b->next_id++;
 }
 
-/* Emit an instruction: opcode with word count header */
 static void emit_op(SPIRVBuilder* b, uint32_t opcode, uint32_t word_count) {
     spirv_builder_emit(b, (word_count << 16) | opcode);
 }
@@ -243,7 +234,6 @@ static void emit_member_decorate(SPIRVBuilder* b, uint32_t struct_id, uint32_t m
     spirv_builder_emit(b, value);
 }
 
-/* Helper: emit a float constant, returns its ID */
 static uint32_t emit_float_constant(SPIRVBuilder* b, uint32_t float_type, float value) {
     uint32_t id = spirv_builder_alloc_id(b);
     uint32_t bits;
@@ -255,7 +245,6 @@ static uint32_t emit_float_constant(SPIRVBuilder* b, uint32_t float_type, float 
     return id;
 }
 
-/* Helper: emit a uint32 constant */
 static uint32_t __attribute__((unused)) emit_uint_constant(SPIRVBuilder* b, uint32_t uint_type, uint32_t value) {
     uint32_t id = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpConstant, 4);
@@ -1015,7 +1004,6 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
     emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_wg_arr);
     spirv_builder_emit(b, id_var_sdata); spirv_builder_emit(b, SpvStorageClassWorkgroup);
 
-    /* ── Function body ── */
     uint32_t id_label_entry = spirv_builder_alloc_id(b);
 
     emit_op(b, SpvOpFunction, 5); spirv_builder_emit(b, id_void);
@@ -1397,7 +1385,6 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_in_u3);
     spirv_builder_emit(b, id_var_gid); spirv_builder_emit(b, SpvStorageClassInput);
 
-    /* ── Function body ── */
     uint32_t id_label_entry = spirv_builder_alloc_id(b);
     uint32_t id_label_body  = spirv_builder_alloc_id(b);
     uint32_t id_label_end   = spirv_builder_alloc_id(b);

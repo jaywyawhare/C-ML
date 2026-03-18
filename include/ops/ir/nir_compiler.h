@@ -1,9 +1,5 @@
-/**
- * @file nir_compiler.h
- * @brief NIR/Mesa multi-vendor GPU compilation
- *
- * Compiles IR to NIR (Mesa's intermediate representation) for multi-vendor
- * GPU support through Mesa's driver stack (AMD, Intel, Qualcomm, etc.).
+/*
+ * NIR/Mesa multi-vendor GPU compilation.
  *
  * NIR is Mesa's common compiler IR used by all Gallium3D and Vulkan drivers.
  * This module dynamically loads libmesa_nir.so at runtime so no build-time
@@ -52,7 +48,6 @@ typedef struct CMLNIRCompiler {
     uint32_t* spirv_output;
     size_t spirv_size;
 
-    /* NIR builder function pointers */
     void* (*nir_builder_init_simple_shader)(void* mem_ctx, void* options,
                                             int stage, const char* name);
     void* (*nir_fadd)(void* builder, void* a, void* b);
@@ -66,28 +61,13 @@ typedef struct CMLNIRCompiler {
     void* (*nir_shader_to_spirv)(void* shader, size_t* size);
 } CMLNIRCompiler;
 
-/** Check if NIR compilation is available (requires Mesa) */
 bool cml_nir_available(void);
-
-/** Create NIR compiler for target */
 CMLNIRCompiler* cml_nir_compiler_create(CMLNIRTarget target);
-
-/** Free NIR compiler */
 void cml_nir_compiler_free(CMLNIRCompiler* compiler);
-
-/** Compile IR graph to NIR */
 int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir);
-
-/** Get compiled binary size (SPIR-V output) */
 size_t cml_nir_binary_size(const CMLNIRCompiler* compiler);
-
-/** Get compiled binary data (SPIR-V output) */
 const void* cml_nir_binary_data(const CMLNIRCompiler* compiler);
-
-/** Get target name */
 const char* cml_nir_target_name(CMLNIRTarget target);
-
-/** Map UOp to NIR operation */
 int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs);
 
 #ifdef __cplusplus

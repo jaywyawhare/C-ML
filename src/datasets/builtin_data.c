@@ -1,12 +1,3 @@
-/**
- * @file builtin_data.c
- * @brief Embedded datasets (no download needed)
- *
- * Contains:
- *   - Airline Passengers (144 monthly totals, 1949-1960)
- *   - Digits 8x8 (1797 procedurally generated samples, 64 features, 10 classes)
- */
-
 #include "datasets/datasets.h"
 #include <stdint.h>
 

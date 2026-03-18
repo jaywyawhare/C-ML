@@ -1,11 +1,3 @@
-/**
- * @file gguf_quant.c
- * @brief Dequantization kernels for GGUF quantized formats
- *
- * Implements dequantization for Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K block
- * formats, matching the llama.cpp layout.  All routines convert to float32.
- */
-
 #include "core/gguf_quant.h"
 #include <string.h>
 #include <stdlib.h>

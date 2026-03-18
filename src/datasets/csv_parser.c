@@ -1,8 +1,3 @@
-/**
- * @file csv_parser.c
- * @brief CSV parser with auto-detection of headers, delimiters, and string labels
- */
-
 #define _POSIX_C_SOURCE 200809L
 #include "datasets/datasets.h"
 #include "core/logging.h"

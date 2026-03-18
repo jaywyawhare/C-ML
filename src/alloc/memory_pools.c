@@ -1,8 +1,3 @@
-/**
- * @file memory_pools.c
- * @brief Memory pool allocator implementation
- */
-
 #include "alloc/memory_pools.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"

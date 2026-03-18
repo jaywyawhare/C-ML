@@ -1,8 +1,3 @@
-/**
- * @file dropout.c
- * @brief Dropout layer implementation
- */
-
 #include "nn/layers/dropout.h"
 #include "nn.h"
 #include "tensor/tensor.h"

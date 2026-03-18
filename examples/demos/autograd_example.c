@@ -1,19 +1,8 @@
-/**
- * @file autograd_example.c
- * @brief Example demonstrating the C-ML autograd system
- *
- * This example shows how to use automatic differentiation
- * in C-ML for training a simple neural network.
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-/**
- * Example 1: Simple gradient computation
- * Compute gradients for: z = x^2 + y^2
- */
+// z = x^2 + y^2
 static void example_simple_gradients(void) {
     printf("\n=== Example 1: Simple Gradients ===\n");
     printf("Computing gradients for: z = x^2 + y^2\n\n");
@@ -58,10 +47,7 @@ static void example_simple_gradients(void) {
     tensor_free(z);
 }
 
-/**
- * Example 2: Neural network forward and backward pass
- * Simple 1-layer network: y = sigmoid(w*x + b)
- */
+// y = sigmoid(w*x + b)
 static void example_neural_network(void) {
     printf("\n=== Example 2: Neural Network ===\n");
     printf("Simple 1-layer network: y = sigmoid(w*x + b)\n\n");
@@ -106,10 +92,6 @@ static void example_neural_network(void) {
     tensor_free(y);
 }
 
-/**
- * Example 3: Loss function and optimization step
- * Compute MSE loss and gradients for a simple prediction problem
- */
 static void example_loss_function(void) {
     printf("\n=== Example 3: Loss Function ===\n");
     printf("Training with MSE loss\n\n");
@@ -161,10 +143,6 @@ static void example_loss_function(void) {
     tensor_free(loss);
 }
 
-/**
- * Example 4: Gradient accumulation
- * Show how gradients accumulate over multiple backward passes
- */
 static void example_gradient_accumulation(void) {
     printf("\n=== Example 4: Gradient Accumulation ===\n");
     printf("Accumulating gradients from multiple losses\n\n");
@@ -209,10 +187,6 @@ static void example_gradient_accumulation(void) {
     tensor_free(y2);
 }
 
-/**
- * Example 5: No gradient mode
- * Demonstrate disabling gradient computation
- */
 static void example_no_grad_mode(void) {
     printf("\n=== Example 5: No Gradient Mode ===\n");
     printf("Disabling gradient computation\n\n");

@@ -1,11 +1,3 @@
-/**
- * @file test_serving.c
- * @brief Tests for the continuous batching / serving scheduler
- *
- * Validates request queue, batch admission, status transitions,
- * finish/stats tracking, and queue overflow handling.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,7 +20,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== Test: default config returns sensible values ===== */
 
 static int test_default_config(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -41,7 +32,6 @@ static int test_default_config(void) {
     return 1;
 }
 
-/* ===== Test: create and free serving context ===== */
 
 static int test_create_free(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -66,7 +56,6 @@ static int test_free_null(void) {
     return 1;
 }
 
-/* ===== Test: set KV cache ===== */
 
 static int test_set_kv_cache(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -92,7 +81,6 @@ static int test_set_kv_cache(void) {
     return 1;
 }
 
-/* ===== Test: submit requests and verify queued ===== */
 
 static int test_submit_single(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -171,7 +159,6 @@ static int test_submit_default_max_new_tokens(void) {
     return 1;
 }
 
-/* ===== Test: step admits requests into batch ===== */
 
 static int test_step_admits_to_batch(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -224,7 +211,6 @@ static int test_step_null_context(void) {
     return 1;
 }
 
-/* ===== Test: status transitions (QUEUED -> PREFILL -> DECODING) ===== */
 
 static int test_status_transitions(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -266,7 +252,6 @@ static int test_get_status_not_found(void) {
     return 1;
 }
 
-/* ===== Test: get tokens ===== */
 
 static int test_get_tokens_empty(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -300,7 +285,6 @@ static int test_get_tokens_not_found(void) {
     return 1;
 }
 
-/* ===== Test: finish request and verify stats ===== */
 
 static int test_finish_request(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -379,7 +363,6 @@ static int test_finish_multiple_requests(void) {
     return 1;
 }
 
-/* ===== Test: queue overflow ===== */
 
 static int test_queue_overflow(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -427,7 +410,6 @@ static int test_queue_overflow(void) {
     return 1;
 }
 
-/* ===== Test: stats snapshot ===== */
 
 static int test_get_stats(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -450,7 +432,6 @@ static int test_get_stats_null(void) {
     return 1;
 }
 
-/* ===== Test: step then finish then step again (batch reuse) ===== */
 
 static int test_step_finish_step(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -498,7 +479,6 @@ static int test_step_finish_step(void) {
     return 1;
 }
 
-/* ===== Test: config clamping ===== */
 
 static int test_config_clamping(void) {
     CMLServingConfig cfg = cml_serving_default_config();
@@ -522,7 +502,6 @@ static int test_config_clamping(void) {
     return 1;
 }
 
-/* ===== Main ===== */
 
 int main(void) {
     printf("test_serving\n\n");

@@ -1,8 +1,3 @@
-/**
- * @file embedding.h
- * @brief Embedding lookup table layer
- */
-
 #ifndef CML_NN_LAYERS_EMBEDDING_H
 #define CML_NN_LAYERS_EMBEDDING_H
 

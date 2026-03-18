@@ -1,8 +1,3 @@
-/**
- * @file gguf.c
- * @brief GGUF serialization implementation
- */
-
 #include "core/gguf.h"
 #include "core/gguf_quant.h"
 #include "core/serialization.h"
@@ -114,7 +109,6 @@ GGUFContext* gguf_open_read(const char* filepath) {
         return NULL;
     }
 
-    // Read header
     uint32_t magic;
     if (fread(&magic, 4, 1, f) != 1 || magic != GGUF_MAGIC) {
         LOG_ERROR("gguf_open_read: invalid GGUF magic");
@@ -137,7 +131,6 @@ GGUFContext* gguf_open_read(const char* filepath) {
     ctx->num_tensors = (int)num_tensors;
     ctx->num_metadata = (int)num_metadata;
 
-    // Skip metadata key-value pairs
     for (uint64_t i = 0; i < num_metadata; i++) {
         char* key = read_gguf_string(f);
         free(key);
@@ -146,7 +139,6 @@ GGUFContext* gguf_open_read(const char* filepath) {
         skip_gguf_value(f, val_type);
     }
 
-    // Read tensor info
     ctx->tensors = calloc(num_tensors, sizeof(GGUFTensorInfo));
     if (!ctx->tensors) { gguf_close(ctx); return NULL; }
 
@@ -165,7 +157,6 @@ GGUFContext* gguf_open_read(const char* filepath) {
         ctx->tensors[i].type = (GGUFTensorType)type;
         if (fread(&ctx->tensors[i].offset, 8, 1, f) != 1) break;
 
-        // Calculate data size
         size_t numel = 1;
         for (int d = 0; d < ctx->tensors[i].ndim; d++)
             numel *= (size_t)ctx->tensors[i].shape[d];
@@ -203,7 +194,6 @@ void gguf_close(GGUFContext* ctx) {
     if (!ctx) return;
 
     if (ctx->is_write && ctx->filepath && ctx->write_count > 0) {
-        // Finalize: write entire GGUF file
         FILE* f = fopen(ctx->filepath, "wb");
         if (f) {
             uint32_t magic = GGUF_MAGIC;
@@ -215,7 +205,6 @@ void gguf_close(GGUFContext* ctx) {
             fwrite(&nt, 8, 1, f);
             fwrite(&nm, 8, 1, f);
 
-            // Write tensor infos
             for (int i = 0; i < ctx->write_count; i++) {
                 write_gguf_string(f, ctx->tensors[i].name);
                 uint32_t ndim = (uint32_t)ctx->tensors[i].ndim;
@@ -234,7 +223,6 @@ void gguf_close(GGUFContext* ctx) {
             long aligned = (pos + 31) & ~31L;
             while (pos < aligned) { uint8_t z = 0; fwrite(&z, 1, 1, f); pos++; }
 
-            // Write tensor data
             fwrite(ctx->write_data, 1, ctx->write_data_size, f);
             fclose(f);
         }
@@ -330,7 +318,6 @@ int gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor) {
 
     size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
 
-    // Ensure write buffer capacity
     while (ctx->write_data_size + data_size > ctx->write_data_cap) {
         ctx->write_data_cap *= 2;
         ctx->write_data = realloc(ctx->write_data, ctx->write_data_cap);

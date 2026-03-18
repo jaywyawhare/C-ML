@@ -1,13 +1,7 @@
-/**
- * @file winograd.c
- * @brief Winograd convolution transforms for 3x3 kernel acceleration
- *
- * Implements F(2x2,3x3) and F(4x4,3x3) Winograd convolution variants.
- * F(2x2,3x3) uses 4x4 tiles and produces 2x2 output tiles (~2.25x speedup).
- * F(4x4,3x3) uses 6x6 tiles and produces 4x4 output tiles (~4x speedup).
- *
- * Reference: Lavin & Gray, "Fast Algorithms for Convolutional Neural Networks"
- */
+/* Winograd convolution: F(2x2,3x3) and F(4x4,3x3) variants.
+ * F(2x2,3x3): 4x4 tiles -> 2x2 output (~2.25x speedup).
+ * F(4x4,3x3): 6x6 tiles -> 4x4 output (~4x speedup).
+ * Ref: Lavin & Gray, "Fast Algorithms for Convolutional Neural Networks" */
 
 #include "ops/winograd.h"
 #include <stdlib.h>
@@ -70,9 +64,6 @@ static const float AT_4x4[4][6] = {
     { 0,  1, -1,  8, -8,  1}
 };
 
-/* Helper: small matrix multiply  C[m x n] = A[m x k] * B[k x n]
- * All matrices stored as flat row-major arrays.
- * Designed for tile-sized matrices (up to 6x6). */
 static void mat_mul_small(const float *A, const float *B, float *C,
                           int m, int k, int n)
 {
@@ -87,18 +78,13 @@ static void mat_mul_small(const float *A, const float *B, float *C,
     }
 }
 
-/* Helper: triple matrix multiply  D[m x n] = A[m x k1] * B[k1 x k2] * C[k2 x n]
- * Uses a caller-provided temporary buffer for the intermediate result. */
 static void mat_mul_triple(const float *A, const float *B, const float *C,
                            float *D, int m, int k1, int k2, int n, float *tmp)
 {
-    /* tmp[m x k2] = A * B */
     mat_mul_small(A, B, tmp, m, k1, k2);
-    /* D[m x n] = tmp * C */
     mat_mul_small(tmp, C, D, m, k2, n);
 }
 
-/* Helper: transpose a row-major matrix  B[n x m] = A^T where A is [m x n] */
 static void mat_transpose(const float *A, float *B, int m, int n)
 {
     for (int i = 0; i < m; i++) {
@@ -108,17 +94,6 @@ static void mat_transpose(const float *A, float *B, int m, int n)
     }
 }
 
-/* Helper: extract a tile from a (possibly padded) 2D plane
- *
- * src:      pointer to the start of the channel plane [src_h x src_w]
- * tile:     output buffer [tile_size x tile_size]
- * tile_row: top-left row in the padded coordinate system
- * tile_col: top-left col in the padded coordinate system
- * src_h:    spatial height of src (un-padded)
- * src_w:    spatial width of src (un-padded)
- * pad_h:    padding applied on each side vertically
- * pad_w:    padding applied on each side horizontally
- * tile_size: side length of the tile */
 static void extract_tile(const float *src, float *tile,
                          int tile_row, int tile_col,
                          int src_h, int src_w,
@@ -138,48 +113,22 @@ static void extract_tile(const float *src, float *tile,
     }
 }
 
-/* Helper: apply input transform  V = B^T * d * B
- *
- * BT_flat:  flattened B^T matrix [ts x ts]
- * B_flat:   flattened B matrix [ts x ts]  (transpose of B^T)
- * tile:     input tile [ts x ts]
- * V:        output buffer [ts x ts]
- * ts:       tile size (4 or 6)
- * tmp:      scratch buffer [ts x ts] */
+/* V = B^T * d * B */
 static void transform_input_tile(const float *BT_flat, const float *B_flat,
                                  const float *tile, float *V,
                                  int ts, float *tmp)
 {
-    /* V = B^T * tile * B */
     mat_mul_triple(BT_flat, tile, B_flat, V, ts, ts, ts, ts, tmp);
 }
 
-/* Helper: apply output transform  Y = A^T * M * A
- *
- * AT_flat:   flattened A^T matrix [out_tile x ts]
- * A_flat:    flattened A matrix [ts x out_tile]  (transpose of A^T)
- * M:         element-wise product accumulator [ts x ts]
- * Y:         output buffer [out_tile x out_tile]
- * out_tile:  output tile size (2 or 4)
- * ts:        tile size (4 or 6)
- * tmp:       scratch buffer [out_tile x ts]  (at least) */
+/* Y = A^T * M * A */
 static void transform_output_tile(const float *AT_flat, const float *A_flat,
                                   const float *M, float *Y,
                                   int out_tile, int ts, float *tmp)
 {
-    /* Y = A^T * M * A */
     mat_mul_triple(AT_flat, M, A_flat, Y, out_tile, ts, ts, out_tile, tmp);
 }
 
-/* Helper: write an output tile into the output plane, accumulating values
- *
- * dst:      pointer to the start of the output channel plane [dst_h x dst_w]
- * tile:     the output tile [out_tile x out_tile]
- * out_row:  top-left output row position
- * out_col:  top-left output col position
- * dst_h:    height of the output plane
- * dst_w:    width of the output plane
- * out_tile: side length of the output tile */
 static void write_output_tile(float *dst, const float *tile,
                               int out_row, int out_col,
                               int dst_h, int dst_w,
@@ -196,13 +145,10 @@ static void write_output_tile(float *dst, const float *tile,
     }
 }
 
-/* Helper: flatten a 2D static array into a contiguous row-major buffer */
 static void flatten_G(const float *src, float *dst, int rows, int cols)
 {
     memcpy(dst, src, (size_t)rows * cols * sizeof(float));
 }
-
-/* Public API */
 
 bool winograd_applicable(int kernel_h, int kernel_w,
                          int stride_h, int stride_w,
@@ -233,13 +179,7 @@ WinogradConfig winograd_select_variant(int height, int width)
     return cfg;
 }
 
-/* winograd_transform_weight
- *
- * For every (oc, ic) pair, compute:
- *   U[oc][ic] = G * g * G^T
- * where g is the [3x3] filter and U is [tile_size x tile_size].
- *
- * Output layout: transformed[oc * in_channels * ts*ts + ic * ts*ts + ...] */
+/* U[oc][ic] = G * g * G^T for each filter g[3x3] */
 int winograd_transform_weight(const float *weight, int out_channels,
                               int in_channels, const WinogradConfig *config,
                               float *transformed)
@@ -249,9 +189,8 @@ int winograd_transform_weight(const float *weight, int out_channels,
     int ts = config->tile_size;    /* 4 or 6 */
     int ks = config->kernel_size;  /* 3      */
 
-    /* Flatten the selected G matrix into a contiguous buffer */
-    float G_flat[6 * 3];  /* max size needed (6x3 for F4x4) */
-    float GT_flat[3 * 6]; /* G^T                             */
+    float G_flat[6 * 3];
+    float GT_flat[3 * 6];
 
     if (config->variant == WINOGRAD_F2x2_3x3) {
         flatten_G(&G_2x2[0][0], G_flat, 4, 3);
@@ -261,8 +200,7 @@ int winograd_transform_weight(const float *weight, int out_channels,
         mat_transpose(G_flat, GT_flat, 6, 3);   /* GT is 3x6 */
     }
 
-    /* Temporary buffer for intermediate product in triple multiply */
-    float tmp[6 * 3]; /* max intermediate: ts x ks */
+    float tmp[6 * 3];
 
     for (int oc = 0; oc < out_channels; oc++) {
         for (int ic = 0; ic < in_channels; ic++) {
@@ -277,19 +215,6 @@ int winograd_transform_weight(const float *weight, int out_channels,
     return 0;
 }
 
-/* winograd_conv2d
- *
- * Full Winograd convolution pipeline:
- *   1. Transform weights to Winograd domain: U = G * w * G^T
- *   2. For each tile in the input:
- *      a. Extract tile d (with implicit padding)
- *      b. Input transform: V = B^T * d * B
- *      c. Element-wise accumulate across input channels: M += V .* U
- *   3. Output transform: Y = A^T * M * A
- *   4. Write Y into the output plane
- *   5. Add bias if present
- *
- * Supports grouped convolution (groups > 1). */
 int winograd_conv2d(const float *input, const float *weight, const float *bias,
                     float *output, int batch, int in_channels, int out_channels,
                     int height, int width, int padding_h, int padding_w,
@@ -303,30 +228,22 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
     int out_tile = config->output_tile;  /* 2 or 4 */
     int ks       = config->kernel_size;  /* 3      */
 
-    /* Output spatial dimensions (stride is always 1 for Winograd) */
     int out_h = height + 2 * padding_h - ks + 1;
     int out_w = width  + 2 * padding_w - ks + 1;
 
     if (out_h <= 0 || out_w <= 0) return -1;
 
-    /* Number of tiles in each spatial direction (ceiling division) */
     int tiles_h = (out_h + out_tile - 1) / out_tile;
     int tiles_w = (out_w + out_tile - 1) / out_tile;
 
-    /* Group partitioning */
     int in_channels_per_group  = in_channels  / groups;
     int out_channels_per_group = out_channels / groups;
 
-    /* Step 1: Transform all weight kernels to Winograd domain
-     *
-     * Layout: U[oc][ic_within_group][ts][ts]
-     * Stored as: U[(oc * in_channels_per_group + ic_g) * ts * ts + ...] */
     size_t U_size = (size_t)out_channels * in_channels_per_group * ts * ts;
     float *U = (float *)malloc(U_size * sizeof(float));
     if (!U) return -1;
 
     {
-        /* Flatten G and compute G^T for weight transform */
         float G_flat[6 * 3];
         float GT_flat[3 * 6];
         float tmp_w[6 * 3];
@@ -345,13 +262,11 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
                 for (int ic_g = 0; ic_g < in_channels_per_group; ic_g++) {
                     int ic = g * in_channels_per_group + ic_g;
 
-                    /* weight layout: [out_channels, in_channels, 3, 3] */
                     const float *kern = weight +
                         ((size_t)oc * in_channels + ic) * ks * ks;
                     float *u_ptr = U +
                         ((size_t)oc * in_channels_per_group + ic_g) * ts * ts;
 
-                    /* U = G * kern * G^T */
                     mat_mul_triple(G_flat, kern, GT_flat, u_ptr,
                                    ts, ks, ks, ts, tmp_w);
                 }
@@ -359,47 +274,41 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         }
     }
 
-    /* Flatten B^T, B, A^T, A for the chosen variant */
     float BT_flat[6 * 6];
-    float B_flat[6 * 6];   /* B = (B^T)^T */
+    float B_flat[6 * 6];
     float AT_flat[4 * 6];
-    float A_flat[6 * 4];   /* A = (A^T)^T */
+    float A_flat[6 * 4];
 
     if (config->variant == WINOGRAD_F2x2_3x3) {
-        /* B^T is 4x4 */
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
                 BT_flat[i * 4 + j] = BT_2x2[i][j];
         mat_transpose(BT_flat, B_flat, 4, 4);
 
-        /* A^T is 2x4 */
         for (int i = 0; i < 2; i++)
             for (int j = 0; j < 4; j++)
                 AT_flat[i * 4 + j] = AT_2x2[i][j];
-        mat_transpose(AT_flat, A_flat, 2, 4);   /* A is 4x2 */
+        mat_transpose(AT_flat, A_flat, 2, 4);
     } else {
-        /* B^T is 6x6 */
         for (int i = 0; i < 6; i++)
             for (int j = 0; j < 6; j++)
                 BT_flat[i * 6 + j] = BT_4x4[i][j];
         mat_transpose(BT_flat, B_flat, 6, 6);
 
-        /* A^T is 4x6 */
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 6; j++)
                 AT_flat[i * 6 + j] = AT_4x4[i][j];
-        mat_transpose(AT_flat, A_flat, 4, 6);   /* A is 6x4 */
+        mat_transpose(AT_flat, A_flat, 4, 6);
     }
 
-    /* Allocate per-tile working buffers */
     size_t ts2  = (size_t)ts * ts;
     size_t ot2  = (size_t)out_tile * out_tile;
 
-    float *tile_buf = (float *)malloc(ts2 * sizeof(float));   /* input tile d    */
-    float *V_buf    = (float *)malloc(ts2 * sizeof(float));   /* B^T * d * B     */
-    float *Y_buf    = (float *)malloc(ot2 * sizeof(float));   /* A^T * M * A     */
-    float *tmp1     = (float *)malloc(ts2 * sizeof(float));   /* scratch for mat_mul_triple */
-    float *acc_buf  = (float *)malloc(ts2 * sizeof(float));   /* accumulated M across ic    */
+    float *tile_buf = (float *)malloc(ts2 * sizeof(float));
+    float *V_buf    = (float *)malloc(ts2 * sizeof(float));
+    float *Y_buf    = (float *)malloc(ot2 * sizeof(float));
+    float *tmp1     = (float *)malloc(ts2 * sizeof(float));
+    float *acc_buf  = (float *)malloc(ts2 * sizeof(float));
 
     if (!tile_buf || !V_buf || !Y_buf || !tmp1 || !acc_buf) {
         free(U);
@@ -411,12 +320,9 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         return -1;
     }
 
-    /* Zero the output buffer */
     size_t output_size = (size_t)batch * out_channels * out_h * out_w;
     memset(output, 0, output_size * sizeof(float));
 
-    /* Step 2: For each batch element, group, output channel, and tile,
-     *         perform the Winograd convolution pipeline. */
     for (int b = 0; b < batch; b++) {
         for (int g = 0; g < groups; g++) {
             int ic_start = g * in_channels_per_group;
@@ -425,55 +331,42 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
             for (int oc_g = 0; oc_g < out_channels_per_group; oc_g++) {
                 int oc = oc_start + oc_g;
 
-                /* Pointer to this output channel plane */
                 float *out_plane = output +
                     ((size_t)b * out_channels + oc) * out_h * out_w;
 
                 for (int th = 0; th < tiles_h; th++) {
                     for (int tw = 0; tw < tiles_w; tw++) {
-                        /* Top-left corner of the tile in padded coordinates */
                         int tile_row = th * out_tile;
                         int tile_col = tw * out_tile;
 
-                        /* Clear the accumulator for this tile position */
                         memset(acc_buf, 0, ts2 * sizeof(float));
 
-                        /* Accumulate element-wise products across all
-                         * input channels in this group */
                         for (int ic_g = 0; ic_g < in_channels_per_group; ic_g++) {
                             int ic = ic_start + ic_g;
 
-                            /* Pointer to this input channel plane */
                             const float *in_plane = input +
                                 ((size_t)b * in_channels + ic) * height * width;
 
-                            /* (a) Extract tile from input (handles padding) */
                             extract_tile(in_plane, tile_buf,
                                          tile_row, tile_col,
                                          height, width,
                                          padding_h, padding_w, ts);
 
-                            /* (b) Input transform: V = B^T * tile * B */
                             transform_input_tile(BT_flat, B_flat,
                                                  tile_buf, V_buf, ts, tmp1);
 
-                            /* Pointer to transformed weight for (oc, ic_g) */
                             const float *u_ptr = U +
                                 ((size_t)oc * in_channels_per_group + ic_g) * ts * ts;
 
-                            /* (c) Element-wise multiply and accumulate:
-                             *     acc[i] += V[i] * U[i] */
                             for (int idx = 0; idx < (int)ts2; idx++) {
                                 acc_buf[idx] += V_buf[idx] * u_ptr[idx];
                             }
                         }
 
-                        /* (d) Output transform: Y = A^T * acc * A */
                         transform_output_tile(AT_flat, A_flat,
                                               acc_buf, Y_buf,
                                               out_tile, ts, tmp1);
 
-                        /* Write output tile into the output plane */
                         int out_row = th * out_tile;
                         int out_col = tw * out_tile;
                         write_output_tile(out_plane, Y_buf,
@@ -482,7 +375,6 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
                     }
                 }
 
-                /* Add bias for this output channel if provided */
                 if (bias) {
                     float b_val = bias[oc];
                     int plane_size = out_h * out_w;
@@ -494,7 +386,6 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         }
     }
 
-    /* Cleanup */
     free(U);
     free(tile_buf);
     free(V_buf);

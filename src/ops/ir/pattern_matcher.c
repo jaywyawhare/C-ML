@@ -1,11 +1,3 @@
-/**
- * @file pattern_matcher.c
- * @brief Declarative pattern-matcher and rewriter for IR graphs
- *
- * Matches IRNode subgraphs against declarative patterns and applies
- * rewrite rules (algebraic simplifications, canonicalisations, etc.).
- */
-
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
@@ -85,12 +77,6 @@ static struct IRNode* get_capture(const CMLMatchResult* result, const char* name
     return NULL;
 }
 
-/**
- * Try to match @p pattern against @p node within the graph @p ir.
- * Fills @p result with any captures.
- *
- * @return true if pattern matches, false otherwise.
- */
 static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern,
                        struct IRNode* node, CMLMatchResult* result) {
     if (!pattern || !node) return false;

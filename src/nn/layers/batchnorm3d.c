@@ -1,11 +1,3 @@
-/**
- * @file batchnorm3d.c
- * @brief Batch Normalization 3D layer implementation
- *
- * Implements batch normalization for 5D inputs [N, C, D, H, W].
- * Normalizes per channel across (N, D, H, W).
- */
-
 #include "nn/layers/batchnorm3d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -116,7 +108,6 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
         bias_data = (float*)tensor_data_ptr(bn->bias->tensor);
     }
 
-    // Normalize
     for (int b = 0; b < batch; b++) {
         for (int c = 0; c < channels; c++) {
             float inv_std = 1.0f / sqrtf(channel_var[c] + bn->eps);

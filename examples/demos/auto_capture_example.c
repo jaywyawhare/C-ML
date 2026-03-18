@@ -1,12 +1,3 @@
-/**
- * @file auto_capture_example.c
- * @brief Example demonstrating automatic IR capture from tensor_* operations
- *
- * This example shows how users can write normal tensor_* code and
- * automatically generate backend code (CUDA, Metal, etc.) without
- * manually creating uop_* wrappers.
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +6,6 @@
 int main(void) {
     cml_init();
 
-    // Create IR context for CUDA generation
     CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
     if (!ir) {
         fprintf(stderr, "Failed to create IR context\n");
@@ -30,15 +20,12 @@ int main(void) {
         return 1;
     }
 
-    // Perform tensor operations while auto-capture is enabled
     int shape[]         = {4};
     TensorConfig config = (TensorConfig){
         .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* a = tensor_empty(shape, 1, &config);
     Tensor* b = tensor_empty(shape, 1, &config);
 
-    // Initialize with some values
-    // Note: accessing data ptr triggers allocation but doesn't execute graph yet
     float* a_data = (float*)tensor_data_ptr(a);
     float* b_data = (float*)tensor_data_ptr(b);
     for (int i = 0; i < 4; i++) {
@@ -51,21 +38,17 @@ int main(void) {
     printf("Input B: [%.1f, %.1f, %.1f, %.1f]\n", (double)b_data[0], (double)b_data[1],
            (double)b_data[2], (double)b_data[3]);
 
-    // These operations will be captured to IR
-    // Computation: e = exp((a + b) * a)
+    // e = exp((a + b) * a)
     Tensor* c = tensor_add(a, b);
     Tensor* d = tensor_mul(c, a);
     Tensor* e = tensor_exp(d);
 
-    // 2. Execute the graph FIRST (on CPU for verification) BEFORE optimization
-    // This ensures execution works even if optimization changes graph structure
     printf("\nExecuting graph on CPU to verify results...\n");
     float* result_data = (float*)tensor_data_ptr(e);
 
     if (result_data) {
         printf("Result (exp((a+b)*a)):\n");
         for (int i = 0; i < 4; i++) {
-            // Expected calculation:
             float val_a    = (float)(i + 1);
             float val_b    = (float)(i + 2);
             float val_c    = val_a + val_b;
@@ -78,7 +61,6 @@ int main(void) {
         printf("Failed to execute graph!\n");
     }
 
-    // 1. Now optimize IR to trigger fusion and generate optimized CUDA code
     cml_ir_optimize(ir);
 
     char* cuda_code = cml_ir_compile(ir, NULL);
@@ -87,7 +69,6 @@ int main(void) {
         free(cuda_code);
     }
 
-    // Clean up intermediate tensors
     if (e)
         tensor_free(e);
     if (d)

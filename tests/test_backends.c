@@ -1,8 +1,3 @@
-/**
- * @file test_backends.c
- * @brief Unit tests for backend detection and initialization
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +11,6 @@
 #include "backend/device.h"
 #include "core/logging.h"
 
-// Test counters
 static int tests_run = 0;
 static int tests_passed = 0;
 
@@ -31,7 +25,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-// Test: CUDA Backend Detection
 
 static int test_cuda_detection(void) {
     bool available = cml_cuda_available();
@@ -41,7 +34,6 @@ static int test_cuda_detection(void) {
     return 1;
 }
 
-// Test: CUDA Backend Create/Free
 
 static int test_cuda_lifecycle(void) {
     if (!cml_cuda_available()) {
@@ -59,7 +51,6 @@ static int test_cuda_lifecycle(void) {
     return 1;
 }
 
-// Test: ROCm Backend Detection
 
 static int test_rocm_detection(void) {
     bool available = cml_rocm_available();
@@ -67,7 +58,6 @@ static int test_rocm_detection(void) {
     return 1;
 }
 
-// Test: ROCm Backend Create/Free
 
 static int test_rocm_lifecycle(void) {
     if (!cml_rocm_available()) {
@@ -85,7 +75,6 @@ static int test_rocm_lifecycle(void) {
     return 1;
 }
 
-// Test: BLAS Detection
 
 static int test_blas_detection(void) {
     bool available = cml_blas_available();
@@ -93,7 +82,6 @@ static int test_blas_detection(void) {
     return 1;
 }
 
-// Test: BLAS Context Create/Free
 
 static int test_blas_lifecycle(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -108,7 +96,6 @@ static int test_blas_lifecycle(void) {
     return 1;
 }
 
-// Test: BLAS SGEMM (if available)
 
 static int test_blas_sgemm(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -147,7 +134,6 @@ static int test_blas_sgemm(void) {
     return success;
 }
 
-// Test: BLAS Vector Operations
 
 static int test_blas_vector_ops(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -182,7 +168,6 @@ static int test_blas_vector_ops(void) {
     return 1;
 }
 
-// Test: Device Detection (from device.h)
 
 static int test_device_detection(void) {
     printf("(cuda=%s, rocm=%s) ",
@@ -191,7 +176,6 @@ static int test_device_detection(void) {
     return 1;
 }
 
-// Test: All Backends Summary
 
 static int test_all_backends_summary(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -214,7 +198,6 @@ static int test_all_backends_summary(void) {
     return (num >= 1);  // At least CPU fallback
 }
 
-// Main
 
 int main(void) {
     printf("\n=== Backend Detection Unit Tests ===\n\n");
@@ -237,9 +220,9 @@ int main(void) {
     printf("\nIntegration:\n");
     TEST(all_backends_summary);
 
-    printf("\n====================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("====================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

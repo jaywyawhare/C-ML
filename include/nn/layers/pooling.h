@@ -1,9 +1,3 @@
-/**
- * @file pooling.h
- * @brief Pooling layers
- *
- */
-
 #ifndef CML_NN_LAYERS_POOLING_H
 #define CML_NN_LAYERS_POOLING_H
 

@@ -1,14 +1,3 @@
-/**
- * @file llm_ops.h
- * @brief LLM inference primitives
- *
- * Provides optimized components for large language model inference:
- * - Grouped Query Attention (GQA) with KV cache
- * - Mixture of Experts (MoE) with top-k gating
- * - BPE tokenizer
- * - RoPE (Rotary Position Embeddings)
- */
-
 #ifndef CML_LLM_OPS_H
 #define CML_LLM_OPS_H
 
@@ -21,8 +10,6 @@
 extern "C" {
 #endif
 
-/* ===== KV Cache ===== */
-
 typedef struct CMLKVCache {
     Tensor* key_cache;     /* [max_seq_len, num_kv_heads, head_dim] */
     Tensor* value_cache;   /* [max_seq_len, num_kv_heads, head_dim] */
@@ -32,25 +19,17 @@ typedef struct CMLKVCache {
     int head_dim;
 } CMLKVCache;
 
-/** Create KV cache */
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim);
 
-/** Free KV cache */
 void cml_kv_cache_free(CMLKVCache* cache);
 
-/** Append new key/value to cache, returns updated length */
 int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value);
 
-/** Reset cache (for new sequence) */
 void cml_kv_cache_reset(CMLKVCache* cache);
 
-/** Get cached keys up to current length */
 Tensor* cml_kv_cache_get_keys(CMLKVCache* cache);
 
-/** Get cached values up to current length */
 Tensor* cml_kv_cache_get_values(CMLKVCache* cache);
-
-/* ===== Grouped Query Attention ===== */
 
 typedef struct CMLGQAConfig {
     int num_heads;          /* Total attention heads (Q) */
@@ -61,15 +40,12 @@ typedef struct CMLGQAConfig {
     int window_size;        /* Sliding window size (0 = unlimited) */
 } CMLGQAConfig;
 
-/* ===== Flash Attention ===== */
-
 typedef struct CMLFlashAttentionConfig {
     int tile_size_q;        /* Tile size for Q dimension (default: 64) */
     int tile_size_kv;       /* Tile size for KV dimension (default: 64) */
     bool enabled;           /* Enable flash attention */
 } CMLFlashAttentionConfig;
 
-/** Default flash attention config */
 CMLFlashAttentionConfig cml_flash_attention_default_config(void);
 
 /** Flash GQA forward pass (O(N) memory via online softmax)
@@ -82,7 +58,6 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
                                const CMLGQAConfig* config,
                                const CMLFlashAttentionConfig* flash_config);
 
-/** Flash GQA with KV cache */
 Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
                                       CMLKVCache* kv_cache,
                                       const CMLGQAConfig* config,
@@ -97,12 +72,9 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
                          Tensor* mask);
 
-/** GQA with KV cache (for autoregressive decoding) */
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
                                 CMLKVCache* kv_cache,
                                 const CMLGQAConfig* config);
-
-/* ===== Rotary Position Embeddings (RoPE) ===== */
 
 typedef struct CMLRoPEConfig {
     int dim;               /* Embedding dimension */
@@ -115,8 +87,6 @@ typedef struct CMLRoPEConfig {
  * position_ids: [batch, seq_len] or NULL for 0..seq_len-1
  */
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config);
-
-/* ===== Mixture of Experts (MoE) ===== */
 
 typedef struct CMLMoEConfig {
     int num_experts;       /* Total number of experts */
@@ -135,10 +105,8 @@ typedef struct CMLMoELayer {
     int ref_count;
 } CMLMoELayer;
 
-/** Create MoE layer */
 CMLMoELayer* cml_moe_create(const CMLMoEConfig* config);
 
-/** Free MoE layer */
 void cml_moe_free(CMLMoELayer* moe);
 
 /** MoE forward pass
@@ -151,8 +119,6 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input);
  * Returns gating weights: [batch * seq_len, num_experts]
  */
 Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input);
-
-/* ===== BPE Tokenizer ===== */
 
 typedef struct CMLBPEMerge {
     char* pair;            /* "ab" merged token */
@@ -173,27 +139,17 @@ typedef struct CMLTokenizer {
     int unk_token_id;
 } CMLTokenizer;
 
-/** Create tokenizer from vocab and merges arrays */
 CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
                                      char** merge_pairs, int num_merges);
 
-/** Free tokenizer */
 void cml_tokenizer_free(CMLTokenizer* tok);
 
-/** Encode text to token IDs
- * Returns array of token IDs, sets num_tokens
- */
 int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens);
 
-/** Decode token IDs to text
- * Returns allocated string
- */
 char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens);
 
-/** Set special token IDs */
 void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int unk);
 
-/** Get vocab size */
 int cml_tokenizer_vocab_size(const CMLTokenizer* tok);
 
 #ifdef __cplusplus

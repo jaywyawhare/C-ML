@@ -53,17 +53,9 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
                      DType dtype, DeviceType device);
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden);
 
-/**
- * @brief Multi-layer RNN wrapper
- *
- * Stacks multiple RNNCell layers, with optional bidirectional support
- * and inter-layer dropout.
- *
- * Input:  [seq_len, batch, input_size]  (or [batch, seq_len, input_size] if batch_first)
- * Output: (output_sequence, h_n)
- *   output_sequence: [seq_len, batch, num_directions * hidden_size]
- *   h_n: [num_layers * num_directions, batch, hidden_size]
- */
+/* Input:  [seq_len, batch, input_size]  (or [batch, seq_len, input_size] if batch_first)
+ * output_sequence: [seq_len, batch, num_directions * hidden_size]
+ * h_n: [num_layers * num_directions, batch, hidden_size] */
 typedef struct RNN {
     Module base;
     int input_size;
@@ -84,12 +76,6 @@ RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
 void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
                  Tensor** output, Tensor** h_n);
 
-/**
- * @brief Multi-layer LSTM wrapper
- *
- * Input:  [seq_len, batch, input_size]  (or [batch, seq_len, input_size] if batch_first)
- * Output: (output_sequence, h_n, c_n)
- */
 typedef struct LSTM {
     Module base;
     int input_size;
@@ -110,12 +96,6 @@ LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectiona
 void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
                   Tensor** output, Tensor** h_n, Tensor** c_n);
 
-/**
- * @brief Multi-layer GRU wrapper
- *
- * Input:  [seq_len, batch, input_size]  (or [batch, seq_len, input_size] if batch_first)
- * Output: (output_sequence, h_n)
- */
 typedef struct GRU {
     Module base;
     int input_size;

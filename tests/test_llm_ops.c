@@ -1,8 +1,3 @@
-/**
- * @file test_llm_ops.c
- * @brief Tests for LLM inference primitives (GQA, MoE, KV Cache, BPE Tokenizer, RoPE)
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -27,7 +22,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== KV Cache Tests ===== */
 
 static int test_kv_cache_create_free(void) {
     CMLKVCache* cache = cml_kv_cache_create(128, 4, 32);
@@ -165,7 +159,6 @@ static int test_kv_cache_reset(void) {
     return 1;
 }
 
-/* ===== GQA Tests ===== */
 
 static int test_gqa_basic(void) {
     /* Standard MHA: num_heads == num_kv_heads */
@@ -338,7 +331,6 @@ static int test_gqa_causal(void) {
     return 1;
 }
 
-/* ===== RoPE Tests ===== */
 
 static int test_rope_basic(void) {
     /* Verify RoPE modifies values at non-zero positions */
@@ -413,7 +405,6 @@ static int test_rope_zero_position(void) {
     return 1;
 }
 
-/* ===== MoE Tests ===== */
 
 static int test_moe_create_free(void) {
     CMLMoEConfig cfg = {
@@ -555,7 +546,6 @@ static int test_moe_single_expert(void) {
     return 1;
 }
 
-/* ===== Tokenizer Tests ===== */
 
 static int test_tokenizer_create_free(void) {
     char* vocab[] = {"a", "b", "c", "d", "ab", "cd", "abcd"};
@@ -726,7 +716,6 @@ static int test_tokenizer_bpe_merge(void) {
     return 1;
 }
 
-/* ===== Main ===== */
 
 int main(void) {
     printf("test_llm_ops\n\n");

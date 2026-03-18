@@ -1,10 +1,3 @@
-/**
- * @file runtime_compiler.c
- * @brief Runtime kernel compilation pipeline implementation
- *
- * Full pipeline: IR -> schedule_v2 -> linearize -> fused codegen -> cache -> execute.
- */
-
 #include "ops/ir/runtime_compiler.h"
 #include "ops/ir/fused_codegen.h"
 #include "ops/ir/schedule.h"

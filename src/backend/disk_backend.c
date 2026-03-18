@@ -1,8 +1,3 @@
-/**
- * @file disk_backend.c
- * @brief Disk-based tensor storage backend implementation
- */
-
 #include "backend/disk_backend.h"
 #include "core/logging.h"
 
@@ -295,7 +290,7 @@ void cml_disk_backend_print(const CMLDiskBackend* backend) {
     default:             mode_str = "unknown"; break;
     }
 
-    printf("=== Disk Backend ===\n");
+    printf("Disk Backend\n");
     printf("Path: %s\n", backend->base_path);
     printf("Mode: %s\n", mode_str);
     printf("Read-only: %s\n", backend->read_only ? "yes" : "no");
@@ -308,5 +303,5 @@ void cml_disk_backend_print(const CMLDiskBackend* backend) {
            (unsigned long)backend->num_writes,
            (double)backend->bytes_written / (1024.0 * 1024.0));
     printf("  Mmaps: %lu\n", (unsigned long)backend->num_mmaps);
-    printf("====================\n");
+    printf("\n");
 }

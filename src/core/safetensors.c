@@ -1,10 +1,5 @@
-/**
- * @file safetensors.c
- * @brief SafeTensors serialization implementation
- *
- * Format: [8-byte header_size][JSON header][raw tensor data]
- * JSON header maps tensor names to {dtype, shape, data_offsets: [start, end]}
- */
+/* Format: [8-byte header_size][JSON header][raw tensor data]
+ * JSON header maps tensor names to {dtype, shape, data_offsets: [start, end]} */
 
 #include "core/safetensors.h"
 #include "core/serialization.h"
@@ -79,7 +74,6 @@ static DType safetensor_str_to_dtype(const char* str) {
     return DTYPE_FLOAT32;
 }
 
-// Minimal JSON parser for safetensors header
 static char* skip_ws(char* p) {
     while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
     return p;
@@ -138,7 +132,6 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
     ctx->tensors = calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
     if (!ctx->tensors) { free(header); safetensors_close(ctx); return NULL; }
 
-    // Parse JSON header: { "name": { "dtype": "F32", "shape": [2,3], "data_offsets": [0, 24] }, ... }
     char* p = header;
     p = skip_ws(p);
     if (*p == '{') p++;
@@ -149,17 +142,14 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
         if (*p == ',') p++;
         p = skip_ws(p);
 
-        // Parse tensor name
         char* name = NULL;
         p = parse_string(p, &name);
         if (!p || !name) break;
 
-        // Skip "__metadata__" key
         if (strcmp(name, "__metadata__") == 0) {
             free(name);
             p = skip_ws(p);
             if (*p == ':') p++;
-            // Skip the value (another object)
             int depth = 0;
             do {
                 if (*p == '{') depth++;
@@ -179,7 +169,6 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
         if (*p != '{') { free(name); break; }
         p++;
 
-        // Parse inner object
         while (*p && *p != '}') {
             p = skip_ws(p);
             if (*p == ',') p++;
@@ -250,7 +239,6 @@ void safetensors_close(SafeTensorsContext* ctx) {
     if (!ctx) return;
 
     if (ctx->is_write && ctx->filepath && ctx->write_count > 0) {
-        // Build JSON header
         size_t json_cap = 4096;
         char* json = malloc(json_cap);
         if (json) {
@@ -259,7 +247,6 @@ void safetensors_close(SafeTensorsContext* ctx) {
 
             for (int i = 0; i < ctx->write_count; i++) {
                 SafeTensorInfo* info = &ctx->tensors[i];
-                // Ensure enough space
                 while (pos + 512 > json_cap) {
                     json_cap *= 2;
                     json = realloc(json, json_cap);
@@ -333,7 +320,6 @@ Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
     if (!t) return NULL;
     tensor_ensure_executed(t);
 
-    // Data starts after 8-byte header_size + header
     long data_offset = 8 + (long)ctx->header_size + (long)info->data_start;
     fseek(ctx->file, data_offset, SEEK_SET);
     if (fread(t->data, 1, data_size, ctx->file) != data_size) {

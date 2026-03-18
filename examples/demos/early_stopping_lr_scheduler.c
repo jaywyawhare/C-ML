@@ -1,8 +1,3 @@
-/**
- * @file early_stopping_lr_scheduler.c
- * @brief Example demonstrating early stopping and learning rate scheduling
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -260,7 +255,6 @@ int main(void) {
     }
 
 cleanup:
-    // cleanup_context_free is called automatically by cml_cleanup()
     cml_cleanup();
     return 0;
 }

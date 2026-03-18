@@ -1,8 +1,3 @@
-/**
- * @file image_dtype.c
- * @brief Image dtype implementation for GPU texture memory
- */
-
 #include "tensor/image_dtype.h"
 #include <stdlib.h>
 #include <string.h>

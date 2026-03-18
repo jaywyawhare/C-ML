@@ -1,12 +1,3 @@
-/**
- * @file webgpu_backend.c
- * @brief WebGPU backend via wgpu-native with dynamic loading
- *
- * All WebGPU (wgpu-native) symbols are loaded at runtime through dlopen/dlsym
- * so that C-ML can be compiled without any WebGPU SDK installed.  When
- * CML_HAS_WEBGPU is not defined, every public function compiles to a stub.
- */
-
 #include "ops/ir/gpu/webgpu_backend.h"
 #include "core/logging.h"
 
@@ -85,13 +76,11 @@ typedef void*    WGPUCommandBuffer;
 typedef uint32_t WGPUBufferUsageFlags;
 typedef uint64_t WGPUMapModeFlags;
 
-/* Minimal enum/flag values used in the implementation */
 #define WGPU_BUFFER_USAGE_STORAGE  0x0080
 #define WGPU_BUFFER_USAGE_COPY_SRC 0x0004
 #define WGPU_BUFFER_USAGE_COPY_DST 0x0008
 #define WGPU_BUFFER_USAGE_MAP_READ 0x0001
 
-/* Callback status used in adapter/device request callbacks */
 typedef enum {
     WGPURequestAdapterStatus_Success = 0,
 } WGPURequestAdapterStatus;
@@ -190,7 +179,6 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void) {
         return NULL;
     }
 
-    /* dlsym all function pointers */
 #define WGPU_LOAD(field, sym_name)                                        \
     backend->field = wgpu_get_symbol(backend->lib_handle, sym_name);      \
     if (!backend->field) {                                                \
@@ -237,7 +225,6 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
         return 0;
     }
 
-    /* ── Type-punned function pointer casts for the C-API calls ── */
     typedef WGPUInstance (*PFN_wgpuCreateInstance)(const void*);
     typedef void (*PFN_wgpuInstanceRequestAdapter)(
         WGPUInstance, const void*, void (*)(WGPURequestAdapterStatus, WGPUAdapter, const char*, void*), void*);
@@ -251,7 +238,6 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
         return -1;
     }
 
-    /* Create instance */
     PFN_wgpuCreateInstance createInst =
         (PFN_wgpuCreateInstance)backend->fn_create_instance;
     backend->instance = createInst(NULL);
@@ -260,7 +246,6 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
         return -1;
     }
 
-    /* Request adapter (synchronous via callback) */
     AdapterUserData adapter_ud = {NULL, false};
     PFN_wgpuInstanceRequestAdapter reqAdapter =
         (PFN_wgpuInstanceRequestAdapter)backend->fn_instance_request_adapter;
@@ -270,9 +255,7 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     }
     reqAdapter(backend->instance, NULL, adapter_request_cb, &adapter_ud);
 
-    /* Spin-poll until the callback fires */
     if (backend->fn_device_poll) {
-        /* Some implementations need a poll to trigger the callback */
         int attempts = 0;
         while (!adapter_ud.done && attempts < 1000) {
             attempts++;
@@ -284,7 +267,6 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     }
     backend->adapter = adapter_ud.adapter;
 
-    /* Request device */
     DeviceUserData device_ud = {NULL, false};
     PFN_wgpuAdapterRequestDevice reqDevice =
         (PFN_wgpuAdapterRequestDevice)backend->fn_adapter_request_device;
@@ -304,7 +286,6 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     }
     backend->device = device_ud.device;
 
-    /* Get queue */
     PFN_wgpuDeviceGetQueue getQueue =
         (PFN_wgpuDeviceGetQueue)backend->fn_device_get_queue;
     if (getQueue) {
@@ -460,7 +441,6 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
         return NULL;
     }
 
-    /* Allocate kernel wrapper */
     CMLWebGPUKernel* kernel = (CMLWebGPUKernel*)calloc(1, sizeof(CMLWebGPUKernel));
     if (!kernel) {
         LOG_ERROR("Failed to allocate CMLWebGPUKernel");
@@ -528,12 +508,6 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
         return -1;
     }
 
-    /* Build a bind group from the provided buffers.
-     * We retrieve the auto-generated bind group layout from the pipeline,
-     * then create a bind group with one storage buffer entry per buffer.
-     */
-
-    /* Try to load wgpuComputePipelineGetBindGroupLayout */
     typedef WGPUBindGroupLayout (*PFN_getBindGroupLayout)(WGPUComputePipeline, uint32_t);
     typedef WGPUBindGroup (*PFN_createBindGroup)(WGPUDevice, const void*);
 
@@ -546,15 +520,6 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     if (getBGL && createBG && num_buffers > 0) {
         WGPUBindGroupLayout layout = getBGL((WGPUComputePipeline)kernel->pipeline, 0);
         if (layout) {
-            /* Build bind group entries.
-             * WGPUBindGroupEntry (packed):
-             *   uint32_t binding;
-             *   WGPUBuffer buffer;
-             *   uint64_t offset;
-             *   uint64_t size;
-             *   WGPUSampler sampler;       (NULL)
-             *   WGPUTextureView textureView; (NULL)
-             */
             struct BindGroupEntry {
                 const void* nextInChain;
                 uint32_t binding;
@@ -580,7 +545,6 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
                     entries[i].textureView = NULL;
                 }
 
-                /* WGPUBindGroupDescriptor */
                 struct {
                     const void* nextInChain;
                     const char* label;
@@ -614,11 +578,9 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
 
     setPipe(pass, (WGPUComputePipeline)kernel->pipeline);
 
-    /* Set the bind group if we created one, or use caller-provided one */
     if (bind_group && setBG) {
         setBG(pass, 0, bind_group, 0, NULL);
     } else if (num_buffers > 0 && setBG) {
-        /* Fallback: assume last buffer entry is a pre-built bind group */
         WGPUBindGroup bg = (WGPUBindGroup)buffers[num_buffers - 1];
         setBG(pass, 0, bg, 0, NULL);
     }
@@ -638,7 +600,6 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
 
     submit(backend->queue, 1, &cmdBuf);
 
-    /* Poll the device until all work completes */
     if (poll) {
         poll(backend->device, true, NULL);
     }
@@ -758,7 +719,6 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
         return -1;
     }
 
-    /* 1. Create staging buffer */
     struct {
         const void* nextInChain;
         const char* label;
@@ -779,15 +739,12 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
         return -1;
     }
 
-    /* 2. Copy from src to staging */
     WGPUCommandEncoder enc = createEnc(backend->device, NULL);
     if (!enc) {
         if (destroyBuf) destroyBuf(staging);
         return -1;
     }
 
-    /* wgpuCommandEncoderCopyBufferToBuffer may not be in our loaded set.
-     * We load it on-the-fly. */
     PFN_copyBufToBuf copyBuf =
         (PFN_copyBufToBuf)wgpu_get_symbol(backend->lib_handle,
                                             "wgpuCommandEncoderCopyBufferToBuffer");
@@ -803,7 +760,6 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
 
     if (poll) poll(backend->device, true, NULL);
 
-    /* 3. Map staging buffer */
     MapUserData map_ud = {false, false};
     mapAsync(staging, 0x0001 /* MAP_READ */, 0, size, buffer_map_cb, &map_ud);
 
@@ -821,7 +777,6 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
         return -1;
     }
 
-    /* 4. Copy data */
     void* mapped = getMapped(staging, 0, size);
     if (mapped) {
         memcpy(dst_host, mapped, size);
@@ -832,7 +787,6 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
         return -1;
     }
 
-    /* 5/6. Unmap and destroy staging */
     unmap(staging);
     if (destroyBuf) destroyBuf(staging);
 

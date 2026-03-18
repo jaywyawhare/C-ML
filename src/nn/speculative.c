@@ -1,12 +1,3 @@
-/**
- * @file speculative.c
- * @brief Speculative decoding implementation
- *
- * Draft K tokens with a small model, verify them in a single forward pass
- * of the larger target model, accept matching tokens and use the target
- * model's prediction as a correction on the first mismatch.
- */
-
 #include "nn/speculative.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
@@ -16,17 +7,12 @@
 #include <math.h>
 #include <time.h>
 
-/** Return wall-clock time in milliseconds. */
 static double now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1.0e6;
 }
 
-/**
- * Given a 2D logits tensor [seq_len, vocab_size], return the argmax token
- * for the row at @p row_index.
- */
 static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
     if (!logits || !logits->data) {
         tensor_ensure_executed(logits);

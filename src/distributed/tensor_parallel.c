@@ -1,13 +1,3 @@
-/**
- * @file tensor_parallel.c
- * @brief Tensor parallelism implementation
- *
- * Column-parallel and row-parallel linear layers following the Megatron-LM
- * partitioning strategy.  Forward passes perform a manual matmul
- * (output = input @ weight^T) on CPU using float32.  The all-reduce is
- * simulated via a simple element-wise sum (single-process mode).
- */
-
 #include "distributed/tensor_parallel.h"
 #include "core/logging.h"
 
@@ -15,14 +5,7 @@
 #include <string.h>
 #include <math.h>
 
-/* Internal helpers */
-
-/**
- * Perform output[M, N] = input[M, K] @ weight[N, K]^T
- *
- * weight is stored row-major as [N, K], so weight^T column j is weight row j.
- * output[i][j] = sum_k input[i][k] * weight[j][k]
- */
+/* output[i][j] = sum_k input[i][k] * weight[j][k]  (weight stored as [N,K]) */
 static void matmul_weight_transposed(const float* input, int M, int K,
                                      const float* weight, int N,
                                      float* output)
@@ -37,8 +20,6 @@ static void matmul_weight_transposed(const float* input, int M, int K,
         }
     }
 }
-
-/* Weight sharding utility */
 
 Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
 {
@@ -119,8 +100,6 @@ Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
         return shard;
     }
 }
-
-/* Column-parallel linear */
 
 CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
                                                      Tensor* full_bias,
@@ -282,8 +261,6 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
     free(out_data);
     return output;
 }
-
-/* Row-parallel linear */
 
 CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
                                                Tensor* full_bias,
@@ -448,8 +425,6 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
     free(out_data);
     return output;
 }
-
-/* All-reduce (simulated) */
 
 Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
 {

@@ -104,12 +104,7 @@ TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedf
                                             float dropout, int num_layers,
                                             DType dtype, DeviceType device);
 
-/**
- * @brief Flash attention configuration
- *
- * When enabled, uses tiled Q/K/V computation with online softmax
- * (FlashAttention-2 algorithm on CPU) for memory-efficient attention.
- */
+/* Tiled Q/K/V with online softmax (FlashAttention-2 on CPU). */
 typedef struct FlashAttentionConfig {
     bool enabled;
     int block_size_q;   // Tile size for queries (default: 64)
@@ -117,12 +112,6 @@ typedef struct FlashAttentionConfig {
     bool causal;        // Whether to apply causal masking
 } FlashAttentionConfig;
 
-/**
- * @brief Key-value cache for autoregressive generation
- *
- * Caches key and value projections from previous timesteps to avoid
- * redundant computation during inference.
- */
 typedef struct KVCache {
     Tensor* key_cache;    // [batch, num_heads, max_seq_len, head_dim]
     Tensor* value_cache;  // [batch, num_heads, max_seq_len, head_dim]
@@ -130,68 +119,20 @@ typedef struct KVCache {
     int current_len;
 } KVCache;
 
-/**
- * @brief Create a KV cache for autoregressive generation
- *
- * @param batch Batch size
- * @param num_heads Number of attention heads
- * @param max_seq_len Maximum sequence length to cache
- * @param head_dim Dimension per head
- * @param dtype Data type
- * @param device Device type
- * @return New KVCache, or NULL on failure
- */
 KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim,
                           DType dtype, DeviceType device);
 
-/**
- * @brief Free a KV cache
- * @param cache KV cache to free
- */
 void kv_cache_free(KVCache* cache);
 
-/**
- * @brief Reset a KV cache (set current_len to 0)
- * @param cache KV cache to reset
- */
 void kv_cache_reset(KVCache* cache);
 
-/**
- * @brief Forward pass with flash attention
- *
- * @param mha Multi-head attention module
- * @param query Query tensor [batch, seq_len, embed_dim]
- * @param key Key tensor
- * @param value Value tensor
- * @param mask Optional attention mask
- * @param config Flash attention configuration
- * @return Output tensor, or NULL on failure
- */
 Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                  Tensor* value, Tensor* mask, FlashAttentionConfig* config);
 
-/**
- * @brief Forward pass with KV cache (for autoregressive generation)
- *
- * @param mha Multi-head attention module
- * @param query Query tensor (single token: [batch, 1, embed_dim])
- * @param key Key tensor
- * @param value Value tensor
- * @param mask Optional attention mask
- * @param cache KV cache to update
- * @return Output tensor, or NULL on failure
- */
 Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query,
                                             Tensor* key, Tensor* value,
                                             Tensor* mask, KVCache* cache);
 
-/**
- * @brief Configure flash attention on a multi-head attention module
- *
- * @param mha Multi-head attention module
- * @param enabled Enable flash attention
- * @param causal Use causal masking
- */
 void multihead_attention_set_flash(MultiHeadAttention* mha, bool enabled, bool causal);
 
 #ifdef __cplusplus

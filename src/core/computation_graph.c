@@ -1,8 +1,3 @@
-/**
- * @file computation_graph.c
- * @brief Computation graph implementation
- */
-
 #include "core/computation_graph.h"
 #include "core/graph_context.h"
 #include "core/logging.h"
@@ -146,7 +141,6 @@ static void graph_node_free(CMLGraphNode_t node) {
         free(node->op_params);
     }
 
-    // Don't free tensor - it's managed separately
     free(node);
 }
 
@@ -180,7 +174,6 @@ CMLGraphNode_t cml_graph_node_input(CMLComputationGraph_t graph, Tensor* tensor)
     node->is_leaf = true;
     graph_add_node(graph, node);
 
-    // Add to leaf nodes
     if (graph->num_leaves >= graph->leaf_capacity) {
         size_t new_capacity = graph->leaf_capacity == 0 ? 8 : graph->leaf_capacity * 2;
         CMLGraphNode_t* new_leaves =
@@ -228,7 +221,6 @@ CMLGraphNode_t cml_graph_node_op(CMLComputationGraph_t graph, CMLOpType op_type,
     node->num_inputs = num_inputs;
 
     if (op_params) {
-        // Store op_params pointer (caller retains ownership)
         node->op_params = op_params;
     }
 
@@ -264,12 +256,10 @@ void cml_graph_build_forward(CMLComputationGraph_t graph, CMLGraphNode_t output)
     if (!graph || !output)
         return;
 
-    // Mark all nodes as unvisited
     for (size_t i = 0; i < graph->num_nodes; i++) {
         graph->nodes[i]->visited = false;
     }
 
-    // Mark graph as built
     graph->built = true;
 }
 
@@ -282,28 +272,16 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     if (!forward_graph || !output)
         return NULL;
 
-    // Build backward graph for autograd
-    // Note: This computation graph backward construction is separate from IR-based backward.
-    // The IR system (used by default) handles backward pass via cml_ir_build_backward().
-    // This function is for graph mode visualization/debugging of backward pass.
-
     CMLComputationGraph_t backward_graph = cml_graph_new();
     if (!backward_graph)
         return NULL;
 
-    // Build backward graph by traversing forward graph in reverse
-    // 1. Start from output node
-    // 2. For each forward node, create corresponding backward node
-    // 3. Connect backward nodes based on forward dependencies
-
-    // Track visited nodes to avoid cycles
     bool* visited = calloc(forward_graph->num_nodes, sizeof(bool));
     if (!visited) {
         cml_graph_free(backward_graph);
         return NULL;
     }
 
-    // Stack for DFS traversal
     CMLGraphNode_t* stack = malloc(forward_graph->num_nodes * sizeof(CMLGraphNode_t));
     if (!stack) {
         free(visited);
@@ -314,7 +292,6 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     int stack_top      = 0;
     stack[stack_top++] = output;
 
-    // Map forward nodes to backward nodes
     CMLGraphNode_t* forward_to_backward = calloc(forward_graph->num_nodes, sizeof(CMLGraphNode_t));
     if (!forward_to_backward) {
         free(stack);
@@ -323,11 +300,9 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
         return NULL;
     }
 
-    // Traverse forward graph in reverse (DFS from output)
     while (stack_top > 0) {
         CMLGraphNode_t forward_node = stack[--stack_top];
 
-        // Find forward node index
         size_t forward_idx = SIZE_MAX;
         for (size_t i = 0; i < forward_graph->num_nodes; i++) {
             if (forward_graph->nodes[i] == forward_node) {
@@ -340,18 +315,16 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
             continue;
         visited[forward_idx] = true;
 
-        // Create backward node for this forward node
-        CMLOpType backward_op = CML_OP_NONE; // Default backward op
-        // Map forward ops to backward ops (basic mapping for graph visualization)
+        CMLOpType backward_op = CML_OP_NONE;
         switch (forward_node->op_type) {
         case CML_OP_ADD:
         case CML_OP_SUB:
         case CML_OP_MUL:
         case CML_OP_DIV:
-            backward_op = forward_node->op_type; // Same op for backward
+            backward_op = forward_node->op_type;
             break;
         case CML_OP_MATMUL:
-            backward_op = CML_OP_MATMUL; // MatMul backward
+            backward_op = CML_OP_MATMUL;
             break;
         case CML_OP_RELU:
         case CML_OP_SIGMOID:
@@ -374,15 +347,12 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
             break;
         }
 
-        // Create backward node (gradient node)
         CMLGraphNode_t backward_node = graph_node_create(backward_op, NULL);
         if (backward_node) {
-            // Link to forward node's inputs (for gradient flow)
             if (forward_node->num_inputs > 0) {
                 backward_node->inputs =
                     malloc((size_t)forward_node->num_inputs * sizeof(CMLGraphNode_t));
                 if (backward_node->inputs) {
-                    // For backward, inputs are the forward node's inputs
                     memcpy(backward_node->inputs, forward_node->inputs,
                            (size_t)forward_node->num_inputs * sizeof(CMLGraphNode_t));
                     backward_node->num_inputs = forward_node->num_inputs;
@@ -393,10 +363,8 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
             forward_to_backward[forward_idx] = backward_node;
         }
 
-        // Add forward node's inputs to stack (traverse backward)
         for (int i = 0; i < forward_node->num_inputs; i++) {
             if (forward_node->inputs[i]) {
-                // Find input node index
                 size_t input_idx = SIZE_MAX;
                 for (size_t j = 0; j < forward_graph->num_nodes; j++) {
                     if (forward_graph->nodes[j] == forward_node->inputs[i]) {
@@ -411,13 +379,10 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
         }
     }
 
-    // Link backward nodes based on forward dependencies
     for (size_t i = 0; i < backward_graph->num_nodes; i++) {
         CMLGraphNode_t backward_node = backward_graph->nodes[i];
         if (backward_node && backward_node->inputs) {
-            // Update inputs to point to corresponding backward nodes
             for (int j = 0; j < backward_node->num_inputs; j++) {
-                // Find corresponding backward node for this forward input
                 for (size_t k = 0; k < forward_graph->num_nodes; k++) {
                     if (forward_graph->nodes[k] == backward_node->inputs[j]) {
                         if (forward_to_backward[k]) {
@@ -442,27 +407,18 @@ static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params) {
     if (!node)
         return -1;
 
-    // If already executed, skip
     if (node->tensor && node->tensor->data) {
         return 0;
     }
 
-    // Execute inputs first
     for (int i = 0; i < node->num_inputs; i++) {
         if (graph_execute_node(node->inputs[i], params) != 0) {
             return -1;
         }
     }
 
-    // Execute operation based on type
-    // Note: This computation graph execution is separate from IR-based execution.
-    // IR-based execution (used by default) handles operations via uops.
-    // This graph execution is for graph mode visualization/debugging.
-    // For actual execution, the IR system should be used instead.
+    /* graph mode is visualization-only; IR handles actual execution */
     if (node->tensor && !node->tensor->data) {
-        // If tensor exists but not executed, this is a graph mode node
-        // In graph mode, execution would happen here, but we use IR mode by default
-        /* graph mode is visualization-only; IR handles actual execution */
     }
 
     return 0;
@@ -472,13 +428,11 @@ static void graph_topo_sort(CMLComputationGraph_t graph) {
     if (!graph)
         return;
 
-    // Reset execution order
     for (size_t i = 0; i < graph->num_nodes; i++) {
         graph->nodes[i]->execution_order = -1;
         graph->nodes[i]->visited         = false;
     }
 
-    // Simple topological sort (Kahn's algorithm)
     int order    = 0;
     bool changed = true;
 
@@ -489,7 +443,6 @@ static void graph_topo_sort(CMLComputationGraph_t graph) {
             if (node->execution_order >= 0)
                 continue;
 
-            // Check if all inputs are executed
             bool ready = true;
             for (int j = 0; j < node->num_inputs; j++) {
                 if (node->inputs[j]->execution_order < 0) {
@@ -512,13 +465,10 @@ int cml_graph_compute(CMLComputationGraph_t graph, CMLGraphExecParams* params) {
 
     if (!graph->built) {
         LOG_WARNING("Graph not built, building now");
-        // Build graph from all nodes
     }
 
-    // Topological sort
     graph_topo_sort(graph);
 
-    // Execute nodes in order
     for (int order = 0; order < (int)graph->num_nodes; order++) {
         for (size_t i = 0; i < graph->num_nodes; i++) {
             CMLGraphNode_t node = graph->nodes[i];
@@ -541,9 +491,7 @@ int cml_graph_compute_default(CMLComputationGraph_t graph) {
 
 int cml_graph_compute_with_context(CMLComputationGraph_t graph, void* context,
                                    CMLGraphExecParams* params) {
-    // Note: context parameter reserved for future memory management integration
-    // Currently, graph execution doesn't use context (IR system handles memory)
-    (void)context; // Reserved for future use (intentional)
+    (void)context;
     return cml_graph_compute(graph, params);
 }
 
@@ -597,15 +545,11 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
     if (!graph || graph->num_nodes < 2)
         return 0;
 
-    // Operation fusion: identify consecutive operations that can be fused
-    // Common patterns: add+relu, mul+add (FMA), etc.
-
     int fused_count = 0;
     bool* fused     = calloc(graph->num_nodes, sizeof(bool));
     if (!fused)
         return -1;
 
-    // Look for fusion patterns
     for (size_t i = 0; i < graph->num_nodes; i++) {
         if (fused[i])
             continue;
@@ -614,7 +558,6 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
         if (!node1 || node1->num_inputs == 0)
             continue;
 
-        // Check if this node's output is used by exactly one other node
         CMLGraphNode_t consumer = NULL;
         int consumer_count      = 0;
 
@@ -634,30 +577,23 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
             }
         }
 
-        // Only fuse if node1 has exactly one consumer
         if (consumer_count == 1 && consumer) {
-            // Check for fusion patterns
             bool can_fuse = false;
 
-            // Pattern 1: ADD + RELU -> FusedAddReLU
             if (node1->op_type == CML_OP_ADD && consumer->op_type == CML_OP_RELU) {
                 can_fuse = true;
             }
-            // Pattern 2: MUL + ADD -> FMA (Fused Multiply-Add)
             else if (node1->op_type == CML_OP_MUL && consumer->op_type == CML_OP_ADD) {
                 can_fuse = true;
             }
-            // Pattern 3: Any unary op followed by another unary op
             else if ((node1->op_type == CML_OP_EXP || node1->op_type == CML_OP_LOG) &&
                      (consumer->op_type == CML_OP_EXP || consumer->op_type == CML_OP_LOG)) {
                 can_fuse = true;
             }
 
             if (can_fuse) {
-                // Mark nodes as fused
                 fused[i] = true;
 
-                // Find consumer index
                 size_t consumer_idx = SIZE_MAX;
                 for (size_t j = 0; j < graph->num_nodes; j++) {
                     if (graph->nodes[j] == consumer) {
@@ -669,12 +605,7 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
                 if (consumer_idx != SIZE_MAX) {
                     fused[consumer_idx] = true;
 
-                    // Update consumer to use node1's inputs directly
-                    // This effectively fuses the operations
                     if (consumer->num_inputs > 0 && consumer->inputs) {
-                        // Replace consumer's input (node1) with node1's inputs
-                        // Basic fusion for graph visualization (IR system handles actual fusion
-                        // optimization)
                         free(consumer->inputs);
                         consumer->inputs =
                             malloc((size_t)node1->num_inputs * sizeof(CMLGraphNode_t));
@@ -686,7 +617,6 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
                     }
 
                     fused_count++;
-                    /* fused */
                 }
             }
         }
@@ -708,7 +638,6 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
     for (size_t i = 0; i < graph->num_nodes; i++) {
         CMLGraphNode_t node = graph->nodes[i];
 
-        // Check if this node is an output (not used as input by any other node)
         bool is_output = true;
         for (size_t j = 0; j < graph->num_nodes; j++) {
             if (i == j)
@@ -724,9 +653,7 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
                 break;
         }
 
-        // If it's an output or a leaf (parameter/input), mark as reachable
         if (is_output || node->is_leaf) {
-            // Mark this node and all its inputs as reachable (DFS)
             graph_mark_reachable(node);
         }
     }
@@ -734,13 +661,11 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
     size_t write_idx = 0;
     for (size_t i = 0; i < graph->num_nodes; i++) {
         if (graph->nodes[i]->visited) {
-            // Keep this node
             if (write_idx != i) {
                 graph->nodes[write_idx] = graph->nodes[i];
             }
             write_idx++;
         } else {
-            // Free unreachable node
             if (graph->nodes[i]) {
                 free(graph->nodes[i]);
             }

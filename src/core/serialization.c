@@ -1,8 +1,3 @@
-/**
- * @file serialization.c
- * @brief Serialization implementation
- */
-
 #include "core/serialization.h"
 #include "core/logging.h"
 #include "backend/device.h"
@@ -80,7 +75,6 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
 
     *named_params = np;
     *num_params   = idx;
-    // Note: Don't free params here - they're owned by the module
     return 0;
 }
 
@@ -121,31 +115,23 @@ int module_save_stream(Module* module, FILE* file) {
         LOG_ERROR("Failed to get named parameters");
         return -1;
     }
-
-    // Write magic number
     if (fwrite(MODEL_MAGIC, 1, 4, file) != 4) {
         LOG_ERROR("Failed to write magic number");
         module_named_parameters_free(named_params, num_params);
         return -1;
     }
-
-    // Write version
     uint8_t version = MODEL_VERSION;
     if (fwrite(&version, 1, 1, file) != 1) {
         LOG_ERROR("Failed to write version");
         module_named_parameters_free(named_params, num_params);
         return -1;
     }
-
-    // Write number of parameters
     int32_t num_params_int = (int32_t)num_params;
     if (fwrite(&num_params_int, sizeof(int32_t), 1, file) != 1) {
         LOG_ERROR("Failed to write number of parameters");
         module_named_parameters_free(named_params, num_params);
         return -1;
     }
-
-    // Write each parameter
     for (int i = 0; i < num_params; i++) {
         NamedParameter* np = &named_params[i];
         Parameter* param   = np->parameter;
@@ -154,8 +140,6 @@ int module_save_stream(Module* module, FILE* file) {
             LOG_WARNING("Skipping parameter %d: invalid parameter", i);
             continue;
         }
-
-        // Write name length
         int name_len         = np->name ? (int)strlen(np->name) : 0;
         int32_t name_len_int = (int32_t)name_len;
         if (fwrite(&name_len_int, sizeof(int32_t), 1, file) != 1) {
@@ -163,8 +147,6 @@ int module_save_stream(Module* module, FILE* file) {
             module_named_parameters_free(named_params, num_params);
             return -1;
         }
-
-        // Write name
         if (name_len > 0) {
             size_t name_len_size = (size_t)name_len;
             if (fwrite(np->name, 1, name_len_size, file) != name_len_size) {
@@ -173,8 +155,6 @@ int module_save_stream(Module* module, FILE* file) {
                 return -1;
             }
         }
-
-        // Write tensor (parameter data)
         if (tensor_write_stream(param->tensor, file) != 0) {
             LOG_ERROR("Failed to write tensor for parameter %d", i);
             module_named_parameters_free(named_params, num_params);
@@ -202,7 +182,6 @@ int module_save(Module* module, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        /* saved */
     }
 
     return result;
@@ -213,8 +192,6 @@ int module_load_stream(Module* module, FILE* file) {
         LOG_ERROR("Invalid arguments to module_load_stream");
         return -1;
     }
-
-    // Read magic number
     char magic[5] = {0};
     if (fread(magic, 1, 4, file) != 4) {
         LOG_ERROR("Failed to read magic number");
@@ -225,8 +202,6 @@ int module_load_stream(Module* module, FILE* file) {
         LOG_ERROR("Invalid magic number: expected %s, got %.4s", MODEL_MAGIC, magic);
         return -1;
     }
-
-    // Read version
     uint8_t version;
     if (fread(&version, 1, 1, file) != 1) {
         LOG_ERROR("Failed to read version");
@@ -237,27 +212,19 @@ int module_load_stream(Module* module, FILE* file) {
         LOG_ERROR("Unsupported version: %d (expected %d)", version, MODEL_VERSION);
         return -1;
     }
-
-    // Read number of parameters
     int32_t num_params_int;
     if (fread(&num_params_int, sizeof(int32_t), 1, file) != 1) {
         LOG_ERROR("Failed to read number of parameters");
         return -1;
     }
     int num_params = (int)num_params_int;
-
-    // Get named parameters from module
     NamedParameter* module_params = NULL;
     int module_num_params         = 0;
     if (module_named_parameters(module, &module_params, &module_num_params) != 0) {
         LOG_ERROR("Failed to get module parameters");
         return -1;
     }
-
-    // Create a map of parameter names to parameters
-    // For simplicity, we'll match by index and name
     for (int i = 0; i < num_params && i < module_num_params; i++) {
-        // Read name length
         int32_t name_len_int;
         if (fread(&name_len_int, sizeof(int32_t), 1, file) != 1) {
             LOG_ERROR("Failed to read name length for parameter %d", i);
@@ -265,8 +232,6 @@ int module_load_stream(Module* module, FILE* file) {
             return -1;
         }
         int name_len = (int)name_len_int;
-
-        // Read name
         char* name = NULL;
         if (name_len > 0) {
             name = malloc((size_t)name_len + 1);
@@ -285,8 +250,6 @@ int module_load_stream(Module* module, FILE* file) {
             }
             name[name_len] = '\0';
         }
-
-        // Read tensor
         Tensor* loaded_tensor = tensor_read_stream(file);
         if (!loaded_tensor) {
             LOG_ERROR("Failed to read tensor for parameter %d", i);
@@ -296,8 +259,6 @@ int module_load_stream(Module* module, FILE* file) {
             module_named_parameters_free(module_params, module_num_params);
             return -1;
         }
-
-        // Find matching parameter in module
         Parameter* target_param = NULL;
         if (name) {
             for (int j = 0; j < module_num_params; j++) {
@@ -311,8 +272,6 @@ int module_load_stream(Module* module, FILE* file) {
         }
 
         if (target_param && target_param->tensor) {
-            // Copy data from loaded tensor to parameter tensor
-            // Check if shapes match
             bool shapes_match = true;
             if (target_param->tensor->ndim != loaded_tensor->ndim) {
                 shapes_match = false;
@@ -326,14 +285,12 @@ int module_load_stream(Module* module, FILE* file) {
             }
 
             if (shapes_match && target_param->tensor->dtype == loaded_tensor->dtype) {
-                // Copy data
                 size_t data_size =
                     target_param->tensor->numel * cml_dtype_size(target_param->tensor->dtype);
                 if (loaded_tensor->device == DEVICE_CPU &&
                     target_param->tensor->device == DEVICE_CPU) {
                     memcpy(target_param->tensor->data, loaded_tensor->data, data_size);
                 } else {
-                    // Use device copy
                     void* cpu_buffer = malloc(data_size);
                     if (cpu_buffer) {
                         if (loaded_tensor->device == DEVICE_CPU) {
@@ -384,7 +341,6 @@ int module_load(Module* module, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        /* loaded */
     }
 
     return result;
@@ -408,54 +364,38 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
         LOG_ERROR("Invalid arguments to tensor_write_stream");
         return -1;
     }
-
-    // Write magic number
     if (fwrite(TENSOR_MAGIC, 1, 4, file) != 4) {
         LOG_ERROR("Failed to write magic number");
         return -1;
     }
-
-    // Write version
     uint8_t version = TENSOR_VERSION;
     if (fwrite(&version, 1, 1, file) != 1) {
         LOG_ERROR("Failed to write version");
         return -1;
     }
-
-    // Write dtype
     uint8_t dtype = (uint8_t)tensor->dtype;
     if (fwrite(&dtype, 1, 1, file) != 1) {
         LOG_ERROR("Failed to write dtype");
         return -1;
     }
-
-    // Write device
     uint8_t device = (uint8_t)tensor->device;
     if (fwrite(&device, 1, 1, file) != 1) {
         LOG_ERROR("Failed to write device");
         return -1;
     }
-
-    // Write ndim
     uint8_t ndim = (uint8_t)tensor->ndim;
     if (fwrite(&ndim, 1, 1, file) != 1) {
         LOG_ERROR("Failed to write ndim");
         return -1;
     }
-
-    // Write shape
     if (fwrite(tensor->shape, sizeof(int), (size_t)ndim, file) != (size_t)ndim) {
         LOG_ERROR("Failed to write shape");
         return -1;
     }
-
-    // Write numel
     if (fwrite(&tensor->numel, sizeof(size_t), 1, file) != 1) {
         LOG_ERROR("Failed to write numel");
         return -1;
     }
-
-    // Ensure tensor is contiguous for efficient reading
     Tensor* contiguous_tensor = tensor;
     if (!tensor->is_contiguous) {
         contiguous_tensor = tensor_contiguous(tensor);
@@ -464,8 +404,6 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
             return -1;
         }
     }
-
-    // Copy data to CPU if needed
     size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
     void* cpu_data   = NULL;
     if (tensor->device != DEVICE_CPU) {
@@ -491,8 +429,6 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
     } else {
         cpu_data = contiguous_tensor->data;
     }
-
-    // Write data
     if (fwrite(cpu_data, 1, data_size, file) != data_size) {
         LOG_ERROR("Failed to write tensor data");
         if (cpu_data != contiguous_tensor->data) {
@@ -503,8 +439,6 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
         }
         return -1;
     }
-
-    // Cleanup
     if (cpu_data != contiguous_tensor->data) {
         free(cpu_data);
     }
@@ -531,7 +465,6 @@ int tensor_write_file(Tensor* tensor, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        /* saved */
     }
 
     return result;
@@ -542,8 +475,6 @@ Tensor* tensor_read_stream(FILE* file) {
         LOG_ERROR("Invalid arguments to tensor_read_stream");
         return NULL;
     }
-
-    // Read magic number
     char magic[5] = {0};
     if (fread(magic, 1, 4, file) != 4) {
         LOG_ERROR("Failed to read magic number");
@@ -554,8 +485,6 @@ Tensor* tensor_read_stream(FILE* file) {
         LOG_ERROR("Invalid magic number: expected %s, got %.4s", TENSOR_MAGIC, magic);
         return NULL;
     }
-
-    // Read version
     uint8_t version;
     if (fread(&version, 1, 1, file) != 1) {
         LOG_ERROR("Failed to read version");
@@ -566,24 +495,18 @@ Tensor* tensor_read_stream(FILE* file) {
         LOG_ERROR("Unsupported version: %d (expected %d)", version, TENSOR_VERSION);
         return NULL;
     }
-
-    // Read dtype
     uint8_t dtype_val;
     if (fread(&dtype_val, 1, 1, file) != 1) {
         LOG_ERROR("Failed to read dtype");
         return NULL;
     }
     DType dtype = (DType)dtype_val;
-
-    // Read device
     uint8_t device_val;
     if (fread(&device_val, 1, 1, file) != 1) {
         LOG_ERROR("Failed to read device");
         return NULL;
     }
     DeviceType device = (DeviceType)device_val;
-
-    // Read ndim
     uint8_t ndim_val;
     if (fread(&ndim_val, 1, 1, file) != 1) {
         LOG_ERROR("Failed to read ndim");
@@ -595,8 +518,6 @@ Tensor* tensor_read_stream(FILE* file) {
         LOG_ERROR("Invalid ndim: %d", ndim);
         return NULL;
     }
-
-    // Read shape
     int* shape = malloc((size_t)ndim * sizeof(int));
     if (!shape) {
         LOG_ERROR("Failed to allocate shape array");
@@ -608,16 +529,12 @@ Tensor* tensor_read_stream(FILE* file) {
         free(shape);
         return NULL;
     }
-
-    // Read numel
     size_t numel;
     if (fread(&numel, sizeof(size_t), 1, file) != 1) {
         LOG_ERROR("Failed to read numel");
         free(shape);
         return NULL;
     }
-
-    // Create tensor
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* tensor      = tensor_empty(shape, ndim, &config);
     free(shape);
@@ -626,8 +543,6 @@ Tensor* tensor_read_stream(FILE* file) {
         LOG_ERROR("Failed to create tensor");
         return NULL;
     }
-
-    // Read data
     size_t data_size = numel * cml_dtype_size(dtype);
     void* cpu_data   = malloc(data_size);
     if (!cpu_data) {
@@ -642,8 +557,6 @@ Tensor* tensor_read_stream(FILE* file) {
         tensor_free(tensor);
         return NULL;
     }
-
-    // Copy data to tensor
     if (device == DEVICE_CPU) {
         memcpy(tensor->data, cpu_data, data_size);
     } else {
@@ -677,13 +590,11 @@ Tensor* tensor_read_file(const char* filepath) {
     fclose(file);
 
     if (tensor) {
-        /* loaded */
     }
 
     return tensor;
 }
 
-// Forward declarations for optimizer state types (defined in optim.c)
 typedef struct SGDMomentumState {
     Tensor* momentum_buffer;
 } SGDMomentumState;
@@ -741,21 +652,15 @@ int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
         LOG_ERROR("Invalid arguments to optimizer_save_stream");
         return -1;
     }
-
-    // Write magic number
     if (fwrite(OPTIMIZER_MAGIC, 1, 4, file) != 4) {
         LOG_ERROR("Failed to write magic number");
         return -1;
     }
-
-    // Write version
     uint8_t version = OPTIMIZER_VERSION;
     if (fwrite(&version, 1, 1, file) != 1) {
         LOG_ERROR("Failed to write version");
         return -1;
     }
-
-    // Write optimizer name
     int name_len         = optimizer->name ? (int)strlen(optimizer->name) : 0;
     int32_t name_len_int = (int32_t)name_len;
     if (fwrite(&name_len_int, sizeof(int32_t), 1, file) != 1) {
@@ -769,19 +674,13 @@ int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
             return -1;
         }
     }
-
-    // Write number of parameter groups
     int32_t num_groups_int = (int32_t)optimizer->num_param_groups;
     if (fwrite(&num_groups_int, sizeof(int32_t), 1, file) != 1) {
         LOG_ERROR("Failed to write number of parameter groups");
         return -1;
     }
-
-    // Write each parameter group
     for (int g = 0; g < optimizer->num_param_groups; g++) {
         ParameterGroup* group = &optimizer->param_groups[g];
-
-        // Write hyperparameters
         if (fwrite(&group->lr, sizeof(float), 1, file) != 1 ||
             fwrite(&group->weight_decay, sizeof(float), 1, file) != 1 ||
             fwrite(&group->momentum, sizeof(float), 1, file) != 1 ||
@@ -791,31 +690,22 @@ int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
             LOG_ERROR("Failed to write hyperparameters for group %d", g);
             return -1;
         }
-
-        // Write step count
         int32_t step_count_int = (int32_t)group->step_count;
         if (fwrite(&step_count_int, sizeof(int32_t), 1, file) != 1) {
             LOG_ERROR("Failed to write step count for group %d", g);
             return -1;
         }
-
-        // Write number of parameters
         int32_t num_params_int = (int32_t)group->num_parameters;
         if (fwrite(&num_params_int, sizeof(int32_t), 1, file) != 1) {
             LOG_ERROR("Failed to write number of parameters for group %d", g);
             return -1;
         }
-
-        // Write state for each parameter
         for (int i = 0; i < group->num_parameters; i++) {
-            // Write parameter index
             int32_t param_idx = (int32_t)i;
             if (fwrite(&param_idx, sizeof(int32_t), 1, file) != 1) {
                 LOG_ERROR("Failed to write parameter index");
                 return -1;
             }
-
-            // Determine state type and write state
             uint8_t state_type = OPTIMIZER_STATE_NONE;
             if (group->state) {
                 if (strcmp(optimizer->name, "SGD") == 0) {
@@ -894,7 +784,6 @@ int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
                     }
                 }
             } else {
-                // No state
                 if (fwrite(&state_type, 1, 1, file) != 1) {
                     LOG_ERROR("Failed to write state type");
                     return -1;
@@ -922,7 +811,6 @@ int optimizer_save(Optimizer* optimizer, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        /* saved */
     }
 
     return result;
@@ -933,8 +821,6 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
         LOG_ERROR("Invalid arguments to optimizer_load_stream");
         return -1;
     }
-
-    // Read magic number
     char magic[5] = {0};
     if (fread(magic, 1, 4, file) != 4) {
         LOG_ERROR("Failed to read magic number");
@@ -945,8 +831,6 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
         LOG_ERROR("Invalid magic number: expected %s, got %.4s", OPTIMIZER_MAGIC, magic);
         return -1;
     }
-
-    // Read version
     uint8_t version;
     if (fread(&version, 1, 1, file) != 1) {
         LOG_ERROR("Failed to read version");
@@ -957,16 +841,12 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
         LOG_ERROR("Unsupported version: %d (expected %d)", version, OPTIMIZER_VERSION);
         return -1;
     }
-
-    // Read optimizer name
     int32_t name_len_int;
     if (fread(&name_len_int, sizeof(int32_t), 1, file) != 1) {
         LOG_ERROR("Failed to read name length");
         return -1;
     }
     int name_len = (int)name_len_int;
-
-    // Verify optimizer name matches (optional check)
     if (name_len > 0) {
         char* saved_name = malloc((size_t)name_len + 1);
         if (!saved_name) {
@@ -988,8 +868,6 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
 
         free(saved_name);
     }
-
-    // Read number of parameter groups
     int32_t num_groups_int;
     if (fread(&num_groups_int, sizeof(int32_t), 1, file) != 1) {
         LOG_ERROR("Failed to read number of parameter groups");
@@ -1000,16 +878,11 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
     if (num_groups != optimizer->num_param_groups) {
         LOG_WARNING("Parameter group count mismatch: saved=%d, current=%d", num_groups,
                     optimizer->num_param_groups);
-        // Continue anyway, but only load matching groups
     }
-
-    // Read each parameter group
     int groups_to_load =
         num_groups < optimizer->num_param_groups ? num_groups : optimizer->num_param_groups;
     for (int g = 0; g < groups_to_load; g++) {
         ParameterGroup* group = &optimizer->param_groups[g];
-
-        // Read hyperparameters
         float saved_lr, saved_weight_decay, saved_momentum, saved_beta1, saved_beta2, saved_epsilon;
         if (fread(&saved_lr, sizeof(float), 1, file) != 1 ||
             fread(&saved_weight_decay, sizeof(float), 1, file) != 1 ||
@@ -1020,24 +893,18 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
             LOG_ERROR("Failed to read hyperparameters for group %d", g);
             return -1;
         }
-
-        // Restore hyperparameters
         group->lr           = saved_lr;
         group->weight_decay = saved_weight_decay;
         group->momentum     = saved_momentum;
         group->beta1        = saved_beta1;
         group->beta2        = saved_beta2;
         group->epsilon      = saved_epsilon;
-
-        // Read step count
         int32_t step_count_int;
         if (fread(&step_count_int, sizeof(int32_t), 1, file) != 1) {
             LOG_ERROR("Failed to read step count for group %d", g);
             return -1;
         }
         group->step_count = (int)step_count_int;
-
-        // Read number of parameters
         int32_t num_params_int;
         if (fread(&num_params_int, sizeof(int32_t), 1, file) != 1) {
             LOG_ERROR("Failed to read number of parameters for group %d", g);
@@ -1048,31 +915,19 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
         if (num_params != group->num_parameters) {
             LOG_WARNING("Parameter count mismatch for group %d: saved=%d, current=%d", g,
                         num_params, group->num_parameters);
-            // Continue anyway, but only load matching parameters
         }
-
-        // Allocate state if needed
-        // Note: params_to_load would be used if we limit loading, but we load all matching params
-
-        // Read state for each parameter
         for (int i = 0; i < num_params; i++) {
-            // Read parameter index
             int32_t param_idx;
             if (fread(&param_idx, sizeof(int32_t), 1, file) != 1) {
                 LOG_ERROR("Failed to read parameter index");
                 return -1;
             }
-
-            // Read state type
             uint8_t state_type;
             if (fread(&state_type, 1, 1, file) != 1) {
                 LOG_ERROR("Failed to read state type");
                 return -1;
             }
-
-            // Only load state if parameter index is valid
             if (param_idx >= 0 && param_idx < group->num_parameters) {
-                // Initialize state if needed
                 if (state_type == OPTIMIZER_STATE_SGD && strcmp(optimizer->name, "SGD") == 0) {
                     if (!group->state) {
                         SGDMomentumState** states =
@@ -1216,12 +1071,10 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
                         states[param_idx]->sum_sq_grad = sum_sq_grad;
                     }
                 } else {
-                    // Skip state tensors for unknown state types
                     LOG_WARNING("Unknown state type %d for parameter %d, skipping", state_type,
                                 param_idx);
                 }
             } else {
-                // Skip state tensors for invalid parameter indices
                 LOG_WARNING("Invalid parameter index %d, skipping state", param_idx);
             }
         }
@@ -1246,7 +1099,6 @@ int optimizer_load(Optimizer* optimizer, const char* filepath) {
     fclose(file);
 
     if (result == 0) {
-        /* loaded */
     }
 
     return result;

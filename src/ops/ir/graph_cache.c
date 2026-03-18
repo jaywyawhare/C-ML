@@ -1,8 +1,3 @@
-/**
- * @file graph_cache.c
- * @brief Graph caching implementation for fast repeated execution
- */
-
 #include "ops/ir/graph_cache.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"

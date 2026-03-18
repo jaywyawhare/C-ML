@@ -1,10 +1,3 @@
-/**
- * @file idx_parser.c
- * @brief IDX file format parser for MNIST/Fashion-MNIST datasets
- *
- * Extracted and generalized from examples/demos/mnist_example.c
- */
-
 #include "datasets/datasets.h"
 #include "core/logging.h"
 #include <stdio.h>

@@ -1,8 +1,3 @@
-/**
- * @file export.h
- * @brief IR export functionality
- */
-
 #ifndef CML_OPS_IR_EXPORT_H
 #define CML_OPS_IR_EXPORT_H
 
@@ -13,28 +8,12 @@
 extern "C" {
 #endif
 
-/**
- * @brief Export kernel analysis data as JSON
- *
- * Exports detailed information about kernels, optimizations, dead code,
- * and fusion opportunities for visualization in the Kernel Studio.
- *
- * @param ir IR context
- * @param optimized Whether to export optimized or unoptimized view
- * @return JSON string (caller must free) or NULL on failure
- */
+/* Exports detailed information about kernels, optimizations, dead code,
+   and fusion opportunities for visualization in the Kernel Studio. */
 char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized);
 
-/**
- * @brief Export graph topology as JSON
- *
- * Exports the graph structure (nodes and edges) for visualization.
- * Uses the same node ordering as cml_ir_export_kernel_analysis to ensure
- * consistency between views.
- *
- * @param ir IR context
- * @return JSON string (caller must free) or NULL on failure
- */
+/* Exports the graph structure (nodes and edges) for visualization.
+   Uses the same node ordering as cml_ir_export_kernel_analysis. */
 char* cml_ir_export_graph_json(CMLGraph_t ir);
 
 #ifdef __cplusplus

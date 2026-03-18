@@ -1,8 +1,3 @@
-/**
- * @file test_missing_ops.c
- * @brief Tests for sort, argsort, topk, cumprod, bitwise ops, nonzero, masked_fill
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>

@@ -1,8 +1,3 @@
-/**
- * @file backend_buffer.c
- * @brief Backend buffer implementation
- */
-
 #include "backend/backend_buffer.h"
 #include "backend/device.h"
 #include "core/logging.h"

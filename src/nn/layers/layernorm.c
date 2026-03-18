@@ -1,8 +1,3 @@
-/**
- * @file layernorm.c
- * @brief Layer Normalization layer implementation using uops
- */
-
 #include "nn/layers/layernorm.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -33,11 +28,11 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         return NULL;
     }
     ReduceParams mean_params;
-    int mean_dim         = input->ndim - 1; // Last dimension
+    int mean_dim         = input->ndim - 1;
     int mean_dims[]      = {mean_dim};
     mean_params.dims     = mean_dims;
     mean_params.num_dims = 1;
-    mean_params.keepdim  = true; // Keep dimension for broadcasting
+    mean_params.keepdim  = true;
 
     Tensor* mean_reduced = uop_mean(input, &mean_params);
     if (!mean_reduced) {
@@ -169,7 +164,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
     if (affine) {
         int weight_shape[] = {normalized_shape};
 
-        // Create weight (gamma) - initialized to ones
         TensorConfig config =
             (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
         Tensor* weight = tensor_ones(weight_shape, 1, &config);
@@ -185,7 +179,6 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
 
         ln->weight = module_get_parameter((Module*)ln, "weight");
 
-        // Create bias (beta) - initialized to zeros
         Tensor* bias = tensor_zeros(weight_shape, 1, &config);
         if (!bias) {
             module_free((Module*)ln);

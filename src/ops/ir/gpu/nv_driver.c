@@ -1,17 +1,3 @@
-/**
- * @file nv_driver.c
- * @brief NVIDIA userspace driver -- direct ioctl interface to kernel module
- *
- * Opens /dev/nvidiactl and /dev/nvidia0 via open(), uses ioctl() for RM
- * operations (NV_ESC_RM_ALLOC, NV_ESC_RM_CONTROL, NV_ESC_RM_FREE).
- * Dispatches kernels through a GPFIFO ring buffer and synchronises via
- * semaphore polling.  PTX is compiled to CUBIN by invoking the `ptxas`
- * subprocess through popen/pclose.
- *
- * The RM ioctl structures are stubs that demonstrate the architecture;
- * the code returns gracefully when hardware is not present.
- */
-
 #include "ops/ir/gpu/nv_driver.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
@@ -41,7 +27,6 @@
 
 #ifdef __linux__
 
-/* File-local handle counter for RM allocations */
 static uint32_t g_nv_next_handle = 0x10000;
 
 typedef struct {
@@ -161,12 +146,10 @@ static int nv_rm_control_unused_guard(void) {
 
 bool cml_nv_driver_available(void) {
 #ifdef __linux__
-    /* Quick stat check -- does not open the device */
     struct stat st;
     if (stat("/dev/nvidia0", &st) != 0) {
         return false;
     }
-    /* Verify we can open it for reading */
     int fd = open("/dev/nvidia0", O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
         return false;
@@ -202,7 +185,6 @@ int cml_nv_driver_init(CMLNVDriver* drv) {
     LOG_ERROR("NV driver: only supported on Linux");
     return -1;
 #else
-    /* ── Open device nodes ── */
     drv->fd_ctl = open("/dev/nvidiactl", O_RDWR | O_CLOEXEC);
     if (drv->fd_ctl < 0) {
         LOG_ERROR("NV driver: failed to open /dev/nvidiactl: %s", strerror(errno));
@@ -217,7 +199,6 @@ int cml_nv_driver_init(CMLNVDriver* drv) {
         return -1;
     }
 
-    /* ── Allocate RM client ── */
     drv->client_handle = g_nv_next_handle++;
     if (nv_rm_alloc(drv->fd_ctl, 0, 0,
                     &drv->client_handle, NV01_ROOT_CLIENT, NULL) != 0) {
@@ -225,7 +206,6 @@ int cml_nv_driver_init(CMLNVDriver* drv) {
         goto fail;
     }
 
-    /* ── Allocate RM device (GPU 0) ── */
     drv->device_handle = g_nv_next_handle++;
     if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->client_handle,
                     &drv->device_handle, NV01_DEVICE_0, NULL) != 0) {
@@ -233,7 +213,6 @@ int cml_nv_driver_init(CMLNVDriver* drv) {
         goto fail;
     }
 
-    /* ── Allocate RM subdevice ── */
     drv->subdevice_handle = g_nv_next_handle++;
     if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle,
                     &drv->subdevice_handle, NV20_SUBDEVICE_0, NULL) != 0) {
@@ -241,15 +220,6 @@ int cml_nv_driver_init(CMLNVDriver* drv) {
         goto fail;
     }
 
-    /* ── Setup GPFIFO channel ──
-     * In a real driver we would:
-     * 1. Allocate a channel group
-     * 2. Allocate a GPFIFO channel (KEPLER_CHANNEL_GPFIFO_A or newer)
-     * 3. mmap the GPFIFO entries and doorbell register
-     * 4. Map the channel's notifier and semaphore pages
-     *
-     * Here we attempt the RM alloc and fall back gracefully.
-     */
     drv->gpfifo.num_entries = NV_GPFIFO_DEFAULT_ENTRIES;
     drv->channel_group_handle = g_nv_next_handle++;
     drv->gpfifo.handle = g_nv_next_handle++;
@@ -273,8 +243,7 @@ int cml_nv_driver_init(CMLNVDriver* drv) {
         }
     }
 
-    /* ── Allocate semaphore for synchronization ── */
-    size_t sem_size = 4096;  /* one page */
+    size_t sem_size = 4096;
     drv->semaphore = (volatile uint32_t*)mmap(NULL, sem_size,
                                               PROT_READ | PROT_WRITE,
                                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -425,9 +394,6 @@ int cml_nv_buffer_upload(CMLNVDriver* drv, CMLNVBuffer* dst,
     }
 
     if (dst->host_visible && dst->cpu_addr) {
-        /* For host-visible buffers we can memcpy directly, then the GPU
-         * would see it via the coherent mapping.  In a real driver we
-         * would issue a DMA copy for device-local buffers. */
         memcpy(dst->cpu_addr, src, n);
         return 0;
     }
@@ -446,8 +412,6 @@ int cml_nv_buffer_upload(CMLNVDriver* drv, CMLNVBuffer* dst,
 
     memcpy(staging->cpu_addr, src, n);
 
-    /* Point the destination to the staging buffer's GPU VA.
-     * The GPU will access data through the staging buffer's coherent mapping. */
     dst->gpu_va = staging->gpu_va;
 
     cml_nv_buffer_free(drv, staging);
@@ -471,8 +435,6 @@ int cml_nv_buffer_download(CMLNVDriver* drv, CMLNVBuffer* src,
         return 0;
     }
 
-    /* Device-local buffer without host mapping.
-     * Synchronize first, then create a staging buffer to read back. */
     cml_nv_synchronize(drv);
 
     CMLNVBuffer* staging = cml_nv_buffer_create(drv, n, true /* host_visible */);
@@ -481,7 +443,6 @@ int cml_nv_buffer_download(CMLNVDriver* drv, CMLNVBuffer* src,
         return -1;
     }
 
-    /* Copy from staging (the data may have been written there during upload) */
     if (staging->cpu_addr) {
         memcpy(dst, staging->cpu_addr, n);
         cml_nv_buffer_free(drv, staging);
@@ -531,7 +492,7 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver* drv, const char* ptx_code,
     fputs(ptx_code, ptx_file);
     fclose(ptx_file);
 
-    char cmd[512];
+    char cmd[1024];
     snprintf(cmd, sizeof(cmd),
              "ptxas -arch=sm_%d -o %s %s 2>&1",
              sm, cubin_path, ptx_path);
@@ -654,26 +615,14 @@ int cml_nv_kernel_launch(CMLNVDriver* drv, CMLNVKernel* kernel,
         return -1;
     }
 
-    /* ── Build a command buffer entry ──
-     *
-     * A real GPFIFO entry is a 64-bit word: [GPU_VA_of_pushbuffer : length].
-     * The pushbuffer itself would contain NV method calls to:
-     *   1. Bind the CUBIN module
-     *   2. Set grid/block dimensions
-     *   3. Set kernel arguments (constant buffer bindings)
-     *   4. Issue a LAUNCH method
-     *   5. Release a semaphore on completion
-     *
-     * Write a GPFIFO entry encoding the ring buffer
-     * mechanics (put pointer advance, wrap, doorbell ring).
-     */
-
+    /* GPFIFO entry is a 64-bit word: [GPU_VA_of_pushbuffer : length].
+     * The pushbuffer contains NV method calls to bind the CUBIN,
+     * set grid/block dims, set kernel args, issue LAUNCH, and
+     * release a semaphore on completion. */
     uint32_t put = drv->gpfifo.put_offset;
 
-    /* Write GPFIFO entry: GPU VA of the command stream */
     drv->gpfifo.entries[put] = kernel->gpu_addr | ((uint64_t)0x40 << 40);
 
-    /* Advance put pointer with wrap */
     put = (put + 1) % drv->gpfifo.num_entries;
     drv->gpfifo.put_offset = put;
 
@@ -731,7 +680,6 @@ int cml_nv_synchronize(CMLNVDriver* drv) {
 
 
 static char* nv_gen_ptx_for_node(struct IRNode* node, int sm) {
-    /* Build a minimal PTX kernel per operation type */
     char* ptx = NULL;
     const char* kname = "nv_auto_kernel";
     size_t buf_size = 4096;
@@ -836,7 +784,6 @@ static char* nv_gen_ptx_for_node(struct IRNode* node, int sm) {
     }
 
     default:
-        /* Unsupported op -- fall back to CPU */
         break;
     }
 
@@ -869,14 +816,12 @@ int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir) {
             continue;
         }
 
-        /* Try GPU path: generate PTX, compile, launch */
         bool gpu_ok = false;
         char* ptx = nv_gen_ptx_for_node(node, sm);
 
         if (ptx) {
             CMLNVKernel* kernel = cml_nv_kernel_compile_ptx(drv, ptx, "nv_auto_kernel");
             if (kernel) {
-                /* Determine element count */
                 size_t numel = 1;
                 for (int d = 0; d < output->ndim; d++) {
                     numel *= (size_t)output->shape[d];
@@ -956,7 +901,6 @@ int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir) {
             free(ptx);
         }
 
-        /* CPU fallback if GPU path failed */
         if (!gpu_ok) {
             LOG_DEBUG("NV driver: GPU path failed for op %d, using CPU fallback",
                       (int)node->type);

@@ -1,12 +1,3 @@
-/**
- * @file training_loop_example.c
- * @brief Minimal training-loop example using new DX features:
- * - Sensible defaults (device, dtype)
- * - Fluent/builder API
- * - Automatic parameter collection (optim_adam_for_model)
- * - Implicit shape inference (tensor_zeros_2d)
- */
-
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,10 +30,7 @@ static void training_example(void) {
     }
     module_set_training(model, true);
 
-    // Print model summary (also exports architecture if VIZ=1)
     cml_summary(model);
-
-    // Register model for automatic architecture export (for visualization)
     training_metrics_register_model(model);
 
     Optimizer* optimizer = NULL;
@@ -61,7 +49,6 @@ static void training_example(void) {
     int batch_size  = 32;
     int num_samples = 100;
 
-    // Allocate FULL dataset
     inputs = tensor_zeros_2d(num_samples, input_size);
     if (!inputs) {
         LOG_ERROR("Failed to create input tensor");
@@ -75,18 +62,14 @@ static void training_example(void) {
         return;
     }
 
-    // Generate meaningful training data
     float* input_data  = (float*)tensor_data_ptr(inputs);
     float* target_data = (float*)tensor_data_ptr(targets);
 
-    // Create a simple learnable pattern: target = 1 if sum of first 3 inputs > 0, else 0
     for (int i = 0; i < num_samples; i++) {
-        // Generate inputs
         for (int j = 0; j < input_size; j++) {
             input_data[i * input_size + j] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f;
         }
 
-        // Create target based on input pattern (learnable)
         float sum = 0.0f;
         for (int j = 0; j < 3 && j < input_size; j++) {
             sum += input_data[i * input_size + j];
@@ -116,14 +99,12 @@ static void training_example(void) {
         for (int batch = 0; batch < num_batches; batch++) {
             optimizer_zero_grad(optimizer);
 
-            // Use different data slices for each batch
             int batch_start = (batch * batch_size) % num_samples;
             int batch_end   = batch_start + batch_size;
             if (batch_end > num_samples)
                 batch_end = num_samples;
             int current_batch_size = batch_end - batch_start;
 
-            // Create batch tensors by copying data
             Tensor* batch_inputs  = tensor_zeros_2d(current_batch_size, input_size);
             Tensor* batch_targets = tensor_zeros_2d(current_batch_size, output_size);
 
@@ -159,13 +140,11 @@ static void training_example(void) {
                 continue;
             }
 
-            // Calculate batch accuracy
             float* out_data = (float*)tensor_data_ptr(outputs);
             int correct     = 0;
             for (int i = 0; i < current_batch_size; i++) {
                 float pred = out_data[i];
-                float tgt  = batch_tgt_data[i]; // reuse pointer
-                // Check if prediction matches target (using 0.5 threshold for 0/1 targets)
+                float tgt  = batch_tgt_data[i];
                 if ((pred > 0.5f && tgt > 0.5f) || (pred <= 0.5f && tgt <= 0.5f)) {
                     correct++;
                 }
@@ -186,19 +165,12 @@ static void training_example(void) {
 
             tensor_backward(loss, NULL, false, false);
 
-            // Export graph and kernels on first batch of first epoch for visualization
             if (batch == 0 && epoch == 0) {
                 autograd_export_json(loss, "graph.json");
 
-                // Export kernel analysis for CodeGenView
                 if (loss->ir_context) {
-                    // Export unoptimized view first
                     char* unopt = cml_ir_export_kernel_analysis(loss->ir_context, false);
-
-                    // Run optimization to get fused kernels and dead code elimination
                     cml_ir_optimize(loss->ir_context);
-
-                    // Export optimized view
                     char* opt = cml_ir_export_kernel_analysis(loss->ir_context, true);
 
                     if (unopt && opt) {
@@ -233,7 +205,6 @@ static void training_example(void) {
         epoch_loss /= (float)num_batches;
         epoch_acc /= (float)num_batches;
 
-        // Capture metrics for UI if needed
         training_metrics_auto_capture_train_accuracy(epoch_acc);
 
         if ((epoch + 1) % 10 == 0 || epoch == 0) {
@@ -263,7 +234,6 @@ static void training_example(void) {
 
     printf("\nTraining completed!\n");
 
-    // Complete the final epoch and export final metrics
     training_metrics_complete_epoch();
 
     Tensor* eval_out = module_forward(model, inputs);

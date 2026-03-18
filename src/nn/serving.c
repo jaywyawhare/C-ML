@@ -1,14 +1,3 @@
-/**
- * @file serving.c
- * @brief Continuous batching / serving scheduler implementation
- *
- * Implements the scheduling infrastructure for LLM serving:
- * - Circular-buffer request queue
- * - Batch admission (QUEUED -> PREFILL -> DECODING)
- * - Request lifecycle management
- * - Serving statistics tracking
- */
-
 #include "nn/serving.h"
 #include "core/logging.h"
 
@@ -16,17 +5,12 @@
 #include <string.h>
 #include <time.h>
 
-/** Get wall-clock time in milliseconds (monotonic where available). */
 static double serving_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1.0e6;
 }
 
-/**
- * Search all queued + active requests for one matching request_id.
- * Returns the request pointer, or NULL if not found.
- */
 static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) {
     if (!ctx) return NULL;
 
@@ -48,7 +32,6 @@ static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) 
     return NULL;
 }
 
-/** Free a single sequence request and its owned buffers. */
 static void free_request(CMLSequenceRequest* req) {
     if (!req) return;
     free(req->prompt_tokens);

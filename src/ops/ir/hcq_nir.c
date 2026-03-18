@@ -1,15 +1,5 @@
-/**
- * @file hcq_nir.c
- * @brief Hardware Command Queues -- NIR/Mesa backend
- *
- * Thin wrapper that forwards HCQ operations to the Vulkan HCQ backend.
- * NIR compiles to SPIR-V which is consumed by the Vulkan pipeline, so
- * queue management and kernel dispatch reuse the existing hcq_vulkan
- * infrastructure.
- *
- * Guarded by CML_HAS_NIR.  When the flag is not defined this translation
- * unit compiles to stubs that return -1.
- */
+/* Forwards HCQ operations to the Vulkan HCQ backend since NIR
+ * compiles to SPIR-V consumed by the Vulkan pipeline. */
 
 #include "ops/ir/hcq.h"
 #include "core/logging.h"

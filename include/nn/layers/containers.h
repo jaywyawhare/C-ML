@@ -1,8 +1,3 @@
-/**
- * @file containers.h
- * @brief Module containers: ModuleList and ModuleDict
- */
-
 #ifndef CML_NN_LAYERS_CONTAINERS_H
 #define CML_NN_LAYERS_CONTAINERS_H
 

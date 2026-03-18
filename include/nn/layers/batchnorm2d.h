@@ -1,10 +1,3 @@
-/**
- * @file batchnorm2d.h
- * @brief Batch Normalization 2D layer
- *
- * Implements the nn.BatchNorm2d layer
- */
-
 #ifndef CML_NN_LAYERS_BATCHNORM2D_H
 #define CML_NN_LAYERS_BATCHNORM2D_H
 
@@ -23,15 +16,12 @@ typedef struct BatchNorm2d {
     bool affine; // Whether to use learnable parameters
     bool track_running_stats;
 
-    // Learnable parameters
     Parameter* weight;
     Parameter* bias;
 
-    // Running statistics (for evaluation)
     Tensor* running_mean;
     Tensor* running_var;
 
-    // Current batch statistics (for training)
     Tensor* current_mean;
     Tensor* current_var;
 } BatchNorm2d;

@@ -1,10 +1,3 @@
-/**
- * @file rmsnorm.c
- * @brief Root Mean Square Layer Normalization implementation using uops
- *
- * RMSNorm: output = input / sqrt(mean(input^2) + eps) * weight
- */
-
 #include "nn/layers/rmsnorm.h"
 #include "nn.h"
 #include "tensor/tensor.h"

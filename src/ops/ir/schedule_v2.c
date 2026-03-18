@@ -1,11 +1,4 @@
-/**
- * @file schedule_v2.c
- * @brief V2 Fusion Scheduler -- graph-coloring fusion algorithm
- *
- * Walks the IR in topological order, greedily extending fusion groups
- * using the existing cml_schedule_can_fuse() rules.
- *
- * Fusion rules (recap):
+/* Fusion rules:
  *   elem -> elem  YES
  *   elem -> reduce YES (softmax as one kernel)
  *   reduce -> elem NO  (barrier)
@@ -13,8 +6,7 @@
  *   movement is free
  *
  * Buffer elimination: if every user of a producer lives in the same
- * fusion group, the intermediate buffer is eliminated (kept in registers).
- */
+ * fusion group, the intermediate buffer is eliminated (kept in registers). */
 
 #include "ops/ir/schedule.h"
 #include "ops/ir/ir.h"
@@ -350,12 +342,12 @@ void cml_schedule_v2_print(const CMLScheduleV2* sched) {
         return;
     }
 
-    printf("=== CML V2 Fusion Schedule ===\n");
+    printf("CML V2 Fusion Schedule\n");
     printf("  Total ops:     %d\n", sched->total_ops_before);
     printf("  Fusion groups: %d\n", sched->total_groups_after);
     printf("  Fusion ratio:  %.2f\n", (double)sched->fusion_ratio);
     printf("  Memory saved:  %zu bytes\n", sched->memory_saved);
-    printf("  ---\n");
+    printf("\n");
 
     for (int i = 0; i < sched->num_groups; i++) {
         const CMLFusionGroup* g = sched->groups[i];
@@ -372,7 +364,7 @@ void cml_schedule_v2_print(const CMLScheduleV2* sched) {
             }
         }
     }
-    printf("===============================\n");
+    printf("\n");
 }
 
 int cml_ir_execute_v2(CMLGraph_t ir) {

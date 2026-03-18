@@ -1,8 +1,3 @@
-/**
- * @file batchnorm2d.c
- * @brief Batch Normalization 2D layer implementation using uops
- */
-
 #include "nn/layers/batchnorm2d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -29,7 +24,6 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
     int height   = input->shape[2];
     int width    = input->shape[3];
 
-    // Validate channels match num_features
     if (channels != bn->num_features) {
         LOG_ERROR("BatchNorm2d: input channels (%d) doesn't match num_features (%d)", channels,
                   bn->num_features);
@@ -63,7 +57,7 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
             return NULL;
         }
         ReduceParams mean_params;
-        int mean_dims[]      = {1}; // Reduce over second dimension
+        int mean_dims[]      = {1};
         mean_params.dims     = mean_dims;
         mean_params.num_dims = 1;
         mean_params.keepdim  = false;
@@ -73,7 +67,6 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
             tensor_free(input_reshaped);
             return NULL;
         }
-        // Store it in current_mean
         float* mean_reduced_data = (float*)tensor_data_ptr(mean_reduced);
         float* current_mean_data = (float*)tensor_data_ptr(bn->current_mean);
         if (mean_reduced_data && current_mean_data) {

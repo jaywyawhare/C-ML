@@ -1,12 +1,3 @@
-/**
- * @file linearize.c
- * @brief Convert CMLFusionGroup to linear instruction sequence
- *
- * Maps eliminated buffers to virtual registers and emits a
- * load -> compute -> store instruction sequence for each fusion group.
- * Simple register allocation for eliminated intermediates.
- */
-
 #include "ops/ir/schedule.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
@@ -87,17 +78,6 @@ static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     return false;
 }
 
-/**
- * Convert a CMLFusionGroup into a linear instruction sequence.
- *
- * Strategy:
- *   1. For each node, emit LOAD for inputs not already in a vreg.
- *   2. Emit COMPUTE with source vregs, allocating a dest vreg.
- *   3. If the node's output is *not* eliminated, emit STORE.
- *      Otherwise keep the result in the vreg for downstream use.
- *
- * Returns a freshly allocated LinearProgram (caller frees).
- */
 static LinearProgram* linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0) return NULL;
 
@@ -236,10 +216,6 @@ void cml_linearize_group_print(const CMLFusionGroup* g) {
     }
 }
 
-/**
- * Linearize a fusion group and return the number of instructions generated.
- * Returns -1 on error.
- */
 int cml_linearize_group_count(const CMLFusionGroup* g) {
     if (!g) return -1;
     LinearProgram* prog = linearize_group(g);

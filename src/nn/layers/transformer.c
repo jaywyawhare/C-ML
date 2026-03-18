@@ -119,7 +119,6 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
 
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
-    // Create projection weight tensors [embed_dim, embed_dim]
     int weight_shape[] = {embed_dim, embed_dim};
     int bias_shape[] = {embed_dim};
 
@@ -509,7 +508,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     layer->dropout = dropout;
     layer->norm_eps = 1e-5f;
 
-    // Create multi-head attention sub-module
     layer->self_attn = nn_multihead_attention(d_model, nhead, dropout, dtype, device);
     if (!layer->self_attn) {
         module_free((Module*)layer);
@@ -745,7 +743,6 @@ Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor
     // Step 2: Cross-attention (if memory provided)
     if (memory) {
         tensor_ensure_executed(memory);
-        // Create temporary tensor from x for cross-attention query
         int x_shape[] = {batch, seq_len, d_model};
         TensorConfig cfg = {.dtype = tgt->dtype, .device = tgt->device, .has_dtype = true, .has_device = true};
         Tensor* x_tensor = tensor_from_data(x, x_shape, 3, &cfg);

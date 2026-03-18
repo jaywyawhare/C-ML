@@ -1,12 +1,3 @@
-/**
- * @file onnx_ops.c
- * @brief ONNX operator mapping to CML UOp operations
- *
- * Maps ~30 ONNX operators to the corresponding CML UOp functions and
- * provides a simple graph executor that walks nodes in topological order
- * (ONNX guarantees topological ordering in the serialised node list).
- */
-
 #include "core/onnx.h"
 #include "core/logging.h"
 #include "ops/uops.h"
@@ -111,13 +102,8 @@ static const int64_t *attr_ints(const CMLONNXNode *node, const char *name,
     return NULL;
 }
 
-/**
- * Each handler receives the ONNX node, a function to look up tensors by
- * name, and stores the output tensor(s) into the map.
- */
 typedef Tensor *(*onnx_op_fn)(const CMLONNXNode *node, TensorMap *map);
 
-/* Convenience: fetch input tensor by index */
 static Tensor *inp(const CMLONNXNode *node, TensorMap *map, int idx)
 {
     if (idx < 0 || idx >= node->num_inputs) return NULL;
@@ -182,7 +168,6 @@ static Tensor *op_reshape(const CMLONNXNode *n, TensorMap *m)
     Tensor *shape = inp(n, m, 1);
     if (!x || !shape) return NULL;
 
-    /* The shape tensor must be executed to read its int64 values */
     tensor_ensure_executed(shape);
     float *sdata = (float *)tensor_data_ptr(shape);
     if (!sdata) return NULL;
@@ -194,14 +179,12 @@ static Tensor *op_reshape(const CMLONNXNode *n, TensorMap *m)
     for (int i = 0; i < new_ndim && i < 8; i++) {
         new_shape[i] = (int)sdata[i];
         if (new_shape[i] == 0) {
-            /* 0 means "copy from input" */
             new_shape[i] = (i < x->ndim) ? x->shape[i] : 1;
         } else if (new_shape[i] == -1) {
             inferred_idx = i;
         }
     }
 
-    /* Resolve the -1 dimension */
     if (inferred_idx >= 0) {
         size_t known = 1;
         for (int i = 0; i < new_ndim; i++) {
@@ -227,7 +210,6 @@ static Tensor *op_transpose(const CMLONNXNode *n, TensorMap *m)
     if (perm_vals && count > 0) {
         for (int i = 0; i < count && i < 8; i++) perm[i] = (int)perm_vals[i];
     } else {
-        /* Default: reverse */
         for (int i = 0; i < x->ndim; i++) perm[i] = x->ndim - 1 - i;
         count = x->ndim;
     }
@@ -353,8 +335,6 @@ static Tensor *op_conv(const CMLONNXNode *n, TensorMap *m)
     return uop_conv2d(x, w, b, &params);
 }
 
-/* Decomposed: y = (x - mean) / sqrt(var + eps) * scale + bias */
-
 static Tensor *op_batchnorm(const CMLONNXNode *n, TensorMap *m)
 {
     Tensor *x     = inp(n, m, 0);
@@ -366,38 +346,24 @@ static Tensor *op_batchnorm(const CMLONNXNode *n, TensorMap *m)
 
     float eps = attr_float(n, "epsilon", 1e-5f);
 
-    /* eps tensor (scalar) */
     Tensor *eps_t = tensor_full((int[]){1}, 1, NULL, eps);
-
-    /* (x - mean) */
     Tensor *xm = uop_sub(x, mean);
-
-    /* sqrt(var + eps) */
     Tensor *ve  = uop_add(var, eps_t);
     Tensor *sve = uop_sqrt(ve);
-
-    /* normalise, scale, shift */
     Tensor *norm   = uop_div(xm, sve);
     Tensor *scaled = uop_mul(norm, scale);
     return uop_add(scaled, bias);
 }
-
-/* Implemented via reshape+reduce since we don't have dedicated pool UOps.
- * For simple cases we use uop_max_reduce / uop_mean on reshaped spatial. */
 
 static Tensor *op_maxpool(const CMLONNXNode *n, TensorMap *m)
 {
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* Reduce-based approach: approximates with global reduce when kernel
-     * covers entire spatial extent. Strided windowing not yet implemented. */
     int kcount = 0;
     const int64_t *kernel_shape = attr_ints(n, "kernel_shape", &kcount);
 
-    /* If we have spatial dims, reduce over them. NCHW format assumed. */
     if (x->ndim == 4 && kernel_shape && kcount >= 2) {
-        /* Reduce over spatial dims */
         int reduce_dims[2] = {2, 3};
         ReduceParams rp = {
             .dims = reduce_dims,
@@ -405,12 +371,10 @@ static Tensor *op_maxpool(const CMLONNXNode *n, TensorMap *m)
             .keepdim = true,
         };
 
-        /* This is a simplification -- real pooling needs sliding windows */
         Tensor *pooled = uop_max_reduce(x, &rp);
         return pooled;
     }
 
-    /* Fallback: pass through */
     return x;
 }
 
@@ -437,7 +401,6 @@ static Tensor *op_global_avg_pool(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* Reduce mean over all spatial dimensions (dims 2..ndim-1) */
     int spatial = x->ndim - 2;
     if (spatial <= 0) return x;
 
@@ -458,7 +421,6 @@ static Tensor *op_flatten(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
     int axis = (int)attr_int(n, "axis", 1);
-    /* Flatten dims [axis, ndim-1] */
     return uop_flatten(x, axis, x->ndim - 1);
 }
 
@@ -468,11 +430,9 @@ static Tensor *op_squeeze(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* axes can be from attribute (opset<13) or input tensor (opset>=13) */
     int acount = 0;
     const int64_t *axes = attr_ints(n, "axes", &acount);
 
-    /* Build new shape by removing squeezed dims */
     int new_shape[8];
     int new_ndim = 0;
 
@@ -487,7 +447,6 @@ static Tensor *op_squeeze(const CMLONNXNode *n, TensorMap *m)
             if (!squeeze) new_shape[new_ndim++] = x->shape[i];
         }
     } else {
-        /* Squeeze all size-1 dims; or check second input */
         Tensor *axes_tensor = inp(n, m, 1);
         if (axes_tensor) {
             tensor_ensure_executed(axes_tensor);
@@ -520,7 +479,6 @@ static Tensor *op_unsqueeze(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* Axes from attribute or second input */
     int acount = 0;
     const int64_t *axes = attr_ints(n, "axes", &acount);
     int axes_buf[8];
@@ -539,17 +497,14 @@ static Tensor *op_unsqueeze(const CMLONNXNode *n, TensorMap *m)
         for (int i = 0; i < acount; i++) axes_buf[i] = (int)axes[i];
     }
 
-    /* Build new shape: insert size-1 at each axis */
     int out_ndim = x->ndim + acount;
     if (out_ndim > 8) out_ndim = 8;
 
     int new_shape[8];
-    /* Normalise negative axes */
     for (int i = 0; i < acount; i++) {
         if (axes_buf[i] < 0) axes_buf[i] += out_ndim;
     }
 
-    /* Sort axes (insertion sort) */
     for (int i = 1; i < acount; i++) {
         int key = axes_buf[i];
         int j = i - 1;
@@ -584,7 +539,6 @@ static Tensor *op_clip(const CMLONNXNode *n, TensorMap *m)
     float min_val = -3.4e38f;
     float max_val =  3.4e38f;
 
-    /* Opset >= 11: min/max are inputs */
     Tensor *min_t = inp(n, m, 1);
     Tensor *max_t = inp(n, m, 2);
 
@@ -622,11 +576,9 @@ static Tensor *op_pad(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* pads tensor is second input (opset >= 11) */
     Tensor *pads_t = inp(n, m, 1);
     float constant_value = 0.0f;
 
-    /* Optional third input is constant_value */
     Tensor *cv = inp(n, m, 2);
     if (cv) {
         tensor_ensure_executed(cv);
@@ -634,7 +586,7 @@ static Tensor *op_pad(const CMLONNXNode *n, TensorMap *m)
         if (d) constant_value = d[0];
     }
 
-    if (!pads_t) return x; /* no padding */
+    if (!pads_t) return x;
 
     tensor_ensure_executed(pads_t);
     float *pd = (float *)tensor_data_ptr(pads_t);
@@ -659,7 +611,6 @@ static Tensor *op_slice(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* Opset >= 10: starts, ends, axes, steps are tensor inputs */
     Tensor *starts_t = inp(n, m, 1);
     Tensor *ends_t   = inp(n, m, 2);
     Tensor *axes_t   = inp(n, m, 3);
@@ -696,11 +647,8 @@ static Tensor *op_slice(const CMLONNXNode *n, TensorMap *m)
         int e = (int)ends_d[i];
         int st_val = steps_d ? (int)steps_d[i] : 1;
 
-        /* Handle negative indices */
         if (s < 0) s += x->shape[axis];
         if (e < 0) e += x->shape[axis];
-
-        /* Clamp */
         if (s < 0) s = 0;
         if (e > x->shape[axis]) e = x->shape[axis];
 
@@ -725,7 +673,6 @@ static Tensor *op_cast(const CMLONNXNode *n, TensorMap *m)
     if (!x) return NULL;
     int to = (int)attr_int(n, "to", 1);
 
-    /* Map ONNX data type enum to CML DType */
     DType target;
     switch (to) {
     case 1:  target = DTYPE_FLOAT32; break;
@@ -747,7 +694,6 @@ static Tensor *op_identity(const CMLONNXNode *n, TensorMap *m)
 
 static Tensor *op_dropout(const CMLONNXNode *n, TensorMap *m)
 {
-    /* In eval/inference mode, Dropout is a no-op pass-through */
     return inp(n, m, 0);
 }
 
@@ -757,7 +703,6 @@ static Tensor *op_shape(const CMLONNXNode *n, TensorMap *m)
     Tensor *x = inp(n, m, 0);
     if (!x) return NULL;
 
-    /* Return a 1D int64 tensor with the shape values */
     TensorConfig cfg = { .dtype = DTYPE_FLOAT32, .has_dtype = true };
     Tensor *out = tensor_empty((int[]){x->ndim}, 1, &cfg);
     if (!out) return NULL;
@@ -774,32 +719,27 @@ static Tensor *op_constant(const CMLONNXNode *n, TensorMap *m)
 {
     (void)m;
 
-    /* Check for 'value' attribute (tensor) */
     const CMLONNXAttribute *va = find_attr(n, "value");
     if (va && va->type == CML_ONNX_ATTR_TENSOR && va->value.tensor) {
         return va->value.tensor;
     }
 
-    /* Check for 'value_float' */
     const CMLONNXAttribute *vf = find_attr(n, "value_float");
     if (vf && vf->type == CML_ONNX_ATTR_FLOAT) {
         return tensor_full((int[]){1}, 1, NULL, vf->value.f);
     }
 
-    /* Check for 'value_int' */
     const CMLONNXAttribute *vi = find_attr(n, "value_int");
     if (vi && vi->type == CML_ONNX_ATTR_INT) {
         return tensor_full((int[]){1}, 1, NULL, (float)vi->value.i);
     }
 
-    /* Check for 'value_floats' */
     const CMLONNXAttribute *vfs = find_attr(n, "value_floats");
     if (vfs && vfs->type == CML_ONNX_ATTR_FLOATS && vfs->value.floats.count > 0) {
         int shape[1] = { vfs->value.floats.count };
         return tensor_from_data(vfs->value.floats.data, shape, 1, NULL);
     }
 
-    /* Check for 'value_ints' */
     const CMLONNXAttribute *vis = find_attr(n, "value_ints");
     if (vis && vis->type == CML_ONNX_ATTR_INTS && vis->value.ints.count > 0) {
         int count = vis->value.ints.count;
@@ -885,11 +825,9 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
 
     CMLONNXGraph *g = &model->graph;
 
-    /* Allocate tensor map on heap (it is large) */
     TensorMap *map = (TensorMap *)calloc(1, sizeof(TensorMap));
     if (!map) return -1;
 
-    /* Step 1: Populate map with initializers */
     for (int i = 0; i < g->num_initializers; i++) {
         if (g->initializers[i].name[0] && g->initializers[i].tensor) {
             tensor_map_set(map, g->initializers[i].name,
@@ -897,19 +835,15 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
         }
     }
 
-    /* Step 2: Populate map with user-provided inputs.
-     * Match by position against graph input list, but skip inputs that
-     * are also initializers (ONNX convention). */
+    /* Skip inputs that are also initializers (ONNX convention) */
     int input_idx = 0;
     for (int i = 0; i < g->num_inputs && input_idx < num_inputs; i++) {
         const char *iname = g->inputs[i].name;
-        /* Skip if already set by an initializer */
         if (tensor_map_get(map, iname) != NULL) continue;
         tensor_map_set(map, iname, inputs[input_idx]);
         input_idx++;
     }
 
-    /* Step 3: Walk nodes in topological order */
     for (int i = 0; i < g->num_nodes; i++) {
         CMLONNXNode *node = &g->nodes[i];
 
@@ -929,9 +863,6 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
             return -3;
         }
 
-        /* Store all outputs.  Most nodes have one output; multi-output
-         * nodes (e.g. Dropout) still store the primary tensor under the
-         * first output name. */
         for (int j = 0; j < node->num_outputs; j++) {
             if (node->outputs[j]) {
                 tensor_map_set(map, node->outputs[j], result);
@@ -939,7 +870,6 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
         }
     }
 
-    /* Step 4: Copy graph outputs */
     int copied = 0;
     for (int i = 0; i < g->num_outputs && i < num_outputs; i++) {
         Tensor *t = tensor_map_get(map, g->outputs[i].name);

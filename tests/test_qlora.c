@@ -1,8 +1,3 @@
-/**
- * @file test_qlora.c
- * @brief Unit tests for QLoRA (Quantized Low-Rank Adaptation) implementation
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +22,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== Test: NF4 Quantization Roundtrip ===== */
 
 static int test_nf4_roundtrip(void) {
     TensorConfig cfg = {
@@ -111,7 +105,6 @@ static int test_nf4_roundtrip(void) {
     return ok;
 }
 
-/* ===== Test: NF4 Table Values ===== */
 
 static int test_nf4_table_values(void) {
     int ok = 1;
@@ -156,7 +149,6 @@ static int test_nf4_table_values(void) {
     return ok;
 }
 
-/* ===== Test: QLoRA Linear Create and Forward Shape ===== */
 
 static int test_qlora_create_and_forward_shape(void) {
     TensorConfig cfg = {
@@ -259,7 +251,6 @@ static int test_qlora_create_and_forward_shape(void) {
     return ok;
 }
 
-/* ===== Test: Memory Savings ===== */
 
 static int test_qlora_memory_savings(void) {
     TensorConfig cfg = {
@@ -318,7 +309,6 @@ static int test_qlora_memory_savings(void) {
     return ok;
 }
 
-/* ===== Test: LoRA B Zero Init - Initial Output Equals Base-Only ===== */
 
 static int test_qlora_lora_b_zero_init(void) {
     TensorConfig cfg = {
@@ -441,7 +431,6 @@ static int test_qlora_lora_b_zero_init(void) {
     return ok;
 }
 
-/* ===== Test: QLoRA Forward With Non-Zero LoRA ===== */
 
 static int test_qlora_forward_nonzero_lora(void) {
     TensorConfig cfg = {
@@ -528,12 +517,11 @@ static int test_qlora_forward_nonzero_lora(void) {
     return ok;
 }
 
-/* ===== Main ===== */
 
 int main(void) {
-    printf("\n=========================================\n");
+    printf("\n");
     printf("  QLoRA (Quantized LoRA) Tests\n");
-    printf("=========================================\n\n");
+    printf("\n");
 
     printf("NF4 Quantization:\n");
     TEST(nf4_roundtrip);
@@ -547,9 +535,9 @@ int main(void) {
     printf("\nMemory:\n");
     TEST(qlora_memory_savings);
 
-    printf("\n=========================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=========================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

@@ -1,12 +1,3 @@
-/**
- * @file test_tensor_parallel.c
- * @brief Tests for tensor parallelism (column-parallel, row-parallel, all-reduce)
- *
- * All tests use tp_size=2 with small matrices so the expected results can be
- * computed by hand.  No GPU or multi-process setup is required -- the
- * all-reduce is simulated in-process.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -37,10 +28,7 @@ static bool float_eq(float a, float b) {
     return fabsf(a - b) < EPSILON;
 }
 
-/* ===== Helper: reference matmul (C = A @ B^T) ==========================
- * A is [M, K], B is [N, K], C is [M, N]
- * C[i][j] = sum_k A[i][k] * B[j][k]
- */
+/* C = A @ B^T: A is [M, K], B is [N, K], C is [M, N] */
 static void ref_matmul_transposed(const float* A, int M, int K,
                                   const float* B, int N,
                                   float* C)
@@ -56,7 +44,6 @@ static void ref_matmul_transposed(const float* A, int M, int K,
     }
 }
 
-/* ===== Helper: create a Tensor from a float array ====================== */
 static Tensor* make_tensor_2d(const float* data, int rows, int cols) {
     int shape[2] = {rows, cols};
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
@@ -71,9 +58,6 @@ static Tensor* make_tensor_1d(const float* data, int len) {
     return tensor_from_data(data, shape, 1, &cfg);
 }
 
-/* ========================================================================
- * Test 1: Weight sharding utility
- * ======================================================================== */
 
 static bool test_weight_shard_dim0(void) {
     /*
@@ -162,16 +146,6 @@ static bool test_weight_shard_dim1(void) {
     return ok;
 }
 
-/* ========================================================================
- * Test 2: Column-parallel forward
- *
- * Full weight [4, 2] (out=4, in=2), input [1, 2].
- * Column-parallel shards output dim -> each rank gets [2, 2].
- * Full output = input @ W^T -> [1, 4].
- * Rank 0 output = first 2 cols of full output.
- * Rank 1 output = last  2 cols of full output.
- * Concatenating rank outputs should equal the full matmul.
- * ======================================================================== */
 
 static bool test_column_parallel_forward(void) {
     float w_data[] = {
@@ -242,13 +216,6 @@ static bool test_column_parallel_forward(void) {
     return ok;
 }
 
-/* ========================================================================
- * Test 3: Row-parallel forward + all-reduce
- *
- * Full weight [2, 4] (out=2, in=4), input [1, 4].
- * Row-parallel shards input dim -> each rank gets [2, 2].
- * Each rank computes a partial [1, 2], then all-reduce sum gives full output.
- * ======================================================================== */
 
 static bool test_row_parallel_forward_allreduce(void) {
     float w_data[] = {
@@ -343,15 +310,6 @@ static bool test_row_parallel_forward_allreduce(void) {
     return partial_ok && reduce_ok;
 }
 
-/* ========================================================================
- * Test 4: Full TP simulation (column -> row -> all-reduce)
- *
- * Simulate a two-layer MLP with tensor parallelism:
- *   hidden = input @ W1^T   (column-parallel, split output)
- *   output = hidden @ W2^T  (row-parallel, split input, all-reduce)
- *
- * Verify the result matches the full (non-parallel) matmul chain.
- * ======================================================================== */
 
 static bool test_full_tp_simulation(void) {
     /* W1: [4, 2] (out=4, in=2) -- column-parallel splits output to 2 per rank */
@@ -482,9 +440,6 @@ static bool test_full_tp_simulation(void) {
     return ok;
 }
 
-/* ========================================================================
- * Test 5: Column-parallel with bias
- * ======================================================================== */
 
 static bool test_column_parallel_with_bias(void) {
     float w_data[] = {
@@ -547,9 +502,6 @@ static bool test_column_parallel_with_bias(void) {
     return ok;
 }
 
-/* ========================================================================
- * Test 6: All-reduce sum correctness
- * ======================================================================== */
 
 static bool test_all_reduce_sum(void) {
     float a_data[] = {1, 2, 3, 4, 5, 6};
@@ -587,9 +539,6 @@ static bool test_all_reduce_sum(void) {
     return ok;
 }
 
-/* ========================================================================
- * Test 7: Larger batch size
- * ======================================================================== */
 
 static bool test_column_parallel_batch(void) {
     /* Weight [4, 2], batch of 3 inputs [3, 2] */
@@ -670,9 +619,6 @@ static bool test_column_parallel_batch(void) {
     return ok;
 }
 
-/* ========================================================================
- * main
- * ======================================================================== */
 
 int main(void) {
     printf("=== Tensor Parallel Tests ===\n\n");

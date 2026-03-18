@@ -1,8 +1,3 @@
-/**
- * @file test_symbolic.c
- * @brief Tests for symbolic shapes
- */
-
 #include "symbolic/symbolic.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,10 +28,6 @@ static int tests_failed = 0;
 
 #define ASSERT_NOT_NULL(ptr) \
     do { if ((ptr) == NULL) { FAIL(#ptr " is NULL"); return; } } while(0)
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 static void test_const_creation(void) {
     TEST(const_creation);
@@ -569,18 +560,12 @@ static void test_div_by_zero_returns_null(void) {
     PASS();
 }
 
-// ============================================================================
-// Main
-// ============================================================================
-
 int main(void) {
     printf("\n=== Symbolic Shapes Tests ===\n\n");
 
-    // Creation
     test_const_creation();
     test_var_creation();
 
-    // Constant folding
     test_const_folding_add();
     test_const_folding_mul();
     test_const_folding_div();
@@ -589,7 +574,6 @@ int main(void) {
     test_const_folding_max();
     test_symbolic_add_no_fold();
 
-    // Bounds inference
     test_bounds_var();
     test_bounds_add();
     test_bounds_mul_positive();
@@ -599,12 +583,10 @@ int main(void) {
     test_bounds_min();
     test_bounds_max();
 
-    // Evaluation
     test_eval_var();
     test_eval_complex();
     test_eval_multi_var();
 
-    // Simplification
     test_simplify_add_zero();
     test_simplify_mul_one();
     test_simplify_mul_zero();
@@ -612,20 +594,16 @@ int main(void) {
     test_simplify_mod_one();
     test_simplify_nested();
 
-    // Debug
     test_to_string();
 
-    // Shape operations
     test_shape_from_concrete();
     test_shape_broadcast_concrete();
     test_shape_broadcast_symbolic();
     test_shape_eval();
     test_shape_to_string();
 
-    // Memory
     test_ref_counting();
 
-    // Edge cases
     test_shape_broadcast_incompatible();
     test_div_by_zero_returns_null();
 

@@ -1,11 +1,3 @@
-/**
- * @file conv_transpose2d.c
- * @brief 2D Transposed Convolution layer implementation
- *
- * Implements transposed convolution (deconvolution) by direct computation.
- * Output shape: H_out = (H_in - 1) * stride - 2*padding + dilation*(kernel-1) + output_padding + 1
- */
-
 #include "nn/layers/conv_transpose2d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
@@ -81,7 +73,6 @@ static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
         tensor_free(output);
         return NULL;
     }
-    // Transposed conv: scatter each input pixel to output
     for (int b = 0; b < batch; b++) {
         for (int ic = 0; ic < in_channels; ic++) {
             for (int ih = 0; ih < in_height; ih++) {

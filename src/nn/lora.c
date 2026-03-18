@@ -1,12 +1,3 @@
-/**
- * @file lora.c
- * @brief LoRA (Low-Rank Adaptation) implementation
- *
- * Implements LoRA layers and adapters for efficient fine-tuning.
- * Uses explicit data loops for matmul operations to avoid dependency
- * on higher-level tensor ops that may not support all needed transposes.
- */
-
 #include "nn/lora.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"

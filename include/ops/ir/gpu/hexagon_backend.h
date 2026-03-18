@@ -1,9 +1,6 @@
-/**
- * @file hexagon_backend.h
- * @brief Qualcomm Hexagon DSP backend
- *
- * Provides DSP acceleration via Qualcomm's Hexagon processor for
- * efficient quantized inference on mobile devices.
+/*
+ * Qualcomm Hexagon DSP backend.
+ * DSP acceleration for efficient quantized inference on mobile devices.
  */
 
 #ifndef CML_HEXAGON_BACKEND_H
@@ -24,19 +21,10 @@ typedef struct CMLHexagonBackend {
     void* handle;             /* DSP runtime handle */
 } CMLHexagonBackend;
 
-/** Check if Hexagon DSP is available */
 bool cml_hexagon_available(void);
-
-/** Create Hexagon backend */
 CMLHexagonBackend* cml_hexagon_backend_create(void);
-
-/** Initialize Hexagon backend */
 int cml_hexagon_backend_init(CMLHexagonBackend* backend);
-
-/** Free Hexagon backend */
 void cml_hexagon_backend_free(CMLHexagonBackend* backend);
-
-/** Execute IR graph on Hexagon DSP */
 int cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir);
 
 #ifdef __cplusplus

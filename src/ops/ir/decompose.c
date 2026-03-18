@@ -1,10 +1,4 @@
-/**
- * @file decompose.c
- * @brief IR Decomposition Pass — rewrites composite ops into primitive ops
- *
- * Reduces composite ops to ~28 primitives so backends only need to handle
- * a minimal set. Runs before optimization so fusion can optimize primitive chains.
- */
+/* Rewrites composite ops into ~28 primitives so backends handle a minimal set. */
 
 #include "ops/ir/decompose.h"
 #include "ops/ir/internal.h"

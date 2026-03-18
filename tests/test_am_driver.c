@@ -1,13 +1,3 @@
-/**
- * @file test_am_driver.c
- * @brief Tests for AMD AM userspace driver (KFD ioctl, AQL dispatch)
- *
- * Tests are skipped gracefully if /dev/kfd is not present (no AMD GPU).
- * When hardware is available, exercises the full driver lifecycle:
- * availability check, create/init/free, buffer management, kernel load,
- * and synchronization.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +5,6 @@
 
 #include "ops/ir/gpu/am_driver.h"
 
-/* -- Test framework (project TEST macro pattern) -- */
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -37,14 +26,7 @@ static bool g_hw_available = false;
     } \
 } while(0)
 
-/* ======================================================================
- * Tests
- * ====================================================================== */
 
-/**
- * Test: cml_am_driver_available returns without crashing and gives
- * a consistent boolean result.
- */
 static bool test_availability_check(void) {
     bool a = cml_am_driver_available();
     bool b = cml_am_driver_available();
@@ -53,10 +35,6 @@ static bool test_availability_check(void) {
     return true;
 }
 
-/**
- * Test: cml_am_driver_create allocates a context, and
- * cml_am_driver_free handles it cleanly.
- */
 static bool test_create_and_free(void) {
     CMLAMDriver* drv = cml_am_driver_create();
     if (!drv) return false;
@@ -70,18 +48,11 @@ static bool test_create_and_free(void) {
     return true;
 }
 
-/**
- * Test: cml_am_driver_free(NULL) does not crash.
- */
 static bool test_free_null(void) {
     cml_am_driver_free(NULL);
     return true;
 }
 
-/**
- * Test: cml_am_driver_init with a valid driver context.
- * Skipped if hardware is not available.
- */
 static bool test_init(void) {
     SKIP_IF_NO_HW();
 
@@ -104,10 +75,6 @@ static bool test_init(void) {
     return true;
 }
 
-/**
- * Test: buffer creation (GTT, host-visible).
- * Skipped if hardware is not available.
- */
 static bool test_buffer_create_gtt(void) {
     SKIP_IF_NO_HW();
 
@@ -135,10 +102,6 @@ static bool test_buffer_create_gtt(void) {
     return true;
 }
 
-/**
- * Test: buffer creation (VRAM, device-local).
- * Skipped if hardware is not available.
- */
 static bool test_buffer_create_vram(void) {
     SKIP_IF_NO_HW();
 
@@ -165,10 +128,6 @@ static bool test_buffer_create_vram(void) {
     return true;
 }
 
-/**
- * Test: buffer upload and download round-trip (GTT buffer).
- * Skipped if hardware is not available.
- */
 static bool test_buffer_upload_download(void) {
     SKIP_IF_NO_HW();
 
@@ -232,35 +191,22 @@ static bool test_buffer_upload_download(void) {
     return match;
 }
 
-/**
- * Test: buffer_free(NULL) does not crash.
- */
 static bool test_buffer_free_null(void) {
     cml_am_buffer_free(NULL, NULL);
     return true;
 }
 
-/**
- * Test: kernel_load with invalid arguments returns NULL.
- */
 static bool test_kernel_load_null_args(void) {
     CMLAMKernel* k = cml_am_kernel_load(NULL, NULL, 0, NULL);
     if (k != NULL) return false;
     return true;
 }
 
-/**
- * Test: kernel_free(NULL) does not crash.
- */
 static bool test_kernel_free_null(void) {
     cml_am_kernel_free(NULL, NULL);
     return true;
 }
 
-/**
- * Test: synchronize on a fresh driver (nothing dispatched) succeeds.
- * Skipped if hardware is not available.
- */
 static bool test_synchronize_no_work(void) {
     SKIP_IF_NO_HW();
 
@@ -278,17 +224,11 @@ static bool test_synchronize_no_work(void) {
     return (ret == 0);
 }
 
-/**
- * Test: synchronize with NULL driver returns error.
- */
 static bool test_synchronize_null(void) {
     int ret = cml_am_synchronize(NULL);
     return (ret == -1);
 }
 
-/**
- * Test: execute_graph with NULL graph returns -1.
- */
 static bool test_execute_graph_stub(void) {
     CMLAMDriver* drv = cml_am_driver_create();
     if (!drv) return false;
@@ -299,18 +239,11 @@ static bool test_execute_graph_stub(void) {
     return (ret == -1);
 }
 
-/**
- * Test: execute_graph with NULL driver returns -1.
- */
 static bool test_execute_graph_null(void) {
     int ret = cml_am_execute_graph(NULL, NULL);
     return (ret == -1);
 }
 
-/**
- * Test: buffer_create with zero size returns NULL.
- * Skipped if hardware is not available.
- */
 static bool test_buffer_create_zero_size(void) {
     SKIP_IF_NO_HW();
 
@@ -327,9 +260,6 @@ static bool test_buffer_create_zero_size(void) {
     return (buf == NULL);
 }
 
-/**
- * Test: buffer_create with uninitialized driver returns NULL.
- */
 static bool test_buffer_create_uninit(void) {
     CMLAMDriver* drv = cml_am_driver_create();
     if (!drv) return false;
@@ -340,9 +270,6 @@ static bool test_buffer_create_uninit(void) {
     return (buf == NULL);
 }
 
-/* ======================================================================
- * Main
- * ====================================================================== */
 
 int main(void) {
     printf("\n=== AMD AM Driver Tests ===\n\n");

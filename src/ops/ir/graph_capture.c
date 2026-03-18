@@ -1,8 +1,3 @@
-/**
- * @file graph_capture.c
- * @brief GPU graph capture and replay implementation
- */
-
 #include "ops/ir/graph_capture.h"
 #include "ops/ir/ir.h"
 #include "core/logging.h"
@@ -50,7 +45,6 @@ int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     if (!graph) return -1;
     if (graph->state == CML_CAPTURE_RECORDING) return -1;
 
-    /* Reset for new recording */
     for (int i = 0; i < graph->num_nodes; i++) {
         free(graph->nodes[i].kernel_args);
     }
@@ -66,7 +60,6 @@ int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op,
                               void** args, int num_args, size_t shared_mem) {
     if (!graph || graph->state != CML_CAPTURE_RECORDING) return -1;
 
-    /* Grow if needed */
     if (graph->num_nodes >= graph->node_capacity) {
         int new_cap = graph->node_capacity * 2;
         if (new_cap > CML_GRAPH_CAPTURE_MAX_NODES)
@@ -218,7 +211,7 @@ void cml_graph_capture_print(const CMLCapturedGraph* graph) {
     default:                    state_str = "UNKNOWN"; break;
     }
 
-    printf("=== Captured Graph ===\n");
+    printf("Captured Graph\n");
     printf("State: %s\n", state_str);
     printf("Nodes: %d\n", graph->num_nodes);
     printf("Inputs: %d, Outputs: %d\n",
@@ -228,5 +221,5 @@ void cml_graph_capture_print(const CMLCapturedGraph* graph) {
         printf("Avg replay: %.3f ms\n",
                graph->total_replay_time_ms / graph->replay_count);
     printf("Capture time: %.3f ms\n", graph->capture_time_ms);
-    printf("======================\n");
+    printf("\n");
 }

@@ -1,8 +1,3 @@
-/**
- * @file aot.c
- * @brief Ahead-of-Time (AOT) compilation implementation
- */
-
 #include "ops/ir/aot.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/context.h"
@@ -20,12 +15,8 @@
 #include "ops/ir/llvm/llvm_backend.h"
 #endif
 
-/**
- * @brief Validate a path/argument string to prevent command injection.
- *
- * Rejects strings containing shell metacharacters that could allow
- * arbitrary command execution when passed to popen/system.
- */
+/* Rejects strings containing shell metacharacters that could allow
+ * arbitrary command execution when passed to popen/system. */
 static bool aot_validate_path(const char* path) {
     if (!path) return false;
     for (const char* p = path; *p; p++) {
@@ -341,7 +332,7 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         char tmp_o_path[512];
         snprintf(tmp_o_path, sizeof(tmp_o_path), "/tmp/cml_aot_%d.o", (int)getpid());
 
-        char cmd[1024];
+        char cmd[2048];
         snprintf(cmd, sizeof(cmd), "cc -O2 -c -o %s %s", tmp_o_path, tmp_c_path);
         FILE* proc = popen(cmd, "r");
         if (!proc) {

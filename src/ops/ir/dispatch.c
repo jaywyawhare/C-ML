@@ -1,10 +1,3 @@
-/**
- * @file dispatch.c
- * @brief Unified dispatch layer implementation
- *
- * Routes IR execution to the appropriate backend: LLVM JIT, CUDA, ROCm, or CPU fallback.
- */
-
 #include "ops/ir/dispatch.h"
 #include "ops/ir/kernel_cache.h"
 #include "ops/ir/ir.h"
@@ -419,6 +412,14 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
     if (!ctx)
         return CML_BACKEND_CPU_FALLBACK;
 
+    /*
+     * For CPU tensors, prefer CPU backends (LLVM JIT > BLAS fallback).
+     * GPU backends (Vulkan, etc.) add dispatch overhead that exceeds
+     * the compute time for CPU-resident data.  Only use GPU backends
+     * when tensors are on a GPU device.
+     */
+
+    /* GPU backends — only beneficial when data is already on device */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_NV))
         return CML_BACKEND_NV;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CUDA))
@@ -431,12 +432,17 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
         return CML_BACKEND_NIR;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_METAL))
         return CML_BACKEND_METAL;
+
+    /* CPU backends — prefer LLVM JIT over software Vulkan/WebGPU */
+    if (cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_LLVM))
+        return CML_BACKEND_CPU_LLVM;
+
+    /* Software GPU backends — last resort before pure fallback */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_VULKAN))
         return CML_BACKEND_VULKAN;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_WEBGPU))
         return CML_BACKEND_WEBGPU;
-    if (cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_LLVM))
-        return CML_BACKEND_CPU_LLVM;
+
     return CML_BACKEND_CPU_FALLBACK;
 }
 
@@ -731,7 +737,7 @@ void cml_dispatch_print_status(CMLDispatchContext* ctx) {
         return;
     }
 
-    printf("\n=== CML Dispatch Status ===\n");
+    printf("\nCML Dispatch Status\n");
     printf("Initialized: %s\n", ctx->initialized ? "Yes" : "No");
     printf("Preferred: %s\n", backend_names[ctx->preferred]);
     printf("Active: %s\n", backend_names[ctx->active]);
@@ -757,7 +763,7 @@ void cml_dispatch_print_status(CMLDispatchContext* ctx) {
     printf("  Cache hits: %zu\n", ctx->cache_hits);
     printf("  Cache misses: %zu\n", ctx->cache_misses);
     printf("  Fallbacks used: %zu\n", ctx->fallbacks_used);
-    printf("===========================\n\n");
+    printf("\n");
 }
 
 void cml_dispatch_synchronize(CMLDispatchContext* ctx) {

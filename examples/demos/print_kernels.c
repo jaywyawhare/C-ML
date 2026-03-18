@@ -1,8 +1,3 @@
-/**
- * @file print_kernels.c
- * @brief Print compiled/optimized kernels for all backends
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,9 +12,8 @@
 
 static void print_separator(const char* title) {
     printf("\n");
-    printf("================================================================================\n");
     printf("  %s\n", title);
-    printf("================================================================================\n\n");
+    printf("\n");
 }
 
 static void print_cpu_fallback_pseudocode(CMLGraph_t ir) {
@@ -37,7 +31,6 @@ static void print_cpu_fallback_pseudocode(CMLGraph_t ir) {
     while (node) {
         printf("Op %d: ", op_num++);
 
-        // Print operation type
         switch (node->type) {
         case UOP_ADD:
             printf("ADD");
@@ -89,7 +82,6 @@ static void print_cpu_fallback_pseudocode(CMLGraph_t ir) {
             break;
         }
 
-        // Print shapes
         if (node->output) {
             printf(" -> [");
             for (int i = 0; i < node->output->ndim; i++) {
@@ -102,7 +94,6 @@ static void print_cpu_fallback_pseudocode(CMLGraph_t ir) {
 
         printf("\n");
 
-        // Print pseudocode for the operation
         switch (node->type) {
         case UOP_ADD:
             printf("    for i in 0..n: out[i] = in0[i] + in1[i]\n");
@@ -134,19 +125,16 @@ static void print_cpu_fallback_pseudocode(CMLGraph_t ir) {
 
 int main(int argc, char* argv[]) {
     printf("\n");
-    printf("========================================\n");
     printf("     CML Kernel Code Generator\n");
-    printf("========================================\n");
+    printf("\n");
 
-    // Parse args
-    int size = 4; // Small size for readable output
+    int size = 4;
     if (argc > 1) {
         size = atoi(argv[1]);
     }
 
     printf("\nGenerating kernels for %dx%d matrix multiplication...\n", size, size);
 
-    // Create tensors
     Tensor* A = tensor_empty_2d(size, size);
     Tensor* B = tensor_empty_2d(size, size);
 
@@ -155,7 +143,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Fill with sample data
     float* a_data = (float*)A->data;
     float* b_data = (float*)B->data;
     for (int i = 0; i < size * size; i++) {
@@ -163,24 +150,20 @@ int main(int argc, char* argv[]) {
         b_data[i] = (float)((i + 1) % 10) / 10.0f;
     }
 
-    // Create IR and add matmul operation
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     cml_ir_set_global_context(ir);
 
-    // Add matmul to IR
     tensor_matmul(A, B);
 
-    // Print CPU pseudocode representation
     print_cpu_fallback_pseudocode(ir);
 
-    // Cleanup
     cml_ir_free(ir);
     tensor_free(A);
     tensor_free(B);
 
-    printf("\n========================================\n");
+    printf("\n");
     printf("           Generation Complete\n");
-    printf("========================================\n\n");
+    printf("\n");
 
     return 0;
 }

@@ -1,8 +1,3 @@
-/**
- * @file null_device.c
- * @brief NULL benchmark device implementation
- */
-
 #include "backend/null_device.h"
 #include "ops/ir/ir.h"
 
@@ -140,7 +135,7 @@ void cml_null_device_print(const CMLNullDevice* dev) {
         return;
     }
 
-    printf("=== NULL Benchmark Device ===\n");
+    printf("NULL Benchmark Device\n");
     printf("Simulated specs:\n");
     printf("  Memory: %.1f GB\n", (double)dev->simulated_memory / (1024.0 * 1024.0 * 1024.0));
     printf("  Bandwidth: %.1f GB/s\n", dev->simulated_bandwidth_gbps);
@@ -157,5 +152,5 @@ void cml_null_device_print(const CMLNullDevice* dev) {
     if (dev->stats.num_kernel_launches > 0)
         printf("  Avg launch overhead: %.2f us\n",
                dev->stats.total_dispatch_time_us / (double)dev->stats.num_kernel_launches);
-    printf("=============================\n");
+    printf("\n");
 }

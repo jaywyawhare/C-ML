@@ -1,7 +1,6 @@
 #ifndef CML_NN_LAYERS_H
 #define CML_NN_LAYERS_H
 
-// Include all layer headers
 #include "nn/layers/linear.h"
 #include "nn/layers/activations.h"
 #include "nn/layers/conv2d.h"
@@ -35,7 +34,6 @@
 extern "C" {
 #endif
 
-// Convenience macros
 #define nn_Linear(in, out, dtype, device, bias) nn_linear(in, out, dtype, device, bias)
 
 #define nn_ReLU(inplace) nn_relu(inplace)

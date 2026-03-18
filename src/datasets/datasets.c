@@ -1,8 +1,3 @@
-/**
- * @file datasets.c
- * @brief Dataset Hub - registry, download, cache, and loading
- */
-
 #define _POSIX_C_SOURCE 200809L
 #include "datasets/datasets.h"
 #include "core/logging.h"

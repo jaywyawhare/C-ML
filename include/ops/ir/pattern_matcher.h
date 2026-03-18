@@ -1,7 +1,5 @@
-/**
- * @file pattern_matcher.h
- * @brief Declarative pattern-matcher compiler for IR rewrites
- *
+/*
+ * Declarative pattern-matcher compiler for IR rewrites.
  * (pattern -> replacement) rules that match IRNode subgraphs.
  */
 
@@ -21,8 +19,6 @@ extern "C" {
 #define CML_REWRITE_MAX_RULES 64
 #define CML_REWRITE_DEFAULT_MAX_ITER 16
 
-/* ── Pattern node: matches an IR subgraph ── */
-
 typedef enum {
     CML_PAT_OP,       /* match a specific UOpType */
     CML_PAT_CAPTURE,  /* capture any single node by name */
@@ -37,8 +33,6 @@ typedef struct CMLPatternNode {
     int num_inputs;
 } CMLPatternNode;
 
-/* ── Match result: captured nodes ── */
-
 typedef struct {
     char name[32];
     struct IRNode* node;
@@ -50,8 +44,6 @@ typedef struct {
     struct IRNode* matched_root;
 } CMLMatchResult;
 
-/* ── Rewrite rule ── */
-
 typedef struct IRNode* (*CMLEmitFn)(CMLGraph_t ir, const CMLMatchResult* match);
 
 typedef struct {
@@ -61,21 +53,15 @@ typedef struct {
     const char* name;     /* debug name */
 } CMLRewriteRule;
 
-/* ── Registry ── */
-
 typedef struct {
     CMLRewriteRule rules[CML_REWRITE_MAX_RULES];
     int num_rules;
 } CMLRewriteRegistry;
 
-/* ── Builder helpers ── */
-
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_inputs);
 CMLPatternNode* cml_pattern_capture(const char* name);
 CMLPatternNode* cml_pattern_any(void);
 void cml_pattern_free(CMLPatternNode* node);
-
-/* ── Registry API ── */
 
 CMLRewriteRegistry* cml_rewrite_registry_create(void);
 void cml_rewrite_registry_free(CMLRewriteRegistry* reg);
@@ -83,26 +69,14 @@ void cml_rewrite_registry_free(CMLRewriteRegistry* reg);
 int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern,
                          CMLEmitFn emit, int priority, const char* name);
 
-/**
- * @brief Apply all rewrite rules to the IR graph until convergence
- *
- * @param reg            Rewrite rule registry
- * @param ir             IR graph
- * @param max_iterations Maximum passes (0 = default)
- * @return Number of rewrites applied, or -1 on error
- */
+/* Apply all rewrite rules until convergence.
+   Returns number of rewrites applied, or -1 on error. */
 int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations);
 
-/**
- * @brief Create a registry with all built-in algebraic simplification rules
- */
 CMLRewriteRegistry* cml_rewrite_builtin_rules(void);
 
-/**
- * @brief Dead code elimination pass: remove nodes not reachable from outputs
- * @param ir IR graph
- * @return Number of nodes removed, or -1 on error
- */
+/* Remove nodes not reachable from outputs.
+   Returns number of nodes removed, or -1 on error. */
 int cml_rewrite_dce(CMLGraph_t ir);
 
 #ifdef __cplusplus

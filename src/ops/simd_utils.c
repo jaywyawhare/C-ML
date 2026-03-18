@@ -1,8 +1,3 @@
-/**
- * @file simd_utils.c
- * @brief SIMD optimization utilities for reductions and element-wise operations
- */
-
 #include "ops/simd_utils.h"
 #include <string.h>
 #include <stddef.h>

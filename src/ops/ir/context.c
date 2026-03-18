@@ -1,8 +1,3 @@
-/**
- * @file context.c
- * @brief IR auto-capture and global context management
- */
-
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
 #include "ops/ir/internal.h"

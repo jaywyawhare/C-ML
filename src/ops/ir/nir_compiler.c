@@ -1,18 +1,3 @@
-/**
- * @file nir_compiler.c
- * @brief NIR/Mesa multi-vendor GPU compilation
- *
- * Loads libmesa_nir.so (or libmesa-nir.so) at runtime via dlopen and
- * resolves NIR builder function pointers with dlsym.  If Mesa is not
- * installed every public function returns a graceful failure.
- *
- * Compilation pipeline:
- *   1. cml_nir_compiler_create()  -- dlopen Mesa, resolve symbols
- *   2. cml_nir_compile()          -- walk CMLGraph nodes, emit NIR ops
- *   3. cml_nir_binary_data/size() -- retrieve the SPIR-V blob
- *   4. cml_nir_compiler_free()    -- tear down
- */
-
 #include "ops/ir/nir_compiler.h"
 #include "core/logging.h"
 
@@ -50,10 +35,6 @@ static const char* mesa_lib_names[] = {
     NULL
 };
 
-/**
- * Try to dlopen one of the known Mesa NIR library names.
- * Returns the handle on success, NULL on failure.
- */
 static void* try_open_mesa(void) {
     for (int i = 0; mesa_lib_names[i]; i++) {
         void* lib = dlopen(mesa_lib_names[i], RTLD_LAZY);
@@ -64,10 +45,6 @@ static void* try_open_mesa(void) {
     return NULL;
 }
 
-/**
- * Resolve a single symbol from the Mesa library.
- * Returns the function pointer or NULL.
- */
 static void* resolve(void* lib, const char* name) {
     void* sym = dlsym(lib, name);
     if (!sym) {
@@ -75,10 +52,6 @@ static void* resolve(void* lib, const char* name) {
     return sym;
 }
 
-/**
- * Load all NIR builder function pointers into the compiler struct.
- * Returns 0 on success, -1 if any required symbol is missing.
- */
 static int load_nir_symbols(CMLNIRCompiler* c) {
     void* lib = c->mesa_lib;
     if (!lib) return -1;

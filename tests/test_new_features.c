@@ -1,9 +1,3 @@
-/**
- * @file test_new_features.c
- * @brief Tests for unfold, var_mean, std_mean, ConvTranspose1d, BatchNorm3d,
- *        LayerNorm2d, Muon optimizer, new data types (int16/uint16/uint32/uint64)
- */
-
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>

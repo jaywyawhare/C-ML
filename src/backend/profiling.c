@@ -1,8 +1,3 @@
-/**
- * @file profiling.c
- * @brief Performance profiling implementation
- */
-
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE
 
@@ -13,7 +8,6 @@
 #include <time.h>
 #include <stdio.h>
 
-// Helper: Get current time in milliseconds
 static double timespec_to_ms(struct timespec* ts) {
     return (double)ts->tv_sec * 1000.0 + (double)ts->tv_nsec / 1000000.0;
 }
@@ -196,9 +190,8 @@ void profiler_print_report(Profiler* profiler) {
     if (!profiler)
         return;
 
-    printf("\n=== Profiling Report ===\n");
+    printf("\nProfiling Report\n");
     printf("%-30s %15s\n", "Operation", "Time (ms)");
-    printf("--------------------------------------------\n");
 
     double total_time = 0.0;
     for (int i = 0; i < profiler->num_timers; i++) {
@@ -210,7 +203,6 @@ void profiler_print_report(Profiler* profiler) {
         }
     }
 
-    printf("--------------------------------------------\n");
     printf("%-30s %15.3f\n", "Total", total_time);
     printf("\n");
 }

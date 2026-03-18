@@ -1,8 +1,3 @@
-/**
- * @file test_serialization.c
- * @brief Unit tests for model save/load and checkpoint save/load
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -185,9 +180,9 @@ int main(void) {
     TEST(load_nonexistent);
     TEST(save_bad_path);
 
-    printf("\n=================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

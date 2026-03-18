@@ -1,8 +1,3 @@
-/**
- * @file test_metal_backend.c
- * @brief Tests for Metal GPU backend
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

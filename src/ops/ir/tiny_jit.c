@@ -1,12 +1,3 @@
-/**
- * @file tiny_jit.c
- * @brief TinyJit -- capture-and-replay JIT implementation
- *
- * Wraps the trace infrastructure with a hash-table cache and shape
- * validation, providing a transparent JIT layer for repeated graph
- * execution.
- */
-
 #include "ops/ir/tiny_jit.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/trace.h"
@@ -54,7 +45,6 @@ static void compute_shape_sig(CMLGraph_t ir, int *sig, int *sig_len, int max_len
 {
     *sig_len = 0;
     struct IRNode *node = ir->head;
-    /* Take the first node's output shape as the signature */
     if (node && node->output_shape && node->output_ndim > 0) {
         int n = node->output_ndim;
         if (n > max_len) n = max_len;
@@ -90,13 +80,11 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
 {
     if (!jit || !ir) return -1;
 
-    /* Step 1 -- Compute graph hash and shape signature */
     uint64_t hash = jit_compute_hash(ir);
     int sig[32];
     int sig_len = 0;
     compute_shape_sig(ir, sig, &sig_len, 32);
 
-    /* Step 2 -- Look up in cache */
     uint64_t idx = hash % CML_JIT_CACHE_SIZE;
     for (int probe = 0; probe < CML_JIT_CACHE_SIZE; probe++) {
         uint64_t slot = (idx + (uint64_t)probe) % CML_JIT_CACHE_SIZE;
@@ -105,9 +93,7 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
         if (!entry->occupied) break;  /* empty slot -> not cached */
 
         if (entry->graph_hash == hash) {
-            /* Hash match -- validate shapes */
             if (!shape_matches(entry, sig, sig_len)) {
-                /* Shape mismatch -> invalidate and re-record */
                 LOG_DEBUG("TinyJit: shape mismatch for hash 0x%016llx, re-recording",
                           (unsigned long long)hash);
                 cml_trace_free(entry->trace);
@@ -118,7 +104,6 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
                 break;
             }
 
-            /* Cache hit: replay */
             if (entry->trace && entry->trace->is_complete) {
                 void *tensor_ptrs[CML_TRACE_MAX_ENTRIES];
                 int n = 0;
@@ -139,7 +124,6 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
         }
     }
 
-    /* Step 3 -- Cache miss: execute normally + record trace */
     jit->misses++;
 
     CMLTrace *trace = cml_trace_create();
@@ -159,7 +143,6 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
 
     cml_trace_end(trace);
 
-    /* Populate slot table */
     {
         int n = 0;
         struct IRNode *node = ir->head;
@@ -173,7 +156,6 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
         trace->num_slots = n;
     }
 
-    /* Step 4 -- Insert into cache */
     if (jit->count < CML_JIT_CACHE_SIZE) {
         idx = hash % CML_JIT_CACHE_SIZE;
         for (int probe = 0; probe < CML_JIT_CACHE_SIZE; probe++) {
@@ -194,7 +176,6 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
         }
     }
 
-    /* Cache full -- execute succeeded but trace is discarded */
     cml_trace_free(trace);
     return 0;
 }

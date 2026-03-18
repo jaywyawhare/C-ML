@@ -74,7 +74,6 @@ void cml_untrack_module(struct Module* module);
 void cml_track_optimizer(struct Optimizer* optimizer);
 void cml_track_dataset(struct Dataset* dataset);
 
-// Tensor creation
 Tensor* cml_empty(int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_zeros(int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_ones(int* shape, int ndim, const TensorConfig* config);
@@ -89,7 +88,6 @@ Tensor* cml_ones_1d(int size);
 Tensor* cml_empty_1d(int size);
 Tensor* cml_tensor_1d(const float* data, int size);
 
-// Element-wise ops
 Tensor* cml_add(Tensor* a, Tensor* b);
 Tensor* cml_sub(Tensor* a, Tensor* b);
 Tensor* cml_mul(Tensor* a, Tensor* b);
@@ -115,7 +113,6 @@ Tensor* cml_rsqrt(Tensor* a);
 Tensor* cml_erf(Tensor* a);
 Tensor* cml_clamp(Tensor* a, float min_val, float max_val);
 
-// Activations
 Tensor* cml_relu(Tensor* a);
 Tensor* cml_sigmoid(Tensor* a);
 Tensor* cml_tanh(Tensor* a);
@@ -127,7 +124,6 @@ Tensor* cml_silu(Tensor* x);
 Tensor* cml_hardswish(Tensor* x);
 Tensor* cml_leaky_relu(Tensor* x, float negative_slope);
 
-// Reductions
 Tensor* cml_sum(Tensor* a, int dim, bool keepdim);
 Tensor* cml_mean(Tensor* a, int dim, bool keepdim);
 Tensor* cml_max(Tensor* a, int dim, bool keepdim);
@@ -139,13 +135,11 @@ Tensor* cml_cumsum(Tensor* a, int dim);
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim);
 Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim);
 
-// Linear algebra
 Tensor* cml_matmul(Tensor* a, Tensor* b);
 Tensor* cml_dot(Tensor* a, Tensor* b);
 QRResult cml_qr(Tensor* a);
 SVDResult cml_svd(Tensor* a);
 
-// Tensor manipulation
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);
 Tensor* cml_clone(Tensor* a);
@@ -176,7 +170,6 @@ Tensor* cml_contiguous(Tensor* a);
 Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
 Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
 
-// Tensor factory
 Tensor* cml_arange(float start, float end, float step, const TensorConfig* config);
 Tensor* cml_linspace(float start, float end, int steps, const TensorConfig* config);
 Tensor* cml_eye(int n, const TensorConfig* config);
@@ -192,7 +185,6 @@ Tensor* cml_randn_like(Tensor* a);
 Tensor* cml_full_like(Tensor* a, float value);
 Tensor* cml_from_blob(void* data, int* shape, int ndim, const TensorConfig* config);
 
-// Dtype casting
 Tensor* cml_cast(Tensor* a, DType dtype);
 Tensor* cml_bitcast(Tensor* a, DType target_dtype);
 Tensor* cml_half(Tensor* a);
@@ -203,13 +195,11 @@ Tensor* cml_short(Tensor* a);
 Tensor* cml_bool_(Tensor* a);
 Tensor* cml_bfloat16(Tensor* a);
 
-// Initialization
 Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
 Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
 Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
 Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
 
-// Module API
 Sequential* cml_nn_sequential(void);
 Sequential* cml_nn_sequential_add(Sequential* seq, Module* layer);
 Tensor* cml_nn_sequential_forward(Sequential* seq, Tensor* input);
@@ -219,7 +209,6 @@ bool cml_nn_module_is_training(Module* module);
 void cml_nn_module_eval(Module* module);
 void cml_nn_module_train(Module* module);
 
-// Layers
 Linear* cml_nn_linear(int in_features, int out_features, DType dtype, DeviceType device, bool bias);
 ReLU* cml_nn_relu(bool inplace);
 Sigmoid* cml_nn_sigmoid(void);
@@ -260,7 +249,6 @@ PReLU* cml_nn_prelu(int num_parameters, float init, DType dtype, DeviceType devi
 ModuleList* cml_nn_module_list(void);
 ModuleDict* cml_nn_module_dict(void);
 
-// Pooling
 MaxPool1d* cml_nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
 MaxPool2d* cml_nn_maxpool2d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
 MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode);
@@ -275,7 +263,6 @@ AdaptiveAvgPool2d* cml_nn_adaptive_avgpool2d(int output_h, int output_w);
 AdaptiveMaxPool1d* cml_nn_adaptive_maxpool1d(int output_size);
 AdaptiveMaxPool2d* cml_nn_adaptive_maxpool2d(int output_h, int output_w);
 
-// RNN layers
 RNNCell* cml_nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
                          DeviceType device);
 LSTMCell* cml_nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
@@ -289,7 +276,6 @@ LSTM* cml_nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirect
 GRU* cml_nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
                 bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
 
-// Attention / Transformer
 MultiHeadAttention* cml_nn_multihead_attention(int embed_dim, int num_heads, float dropout,
                                                DType dtype, DeviceType device);
 TransformerEncoderLayer* cml_nn_transformer_encoder_layer(int d_model, int nhead,
@@ -304,19 +290,16 @@ TransformerDecoder* cml_nn_transformer_decoder(int d_model, int nhead, int dim_f
                                                 float dropout, int num_layers,
                                                 DType dtype, DeviceType device);
 
-// Upsampling
 Upsample* cml_nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
                            UpsampleMode mode, bool align_corners);
 PixelShuffle* cml_nn_pixel_shuffle(int upscale_factor);
 PixelUnshuffle* cml_nn_pixel_unshuffle(int downscale_factor);
 
-// Functional API
 Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims,
                            UpsampleMode mode, bool align_corners);
 Tensor* cml_f_pixel_shuffle(Tensor* input, int upscale_factor);
 Tensor* cml_f_pixel_unshuffle(Tensor* input, int downscale_factor);
 
-// Optimizers
 Optimizer* cml_optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                           float beta1, float beta2, float eps);
 Optimizer* cml_optim_sgd(Parameter** parameters, int num_parameters, float lr, float momentum,
@@ -345,7 +328,6 @@ Optimizer* cml_optim_sgd_for_model(Module* model, float lr, float momentum, floa
 void cml_optim_zero_grad(Optimizer* optimizer);
 void cml_optim_step(Optimizer* optimizer);
 
-// LR Schedulers
 LRScheduler* cml_lr_scheduler_step(Optimizer* opt, int step_size, float gamma);
 LRScheduler* cml_lr_scheduler_reduce_on_plateau(Optimizer* opt, float factor, int patience, float min_lr);
 LRScheduler* cml_lr_scheduler_exponential(Optimizer* opt, float gamma);
@@ -360,7 +342,6 @@ float cml_lr_scheduler_update(LRScheduler* scheduler, float metric);
 float cml_lr_scheduler_get_lr(LRScheduler* scheduler);
 void cml_lr_scheduler_free(LRScheduler* scheduler);
 
-// Loss functions
 Tensor* cml_nn_mse_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_mae_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_bce_loss(Tensor* input, Tensor* target);
@@ -373,7 +354,6 @@ Tensor* cml_nn_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* neg
 Tensor* cml_nn_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, float margin);
 Tensor* cml_nn_nll_loss(Tensor* log_probs, Tensor* targets);
 
-// Autograd
 void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
 void cml_zero_grad(Tensor* tensor);
 void cml_no_grad(void);
@@ -389,13 +369,11 @@ bool cml_is_leaf(Tensor* t);
  */
 void cml_reset_ir_context(void);
 
-// JIT kernel cache
 void cml_kernel_cache_clear(void);
 void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory);
 double cml_kernel_cache_hit_rate(void);
 void cml_kernel_cache_print_stats(void);
 
-// AMP (automatic mixed precision)
 void cml_autocast_enter(DType target_dtype);
 void cml_autocast_exit(void);
 bool cml_autocast_is_enabled(void);
@@ -407,7 +385,6 @@ void cml_grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_par
 void cml_grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimizer);
 void cml_grad_scaler_update(GradScaler* scaler);
 
-// Sparse tensors
 SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values,
                                       const int* dense_shape, int dense_ndim);
 SparseCOOData* cml_sparse_from_dense(Tensor* dense);
@@ -416,7 +393,6 @@ Tensor* cml_sparse_matmul(SparseCOOData* sparse, Tensor* dense);
 SparseCOOData* cml_sparse_coalesce(SparseCOOData* sparse);
 void cml_sparse_free(SparseCOOData* sparse);
 
-// Serialization
 Tensor* cml_from_url(const char* url);
 GGUFContext* cml_gguf_open_read(const char* path);
 GGUFContext* cml_gguf_open_write(const char* path);

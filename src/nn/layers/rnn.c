@@ -502,13 +502,7 @@ static void register_cell_params(Module* parent, Module* cell,
     }
 }
 
-/**
- * @brief Helper: extract a [batch, features] slice from a 3-D tensor
- *        at a given time-step index along dimension 0.
- *
- * src shape: [seq_len, batch, features]
- * Returns a NEW tensor of shape [batch, features] with a copy of the data.
- */
+/* Extract [batch, features] slice at time-step t from [seq_len, batch, features]. */
 static Tensor* slice_timestep(Tensor* src, int t, DType dtype, DeviceType device) {
     int batch = src->shape[1];
     int feat  = src->shape[2];
@@ -524,10 +518,6 @@ static Tensor* slice_timestep(Tensor* src, int t, DType dtype, DeviceType device
     return out;
 }
 
-/**
- * @brief Helper: write a [batch, features] slice into a 3-D tensor
- *        at a given time-step index along dimension 0.
- */
 static void write_timestep(Tensor* dst, int t, Tensor* src) {
     int batch = dst->shape[1];
     int feat  = dst->shape[2];
@@ -537,13 +527,7 @@ static void write_timestep(Tensor* dst, int t, Tensor* src) {
     memcpy(dst_data + (size_t)t * stride, src_data, stride * sizeof(float));
 }
 
-/**
- * @brief Helper: transpose a 3-D tensor between
- *        [dim0, dim1, dim2] <-> [dim1, dim0, dim2].
- *
- * Used to convert between batch_first and seq_first layouts.
- * Returns a NEW tensor; caller is responsible for freeing it.
- */
+/* Transpose dims 0 and 1 of a 3-D tensor (batch_first <-> seq_first). */
 static Tensor* transpose_01(Tensor* src) {
     int d0 = src->shape[0];
     int d1 = src->shape[1];
@@ -565,10 +549,6 @@ static Tensor* transpose_01(Tensor* src) {
     return out;
 }
 
-/**
- * @brief Helper: concatenate two [seq_len, batch, feat] tensors along the
- *        feature (last) dimension, producing [seq_len, batch, feat_a + feat_b].
- */
 static Tensor* concat_features(Tensor* a, Tensor* b) {
     int seq   = a->shape[0];
     int batch = a->shape[1];
@@ -595,13 +575,6 @@ static Tensor* concat_features(Tensor* a, Tensor* b) {
     return out;
 }
 
-/**
- * @brief Helper: write a hidden-state slice into h_n at the correct position.
- *
- * h_n shape:  [num_layers * num_directions, batch, hidden_size]
- * h   shape:  [batch, hidden_size]
- * index:      layer * num_directions + dir
- */
 static void write_hidden(Tensor* h_n, int index, Tensor* h) {
     int batch = h_n->shape[1];
     int hs    = h_n->shape[2];

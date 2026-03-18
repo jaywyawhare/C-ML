@@ -1,12 +1,3 @@
-/**
- * @file test_multi_gpu.c
- * @brief Tests for multi-GPU support and distributed training
- *
- * Tests simulated multi-GPU devices, distributed collectives,
- * DDP gradient sync, and pipeline parallelism — all without
- * requiring real GPU hardware.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

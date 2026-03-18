@@ -1,8 +1,3 @@
-/**
- * @file zoo.c
- * @brief Model Zoo implementation - weight download/loading and model registry
- */
-
 #include "zoo/zoo.h"
 #include "nn.h"
 #include "nn/layers.h"

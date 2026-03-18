@@ -1,8 +1,3 @@
-/**
- * @file test_dispatch.c
- * @brief Unit tests for the unified dispatch layer
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +11,6 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 
-// Test counters
 static int tests_run = 0;
 static int tests_passed = 0;
 
@@ -31,7 +25,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-// Test: Dispatch Context Creation
 
 static int test_dispatch_create(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -53,7 +46,6 @@ static int test_dispatch_create(void) {
     return 1;
 }
 
-// Test: Dispatch Initialization
 
 static int test_dispatch_init(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -81,7 +73,6 @@ static int test_dispatch_init(void) {
     return 1;
 }
 
-// Test: Backend Detection
 
 static int test_backend_detection(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -105,7 +96,6 @@ static int test_backend_detection(void) {
     return 1;
 }
 
-// Test: Backend Names
 
 static int test_backend_names(void) {
     const char* name;
@@ -129,7 +119,6 @@ static int test_backend_names(void) {
     return 1;
 }
 
-// Test: Set Preferred Backend
 
 static int test_set_preferred(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -153,7 +142,6 @@ static int test_set_preferred(void) {
     return 1;
 }
 
-// Test: Global Context Singleton
 
 static int test_global_context(void) {
     CMLDispatchContext* ctx1 = cml_dispatch_get_global();
@@ -171,7 +159,6 @@ static int test_global_context(void) {
     return 1;
 }
 
-// Test: Backend Info
 
 static int test_backend_info(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -206,7 +193,6 @@ static int test_backend_info(void) {
     return 1;
 }
 
-// Test: Best Backend Selection
 
 static int test_best_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -232,7 +218,6 @@ static int test_best_backend(void) {
     return 1;
 }
 
-// Test: Simple IR Execution via Dispatch
 
 static int test_dispatch_execute_simple(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -304,7 +289,6 @@ static int test_dispatch_execute_simple(void) {
     return success;
 }
 
-// Test: Environment Variable Backend Selection
 
 static int test_env_backend_selection(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -345,7 +329,6 @@ static int test_env_backend_selection(void) {
     return 1;
 }
 
-// Test: Statistics Tracking
 
 static int test_statistics(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
@@ -384,7 +367,6 @@ static int test_statistics(void) {
     return success;
 }
 
-// Main
 
 int main(void) {
     printf("\n=== Dispatch Layer Unit Tests ===\n\n");
@@ -401,9 +383,9 @@ int main(void) {
     TEST(env_backend_selection);
     TEST(statistics);
 
-    printf("\n=================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

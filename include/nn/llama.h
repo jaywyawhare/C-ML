@@ -1,8 +1,3 @@
-/**
- * @file llama.h
- * @brief LLaMA model inference
- */
-
 #ifndef CML_NN_LLAMA_H
 #define CML_NN_LLAMA_H
 
@@ -29,7 +24,6 @@ typedef struct CMLLLaMAConfig {
     int tensor_parallel_rank;  /* This rank's index (default: 0) */
 } CMLLLaMAConfig;
 
-/* Pre-defined configs */
 CMLLLaMAConfig cml_llama_config_7b(void);
 CMLLLaMAConfig cml_llama_config_13b(void);
 CMLLLaMAConfig cml_llama_config_70b(void);
@@ -93,27 +87,21 @@ typedef struct CMLGenerationResult {
 
 CMLGenerationConfig cml_generation_default_config(void);
 
-/* Model lifecycle */
 CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config);
 void           cml_llama_free(CMLLLaMAModel* model);
 
-/* Weight loading */
 int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath);
 
-/* Forward pass */
 Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_len);
 Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
                                  Tensor* hidden, int start_pos);
 
-/* Generation */
 CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt,
                                           const CMLGenerationConfig* config);
 void cml_generation_result_free(CMLGenerationResult* result);
 
-/* Sampling */
 int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config);
 
-/* Utility */
 void cml_llama_reset(CMLLLaMAModel* model);
 void cml_llama_print_config(const CMLLLaMAConfig* config);
 

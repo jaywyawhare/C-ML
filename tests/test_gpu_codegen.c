@@ -1,11 +1,3 @@
-/**
- * @file test_gpu_codegen.c
- * @brief Tests for GPU code generation via LLVM NVPTX/AMDGPU targets
- *
- * Tests skip gracefully if no GPU is available.
- * When a GPU is present, results are verified against CPU execution.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

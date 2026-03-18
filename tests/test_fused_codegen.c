@@ -1,8 +1,3 @@
-/**
- * @file test_fused_codegen.c
- * @brief Tests for fused kernel code generation
- */
-
 #include "ops/ir/fused_codegen.h"
 #include "ops/ir/schedule.h"
 #include "tensor/tensor.h"

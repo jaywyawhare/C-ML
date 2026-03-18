@@ -1,11 +1,3 @@
-/**
- * @file test_paged_attention.c
- * @brief Tests for paged KV cache and paged GQA forward
- *
- * Covers block allocation/free, sequence lifecycle, token append,
- * paged GQA output shape, and multi-sequence block pool sharing.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -30,16 +22,12 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== Helpers ===== */
 
 /** Fill a float buffer with a constant value. */
 static void fill_float(float* buf, size_t n, float val) {
     for (size_t i = 0; i < n; i++) buf[i] = val;
 }
 
-/* ===================================================================
- * 1. Block allocation and freeing
- * =================================================================== */
 
 static int test_alloc_single_block(void) {
     CMLPagedKVCache* cache = cml_paged_kv_cache_create(4, 2, 2, 8);
@@ -129,9 +117,6 @@ static int test_alloc_stats(void) {
     return 1;
 }
 
-/* ===================================================================
- * 2. Sequence init, append, token count
- * =================================================================== */
 
 static int test_init_sequence(void) {
     CMLPagedKVCache* cache = cml_paged_kv_cache_create(16, 4, 2, 8);
@@ -260,9 +245,6 @@ static int test_append_verifies_data(void) {
     return 1;
 }
 
-/* ===================================================================
- * 3. Free sequence returns blocks to pool
- * =================================================================== */
 
 static int test_free_sequence_returns_blocks(void) {
     CMLPagedKVCache* cache = cml_paged_kv_cache_create(8, 4, 1, 4);
@@ -340,9 +322,6 @@ static int test_free_sequence_reuse_slot(void) {
     return 1;
 }
 
-/* ===================================================================
- * 4. Paged GQA forward produces correct shape
- * =================================================================== */
 
 static int test_paged_gqa_output_shape(void) {
     int num_kv_heads = 2;
@@ -523,9 +502,6 @@ static int test_paged_gqa_output_nonzero(void) {
     return 1;
 }
 
-/* ===================================================================
- * 5. Multiple sequences sharing the block pool
- * =================================================================== */
 
 static int test_multi_sequence_shared_pool(void) {
     int max_blocks = 16;
@@ -622,9 +598,6 @@ static int test_multi_sequence_independent_data(void) {
     return 1;
 }
 
-/* ===================================================================
- * Edge cases and error handling
- * =================================================================== */
 
 static int test_create_invalid_params(void) {
     if (cml_paged_kv_cache_create(0, 4, 2, 8) != NULL) return 0;
@@ -682,9 +655,6 @@ static int test_gqa_null_args(void) {
     return 1;
 }
 
-/* ===================================================================
- * Main
- * =================================================================== */
 
 int main(void) {
     printf("test_paged_attention\n\n");

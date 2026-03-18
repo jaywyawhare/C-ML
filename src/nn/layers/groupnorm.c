@@ -1,15 +1,3 @@
-/**
- * @file groupnorm.c
- * @brief Group Normalization layer implementation
- *
- * Normalizes within groups of channels. For input [N, C, ...]:
- * - Divide C channels into num_groups groups, each with C/num_groups channels
- * - For each sample and group, compute mean and variance across the channels
- *   in that group and all spatial dimensions
- * - Normalize: (x - mean) / sqrt(var + eps)
- * - Apply affine transform if enabled: y = weight * x_norm + bias (per-channel)
- */
-
 #include "nn/layers/groupnorm.h"
 #include "nn.h"
 #include "tensor/tensor.h"

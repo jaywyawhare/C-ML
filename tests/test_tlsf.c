@@ -1,8 +1,3 @@
-/**
- * @file test_tlsf.c
- * @brief Unit tests for TLSF allocator and timeline memory planner
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +16,6 @@ static int tests_passed = 0;
     else { printf("FAIL\n"); } \
 } while(0)
 
-/* ===== TLSF Allocator Tests ===== */
 
 static int test_create_destroy(void)
 {
@@ -348,7 +342,6 @@ static int test_many_alloc_free_cycles(void)
     return 1;
 }
 
-/* ===== Timeline Planner Tests ===== */
 
 static int test_timeline_create_destroy(void)
 {
@@ -556,7 +549,6 @@ static int test_timeline_print(void)
     return 1;
 }
 
-/* ===== Main ===== */
 
 int main(void)
 {

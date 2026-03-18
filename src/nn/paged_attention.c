@@ -1,12 +1,3 @@
-/**
- * @file paged_attention.c
- * @brief Paged KV cache and attention implementation
- *
- * Block allocator uses a stack-based free list for O(1) alloc/free.
- * GQA forward gathers K/V from physically non-contiguous page blocks
- * and runs standard scaled dot-product attention per query head.
- */
-
 #include "nn/paged_attention.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
@@ -14,7 +5,6 @@
 #include <string.h>
 #include <math.h>
 
-/** Softmax in-place over the last dimension of a flat [rows, cols] buffer. */
 static void paged_softmax_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
         float* row = data + (size_t)r * cols;
@@ -36,12 +26,10 @@ static void paged_softmax_inplace(float* data, int rows, int cols) {
     }
 }
 
-/** Number of floats in a single token's KV slice. */
 static inline size_t token_kv_size(const CMLPagedKVCache* cache) {
     return (size_t)cache->num_kv_heads * cache->head_dim;
 }
 
-/** Number of floats in an entire block's K or V buffer. */
 static inline size_t block_buf_size(const CMLPagedKVCache* cache) {
     return (size_t)cache->block_size * token_kv_size(cache);
 }

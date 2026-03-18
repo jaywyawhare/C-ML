@@ -1,8 +1,3 @@
-/**
- * @file test_runtime_compiler.c
- * @brief Tests for runtime kernel compilation pipeline
- */
-
 #include "ops/ir/runtime_compiler.h"
 #include "ops/ir/fused_codegen.h"
 #include "tensor/tensor.h"

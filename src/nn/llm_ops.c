@@ -1,11 +1,3 @@
-/**
- * @file llm_ops.c
- * @brief LLM inference primitives implementation
- *
- * Implements Grouped Query Attention, KV Cache, Mixture of Experts,
- * Rotary Position Embeddings, and BPE Tokenizer.
- */
-
 #include "nn/llm_ops.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
@@ -14,7 +6,6 @@
 #include <stdio.h>
 #include <math.h>
 
-/** Softmax over last dimension for a flat buffer treated as [rows, cols] */
 static void llm_softmax_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
         float* row = data + (size_t)r * cols;
@@ -36,7 +27,6 @@ static void llm_softmax_inplace(float* data, int rows, int cols) {
     }
 }
 
-/** Xavier/Glorot uniform initialization */
 static void llm_xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
     float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
     for (size_t i = 0; i < numel; i++) {
@@ -46,7 +36,6 @@ static void llm_xavier_init(float* data, size_t numel, int fan_in, int fan_out) 
 
 #define HASH_EMPTY (-1)
 
-/** FNV-1a hash */
 static unsigned int fnv1a_hash(const char* str) {
     unsigned int hash = 2166136261u;
     while (*str) {
@@ -56,7 +45,6 @@ static unsigned int fnv1a_hash(const char* str) {
     return hash;
 }
 
-/** Insert into open-addressing hash table. Returns 0 on success, -1 on full. */
 static int hash_insert(int* table, int table_size, char** vocab, const char* key, int value) {
     unsigned int h = fnv1a_hash(key) % (unsigned int)table_size;
     for (int probe = 0; probe < table_size; probe++) {
@@ -74,7 +62,6 @@ static int hash_insert(int* table, int table_size, char** vocab, const char* key
     return -1; /* table full */
 }
 
-/** Lookup in open-addressing hash table. Returns token ID or -1 if not found. */
 static int hash_lookup(const int* table, int table_size, char** vocab, const char* key) {
     unsigned int h = fnv1a_hash(key) % (unsigned int)table_size;
     for (int probe = 0; probe < table_size; probe++) {

@@ -1,8 +1,3 @@
-/**
- * @file test_memory.c
- * @brief Unit tests for memory pool, graph allocator, and cleanup context
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,9 +157,9 @@ int main(void) {
     TEST(cleanup_clear_all);
     TEST(cleanup_null_safety);
 
-    printf("\n=====================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=====================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

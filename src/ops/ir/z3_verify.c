@@ -1,12 +1,3 @@
-/**
- * @file z3_verify.c
- * @brief Z3 SMT solver for IR validation
- *
- * When CML_HAS_Z3 is defined, dynamically loads libz3 and uses the Z3 C API
- * to verify IR transformation equivalence, index bounds, and schedule
- * correctness.  Otherwise, all public functions return CML_VERIFY_UNSUPPORTED.
- */
-
 #include "ops/ir/z3_verify.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"

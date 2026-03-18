@@ -8,14 +8,7 @@
 extern "C" {
 #endif
 
-/**
- * @brief Initialize graph context
- */
 void cml_graph_context_init(void);
-
-/**
- * @brief Cleanup graph context
- */
 void cml_graph_context_cleanup(void);
 
 #ifdef __cplusplus

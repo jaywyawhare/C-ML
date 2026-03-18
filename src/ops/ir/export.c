@@ -1,8 +1,3 @@
-/**
- * @file ir_kernel_export.c
- * @brief Export kernel analysis data for visualization
- */
-
 #include "ops/ir/ir.h"
 #include "ops/ir/export.h"
 #include "ops/ir/internal.h"

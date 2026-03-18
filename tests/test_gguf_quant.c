@@ -1,8 +1,3 @@
-/**
- * @file test_gguf_quant.c
- * @brief Tests for GGUF quantized tensor dequantization
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

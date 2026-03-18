@@ -1,15 +1,3 @@
-/**
- * @file hcq_nv.c
- * @brief Hardware Command Queues -- NV userspace driver backend
- *
- * Guarded by CML_HAS_NV_DRIVER.  When the flag is not defined this
- * translation unit compiles to stubs that return -1.  When it *is* defined
- * the functions below are linked in and called from the dispatcher in hcq.c.
- *
- * Uses GPFIFO-based queues for kernel dispatch and semaphore signals for
- * synchronization.  Same pattern as hcq_vulkan.c.
- */
-
 #include "ops/ir/hcq.h"
 #include "core/logging.h"
 

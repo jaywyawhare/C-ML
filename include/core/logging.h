@@ -14,7 +14,6 @@ typedef enum {
 extern "C" {
 #endif
 
-// Global log level
 extern LogLevel g_log_level;
 
 void cml_set_log_level(LogLevel level);

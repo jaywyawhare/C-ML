@@ -1,8 +1,3 @@
-/**
- * @file test_schedule.c
- * @brief Tests for automatic kernel scheduling and fusion
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +17,6 @@ static int tests_passed = 0;
     else { printf("FAIL\n"); } \
 } while(0)
 
-/* ---------- helpers ---------- */
 
 static Tensor* make_tensor(int d0, int d1) {
     int shape[2] = { d0, d1 };
@@ -36,7 +30,6 @@ static Tensor* make_tensor_4d(int n, int c, int h, int w) {
     return tensor_empty(shape, 4, &cfg);
 }
 
-/* ---------- classification tests ---------- */
 
 static int test_is_elementwise(void) {
     return cml_schedule_is_elementwise(UOP_ADD)
@@ -71,7 +64,6 @@ static int test_is_movement(void) {
         && !cml_schedule_is_movement(UOP_SUM);
 }
 
-/* ---------- fusion tests ---------- */
 
 static int test_can_fuse_elementwise(void) {
     return cml_schedule_can_fuse(UOP_ADD, UOP_MUL)
@@ -102,7 +94,6 @@ static int test_movement_fuses_with_anything(void) {
         && cml_schedule_can_fuse(UOP_PERMUTE, UOP_MATMUL);
 }
 
-/* ---------- options tests ---------- */
 
 static int test_default_options(void) {
     CMLScheduleOptions opts = cml_schedule_default_options();
@@ -113,7 +104,6 @@ static int test_default_options(void) {
         && opts.topological_sort == true;
 }
 
-/* ---------- schedule creation tests ---------- */
 
 static int test_schedule_empty_graph(void) {
     CMLGraph_t g = cml_ir_new(IR_TARGET_C);
@@ -472,7 +462,6 @@ static int test_schedule_standalone_reduce(void) {
     return ok;
 }
 
-/* ---------- main ---------- */
 
 int main(void) {
     printf("\n=== test_schedule ===\n\n");

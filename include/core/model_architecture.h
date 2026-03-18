@@ -1,11 +1,3 @@
-/**
- * @file model_architecture.h
- * @brief Model architecture visualization export for C-ML
- *
- * This module extracts model architecture information from C-ML models
- * and exports it in a structured format for visualization.
- */
-
 #ifndef CML_MODEL_ARCHITECTURE_H
 #define CML_MODEL_ARCHITECTURE_H
 
@@ -17,9 +9,6 @@
 extern "C" {
 #endif
 
-/**
- * @brief Layer information structure
- */
 typedef struct {
     const char* type; // Layer type (e.g., "Linear", "ReLU", "Conv2d")
     int layer_index;  // Index in the model
@@ -35,9 +24,6 @@ typedef struct {
     char* details;    // Additional layer details (JSON string)
 } LayerInfo;
 
-/**
- * @brief Model architecture structure
- */
 typedef struct {
     LayerInfo* layers;    // Array of layer information
     size_t num_layers;    // Number of layers
@@ -46,40 +32,9 @@ typedef struct {
     int trainable_params; // Trainable parameters
 } ModelArchitecture;
 
-/**
- * @brief Create a new model architecture structure
- */
 ModelArchitecture* model_architecture_create(void);
-
-/**
- * @brief Extract architecture from a Module
- *
- * Traverses the module structure (handles Sequential, Linear, etc.)
- * and extracts layer information.
- *
- * @param module The module to extract architecture from
- * @param arch Architecture structure to populate
- * @return 0 on success, negative value on failure
- */
 int model_architecture_extract(Module* module, ModelArchitecture* arch);
-
-/**
- * @brief Export model architecture to JSON
- *
- * Exports the architecture in a format suitable for visualization:
- * - Layer types and properties
- * - Connections between layers
- * - Parameter information
- *
- * @param arch Architecture to export
- * @param path Output file path
- * @return 0 on success, negative value on failure
- */
 int model_architecture_export_json(const ModelArchitecture* arch, const char* path);
-
-/**
- * @brief Free model architecture structure
- */
 void model_architecture_free(ModelArchitecture* arch);
 
 #ifdef __cplusplus

@@ -1,11 +1,3 @@
-/**
- * @file data_parallel.h
- * @brief Distributed Data Parallel (DDP) training
- *
- * Implements PyTorch-style DDP: broadcast params from rank 0 at init,
- * bucketed gradient all-reduce (25MB buckets), average by world_size.
- */
-
 #ifndef CML_DATA_PARALLEL_H
 #define CML_DATA_PARALLEL_H
 
@@ -17,9 +9,6 @@
 extern "C" {
 #endif
 
-/**
- * @brief DDP configuration
- */
 typedef struct {
     size_t bucket_size_bytes;    /* Gradient bucket size (default: 25MB) */
     bool broadcast_buffers;      /* Broadcast non-parameter buffers */
@@ -27,9 +16,6 @@ typedef struct {
     int gradient_as_bucket_view; /* Use gradient views (memory efficient) */
 } DDPConfig;
 
-/**
- * @brief DDP wrapper around a module
- */
 typedef struct CMLDataParallel {
     Module* module;             /* Wrapped module (not owned) */
     DistProcessGroup* group;    /* Process group */
@@ -49,47 +35,18 @@ typedef struct CMLDataParallel {
     bool initialized;
 } CMLDataParallel;
 
-/**
- * @brief Create default DDP configuration
- */
 DDPConfig cml_ddp_default_config(void);
 
-/**
- * @brief Wrap a module for distributed data parallel training
- *
- * Broadcasts parameters from rank 0, sets up gradient buckets.
- *
- * @param module Module to wrap
- * @param config DDP configuration (NULL = defaults)
- * @return DDP wrapper, or NULL on failure
- */
+/* Broadcasts parameters from rank 0, sets up gradient buckets. */
 CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config);
 
-/**
- * @brief Forward pass through DDP module
- *
- * Same as module_forward, but registers backward hooks for gradient sync.
- *
- * @param ddp DDP wrapper
- * @param input Input tensor
- * @return Output tensor
- */
 Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input);
 
-/**
- * @brief Synchronize gradients after backward pass
- *
- * Performs bucketed all-reduce of gradients and averages by world_size.
- * Call this after tensor_backward() and before optimizer_step().
- *
- * @param ddp DDP wrapper
- * @return 0 on success
- */
+/* Bucketed all-reduce of gradients, averaged by world_size.
+ * Call after tensor_backward() and before optimizer_step(). */
 int cml_ddp_sync_gradients(CMLDataParallel* ddp);
 
-/**
- * @brief Free DDP wrapper (does NOT free the underlying module)
- */
+/* Does NOT free the underlying module. */
 void cml_ddp_free(CMLDataParallel* ddp);
 
 #ifdef __cplusplus

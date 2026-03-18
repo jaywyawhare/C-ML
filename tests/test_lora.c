@@ -1,8 +1,3 @@
-/**
- * @file test_lora.c
- * @brief Unit tests for LoRA (Low-Rank Adaptation) implementation
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +22,6 @@ static int tests_passed = 0;
     } \
 } while(0)
 
-/* ===== Test: LoRA Linear Forward ===== */
 
 static int test_lora_linear_forward(void) {
     TensorConfig cfg = {
@@ -116,7 +110,6 @@ static int test_lora_linear_forward(void) {
     return ok;
 }
 
-/* ===== Test: LoRA Merge and Unmerge ===== */
 
 static int test_lora_merge_unmerge(void) {
     TensorConfig cfg = {
@@ -220,7 +213,6 @@ static int test_lora_merge_unmerge(void) {
     return ok;
 }
 
-/* ===== Test: LoRA Adapter ===== */
 
 static int test_lora_adapter(void) {
     TensorConfig cfg = {
@@ -336,7 +328,6 @@ static int test_lora_adapter(void) {
     return ok;
 }
 
-/* ===== Test: B initialized to zero ===== */
 
 static int test_lora_zero_init_B(void) {
     TensorConfig cfg = {
@@ -443,12 +434,11 @@ static int test_lora_zero_init_B(void) {
     return ok;
 }
 
-/* ===== Main ===== */
 
 int main(void) {
-    printf("\n=========================================\n");
+    printf("\n");
     printf("  LoRA (Low-Rank Adaptation) Tests\n");
-    printf("=========================================\n\n");
+    printf("\n");
 
     printf("LoRA Linear:\n");
     TEST(lora_linear_forward);
@@ -460,9 +450,9 @@ int main(void) {
     printf("\nAdapter:\n");
     TEST(lora_adapter);
 
-    printf("\n=========================================\n");
+    printf("\n");
     printf("Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("=========================================\n\n");
+    printf("\n");
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

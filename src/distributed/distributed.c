@@ -1,20 +1,20 @@
-/**
- * @file distributed.c
- * @brief Process group management and collective operations
- */
-
 #include "distributed/distributed.h"
 #include "distributed/comm_backend.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
 static DistProcessGroup* g_default_group = NULL;
+static pthread_mutex_t g_dist_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int cml_dist_init(DistBackendType backend, int world_size, int rank) {
+    pthread_mutex_lock(&g_dist_mutex);
+
     if (g_default_group && g_default_group->initialized) {
         LOG_WARNING("Distributed already initialized");
+        pthread_mutex_unlock(&g_dist_mutex);
         return 0;
     }
 
@@ -33,8 +33,10 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
     }
 
     g_default_group = calloc(1, sizeof(DistProcessGroup));
-    if (!g_default_group)
+    if (!g_default_group) {
+        pthread_mutex_unlock(&g_dist_mutex);
         return -1;
+    }
 
     g_default_group->rank = rank;
     g_default_group->world_size = world_size;
@@ -69,20 +71,24 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
         LOG_ERROR("Failed to create any communication backend");
         free(g_default_group);
         g_default_group = NULL;
+        pthread_mutex_unlock(&g_dist_mutex);
         return -1;
     }
 
     g_default_group->ops = ops;
 
+    /* Store backend context on the process group */
+    g_default_group->backend_ctx = ops->backend_ctx;
+
     /* Initialize backend */
     if (ops->init) {
-        void* ctx = NULL;
-        int result = ops->init(ctx, world_size, rank);
+        int result = ops->init(ops->backend_ctx, world_size, rank);
         if (result != 0) {
             LOG_ERROR("Backend initialization failed");
             cml_dist_free_backend(ops);
             free(g_default_group);
             g_default_group = NULL;
+            pthread_mutex_unlock(&g_dist_mutex);
             return -1;
         }
     }
@@ -94,6 +100,7 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
              backend == DIST_BACKEND_NCCL ? "NCCL" :
              backend == DIST_BACKEND_MPI ? "MPI" : "Gloo");
 
+    pthread_mutex_unlock(&g_dist_mutex);
     return 0;
 }
 
@@ -114,8 +121,12 @@ bool cml_dist_is_initialized(void) {
 }
 
 void cml_dist_destroy(void) {
-    if (!g_default_group)
+    pthread_mutex_lock(&g_dist_mutex);
+
+    if (!g_default_group) {
+        pthread_mutex_unlock(&g_dist_mutex);
         return;
+    }
 
     if (g_default_group->ops) {
         if (g_default_group->ops->destroy)
@@ -126,6 +137,7 @@ void cml_dist_destroy(void) {
     free(g_default_group);
     g_default_group = NULL;
 
+    pthread_mutex_unlock(&g_dist_mutex);
     LOG_INFO("Distributed destroyed");
 }
 

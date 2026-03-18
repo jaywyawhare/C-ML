@@ -1,14 +1,3 @@
-/**
- * @file wmma.c
- * @brief WMMA (Warp Matrix Multiply Accumulate) Tensor Core support
- *
- * Generates CUDA C kernels using nvcuda::wmma intrinsics for fp16 matrix
- * multiplication on NVIDIA Volta+ GPUs (SM >= 70).  The generated source
- * is compiled at runtime via NVRTC through the existing CUDA backend.
- *
- * Guarded by CML_HAS_CUDA -- stubs are provided otherwise.
- */
-
 #include "ops/ir/gpu/wmma.h"
 #include "core/logging.h"
 

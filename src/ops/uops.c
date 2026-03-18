@@ -1,8 +1,3 @@
-/**
- * @file uops.c
- * @brief Micro-Operations implementation
- */
-
 #include "ops/uops.h"
 #include "ops/winograd.h"
 #include "ops/ir/ir.h"

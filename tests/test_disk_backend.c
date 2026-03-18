@@ -1,8 +1,3 @@
-/**
- * @file test_disk_backend.c
- * @brief Tests for disk-based tensor storage backend
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

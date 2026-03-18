@@ -5,7 +5,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdatomic.h>
 #include <pthread.h>
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 #ifdef __linux__
 #include <dlfcn.h>
@@ -42,9 +46,18 @@ static CMLBlasContext* g_blas_ctx = NULL;
 
 static const char* blas_library_paths[] = {
 #ifdef __linux__
+    /* MKL (fastest on Intel, competitive on AMD) */
     "libmkl_rt.so",
+    "libmkl_rt.so.2",
+    "libmkl_rt.so.1",
+    /* BLIS (often beats OpenBLAS, especially on AMD) */
+    "libblis.so",
+    "libblis.so.4",
+    "libblis.so.3",
+    /* OpenBLAS (widely available, good performance) */
     "libopenblas.so.0",
     "libopenblas.so",
+    /* ATLAS, reference BLAS */
     "libatlas.so",
     "libcblas.so.3",
     "libcblas.so",
@@ -55,9 +68,13 @@ static const char* blas_library_paths[] = {
     "libopenblas.dylib",
     "/opt/homebrew/opt/openblas/lib/libopenblas.dylib",
     "/usr/local/opt/openblas/lib/libopenblas.dylib",
+    "libblis.dylib",
     "libblas.dylib",
 #elif defined(_WIN32)
-    "openblas.dll", "libopenblas.dll", "mkl_rt.dll", "blas.dll",
+    "mkl_rt.dll", "mkl_rt.2.dll",
+    "libblis.dll",
+    "openblas.dll", "libopenblas.dll",
+    "blas.dll",
 #endif
     NULL};
 
@@ -94,6 +111,50 @@ static void load_cblas_functions(CMLBlasContext* ctx) {
     }
 }
 
+static void tune_blas_threading(CMLBlasContext* ctx) {
+    if (!ctx || !ctx->lib_handle)
+        return;
+
+    /* MKL: set threading via mkl_set_num_threads */
+    void (*mkl_set_num_threads)(int) = LIB_SYM(ctx->lib_handle, "MKL_Set_Num_Threads");
+    if (!mkl_set_num_threads)
+        mkl_set_num_threads = LIB_SYM(ctx->lib_handle, "mkl_set_num_threads");
+    if (mkl_set_num_threads) {
+        const char* env = getenv("MKL_NUM_THREADS");
+        if (!env) {
+            /* Use all available cores for MKL */
+            int ncores = 1;
+#ifdef __linux__
+            ncores = sysconf(_SC_NPROCESSORS_ONLN);
+            if (ncores < 1) ncores = 1;
+#endif
+            mkl_set_num_threads(ncores);
+            LOG_INFO("MKL threads set to %d", ncores);
+        }
+        ctx->is_mkl = true;
+        return;
+    }
+
+    /* OpenBLAS: set threading via openblas_set_num_threads.
+       OpenBLAS built with OpenMP ignores this and reads OMP_NUM_THREADS,
+       so we must also set that env var to guarantee single-threaded mode. */
+    void (*openblas_set)(int) = LIB_SYM(ctx->lib_handle, "openblas_set_num_threads");
+    if (openblas_set) {
+        if (!getenv("OPENBLAS_NUM_THREADS") && !getenv("OMP_NUM_THREADS")) {
+            openblas_set(1);
+            setenv("OMP_NUM_THREADS", "1", 0);
+            setenv("GOTO_NUM_THREADS", "1", 0);
+        }
+        ctx->is_openblas = true;
+    }
+
+    /* BLIS: set threading via bli_thread_set_num_threads */
+    void (*blis_set)(int) = LIB_SYM(ctx->lib_handle, "bli_thread_set_num_threads");
+    if (blis_set) {
+        ctx->is_blis = true;
+    }
+}
+
 CMLBlasContext* cml_blas_init(void) {
     CMLBlasContext* ctx = calloc(1, sizeof(CMLBlasContext));
     if (!ctx) {
@@ -109,6 +170,7 @@ CMLBlasContext* cml_blas_init(void) {
             if (ctx->cblas_sgemm || ctx->sgemm_) {
                 strncpy(ctx->lib_name, env_blas, sizeof(ctx->lib_name) - 1);
                 ctx->initialized = true;
+                tune_blas_threading(ctx);
                 LOG_INFO("Loaded BLAS library (from CML_BLAS_LIB): %s", ctx->lib_name);
                 return ctx;
             }
@@ -127,6 +189,7 @@ CMLBlasContext* cml_blas_init(void) {
             if (ctx->cblas_sgemm || ctx->sgemm_) {
                 strncpy(ctx->lib_name, blas_library_paths[i], sizeof(ctx->lib_name) - 1);
                 ctx->initialized = true;
+                tune_blas_threading(ctx);
                 LOG_INFO("Loaded BLAS library: %s", ctx->lib_name);
                 return ctx;
             }
@@ -159,6 +222,13 @@ void cml_blas_free(CMLBlasContext* ctx) {
 }
 
 CMLBlasContext* cml_blas_get_context(void) {
+    /* Fast path: context already initialized — no lock needed */
+    CMLBlasContext* ctx = atomic_load_explicit(
+        (_Atomic(CMLBlasContext*)*)&g_blas_ctx, memory_order_acquire);
+    if (ctx)
+        return ctx;
+
+    /* Slow path: first call, initialize under lock */
     if (!g_blas_lock_initialized) {
         pthread_mutex_init(&g_blas_lock, NULL);
         g_blas_lock_initialized = true;
@@ -167,10 +237,74 @@ CMLBlasContext* cml_blas_get_context(void) {
     if (!g_blas_ctx) {
         g_blas_ctx = cml_blas_init();
     }
-    CMLBlasContext* result = g_blas_ctx;
+    ctx = g_blas_ctx;
+    atomic_thread_fence(memory_order_release);
     blas_unlock();
-    return result;
+    return ctx;
 }
+
+#if defined(__AVX2__) || defined(__AVX__)
+#include <immintrin.h>
+
+/* Small-matrix GEMM: avoids BLAS thread pool overhead for M,N,K < 64 */
+static void sgemm_avx_small(const float* A, const float* B, float* C,
+                             int M, int N, int K, float alpha, float beta) {
+    /* Apply beta to C */
+    if (beta == 0.0f) {
+        memset(C, 0, (size_t)M * N * sizeof(float));
+    } else if (beta != 1.0f) {
+        size_t total = (size_t)M * N;
+        __m256 vbeta = _mm256_set1_ps(beta);
+        size_t i = 0;
+        for (; i + 8 <= total; i += 8)
+            _mm256_storeu_ps(C + i, _mm256_mul_ps(_mm256_loadu_ps(C + i), vbeta));
+        for (; i < total; i++)
+            C[i] *= beta;
+    }
+
+    /* C += alpha * A @ B, using register blocking */
+    for (int m = 0; m < M; m++) {
+        for (int k = 0; k < K; k++) {
+            __m256 a_mk = _mm256_set1_ps(alpha * A[m * K + k]);
+            int n = 0;
+            for (; n + 16 <= N; n += 16) {
+                /* Process 16 elements (2x unrolled) */
+                __m256 c0 = _mm256_loadu_ps(C + m * N + n);
+                __m256 c1 = _mm256_loadu_ps(C + m * N + n + 8);
+                __m256 b0 = _mm256_loadu_ps(B + k * N + n);
+                __m256 b1 = _mm256_loadu_ps(B + k * N + n + 8);
+#ifdef __FMA__
+                c0 = _mm256_fmadd_ps(a_mk, b0, c0);
+                c1 = _mm256_fmadd_ps(a_mk, b1, c1);
+#else
+                c0 = _mm256_add_ps(c0, _mm256_mul_ps(a_mk, b0));
+                c1 = _mm256_add_ps(c1, _mm256_mul_ps(a_mk, b1));
+#endif
+                _mm256_storeu_ps(C + m * N + n, c0);
+                _mm256_storeu_ps(C + m * N + n + 8, c1);
+            }
+            for (; n + 8 <= N; n += 8) {
+                __m256 c_val = _mm256_loadu_ps(C + m * N + n);
+                __m256 b_val = _mm256_loadu_ps(B + k * N + n);
+#ifdef __FMA__
+                c_val = _mm256_fmadd_ps(a_mk, b_val, c_val);
+#else
+                c_val = _mm256_add_ps(c_val, _mm256_mul_ps(a_mk, b_val));
+#endif
+                _mm256_storeu_ps(C + m * N + n, c_val);
+            }
+            /* Scalar tail */
+            float a_scalar = alpha * A[m * K + k];
+            for (; n < N; n++)
+                C[m * N + n] += a_scalar * B[k * N + n];
+        }
+    }
+}
+#endif /* __AVX2__ || __AVX__ */
+
+/* Threshold: use AVX kernel for small matrices, BLAS for large ones.
+ * Below this threshold, BLAS thread pool overhead > compute time. */
+#define SMALL_GEMM_THRESHOLD (64 * 64 * 64)
 
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                    int K, float alpha, float beta) {
@@ -185,6 +319,14 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
         LOG_ERROR("Invalid arguments to cml_blas_sgemm");
         return -1;
     }
+
+    /* Small matrix fast path: AVX2 microkernel avoids BLAS thread overhead */
+#if defined(__AVX2__) || defined(__AVX__)
+    if ((long long)M * N * K < SMALL_GEMM_THRESHOLD) {
+        sgemm_avx_small(A, B, C, M, N, K, alpha, beta);
+        return 0;
+    }
+#endif
 
     if (ctx->cblas_sgemm) {
         // CBLAS interface (row-major)

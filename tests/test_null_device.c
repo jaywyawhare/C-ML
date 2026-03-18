@@ -1,8 +1,3 @@
-/**
- * @file test_null_device.c
- * @brief Tests for NULL benchmark device
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

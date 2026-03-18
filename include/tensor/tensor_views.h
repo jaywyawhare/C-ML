@@ -7,7 +7,6 @@
 extern "C" {
 #endif
 
-// View operations
 Tensor* tensor_view(Tensor* t, int* new_shape, int new_ndim);
 Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size_t storage_offset);
 Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim);

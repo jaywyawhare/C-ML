@@ -1,8 +1,3 @@
-/**
- * @file test_winograd.c
- * @brief Tests for Winograd convolution transforms
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
