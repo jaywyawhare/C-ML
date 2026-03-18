@@ -1,8 +1,3 @@
-/**
- * @file optimization.c
- * @brief IR optimization passes (fusion, DCE, reordering)
- */
-
 #include "ops/ir/ir.h"
 #include "ops/ir/optimization.h"
 #include "ops/ir/pattern_matcher.h"
@@ -602,11 +597,22 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
     if (!ir || ir->node_count <= 0)
         return -1;
 
-    int* in_degree = calloc((size_t)ir->node_count, sizeof(int));
+    /* Walk the linked list to get the real count — earlier passes
+       (CSE, DCE, fusion) can leave ir->node_count stale. */
+    int actual_count = 0;
+    for (struct IRNode* n = ir->head; n; n = n->next)
+        actual_count++;
+
+    if (actual_count <= 0)
+        return -1;
+
+    ir->node_count = actual_count;
+
+    int* in_degree = calloc((size_t)actual_count, sizeof(int));
     if (!in_degree)
         return -1;
 
-    struct IRNode** all_nodes = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
+    struct IRNode** all_nodes = malloc((size_t)actual_count * sizeof(struct IRNode*));
     if (!all_nodes) {
         free(in_degree);
         return -1;
