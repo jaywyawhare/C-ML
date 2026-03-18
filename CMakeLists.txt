@@ -1,35 +1,38 @@
 cmake_minimum_required(VERSION 3.16)
 project(C-ML VERSION 0.0.3 LANGUAGES C CXX)
 
-# Set C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Set build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Compiler flags
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
+# -march=native is critical: without it the compiler emits SSE2 only
+# and our AVX2 microkernels are dead code.
+include(CheckCCompilerFlag)
+check_c_compiler_flag("-march=native" HAS_MARCH_NATIVE)
+if(HAS_MARCH_NATIVE)
+    set(NATIVE_FLAG "-march=native")
+else()
+    set(NATIVE_FLAG "")
+endif()
 
-# Set output directories
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra ${NATIVE_FLAG}")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG ${NATIVE_FLAG}")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG ${NATIVE_FLAG}")
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-# ============================================================================
-# Direct LLVM Backend
-# ============================================================================
+# --- LLVM Backend -----------------------------------------------------------
+
 option(ENABLE_LLVM_BACKEND "Enable direct LLVM IR JIT backend" ON)
 
 if(ENABLE_LLVM_BACKEND)
-    # Use llvm-config to find LLVM
     find_program(LLVM_CONFIG_EXE NAMES llvm-config llvm-config-21 llvm-config-20 llvm-config-19)
     if(LLVM_CONFIG_EXE)
         execute_process(COMMAND ${LLVM_CONFIG_EXE} --cflags
@@ -45,7 +48,6 @@ if(ENABLE_LLVM_BACKEND)
         execute_process(COMMAND ${LLVM_CONFIG_EXE} --version
             OUTPUT_VARIABLE LLVM_BACKEND_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-        # Check for required header
         include(CheckIncludeFile)
         set(CMAKE_REQUIRED_INCLUDES ${LLVM_BACKEND_INCDIR})
         check_include_file("llvm-c/LLJIT.h" HAS_LLVM_LLJIT)
@@ -53,10 +55,8 @@ if(ENABLE_LLVM_BACKEND)
         if(HAS_LLVM_LLJIT)
             add_definitions(-DCML_HAS_LLVM_BACKEND)
             include_directories(${LLVM_BACKEND_INCDIR})
-
-            # Parse the library flags into a list for CMake
-            separate_arguments(LLVM_BACKEND_LIBS_LIST UNIX_COMMAND "${LLVM_BACKEND_LDFLAGS} ${LLVM_BACKEND_LIBS_RAW} ${LLVM_BACKEND_SYSLIBS}")
-
+            separate_arguments(LLVM_BACKEND_LIBS_LIST UNIX_COMMAND
+                "${LLVM_BACKEND_LDFLAGS} ${LLVM_BACKEND_LIBS_RAW} ${LLVM_BACKEND_SYSLIBS}")
             message(STATUS "LLVM backend enabled (LLVM ${LLVM_BACKEND_VERSION})")
             set(LLVM_BACKEND_FOUND TRUE)
         else()
@@ -72,11 +72,8 @@ else()
     set(LLVM_BACKEND_FOUND FALSE)
 endif()
 
-# ============================================================================
-# GPU SDK Detection (Optional)
-# ============================================================================
+# --- GPU SDK Detection ------------------------------------------------------
 
-# CUDA Toolkit Detection
 option(ENABLE_CUDA "Enable CUDA backend" ON)
 if(ENABLE_CUDA)
     find_package(CUDAToolkit QUIET)
@@ -84,15 +81,13 @@ if(ENABLE_CUDA)
         message(STATUS "CUDA Toolkit found: ${CUDAToolkit_VERSION}")
         add_definitions(-DCML_HAS_CUDA)
         include_directories(${CUDAToolkit_INCLUDE_DIRS})
-        # CUDA backend uses dlopen/dlsym — no link-time CUDA libs needed.
-        # Linking the CUDA stub libcuda.so causes hangs on systems without a GPU driver.
+        # Don't link libcuda.so — we dlopen it. The stub causes hangs without a GPU.
         set(CUDA_LIBS "")
     else()
         message(STATUS "CUDA Toolkit not found - CUDA backend uses dynamic loading")
     endif()
 endif()
 
-# ROCm/HIP Detection
 option(ENABLE_ROCM "Enable ROCm/HIP backend" ON)
 if(ENABLE_ROCM)
     find_package(hip QUIET CONFIG)
@@ -119,7 +114,6 @@ if(ENABLE_OPENCL)
     endif()
 endif()
 
-# Metal Backend (macOS only)
 option(ENABLE_METAL "Enable Metal backend (macOS only)" ON)
 set(METAL_FOUND FALSE)
 if(ENABLE_METAL AND APPLE)
@@ -138,49 +132,44 @@ else()
     message(STATUS "Metal backend disabled (not macOS or disabled)")
 endif()
 
-# WebGPU Backend (wgpu-native)
 option(ENABLE_WEBGPU "Enable WebGPU backend via wgpu-native" OFF)
 if(ENABLE_WEBGPU)
     add_definitions(-DCML_HAS_WEBGPU)
     message(STATUS "WebGPU backend enabled (dynamic loading)")
 endif()
 
-# Vulkan Backend (dynamic loading, no compile-time Vulkan SDK needed)
 option(ENABLE_VULKAN "Enable Vulkan/SPIR-V compute backend" ON)
 if(ENABLE_VULKAN)
     add_definitions(-DCML_HAS_VULKAN)
     message(STATUS "Vulkan backend enabled (dynamic loading)")
 endif()
 
-# NV Userspace Driver (direct ioctl, bypasses libcuda)
 option(ENABLE_NV_DRIVER "Enable NVIDIA userspace driver (direct ioctl)" OFF)
 if(ENABLE_NV_DRIVER)
     add_definitions(-DCML_HAS_NV_DRIVER)
     message(STATUS "NV userspace driver enabled")
 endif()
 
-# AM (AMD) Userspace Driver (KFD ioctl, bypasses libamdhip64)
 option(ENABLE_AM_DRIVER "Enable AMD userspace driver (KFD ioctl)" OFF)
 if(ENABLE_AM_DRIVER)
     add_definitions(-DCML_HAS_AM_DRIVER)
     message(STATUS "AM userspace driver enabled")
 endif()
 
-# Mesa NIR Backend
 option(ENABLE_NIR "Enable Mesa NIR multi-vendor GPU backend" OFF)
 if(ENABLE_NIR)
     add_definitions(-DCML_HAS_NIR)
     message(STATUS "NIR/Mesa backend enabled (dynamic loading)")
 endif()
 
-# ONNX Runtime
 option(ENABLE_ONNX "Enable ONNX model loading and execution" ON)
 if(ENABLE_ONNX)
     add_definitions(-DCML_HAS_ONNX)
     message(STATUS "ONNX runtime enabled")
 endif()
 
-# Source files
+# --- Sources -----------------------------------------------------------------
+
 set(CORE_SOURCES
     src/cml.c
     src/core/logging.c
@@ -204,12 +193,8 @@ set(CORE_SOURCES
     src/core/tinyfs.c
 )
 
-# ONNX sources (conditional)
 if(ENABLE_ONNX)
-    list(APPEND CORE_SOURCES
-        src/core/onnx.c
-        src/core/onnx_ops.c
-    )
+    list(APPEND CORE_SOURCES src/core/onnx.c src/core/onnx_ops.c)
 endif()
 
 set(ALLOC_SOURCES
@@ -251,6 +236,8 @@ set(OPS_SOURCES
     src/ops/ir/hcq.c
     src/ops/ir/hcq_cuda.c
     src/ops/ir/hcq_opencl.c
+    src/ops/ir/hcq_vulkan.c
+    src/ops/ir/hcq_nv.c
     src/ops/ir/hcq_am.c
     src/ops/ir/beam_search.c
     src/ops/ir/trace.c
@@ -281,59 +268,28 @@ set(OPS_SOURCES
     src/ops/simd_views.c
 )
 
-# Metal backend sources
 if(METAL_FOUND)
     list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_backend.m)
 endif()
 
-# WebGPU backend sources (has internal stubs when WebGPU unavailable)
 list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
 
-# Vulkan/SPIR-V backend sources
 if(ENABLE_VULKAN)
     list(APPEND OPS_SOURCES
         src/ops/ir/gpu/vulkan_backend.c
         src/ops/ir/gpu/spirv_codegen.c
-        src/ops/ir/hcq_vulkan.c
     )
 endif()
 
-# NV userspace driver sources
-if(ENABLE_NV_DRIVER)
-    list(APPEND OPS_SOURCES
-        src/ops/ir/gpu/nv_driver.c
-        src/ops/ir/hcq_nv.c
-    )
-endif()
-
-# AM (AMD) userspace driver sources
-if(ENABLE_AM_DRIVER)
-    list(APPEND OPS_SOURCES
-        src/ops/ir/gpu/am_driver.c
-        src/ops/ir/hcq_am.c
-    )
-endif()
-
-# NIR/Mesa backend sources
 if(ENABLE_NIR)
-    list(APPEND OPS_SOURCES
-        src/ops/ir/nir_compiler.c
-        src/ops/ir/hcq_nir.c
-    )
+    list(APPEND OPS_SOURCES src/ops/ir/nir_compiler.c src/ops/ir/hcq_nir.c)
 endif()
 
-# Kernel fusion scheduler V2
-list(APPEND OPS_SOURCES
-    src/ops/ir/schedule_v2.c
-    src/ops/ir/linearize.c
-)
+list(APPEND OPS_SOURCES src/ops/ir/schedule_v2.c src/ops/ir/linearize.c)
 
-# LLVM backend source (direct LLVM IR JIT)
 if(LLVM_BACKEND_FOUND)
-    list(APPEND OPS_SOURCES src/ops/ir/llvm/llvm_backend.c)
-    list(APPEND OPS_SOURCES src/ops/ir/gpu/gpu_codegen.c)
+    list(APPEND OPS_SOURCES src/ops/ir/llvm/llvm_backend.c src/ops/ir/gpu/gpu_codegen.c)
 endif()
-
 
 set(TENSOR_SOURCES
     src/tensor/tensor.c
@@ -391,16 +347,10 @@ set(NN_SOURCES
     src/nn/speculative.c
 )
 
-set(SYMBOLIC_SOURCES
-    src/symbolic/symbolic.c
-)
+set(SYMBOLIC_SOURCES src/symbolic/symbolic.c)
 
-set(OPTIM_SOURCES
-    src/optim.c
-    src/optim/lr_scheduler.c
-)
+set(OPTIM_SOURCES src/optim.c src/optim/lr_scheduler.c)
 
-# Distributed training
 option(ENABLE_DISTRIBUTED "Enable distributed training" OFF)
 option(ENABLE_NCCL "Enable NCCL backend (requires libnccl)" ON)
 option(ENABLE_MPI "Enable MPI backend (requires libmpi)" ON)
@@ -409,6 +359,7 @@ if(ENABLE_DISTRIBUTED)
     add_definitions(-DCML_HAS_DISTRIBUTED)
     set(DISTRIBUTED_SOURCES
         src/distributed/distributed.c
+        src/distributed/comm_backend.c
         src/distributed/gloo_backend.c
         src/distributed/ring_allreduce.c
         src/distributed/data_parallel.c
@@ -425,14 +376,10 @@ if(ENABLE_DISTRIBUTED)
     endif()
     message(STATUS "Distributed training enabled (NCCL: ${ENABLE_NCCL}, MPI: ${ENABLE_MPI})")
 else()
-    # Tensor parallelism is always available (single-process simulation)
-    set(DISTRIBUTED_SOURCES
-        src/distributed/tensor_parallel.c
-    )
+    set(DISTRIBUTED_SOURCES src/distributed/tensor_parallel.c)
     message(STATUS "Distributed training disabled (tensor parallelism still available)")
 endif()
 
-# Dataset Hub
 set(DATASET_SOURCES
     src/datasets/datasets.c
     src/datasets/csv_parser.c
@@ -440,13 +387,9 @@ set(DATASET_SOURCES
     src/datasets/builtin_data.c
 )
 
-# Model Zoo
 option(BUILD_MODEL_ZOO "Build model zoo" ON)
-
 if(BUILD_MODEL_ZOO)
-    set(ZOO_SOURCES
-        src/zoo/zoo.c
-    )
+    set(ZOO_SOURCES src/zoo/zoo.c)
     message(STATUS "Model zoo enabled")
 else()
     set(ZOO_SOURCES "")
@@ -468,59 +411,46 @@ set(LIBRARY_SOURCES
     ${DATASET_SOURCES}
 )
 
-# Main executable
-add_executable(cml main.c ${LIBRARY_SOURCES})
+# --- Helper to link all optional backends to a target ------------------------
 
-# Set target properties
+function(cml_link_all target)
+    target_link_libraries(${target} m dl pthread)
+    if(LLVM_BACKEND_FOUND)
+        target_link_libraries(${target} ${LLVM_BACKEND_LIBS_LIST})
+    endif()
+    if(CUDA_LIBS)
+        target_link_libraries(${target} ${CUDA_LIBS})
+    endif()
+    if(ROCM_LIBS)
+        target_link_libraries(${target} ${ROCM_LIBS})
+    endif()
+    if(OPENCL_LIBS)
+        target_link_libraries(${target} ${OPENCL_LIBS})
+    endif()
+    if(METAL_FOUND)
+        target_link_libraries(${target} ${METAL_LIBS})
+    endif()
+endfunction()
+
+# --- Targets -----------------------------------------------------------------
+
+add_executable(cml main.c ${LIBRARY_SOURCES})
 set_target_properties(cml PROPERTIES
     OUTPUT_NAME "cml"
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
 )
+cml_link_all(cml)
 
-# Link libraries
-target_link_libraries(cml m dl pthread)  # dl for dynamic loading, pthread for thread safety
-if(LLVM_BACKEND_FOUND)
-    target_link_libraries(cml ${LLVM_BACKEND_LIBS_LIST})
-endif()
-if(CUDA_LIBS)
-    target_link_libraries(cml ${CUDA_LIBS})
-endif()
-if(ROCM_LIBS)
-    target_link_libraries(cml ${ROCM_LIBS})
-endif()
-if(OPENCL_LIBS)
-    target_link_libraries(cml ${OPENCL_LIBS})
-endif()
-if(METAL_FOUND)
-    target_link_libraries(cml ${METAL_LIBS})
-endif()
-
-# Create static library
 add_library(cml_static STATIC ${LIBRARY_SOURCES})
 set_target_properties(cml_static PROPERTIES
     OUTPUT_NAME "cml"
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
 )
-target_link_libraries(cml_static m dl pthread)
-if(LLVM_BACKEND_FOUND)
-    target_link_libraries(cml_static ${LLVM_BACKEND_LIBS_LIST})
-endif()
-if(CUDA_LIBS)
-    target_link_libraries(cml_static ${CUDA_LIBS})
-endif()
-if(ROCM_LIBS)
-    target_link_libraries(cml_static ${ROCM_LIBS})
-endif()
-if(OPENCL_LIBS)
-    target_link_libraries(cml_static ${OPENCL_LIBS})
-endif()
-if(METAL_FOUND)
-    target_link_libraries(cml_static ${METAL_LIBS})
-endif()
+target_compile_definitions(cml_static PUBLIC CML_STATIC_DEFINE)
+cml_link_all(cml_static)
 
-# Create shared library
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 if(BUILD_SHARED_LIBS)
     add_library(cml_shared SHARED ${LIBRARY_SOURCES})
@@ -528,81 +458,72 @@ if(BUILD_SHARED_LIBS)
         OUTPUT_NAME "cml"
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}
+        C_VISIBILITY_PRESET hidden
     )
-    target_link_libraries(cml_shared m dl pthread)
-    if(LLVM_BACKEND_FOUND)
-        target_link_libraries(cml_shared ${LLVM_BACKEND_LIBS_LIST})
-    endif()
-    if(CUDA_LIBS)
-        target_link_libraries(cml_shared ${CUDA_LIBS})
-    endif()
-    if(ROCM_LIBS)
-        target_link_libraries(cml_shared ${ROCM_LIBS})
-    endif()
-    if(OPENCL_LIBS)
-        target_link_libraries(cml_shared ${OPENCL_LIBS})
-    endif()
-    if(METAL_FOUND)
-        target_link_libraries(cml_shared ${METAL_LIBS})
-    endif()
+    target_compile_definitions(cml_shared PRIVATE CML_BUILDING_DLL)
+    cml_link_all(cml_shared)
 endif()
 
-# Tests
+# --- Tests -------------------------------------------------------------------
+
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
     enable_testing()
-
-    # Find test files in tests/ directory
     file(GLOB TEST_SOURCES "tests/*.c")
-
     foreach(test_source ${TEST_SOURCES})
         get_filename_component(test_name ${test_source} NAME_WE)
         add_executable(${test_name} ${test_source} ${LIBRARY_SOURCES})
-        target_link_libraries(${test_name} m dl pthread)
-        if(LLVM_BACKEND_FOUND)
-            target_link_libraries(${test_name} ${LLVM_BACKEND_LIBS_LIST})
-        endif()
-        if(CUDA_LIBS)
-            target_link_libraries(${test_name} ${CUDA_LIBS})
-        endif()
-        if(OPENCL_LIBS)
-            target_link_libraries(${test_name} ${OPENCL_LIBS})
-        endif()
-        if(METAL_FOUND)
-            target_link_libraries(${test_name} ${METAL_LIBS})
-        endif()
+        cml_link_all(${test_name})
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
 endif()
 
-# Python bindings (placeholder for future)
-option(BUILD_PYTHON_BINDINGS "Build Python bindings" OFF)
-if(BUILD_PYTHON_BINDINGS)
-    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-    # Python binding implementation would go here
-    message(STATUS "Python bindings not implemented yet")
-endif()
+# --- Examples ----------------------------------------------------------------
 
-# Documentation
-option(BUILD_DOCS "Build documentation" OFF)
-if(BUILD_DOCS)
-    find_package(Doxygen)
-    if(DOXYGEN_FOUND)
-        set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
-        set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+option(BUILD_EXAMPLES "Build example programs" ON)
 
-        configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-
-        add_custom_target(docs ALL
-            COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "Generating API documentation with Doxygen"
-            VERBATIM
-        )
+function(cml_add_example target_name source_file)
+    add_executable(${target_name} ${source_file})
+    target_link_libraries(${target_name} cml_static m dl)
+    if(LLVM_BACKEND_FOUND)
+        target_link_libraries(${target_name} ${LLVM_BACKEND_LIBS_LIST})
     endif()
+endfunction()
+
+if(BUILD_EXAMPLES)
+    cml_add_example(hello_cml examples/tutorials/hello_cml.c)
+    cml_add_example(simple_xor examples/tutorials/simple_xor.c)
+    cml_add_example(tensor_ops examples/tutorials/tensor_ops.c)
+    cml_add_example(linear_regression examples/tutorials/linear_regression.c)
+    cml_add_example(logistic_regression examples/tutorials/logistic_regression.c)
+    cml_add_example(mlp_classifier examples/tutorials/mlp_classifier.c)
+    cml_add_example(autoencoder examples/tutorials/autoencoder.c)
+    cml_add_example(conv_net examples/tutorials/conv_net.c)
+    cml_add_example(rnn_sequence examples/tutorials/rnn_sequence.c)
+    cml_add_example(lstm_timeseries examples/tutorials/lstm_timeseries.c)
+    cml_add_example(gru_classifier examples/tutorials/gru_classifier.c)
+    cml_add_example(embedding examples/tutorials/embedding.c)
+    cml_add_example(gan examples/tutorials/gan.c)
+    cml_add_example(multi_task examples/tutorials/multi_task.c)
+    cml_add_example(transformer examples/tutorials/transformer.c)
+    cml_add_example(lr_scheduler examples/tutorials/lr_scheduler.c)
+    cml_add_example(activations examples/tutorials/activations.c)
+    cml_add_example(bench_forward examples/benchmarks/bench_forward.c)
+    cml_add_example(bench_gemm examples/benchmarks/bench_gemm.c)
+    cml_add_example(llama_inference examples/llama_inference.c)
+    cml_add_example(autograd_example examples/demos/autograd_example.c)
+    cml_add_example(auto_capture_example examples/demos/auto_capture_example.c)
+    cml_add_example(comprehensive_fusion_example examples/demos/comprehensive_fusion_example.c)
+    cml_add_example(dead_code_example examples/demos/dead_code_example.c)
+    cml_add_example(early_stopping_lr_scheduler examples/demos/early_stopping_lr_scheduler.c)
+    cml_add_example(export_graph examples/demos/export_graph.c)
+    cml_add_example(mnist_example examples/demos/mnist_example.c)
+    cml_add_example(print_kernels examples/demos/print_kernels.c)
+    cml_add_example(training_loop_example examples/demos/training_loop_example.c)
 endif()
 
-# Install rules
+# --- Install -----------------------------------------------------------------
+
 install(TARGETS cml cml_static
     EXPORT CMLTargets
     RUNTIME DESTINATION bin
@@ -611,22 +532,9 @@ install(TARGETS cml cml_static
 )
 
 if(BUILD_SHARED_LIBS)
-    install(TARGETS cml_shared
-        EXPORT CMLTargets
-        LIBRARY DESTINATION lib
-    )
-
-    # Shared library visibility: hide symbols by default
-    set_target_properties(cml_shared PROPERTIES
-        C_VISIBILITY_PRESET hidden
-    )
-    target_compile_definitions(cml_shared PRIVATE CML_BUILDING_DLL)
+    install(TARGETS cml_shared EXPORT CMLTargets LIBRARY DESTINATION lib)
 endif()
 
-# Static library definition
-target_compile_definitions(cml_static PUBLIC CML_STATIC_DEFINE)
-
-# CMake package config (find_package(CML) support)
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMLConfig.cmake.in
@@ -638,38 +546,26 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
-install(EXPORT CMLTargets
-    FILE CMLTargets.cmake
-    NAMESPACE CML::
-    DESTINATION lib/cmake/CML
-)
+install(EXPORT CMLTargets FILE CMLTargets.cmake NAMESPACE CML:: DESTINATION lib/cmake/CML)
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
     DESTINATION lib/cmake/CML
 )
 
-# pkg-config support
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cml.pc.in
     ${CMAKE_CURRENT_BINARY_DIR}/cml.pc
     @ONLY
 )
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cml.pc
-    DESTINATION lib/pkgconfig
-)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cml.pc DESTINATION lib/pkgconfig)
 
-# Install headers
-install(DIRECTORY include/
-    DESTINATION include
-    FILES_MATCHING PATTERN "*.h"
-)
+install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
 
-# Install visualization tools
 if(UNIX)
     set(VIZ_INSTALL_DIR share/cml)
 elseif(WIN32)
-    set(VIZ_INSTALL_DIR bin/viz) # Or somewhere else appropriate
+    set(VIZ_INSTALL_DIR bin/viz)
 endif()
 
 install(FILES scripts/viz.py scripts/fastapi_server.py
@@ -677,92 +573,16 @@ install(FILES scripts/viz.py scripts/fastapi_server.py
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 )
 
-# Install frontend if built
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/viz-ui/dist")
-    install(DIRECTORY viz-ui/dist
-        DESTINATION ${VIZ_INSTALL_DIR}/viz-ui
-    )
-else()
-    message(WARNING "Visualization frontend not found at viz-ui/dist. Run 'npm run build' in viz-ui to include it in install.")
+    install(DIRECTORY viz-ui/dist DESTINATION ${VIZ_INSTALL_DIR}/viz-ui)
 endif()
 
-# Print configuration summary
+# --- Summary -----------------------------------------------------------------
+
 message(STATUS "")
-message(STATUS "C-ML Configuration Summary")
-message(STATUS "==========================")
-message(STATUS "Version: ${PROJECT_VERSION}")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
+message(STATUS "C-ML ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
+message(STATUS "  LLVM: ${LLVM_BACKEND_FOUND}  CUDA: ${CUDAToolkit_FOUND}  ROCm: ${hip_FOUND}  Metal: ${METAL_FOUND}")
+message(STATUS "  Vulkan: ${ENABLE_VULKAN}  WebGPU: ${ENABLE_WEBGPU}  OpenCL: ${OpenCL_FOUND}")
+message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}  AM Driver: ${ENABLE_AM_DRIVER}  NIR: ${ENABLE_NIR}")
+message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Distributed: ${ENABLE_DISTRIBUTED}")
 message(STATUS "")
-message(STATUS "Backend Support:")
-message(STATUS "  LLVM JIT: ${LLVM_BACKEND_FOUND}")
-message(STATUS "  CUDA: ${CUDAToolkit_FOUND}")
-message(STATUS "  ROCm/HIP: ${hip_FOUND}")
-message(STATUS "  Metal: ${METAL_FOUND}")
-message(STATUS "  Vulkan: ${ENABLE_VULKAN}")
-message(STATUS "  WebGPU: ${ENABLE_WEBGPU}")
-message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}")
-message(STATUS "  AM Driver: ${ENABLE_AM_DRIVER}")
-message(STATUS "  NIR/Mesa: ${ENABLE_NIR}")
-message(STATUS "  ONNX: ${ENABLE_ONNX}")
-message(STATUS "")
-message(STATUS "Build Options:")
-message(STATUS "  Build tests: ${BUILD_TESTS}")
-message(STATUS "  Build shared libs: ${BUILD_SHARED_LIBS}")
-message(STATUS "  Build Python bindings: ${BUILD_PYTHON_BINDINGS}")
-message(STATUS "  Build documentation: ${BUILD_DOCS}")
-message(STATUS "  Distributed training: ${ENABLE_DISTRIBUTED}")
-message(STATUS "  Model zoo: ${BUILD_MODEL_ZOO}")
-message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
-message(STATUS "")
-
-# Examples
-option(BUILD_EXAMPLES "Build example programs" ON)
-
-# Helper function to add an example with all needed link libraries
-function(cml_add_example target_name source_file)
-    add_executable(${target_name} ${source_file})
-    target_link_libraries(${target_name} cml_static m dl)
-    if(LLVM_BACKEND_FOUND)
-        target_link_libraries(${target_name} ${LLVM_BACKEND_LIBS_LIST})
-    endif()
-endfunction()
-
-if(BUILD_EXAMPLES)
-    # Tutorials
-    cml_add_example(hello_cml examples/tutorials/hello_cml.c)
-    cml_add_example(simple_xor examples/tutorials/simple_xor.c)
-    cml_add_example(ex01_tensor_ops examples/tutorials/ex01_tensor_ops.c)
-    cml_add_example(ex02_linear_regression examples/tutorials/ex02_linear_regression.c)
-    cml_add_example(ex03_logistic_regression examples/tutorials/ex03_logistic_regression.c)
-    cml_add_example(ex04_mlp_classifier examples/tutorials/ex04_mlp_classifier.c)
-    cml_add_example(ex05_autoencoder examples/tutorials/ex05_autoencoder.c)
-    cml_add_example(ex06_conv_net examples/tutorials/ex06_conv_net.c)
-    cml_add_example(ex07_rnn_sequence examples/tutorials/ex07_rnn_sequence.c)
-    cml_add_example(ex08_lstm_timeseries examples/tutorials/ex08_lstm_timeseries.c)
-    cml_add_example(ex09_gru_classifier examples/tutorials/ex09_gru_classifier.c)
-    cml_add_example(ex10_embedding examples/tutorials/ex10_embedding.c)
-    cml_add_example(ex11_gan examples/tutorials/ex11_gan.c)
-    cml_add_example(ex12_multi_task examples/tutorials/ex12_multi_task.c)
-    cml_add_example(ex13_transformer examples/tutorials/ex13_transformer.c)
-    cml_add_example(ex14_lr_scheduler examples/tutorials/ex14_lr_scheduler.c)
-    cml_add_example(ex15_activations_showcase examples/tutorials/ex15_activations_showcase.c)
-
-    # Benchmarks
-    cml_add_example(bench_forward examples/benchmarks/bench_forward.c)
-    cml_add_example(bench_gemm examples/benchmarks/bench_gemm.c)
-
-    # LLM Inference
-    cml_add_example(llama_inference examples/llama_inference.c)
-
-    # Demos
-    cml_add_example(autograd_example examples/demos/autograd_example.c)
-    cml_add_example(auto_capture_example examples/demos/auto_capture_example.c)
-    cml_add_example(comprehensive_fusion_example examples/demos/comprehensive_fusion_example.c)
-    cml_add_example(dead_code_example examples/demos/dead_code_example.c)
-    cml_add_example(early_stopping_lr_scheduler examples/demos/early_stopping_lr_scheduler.c)
-    cml_add_example(export_graph examples/demos/export_graph.c)
-    cml_add_example(mnist_example examples/demos/mnist_example.c)
-    cml_add_example(print_kernels examples/demos/print_kernels.c)
-    cml_add_example(training_loop_example examples/demos/training_loop_example.c)
-endif()
