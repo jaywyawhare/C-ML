@@ -667,7 +667,18 @@ static int fuse_operations(CMLGraph_t ir) {
 
 // Helper: Reorder operations for better cache locality
 static int reorder_for_cache_locality(CMLGraph_t ir) {
-    if (!ir || ir->node_count <= 0)
+    if (!ir)
+        return -1;
+
+    int actual_count = 0;
+    struct IRNode* curr = ir->head;
+    while (curr) {
+        actual_count++;
+        curr = curr->next;
+    }
+    ir->node_count = actual_count; // Resynchronize the counter
+
+    if (ir->node_count <= 0)
         return -1;
 
     // Topological sort using Kahn's algorithm
