@@ -16,7 +16,6 @@ brew install cmake                  # macOS
 
 **libdl** -- runtime loading of optional libraries. Included on Linux/macOS.
 
----
 
 ## Optional (Recommended)
 
@@ -67,7 +66,6 @@ brew install llvm@18                   # macOS
 
 Used by the dataset hub to download datasets. At least one must be in PATH.
 
----
 
 ## Optional (GPU)
 
@@ -89,7 +87,6 @@ sudo apt-get install libvulkan-dev     # Ubuntu/Debian
 
 See https://vulkan.lunarg.com/sdk/home
 
----
 
 ## Summary
 

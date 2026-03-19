@@ -20,7 +20,6 @@ C-ML supports multiple GPU and accelerator backends for compute kernel execution
 
 **Header directory:** `include/ops/ir/gpu/` (GPU-specific), `include/backend/` (OpenCL)
 
----
 
 ## CUDA Backend
 
@@ -102,7 +101,6 @@ int cml_ptx_execute_graph(CMLPTXCodegen* cg, CMLGraph_t ir);
 
 All `cml_ptx_gen_*` functions return heap-allocated strings. The caller must `free()` them.
 
----
 
 ## NVIDIA Direct Driver
 
@@ -153,7 +151,6 @@ int cml_nv_synchronize(CMLNVDriver* drv);
 int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir);
 ```
 
----
 
 ## ROCm/HIP Backend
 
@@ -202,7 +199,6 @@ int cml_rocm_upload_tensor(CMLROCmBackend* backend, Tensor* tensor);
 int cml_rocm_download_tensor(CMLROCmBackend* backend, Tensor* tensor);
 ```
 
----
 
 ## AMD Direct Driver
 
@@ -253,7 +249,6 @@ int cml_am_synchronize(CMLAMDriver* drv);
 int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir);
 ```
 
----
 
 ## Vulkan Backend
 
@@ -312,7 +307,6 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir);
 int cml_vulkan_synchronize(CMLVulkanBackend* backend);
 ```
 
----
 
 ## SPIR-V Codegen
 
@@ -347,7 +341,6 @@ uint32_t      spirv_builder_alloc_id(SPIRVBuilder* b);
 uint32_t*     spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size);
 ```
 
----
 
 ## WebGPU Backend
 
@@ -400,7 +393,6 @@ char* cml_wgsl_generate(struct IRNode* node);
 int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph);
 ```
 
----
 
 ## Metal Backend
 
@@ -448,7 +440,6 @@ char* cml_metal_generate_msl(struct IRNode* node);
 int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph);
 ```
 
----
 
 ## OpenCL Backend
 
@@ -474,7 +465,6 @@ BackendOps opencl_backend_get_ops(void);
 int opencl_backend_get_device_info(char* buffer, size_t buffer_size);
 ```
 
----
 
 ## Adreno Backend
 
@@ -495,7 +485,6 @@ int               cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir);
 const char*       cml_adreno_device_info(const CMLAdrenoBackend* backend);
 ```
 
----
 
 ## Hexagon Backend
 
@@ -515,7 +504,6 @@ void               cml_hexagon_backend_free(CMLHexagonBackend* backend);
 int                cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir);
 ```
 
----
 
 ## Enabling Backends at Build Time
 

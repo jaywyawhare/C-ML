@@ -41,7 +41,6 @@ Memory Pools                 TLSF Allocator
 - `src/alloc/memory_pools.c`
 - `src/alloc/memory_management.c`
 
----
 
 ## TLSF Allocator (Two-Level Segregated Fit)
 
@@ -116,7 +115,6 @@ cml_tlsf_stats(alloc, &used, &peak, NULL, NULL);
 cml_tlsf_destroy(alloc);
 ```
 
----
 
 ## Timeline Planner
 
@@ -186,7 +184,6 @@ size_t total = cml_timeline_planner_total_memory(planner);
 cml_timeline_planner_destroy(planner);
 ```
 
----
 
 ## Graph Allocator
 
@@ -280,7 +277,6 @@ The context supports three modes:
 - **Dynamic allocation:** Set `mem_size = 0` to allocate each tensor individually via the backend buffer system.
 - **Measurement mode:** Set `no_alloc = true` to only track memory usage without allocating.
 
----
 
 ## Memory Pools
 
@@ -320,7 +316,6 @@ memory_pool_free_block(pool, block);
 memory_pool_free(pool);
 ```
 
----
 
 ## Safe Allocation Wrappers
 
@@ -351,7 +346,6 @@ void cml_device_free(void* ptr, DeviceType device);
 
 These delegate to the device abstraction layer (`device_alloc` / `device_free`) which routes to the appropriate backend (CPU `malloc`, CUDA `cuMemAlloc`, etc.).
 
----
 
 ## Choosing the Right Allocator
 

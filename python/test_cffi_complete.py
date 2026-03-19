@@ -45,6 +45,41 @@ def test_category(name, tests):
     return passed, failed, skipped
 
 
+def _test_unary_op(fn_name):
+    fn = getattr(lib, f"cml_{fn_name}")
+    a = lib.cml_ones_2d(3, 3)
+    c = fn(a)
+    success = c != ffi.NULL
+    lib.tensor_free(a)
+    if success:
+        lib.tensor_free(c)
+    return success
+
+
+def _test_binary_op(fn_name):
+    fn = getattr(lib, f"cml_{fn_name}")
+    a = lib.cml_ones_2d(3, 3)
+    b = lib.cml_ones_2d(3, 3)
+    c = fn(a, b)
+    success = c != ffi.NULL
+    lib.tensor_free(a)
+    lib.tensor_free(b)
+    if success:
+        lib.tensor_free(c)
+    return success
+
+
+def _test_reduction(fn_name):
+    fn = getattr(lib, f"cml_{fn_name}")
+    a = lib.cml_ones_2d(3, 3)
+    c = fn(a, 0, False)
+    success = c != ffi.NULL
+    lib.tensor_free(a)
+    if success:
+        lib.tensor_free(c)
+    return success
+
+
 def main():
     print("\n" + "=" * 60)
     print("CML CFFI Comprehensive Bindings Test")
@@ -54,9 +89,7 @@ def main():
     total_failed = 0
     total_skipped = 0
 
-    # ================================================================
     # 1. Initialization
-    # ================================================================
     def test_init():
         result = lib.cml_init()
         return result == 0
@@ -78,12 +111,10 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 2. Device and Dtype Management
-    # ================================================================
     def test_get_device():
         device = lib.cml_get_default_device()
-        return device >= 0  # Valid device type
+        return device >= 0
 
     def test_get_dtype():
         dtype = lib.cml_get_default_dtype()
@@ -103,9 +134,7 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 3. Tensor Creation
-    # ================================================================
     def test_zeros_2d():
         t = lib.cml_zeros_2d(3, 4)
         success = t != ffi.NULL
@@ -146,53 +175,7 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 4. Tensor Arithmetic Operations
-    # ================================================================
-    def test_add():
-        a = lib.cml_ones_2d(3, 3)
-        b = lib.cml_ones_2d(3, 3)
-        c = lib.cml_add(a, b)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        lib.tensor_free(b)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_sub():
-        a = lib.cml_ones_2d(3, 3)
-        b = lib.cml_ones_2d(3, 3)
-        c = lib.cml_sub(a, b)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        lib.tensor_free(b)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_mul():
-        a = lib.cml_ones_2d(3, 3)
-        b = lib.cml_ones_2d(3, 3)
-        c = lib.cml_mul(a, b)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        lib.tensor_free(b)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_div():
-        a = lib.cml_ones_2d(3, 3)
-        b = lib.cml_ones_2d(3, 3)
-        c = lib.cml_div(a, b)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        lib.tensor_free(b)
-        if success:
-            lib.tensor_free(c)
-        return success
-
     def test_matmul():
         a = lib.cml_ones_2d(3, 4)
         b = lib.cml_ones_2d(4, 5)
@@ -204,130 +187,34 @@ def main():
             lib.tensor_free(c)
         return success
 
-    def test_pow():
-        a = lib.cml_ones_2d(3, 3)
-        b = lib.cml_ones_2d(3, 3)
-        c = lib.cml_pow(a, b)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        lib.tensor_free(b)
-        if success:
-            lib.tensor_free(c)
-        return success
-
     arith_tests = [
-        ("cml_add", test_add),
-        ("cml_sub", test_sub),
-        ("cml_mul", test_mul),
-        ("cml_div", test_div),
+        ("cml_add", lambda: _test_binary_op("add")),
+        ("cml_sub", lambda: _test_binary_op("sub")),
+        ("cml_mul", lambda: _test_binary_op("mul")),
+        ("cml_div", lambda: _test_binary_op("div")),
         ("cml_matmul", test_matmul),
-        ("cml_pow", test_pow),
+        ("cml_pow", lambda: _test_binary_op("pow")),
     ]
     p, f, s = test_category("Tensor Arithmetic", arith_tests)
     total_passed += p
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 5. Tensor Math Operations
-    # ================================================================
-    def test_exp():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_exp(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_log():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_log(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_sqrt():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_sqrt(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_sin():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_sin(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_cos():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_cos(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_tan():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_tan(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
     math_tests = [
-        ("cml_exp", test_exp),
-        ("cml_log", test_log),
-        ("cml_sqrt", test_sqrt),
-        ("cml_sin", test_sin),
-        ("cml_cos", test_cos),
-        ("cml_tan", test_tan),
+        ("cml_exp", lambda: _test_unary_op("exp")),
+        ("cml_log", lambda: _test_unary_op("log")),
+        ("cml_sqrt", lambda: _test_unary_op("sqrt")),
+        ("cml_sin", lambda: _test_unary_op("sin")),
+        ("cml_cos", lambda: _test_unary_op("cos")),
+        ("cml_tan", lambda: _test_unary_op("tan")),
     ]
     p, f, s = test_category("Tensor Math", math_tests)
     total_passed += p
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 6. Tensor Activations
-    # ================================================================
-    def test_relu():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_relu(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_sigmoid():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_sigmoid(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_tanh():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_tanh(a)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
     def test_softmax():
         a = lib.cml_ones_2d(3, 3)
         c = lib.cml_softmax(a, 1)
@@ -338,9 +225,9 @@ def main():
         return success
 
     activation_tests = [
-        ("cml_relu", test_relu),
-        ("cml_sigmoid", test_sigmoid),
-        ("cml_tanh", test_tanh),
+        ("cml_relu", lambda: _test_unary_op("relu")),
+        ("cml_sigmoid", lambda: _test_unary_op("sigmoid")),
+        ("cml_tanh", lambda: _test_unary_op("tanh")),
         ("cml_softmax", test_softmax),
     ]
     p, f, s = test_category("Tensor Activations", activation_tests)
@@ -348,59 +235,19 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 7. Tensor Reductions
-    # ================================================================
-    def test_sum():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_sum(a, 0, False)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_mean():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_mean(a, 0, False)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_max():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_max(a, 0, False)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
-    def test_min():
-        a = lib.cml_ones_2d(3, 3)
-        c = lib.cml_min(a, 0, False)
-        success = c != ffi.NULL
-        lib.tensor_free(a)
-        if success:
-            lib.tensor_free(c)
-        return success
-
     reduction_tests = [
-        ("cml_sum", test_sum),
-        ("cml_mean", test_mean),
-        ("cml_max", test_max),
-        ("cml_min", test_min),
+        ("cml_sum", lambda: _test_reduction("sum")),
+        ("cml_mean", lambda: _test_reduction("mean")),
+        ("cml_max", lambda: _test_reduction("max")),
+        ("cml_min", lambda: _test_reduction("min")),
     ]
     p, f, s = test_category("Tensor Reductions", reduction_tests)
     total_passed += p
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 8. Tensor Manipulation
-    # ================================================================
     def test_transpose():
         a = lib.cml_ones_2d(3, 4)
         c = lib.cml_transpose(a, 0, 1)
@@ -457,9 +304,7 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 9. Autograd
-    # ================================================================
     def test_enable_grad():
         lib.cml_enable_grad()
         return lib.cml_is_grad_enabled() == True
@@ -487,7 +332,7 @@ def main():
         a = lib.cml_ones_2d(3, 3)
         lib.cml_zero_grad(a)
         lib.tensor_free(a)
-        return True  # No error means success
+        return True
 
     def test_backward():
         a = lib.cml_ones_2d(3, 3)
@@ -499,7 +344,7 @@ def main():
         lib.tensor_free(a)
         lib.tensor_free(b)
         lib.tensor_free(c)
-        return True  # No error means success
+        return True
 
     autograd_tests = [
         ("cml_enable_grad", test_enable_grad),
@@ -514,39 +359,30 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 10. Neural Network Layers
-    # ================================================================
     def test_nn_sequential():
         seq = lib.cml_nn_sequential()
-        success = seq != ffi.NULL
-        # Don't free - it's managed differently
-        return success
+        return seq != ffi.NULL
 
     def test_nn_linear():
         linear = lib.cml_nn_linear(10, 5, 0, 0, True)  # DTYPE_FLOAT32, DEVICE_CPU
-        success = linear != ffi.NULL
-        return success
+        return linear != ffi.NULL
 
     def test_nn_relu():
         relu = lib.cml_nn_relu(False)
-        success = relu != ffi.NULL
-        return success
+        return relu != ffi.NULL
 
     def test_nn_sigmoid():
         sig = lib.cml_nn_sigmoid()
-        success = sig != ffi.NULL
-        return success
+        return sig != ffi.NULL
 
     def test_nn_tanh():
         tanh = lib.cml_nn_tanh()
-        success = tanh != ffi.NULL
-        return success
+        return tanh != ffi.NULL
 
     def test_nn_dropout():
         dropout = lib.cml_nn_dropout(0.5, False)
-        success = dropout != ffi.NULL
-        return success
+        return dropout != ffi.NULL
 
     nn_layer_tests = [
         ("cml_nn_sequential", test_nn_sequential),
@@ -561,9 +397,7 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 11. Neural Network Operations
-    # ================================================================
     def test_nn_module_forward():
         linear = lib.cml_nn_linear(4, 2, 0, 0, True)
         if linear == ffi.NULL:
@@ -595,14 +429,12 @@ def main():
         if seq == ffi.NULL:
             return False
 
-        # Add a linear layer
         linear = lib.cml_nn_linear(4, 2, 0, 0, True)
         if linear == ffi.NULL:
             return False
         linear_module = ffi.cast("Module*", linear)
         lib.cml_nn_sequential_add(seq, linear_module)
 
-        # Forward pass
         x = lib.cml_ones_2d(3, 4)
         y = lib.cml_nn_sequential_forward(seq, x)
         success = y != ffi.NULL
@@ -622,9 +454,7 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 12. Loss Functions
-    # ================================================================
     def test_mse_loss():
         pred = lib.cml_ones_2d(3, 3)
         target = lib.cml_zeros_2d(3, 3)
@@ -650,7 +480,6 @@ def main():
     def test_bce_loss():
         # BCE expects probabilities in (0, 1)
         pred = lib.cml_ones_2d(3, 3)
-        # Scale to 0.5 (need to use proper values)
         target = lib.cml_ones_2d(3, 3)
         loss = lib.cml_nn_bce_loss(pred, target)
         success = loss != ffi.NULL
@@ -661,12 +490,9 @@ def main():
         return success
 
     def test_cross_entropy_loss():
-        # Cross entropy expects:
-        # - pred: (batch, num_classes) logits
-        # - target: (batch,) class indices as 1D tensor
-        pred = lib.cml_ones_2d(4, 3)  # 4 samples, 3 classes
-        # Create proper 1D target tensor with class indices
-        target_data = ffi.new("float[4]", [0.0, 1.0, 2.0, 0.0])  # Class indices
+        # pred: (batch, num_classes) logits; target: (batch,) class indices
+        pred = lib.cml_ones_2d(4, 3)
+        target_data = ffi.new("float[4]", [0.0, 1.0, 2.0, 0.0])
         target = lib.cml_tensor_1d(target_data, 4)
         if target == ffi.NULL:
             lib.tensor_free(pred)
@@ -680,7 +506,6 @@ def main():
         return success
 
     def test_huber_loss():
-        # huber_loss now works with lazy uop_cmplt
         pred = lib.cml_ones_2d(2, 3)
         target = lib.cml_zeros_2d(2, 3)
         loss = lib.cml_nn_huber_loss(pred, target, 1.0)
@@ -692,9 +517,8 @@ def main():
         return success
 
     def test_kl_div_loss():
-        # kl_div_loss now works with lazy uops
         pred = lib.cml_ones_2d(2, 3)
-        target = lib.cml_ones_2d(2, 3)  # Use same values to avoid log issues
+        target = lib.cml_ones_2d(2, 3)
         loss = lib.cml_nn_kl_div_loss(pred, target)
         success = loss != ffi.NULL
         lib.tensor_free(pred)
@@ -716,77 +540,56 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 13. Optimizers
-    # ================================================================
-    def test_adam_optimizer():
-        # Create model
+    def _create_model_and_optimizer(create_opt_fn):
         linear = lib.cml_nn_linear(4, 2, 0, 0, True)
         if linear == ffi.NULL:
-            return False
+            return None, None
         module = ffi.cast("Module*", linear)
-
-        # Create optimizer
-        opt = lib.cml_optim_adam_for_model(module, 0.001, 0.0, 0.9, 0.999, 1e-8)
-        success = opt != ffi.NULL
-
-        if success:
-            lib.optimizer_free(opt)
-        lib.module_free(module)
-        return success
-
-    def test_sgd_optimizer():
-        # Create model
-        linear = lib.cml_nn_linear(4, 2, 0, 0, True)
-        if linear == ffi.NULL:
-            return False
-        module = ffi.cast("Module*", linear)
-
-        # Create optimizer
-        opt = lib.cml_optim_sgd_for_model(module, 0.01, 0.9, 0.0)
-        success = opt != ffi.NULL
-
-        if success:
-            lib.optimizer_free(opt)
-        lib.module_free(module)
-        return success
-
-    def test_optimizer_step():
-        # Create model
-        linear = lib.cml_nn_linear(4, 2, 0, 0, True)
-        if linear == ffi.NULL:
-            return False
-        module = ffi.cast("Module*", linear)
-
-        # Create optimizer
-        opt = lib.cml_optim_adam_for_model(module, 0.001, 0.0, 0.9, 0.999, 1e-8)
+        opt = create_opt_fn(module)
         if opt == ffi.NULL:
             lib.module_free(module)
+            return None, None
+        return module, opt
+
+    def test_adam_optimizer():
+        module, opt = _create_model_and_optimizer(
+            lambda m: lib.cml_optim_adam_for_model(m, 0.001, 0.0, 0.9, 0.999, 1e-8)
+        )
+        if opt is None:
             return False
+        lib.optimizer_free(opt)
+        lib.module_free(module)
+        return True
 
-        # Step (just check it doesn't crash)
+    def test_sgd_optimizer():
+        module, opt = _create_model_and_optimizer(
+            lambda m: lib.cml_optim_sgd_for_model(m, 0.01, 0.9, 0.0)
+        )
+        if opt is None:
+            return False
+        lib.optimizer_free(opt)
+        lib.module_free(module)
+        return True
+
+    def test_optimizer_step():
+        module, opt = _create_model_and_optimizer(
+            lambda m: lib.cml_optim_adam_for_model(m, 0.001, 0.0, 0.9, 0.999, 1e-8)
+        )
+        if opt is None:
+            return False
         lib.cml_optim_step(opt)
-
         lib.optimizer_free(opt)
         lib.module_free(module)
         return True
 
     def test_optimizer_zero_grad():
-        # Create model
-        linear = lib.cml_nn_linear(4, 2, 0, 0, True)
-        if linear == ffi.NULL:
+        module, opt = _create_model_and_optimizer(
+            lambda m: lib.cml_optim_adam_for_model(m, 0.001, 0.0, 0.9, 0.999, 1e-8)
+        )
+        if opt is None:
             return False
-        module = ffi.cast("Module*", linear)
-
-        # Create optimizer
-        opt = lib.cml_optim_adam_for_model(module, 0.001, 0.0, 0.9, 0.999, 1e-8)
-        if opt == ffi.NULL:
-            lib.module_free(module)
-            return False
-
-        # Zero grad (just check it doesn't crash)
         lib.cml_optim_zero_grad(opt)
-
         lib.optimizer_free(opt)
         lib.module_free(module)
         return True
@@ -802,12 +605,10 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 14. Utility Functions
-    # ================================================================
     def test_set_log_level():
-        lib.cml_set_log_level(0)  # Set to lowest
-        return True  # No error means success
+        lib.cml_set_log_level(0)
+        return True
 
     def test_version():
         major = ffi.new("int*")
@@ -826,12 +627,9 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # 15. End-to-End Training Test
-    # ================================================================
     def test_full_training_loop():
         """Complete training loop test."""
-        # Create model
         seq = lib.cml_nn_sequential()
         if seq == ffi.NULL:
             return False
@@ -851,24 +649,20 @@ def main():
             return False
         lib.cml_nn_sequential_add(seq, ffi.cast("Module*", linear2))
 
-        # Create optimizer
         seq_module = ffi.cast("Module*", seq)
         opt = lib.cml_optim_adam_for_model(seq_module, 0.001, 0.0, 0.9, 0.999, 1e-8)
         if opt == ffi.NULL:
             return False
 
-        # Training iteration
         x = lib.cml_ones_2d(2, 4)
         target = lib.cml_zeros_2d(2, 2)
 
-        # Forward
         y = lib.cml_nn_sequential_forward(seq, x)
         if y == ffi.NULL:
             lib.tensor_free(x)
             lib.tensor_free(target)
             return False
 
-        # Loss
         loss = lib.cml_nn_mse_loss(y, target)
         if loss == ffi.NULL:
             lib.tensor_free(x)
@@ -876,14 +670,10 @@ def main():
             lib.tensor_free(y)
             return False
 
-        # Backward
         lib.cml_backward(loss, ffi.NULL, False, False)
-
-        # Optimizer step
         lib.cml_optim_step(opt)
         lib.cml_optim_zero_grad(opt)
 
-        # Cleanup
         lib.tensor_free(x)
         lib.tensor_free(target)
         lib.tensor_free(y)
@@ -900,9 +690,7 @@ def main():
     total_failed += f
     total_skipped += s
 
-    # ================================================================
     # Summary (before cleanup to ensure results are shown)
-    # ================================================================
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)

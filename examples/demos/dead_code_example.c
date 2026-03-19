@@ -4,7 +4,7 @@
 #include <string.h>
 
 int main(void) {
-    printf("=== Dead Code & IR Optimization Demo ===\n\n");
+    printf("Dead Code & IR Optimization Demo\n\n");
 
     cml_init();
     cml_seed(42);
@@ -61,7 +61,7 @@ int main(void) {
     float value = tensor_get_float(output, 0);
     printf("\nFinal output value: %.6f\n", value);
 
-    printf("\n=== Exporting IR Analysis ===\n");
+    printf("\nExporting IR Analysis\n");
 
     if (output->ir_context) {
         char* unopt = cml_ir_export_kernel_analysis(output->ir_context, false);
@@ -94,7 +94,7 @@ int main(void) {
         printf("Warning: No IR context available\n");
     }
 
-    printf("\n=== Summary ===\n");
+    printf("\nSummary\n");
     printf("Dead nodes created:     5 (should be eliminated)\n");
     printf("Element-wise chain:     5 ops (should be fused)\n");
     printf("Redundant computations: 2 (CSE should eliminate 1)\n");
@@ -124,6 +124,6 @@ int main(void) {
 
     cml_cleanup();
 
-    printf("\n=== Done ===\n");
+    printf("\nDone\n");
     return 0;
 }

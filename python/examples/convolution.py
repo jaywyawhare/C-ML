@@ -16,7 +16,7 @@ def main():
     cml.init()
     cml.seed(42)
 
-    print("=== Convolutional Neural Network Example ===\n")
+    print("Convolutional Neural Network Example\n")
 
     # Parameters
     batch_size = 16
@@ -71,16 +71,9 @@ def main():
     for epoch in range(epochs):
         optimizer.zero_grad()
 
-        # Forward pass through CNN
         features = model(X_train)
-
-        # Compute loss
         loss = cml.cross_entropy_loss(features, y_train)
-
-        # Backward pass
         cml.backward(loss)
-
-        # Update parameters
         optimizer.step()
 
         if (epoch + 1) % 2 == 0:
@@ -90,7 +83,7 @@ def main():
 
     # Inference
     print("\nRunning inference...")
-    model.set_training(False)  # Disable dropout
+    model.set_training(False)
 
     test_input = cml.randn([batch_size, 3, 32, 32])
     predictions = model(test_input)

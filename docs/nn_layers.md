@@ -5,7 +5,6 @@ All layers inherit from `Module` and can be composed using container types like 
 
 Include `"cml.h"` or `"nn/layers.h"` to access all layer types.
 
----
 
 ## Table of Contents
 
@@ -55,7 +54,6 @@ Include `"cml.h"` or `"nn/layers.h"` to access all layer types.
   - [Upsample](#upsample)
 - [Complete Example](#complete-example)
 
----
 
 ## Module API
 
@@ -78,7 +76,6 @@ void module_free(Module* module);
 
 Training mode affects the behavior of layers like `Dropout` (disabled during eval) and `BatchNorm2d` (uses running statistics during eval).
 
----
 
 ## Containers
 
@@ -171,7 +168,6 @@ Module* enc = module_dict_get(branches, "encoder");
 Tensor* latent = cml_nn_module_forward(enc, input);
 ```
 
----
 
 ## Linear
 
@@ -226,7 +222,6 @@ Parameter* w = linear_get_weight(fc);
 module_free((Module*)fc);
 ```
 
----
 
 ## Convolutions
 
@@ -305,7 +300,6 @@ Tensor* output = cml_nn_module_forward((Module*)conv, input);
 // input shape: [batch, in_channels, depth, height, width]
 ```
 
----
 
 ## Transposed Convolutions
 
@@ -426,7 +420,6 @@ Tensor* output = cml_nn_module_forward((Module*)deconv, input);
 // input shape: [batch, in_channels, depth, height, width]
 ```
 
----
 
 ## Recurrent Layers
 
@@ -525,7 +518,6 @@ for (int t = 0; t < seq_len; t++) {
 }
 ```
 
----
 
 ## Transformer
 
@@ -604,7 +596,6 @@ Tensor* output = cml_nn_module_forward((Module*)layer, input);
 // input/output shape: [seq_len, batch, d_model]
 ```
 
----
 
 ## Embedding
 
@@ -640,7 +631,6 @@ Tensor* output = cml_nn_module_forward((Module*)emb, token_indices);
 // output shape: [batch, seq_len, 128]
 ```
 
----
 
 ## Normalization
 
@@ -880,7 +870,6 @@ Tensor* output = cml_nn_module_forward((Module*)rms, input);
 
 **Note:** RMSNorm has no bias parameter and no mean subtraction, making it computationally cheaper than LayerNorm while achieving comparable performance in many settings.
 
----
 
 ## Pooling
 
@@ -931,7 +920,6 @@ Tensor* output = cml_nn_module_forward((Module*)pool, input);
 // output shape: [batch, channels, height/2, width/2]
 ```
 
----
 
 ## Activation Layers
 
@@ -1022,7 +1010,6 @@ PReLU* prelu_shared = nn_prelu(1, 0.25f, DTYPE_FLOAT32, DEVICE_CPU);
 
 **Note:** Unlike LeakyReLU which has a fixed slope, PReLU learns the optimal negative slope during training via backpropagation.
 
----
 
 ## Dropout
 
@@ -1053,7 +1040,6 @@ cml_nn_module_eval((Module*)drop);   // Dropout disabled
 Tensor* eval_out = cml_nn_module_forward((Module*)drop, input);
 ```
 
----
 
 ## Utility Layers
 
@@ -1204,7 +1190,6 @@ Tensor* resized = f_interpolate(input, out_size, 2, UPSAMPLE_BICUBIC, true);
 
 **Note:** `align_corners` only applies to bilinear and bicubic modes. When `true`, the corner pixels of input and output are exactly aligned, which can produce different results at boundaries.
 
----
 
 ## Complete Example
 

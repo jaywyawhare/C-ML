@@ -530,7 +530,7 @@ void autograd_print_graph(Tensor* tensor) {
     if (!tensor)
         return;
 
-    printf("\n=== Autograd Graph ===\n");
+    printf("\nAutograd Graph\n");
     printf("Tensor: %p\n", (void*)tensor);
     printf("Requires grad: %s\n", tensor->requires_grad ? "Yes" : "No");
     printf("Is leaf: %s\n", tensor_is_leaf(tensor) ? "Yes" : "No");
@@ -542,7 +542,7 @@ void autograd_print_graph(Tensor* tensor) {
         printf("Number of inputs: %d\n", tensor->ir_node->num_inputs);
     }
 
-    printf("=====================\n\n");
+    printf("\n");
 }
 
 #include <inttypes.h>

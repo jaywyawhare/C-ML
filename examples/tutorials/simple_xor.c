@@ -10,8 +10,18 @@ static void cml_sleep_ms(unsigned int ms) { Sleep(ms); }
 static void cml_sleep_ms(unsigned int ms) { usleep(ms * 1000); }
 #endif
 
+static float compute_accuracy(Tensor* output, float* y_data, int n) {
+    int correct = 0;
+    for (int i = 0; i < n; i++) {
+        float pred = tensor_get_float(output, i);
+        float rounded = pred > 0.5f ? 1.0f : 0.0f;
+        if (rounded == y_data[i]) correct++;
+    }
+    return (float)correct / (float)n;
+}
+
 int main() {
-    printf("=== C-ML Simple XOR Example ===\n\n");
+    printf("C-ML Simple XOR Example\n\n");
 
     cml_init();
 
@@ -59,17 +69,7 @@ int main() {
         Tensor* output = cml_nn_sequential_forward(model, X);
         Tensor* loss = cml_nn_mse_loss(output, y);
 
-        float accuracy    = 0.0f;
-        int correct_count = 0;
-        for (int i = 0; i < 4; i++) {
-            float pred     = tensor_get_float(output, i);
-            float expected = y_data[i];
-            float rounded  = pred > 0.5f ? 1.0f : 0.0f;
-            if (rounded == expected) {
-                correct_count++;
-            }
-        }
-        accuracy = (float)correct_count / 4.0f;
+        float accuracy = compute_accuracy(output, y_data, 4);
 
         cml_optim_zero_grad(optimizer);
         cml_backward(loss, NULL, false, false);
@@ -84,17 +84,7 @@ int main() {
             Tensor* val_output      = cml_nn_sequential_forward(model, X);
             Tensor* val_loss_tensor = cml_nn_mse_loss(val_output, y);
 
-            float val_accuracy    = 0.0f;
-            int val_correct_count = 0;
-            for (int i = 0; i < 4; i++) {
-                float pred     = tensor_get_float(val_output, i);
-                float expected = y_data[i];
-                float rounded  = pred > 0.5f ? 1.0f : 0.0f;
-                if (rounded == expected) {
-                    val_correct_count++;
-                }
-            }
-            val_accuracy   = (float)val_correct_count / 4.0f;
+            float val_accuracy = compute_accuracy(val_output, y_data, 4);
             float val_loss = tensor_get_float(val_loss_tensor, 0);
 
             training_metrics_auto_capture_validation(val_loss, val_accuracy);
@@ -111,24 +101,23 @@ int main() {
     Tensor* test_loss_tensor = cml_nn_mse_loss(predictions, y);
     float test_loss          = tensor_get_float(test_loss_tensor, 0);
 
-    int correct = 0;
     for (int i = 0; i < 4; i++) {
         float pred     = tensor_get_float(predictions, i);
         float expected = y_data[i];
         float rounded  = pred > 0.5f ? 1.0f : 0.0f;
         int is_correct = (rounded == expected);
-        correct += is_correct;
 
         printf("[%.0f, %.0f]\t\t%.4f\t\t%.0f\t\t%s\n", X_data[i * 2], X_data[i * 2 + 1], pred,
                expected, is_correct ? "PASS" : "FAIL");
     }
 
-    float test_accuracy = (float)correct / 4.0f;
+    float test_accuracy = compute_accuracy(predictions, y_data, 4);
+    int correct = (int)(test_accuracy * 4.0f);
     printf("\nAccuracy: %d/4 (%.0f%%)\n", correct, test_accuracy * 100.0f);
 
     training_metrics_auto_capture_test(test_loss, test_accuracy);
     cml_cleanup();
 
-    printf("\n=== Example Complete ===\n");
+    printf("\nExample Complete\n");
     return 0;
 }

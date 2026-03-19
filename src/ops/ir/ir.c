@@ -1,7 +1,3 @@
-/**
- * @file ir.c
- * @brief Intermediate Representation (IR) implementation
- */
 
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"

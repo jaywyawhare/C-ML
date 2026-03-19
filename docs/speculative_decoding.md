@@ -2,7 +2,6 @@
 
 Speculative decoding is an LLM inference acceleration technique (based on Leviathan et al., 2023) that uses a small "draft" model to propose multiple tokens, which are then verified in parallel by a larger "target" model in a single forward pass. This amortizes the cost of autoregressive generation while preserving the target model's output quality.
 
----
 
 ## Table of Contents
 
@@ -13,7 +12,6 @@ Speculative decoding is an LLM inference acceleration technique (based on Leviat
 1. [Usage Example](#usage-example)
 1. [Performance Metrics](#performance-metrics)
 
----
 
 ## Overview
 
@@ -27,7 +25,6 @@ This produces the same quality as the target model while reducing the number of 
 
 **Files:** `include/nn/speculative.h`, `src/nn/speculative.c`
 
----
 
 ## How It Works
 
@@ -50,7 +47,6 @@ Draft model            Target model           Accept/Reject
 - On mismatch, use the target model's prediction as a correction token
 - If all K tokens are accepted, sample one bonus token from the target's final logits
 
----
 
 ## API Reference
 
@@ -100,7 +96,6 @@ typedef int (*CMLSampleTokenFn)(void* model_ctx, Tensor* logits, float temperatu
 | `cml_speculative_result_free(result)` | Free a decode result |
 | `cml_speculative_acceptance_rate(decoder)` | Get overall acceptance rate across all steps |
 
----
 
 ## Configuration
 
@@ -114,7 +109,6 @@ typedef int (*CMLSampleTokenFn)(void* model_ctx, Tensor* logits, float temperatu
 
 Maximum draft tokens per step is capped at `CML_SPEC_MAX_DRAFT_TOKENS` (16).
 
----
 
 ## Usage Example
 
@@ -146,7 +140,6 @@ printf("Overall acceptance: %.0f%%\n",
 cml_speculative_free(dec);
 ```
 
----
 
 ## Performance Metrics
 

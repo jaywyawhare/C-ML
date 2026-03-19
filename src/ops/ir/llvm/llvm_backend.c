@@ -1,14 +1,3 @@
-/**
- * @file llvm_backend.c
- * @brief Direct LLVM IR backend — builds LLVM IR from UOps and JIT-executes
- *
- * Uses the LLVM C API directly for IR building, PassBuilder for
- * optimization, and ORC LLJIT for JIT compilation.
- *
- * ABI: All kernels use raw float* pointers (no memref descriptors).
- * Signature: void kernel(float* in0, float* in1, ..., float* out, i64 numel,
- *                        i64 in0_numel, i64 in1_numel, ...)
- */
 
 #ifdef CML_HAS_LLVM_BACKEND
 

@@ -2,7 +2,6 @@
 
 BEAM search is C-ML's parametric kernel auto-tuning framework that automatically finds optimal GPU kernel launch configurations. It evaluates candidate configurations across multiple dimensions and selects the best-performing one, with optional hardware-level CUDA timing for precise measurements.
 
----
 
 ## Table of Contents
 
@@ -14,7 +13,6 @@ BEAM search is C-ML's parametric kernel auto-tuning framework that automatically
 1. [Cache Persistence](#cache-persistence)
 1. [Usage Example](#usage-example)
 
----
 
 ## Overview
 
@@ -27,7 +25,6 @@ When launching GPU kernels, performance depends heavily on the block size, unrol
 
 **Files:** `include/ops/ir/beam_search.h`, `src/ops/ir/beam_search.c`, `src/ops/ir/beam_cuda_timing.c`
 
----
 
 ## How It Works
 
@@ -67,7 +64,6 @@ Candidates are scored based on:
 - **Overshoot penalty**: Configurations that exceed total elements waste work
 - The top `beam_width` candidates survive for evaluation
 
----
 
 ## API Reference
 
@@ -105,7 +101,6 @@ typedef struct {
 | `cml_beam_cache_load(ctx, path)` | Load cache from disk |
 | `cml_beam_cuda_timing_fn(variant, user_data)` | CUDA hardware timing callback |
 
----
 
 ## Configuration
 
@@ -126,7 +121,6 @@ export CML_BEAM=16   # Exhaustive search
 | `warmup_runs` | 2 | GPU warmup iterations before timing |
 | `timing_runs` | 5 | Actual measurement iterations |
 
----
 
 ## CUDA Hardware Timing
 
@@ -156,7 +150,6 @@ The hardware path pre-filters to `beam_width * 2` candidates using heuristics be
 
 **Requires:** `CML_HAS_CUDA` compile flag. Without it, `cml_beam_cuda_timing_fn()` returns -1.0 (error).
 
----
 
 ## Cache Persistence
 
@@ -167,7 +160,6 @@ cml_beam_cache_save(ctx, "beam_cache.bin");
 cml_beam_cache_load(ctx, "beam_cache.bin");
 ```
 
----
 
 ## Usage Example
 

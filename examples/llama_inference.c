@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
         default:  config = cml_llama_config_7b();  break;
     }
 
-    printf("=== LLaMA Inference (C-ML) ===\n\n");
+    printf("LLaMA Inference (C-ML)\n\n");
     cml_llama_print_config(&config);
     printf("\n");
 
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
     printf("  Seed:        %u\n", seed);
     printf("\n");
 
-    printf("--- Output ---\n");
+    printf("Output\n");
     CMLGenerationResult* result = cml_llama_generate(model, prompt, &gen_config);
 
     if (!result) {
@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
         printf("\n");
     }
 
-    printf("\n--- Statistics ---\n");
+    printf("\nStatistics\n");
     printf("  Total tokens:     %d\n", result->num_tokens);
     printf("  Total time:       %.1f ms\n", result->total_time_ms);
     printf("  Tokens/second:    %.1f\n", result->tokens_per_second);

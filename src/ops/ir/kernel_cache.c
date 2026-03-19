@@ -97,12 +97,10 @@ void cml_kernel_cache_free(CMLKernelCache* cache) {
     // Clear all entries
     kernel_cache_clear(cache);
 
-    // Free mutex
     if (cache->lock_initialized) {
         pthread_mutex_destroy(&cache->lock);
     }
 
-    // Free buckets and cache
     free(cache->buckets);
     free(cache);
 }

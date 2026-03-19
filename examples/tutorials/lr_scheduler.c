@@ -16,7 +16,7 @@ static void train_with_scheduler(const char* name, Sequential* model,
                                   Tensor* X, Tensor* y,
                                   Optimizer* opt, LRScheduler* sched,
                                   int epochs) {
-    printf("\n--- %s ---\n", name);
+    printf("\n%s\n", name);
 
     for (int epoch = 1; epoch <= epochs; epoch++) {
         Tensor* pred = cml_nn_sequential_forward(model, X);

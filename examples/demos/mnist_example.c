@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
 
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    printf("=== MNIST Classification with C-ML ===\n\n");
+    printf("MNIST Classification with C-ML\n\n");
 
     char train_images_path[512], train_labels_path[512];
     char test_images_path[512], test_labels_path[512];
@@ -328,7 +328,7 @@ int main(int argc, char** argv) {
            (num_epochs * train_subset) / total_time);
 
     if (test_images && test_labels) {
-        printf("\n=== Testing on %d samples ===\n", num_test);
+        printf("\nTesting on %d samples\n", num_test);
 
         int test_x_shape[] = {num_test, input_size};
         int test_y_shape[] = {num_test, num_classes};
@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
         tensor_free(y_test);
     }
 
-    printf("\n=== Done ===\n");
+    printf("\nDone\n");
     free(train_images);
     free(train_labels);
     if (test_images)

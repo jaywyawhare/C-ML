@@ -32,25 +32,6 @@ static inline int tlsf_ffs(uint32_t x)
 }
 
 
-/*
- * A block in memory looks like:
- *
- *   +-------------------+
- *   | prev_phys (8 B)   |   <- TLSFBlock*
- *   +-------------------+
- *   | size+flags (8 B)  |   <- size_t with 2 LSBs used for flags
- *   +-------------------+  <- user pointer starts here (BLOCK_HEADER_SIZE offset)
- *   | next_free (8 B)   |   (only present when block is free; overlaps user area)
- *   +-------------------+
- *   | prev_free (8 B)   |   (only present when block is free; overlaps user area)
- *   +-------------------+
- *   | ... user data ... |
- *   +-------------------+
- *
- * BLOCK_HEADER_SIZE = offset of next_free = 16 bytes (on 64-bit).
- * When the block is free, the first 16 bytes of the user area store the free list pointers.
- * Minimum user area size = 16 bytes (to hold next_free + prev_free).
- */
 
 #define BLOCK_HEADER_SIZE  ((size_t)offsetof(TLSFBlock, next_free))
 #define MIN_USER_SIZE      (sizeof(void*) * 2)  /* Space for next_free + prev_free */

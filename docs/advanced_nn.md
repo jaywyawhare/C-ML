@@ -2,7 +2,6 @@
 
 This document covers C-ML's advanced neural network modules for LLM fine-tuning, inference, and serving.
 
----
 
 ## Table of Contents
 
@@ -14,7 +13,6 @@ This document covers C-ML's advanced neural network modules for LLM fine-tuning,
 6. [Model Serving](#model-serving)
 7. [Speculative Decoding](#speculative-decoding)
 
----
 
 ## LoRA Adapters
 
@@ -67,7 +65,6 @@ cml_lora_adapter_free(adapter);
 - Merging modifies `base_weight` in-place and saves a frozen copy for unmerge.
 - Typical rank values: 4, 8, or 16. Alpha is usually set equal to rank.
 
----
 
 ## QLoRA (Quantized LoRA)
 
@@ -118,7 +115,6 @@ cml_qlora_linear_free(qlora);
 - The forward pass dequantizes on-the-fly to a float32 temporary for matmul.
 - `block_size` of 64 is the typical choice. `enable_double_quant` quantizes scale factors too for additional savings.
 
----
 
 ## LLM Operations
 
@@ -218,7 +214,6 @@ char*         cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num
 void          cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int unk);
 ```
 
----
 
 ## Paged Attention
 
@@ -275,7 +270,6 @@ cml_paged_kv_cache_free(cache);
 - Block data layout: `[block_size, num_kv_heads, head_dim]`.
 - Pairs naturally with the serving scheduler (see below).
 
----
 
 ## LLaMA Model
 
@@ -351,7 +345,6 @@ cml_llama_free(model);
 - The model owns a `CMLTokenizer*` for encode/decode; set it after creation or let `cml_llama_load_gguf` populate it.
 - Call `cml_llama_reset` between unrelated sequences to clear KV caches.
 
----
 
 ## Model Serving
 
@@ -429,7 +422,6 @@ cml_paged_kv_cache_free(kv);
 - `cml_serving_step` admits queued requests into the active batch up to `max_batch_size`.
 - Stats track time-to-first-token, tokens/second, and total throughput.
 
----
 
 ## Speculative Decoding
 

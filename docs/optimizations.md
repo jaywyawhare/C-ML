@@ -2,7 +2,6 @@
 
 This document provides a comprehensive overview of all optimization techniques implemented in C-ML, how they work internally, and how to leverage them for maximum performance.
 
----
 
 ## Table of Contents
 
@@ -21,7 +20,6 @@ This document provides a comprehensive overview of all optimization techniques i
 1. [Profiling](#12-profiling)
 1. [Best Practices](#best-practices)
 
----
 
 ## Overview
 
@@ -43,7 +41,6 @@ Runtime                SIMD (SSE/AVX/AVX-512/NEON), threading, BLAS, kernel cach
 Hardware (CPU/GPU)
 ```
 
----
 
 ## 1. SIMD Vectorization
 
@@ -186,7 +183,6 @@ void simd_exp_f32_parallel(const float* in, float* out, size_t n);
 float simd_sum_f32_parallel(const float* data, size_t n);  // Parallel reduction
 ```
 
----
 
 ## 2. Memory Optimizations
 
@@ -311,7 +307,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
 }
 ```
 
----
 
 ## 3. Parallelization
 
@@ -395,7 +390,6 @@ static void* worker_thread(void* arg) {
 }
 ```
 
----
 
 ## 4. BLAS Integration
 
@@ -506,7 +500,6 @@ for (int i0 = 0; i0 < M; i0 += BLOCK) {
 }
 ```
 
----
 
 ## 5. IR Graph Optimizations
 
@@ -692,7 +685,6 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
 }
 ```
 
----
 
 ## 6. Operation Fusion
 
@@ -818,7 +810,6 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
 }
 ```
 
----
 
 ## 7. LLVM JIT Backend
 
@@ -853,7 +844,6 @@ cml_ir_optimize(ir);  // DCE, fusion, reordering
 // Happens automatically during execution
 ```
 
----
 
 ## 8. Caching
 
@@ -1042,7 +1032,6 @@ CMLKernelEntry* cml_kernel_cache_lookup(CMLKernelCache* cache, uint64_t hash) {
 }
 ```
 
----
 
 ## 9. GPU Backends
 
@@ -1089,7 +1078,6 @@ typedef enum {
 - Cross-platform GPU support
 - SPIR-V code generation
 
----
 
 ## 10. Gradient Checkpointing
 
@@ -1191,7 +1179,6 @@ Tensor* autograd_recompute(Tensor* tensor) {
 }
 ```
 
----
 
 ## 11. Compiler Optimizations
 
@@ -1248,7 +1235,6 @@ analyze: CFLAGS += -fanalyzer
 | `-mavx2 -mfma`   | Enable AVX2 + FMA instructions     |
 | `-mavx512f`      | Enable AVX-512 instructions        |
 
----
 
 ## 12. Profiling
 
@@ -1290,7 +1276,6 @@ void cml_blas_print_status(CMLBlasContext* ctx);
 void cml_print_simd_caps(void);
 ```
 
----
 
 ## Best Practices
 
@@ -1329,7 +1314,6 @@ cml_graph_cache_print_stats(NULL);
 cml_kernel_cache_print_stats(NULL);
 ```
 
----
 
 ## Known Limitations
 
@@ -1343,7 +1327,6 @@ When using LLVM JIT execution, memory can grow over time because LLVM's internal
 - Use larger batch sizes to reduce total JIT compilations
 - The kernel cache (LRU, 256 entries) automatically limits compiled kernel accumulation
 
----
 
 ## Summary Table
 
@@ -1359,7 +1342,6 @@ When using LLVM JIT execution, memory can grow over time because LLVM's internal
 | Checkpointing    | `checkpointing.c` | 1x             | 50-80% reduction      |
 | Thread Pool      | `threadpool.c`    | Nx (N = cores) | Minimal               |
 
----
 
 ## References
 

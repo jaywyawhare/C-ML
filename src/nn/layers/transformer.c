@@ -191,7 +191,6 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     int total_q = batch * seq_q;
     int total_k = batch * seq_k;
 
-    // Get parameter data
     float* wq_data = (float*)tensor_data_ptr(mha->W_q->tensor);
     float* wk_data = (float*)tensor_data_ptr(mha->W_k->tensor);
     float* wv_data = (float*)tensor_data_ptr(mha->W_v->tensor);
@@ -1111,7 +1110,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
         return multihead_attention_forward(mha, query, key, value, mask);
     }
 
-    // Get parameter data
     float* wq_data = (float*)tensor_data_ptr(mha->W_q->tensor);
     float* wk_data = (float*)tensor_data_ptr(mha->W_k->tensor);
     float* wv_data = (float*)tensor_data_ptr(mha->W_v->tensor);
@@ -1206,14 +1204,12 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
         return NULL;
     }
 
-    // Get mask data if present
     float* mask_data = NULL;
     if (mask) {
         tensor_ensure_executed(mask);
         mask_data = (float*)tensor_data_ptr(mask);
     }
 
-    // Iterate over each batch*head
     for (int bh = 0; bh < BH; bh++) {
         float* Q_bh = Q_mh + (size_t)bh * seq_q * head_dim;
         float* K_bh = K_mh + (size_t)bh * seq_k * head_dim;
@@ -1422,7 +1418,6 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
         return NULL;
     }
 
-    // Get parameter data
     float* wq_data = (float*)tensor_data_ptr(mha->W_q->tensor);
     float* wk_data = (float*)tensor_data_ptr(mha->W_k->tensor);
     float* wv_data = (float*)tensor_data_ptr(mha->W_v->tensor);

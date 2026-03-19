@@ -16,7 +16,7 @@ def main():
     cml.init()
     cml.seed(42)
 
-    print("=== Classification Example ===\n")
+    print("Classification Example\n")
 
     # Hyperparameters
     num_samples = 64
@@ -37,12 +37,12 @@ def main():
     # Build classifier model
     print("Building classification model...")
     model = cml.Sequential()
-    model.add(cml.Linear(input_dim, 64))  # Input layer
-    model.add(cml.ReLU())  # Activation
-    model.add(cml.Dropout(p=0.2))  # Dropout for regularization
-    model.add(cml.Linear(64, 32))  # Hidden layer
-    model.add(cml.ReLU())  # Activation
-    model.add(cml.Linear(32, num_classes))  # Output layer (logits)
+    model.add(cml.Linear(input_dim, 64))
+    model.add(cml.ReLU())
+    model.add(cml.Dropout(p=0.2))
+    model.add(cml.Linear(64, 32))
+    model.add(cml.ReLU())
+    model.add(cml.Linear(32, num_classes))
 
     print(f"Model built with {len(model)} layers")
 
@@ -54,19 +54,10 @@ def main():
     model.set_training(True)
 
     for epoch in range(epochs):
-        # Zero gradients
         optimizer.zero_grad()
-
-        # Forward pass
         logits = model(X_train)
-
-        # Compute loss
         loss = cml.cross_entropy_loss(logits, y_train)
-
-        # Backward pass
         cml.backward(loss)
-
-        # Update
         optimizer.step()
 
         if (epoch + 1) % 5 == 0:
@@ -76,7 +67,7 @@ def main():
 
     # Evaluation
     print("\nEvaluating model...")
-    model.set_training(False)  # Disable dropout for inference
+    model.set_training(False)
 
     eval_logits = model(X_train)
     eval_loss = cml.cross_entropy_loss(eval_logits, y_train)

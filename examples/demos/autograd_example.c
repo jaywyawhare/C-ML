@@ -4,7 +4,7 @@
 
 // z = x^2 + y^2
 static void example_simple_gradients(void) {
-    printf("\n=== Example 1: Simple Gradients ===\n");
+    printf("\nExample 1: Simple Gradients\n");
     printf("Computing gradients for: z = x^2 + y^2\n\n");
 
     int shape[]         = {1};
@@ -49,7 +49,7 @@ static void example_simple_gradients(void) {
 
 // y = sigmoid(w*x + b)
 static void example_neural_network(void) {
-    printf("\n=== Example 2: Neural Network ===\n");
+    printf("\nExample 2: Neural Network\n");
     printf("Simple 1-layer network: y = sigmoid(w*x + b)\n\n");
 
     int shape[]         = {1};
@@ -93,7 +93,7 @@ static void example_neural_network(void) {
 }
 
 static void example_loss_function(void) {
-    printf("\n=== Example 3: Loss Function ===\n");
+    printf("\nExample 3: Loss Function\n");
     printf("Training with MSE loss\n\n");
 
     int shape[]         = {3};
@@ -144,7 +144,7 @@ static void example_loss_function(void) {
 }
 
 static void example_gradient_accumulation(void) {
-    printf("\n=== Example 4: Gradient Accumulation ===\n");
+    printf("\nExample 4: Gradient Accumulation\n");
     printf("Accumulating gradients from multiple losses\n\n");
 
     int shape[]         = {1};
@@ -188,7 +188,7 @@ static void example_gradient_accumulation(void) {
 }
 
 static void example_no_grad_mode(void) {
-    printf("\n=== Example 5: No Gradient Mode ===\n");
+    printf("\nExample 5: No Gradient Mode\n");
     printf("Disabling gradient computation\n\n");
 
     int shape[]         = {1};

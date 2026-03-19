@@ -210,6 +210,5 @@ IR_TARGET_WGSL       // WebGPU
 - [ ] Profiled performance
 - [ ] Cleaned up resources
 
----
 
 **Remember**: The best optimization is the one you can measure! Always profile before and after.

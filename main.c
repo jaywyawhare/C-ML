@@ -43,17 +43,14 @@ int main(void) {
     printf("\nTraining for %d epochs...\n\n", num_epochs);
 
     for (int epoch = 0; epoch < num_epochs; epoch++) {
-        // Zero gradients before forward pass
         cml_optim_zero_grad(optimizer);
 
-        // Forward pass
         Tensor* outputs = cml_nn_module_forward((Module*)model, X);
         if (!outputs) {
             printf("Error: Forward pass failed at epoch %d\n", epoch);
             break;
         }
 
-        // Compute loss
         Tensor* loss = cml_nn_mse_loss(outputs, y);
         if (!loss) {
             printf("Error: Loss computation failed at epoch %d\n", epoch);
@@ -61,13 +58,11 @@ int main(void) {
             break;
         }
 
-        // Get loss value
         float epoch_loss = tensor_get_float(loss, 0);
         if (epoch_loss < best_loss) {
             best_loss = epoch_loss;
         }
 
-        // Calculate accuracy
         int correct        = 0;
         float* output_data = (float*)tensor_data_ptr(outputs);
         float* target_data = (float*)tensor_data_ptr(y);
@@ -84,10 +79,8 @@ int main(void) {
             best_accuracy = accuracy;
         }
 
-        // Backward pass - autograd computes gradients
         cml_backward(loss, NULL, false, false);
 
-        // Update parameters
         cml_optim_step(optimizer);
 
         // Capture training metrics AFTER backward (so loss is captured by cml_backward)

@@ -17,7 +17,6 @@ tensor parallelism.  Both a C API and Python bindings are available.
 - [C API Reference](#c-api-reference)
 - [Example: DDP Training Loop](#example-ddp-training-loop)
 
----
 
 ## Process Group Initialization
 
@@ -60,7 +59,6 @@ ready      = dist.is_initialized()
 dist.destroy_process_group()
 ```
 
----
 
 ## Communication Backends
 
@@ -83,7 +81,6 @@ DistCommOps* cml_dist_create_gloo_backend(void);
 void         cml_dist_free_backend(DistCommOps* ops);
 ```
 
----
 
 ## Collective Operations
 
@@ -163,7 +160,6 @@ int (*send)(Tensor* tensor, int dst_rank, int tag, void* ctx);
 int (*recv)(Tensor* tensor, int src_rank, int tag, void* ctx);
 ```
 
----
 
 ## Distributed Data Parallel (DDP)
 
@@ -227,7 +223,6 @@ for epoch in range(num_epochs):
 dist.destroy_process_group()
 ```
 
----
 
 ## Pipeline Parallelism
 
@@ -289,7 +284,6 @@ pipe = dist.PipelineParallel(
 output = pipe(input_tensor)
 ```
 
----
 
 ## Tensor Parallelism
 
@@ -354,7 +348,6 @@ Each rank independently computes its column-parallel shard, applies the
 activation, then feeds the result through the row-parallel layer.  The
 all-reduce after the row-parallel layer produces the final output.
 
----
 
 ## Python API
 
@@ -373,7 +366,6 @@ The Python distributed module lives at `python/cml/distributed.py` and exposes:
 
 Backend name strings: `"nccl"`, `"mpi"`, `"gloo"`.
 
----
 
 ## C API Reference
 
@@ -401,7 +393,6 @@ Backend name strings: `"nccl"`, `"mpi"`, `"gloo"`.
 | `src/distributed/mpi_backend.c`          | MPI backend (dlopen)                         |
 | `src/distributed/gloo_backend.c`         | Gloo backend                                 |
 
----
 
 ## Example: DDP Training Loop
 

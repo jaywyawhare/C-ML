@@ -44,13 +44,12 @@ class TrainingContext:
 
 @contextmanager
 def training_mode(model, training: bool = True):
-    old_training = None  # Would track actual mode
+    old_training = model.is_training() if hasattr(model, 'is_training') else not training
     try:
         model.set_training(training)
         yield model
     finally:
-        if old_training is not None:
-            model.set_training(old_training)
+        model.set_training(old_training)
 
 
 @contextmanager
@@ -102,22 +101,6 @@ def suppress_output(fn: Callable) -> Callable:
             sys.stdout = old_stdout
 
         return result
-
-    return wrapper
-
-
-def profile_memory(fn: Callable) -> Callable:
-    def wrapper(*args, **kwargs):
-        # Memory profiling would go here
-        return fn(*args, **kwargs)
-
-    return wrapper
-
-
-def requires_grad(fn: Callable) -> Callable:
-    def wrapper(*args, **kwargs):
-        # Would enable gradients
-        return fn(*args, **kwargs)
 
     return wrapper
 
@@ -191,8 +174,5 @@ class LearningRateScheduler:
         elif self.schedule == "exponential":
             new_lr = self.initial_lr * (self.decay**self.epoch)
             self.optimizer.set_lr(new_lr)
-        elif self.schedule == "linear":
-            # Linear decay
-            pass
 
         self.epoch += 1

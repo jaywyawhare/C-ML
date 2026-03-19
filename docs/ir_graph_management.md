@@ -13,7 +13,6 @@ This document describes the Intermediate Representation (IR) graph management sy
 1. [API Reference](#api-reference)
 1. [Best Practices](#best-practices)
 
----
 
 ## IR Graph Lifecycle
 
@@ -63,7 +62,6 @@ After each training iteration, the IR graph is automatically reset to prevent me
 // This prevents node accumulation across epochs
 ```
 
----
 
 ## Memory Management
 
@@ -139,7 +137,6 @@ This ensures that:
 
 This prevents double-free errors and ensures data remains valid after IR reset.
 
----
 
 ## Usage Analysis
 
@@ -192,7 +189,6 @@ For a typical XOR training graph:
 - **Dead nodes:** 0
 - **Use count:** Varies by node (inputs used more than outputs)
 
----
 
 ## Kernel Export
 
@@ -258,7 +254,6 @@ for (int i = 0; i < n; i++) {
 
 Operations without code generation show a placeholder comment.
 
----
 
 ## API Reference
 
@@ -284,7 +279,6 @@ void cml_ir_reset_global_context(void);
 - Sets `g_global_ir_context` to NULL
 - Next operation will create a new context
 
----
 
 #### `cml_ir_ensure_gradients_executed()`
 
@@ -312,7 +306,6 @@ cml_ir_ensure_gradients_executed(tensor->ir_context);
 cml_ir_reset_global_context();
 ```
 
----
 
 #### `cml_ir_export_kernel_analysis()`
 
@@ -346,7 +339,6 @@ free(raw_json);
 free(opt_json);
 ```
 
----
 
 ### Internal Functions
 
@@ -366,7 +358,6 @@ static void analyze_usage(CMLGraph_t ir);
 - Updates `use_count` for each node
 - Enables dead node detection
 
----
 
 ## Best Practices
 
@@ -442,7 +433,6 @@ Monitor IR memory usage:
 // After optimization: ~14KB constant (reset each epoch)
 ```
 
----
 
 ## Troubleshooting
 
@@ -452,7 +442,6 @@ Monitor IR memory usage:
 
 **Solution:** Ensure `cml_ir_ensure_gradients_executed()` is called before reset.
 
----
 
 ### Issue: Loss value is garbage after backward pass
 
@@ -460,7 +449,6 @@ Monitor IR memory usage:
 
 **Solution:** Call `tensor_ensure_executed(loss)` before backward pass, or read loss value before calling `cml_backward()`.
 
----
 
 ### Issue: Validation metrics show as 0 in UI
 
@@ -472,7 +460,6 @@ Monitor IR memory usage:
 - Check that `g_current_epoch` indexing is correct (1-indexed vs 0-indexed)
 - Verify validation is called within the training loop
 
----
 
 ### Issue: Memory keeps growing across epochs
 
@@ -483,7 +470,6 @@ Monitor IR memory usage:
 - Set `VIZ=1` environment variable
 - Or manually call `cml_ir_reset_global_context()` after each iteration
 
----
 
 ## Performance Considerations
 
@@ -508,7 +494,6 @@ IR reset adds minimal overhead:
 - **Disable** for production training (no VIZ)
 - **Profile** if training on very large graphs (millions of nodes)
 
----
 
 ## Future Enhancements
 
@@ -549,7 +534,6 @@ void my_optimization_pass(CMLGraph_t ir) {
 // Will be reflected in "optimized" view
 ```
 
----
 
 ## References
 
@@ -557,7 +541,6 @@ void my_optimization_pass(CMLGraph_t ir) {
 - [API Reference](api_reference.md)
 - [Training Guide](training.md)
 
----
 
 ## Changelog
 
@@ -582,7 +565,6 @@ void my_optimization_pass(CMLGraph_t ir) {
 - 1000x reduction in memory usage for long training runs
 - Constant memory footprint regardless of epoch count
 
----
 
 ## License
 

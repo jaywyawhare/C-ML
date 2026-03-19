@@ -243,7 +243,7 @@ void cml_free_execution_plan(CMLExecutionPlan* plan) {
     free(plan);
 }
 
-static int execute_node_fast(struct IRNode* node, float* out_buf) {
+int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
     if (!node || !out_buf)
         return -1;
 
@@ -540,7 +540,7 @@ int cml_execute_plan(CMLExecutionPlan* plan, Tensor** inputs, size_t num_inputs)
         struct IRNode* node = plan->nodes[i];
         float* out_buf      = plan->buffers[i];
 
-        int ret = execute_node_fast(node, out_buf);
+        int ret = cml_execute_node_fast(node, out_buf);
         if (ret != 0) {
             LOG_ERROR("Failed to execute node %zu (type %d)", i, node->type);
             return -1;

@@ -13,11 +13,10 @@ import cml
 
 
 def main():
-    # Initialize CML
     cml.init()
     cml.seed(42)  # Reproducible results
 
-    print("=== Neural Network Training Example ===\n")
+    print("Neural Network Training Example\n")
 
     # Create sample data
     print("Creating sample data...")
@@ -27,11 +26,11 @@ def main():
     # Build model
     print("Building model...")
     model = cml.Sequential()
-    model.add(cml.Linear(10, 20))  # Input: 10 -> Hidden: 20
-    model.add(cml.ReLU())  # ReLU activation
-    model.add(cml.Linear(20, 10))  # Hidden: 20 -> 10
-    model.add(cml.ReLU())  # ReLU activation
-    model.add(cml.Linear(10, 1))  # Output: 1
+    model.add(cml.Linear(10, 20))
+    model.add(cml.ReLU())
+    model.add(cml.Linear(20, 10))
+    model.add(cml.ReLU())
+    model.add(cml.Linear(10, 1))
 
     print(f"Model has {len(model)} layers")
 
@@ -45,31 +44,19 @@ def main():
     # Training loop
     print("\nTraining for 10 epochs...\n")
     for epoch in range(10):
-        # Zero gradients
         optimizer.zero_grad()
-
-        # Forward pass
         output = model(X)
-
-        # Compute loss
         loss = cml.mse_loss(output, y)
-
-        # Backward pass (compute gradients)
         cml.backward(loss)
-
-        # Update parameters
         optimizer.step()
 
-        # Print progress
         if (epoch + 1) % 2 == 0:
             print(f"Epoch {epoch+1:2d}: Loss computed")
 
     print("\nTraining complete!")
 
-    # Switch to inference mode
     model.set_training(False)
 
-    # Make predictions
     print("\nMaking predictions...")
     predictions = model(X)
 

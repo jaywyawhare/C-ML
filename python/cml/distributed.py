@@ -106,7 +106,7 @@ class DistributedDataParallel:
         _ensure_bindings()
         lib = _get_lib()
         try:
-            all_reduce = lib.cml_dist_all_reduce
+            all_reduce = lib.cml_dist_allreduce
         except AttributeError:
             # All-reduce not available in this build; gradients remain local
             return
@@ -114,14 +114,12 @@ class DistributedDataParallel:
         for param in self.parameters():
             if hasattr(param, 'grad') and param.grad is not None:
                 all_reduce(param.grad._tensor, DIST_REDUCE_SUM)
-                # Average across world size
                 ws = get_world_size()
                 if ws > 1:
                     import numpy as np
                     grad_arr = param.grad.numpy() / float(ws)
                     from cml.core import Tensor
                     averaged = Tensor.from_numpy(grad_arr.astype(np.float32))
-                    # Copy averaged data back
                     param.grad = averaged
 
     def parameters(self):

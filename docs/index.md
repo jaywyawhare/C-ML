@@ -10,7 +10,6 @@
 
 **Version 0.0.3** | [GitHub](https://github.com/jaywyawhare/C-ML) | [Issues](https://github.com/jaywyawhare/C-ML/issues)
 
----
 
 ## Overview
 
@@ -205,6 +204,5 @@ We welcome contributions! Please see the main [README](../README.md) for contrib
 
 MIT License - see [LICENSE](../LICENSE) file for details.
 
----
 
 **Need help?** Open an [issue](https://github.com/jaywyawhare/C-ML/issues) or check the [API Reference](api_reference.md).

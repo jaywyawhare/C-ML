@@ -2,7 +2,6 @@
 
 Linearization converts a `CMLFusionGroup` (a set of fused IR operations) into a flat instruction sequence with virtual register allocation, which is then lowered to backend-specific kernel code. This is the bridge between the IR graph optimizer and actual executable GPU/CPU kernels.
 
----
 
 ## Table of Contents
 
@@ -15,7 +14,6 @@ Linearization converts a `CMLFusionGroup` (a set of fused IR operations) into a 
 1. [Runtime Compilation & Caching](#runtime-compilation--caching)
 1. [Usage Example](#usage-example)
 
----
 
 ## Overview
 
@@ -23,7 +21,6 @@ After the IR graph scheduler groups operations into `CMLFusionGroup`s, each grou
 
 **Files:** `src/ops/ir/linearize.c`, `src/ops/ir/fused_codegen.c`, `include/ops/ir/fused_codegen.h`
 
----
 
 ## Pipeline
 
@@ -52,7 +49,6 @@ Runtime Compilation & Cache
   hash LinearProgram (FNV-1a), compile on cache miss, execute
 ```
 
----
 
 ## Linearization
 
@@ -103,7 +99,6 @@ typedef struct CMLLinearProgram {
 } CMLLinearProgram;
 ```
 
----
 
 ## Code Generation Backends
 
@@ -151,7 +146,6 @@ add.f32 v4, v2, v3;
 st.global.f32 [out0 + tid*4], v4;
 ```
 
----
 
 ## API Reference
 
@@ -188,7 +182,6 @@ st.global.f32 [out0 + tid*4], v4;
 | `cml_runtime_compile_group(rc, group)` | Compile a fusion group (cached) |
 | `cml_runtime_compile_program(rc, prog, work_size)` | Compile a linear program (cached) |
 
----
 
 ## Buffer Elimination
 
@@ -210,7 +203,6 @@ Without elimination:            With elimination:
 
 This reduces memory bandwidth by keeping intermediate values in registers, which is critical for GPU performance where memory access is often the bottleneck.
 
----
 
 ## Runtime Compilation & Caching
 
@@ -228,7 +220,6 @@ const CMLCompiledKernel* k2 = cml_runtime_compile_group(rc, group);
 cml_runtime_compiler_free(rc);
 ```
 
----
 
 ## Usage Example
 

@@ -1,6 +1,5 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/execution.h"
-#include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/graph_cache.h"
 #include "ops/ir/schedule.h"
@@ -221,11 +220,6 @@ CMLBlasContext* get_blas_context(void) {
     }
     return g_exec_blas_ctx;
 }
-
-/**
- * @file execution.c
- * @brief IR execution with CPU interpreter and optional LLVM JIT
- */
 
 // Numpy-style broadcast index: given a flat index in the output tensor,
 // compute the corresponding flat index in a (possibly smaller) input tensor.

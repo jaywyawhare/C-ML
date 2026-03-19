@@ -163,7 +163,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     if (node_count == 0)
         return 0;
 
-    // Allocate arrays for liveness tracking
     size_t* tensor_sizes = calloc(node_count, sizeof(size_t));
     int* execution_order = calloc(node_count, sizeof(int));
     int* use_counts      = calloc(node_count, sizeof(int));
@@ -550,10 +549,6 @@ bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph) {
     if (!galloc || galloc->num_buffers == 0)
         return false;
 
-    // Allocate buffers for the graph
-    // If graph is provided and reserve was called, use reserved sizes
-    // Otherwise, use default estimate
-
     for (int i = 0; i < galloc->num_buffers; i++) {
         if (!galloc->buffers[i]) {
             size_t buffer_size = galloc->buffer_sizes[i];
@@ -581,7 +576,6 @@ bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph) {
                 cml_backend_buffer_type_alloc_buffer(galloc->buffer_types[i], buffer_size);
             if (!galloc->buffers[i]) {
                 LOG_ERROR("Failed to allocate graph buffer %d of size %zu", i, buffer_size);
-                // Free any buffers we already allocated
                 for (int j = 0; j < i; j++) {
                     if (galloc->buffers[j]) {
                         cml_backend_buffer_free(galloc->buffers[j]);
@@ -618,13 +612,11 @@ bool cml_graph_allocator_realloc_buffer(CMLGraphAllocator_t galloc, int buffer_i
         return true;
     }
 
-    // Free old buffer if it exists
     if (galloc->buffers[buffer_id]) {
         cml_backend_buffer_free(galloc->buffers[buffer_id]);
         galloc->buffers[buffer_id] = NULL;
     }
 
-    // Allocate new buffer with larger size
     galloc->buffer_sizes[buffer_id] = new_size;
     galloc->buffers[buffer_id] =
         cml_backend_buffer_type_alloc_buffer(galloc->buffer_types[buffer_id], new_size);
@@ -642,13 +634,11 @@ bool cml_graph_allocator_init_pool(CMLGraphAllocator_t galloc, int buffer_id, si
     if (!galloc || buffer_id < 0 || buffer_id >= galloc->num_buffers)
         return false;
 
-    // Free existing pool if any
     if (galloc->memory_pools[buffer_id]) {
         memory_pool_free(galloc->memory_pools[buffer_id]);
         galloc->memory_pools[buffer_id] = NULL;
     }
 
-    // Create new pool
     galloc->memory_pools[buffer_id] = memory_pool_create(block_size, num_blocks, dtype);
     if (!galloc->memory_pools[buffer_id]) {
         LOG_ERROR("Failed to create memory pool for buffer %d", buffer_id);
@@ -687,7 +677,6 @@ int cml_tensor_allocator_alloc(CMLTensorAllocator* talloc, Tensor* tensor) {
         return -1;
     }
 
-    // Set tensor data
     tensor->data = (char*)talloc->base + aligned_offset;
     tensor->device =
         cml_backend_buffer_type_get_device(cml_backend_buffer_get_type(talloc->buffer));
@@ -720,14 +709,12 @@ CMLContext_t cml_context_new(CMLContextParams params) {
     ctx->mem_size         = 0;
 
     if (params.mem_buffer) {
-        // Allocate a new buffer and copy from the provided one
         CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(ctx->device);
         if (!buft) {
             free(ctx);
             return NULL;
         }
 
-        // Allocate buffer and copy provided memory
         ctx->buffer = cml_backend_buffer_type_alloc_buffer(buft, params.mem_size);
         if (!ctx->buffer) {
             free(ctx);
@@ -743,7 +730,6 @@ CMLContext_t cml_context_new(CMLContextParams params) {
         ctx->mem_size = params.mem_size;
         cml_tensor_allocator_new(&ctx->tensor_allocator, ctx->buffer);
     } else if (params.mem_size > 0 && !params.no_alloc) {
-        // Allocate new buffer using backend_buffer
         CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(ctx->device);
         if (!buft) {
             free(ctx);
@@ -810,7 +796,6 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
 
     // If context has a pre-allocated buffer, use tensor allocator
     if (ctx->buffer && ctx->tensor_allocator.buffer) {
-        // Create tensor structure first
         TensorConfig config = {
             .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
         Tensor* tensor = tensor_empty(shape, ndim, &config);
@@ -831,7 +816,6 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         tensor->data      = NULL;
         tensor->owns_data = false;
 
-        // Allocate data from context buffer
         if (cml_tensor_allocator_alloc(&ctx->tensor_allocator, tensor) != 0) {
             tensor_free(tensor);
             LOG_ERROR("Context out of memory: used %zu, total %zu, need %zu", ctx->used_mem,
@@ -853,14 +837,12 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         return tensor_empty(shape, ndim, &config);
     }
 
-    // Allocate buffer for this tensor
     CMLBackendBuffer_t buffer = cml_backend_buffer_type_alloc_buffer(buft, size);
     if (!buffer) {
         LOG_ERROR("Failed to allocate buffer for tensor");
         return NULL;
     }
 
-    // Create tensor and initialize with buffer
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* tensor      = tensor_empty(shape, ndim, &config);
     if (!tensor) {
@@ -868,7 +850,6 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         return NULL;
     }
 
-    // Initialize tensor with buffer
     if (cml_backend_buffer_init_tensor(buffer, tensor) != 0) {
         tensor_free(tensor);
         cml_backend_buffer_free(buffer);
@@ -877,11 +858,4 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
 
     ctx->used_mem += size;
     return tensor;
-}
-
-void cml_context_set_param(CMLContext_t ctx, Tensor* tensor) {
-    (void)ctx;
-    (void)tensor;
-    // Mark tensor as parameter for autograd/optimization
-    // This would be used by the optimizer to identify trainable parameters
 }

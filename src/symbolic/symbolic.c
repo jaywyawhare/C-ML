@@ -312,7 +312,6 @@ void sym_expr_release(SymExpr* e) {
     if (!e) return;
     if (--e->ref_count > 0) return;
 
-    // Free children for binary ops
     if (e->type != SYM_CONST && e->type != SYM_VAR) {
         sym_expr_release(e->binop.left);
         sym_expr_release(e->binop.right);

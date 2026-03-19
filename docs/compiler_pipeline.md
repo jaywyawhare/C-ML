@@ -4,7 +4,6 @@ End-to-end reference for the CML compilation pipeline, from IR graph constructio
 
 For related topics see: [Graph Mode](graph_mode.md), [Linearization & Fused Codegen](linearization.md), [Optimizations](optimizations.md).
 
----
 
 ## Pipeline Overview
 
@@ -50,7 +49,6 @@ IR Graph (CMLGraph_t)
     |-- Graph capture  (graph_capture.h)
 ```
 
----
 
 ## Stage 1: Pattern Matching & Rewrites
 
@@ -85,7 +83,6 @@ int  cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iteration
 int  cml_rewrite_dce(CMLGraph_t ir);
 ```
 
----
 
 ## Stage 2: Z3 Formal Verification (Optional)
 
@@ -109,7 +106,6 @@ CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v, CMLGraph_t ir, void* sc
 
 Results: `CML_VERIFY_PASS`, `CML_VERIFY_FAIL`, `CML_VERIFY_TIMEOUT`, `CML_VERIFY_UNSUPPORTED`.
 
----
 
 ## Stage 3: Scheduling & Fusion
 
@@ -170,7 +166,6 @@ bool cml_schedule_is_reduction(UOpType type);
 bool cml_schedule_is_movement(UOpType type);
 ```
 
----
 
 ## Stage 4: Linearization
 
@@ -187,7 +182,6 @@ void cml_linear_program_print(const CMLLinearProgram* prog);
 
 Instructions: `LINOP_LOAD`, `LINOP_COMPUTE`, `LINOP_STORE`. Eliminated intermediates stay in virtual registers, avoiding memory round-trips.
 
----
 
 ## Stage 5: Fused Code Generation
 
@@ -261,7 +255,6 @@ uint32_t      spirv_builder_alloc_id(SPIRVBuilder* b);
 uint32_t*     spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size);
 ```
 
----
 
 ## Stage 6: Kernel Cache
 
@@ -297,7 +290,6 @@ double kernel_cache_hit_rate(CMLKernelCache* cache);
 void cml_kernel_cache_set_free_fn(CMLKernelBackend backend, CMLKernelFreeFn free_fn);
 ```
 
----
 
 ## Stage 7: Execution
 
@@ -404,7 +396,6 @@ int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* te
 
 States: `CML_CAPTURE_IDLE` -> `CML_CAPTURE_RECORDING` -> `CML_CAPTURE_READY`.
 
----
 
 ## Typical Usage
 

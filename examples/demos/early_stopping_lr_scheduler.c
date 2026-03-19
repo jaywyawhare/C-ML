@@ -152,7 +152,7 @@ int main(void) {
         training_metrics_set_lr_schedule_params(metrics, params_buf);
     }
 
-    printf("\n=== Training Configuration ===\n");
+    printf("\nTraining Configuration\n");
     printf("Max epochs: %d\n", num_epochs);
     printf("Early stopping patience: %d\n", patience);
     printf("LR scheduler: StepLR (step_size=%d, gamma=%.2f)\n", lr_step_size, (double)lr_gamma);
@@ -215,7 +215,7 @@ int main(void) {
             no_improve_epochs++;
             if (no_improve_epochs >= patience) {
                 early_stopped_at = epoch + 1;
-                printf("\n=== Early Stopping Triggered ===\n");
+                printf("\nEarly Stopping Triggered\n");
                 printf("Stopped at epoch %d (best loss: %.6f)\n", early_stopped_at,
                        (double)best_loss);
                 printf("No improvement for %d epochs\n", patience);
@@ -238,7 +238,7 @@ int main(void) {
             tensor_free(outputs);
     }
 
-    printf("\n=== Training Summary ===\n");
+    printf("\nTraining Summary\n");
     if (early_stopped_at > 0) {
         printf("Training stopped early at epoch %d (out of %d planned)\n", early_stopped_at,
                num_epochs);

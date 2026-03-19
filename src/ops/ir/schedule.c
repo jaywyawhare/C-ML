@@ -714,7 +714,7 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
                     "  Fusion ratio: %.2f\n"
                     "  Total FLOPs:  %zu\n"
                     "  Peak memory:  %zu bytes\n"
-                    "  ---\n",
+                    "\n",
                     sched->total_ops, sched->total_kernels,
                     (double)sched->fusion_ratio,
                     sched->total_flops, sched->peak_memory);

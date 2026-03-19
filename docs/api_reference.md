@@ -23,7 +23,6 @@ Complete API reference for the C-ML library.
 - [Gradient Checkpointing](#gradient-checkpointing)
 - [Profiling](#profiling)
 
----
 
 ## Initialization
 
@@ -58,7 +57,6 @@ int main(void) {
 
 `cml_init()` must be called before any other library function. `cml_cleanup()` is automatically registered via `atexit`, so explicit calls are optional but recommended for clarity. If the library was initialized multiple times (nested init), `cml_cleanup()` decrements a refcount; use `cml_force_cleanup()` to tear down regardless.
 
----
 
 ## Tensor Creation
 
@@ -128,7 +126,6 @@ float data[] = {1, 2, 3, 4, 5, 6};
 Tensor* e = cml_tensor_2d(data, 2, 3);
 ```
 
----
 
 ## Tensor Operations
 
@@ -217,7 +214,6 @@ tensor_free(b);
 tensor_free(a);
 ```
 
----
 
 ## Neural Network Layers
 
@@ -339,7 +335,6 @@ cml_summary((Module*)model);
 Tensor* output = cml_nn_module_forward((Module*)model, input);
 ```
 
----
 
 ## Optimizers
 
@@ -410,7 +405,6 @@ for (int epoch = 0; epoch < 100; epoch++) {
 optimizer_free(opt);
 ```
 
----
 
 ## LR Schedulers
 
@@ -460,7 +454,6 @@ for (int epoch = 0; epoch < 50; epoch++) {
 lr_scheduler_free(sched);
 ```
 
----
 
 ## Loss Functions
 
@@ -512,7 +505,6 @@ Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets);
 
 All loss functions return a scalar tensor. Call `cml_backward()` on the result to compute gradients.
 
----
 
 ## Autograd
 
@@ -555,7 +547,6 @@ tensor_free(y);
 tensor_free(x);
 ```
 
----
 
 ## Dataset Hub
 
@@ -614,7 +605,6 @@ dataset_free(test);
 dataset_free(ds);
 ```
 
----
 
 ## Model Zoo
 
@@ -660,7 +650,6 @@ Tensor* out = cml_nn_module_forward(model, input);
 module_free(model);
 ```
 
----
 
 ## Model I/O
 
@@ -699,7 +688,6 @@ model_load_checkpoint(model, opt, &resume_epoch, &resume_loss, "checkpoint.cml")
 printf("Resuming from epoch %d (loss=%.4f)\n", resume_epoch, resume_loss);
 ```
 
----
 
 ## Device Management
 
@@ -714,7 +702,6 @@ DEVICE_AUTO     // Auto-detect best available
 
 Device selection is specified through `TensorConfig` when creating tensors, or through the `DType`/`DeviceType` arguments in layer constructors.
 
----
 
 ## Memory Management
 
@@ -768,7 +755,6 @@ for (int epoch = 0; epoch < 100; epoch++) {
 cml_cleanup();
 ```
 
----
 
 ## Kernel Cache
 
@@ -789,7 +775,6 @@ void   cml_kernel_cache_print_stats(void);
 | `cml_kernel_cache_hit_rate`    | Returns hit rate as a value in \[0.0, 1.0\]    |
 | `cml_kernel_cache_print_stats` | Print formatted cache statistics to stdout     |
 
----
 
 ## Error Handling
 
@@ -814,7 +799,6 @@ cml_set_error_handler(my_handler);
 
 When set, the global error handler is invoked on any library error, giving you the opportunity to log, abort, or recover.
 
----
 
 ## Error Stack
 
@@ -866,7 +850,6 @@ if (CML_HAS_ERRORS()) {
 }
 ```
 
----
 
 ## Gradient Checkpointing
 
@@ -923,7 +906,6 @@ sequential_apply_checkpointing(model, 3);
 Tensor* out = checkpoint_forward((Module*)expensive_layer, input);
 ```
 
----
 
 ## Profiling
 
@@ -994,7 +976,6 @@ profiler_print_report(prof);
 profiler_free(prof);
 ```
 
----
 
 ## See Also
 

@@ -1,9 +1,3 @@
-/**
- * @file nn.c
- * @brief Neural network base module -- named parameter management, forward pass,
- *        training/eval mode, module composition.
- */
-
 #define _POSIX_C_SOURCE 200809L
 #include "nn.h"
 #include "cml.h"
@@ -66,7 +60,7 @@ void module_free(Module* module) {
         module->name = NULL;
     }
 
-    // Free parameters (but NOT the tensors inside - those are managed separately)
+    // Tensors inside are managed separately
     if (module->parameters) {
         for (int i = 0; i < module->num_parameters; i++) {
             if (module->parameters[i]) {

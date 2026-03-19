@@ -149,10 +149,10 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     }
 
     t->requires_grad  = requires_grad;
-    t->is_executed    = true; // Leaf tensors are already "executed"
+    t->is_executed    = true;
     t->ir_context     = NULL;
     t->ir_node        = NULL;
-    t->grad           = NULL; // Initialize gradient to NULL
+    t->grad           = NULL;
     t->ref_count      = 1;
     t->base           = NULL;
     t->strides        = NULL;
@@ -162,7 +162,6 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->user_data      = NULL;
     t->owns_data      = true;
 
-    // Calculate numel
     t->numel = 1;
     for (int i = 0; i < ndim; i++) {
         t->numel *= shape[i];
@@ -445,23 +444,11 @@ size_t cml_dtype_size(DType dtype) {
     }
 }
 
-/**
- * @brief Promote two dtypes to a common dtype following NumPy rules
- *
- * Promotion order (lowest to highest):
- * - BOOL < INT32 < INT64 < FLOAT32 < FLOAT64
- *
- * @param dtype1 First dtype
- * @param dtype2 Second dtype
- * @return Promoted dtype (the higher precision one)
- */
 DType cml_promote_dtype(DType dtype1, DType dtype2) {
-    // Same dtype - no promotion needed
     if (dtype1 == dtype2) {
         return dtype1;
     }
 
-    // Promotion hierarchy: BOOL < INT32 < INT64 < FLOAT32 < FLOAT64
     int rank1 = 0, rank2 = 0;
 
     // Promotion hierarchy: BOOL < UINT8 < INT8 < INT32 < INT64 < FLOAT16 < BFLOAT16 < FLOAT32 < FLOAT64
@@ -500,7 +487,6 @@ size_t* compute_contiguous_strides(int* shape, int ndim) {
 
     if (ndim == 0) {
         // Scalar tensor has no strides, but some functions might expect a non-NULL pointer
-        // Return a dummy pointer that can be freed
         return (size_t*)malloc(sizeof(size_t));
     }
 
@@ -695,14 +681,13 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     if (!t)
         return NULL;
 
-    // Set IR references
     t->ir_node    = node;
     t->ir_context = ir_context;
 
     // Link output tensor back to IR node
     node->output = t;
 
-    // Set shape from IR node (computed by broadcasting)
+    // Shape from broadcasting
     if (node->output_shape) {
         t->shape = tensor_shape_copy(node->output_shape, node->output_ndim);
         if (!t->shape) {
@@ -727,7 +712,6 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         }
     }
 
-    // Set dtype and device from first input
     if (node->inputs && node->inputs[0]) {
         t->dtype  = node->inputs[0]->dtype;
         t->device = node->inputs[0]->device;
@@ -738,12 +722,12 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
 
     // Execution state (lazy)
     t->is_executed = false;
-    t->data        = NULL; // NULL until executed
+    t->data        = NULL;
     t->owns_data   = true; // Will own data when executed
 
     // Autograd
     t->requires_grad = node->requires_grad;
-    t->grad          = NULL; // Gradient tensor (also lazy)
+    t->grad          = NULL;
 
     // Memory management
     t->ref_count = 1;
@@ -837,7 +821,7 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
     t->ir_node     = NULL;
     t->ir_context  = NULL;
     t->is_executed = true; // Leaf tensors have data immediately
-    t->data        = NULL; // Will be allocated below
+    t->data        = NULL;
     t->owns_data   = true;
 
     t->is_contiguous = true;

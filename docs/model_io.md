@@ -2,7 +2,6 @@
 
 C-ML supports multiple serialization formats for saving, loading, and exchanging model weights and tensors. This document covers each format, its API, usage examples, and trade-offs.
 
----
 
 ## Table of Contents
 
@@ -16,7 +15,6 @@ C-ML supports multiple serialization formats for saving, loading, and exchanging
 8. [Quantization (int8 / uint8 / NF4)](#quantization)
 9. [Architecture Export](#architecture-export)
 
----
 
 ## Native Serialization
 
@@ -62,7 +60,6 @@ Tensor* loaded = tensor_read_file("embedding.bin");
 - Stream variants (`*_stream`) let you multiplex several objects into one file or pipe data over a network socket.
 - All functions return 0 on success and a negative value on failure.
 
----
 
 ## Model I/O Utilities
 
@@ -99,7 +96,6 @@ model_load_checkpoint(model, optimizer, &resumed_epoch, &resumed_loss, "checkpoi
 - `model_save_checkpoint` / `model_load_checkpoint` are the recommended way to persist training runs because they capture everything needed to resume.
 - The format is C-ML-internal and not intended for cross-framework exchange.
 
----
 
 ## GGUF Format
 
@@ -160,7 +156,6 @@ module_save_gguf(model, "exported.gguf");
 - Quantized tensor types are automatically dequantized on read via `gguf_quant.h` (see next section).
 - Metadata types (strings, arrays, etc.) are defined in the `GGUFMetadataType` enum.
 
----
 
 ## GGUF Quantization
 
@@ -207,7 +202,6 @@ if (gguf_type_is_quantized(GGUF_TENSOR_Q4_0)) {
 - Block structures (`BlockQ4_0`, `BlockQ4_K`, etc.) match the llama.cpp memory layout exactly.
 - Dequantization always produces float32 output.
 
----
 
 ## SafeTensors Format
 
@@ -254,7 +248,6 @@ module_save_safetensors(model, "exported.safetensors");
 - The API mirrors the GGUF API for consistency.
 - Compatible with the Hugging Face `safetensors` Python library.
 
----
 
 ## ONNX Runtime
 
@@ -309,7 +302,6 @@ cml_onnx_free(onnx);
 - The graph is limited to `CML_ONNX_MAX_NODES` (512) nodes. Models with more nodes will fail to load.
 - Attribute name strings are capped at 64 characters; tensor info names at 128 characters.
 
----
 
 ## PyTorch .pth Loader
 
@@ -357,7 +349,6 @@ cml_pth_free(sd);
 - The loader handles the ZIP+pickle format; very old PyTorch files using raw pickle without ZIP may not be supported.
 - The `original_dtype` field on each `CMLPthEntry` records the dtype before any conversion, which is useful for tracking precision changes.
 
----
 
 ## Quantization
 
@@ -412,7 +403,6 @@ free(scales);
 - NF4 packs two 4-bit values per uint8. The resulting tensor has `numel / 2` elements.
 - The `CML_NF4_TABLE` global contains the 16 values optimized for normally distributed weights.
 
----
 
 ## Architecture Export
 
@@ -450,7 +440,6 @@ model_architecture_free(arch);
 - Handles Sequential, Linear, Conv2d, and other standard module types.
 - This is for introspection and visualization only -- it does not save or load weights.
 
----
 
 ## Format Comparison
 

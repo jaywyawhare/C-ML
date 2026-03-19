@@ -276,7 +276,6 @@ int cml_backend_buffer_init_tensor(CMLBackendBuffer_t buffer, Tensor* tensor) {
         return -1;
     }
 
-    // Set tensor data pointer
     tensor->data      = buffer->base;
     tensor->device    = buffer->device;
     tensor->owns_data = false; // Buffer owns the memory

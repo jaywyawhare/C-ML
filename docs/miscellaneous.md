@@ -13,7 +13,6 @@ Additional C-ML subsystems covering sparse tensors, image dtypes, data augmentat
 - [Disk Backend](#disk-backend)
 - [CMake Integration](#cmake-integration)
 
----
 
 ## Sparse Tensors
 
@@ -78,7 +77,6 @@ Tensor* result    = sparse_matmul(sp, dense_B);    // [1000, 64]
 sparse_free(sp);
 ```
 
----
 
 ## Image Dtype
 
@@ -143,7 +141,6 @@ if (fmt != CML_IMAGE_NONE) {
 }
 ```
 
----
 
 ## Data Augmentation
 
@@ -220,7 +217,6 @@ Tensor* augmented = augment_apply(batch, aug);
 augmentation_config_free(aug);
 ```
 
----
 
 ## Winograd Convolution
 
@@ -289,7 +285,6 @@ winograd_conv2d(input, weight, bias, output,
                 /*groups=*/1, &cfg);
 ```
 
----
 
 ## Symbolic Computation
 
@@ -379,7 +374,6 @@ sym_expr_release(seq);
 sym_expr_release(batch);
 ```
 
----
 
 ## SIMD Vectorization
 
@@ -470,7 +464,6 @@ void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
                          const size_t* strides, const int* perm, int ndim, size_t numel);
 ```
 
----
 
 ## Disk Backend
 
@@ -558,7 +551,6 @@ cml_disk_tensor_free(dt);
 cml_disk_backend_free(disk);
 ```
 
----
 
 ## CMake Integration
 

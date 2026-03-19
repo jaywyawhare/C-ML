@@ -65,14 +65,12 @@ def build_bindings():
     print("Building CML CFFI bindings...")
 
     try:
-        # Import CFFI builder
         from _cml_cffi import ffi
     except ImportError:
         print("Error: Could not import _cml_cffi")
         sys.exit(1)
 
     try:
-        # Compile the bindings
         print("Compiling CFFI module...")
         ffi.compile(verbose=True)
         print("CFFI bindings compiled successfully")
@@ -109,11 +107,9 @@ if __name__ == "__main__":
     print("CML Python Bindings Builder")
     print("=" * 40)
 
-    # Check dependencies
     print("\nChecking dependencies...")
     check_dependencies()
 
-    # Find CML library
     print("\nLocating CML library...")
     try:
         lib_path = find_cml_lib()
@@ -122,7 +118,6 @@ if __name__ == "__main__":
         print(f"{e}")
         sys.exit(1)
 
-    # Build bindings
     print()
     try:
         build_bindings()
@@ -133,7 +128,6 @@ if __name__ == "__main__":
         traceback.print_exc()
         sys.exit(1)
 
-    # Verify
     if verify_installation():
         print("\n" + "=" * 40)
         print("Build successful! You can now use CML from Python:")

@@ -1,11 +1,3 @@
-/**
- * @file backward.c
- * @brief Backward pass execution with CPU fallback
- *
- * This file implements backward pass for gradient computation
- * using a CPU interpreter.
- */
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

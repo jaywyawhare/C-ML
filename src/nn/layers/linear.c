@@ -121,7 +121,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 2, &config);
     if (!weight) {
-        // Error already pushed by tensor_empty
         module_free((Module*)linear);
         return NULL;
     }
@@ -143,7 +142,6 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
             (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
         Tensor* bias = tensor_zeros(bias_shape, 1, &bias_config);
         if (!bias) {
-            // Error already pushed by tensor_zeros
             module_free((Module*)linear);
             return NULL;
         }

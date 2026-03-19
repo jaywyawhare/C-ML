@@ -25,9 +25,8 @@ from cml import (
 
 def simple_training_example():
     """Simple training example using convenience functions."""
-    print("=== Simple Training Example ===\n")
+    print("Simple Training Example\n")
 
-    # Initialize
     cml.init()
     cml.seed(42)
 
@@ -56,12 +55,10 @@ def simple_training_example():
         verbose=True,
     )
 
-    # Evaluate
     print("\nEvaluating...")
     test_loss = evaluate_model(model, X_test, y_test)
     print(f"Test loss: {test_loss}")
 
-    # Predict
     print("\nMaking predictions...")
     predictions = predict(model, X_test)
     print(f"Predictions computed: {predictions.size} elements")
@@ -72,7 +69,7 @@ def simple_training_example():
 
 def metrics_tracking_example():
     """Example with metrics tracking."""
-    print("\n=== Metrics Tracking Example ===\n")
+    print("\nMetrics Tracking Example\n")
 
     cml.init()
     cml.seed(42)
@@ -118,7 +115,7 @@ def metrics_tracking_example():
 
 def early_stopping_example():
     """Example with early stopping."""
-    print("\n=== Early Stopping Example ===\n")
+    print("\nEarly Stopping Example\n")
 
     cml.init()
     cml.seed(42)
@@ -168,7 +165,7 @@ def early_stopping_example():
 
 def context_manager_example():
     """Example with device/dtype context managers."""
-    print("\n=== Context Manager Example ===\n")
+    print("\nContext Manager Example\n")
 
     cml.init()
 
@@ -181,17 +178,13 @@ def context_manager_example():
         X = cml.randn([10, 10])
         print(f"Model created: {model}")
 
-    # (Would use GPU if available)
-    # with TrainingContext(device="cuda", dtype="float32"):
-    #     print("Training on CUDA with float32...")
-
     cml.cleanup()
     print("Done!")
 
 
 def dataset_loader_example():
     """Example with dataset and dataloader."""
-    print("\n=== Dataset & DataLoader Example ===\n")
+    print("\nDataset & DataLoader Example\n")
 
     cml.init()
     cml.seed(42)
@@ -226,7 +219,7 @@ def dataset_loader_example():
 
 def combined_example():
     """Combined example using all convenience features."""
-    print("\n=== Combined Example - All Features ===\n")
+    print("\nCombined Example - All Features\n")
 
     cml.init()
     cml.seed(42)

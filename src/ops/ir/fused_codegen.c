@@ -159,7 +159,7 @@ static const char* linop_kind_str(CMLLinearOpKind k) {
 
 void cml_linear_program_print(const CMLLinearProgram* prog) {
     if (!prog) { printf("LinearProgram: (null)\n"); return; }
-    printf("--- CMLLinearProgram (%d ops, %d vregs) ---\n",
+    printf("CMLLinearProgram (%d ops, %d vregs)\n",
            prog->num_ops, prog->next_vreg);
     for (int i = 0; i < prog->num_ops; i++) {
         const CMLLinearOp* op = &prog->ops[i];
@@ -175,7 +175,6 @@ void cml_linear_program_print(const CMLLinearProgram* prog) {
         }
         printf("\n");
     }
-    printf("---\n");
 }
 
 static const char* uop_to_c_binary(UOpType uop) {

@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 int main() {
-    printf("=== C-ML Hello World ===\n\n");
+    printf("C-ML Hello World\n\n");
 
     cml_init();
     printf("C-ML initialized successfully!\n\n");
@@ -21,7 +21,7 @@ int main() {
     printf("Model Summary:\n");
     cml_summary((Module*)model);
 
-    printf("\n=== All tests passed! ===\n");
+    printf("\nAll tests passed!\n");
     printf("C-ML is working correctly on your system.\n\n");
 
     cml_cleanup();

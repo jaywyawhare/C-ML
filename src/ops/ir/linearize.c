@@ -188,7 +188,7 @@ static const char* linop_name(LinearOpKind k) {
 static void linear_program_print(const LinearProgram* prog) {
     if (!prog) { printf("LinearProgram: (null)\n"); return; }
 
-    printf("--- Linear Program (%d ops, %d vregs) ---\n",
+    printf("Linear Program (%d ops, %d vregs)\n",
            prog->num_ops, prog->next_vreg);
     for (int i = 0; i < prog->num_ops; i++) {
         const LinearOp* op = &prog->ops[i];
@@ -204,7 +204,6 @@ static void linear_program_print(const LinearProgram* prog) {
         }
         printf("\n");
     }
-    printf("---\n");
 }
 
 void cml_linearize_group_print(const CMLFusionGroup* g) {

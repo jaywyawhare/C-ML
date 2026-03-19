@@ -1,11 +1,6 @@
-/**
- * @file metal_backend.m
- * @brief Metal GPU backend implementation for macOS/iOS
- *
  * Objective-C implementation using the Metal framework.
  * Entirely guarded by CML_HAS_METAL -- on non-Apple platforms every
  * public function compiles to a safe stub that returns false/NULL/-1.
- */
 
 #include "ops/ir/gpu/metal_backend.h"
 #include "core/logging.h"
@@ -14,9 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ========================================================================
- * CML_HAS_METAL -- full implementation
- * ======================================================================== */
+/* CML_HAS_METAL -- full implementation */
 #ifdef CML_HAS_METAL
 
 #import <Metal/Metal.h>
@@ -50,7 +43,6 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
     }
 
     @autoreleasepool {
-        /* Create the system default Metal device */
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
         if (!device) {
             LOG_ERROR("MTLCreateSystemDefaultDevice() returned nil");
@@ -61,7 +53,6 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
         CFRetain((__bridge CFTypeRef)device);
         backend->device = (__bridge void*)device;
 
-        /* Create a command queue */
         id<MTLCommandQueue> queue = [device newCommandQueue];
         if (!queue) {
             LOG_ERROR("Failed to create MTLCommandQueue");
@@ -72,7 +63,6 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
         /* newCommandQueue already returns a +1 object; store as void* */
         backend->command_queue = (__bridge_retained void*)queue;
 
-        /* Query device name */
         const char* name = [[device name] UTF8String];
         if (name) {
             strncpy(backend->device_name, name, sizeof(backend->device_name) - 1);
@@ -132,7 +122,6 @@ CMLMetalKernel* cml_metal_compile_msl(CMLMetalBackend* backend,
     @autoreleasepool {
         id<MTLDevice> device = (__bridge id<MTLDevice>)backend->device;
 
-        /* Compile the MSL source into a library */
         NSString* src = [NSString stringWithUTF8String:msl_source];
         NSError* error = nil;
         id<MTLLibrary> library = [device newLibraryWithSource:src
@@ -144,7 +133,6 @@ CMLMetalKernel* cml_metal_compile_msl(CMLMetalBackend* backend,
             return NULL;
         }
 
-        /* Retrieve the named function */
         NSString* fnName = [NSString stringWithUTF8String:function_name];
         id<MTLFunction> function = [library newFunctionWithName:fnName];
         if (!function) {
@@ -152,7 +140,6 @@ CMLMetalKernel* cml_metal_compile_msl(CMLMetalBackend* backend,
             return NULL;
         }
 
-        /* Create a compute pipeline state from the function */
         error = nil;
         id<MTLComputePipelineState> pipeline =
             [device newComputePipelineStateWithFunction:function error:&error];
@@ -162,7 +149,6 @@ CMLMetalKernel* cml_metal_compile_msl(CMLMetalBackend* backend,
             return NULL;
         }
 
-        /* Allocate and fill the kernel structure */
         CMLMetalKernel* kernel = (CMLMetalKernel*)calloc(1, sizeof(CMLMetalKernel));
         if (!kernel) {
             LOG_ERROR("Failed to allocate CMLMetalKernel");
@@ -220,14 +206,12 @@ int cml_metal_launch_kernel(CMLMetalBackend* backend,
         id<MTLComputePipelineState> pipeline =
             (__bridge id<MTLComputePipelineState>)kernel->pipeline;
 
-        /* Create a command buffer */
         id<MTLCommandBuffer> cmdBuf = [queue commandBuffer];
         if (!cmdBuf) {
             LOG_ERROR("Failed to create Metal command buffer");
             return -1;
         }
 
-        /* Create a compute command encoder */
         id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
         if (!encoder) {
             LOG_ERROR("Failed to create Metal compute encoder");
@@ -236,20 +220,17 @@ int cml_metal_launch_kernel(CMLMetalBackend* backend,
 
         [encoder setComputePipelineState:pipeline];
 
-        /* Bind all buffers */
         for (int i = 0; i < num_buffers; i++) {
             id<MTLBuffer> mtlBuf = (__bridge id<MTLBuffer>)buffers[i];
             [encoder setBuffer:mtlBuf offset:0 atIndex:(NSUInteger)i];
         }
 
-        /* Dispatch thread groups */
         MTLSize gridSize  = MTLSizeMake(grid[0],  grid[1],  grid[2]);
         MTLSize blockSize = MTLSizeMake(block[0], block[1], block[2]);
 
         [encoder dispatchThreads:gridSize threadsPerThreadgroup:blockSize];
         [encoder endEncoding];
 
-        /* Commit and wait for completion */
         [cmdBuf commit];
         [cmdBuf waitUntilCompleted];
 
@@ -288,7 +269,6 @@ void cml_metal_free(CMLMetalBackend* backend, void* buffer) {
     if (!buffer) return;
 
     @autoreleasepool {
-        /* Release the retained Metal buffer */
         CFRelease((CFTypeRef)buffer);
     }
 }
@@ -333,9 +313,7 @@ int cml_metal_download(CMLMetalBackend* backend,
     return 0;
 }
 
-/* ========================================================================
- * Stubs -- when CML_HAS_METAL is NOT defined
- * ======================================================================== */
+/* Stubs -- CML_HAS_METAL is NOT defined */
 #else /* !CML_HAS_METAL */
 
 bool cml_metal_available(void) {

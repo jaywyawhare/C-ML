@@ -1,7 +1,3 @@
-/**
- * @file activations.c
- * @brief Activation function layers implementation
- */
 
 #include "nn/layers/activations.h"
 #include "nn.h"

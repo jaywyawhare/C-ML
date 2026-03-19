@@ -6,7 +6,7 @@
 int main(void) {
     cml_init();
 
-    printf("=== Comprehensive Fusion Example ===\n\n");
+    printf("Comprehensive Fusion Example\n\n");
 
     CMLGraph_t ir = cml_ir_new(IR_TARGET_CUDA);
     if (!ir) {
@@ -46,7 +46,7 @@ int main(void) {
     printf("C: [%.2f, %.2f, %.2f, %.2f, ...]\n", (double)c_data[0], (double)c_data[1],
            (double)c_data[2], (double)c_data[3]);
 
-    printf("\n=== Creating computation graph ===\n");
+    printf("\nCreating computation graph\n");
 
     printf("\n1. FUSION_FMA test: result1 = a * b + c\n");
     Tensor* mul_result = tensor_mul(a, b);
@@ -106,7 +106,7 @@ int main(void) {
     Tensor* sum4         = tensor_add(sum3, result5);
     Tensor* final_result = tensor_add(sum4, result6);
 
-    printf("\n=== Executing computation graphs ===\n");
+    printf("\nExecuting computation graphs\n");
 
     float* r1 = (float*)tensor_data_ptr(result1);
     float* r2 = (float*)tensor_data_ptr(result2);
@@ -129,13 +129,13 @@ int main(void) {
     printf("result6[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r6[0], (double)r6[1], (double)r6[2],
            (double)r6[3]);
 
-    printf("\n=== Exporting raw kernel analysis ===\n");
+    printf("\nExporting raw kernel analysis\n");
     char* raw_json = cml_ir_export_kernel_analysis(ir, false);
 
-    printf("\n=== Optimizing IR (fusion, dead code elimination, etc.) ===\n");
+    printf("\nOptimizing IR (fusion, dead code elimination, etc.)\n");
     cml_ir_optimize(ir);
 
-    printf("\n=== Exporting optimized kernel analysis ===\n");
+    printf("\nExporting optimized kernel analysis\n");
     char* opt_json = cml_ir_export_kernel_analysis(ir, true);
 
     if (raw_json && opt_json) {
@@ -153,7 +153,7 @@ int main(void) {
     if (opt_json)
         free(opt_json);
 
-    printf("\n=== Exporting graph topology ===\n");
+    printf("\nExporting graph topology\n");
     char* graph_json = cml_ir_export_graph_json(ir);
     if (graph_json) {
         FILE* f = fopen("graph.json", "w");
@@ -167,7 +167,7 @@ int main(void) {
         free(graph_json);
     }
 
-    printf("\n=== Generated CUDA code (after optimization) ===\n");
+    printf("\nGenerated CUDA code (after optimization)\n");
     char* cuda_code = cml_ir_compile(ir, NULL);
     if (cuda_code) {
         printf("%s\n", cuda_code);
@@ -178,11 +178,11 @@ int main(void) {
 
     char* ir_str = cml_ir_to_string(ir);
     if (ir_str) {
-        printf("\n=== IR Summary ===\n%s\n", ir_str);
+        printf("\nIR Summary\n%s\n", ir_str);
         free(ir_str);
     }
 
-    printf("\n=== Cleaning up ===\n");
+    printf("\nCleaning up\n");
     tensor_free(final_result);
     tensor_free(sum4);
     tensor_free(sum3);
@@ -222,6 +222,6 @@ int main(void) {
     cml_ir_free(ir);
     cml_cleanup();
 
-    printf("\n=== Example completed successfully ===\n");
+    printf("\nExample completed successfully\n");
     return 0;
 }
