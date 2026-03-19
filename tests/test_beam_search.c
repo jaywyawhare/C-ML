@@ -136,7 +136,7 @@ static void test_tune(void) {
 }
 
 int main(void) {
-    printf("=== BEAM Search Tests ===\n");
+    printf("BEAM Search Tests\n");
 
     test_create_free();
     test_cache_miss();

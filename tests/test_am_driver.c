@@ -272,7 +272,7 @@ static bool test_buffer_create_uninit(void) {
 
 
 int main(void) {
-    printf("\n=== AMD AM Driver Tests ===\n\n");
+    printf("\nAMD AM Driver Tests\n\n");
 
     /* Check hardware availability once */
     g_hw_available = cml_am_driver_available();
@@ -300,6 +300,6 @@ int main(void) {
     TEST(buffer_create_zero_size);
     TEST(synchronize_no_work);
 
-    printf("\n=== Results: %d/%d passed ===\n\n", tests_passed, tests_run);
+    printf("\nResults: %d/%d passed\n\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
 }

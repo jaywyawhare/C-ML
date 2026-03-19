@@ -119,7 +119,7 @@ static void test_register_rule(void) {
 }
 
 int main(void) {
-    printf("=== Pattern Matcher Tests ===\n");
+    printf("Pattern Matcher Tests\n");
 
     test_pattern_builder_op();
     test_pattern_builder_capture();

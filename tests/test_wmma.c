@@ -184,7 +184,7 @@ static void test_wmma_matmul_if_available(void) {
 }
 
 int main(void) {
-    printf("=== WMMA (Tensor Core) Tests ===\n");
+    printf("WMMA (Tensor Core) Tests\n");
 
     test_select_config_basic();
     test_select_config_small();

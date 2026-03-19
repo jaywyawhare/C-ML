@@ -103,7 +103,7 @@ static void test_webgpu_backend_lifecycle(void) {
 #endif
 
 int main(void) {
-    printf("=== WebGPU Backend Tests ===\n");
+    printf("WebGPU Backend Tests\n");
 
     /* WGSL codegen tests do not require a WebGPU device */
     test_wgsl_generate_add();

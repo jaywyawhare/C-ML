@@ -168,7 +168,7 @@ static int test_double_free(void) {
 
 
 int main(void) {
-    printf("=== NIR Compiler Tests ===\n\n");
+    printf("NIR Compiler Tests\n\n");
 
     printf("Availability:\n");
     TEST(nir_available);

@@ -30,7 +30,6 @@ static int test_dispatch_create(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
     if (!ctx) return 0;
 
-    // Check initial state
     if (ctx->initialized) {
         cml_dispatch_free(ctx);
         return 0;
@@ -57,13 +56,11 @@ static int test_dispatch_init(void) {
         return 0;
     }
 
-    // Should be initialized now
     if (!ctx->initialized) {
         cml_dispatch_free(ctx);
         return 0;
     }
 
-    // Should have an active backend
     if (ctx->active >= CML_BACKEND_COUNT) {
         cml_dispatch_free(ctx);
         return 0;
@@ -86,7 +83,6 @@ static int test_backend_detection(void) {
         return 0;
     }
 
-    // CPU fallback must be available
     if (!cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_FALLBACK)) {
         cml_dispatch_free(ctx);
         return 0;
@@ -150,10 +146,7 @@ static int test_global_context(void) {
     CMLDispatchContext* ctx2 = cml_dispatch_get_global();
     if (!ctx2) return 0;
 
-    // Should be the same instance
     if (ctx1 != ctx2) return 0;
-
-    // Should be initialized
     if (!ctx1->initialized) return 0;
 
     return 1;
@@ -202,13 +195,11 @@ static int test_best_backend(void) {
 
     CMLBackendType best = cml_dispatch_get_best_backend(ctx);
 
-    // Must be a valid backend
     if (best >= CML_BACKEND_COUNT) {
         cml_dispatch_free(ctx);
         return 0;
     }
 
-    // Must be available
     if (!cml_dispatch_backend_available(ctx, best)) {
         cml_dispatch_free(ctx);
         return 0;
@@ -235,7 +226,6 @@ static int test_dispatch_execute_simple(void) {
     // Set as global context for tensor operations
     cml_ir_set_global_context(ir);
 
-    // Create input tensors
     Tensor* a = tensor_empty_2d(2, 2);
     Tensor* b = tensor_empty_2d(2, 2);
 
@@ -247,7 +237,6 @@ static int test_dispatch_execute_simple(void) {
         return 0;
     }
 
-    // Fill with test data
     float* a_data = (float*)a->data;
     float* b_data = (float*)b->data;
     for (int i = 0; i < 4; i++) {
@@ -268,7 +257,6 @@ static int test_dispatch_execute_simple(void) {
     // Execute via dispatch
     int exec_result = cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
 
-    // Check execution succeeded
     int success = (exec_result == 0);
 
     // Verify result if execution succeeded
@@ -336,7 +324,6 @@ static int test_statistics(void) {
 
     cml_dispatch_init(ctx);
 
-    // Initial stats should be zero
     if (ctx->executions_total != 0 ||
         ctx->cache_hits != 0 ||
         ctx->cache_misses != 0) {
@@ -356,7 +343,6 @@ static int test_statistics(void) {
         cml_dispatch_execute(ctx, ir, NULL, 0, NULL, 0);
     }
 
-    // Execution count should increase
     int success = (ctx->executions_total >= 1);
 
     if (a) tensor_free(a);
@@ -369,7 +355,7 @@ static int test_statistics(void) {
 
 
 int main(void) {
-    printf("\n=== Dispatch Layer Unit Tests ===\n\n");
+    printf("\nDispatch Layer Unit Tests\n\n");
 
     TEST(dispatch_create);
     TEST(dispatch_init);

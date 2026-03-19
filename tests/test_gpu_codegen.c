@@ -322,7 +322,7 @@ static int test_gpu_matmul(void) {
 }
 
 int main(void) {
-    printf("\n=== GPU Codegen Tests ===\n");
+    printf("\nGPU Codegen Tests\n");
     printf("GPU available: %s\n\n", has_gpu() ? "YES" : "NO");
 
     TEST(gpu_codegen_lifecycle);
@@ -334,6 +334,6 @@ int main(void) {
     TEST(gpu_reduction_sum);
     TEST(gpu_matmul);
 
-    printf("\n=== Results: %d/%d passed ===\n\n", tests_passed, tests_run);
+    printf("\nResults: %d/%d passed\n\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
 }

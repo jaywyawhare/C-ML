@@ -339,7 +339,7 @@ static bool test_full_tp_simulation(void) {
         return false;
     }
 
-    /* ---- Reference: full matmul ---- */
+    /* Reference: full matmul */
     /* hidden = input @ W1^T = [2,3] @ [[1,0],[0,1],[1,1],[2,-1]]^T
      *        = [2*1+3*0, 2*0+3*1, 2*1+3*1, 2*2+3*(-1)]
      *        = [2, 3, 5, 1]
@@ -356,7 +356,7 @@ static bool test_full_tp_simulation(void) {
     float ref_output[2];
     ref_matmul_transposed(ref_hidden, 1, 4, w2_data, 2, ref_output);
 
-    /* ---- Tensor-parallel: rank 0 and rank 1 ---- */
+    /* Tensor-parallel: rank 0 and rank 1 */
 
     /* Column-parallel on W1 */
     CMLColumnParallelLinear* cp0 = cml_column_parallel_create(W1, NULL, 2, 0);
@@ -621,7 +621,7 @@ static bool test_column_parallel_batch(void) {
 
 
 int main(void) {
-    printf("=== Tensor Parallel Tests ===\n\n");
+    printf("Tensor Parallel Tests\n\n");
 
     printf("Weight sharding:\n");
     TEST(weight_shard_dim0);
@@ -641,6 +641,6 @@ int main(void) {
     printf("\nFull TP simulation:\n");
     TEST(full_tp_simulation);
 
-    printf("\n=== Results: %d/%d tests passed ===\n", tests_passed, tests_run);
+    printf("\nResults: %d/%d tests passed\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
 }

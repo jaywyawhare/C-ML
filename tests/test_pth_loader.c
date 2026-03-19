@@ -59,7 +59,7 @@ static int test_list_keys_null(void) {
 }
 
 int main(void) {
-    printf("=== PTH Loader Tests ===\n");
+    printf("PTH Loader Tests\n");
 
     RUN_TEST(test_load_nonexistent);
     RUN_TEST(test_free_null);

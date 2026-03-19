@@ -132,7 +132,7 @@ static int test_free_null(void) {
 }
 
 int main(void) {
-    printf("=== NULL Device Tests ===\n");
+    printf("NULL Device Tests\n");
 
     RUN_TEST(test_create_destroy);
     RUN_TEST(test_create_with_spec);

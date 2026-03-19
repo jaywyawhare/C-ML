@@ -839,7 +839,7 @@ static int test_dist_multi_rank_simulation(void) {
 #endif /* CML_HAS_DISTRIBUTED */
 
 int main(void) {
-    printf("\n=== Multi-GPU & Distributed Training Tests ===\n\n");
+    printf("\nMulti-GPU & Distributed Training Tests\n\n");
 
     printf("Simulated GPU Devices:\n");
     TEST(sim_gpu_enable_disable);

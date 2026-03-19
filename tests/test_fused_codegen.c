@@ -183,7 +183,7 @@ static void test_mul_chain_codegen(void) {
 }
 
 int main(void) {
-    printf("=== Fused Codegen Tests ===\n\n");
+    printf("Fused Codegen Tests\n\n");
 
     test_c_codegen();
     test_ptx_codegen();
@@ -191,6 +191,6 @@ int main(void) {
     test_linear_program_print();
     test_mul_chain_codegen();
 
-    printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
+    printf("\nResults: %d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

@@ -178,7 +178,7 @@ static int test_loss_backward(void) {
 int main(void) {
     cml_init();
 
-    printf("\n=== Autograd Unit Tests ===\n\n");
+    printf("\nAutograd Unit Tests\n\n");
 
     printf("Forward Ops:\n");
     TEST(forward_add);

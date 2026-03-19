@@ -139,7 +139,7 @@ static void test_pipeline_add_stages(void) {
 }
 
 int main(void) {
-    printf("=== Hardware Command Queue (HCQ) Tests ===\n");
+    printf("Hardware Command Queue (HCQ) Tests\n");
 
     test_queue_create_destroy();
     test_signal_create_destroy();

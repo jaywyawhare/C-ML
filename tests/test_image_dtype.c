@@ -148,7 +148,7 @@ static int test_free_null(void) {
 }
 
 int main(void) {
-    printf("=== Image Dtype Tests ===\n");
+    printf("Image Dtype Tests\n");
 
     RUN_TEST(test_channels_rgba32f);
     RUN_TEST(test_channels_rg32f);

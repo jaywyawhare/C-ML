@@ -6,7 +6,7 @@
 #include "core/onnx.h"
 
 int main(void) {
-    printf("=== ONNX Runtime Tests ===\n");
+    printf("ONNX Runtime Tests\n");
 
 #ifdef CML_HAS_ONNX
 

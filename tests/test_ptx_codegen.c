@@ -348,7 +348,7 @@ static void test_bounds_check(void) {
 }
 
 int main(void) {
-    printf("\n=== PTX Codegen Tests ===\n\n");
+    printf("\nPTX Codegen Tests\n\n");
 
     test_create_destroy();
 
@@ -380,6 +380,6 @@ int main(void) {
     test_register_declarations();
     test_bounds_check();
 
-    printf("\n=== Results: %d passed, %d failed ===\n\n", tests_passed, tests_failed);
+    printf("\nResults: %d passed, %d failed\n\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

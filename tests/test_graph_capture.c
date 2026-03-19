@@ -186,7 +186,7 @@ static int test_record_with_args(void) {
 }
 
 int main(void) {
-    printf("=== Graph Capture Tests ===\n");
+    printf("Graph Capture Tests\n");
 
     RUN_TEST(test_create_destroy);
     RUN_TEST(test_initial_state);

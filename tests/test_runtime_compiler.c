@@ -187,7 +187,7 @@ static void test_set_backend(void) {
 }
 
 int main(void) {
-    printf("=== Runtime Compiler Tests ===\n\n");
+    printf("Runtime Compiler Tests\n\n");
 
     test_compiler_create_free();
     test_compile_program();
@@ -196,6 +196,6 @@ int main(void) {
     test_clear_cache();
     test_set_backend();
 
-    printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
+    printf("\nResults: %d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

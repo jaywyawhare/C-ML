@@ -140,7 +140,7 @@ static void test_q4_0_dequantize(void) {
 }
 
 int main(void) {
-    printf("=== GGUF Quantization Tests ===\n");
+    printf("GGUF Quantization Tests\n");
 
     test_type_is_quantized();
     test_block_size();

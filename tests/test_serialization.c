@@ -169,7 +169,7 @@ static int test_save_bad_path(void) {
 int main(void) {
     cml_init();
 
-    printf("\n=== Serialization Unit Tests ===\n\n");
+    printf("\nSerialization Unit Tests\n\n");
 
     printf("Model I/O:\n");
     TEST(model_save_load);

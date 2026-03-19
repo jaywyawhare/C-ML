@@ -561,7 +561,7 @@ static void test_div_by_zero_returns_null(void) {
 }
 
 int main(void) {
-    printf("\n=== Symbolic Shapes Tests ===\n\n");
+    printf("\nSymbolic Shapes Tests\n\n");
 
     test_const_creation();
     test_var_creation();
@@ -607,6 +607,6 @@ int main(void) {
     test_shape_broadcast_incompatible();
     test_div_by_zero_returns_null();
 
-    printf("\n=== Results: %d passed, %d failed ===\n\n", tests_passed, tests_failed);
+    printf("\nResults: %d passed, %d failed\n\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

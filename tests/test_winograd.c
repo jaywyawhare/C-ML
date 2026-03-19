@@ -119,7 +119,7 @@ static void test_winograd_conv2d_basic(void) {
 }
 
 int main(void) {
-    printf("=== Winograd Convolution Tests ===\n");
+    printf("Winograd Convolution Tests\n");
 
     test_winograd_applicable_true();
     test_winograd_applicable_false();

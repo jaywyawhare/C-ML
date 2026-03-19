@@ -169,7 +169,7 @@ static int test_free_null(void) {
 }
 
 int main(void) {
-    printf("=== Disk Backend Tests ===\n");
+    printf("Disk Backend Tests\n");
     setup_test_dir();
 
     RUN_TEST(test_create_destroy);

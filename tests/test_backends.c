@@ -200,7 +200,7 @@ static int test_all_backends_summary(void) {
 
 
 int main(void) {
-    printf("\n=== Backend Detection Unit Tests ===\n\n");
+    printf("\nBackend Detection Unit Tests\n\n");
 
     printf("GPU Backends:\n");
     TEST(cuda_detection);

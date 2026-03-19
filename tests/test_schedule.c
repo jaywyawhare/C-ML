@@ -464,7 +464,7 @@ static int test_schedule_standalone_reduce(void) {
 
 
 int main(void) {
-    printf("\n=== test_schedule ===\n\n");
+    printf("\ntest_schedule\n\n");
 
     RUN_TEST(test_is_elementwise);
     RUN_TEST(test_is_reduction);

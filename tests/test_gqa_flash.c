@@ -253,7 +253,7 @@ static void test_flash_large_tiles(void) {
 }
 
 int main(void) {
-    printf("=== Flash Attention GQA Tests ===\n\n");
+    printf("Flash Attention GQA Tests\n\n");
     srand(42);
 
     test_flash_vs_standard();
@@ -261,6 +261,6 @@ int main(void) {
     test_sliding_window();
     test_flash_large_tiles();
 
-    printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
+    printf("\nResults: %d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

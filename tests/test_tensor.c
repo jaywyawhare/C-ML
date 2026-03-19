@@ -212,7 +212,7 @@ static int test_null_safety(void) {
 int main(void) {
     cml_init();
 
-    printf("\n=== Tensor Unit Tests ===\n\n");
+    printf("\nTensor Unit Tests\n\n");
 
     printf("Creation:\n");
     TEST(empty_tensor);

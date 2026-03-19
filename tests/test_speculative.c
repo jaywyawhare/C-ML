@@ -85,7 +85,6 @@ static int mock_sample(void* model_ctx, Tensor* logits, float temperature) {
     return best;
 }
 
-/* ---------- Position-aware forward for partial-agree tests -------- */
 
 typedef struct PartialAgreeCtx {
     int agree_count;     /* Number of draft positions to agree with. */

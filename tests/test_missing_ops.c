@@ -873,7 +873,7 @@ static int test_logsigmoid(void) {
 }
 
 int main(void) {
-    printf("=== Missing Ops Tests ===\n");
+    printf("Missing Ops Tests\n");
     TEST(sort_1d);
     TEST(sort_descending);
     TEST(argsort_1d);
@@ -886,7 +886,7 @@ int main(void) {
     TEST(nonzero);
     TEST(masked_fill);
 
-    printf("\n=== New Unary Ops ===\n");
+    printf("\nNew Unary Ops\n");
     TEST(log10);
     TEST(sinh_cosh);
     TEST(asinh_acosh_atanh);
@@ -894,24 +894,24 @@ int main(void) {
     TEST(isinf_isnan_isfinite);
     TEST(logical_not);
 
-    printf("\n=== New Binary Ops ===\n");
+    printf("\nNew Binary Ops\n");
     TEST(idiv);
     TEST(mod);
     TEST(minimum);
     TEST(logaddexp);
     TEST(logical_and_or);
 
-    printf("\n=== Comparison Ops ===\n");
+    printf("\nComparison Ops\n");
     TEST(comparisons);
 
-    printf("\n=== New Reduction Ops ===\n");
+    printf("\nNew Reduction Ops\n");
     TEST(min_reduce);
     TEST(var_std);
     TEST(any_all);
     TEST(logsumexp);
     TEST(cummax_cummin);
 
-    printf("\n=== Movement Ops ===\n");
+    printf("\nMovement Ops\n");
     TEST(cat);
     TEST(stack);
     TEST(roll);
@@ -919,7 +919,7 @@ int main(void) {
     TEST(diag);
     TEST(one_hot);
 
-    printf("\n=== Tinygrad Parity Round 2 ===\n");
+    printf("\nTinygrad Parity Round 2\n");
     TEST(erfc);
     TEST(lerp);
     TEST(tile);
@@ -928,7 +928,7 @@ int main(void) {
     TEST(shrink);
     TEST(logcumsumexp);
 
-    printf("\n=== Activation Ops ===\n");
+    printf("\nActivation Ops\n");
     TEST(relu6);
     TEST(hard_sigmoid);
     TEST(hard_tanh);

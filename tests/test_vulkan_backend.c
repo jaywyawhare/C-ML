@@ -243,7 +243,7 @@ static int test_vulkan_kernel_dispatch(void) {
 }
 
 int main(void) {
-    printf("=== Vulkan/SPIR-V Backend Tests ===\n\n");
+    printf("Vulkan/SPIR-V Backend Tests\n\n");
 
     printf("SPIR-V Codegen:\n");
     TEST(spirv_codegen_create);

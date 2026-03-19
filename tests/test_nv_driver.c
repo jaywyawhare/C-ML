@@ -338,7 +338,7 @@ static int test_kernel_launch_not_init(void) {
 
 
 int main(void) {
-    printf("\n=== NV Driver Tests ===\n\n");
+    printf("\nNV Driver Tests\n\n");
 
     /* These always run, regardless of hardware */
     TEST(driver_available);
@@ -357,6 +357,6 @@ int main(void) {
     TEST(buffer_create_free);
     TEST(buffer_upload_download);
 
-    printf("\n=== Results: %d/%d passed ===\n\n", tests_passed, tests_run);
+    printf("\nResults: %d/%d passed\n\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
 }

@@ -6,7 +6,7 @@
 #include "ops/ir/gpu/metal_backend.h"
 
 int main(void) {
-    printf("=== Metal Backend Tests ===\n");
+    printf("Metal Backend Tests\n");
 
 #ifdef CML_HAS_METAL
 

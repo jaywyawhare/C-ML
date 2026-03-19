@@ -963,7 +963,7 @@ static int test_tensor_from_url_api(void) {
 }
 
 int main(void) {
-    printf("=== New Features Tests ===\n");
+    printf("New Features Tests\n");
 
     TEST(unfold_1d);
     TEST(unfold_stride);

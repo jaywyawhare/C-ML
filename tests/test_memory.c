@@ -138,7 +138,7 @@ static int test_cleanup_null_safety(void) {
 int main(void) {
     cml_init();
 
-    printf("\n=== Memory Management Unit Tests ===\n\n");
+    printf("\nMemory Management Unit Tests\n\n");
 
     printf("Memory Pool:\n");
     TEST(memory_pool_create);

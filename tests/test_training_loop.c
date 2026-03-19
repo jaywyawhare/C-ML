@@ -136,7 +136,7 @@ int main(void) {
     printf("Best Training Loss: %.6f\n", (double)best_loss);
     printf("Best Training Accuracy: %.2f%%\n", (double)(best_accuracy * 100.0f));
 
-    printf("\n=== Final Evaluation ===\n");
+    printf("\nFinal Evaluation\n");
 
     if (training_metrics_evaluate_dataset((Module*)model, train_dataset, tensor_mse_loss, false) ==
         0) {

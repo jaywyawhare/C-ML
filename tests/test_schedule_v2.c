@@ -387,7 +387,7 @@ static int test_v2_group_colors(void) {
 
 
 int main(void) {
-    printf("\n=== test_schedule_v2 ===\n\n");
+    printf("\ntest_schedule_v2\n\n");
 
     RUN_TEST(test_v2_create_empty);
     RUN_TEST(test_v2_create_null);

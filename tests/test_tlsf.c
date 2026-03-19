@@ -552,7 +552,7 @@ static int test_timeline_print(void)
 
 int main(void)
 {
-    printf("=== TLSF Allocator Tests ===\n\n");
+    printf("TLSF Allocator Tests\n\n");
 
     printf("[TLSF Core]\n");
     RUN_TEST(test_create_destroy);
@@ -580,7 +580,7 @@ int main(void)
     RUN_TEST(test_timeline_sequential);
     RUN_TEST(test_timeline_print);
 
-    printf("\n=== Results: %d/%d tests passed ===\n", tests_passed, tests_run);
+    printf("\nResults: %d/%d tests passed\n", tests_passed, tests_run);
 
     return (tests_passed == tests_run) ? 0 : 1;
 }

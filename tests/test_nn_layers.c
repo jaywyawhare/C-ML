@@ -241,7 +241,7 @@ static int test_sequential_forward(void) {
 int main(void) {
     cml_init();
 
-    printf("\n=== Neural Network Layers Unit Tests ===\n\n");
+    printf("\nNeural Network Layers Unit Tests\n\n");
 
     printf("Core Layers:\n");
     TEST(linear);

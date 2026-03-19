@@ -200,7 +200,7 @@ static void test_cache_multiple_entries(void) {
 }
 
 int main(void) {
-    printf("=== Trace-and-Replay Tests ===\n");
+    printf("Trace-and-Replay Tests\n");
 
     test_trace_create_free();
     test_trace_begin_end();

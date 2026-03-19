@@ -508,7 +508,7 @@ static bool test_pipeline_null_stages(void) {
 
 
 int main(void) {
-    printf("=== Distributed Training Tests ===\n\n");
+    printf("Distributed Training Tests\n\n");
 
     printf("Process group lifecycle:\n");
     TEST(dist_init_destroy);
@@ -545,6 +545,6 @@ int main(void) {
     TEST(ddp_without_init);
     TEST(pipeline_null_stages);
 
-    printf("\n=== Results: %d/%d tests passed ===\n", tests_passed, tests_run);
+    printf("\nResults: %d/%d tests passed\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
 }

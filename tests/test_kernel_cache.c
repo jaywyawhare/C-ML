@@ -291,7 +291,7 @@ static int test_large_cache(void) {
 
 
 int main(void) {
-    printf("\n=== Kernel Cache Unit Tests ===\n\n");
+    printf("\nKernel Cache Unit Tests\n\n");
 
     TEST(cache_create);
     TEST(cache_create_zero);
