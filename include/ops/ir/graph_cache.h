@@ -52,4 +52,6 @@ void cml_free_execution_plan(CMLExecutionPlan* plan);
 CMLGraphCache* cml_get_graph_cache(void);
 void cml_graph_cache_print_stats(CMLGraphCache* cache);
 
+int cml_execute_node_fast(struct IRNode* node, float* out_buf);
+
 #endif // CML_GRAPH_CACHE_H
