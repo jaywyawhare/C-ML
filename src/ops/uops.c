@@ -13,8 +13,10 @@
 #include <stdio.h>
 
 static Tensor* uop_binary(Tensor* a, Tensor* b, UOpType type) {
-    if (!a || !b)
+    if (!a || !b) {
+        LOG_ERROR("NULL tensor input to uop_binary");
         return NULL;
+    }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
@@ -3156,3 +3158,46 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
 
     return NULL;
 }
+
+/* --- Extended math/comparison wrappers --- */
+
+/* Unary wrappers */
+Tensor* uop_sign(Tensor* a)        { return uop_unary(a, UOP_SIGN); }
+Tensor* uop_floor(Tensor* a)       { return uop_unary(a, UOP_FLOOR); }
+Tensor* uop_ceil(Tensor* a)        { return uop_unary(a, UOP_CEIL); }
+Tensor* uop_round(Tensor* a)       { return uop_unary(a, UOP_ROUND); }
+Tensor* uop_log2(Tensor* a)        { return uop_unary(a, UOP_LOG2); }
+Tensor* uop_exp2(Tensor* a)        { return uop_unary(a, UOP_EXP2); }
+Tensor* uop_asin(Tensor* a)        { return uop_unary(a, UOP_ASIN); }
+Tensor* uop_acos(Tensor* a)        { return uop_unary(a, UOP_ACOS); }
+Tensor* uop_atan(Tensor* a)        { return uop_unary(a, UOP_ATAN); }
+Tensor* uop_square(Tensor* a)      { return uop_unary(a, UOP_SQUARE); }
+Tensor* uop_rsqrt(Tensor* a)       { return uop_unary(a, UOP_RSQRT); }
+Tensor* uop_erf(Tensor* a)         { return uop_unary(a, UOP_ERF); }
+Tensor* uop_log10(Tensor* a)       { return uop_unary(a, UOP_LOG10); }
+Tensor* uop_sinh(Tensor* a)        { return uop_unary(a, UOP_SINH); }
+Tensor* uop_cosh(Tensor* a)        { return uop_unary(a, UOP_COSH); }
+Tensor* uop_asinh(Tensor* a)       { return uop_unary(a, UOP_ASINH); }
+Tensor* uop_acosh(Tensor* a)       { return uop_unary(a, UOP_ACOSH); }
+Tensor* uop_atanh(Tensor* a)       { return uop_unary(a, UOP_ATANH); }
+Tensor* uop_trunc(Tensor* a)       { return uop_unary(a, UOP_TRUNC); }
+Tensor* uop_isinf(Tensor* a)       { return uop_unary(a, UOP_ISINF); }
+Tensor* uop_isnan(Tensor* a)       { return uop_unary(a, UOP_ISNAN); }
+Tensor* uop_isfinite(Tensor* a)    { return uop_unary(a, UOP_ISFINITE); }
+Tensor* uop_logical_not(Tensor* a) { return uop_unary(a, UOP_LOGICAL_NOT); }
+
+/* Binary wrappers */
+Tensor* uop_idiv(Tensor* a, Tensor* b)        { return uop_binary(a, b, UOP_IDIV); }
+Tensor* uop_mod(Tensor* a, Tensor* b)         { return uop_binary(a, b, UOP_MOD); }
+Tensor* uop_minimum(Tensor* a, Tensor* b)     { return uop_binary(a, b, UOP_MINIMUM); }
+Tensor* uop_copysign(Tensor* a, Tensor* b)    { return uop_binary(a, b, UOP_COPYSIGN); }
+Tensor* uop_logaddexp(Tensor* a, Tensor* b)   { return uop_binary(a, b, UOP_LOGADDEXP); }
+Tensor* uop_lshift(Tensor* a, Tensor* b)      { return uop_binary(a, b, UOP_LSHIFT); }
+Tensor* uop_rshift(Tensor* a, Tensor* b)      { return uop_binary(a, b, UOP_RSHIFT); }
+Tensor* uop_logical_and(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_LOGICAL_AND); }
+Tensor* uop_logical_or(Tensor* a, Tensor* b)  { return uop_binary(a, b, UOP_LOGICAL_OR); }
+Tensor* uop_cmpeq(Tensor* a, Tensor* b)       { return uop_binary(a, b, UOP_CMPEQ); }
+Tensor* uop_cmpne(Tensor* a, Tensor* b)       { return uop_binary(a, b, UOP_CMPNE); }
+Tensor* uop_cmple(Tensor* a, Tensor* b)       { return uop_binary(a, b, UOP_CMPLE); }
+Tensor* uop_cmpgt(Tensor* a, Tensor* b)       { return uop_binary(a, b, UOP_CMPGT); }
+Tensor* uop_cmpge(Tensor* a, Tensor* b)       { return uop_binary(a, b, UOP_CMPGE); }

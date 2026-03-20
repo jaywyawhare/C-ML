@@ -71,8 +71,18 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
         node          = node->next;
     }
 
-    struct IRNode* stack[256]; // Stack for DFS
+    int stack_capacity = 256;
     int stack_top = 0;
+    struct IRNode** stack = malloc((size_t)stack_capacity * sizeof(struct IRNode*));
+    if (!stack) {
+        LOG_ERROR("Failed to allocate DCE stack; marking all nodes as used");
+        node = ir->head;
+        while (node) {
+            node->is_used = true;
+            node          = node->next;
+        }
+        return;
+    }
 
     if (ir->tail) {
         stack[stack_top++] = ir->tail;
@@ -86,12 +96,24 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
             struct IRNode* producer = find_node_by_output(ir, current->input_names[i]);
             if (producer && !producer->is_used) {
                 producer->is_used = true;
-                if (stack_top < 256) {
-                    stack[stack_top++] = producer;
+                if (stack_top >= stack_capacity) {
+                    int new_capacity = stack_capacity * 2;
+                    struct IRNode** new_stack =
+                        realloc(stack, (size_t)new_capacity * sizeof(struct IRNode*));
+                    if (!new_stack) {
+                        LOG_ERROR("Failed to grow DCE stack; node will be kept as used");
+                        producer->is_used = true;
+                        continue;
+                    }
+                    stack = new_stack;
+                    stack_capacity = new_capacity;
                 }
+                stack[stack_top++] = producer;
             }
         }
     }
+
+    free(stack);
 }
 
 static int remove_dead_nodes(CMLGraph_t ir) {

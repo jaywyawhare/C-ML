@@ -30,17 +30,11 @@ CMLGraph_t cml_ir_get_auto_capture_context(void) { return atomic_load(&g_auto_ca
 UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     switch (op_type) {
     case OP_NONE:
-    case OP_TANH:
     case OP_RELU:
-    case OP_SIGMOID:
     case OP_SOFTMAX:
     case OP_LOG_SOFTMAX:
     case OP_LEAKY_RELU:
-    case OP_ELU:
-    case OP_SELU:
     case OP_SWISH:
-    case OP_MISH:
-    case OP_HARD_SWISH:
     case OP_GELU:
     case OP_MIN:
     case OP_TRANSPOSE:
@@ -57,6 +51,18 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     case OP_DETACH:
     case OP_CUSTOM:
         return UOP_COUNT;
+    case OP_TANH:
+        return UOP_TANH;
+    case OP_SIGMOID:
+        return UOP_SIGMOID;
+    case OP_ELU:
+        return UOP_ELU;
+    case OP_SELU:
+        return UOP_SELU;
+    case OP_MISH:
+        return UOP_MISH;
+    case OP_HARD_SWISH:
+        return UOP_HARDSWISH;
     case OP_POW:
         return UOP_POW;
     case OP_SIN:
@@ -98,7 +104,7 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
         return UOP_PERMUTE;
 
     default:
-        return UOP_COUNT; // Invalid/unknown
+        return UOP_COUNT;
     }
 }
 
@@ -138,6 +144,9 @@ void cml_ir_set_global_context(CMLGraph_t ir) { g_global_ir_context = ir; }
 
 void cml_ir_reset_global_context(void) {
     if (g_global_ir_context) {
+        if (atomic_load(&g_auto_capture_ir) == g_global_ir_context) {
+            cml_ir_disable_auto_capture();
+        }
         cml_ir_free(g_global_ir_context);
         g_global_ir_context = NULL;
     }

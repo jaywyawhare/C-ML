@@ -621,8 +621,6 @@ static int decompose_sign(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-// Phase B — Comparisons
-
 // CMPEQ: where(a < b, 0, where(b < a, 0, 1))
 static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a = node->inputs[0];
@@ -828,7 +826,6 @@ static int decompose_minimum(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-// Phase C — Math
 
 // LOG10: log(x) * (1/log(10))
 static int decompose_log10(CMLGraph_t ir, struct IRNode* node) {
@@ -1042,7 +1039,6 @@ static int decompose_copysign(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-// Phase D — Reductions
 
 // MEAN: sum(x) / n
 static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
@@ -1157,7 +1153,6 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-// Phase E — Logical
 
 // LOGICAL_NOT: where(x, 0, 1) — but x is float, so where(x != 0, 0, 1)
 // Simplified: we treat nonzero as true. where(x < 0 OR 0 < x, 0, 1)
@@ -1572,134 +1567,55 @@ int cml_ir_decompose(CMLGraph_t ir) {
     struct IRNode* node = ir->head;
 
     while (node) {
-        struct IRNode* next = node->next; // Save next before potential replacement
+        struct IRNode* next = node->next;
         int result = 0;
-        bool was_decomposed = false;
+        bool decomposed = false;
 
         switch (node->type) {
-        // Phase A — Activations
-        case UOP_SIGMOID:
-            result = decompose_sigmoid(ir, node);
-            was_decomposed = true;
-            break;
-        case UOP_TANH:
-            result = decompose_tanh(ir, node);
-            break;
-        case UOP_SQUARE:
-            result = decompose_square(ir, node);
-            break;
-        case UOP_RSQRT:
-            result = decompose_rsqrt(ir, node);
-            break;
-        case UOP_ABS:
-            result = decompose_abs(ir, node);
-            break;
+        case UOP_SIGMOID:  result = decompose_sigmoid(ir, node);  decomposed = true; break;
+        case UOP_TANH:     result = decompose_tanh(ir, node);     decomposed = true; break;
+        case UOP_SQUARE:   result = decompose_square(ir, node);   decomposed = true; break;
+        case UOP_RSQRT:    result = decompose_rsqrt(ir, node);    decomposed = true; break;
+        case UOP_ABS:      result = decompose_abs(ir, node);      decomposed = true; break;
 
-        // Phase B — Comparisons
-        case UOP_CMPEQ:
-            result = decompose_cmpeq(ir, node);
-            break;
-        case UOP_CMPNE:
-            result = decompose_cmpne(ir, node);
-            break;
-        case UOP_CMPLE:
-            result = decompose_cmple(ir, node);
-            break;
-        case UOP_CMPGT:
-            result = decompose_cmpgt(ir, node);
-            break;
-        case UOP_CMPGE:
-            result = decompose_cmpge(ir, node);
-            break;
-        case UOP_MINIMUM:
-            result = decompose_minimum(ir, node);
-            break;
+        case UOP_CMPEQ:    result = decompose_cmpeq(ir, node);    decomposed = true; break;
+        case UOP_CMPNE:    result = decompose_cmpne(ir, node);    decomposed = true; break;
+        case UOP_CMPLE:    result = decompose_cmple(ir, node);    decomposed = true; break;
+        case UOP_CMPGT:    result = decompose_cmpgt(ir, node);    decomposed = true; break;
+        case UOP_CMPGE:    result = decompose_cmpge(ir, node);    decomposed = true; break;
+        case UOP_MINIMUM:  result = decompose_minimum(ir, node);  decomposed = true; break;
 
-        // Phase C — Math
-        case UOP_COS:
-            result = decompose_cos(ir, node);
-            break;
-        case UOP_TAN:
-            result = decompose_tan(ir, node);
-            break;
-        case UOP_LOG2:
-            result = decompose_log2(ir, node);
-            break;
-        case UOP_EXP2:
-            result = decompose_exp2(ir, node);
-            break;
-        case UOP_LOG10:
-            result = decompose_log10(ir, node);
-            break;
-        case UOP_LOGADDEXP:
-            result = decompose_logaddexp(ir, node);
-            break;
-        case UOP_MOD:
-            result = decompose_mod(ir, node);
-            break;
-        case UOP_IDIV:
-            result = decompose_idiv(ir, node);
-            break;
-        case UOP_COPYSIGN:
-            result = decompose_copysign(ir, node);
-            break;
-        case UOP_SIGN:
-            result = decompose_sign(ir, node);
-            break;
-        case UOP_SINH:
-            result = decompose_sinh(ir, node);
-            break;
-        case UOP_COSH:
-            result = decompose_cosh(ir, node);
-            break;
-        case UOP_ATANH:
-            result = decompose_atanh(ir, node);
-            break;
+        case UOP_COS:      result = decompose_cos(ir, node);      decomposed = true; break;
+        case UOP_TAN:      result = decompose_tan(ir, node);      decomposed = true; break;
+        case UOP_LOG2:     result = decompose_log2(ir, node);     decomposed = true; break;
+        case UOP_EXP2:     result = decompose_exp2(ir, node);     decomposed = true; break;
+        case UOP_LOG10:    result = decompose_log10(ir, node);    decomposed = true; break;
+        case UOP_LOGADDEXP:result = decompose_logaddexp(ir, node);decomposed = true; break;
+        case UOP_MOD:      result = decompose_mod(ir, node);      decomposed = true; break;
+        case UOP_IDIV:     result = decompose_idiv(ir, node);     decomposed = true; break;
+        case UOP_COPYSIGN: result = decompose_copysign(ir, node); decomposed = true; break;
+        case UOP_SIGN:     result = decompose_sign(ir, node);     decomposed = true; break;
+        case UOP_SINH:     result = decompose_sinh(ir, node);     decomposed = true; break;
+        case UOP_COSH:     result = decompose_cosh(ir, node);     decomposed = true; break;
+        case UOP_ATANH:    result = decompose_atanh(ir, node);    decomposed = true; break;
 
-        // Phase D — Reductions
-        case UOP_MEAN:
-            result = decompose_mean(ir, node);
-            break;
-        case UOP_MIN_REDUCE:
-            result = decompose_min_reduce(ir, node);
-            break;
+        case UOP_MEAN:       result = decompose_mean(ir, node);       decomposed = true; break;
+        case UOP_MIN_REDUCE: result = decompose_min_reduce(ir, node); decomposed = true; break;
 
-        // Phase E — Logical & misc
-        case UOP_LOGICAL_NOT:
-            result = decompose_logical_not(ir, node);
-            break;
-        case UOP_LOGICAL_AND:
-            result = decompose_logical_and(ir, node);
-            break;
-        case UOP_LOGICAL_OR:
-            result = decompose_logical_or(ir, node);
-            break;
-        case UOP_CLAMP:
-            result = decompose_clamp(ir, node);
-            break;
-        case UOP_SOFTPLUS:
-            result = decompose_softplus(ir, node);
-            break;
-        case UOP_LOGSIGMOID:
-            result = decompose_logsigmoid(ir, node);
-            break;
-        case UOP_ERFC:
-            result = decompose_erfc(ir, node);
-            break;
+        case UOP_LOGICAL_NOT: result = decompose_logical_not(ir, node); decomposed = true; break;
+        case UOP_LOGICAL_AND: result = decompose_logical_and(ir, node); decomposed = true; break;
+        case UOP_LOGICAL_OR:  result = decompose_logical_or(ir, node);  decomposed = true; break;
+        case UOP_CLAMP:       result = decompose_clamp(ir, node);       decomposed = true; break;
+        case UOP_SOFTPLUS:    result = decompose_softplus(ir, node);    decomposed = true; break;
+        case UOP_LOGSIGMOID:  result = decompose_logsigmoid(ir, node);  decomposed = true; break;
+        case UOP_ERFC:        result = decompose_erfc(ir, node);        decomposed = true; break;
 
-        default:
-            // Not a composite op — keep as-is
-            break;
+        default: break;
         }
 
-        if (result != 0 && was_decomposed) {
+        if (result != 0 && decomposed)
             LOG_WARNING("Failed to decompose op type %d", node->type);
-        }
-        (void)was_decomposed;
-        (void)result;
 
-        // After decomposition, node is freed and replaced.
-        // The chain's tail->next was set to 'next' in replace_node_with_chain.
         node = next;
     }
 
