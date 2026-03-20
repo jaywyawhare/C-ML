@@ -50,6 +50,8 @@ static const char* dtype_to_safetensor_str(DType dtype) {
         case DTYPE_BOOL:    return "BOOL";
         case DTYPE_FLOAT8_E4M3: return "F8_E4M3";
         case DTYPE_FLOAT8_E5M2: return "F8_E5M2";
+        case DTYPE_FLOAT8_E4M3_FNUZ: return "F8_E4M3FNUZ";
+        case DTYPE_FLOAT8_E5M2_FNUZ: return "F8_E5M2FNUZ";
         default: return "F32";
     }
 }
@@ -71,6 +73,8 @@ static DType safetensor_str_to_dtype(const char* str) {
     if (strcmp(str, "BOOL") == 0) return DTYPE_BOOL;
     if (strcmp(str, "F8_E4M3") == 0) return DTYPE_FLOAT8_E4M3;
     if (strcmp(str, "F8_E5M2") == 0) return DTYPE_FLOAT8_E5M2;
+    if (strcmp(str, "F8_E4M3FNUZ") == 0) return DTYPE_FLOAT8_E4M3_FNUZ;
+    if (strcmp(str, "F8_E5M2FNUZ") == 0) return DTYPE_FLOAT8_E5M2_FNUZ;
     return DTYPE_FLOAT32;
 }
 

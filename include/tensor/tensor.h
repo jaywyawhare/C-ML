@@ -27,8 +27,10 @@ typedef enum {
     DTYPE_UINT16,
     DTYPE_UINT32,
     DTYPE_UINT64,
-    DTYPE_FLOAT8_E4M3,  // 1 sign, 4 exponent, 3 mantissa (range [-448, 448])
-    DTYPE_FLOAT8_E5M2,  // 1 sign, 5 exponent, 2 mantissa (range [-57344, 57344])
+    DTYPE_FLOAT8_E4M3,       // 1 sign, 4 exponent, 3 mantissa (range [-448, 448])
+    DTYPE_FLOAT8_E5M2,       // 1 sign, 5 exponent, 2 mantissa (range [-57344, 57344])
+    DTYPE_FLOAT8_E4M3_FNUZ,  // FNUZ: no negative zero, no inf, bias=8 (AMD MI300)
+    DTYPE_FLOAT8_E5M2_FNUZ,  // FNUZ: no negative zero, no inf, bias=16 (AMD MI300)
 } DType;
 
 struct IRNode;
@@ -159,6 +161,8 @@ Tensor* tensor_long(Tensor* a);
 Tensor* tensor_short(Tensor* a);
 Tensor* tensor_bool(Tensor* a);
 Tensor* tensor_bfloat16(Tensor* a);
+Tensor* tensor_fp8e4m3fnuz(Tensor* a);
+Tensor* tensor_fp8e5m2fnuz(Tensor* a);
 
 typedef enum {
     INTERP_NEAREST,
@@ -202,6 +206,21 @@ typedef struct {
 SVDResult tensor_svd(Tensor* a);
 
 Tensor* tensor_from_url(const char* url);
+
+Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);
+Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors);
+Tensor* tensor_one_hot(Tensor* indices, int num_classes);
+Tensor* tensor_multinomial(Tensor* probs, int num_samples, bool replacement);
+Tensor* tensor_roll(Tensor* t, int shift, int axis);
+Tensor* tensor_nonzero(Tensor* t);
+Tensor* tensor_copysign(Tensor* a, Tensor* b);
+Tensor* tensor_logaddexp(Tensor* a, Tensor* b);
+
+int tensor_assign(Tensor* t, Tensor* src);
+int tensor_assign_data(Tensor* t, const void* data, size_t nbytes);
+
+uint64_t tensor_hash(Tensor* t);
+int tensor_keccak(Tensor* t, uint8_t* out, size_t out_len);
 
 #ifdef __cplusplus
 }

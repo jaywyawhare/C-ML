@@ -263,6 +263,43 @@ Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims,
     }
 }
 
+/* Nearest-neighbor upsample for 5D tensors [N, C, D, H, W] */
+static Tensor* upsample_nearest_5d(Tensor* input, int out_d, int out_h, int out_w) {
+    int N = input->shape[0], C = input->shape[1];
+    int in_d = input->shape[2], in_h = input->shape[3], in_w = input->shape[4];
+
+    int out_shape[] = {N, C, out_d, out_h, out_w};
+    TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
+                        .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty(out_shape, 5, &cfg);
+    if (!output) return NULL;
+    tensor_ensure_executed(output);
+
+    float* in_data  = (float*)tensor_data_ptr(input);
+    float* out_data = (float*)tensor_data_ptr(output);
+    if (!in_data || !out_data) { tensor_free(output); return NULL; }
+
+    for (int n = 0; n < N; n++) {
+        for (int c = 0; c < C; c++) {
+            for (int od = 0; od < out_d; od++) {
+                int id = od * in_d / out_d;
+                for (int oh = 0; oh < out_h; oh++) {
+                    int ih = oh * in_h / out_h;
+                    for (int ow = 0; ow < out_w; ow++) {
+                        int iw = ow * in_w / out_w;
+                        size_t src = ((size_t)n * C + c) * in_d * in_h * in_w +
+                                     (size_t)id * in_h * in_w + ih * in_w + iw;
+                        size_t dst = ((size_t)n * C + c) * out_d * out_h * out_w +
+                                     (size_t)od * out_h * out_w + oh * out_w + ow;
+                        out_data[dst] = in_data[src];
+                    }
+                }
+            }
+        }
+    }
+    return output;
+}
+
 Tensor* upsample_forward(Module* module, Tensor* input) {
     Upsample* layer = (Upsample*)module;
 
@@ -271,11 +308,43 @@ Tensor* upsample_forward(Module* module, Tensor* input) {
 
     tensor_ensure_executed(input);
 
-    if (input->ndim != 4) {
-        LOG_ERROR("Upsample forward: expected 4D input [N,C,H,W], got %dD", input->ndim);
+    if (input->ndim != 4 && input->ndim != 5) {
+        LOG_ERROR("Upsample forward: expected 4D or 5D input, got %dD", input->ndim);
         return NULL;
     }
 
+    /* 5D path: [N, C, D, H, W] */
+    if (input->ndim == 5) {
+        int in_d = input->shape[2], in_h = input->shape[3], in_w = input->shape[4];
+        int out_d, out_h, out_w;
+
+        if (layer->scale_factor > 0.0f) {
+            out_d = (int)(in_d * layer->scale_factor);
+            out_h = (int)(in_h * layer->scale_factor);
+            out_w = (int)(in_w * layer->scale_factor);
+        } else if (layer->num_output_dims >= 3) {
+            out_d = layer->output_size[0];
+            out_h = layer->output_size[1];
+            out_w = layer->output_size[2];
+        } else {
+            LOG_ERROR("Upsample 5D: neither scale_factor nor 3D output_size is set");
+            return NULL;
+        }
+
+        if (out_d <= 0 || out_h <= 0 || out_w <= 0) {
+            LOG_ERROR("Upsample 5D: invalid output size (%d, %d, %d)", out_d, out_h, out_w);
+            return NULL;
+        }
+
+        if (layer->mode == UPSAMPLE_NEAREST) {
+            return upsample_nearest_5d(input, out_d, out_h, out_w);
+        }
+
+        LOG_ERROR("Upsample 5D: only nearest mode is supported");
+        return NULL;
+    }
+
+    /* 4D path: [N, C, H, W] */
     int in_h = input->shape[2];
     int in_w = input->shape[3];
 

@@ -544,7 +544,7 @@ int backend_init(BackendType type) {
     backend_lock();
     if (g_current_backend && g_current_backend->type == type) {
         backend_unlock();
-        return 0; // Already initialized
+        return 0;
     }
 
     if (g_current_backend) {
@@ -578,7 +578,6 @@ int backend_init(BackendType type) {
         if (device_metal_available()) {
             g_current_backend->ops = simd_ops;
 
-            // Try to detect Metal Performance Shaders availability
             // MPS is available on macOS 12.0+ and provides optimized GPU kernels
 #ifdef __APPLE__
             void* mps_framework =
@@ -605,7 +604,6 @@ int backend_init(BackendType type) {
         if (device_rocm_available()) {
             g_current_backend->ops = simd_ops;
 
-            // Try to detect rocBLAS availability for optimized matmul
             const char* rocblas_libs[] = {
 #ifdef __linux__
                 "librocblas.so", "librocblas.so.0",
@@ -743,11 +741,9 @@ static bool check_blas_available(void) {
 #endif
         NULL};
 
-    // Try to load BLAS libraries
     for (int i = 0; blas_libs[i] != NULL; i++) {
         void* blas_lib = CML_DLOPEN(blas_libs[i], RTLD_LAZY);
         if (blas_lib) {
-            // Check for BLAS symbols
             for (int j = 0; blas_symbols[j] != NULL; j++) {
                 void* symbol = CML_DLSYM(blas_lib, blas_symbols[j]);
                 if (symbol) {
@@ -766,7 +762,7 @@ static bool check_blas_available(void) {
 bool backend_is_available(BackendType type) {
     switch (type) {
     case BACKEND_SCALAR:
-        return true; // Always available
+        return true;
     case BACKEND_SSE:
         return check_cpu_feature_sse();
     case BACKEND_AVX:

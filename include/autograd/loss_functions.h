@@ -59,6 +59,12 @@ struct Tensor* tensor_cosine_embedding_loss(struct Tensor* x1, struct Tensor* x2
 /* loss = -mean(log_probs[i, targets[i]]) */
 struct Tensor* tensor_nll_loss(struct Tensor* log_probs, struct Tensor* targets);
 
+/* Cross entropy with label smoothing: (1-e)*CE + e*uniform_loss */
+struct Tensor* tensor_cross_entropy_loss_smooth(struct Tensor* input, struct Tensor* target,
+                                                float label_smoothing);
+struct Tensor* tensor_sparse_cross_entropy_loss_smooth(struct Tensor* input, struct Tensor* target,
+                                                       float label_smoothing);
+
 #ifdef __cplusplus
 }
 #endif

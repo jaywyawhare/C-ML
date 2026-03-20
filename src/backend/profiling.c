@@ -157,7 +157,6 @@ int profiler_start(Profiler* profiler, const char* name) {
         profiler->capacity = new_capacity;
     }
 
-    // Create new timer
     Timer* timer = profiler_timer_create(name);
     if (!timer)
         return -1;

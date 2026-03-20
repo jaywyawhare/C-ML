@@ -32,7 +32,6 @@ MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype) {
     for (int i = 0; i < num_blocks; i++) {
         pool->blocks[i] = malloc(block_size);
         if (!pool->blocks[i]) {
-            // Free already allocated blocks
             for (int j = 0; j < i; j++) {
                 free(pool->blocks[j]);
             }
@@ -133,7 +132,6 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
     for (size_t i = 0; i < num_tensors; i++) {
         pool->tensors[i] = tensor_empty(shape, ndim, &config);
         if (!pool->tensors[i]) {
-            // Free already allocated tensors
             for (size_t j = 0; j < i; j++) {
                 tensor_free(pool->tensors[j]);
             }

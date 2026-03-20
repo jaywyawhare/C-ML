@@ -208,8 +208,6 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
         return NULL;
     }
 
-    // Step 1: Linear projections
-    // Q: [total_q, embed_dim] -> [total_q, embed_dim]
     float* Q = malloc((size_t)total_q * embed_dim * sizeof(float));
     float* K = malloc((size_t)total_k * embed_dim * sizeof(float));
     float* V = malloc((size_t)total_k * embed_dim * sizeof(float));
@@ -223,8 +221,7 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     linear_project(K, k_in, wk_data, bk_data, total_k, embed_dim, embed_dim);
     linear_project(V, v_in, wv_data, bv_data, total_k, embed_dim, embed_dim);
 
-    // Step 2: Reshape to multi-head: [B, S, H, D] -> [B, H, S, D]
-    // Q: [batch, seq_q, num_heads, head_dim] -> [batch, num_heads, seq_q, head_dim]
+    // [B, S, H, D] -> [B, H, S, D]
     float* Q_mh = malloc((size_t)batch * num_heads * seq_q * head_dim * sizeof(float));
     float* K_mh = malloc((size_t)batch * num_heads * seq_k * head_dim * sizeof(float));
     float* V_mh = malloc((size_t)batch * num_heads * seq_k * head_dim * sizeof(float));
@@ -234,7 +231,6 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
         return NULL;
     }
 
-    // Transpose [B, S, H, D] -> [B, H, S, D]
     for (int b = 0; b < batch; b++) {
         for (int s = 0; s < seq_q; s++) {
             for (int h = 0; h < num_heads; h++) {
@@ -258,8 +254,7 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
 
     free(Q); free(K); free(V);
 
-    // Step 3: Attention scores: [B*H, seq_q, head_dim] @ [B*H, head_dim, seq_k] -> [B*H, seq_q, seq_k]
-    // First transpose K: [B*H, seq_k, head_dim] -> [B*H, head_dim, seq_k]
+    // Transpose K: [B*H, seq_k, head_dim] -> [B*H, head_dim, seq_k]
     int BH = batch * num_heads;
     float* K_t = malloc((size_t)BH * head_dim * seq_k * sizeof(float));
     if (!K_t) {
@@ -289,20 +284,17 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     free(Q_mh);
     free(K_mh);
 
-    // Scale by 1/sqrt(head_dim)
     float scale = 1.0f / sqrtf((float)head_dim);
     size_t scores_size = (size_t)BH * seq_q * seq_k;
     for (size_t i = 0; i < scores_size; i++) {
         scores[i] *= scale;
     }
 
-    // Step 4: Apply mask if provided
     if (mask) {
         tensor_ensure_executed(mask);
         float* mask_data = (float*)tensor_data_ptr(mask);
         if (mask_data) {
-            // Mask shape: [seq_q, seq_k] or [batch, seq_q, seq_k]
-            // Broadcast across batch*heads
+            // Broadcast mask across batch*heads
             for (int bh = 0; bh < BH; bh++) {
                 for (int sq = 0; sq < seq_q; sq++) {
                     for (int sk = 0; sk < seq_k; sk++) {
@@ -322,10 +314,9 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
         }
     }
 
-    // Step 5: Softmax over last dim
     softmax_inplace(scores, BH * seq_q, seq_k);
 
-    // Step 6: scores @ V -> [B*H, seq_q, head_dim]
+    // scores @ V -> [B*H, seq_q, head_dim]
     float* attn_out = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
     if (!attn_out) {
         LOG_ERROR("MultiHeadAttention forward: allocation failed");
@@ -337,7 +328,7 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     free(scores);
     free(V_mh);
 
-    // Step 7: Transpose back [B, H, seq_q, head_dim] -> [B, seq_q, H, head_dim] -> [B, seq_q, embed_dim]
+    // [B, H, seq_q, head_dim] -> [B, seq_q, embed_dim]
     float* concat = malloc((size_t)batch * seq_q * embed_dim * sizeof(float));
     if (!concat) {
         LOG_ERROR("MultiHeadAttention forward: allocation failed");
@@ -357,7 +348,6 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     }
     free(attn_out);
 
-    // Step 8: Output projection: [total_q, embed_dim] -> [total_q, embed_dim]
     float* output_data = malloc((size_t)total_q * embed_dim * sizeof(float));
     if (!output_data) {
         LOG_ERROR("MultiHeadAttention forward: allocation failed");
@@ -408,7 +398,6 @@ static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
     if (!x) return NULL;
     memcpy(x, x_data, buf_size * sizeof(float));
 
-    // Step 1: Self-attention
     Tensor* attn_out = multihead_attention_forward(layer->self_attn, input, input, input, NULL);
     if (!attn_out) {
         free(x);
@@ -417,19 +406,16 @@ static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
     tensor_ensure_executed(attn_out);
     float* attn_data = (float*)tensor_data_ptr(attn_out);
 
-    // Step 2: Residual connection: x = x + self_attention
     for (size_t i = 0; i < buf_size; i++) {
         x[i] += attn_data[i];
     }
     tensor_free(attn_out);
 
-    // Step 3: Layer norm 1
     float* norm1_w = (float*)tensor_data_ptr(layer->norm1_weight->tensor);
     float* norm1_b = (float*)tensor_data_ptr(layer->norm1_bias->tensor);
     layer_norm_inplace(x, total, d_model, norm1_w, norm1_b, layer->norm_eps);
 
-    // Step 4: Feedforward network
-    // ff_hidden = relu(x @ linear1_weight^T + linear1_bias)
+    // ff_hidden = relu(x @ W1^T + b1), ff_out = ff_hidden @ W2^T + b2
     float* l1_w = (float*)tensor_data_ptr(layer->linear1_weight->tensor);
     float* l1_b = (float*)tensor_data_ptr(layer->linear1_bias->tensor);
     float* l2_w = (float*)tensor_data_ptr(layer->linear2_weight->tensor);
@@ -443,12 +429,10 @@ static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
 
     linear_project(ff_hidden, x, l1_w, l1_b, total, d_model, dim_ff);
 
-    // ReLU
     for (size_t i = 0; i < (size_t)total * dim_ff; i++) {
         if (ff_hidden[i] < 0.0f) ff_hidden[i] = 0.0f;
     }
 
-    // ff_out = ff_hidden @ linear2_weight^T + linear2_bias
     float* ff_out = malloc(buf_size * sizeof(float));
     if (!ff_out) {
         free(x); free(ff_hidden);
@@ -458,13 +442,11 @@ static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
     linear_project(ff_out, ff_hidden, l2_w, l2_b, total, dim_ff, d_model);
     free(ff_hidden);
 
-    // Step 5: Residual connection: x = x + ff_out
     for (size_t i = 0; i < buf_size; i++) {
         x[i] += ff_out[i];
     }
     free(ff_out);
 
-    // Step 6: Layer norm 2
     float* norm2_w = (float*)tensor_data_ptr(layer->norm2_weight->tensor);
     float* norm2_b = (float*)tensor_data_ptr(layer->norm2_bias->tensor);
     layer_norm_inplace(x, total, d_model, norm2_w, norm2_b, layer->norm_eps);
@@ -725,7 +707,6 @@ Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor
     if (!x) return NULL;
     memcpy(x, x_data, buf_size * sizeof(float));
 
-    // Step 1: Self-attention
     Tensor* self_attn_out = multihead_attention_forward(layer->self_attn, tgt, tgt, tgt, tgt_mask);
     if (!self_attn_out) { free(x); return NULL; }
     tensor_ensure_executed(self_attn_out);
@@ -739,7 +720,7 @@ Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor
     float* n1b = (float*)tensor_data_ptr(layer->norm1_bias->tensor);
     layer_norm_inplace(x, total, d_model, n1w, n1b, layer->norm_eps);
 
-    // Step 2: Cross-attention (if memory provided)
+    // Cross-attention (if memory provided)
     if (memory) {
         tensor_ensure_executed(memory);
         int x_shape[] = {batch, seq_len, d_model};
@@ -761,7 +742,6 @@ Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor
         layer_norm_inplace(x, total, d_model, n2w, n2b, layer->norm_eps);
     }
 
-    // Step 3: Feedforward
     float* l1w = (float*)tensor_data_ptr(layer->linear1_weight->tensor);
     float* l1b = (float*)tensor_data_ptr(layer->linear1_bias->tensor);
     float* l2w = (float*)tensor_data_ptr(layer->linear2_weight->tensor);
@@ -1127,7 +1107,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
         return NULL;
     }
 
-    // Step 1: Linear projections
     float* Q = malloc((size_t)total_q * embed_dim * sizeof(float));
     float* K = malloc((size_t)total_k * embed_dim * sizeof(float));
     float* V = malloc((size_t)total_k * embed_dim * sizeof(float));
@@ -1141,7 +1120,7 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
     linear_project(K, k_in, wk_data, bk_data, total_k, embed_dim, embed_dim);
     linear_project(V, v_in, wv_data, bv_data, total_k, embed_dim, embed_dim);
 
-    // Step 2: Reshape to multi-head: [B, S, H, D] -> [B, H, S, D]
+    // [B, S, H, D] -> [B, H, S, D]
     int BH = batch * num_heads;
     float* Q_mh = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
     float* K_mh = malloc((size_t)BH * seq_k * head_dim * sizeof(float));
@@ -1177,12 +1156,9 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
 
     float scale = 1.0f / sqrtf((float)head_dim);
 
-    // Step 3: Tiled attention with online softmax (FlashAttention-2 on CPU)
-    // Output accumulator: [BH, seq_q, head_dim]
+    // Tiled attention with online softmax (FlashAttention-2 on CPU)
     float* O = calloc((size_t)BH * seq_q * head_dim, sizeof(float));
-    // Running max per row: [BH, seq_q] initialized to -inf
     float* row_max = malloc((size_t)BH * seq_q * sizeof(float));
-    // Running sum per row: [BH, seq_q] initialized to 0
     float* row_sum = calloc((size_t)BH * seq_q, sizeof(float));
     if (!O || !row_max || !row_sum) {
         LOG_ERROR("flash_attention_forward: allocation failed");
@@ -1195,7 +1171,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
         row_max[i] = -1e30f;
     }
 
-    // Temporary tile buffers
     float* S_tile = malloc((size_t)block_q * block_kv * sizeof(float));
     if (!S_tile) {
         LOG_ERROR("flash_attention_forward: allocation failed");
@@ -1218,19 +1193,16 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
         float* rmax_bh = row_max + (size_t)bh * seq_q;
         float* rsum_bh = row_sum + (size_t)bh * seq_q;
 
-        // For each Q tile
         for (int qi = 0; qi < seq_q; qi += block_q) {
             int q_end = qi + block_q;
             if (q_end > seq_q) q_end = seq_q;
             int q_len = q_end - qi;
 
-            // For each K/V tile
             for (int ki = 0; ki < seq_k; ki += block_kv) {
                 int k_end = ki + block_kv;
                 if (k_end > seq_k) k_end = seq_k;
                 int k_len = k_end - ki;
 
-                // Compute S_tile = Q_tile @ K_tile^T * scale
                 for (int qr = 0; qr < q_len; qr++) {
                     for (int kr = 0; kr < k_len; kr++) {
                         float dot = 0.0f;
@@ -1242,7 +1214,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
                     }
                 }
 
-                // Apply causal mask if configured
                 if (config->causal) {
                     for (int qr = 0; qr < q_len; qr++) {
                         for (int kr = 0; kr < k_len; kr++) {
@@ -1253,7 +1224,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
                     }
                 }
 
-                // Apply external mask if provided
                 if (mask_data) {
                     int b_idx = bh / num_heads;
                     for (int qr = 0; qr < q_len; qr++) {
@@ -1272,38 +1242,30 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
                     }
                 }
 
-                // Online softmax update for each row in the Q tile
                 for (int qr = 0; qr < q_len; qr++) {
                     int row_idx = qi + qr;
 
-                    // Find tile row max
                     float tile_max = S_tile[qr * k_len];
                     for (int kr = 1; kr < k_len; kr++) {
                         if (S_tile[qr * k_len + kr] > tile_max)
                             tile_max = S_tile[qr * k_len + kr];
                     }
 
-                    // Compute new global max
                     float old_max = rmax_bh[row_idx];
                     float new_max = old_max > tile_max ? old_max : tile_max;
 
-                    // Rescale factor for previously accumulated values
                     float rescale_old = expf(old_max - new_max);
-                    // Rescale factor for new tile
                     float rescale_new = expf(tile_max - new_max);
 
-                    // Rescale existing accumulator
                     rsum_bh[row_idx] *= rescale_old;
                     for (int d = 0; d < head_dim; d++) {
                         O_bh[row_idx * head_dim + d] *= rescale_old;
                     }
 
-                    // Compute exp(S - tile_max) for this row and accumulate
                     float tile_sum = 0.0f;
                     for (int kr = 0; kr < k_len; kr++) {
                         float p = expf(S_tile[qr * k_len + kr] - tile_max) * rescale_new;
                         tile_sum += p;
-                        // Accumulate weighted V
                         for (int d = 0; d < head_dim; d++) {
                             O_bh[row_idx * head_dim + d] +=
                                 p * V_bh[(ki + kr) * head_dim + d];
@@ -1316,7 +1278,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
             }
         }
 
-        // Final normalization: O = O / row_sum
         for (int qr = 0; qr < seq_q; qr++) {
             float inv_sum = (rsum_bh[qr] > 0.0f) ? (1.0f / rsum_bh[qr]) : 0.0f;
             for (int d = 0; d < head_dim; d++) {
@@ -1332,7 +1293,7 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
     free(K_mh);
     free(V_mh);
 
-    // Step 4: Transpose back [B, H, seq_q, head_dim] -> [B, seq_q, embed_dim]
+    // [B, H, seq_q, head_dim] -> [B, seq_q, embed_dim]
     float* concat = malloc((size_t)batch * seq_q * embed_dim * sizeof(float));
     if (!concat) {
         LOG_ERROR("flash_attention_forward: allocation failed");
@@ -1352,7 +1313,6 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
     }
     free(O);
 
-    // Step 5: Output projection
     float* output_data = malloc((size_t)total_q * embed_dim * sizeof(float));
     if (!output_data) {
         LOG_ERROR("flash_attention_forward: allocation failed");
@@ -1435,7 +1395,6 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
         return NULL;
     }
 
-    // Step 1: Project Q from the new query, K and V from the new key/value
     float* Q_proj = malloc((size_t)total_q * embed_dim * sizeof(float));
     float* K_proj = malloc((size_t)total_k * embed_dim * sizeof(float));
     float* V_proj = malloc((size_t)total_k * embed_dim * sizeof(float));
@@ -1449,7 +1408,7 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     linear_project(K_proj, k_in, wk_data, bk_data, total_k, embed_dim, embed_dim);
     linear_project(V_proj, v_in, wv_data, bv_data, total_k, embed_dim, embed_dim);
 
-    // Step 2: Reshape new K, V to [B, H, seq_k, D] and append to cache
+    // Reshape new K, V to [B, H, seq_k, D] and append to cache
     float* kc_data = (float*)tensor_data_ptr(cache->key_cache);
     float* vc_data = (float*)tensor_data_ptr(cache->value_cache);
     if (!kc_data || !vc_data) {
@@ -1461,7 +1420,7 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     int max_sl = cache->max_seq_len;
     int cur_pos = cache->current_len;
 
-    // Copy new K, V into cache at position [b, h, cur_pos..cur_pos+seq_k, d]
+    // Copy new K, V into cache at [b, h, cur_pos..cur_pos+seq_k, d]
     for (int b = 0; b < batch; b++) {
         for (int s = 0; s < seq_k; s++) {
             for (int h = 0; h < num_heads; h++) {
@@ -1481,11 +1440,10 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     free(K_proj);
     free(V_proj);
 
-    // Update current length
     cache->current_len = cur_pos + seq_k;
     int cached_len = cache->current_len;
 
-    // Step 3: Reshape Q to multi-head: [B, seq_q, H, D] -> [B, H, seq_q, D]
+    // [B, seq_q, H, D] -> [B, H, seq_q, D]
     int BH = batch * num_heads;
     float* Q_mh = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
     if (!Q_mh) {
@@ -1506,9 +1464,7 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     }
     free(Q_proj);
 
-    // Step 4: Compute attention scores: Q_mh @ cached_K^T
-    // cached K is in [B, H, max_sl, D] but we only use [0..cached_len)
-    // Transpose cached K for matmul: [BH, D, cached_len]
+    // Transpose cached K for matmul: [B, H, cached_len, D] -> [BH, D, cached_len]
     float* K_t = malloc((size_t)BH * head_dim * cached_len * sizeof(float));
     if (!K_t) {
         LOG_ERROR("multihead_attention_forward_cached: allocation failed");
@@ -1528,7 +1484,6 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
         }
     }
 
-    // scores: [BH, seq_q, cached_len]
     float* scores = malloc((size_t)BH * seq_q * cached_len * sizeof(float));
     if (!scores) {
         LOG_ERROR("multihead_attention_forward_cached: allocation failed");
@@ -1540,14 +1495,12 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     free(K_t);
     free(Q_mh);
 
-    // Scale
     float scale = 1.0f / sqrtf((float)head_dim);
     size_t scores_size = (size_t)BH * seq_q * cached_len;
     for (size_t i = 0; i < scores_size; i++) {
         scores[i] *= scale;
     }
 
-    // Apply mask if provided
     if (mask) {
         tensor_ensure_executed(mask);
         float* mask_data = (float*)tensor_data_ptr(mask);
@@ -1571,11 +1524,9 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
         }
     }
 
-    // Softmax
     softmax_inplace(scores, BH * seq_q, cached_len);
 
-    // Step 5: scores @ cached_V -> [BH, seq_q, head_dim]
-    // Extract cached V into contiguous buffer [BH, cached_len, head_dim]
+    // Extract cached V into contiguous [BH, cached_len, head_dim] for matmul
     float* V_cached = malloc((size_t)BH * cached_len * head_dim * sizeof(float));
     if (!V_cached) {
         LOG_ERROR("multihead_attention_forward_cached: allocation failed");
@@ -1606,7 +1557,7 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     free(scores);
     free(V_cached);
 
-    // Step 6: Transpose back [B, H, seq_q, D] -> [B, seq_q, embed_dim]
+    // [B, H, seq_q, D] -> [B, seq_q, embed_dim]
     float* concat = malloc((size_t)batch * seq_q * embed_dim * sizeof(float));
     if (!concat) {
         LOG_ERROR("multihead_attention_forward_cached: allocation failed");
@@ -1626,7 +1577,6 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     }
     free(attn_out);
 
-    // Step 7: Output projection
     float* output_data = malloc((size_t)total_q * embed_dim * sizeof(float));
     if (!output_data) {
         LOG_ERROR("multihead_attention_forward_cached: allocation failed");

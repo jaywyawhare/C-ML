@@ -603,6 +603,211 @@ Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, flo
     return uop_add(uop_mul(weight_pos, pos_loss), uop_mul(weight_neg, neg_loss));
 }
 
+Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
+                                          float label_smoothing) {
+    if (!input || !target) {
+        LOG_ERROR("Cross Entropy Loss (smooth): input or target is NULL");
+        return NULL;
+    }
+
+    if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
+        LOG_ERROR("Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
+        return NULL;
+    }
+
+    if (label_smoothing == 0.0f)
+        return tensor_cross_entropy_loss(input, target);
+
+    if (target->ndim != 1) {
+        LOG_ERROR("Cross Entropy Loss (smooth): target must be 1D");
+        return NULL;
+    }
+
+    if (input->ndim < 2) {
+        LOG_ERROR("Cross Entropy Loss (smooth): input must be at least 2D [N, C]");
+        return NULL;
+    }
+
+    size_t n_samples = target->numel;
+    size_t input_batch_size = 1;
+    for (int i = 0; i < input->ndim - 1; i++)
+        input_batch_size *= (size_t)input->shape[i];
+
+    if (input_batch_size != n_samples) {
+        LOG_ERROR("Cross Entropy Loss (smooth): batch size mismatch - input: %zu, target: %zu",
+                  input_batch_size, n_samples);
+        return NULL;
+    }
+
+    int num_classes = input->shape[input->ndim - 1];
+
+    Tensor* softmax_output = tensor_softmax(input, input->ndim - 1);
+    if (!softmax_output) return NULL;
+
+    Tensor* log_softmax = tensor_log(softmax_output);
+    if (!log_softmax) return NULL;
+
+    Tensor* gathered = uop_gather(log_softmax, target, -1);
+    if (!gathered) return NULL;
+
+    Tensor* neg_gathered = uop_neg(gathered);
+    if (!neg_gathered) return NULL;
+
+    ReduceParams ce_reduce = {0};
+    Tensor* ce_loss = uop_mean(neg_gathered, &ce_reduce);
+    if (!ce_loss) return NULL;
+
+    Tensor* neg_log_softmax = uop_neg(log_softmax);
+    if (!neg_log_softmax) return NULL;
+
+    ReduceParams all_reduce = {0};
+    Tensor* sum_neg_log = uop_mean(neg_log_softmax, &all_reduce);
+    if (!sum_neg_log) return NULL;
+
+    float inv_k = 1.0f / (float)num_classes;
+    float inv_k_arr[1] = {inv_k};
+    Tensor* inv_k_t = tensor_from_array_2d(inv_k_arr, 1, 1);
+    if (!inv_k_t) return NULL;
+
+    Tensor* uniform_loss = uop_mul(sum_neg_log, inv_k_t);
+    if (!uniform_loss) return NULL;
+
+    float eps = label_smoothing;
+    float one_minus_eps_arr[1] = {1.0f - eps};
+    Tensor* one_minus_eps_t = tensor_from_array_2d(one_minus_eps_arr, 1, 1);
+    if (!one_minus_eps_t) return NULL;
+
+    float eps_arr[1] = {eps};
+    Tensor* eps_t = tensor_from_array_2d(eps_arr, 1, 1);
+    if (!eps_t) return NULL;
+
+    Tensor* weighted_ce = uop_mul(one_minus_eps_t, ce_loss);
+    if (!weighted_ce) return NULL;
+
+    Tensor* weighted_uniform = uop_mul(eps_t, uniform_loss);
+    if (!weighted_uniform) return NULL;
+
+    return uop_add(weighted_ce, weighted_uniform);
+}
+
+Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
+                                                 float label_smoothing) {
+    if (!input || !target) {
+        LOG_ERROR("Sparse Cross Entropy Loss (smooth): input or target is NULL");
+        return NULL;
+    }
+
+    if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
+        LOG_ERROR("Sparse Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
+        return NULL;
+    }
+
+    if (label_smoothing == 0.0f)
+        return tensor_sparse_cross_entropy_loss(input, target);
+
+    if (target->ndim != 1) {
+        LOG_ERROR("Sparse Cross Entropy Loss (smooth): target must be 1D");
+        return NULL;
+    }
+
+    if (input->ndim < 2) {
+        LOG_ERROR("Sparse Cross Entropy Loss (smooth): input must be at least 2D [N, C]");
+        return NULL;
+    }
+
+    size_t n_samples = target->numel;
+    size_t input_batch_size = 1;
+    for (int i = 0; i < input->ndim - 1; i++)
+        input_batch_size *= (size_t)input->shape[i];
+
+    if (input_batch_size != n_samples) {
+        LOG_ERROR("Sparse Cross Entropy Loss (smooth): batch size mismatch - input: %zu, target: %zu",
+                  input_batch_size, n_samples);
+        return NULL;
+    }
+
+    int num_classes = input->shape[input->ndim - 1];
+
+    Tensor* target_logits = uop_gather(input, target, -1);
+    if (!target_logits) return NULL;
+
+    Tensor* exp_logits = uop_exp(input);
+    if (!exp_logits) return NULL;
+
+    int sum_dim = input->ndim - 1;
+    int sum_dims[] = {sum_dim};
+    ReduceParams sum_params = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
+
+    Tensor* sum_exp = uop_sum(exp_logits, &sum_params);
+    if (!sum_exp) return NULL;
+
+    Tensor* log_sum_exp = uop_log(sum_exp);
+    if (!log_sum_exp) return NULL;
+
+    Tensor* loss_per_sample = uop_add(uop_neg(target_logits), log_sum_exp);
+    if (!loss_per_sample) return NULL;
+
+    ReduceParams mean_params = {0};
+    Tensor* ce_loss = uop_mean(loss_per_sample, &mean_params);
+    if (!ce_loss) return NULL;
+
+    Tensor* neg_input = uop_neg(input);
+    if (!neg_input) return NULL;
+
+    Tensor* exp_for_lse = uop_exp(input);
+    if (!exp_for_lse) return NULL;
+
+    Tensor* sum_exp_2 = uop_sum(exp_for_lse, &sum_params);
+    if (!sum_exp_2) return NULL;
+
+    Tensor* log_sum_exp_2 = uop_log(sum_exp_2);
+    if (!log_sum_exp_2) return NULL;
+
+    ReduceParams class_reduce = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
+    Tensor* input_sum = uop_sum(input, &class_reduce);
+    if (!input_sum) return NULL;
+
+    float k_f = (float)num_classes;
+    float k_arr[1] = {k_f};
+    Tensor* k_t = tensor_from_array_2d(k_arr, 1, 1);
+    if (!k_t) return NULL;
+
+    Tensor* scaled_lse = uop_mul(k_t, log_sum_exp_2);
+    if (!scaled_lse) return NULL;
+
+    Tensor* uniform_per_sample = uop_sub(scaled_lse, input_sum);
+    if (!uniform_per_sample) return NULL;
+
+    float inv_k = 1.0f / k_f;
+    float inv_k_arr[1] = {inv_k};
+    Tensor* inv_k_t = tensor_from_array_2d(inv_k_arr, 1, 1);
+    if (!inv_k_t) return NULL;
+
+    Tensor* uniform_scaled = uop_mul(inv_k_t, uniform_per_sample);
+    if (!uniform_scaled) return NULL;
+
+    ReduceParams uniform_mean = {0};
+    Tensor* uniform_loss = uop_mean(uniform_scaled, &uniform_mean);
+    if (!uniform_loss) return NULL;
+
+    float eps = label_smoothing;
+    float one_minus_eps_arr[1] = {1.0f - eps};
+    Tensor* one_minus_eps_t = tensor_from_array_2d(one_minus_eps_arr, 1, 1);
+    if (!one_minus_eps_t) return NULL;
+
+    float eps_arr[1] = {eps};
+    Tensor* eps_t = tensor_from_array_2d(eps_arr, 1, 1);
+    if (!eps_t) return NULL;
+
+    Tensor* weighted_ce = uop_mul(one_minus_eps_t, ce_loss);
+    if (!weighted_ce) return NULL;
+
+    Tensor* weighted_uniform = uop_mul(eps_t, uniform_loss);
+    if (!weighted_uniform) return NULL;
+
+    return uop_add(weighted_ce, weighted_uniform);
+}
+
 Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets) {
     if (!log_probs || !targets) {
         LOG_ERROR("NLL Loss: log_probs or targets is NULL");

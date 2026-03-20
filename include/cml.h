@@ -66,6 +66,7 @@
 
 #include "zoo/zoo.h"
 #include "datasets/datasets.h"
+#include "datasets/loaders.h"
 
 void cml_summary(struct Module* module);
 

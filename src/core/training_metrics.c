@@ -869,7 +869,7 @@ static void training_metrics_auto_detect_epoch(Optimizer* optimizer) {
     if (!g_global_metrics || !optimizer)
         return;
     if (g_manual_epoch_control) {
-        g_zero_grad_called = false; // Reset flag to prevent accumulation
+        g_zero_grad_called = false;
         return;
     }
 
@@ -888,7 +888,7 @@ static void training_metrics_auto_detect_epoch(Optimizer* optimizer) {
 
         g_current_epoch++;
         g_epoch_start_time = get_time_sec();
-        g_zero_grad_called = false; // Reset flag
+        g_zero_grad_called = false;
     } else if (g_zero_grad_called && !g_epoch_in_progress) {
         g_current_epoch     = 1;
         g_epoch_start_time  = get_time_sec();
@@ -900,7 +900,7 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
     if (!g_global_metrics)
         return;
     g_manual_epoch_control = true;
-    g_current_epoch        = 0; // Reset epoch counter for manual control
+    g_current_epoch        = 0;
     if (num_epochs > g_global_metrics->num_epochs) {
         training_metrics_ensure_capacity(g_global_metrics, num_epochs);
     }

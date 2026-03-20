@@ -25,7 +25,6 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int 
     scheduler->num_milestones = num_milestones;
     scheduler->last_epoch     = 0;
 
-    // Copy milestones array
     scheduler->milestones = malloc(sizeof(int) * (size_t)num_milestones);
     if (!scheduler->milestones) {
         free(scheduler);
@@ -72,7 +71,6 @@ LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int tota
     scheduler->final_div_factor = final_div_factor > 0.0f ? final_div_factor : 1e4f;
     scheduler->last_epoch       = 0;
 
-    // Set initial learning rate = max_lr / div_factor
     float init_lr = max_lr / scheduler->div_factor;
     scheduler->initial_lr = init_lr;
     scheduler->current_lr = init_lr;

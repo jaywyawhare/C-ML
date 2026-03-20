@@ -332,7 +332,6 @@ CMLBackendBufferType_t cml_backend_buffer_get_type(CMLBackendBuffer_t buffer) {
 }
 
 void cml_backend_buffer_reset(CMLBackendBuffer_t buffer) {
-    // Clear the buffer
     if (buffer) {
         cml_backend_buffer_clear(buffer, 0);
     }

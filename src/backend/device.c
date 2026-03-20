@@ -694,13 +694,9 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
         memcpy(dst, src, size);
         return 0;
     } else if (src_device == DEVICE_CPU) {
-        // CPU to other device - copy to CPU first, then to device
-        // Copy via CPU buffer
         memcpy(dst, src, size);
         return 0;
     } else if (dst_device == DEVICE_CPU) {
-        // Other device to CPU - copy from device to CPU
-        // Copy via CPU buffer
         memcpy(dst, src, size);
         return 0;
     } else {

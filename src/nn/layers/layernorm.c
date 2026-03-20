@@ -35,19 +35,17 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
     mean_params.keepdim  = true;
 
     Tensor* mean_reduced = uop_mean(input, &mean_params);
-    if (!mean_reduced) {
+    if (!mean_reduced)
         return NULL;
-    }
+
     Tensor* centered = uop_sub(input, mean_reduced);
-    tensor_free(mean_reduced);
-    if (!centered) {
+    if (!centered)
         return NULL;
-    }
+
     Tensor* diff_sq = uop_mul(centered, centered);
-    if (!diff_sq) {
-        tensor_free(centered);
+    if (!diff_sq)
         return NULL;
-    }
+
     ReduceParams var_params;
     int var_dims[]      = {mean_dim};
     var_params.dims     = var_dims;
@@ -55,44 +53,33 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
     var_params.keepdim  = true;
 
     Tensor* var_reduced = uop_mean(diff_sq, &var_params);
-    tensor_free(diff_sq);
-    if (!var_reduced) {
-        tensor_free(centered);
+    if (!var_reduced)
         return NULL;
-    }
+
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* eps_tensor = tensor_zeros(var_reduced->shape, var_reduced->ndim, &config);
-    if (!eps_tensor) {
-        tensor_free(centered);
-        tensor_free(var_reduced);
+    if (!eps_tensor)
         return NULL;
-    }
+
     float* eps_data = (float*)tensor_data_ptr(eps_tensor);
     if (eps_data) {
-        for (size_t i = 0; i < eps_tensor->numel; i++) {
+        for (size_t i = 0; i < eps_tensor->numel; i++)
             eps_data[i] = ln->eps;
-        }
     }
+
     Tensor* var_eps = uop_add(var_reduced, eps_tensor);
-    tensor_free(var_reduced);
-    tensor_free(eps_tensor);
-    if (!var_eps) {
-        tensor_free(centered);
+    if (!var_eps)
         return NULL;
-    }
+
     Tensor* std_tensor = uop_sqrt(var_eps);
-    tensor_free(var_eps);
-    if (!std_tensor) {
-        tensor_free(centered);
+    if (!std_tensor)
         return NULL;
-    }
+
     Tensor* normalized = uop_div(centered, std_tensor);
-    tensor_free(centered);
-    tensor_free(std_tensor);
-    if (!normalized) {
+    if (!normalized)
         return NULL;
-    }
+
     Tensor* output = normalized;
 
     if (ln->affine && ln->weight && ln->bias) {
@@ -101,31 +88,24 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
         expand_weight.new_ndim  = input->ndim;
 
         Tensor* weight_broadcast = uop_expand(ln->weight->tensor, &expand_weight);
-        if (!weight_broadcast) {
-            tensor_free(output);
+        if (!weight_broadcast)
             return NULL;
-        }
+
         Tensor* scaled = uop_mul(weight_broadcast, output);
-        tensor_free(weight_broadcast);
-        tensor_free(output);
-        if (!scaled) {
+        if (!scaled)
             return NULL;
-        }
+
         ExpandParams expand_bias;
         expand_bias.new_shape = input->shape;
         expand_bias.new_ndim  = input->ndim;
 
         Tensor* bias_broadcast = uop_expand(ln->bias->tensor, &expand_bias);
-        if (!bias_broadcast) {
-            tensor_free(scaled);
+        if (!bias_broadcast)
             return NULL;
-        }
+
         output = uop_add(scaled, bias_broadcast);
-        tensor_free(scaled);
-        tensor_free(bias_broadcast);
-        if (!output) {
+        if (!output)
             return NULL;
-        }
     }
     if (autograd_is_grad_enabled() && input->requires_grad) {
         output->requires_grad = true;

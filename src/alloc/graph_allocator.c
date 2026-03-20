@@ -181,7 +181,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         return calculate_peak_memory_simple(graph);
     }
 
-    // Step 1: Collect tensor sizes and build dependency graph
     for (size_t i = 0; i < node_count; i++) {
         CMLGraphNode_t node = cml_graph_get_node_by_index(graph, i);
         if (!node)
@@ -205,7 +204,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
             if (!consumer || consumer == node)
                 continue;
 
-            // Check if consumer uses this node as input
             int num_inputs = cml_graph_node_get_num_inputs(consumer);
             for (int k = 0; k < num_inputs; k++) {
                 CMLGraphNode_t input = cml_graph_node_get_input(consumer, k);
@@ -217,7 +215,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         }
     }
 
-    // Step 2: Topological sort to determine execution order
     // Use Kahn's algorithm
     int* in_degree = calloc(node_count, sizeof(int));
     if (!in_degree) {
@@ -228,21 +225,19 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         return calculate_peak_memory_simple(graph);
     }
 
-    // Calculate in-degrees (number of dependencies)
     for (size_t i = 0; i < node_count; i++) {
         CMLGraphNode_t node = cml_graph_get_node_by_index(graph, i);
         if (!node)
             continue;
 
         if (is_leaf[i]) {
-            in_degree[i] = 0; // Leaf nodes have no dependencies
+            in_degree[i] = 0;
         } else {
             int num_inputs = cml_graph_node_get_num_inputs(node);
             in_degree[i]   = num_inputs;
         }
     }
 
-    // Queue for nodes ready to execute (no dependencies)
     size_t* queue = malloc(node_count * sizeof(size_t));
     if (!queue) {
         free(tensor_sizes);
@@ -256,14 +251,12 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     int queue_front = 0;
     int queue_back  = 0;
 
-    // Add leaf nodes to queue (they have no dependencies)
     for (size_t i = 0; i < node_count; i++) {
         if (in_degree[i] == 0) {
             queue[queue_back++] = i;
         }
     }
 
-    // Topological sort
     int order = 0;
     while (queue_front < queue_back) {
         size_t current_idx           = queue[queue_front++];
@@ -278,7 +271,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
                     if (!node)
                         continue;
 
-                    // Check if node depends on current_node
                     int num_inputs = cml_graph_node_get_num_inputs(node);
                     for (int j = 0; j < num_inputs; j++) {
                         CMLGraphNode_t input = cml_graph_node_get_input(node, j);
@@ -298,11 +290,8 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     free(in_degree);
     free(queue);
 
-    // Step 3: Simulate execution and track liveness
-    // For each execution step, calculate sum of alive tensor sizes
     size_t peak_memory = 0;
 
-    // Track when each tensor becomes alive and when it can be freed
     int* alive_until = calloc(node_count, sizeof(int));
     if (!alive_until) {
         free(tensor_sizes);
@@ -312,12 +301,11 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         return calculate_peak_memory_simple(graph);
     }
 
-    // Calculate when each tensor can be freed
     // A tensor is alive until all its consumers have executed
     for (size_t i = 0; i < node_count; i++) {
         if (is_leaf[i]) {
             // Leaf nodes are always alive (never freed)
-            alive_until[i] = order; // Stay alive until end
+            alive_until[i] = order;
         } else {
             // Find the last consumer's execution order
             int last_consumer_order = execution_order[i];
@@ -328,7 +316,6 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
                     if (!consumer || consumer == node)
                         continue;
 
-                    // Check if consumer uses this node
                     int num_inputs = cml_graph_node_get_num_inputs(consumer);
                     for (int k = 0; k < num_inputs; k++) {
                         CMLGraphNode_t input = cml_graph_node_get_input(consumer, k);
@@ -346,11 +333,9 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         }
     }
 
-    // Step 4: Calculate peak memory at each execution step
     for (int step = 0; step < order; step++) {
         size_t current_memory = 0;
 
-        // Sum memory of all tensors alive at this step
         for (size_t i = 0; i < node_count; i++) {
             int exec_order = execution_order[i];
             if (exec_order >= 0 && exec_order <= step && step < alive_until[i]) {
@@ -387,7 +372,6 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
     if (node_count == 0)
         return 0;
 
-    // Calculate leaf node memory (always alive)
     size_t leaf_memory = 0;
     for (size_t i = 0; i < node_count; i++) {
         CMLGraphNode_t node = cml_graph_get_node_by_index(graph, i);
@@ -401,12 +385,10 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
         }
     }
 
-    // Calculate intermediate memory with adaptive liveness factor
     // Factor depends on graph structure: deeper graphs have lower peak liveness
     size_t total_intermediate_memory = 0;
     size_t max_depth                 = 0;
 
-    // Estimate graph depth by counting nodes at different levels
     for (size_t i = 0; i < node_count; i++) {
         CMLGraphNode_t node = cml_graph_get_node_by_index(graph, i);
         if (node && !cml_graph_node_is_leaf(node)) {
@@ -416,13 +398,10 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
             } else {
                 total_intermediate_memory += 4 * 1024;
             }
-            // Estimate graph complexity (count non-leaf nodes as complexity indicator)
             max_depth++;
         }
     }
 
-    // Adaptive liveness factor: 30-50% based on graph complexity
-    // Smaller graphs (< 10 nodes): 50%, larger graphs: 30%
     int liveness_percent            = (node_count < 10) ? 50 : (node_count < 50) ? 40 : 30;
     size_t peak_intermediate_memory = (total_intermediate_memory * (size_t)liveness_percent) / 100;
     size_t peak_memory              = leaf_memory + peak_intermediate_memory;
@@ -438,20 +417,14 @@ bool cml_graph_allocator_reserve(CMLGraphAllocator_t galloc, void* graph) {
     if (!galloc || galloc->num_buffers == 0)
         return false;
 
-    // If graph is provided, calculate memory requirements from graph nodes
     if (graph) {
-        // Cast to computation graph
         CMLComputationGraph_t cgraph = (CMLComputationGraph_t)graph;
-
-        // Perform liveness analysis to calculate peak memory
         size_t peak_memory = calculate_peak_memory(cgraph);
 
-        // If liveness analysis didn't work, use conservative estimate
         if (peak_memory == 0) {
             peak_memory = 1024 * 1024; // 1MB default
         }
 
-        // Reserve buffers with calculated size
         for (int i = 0; i < galloc->num_buffers; i++) {
             if (!galloc->buffer_reserved[i]) {
                 galloc->buffer_reserved[i] = true;
@@ -461,7 +434,6 @@ bool cml_graph_allocator_reserve(CMLGraphAllocator_t galloc, void* graph) {
             }
         }
     } else {
-        // No graph provided - just mark as reserved
         for (int i = 0; i < galloc->num_buffers; i++) {
             galloc->buffer_reserved[i] = true;
         }
@@ -475,23 +447,19 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
     if (!galloc || galloc->num_buffers == 0)
         return false;
 
-    // Reserve buffers with explicit node/leaf buffer IDs
     // This allows fine-grained control over which nodes use which buffers
     if (graph && node_buffer_ids && leaf_buffer_ids) {
         CMLComputationGraph_t cgraph = (CMLComputationGraph_t)graph;
 
-        // Calculate memory per buffer based on assigned nodes
         size_t* buffer_memory = calloc((size_t)galloc->num_buffers, sizeof(size_t));
         if (!buffer_memory) {
             // Fallback to basic reserve
             return cml_graph_allocator_reserve(galloc, graph);
         }
 
-        // Calculate memory per buffer using actual tensor sizes from nodes
         size_t node_count = cml_graph_get_node_count(cgraph);
         size_t leaf_count = cml_graph_get_leaf_count(cgraph);
 
-        // Distribute memory across buffers based on assignments using actual tensor sizes
         for (size_t i = 0; i < node_count; i++) {
             CMLGraphNode_t node = cml_graph_get_node_by_index(cgraph, i);
             if (!node)
@@ -508,7 +476,6 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
         }
 
         for (size_t i = 0; i < leaf_count; i++) {
-            // Find leaf nodes and use their actual sizes
             for (size_t j = 0; j < node_count; j++) {
                 CMLGraphNode_t node = cml_graph_get_node_by_index(cgraph, j);
                 if (!node || !cml_graph_node_is_leaf(node))
@@ -526,7 +493,6 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
             }
         }
 
-        // Reserve each buffer with calculated size
         for (int i = 0; i < galloc->num_buffers; i++) {
             if (!galloc->buffer_reserved[i]) {
                 galloc->buffer_reserved[i] = true;
@@ -553,18 +519,15 @@ bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph) {
         if (!galloc->buffers[i]) {
             size_t buffer_size = galloc->buffer_sizes[i];
 
-            // If size not set, use default estimate
             if (buffer_size == 0) {
                 buffer_size             = 1024 * 1024; // 1MB default
                 galloc->buffer_sizes[i] = buffer_size;
             }
 
-            // If graph provided, recalculate size for accuracy
             if (graph) {
                 CMLComputationGraph_t cgraph = (CMLComputationGraph_t)graph;
                 size_t calculated_size       = calculate_peak_memory(cgraph);
                 if (calculated_size > 0) {
-                    // Use the larger of reserved size or calculated size
                     if (calculated_size > buffer_size) {
                         buffer_size = calculated_size;
                     }
@@ -669,7 +632,6 @@ int cml_tensor_allocator_alloc(CMLTensorAllocator* talloc, Tensor* tensor) {
     size_t required_size = cml_backend_buffer_get_alloc_size(talloc->buffer, tensor);
     size_t buffer_size   = cml_backend_buffer_get_size(talloc->buffer);
 
-    // Align offset
     size_t aligned_offset = (talloc->offset + talloc->alignment - 1) & ~(talloc->alignment - 1);
 
     if (aligned_offset + required_size > buffer_size) {
@@ -702,7 +664,7 @@ CMLContext_t cml_context_new(CMLContextParams params) {
         return NULL;
 
     ctx->no_alloc         = params.no_alloc;
-    ctx->device           = DEVICE_CPU; // Default device
+    ctx->device           = DEVICE_CPU;
     ctx->buffer           = NULL;
     ctx->tensor_allocator = (CMLTensorAllocator){0};
     ctx->used_mem         = 0;
@@ -721,7 +683,6 @@ CMLContext_t cml_context_new(CMLContextParams params) {
             return NULL;
         }
 
-        // Copy provided buffer content
         void* base = cml_backend_buffer_get_base(ctx->buffer);
         if (base && params.mem_buffer) {
             memcpy(base, params.mem_buffer, params.mem_size);
@@ -781,7 +742,6 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
     if (!ctx || !shape || ndim <= 0)
         return NULL;
 
-    // Calculate required size
     size_t numel = 1;
     for (int i = 0; i < ndim; i++) {
         numel *= (size_t)shape[i];
@@ -794,7 +754,6 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         return NULL; // Don't actually allocate
     }
 
-    // If context has a pre-allocated buffer, use tensor allocator
     if (ctx->buffer && ctx->tensor_allocator.buffer) {
         TensorConfig config = {
             .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
@@ -828,7 +787,6 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         return tensor;
     }
 
-    // Dynamic allocation mode - use backend_buffer for device-specific allocation
     CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(device);
     if (!buft) {
         // Fallback to standard allocation

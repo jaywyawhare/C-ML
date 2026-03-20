@@ -54,7 +54,6 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     if (!cache)
         return NULL;
 
-    // Store input shape
     cache->input_ndim  = input->ndim;
     cache->input_shape = malloc(sizeof(int) * input->ndim);
     if (!cache->input_shape) {
@@ -64,7 +63,6 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     memcpy(cache->input_shape, input->shape, sizeof(int) * input->ndim);
     cache->input_numel = input->numel;
 
-    // Allocate input buffer
     cache->input_buffer = aligned_alloc(32, input->numel * sizeof(float));
     if (!cache->input_buffer) {
         free(cache->input_shape);
@@ -72,7 +70,6 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
         return NULL;
     }
 
-    // Store output info and allocate buffer
     cache->output_numel  = output->numel;
     cache->output_buffer = aligned_alloc(32, output->numel * sizeof(float));
     if (!cache->output_buffer) {
@@ -82,7 +79,6 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
         return NULL;
     }
 
-    // Create execution plan
     cache->plan = cml_create_execution_plan(ir);
     if (!cache->plan) {
         free(cache->output_buffer);
@@ -109,10 +105,8 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
         return NULL;
     }
 
-    // Copy input data to the input buffer (this is the new input for this forward pass)
     memcpy(cache->input_buffer, input->data, cache->input_numel * sizeof(float));
 
-    // Execute each node in order, using pre-allocated buffers
     for (size_t i = 0; i < plan->num_nodes; i++) {
         struct IRNode* node = plan->nodes[i];
         float* out_buf      = plan->buffers[i];
@@ -154,14 +148,11 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
         if (cml_execute_node_fast(node, out_buf) != 0)
             return NULL;
 
-        // Update the node's output data pointer to our buffer
-        // This is important so that subsequent nodes can read from it
         if (node->output) {
             node->output->data = out_buf;
         }
     }
 
-    // Copy final result to output buffer
     struct IRNode* last_node = plan->nodes[plan->num_nodes - 1];
     if (last_node && last_node->output) {
         memcpy(cache->output_buffer, plan->buffers[plan->num_nodes - 1],
@@ -177,6 +168,8 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
     return output;
 }
 
+static int g_sequential_depth = 0;
+
 static Tensor* sequential_forward(Module* module, Tensor* input) {
     Sequential* seq = (Sequential*)module;
 
@@ -190,7 +183,7 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
         LOG_WARNING("Cached execution failed, rebuilding graph");
         sequential_invalidate_cache(seq);
     }
-    cml_ir_reset_global_context();
+    g_sequential_depth++;
 
     Tensor* output = input;
     for (int i = 0; i < seq->num_modules; i++) {
@@ -209,13 +202,17 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
 
         output = next_output;
     }
+
+    g_sequential_depth--;
+
+    /* Ensure the output data is materialized before returning. */
+    if (output && output != input) {
+        tensor_ensure_executed(output);
+    }
+
     if (seq->enable_graph_cache && !seq->cached_graph) {
         CMLGraph_t ir = cml_ir_get_or_create_context();
         if (ir) {
-            // Force execution first to ensure graph is complete
-            float* out_data = (float*)tensor_data_ptr(output);
-            (void)out_data;
-
             seq->cached_graph = create_cached_graph(input, output, ir);
             if (seq->cached_graph) {
                 LOG_DEBUG("Graph cached for Sequential model");

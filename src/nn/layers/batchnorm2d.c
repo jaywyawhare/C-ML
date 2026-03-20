@@ -63,37 +63,31 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
         mean_params.keepdim  = false;
 
         Tensor* mean_reduced = uop_mean(input_reshaped, &mean_params);
-        if (!mean_reduced) {
-            tensor_free(input_reshaped);
+        if (!mean_reduced)
             return NULL;
-        }
+
         float* mean_reduced_data = (float*)tensor_data_ptr(mean_reduced);
         float* current_mean_data = (float*)tensor_data_ptr(bn->current_mean);
-        if (mean_reduced_data && current_mean_data) {
+        if (mean_reduced_data && current_mean_data)
             memcpy(current_mean_data, mean_reduced_data, (size_t)channels * sizeof(float));
-        }
-        tensor_free(mean_reduced);
+
         ExpandParams expand_params;
         int reshaped_shape_expand[] = {channels, batch * height * width};
         expand_params.new_shape     = reshaped_shape_expand;
         expand_params.new_ndim      = 2;
 
         Tensor* mean_broadcast = uop_expand(bn->current_mean, &expand_params);
-        if (!mean_broadcast) {
-            tensor_free(input_reshaped);
+        if (!mean_broadcast)
             return NULL;
-        }
+
         Tensor* diff = uop_sub(input_reshaped, mean_broadcast);
-        tensor_free(input_reshaped);
-        tensor_free(mean_broadcast);
-        if (!diff) {
+        if (!diff)
             return NULL;
-        }
+
         Tensor* diff_sq = uop_mul(diff, diff);
-        tensor_free(diff);
-        if (!diff_sq) {
+        if (!diff_sq)
             return NULL;
-        }
+
         ReduceParams var_params;
         int var_dims[]      = {1};
         var_params.dims     = var_dims;
@@ -101,16 +95,13 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
         var_params.keepdim  = false;
 
         Tensor* var_reduced = uop_mean(diff_sq, &var_params);
-        tensor_free(diff_sq);
-        if (!var_reduced) {
+        if (!var_reduced)
             return NULL;
-        }
+
         float* var_reduced_data = (float*)tensor_data_ptr(var_reduced);
         float* current_var_data = (float*)tensor_data_ptr(bn->current_var);
-        if (var_reduced_data && current_var_data) {
+        if (var_reduced_data && current_var_data)
             memcpy(current_var_data, var_reduced_data, (size_t)channels * sizeof(float));
-        }
-        tensor_free(var_reduced);
         if (bn->track_running_stats && bn->running_mean && bn->running_var) {
             float* running_mean = (float*)tensor_data_ptr(bn->running_mean);
             float* running_var  = (float*)tensor_data_ptr(bn->running_var);
@@ -136,94 +127,97 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
         LOG_ERROR("BatchNorm2d: missing mean or variance tensor");
         return NULL;
     }
+
+    /* Reshape 1D [C] stats to [1, C, 1, 1] for correct broadcasting to [B, C, H, W] */
+    ReshapeParams reshape_1d_to_4d;
+    int stat_4d_shape[] = {1, channels, 1, 1};
+    reshape_1d_to_4d.new_shape = stat_4d_shape;
+    reshape_1d_to_4d.new_ndim  = 4;
+
+    Tensor* mean_4d = uop_reshape(mean_tensor, &reshape_1d_to_4d);
+    if (!mean_4d) return NULL;
+
     ExpandParams expand_mean;
     int input_shape[]     = {batch, channels, height, width};
     expand_mean.new_shape = input_shape;
     expand_mean.new_ndim  = 4;
 
-    Tensor* mean_broadcast = uop_expand(mean_tensor, &expand_mean);
-    if (!mean_broadcast) {
+    Tensor* mean_broadcast = uop_expand(mean_4d, &expand_mean);
+    if (!mean_broadcast)
         return NULL;
-    }
+
     Tensor* centered = uop_sub(input, mean_broadcast);
-    tensor_free(mean_broadcast);
-    if (!centered) {
+    if (!centered)
         return NULL;
-    }
+
     int var_shape[]     = {channels};
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* eps_tensor = tensor_zeros(var_shape, 1, &config);
-    if (!eps_tensor) {
-        tensor_free(centered);
+    if (!eps_tensor)
         return NULL;
-    }
+
     float* eps_data = (float*)tensor_data_ptr(eps_tensor);
     if (eps_data) {
-        for (int c = 0; c < channels; c++) {
+        for (int c = 0; c < channels; c++)
             eps_data[c] = bn->eps;
-        }
     }
+
     Tensor* var_eps = uop_add(var_tensor, eps_tensor);
-    tensor_free(eps_tensor);
-    if (!var_eps) {
-        tensor_free(centered);
+    if (!var_eps)
         return NULL;
-    }
+
     Tensor* std_tensor = uop_sqrt(var_eps);
-    tensor_free(var_eps);
-    if (!std_tensor) {
-        tensor_free(centered);
+    if (!std_tensor)
         return NULL;
-    }
+
+    Tensor* std_4d = uop_reshape(std_tensor, &reshape_1d_to_4d);
+    if (!std_4d)
+        return NULL;
+
     ExpandParams expand_std;
     expand_std.new_shape  = input_shape;
     expand_std.new_ndim   = 4;
-    Tensor* std_broadcast = uop_expand(std_tensor, &expand_std);
-    tensor_free(std_tensor);
-    if (!std_broadcast) {
-        tensor_free(centered);
+    Tensor* std_broadcast = uop_expand(std_4d, &expand_std);
+    if (!std_broadcast)
         return NULL;
-    }
+
     Tensor* normalized = uop_div(centered, std_broadcast);
-    tensor_free(centered);
-    tensor_free(std_broadcast);
-    if (!normalized) {
+    if (!normalized)
         return NULL;
-    }
+
     Tensor* output = normalized;
 
     if (bn->affine && bn->weight && bn->bias) {
+        Tensor* weight_4d = uop_reshape(bn->weight->tensor, &reshape_1d_to_4d);
+        if (!weight_4d)
+            return NULL;
+
         ExpandParams expand_weight;
         expand_weight.new_shape = input_shape;
         expand_weight.new_ndim  = 4;
+        Tensor* weight_broadcast = uop_expand(weight_4d, &expand_weight);
+        if (!weight_broadcast)
+            return NULL;
 
-        Tensor* weight_broadcast = uop_expand(bn->weight->tensor, &expand_weight);
-        if (!weight_broadcast) {
-            tensor_free(output);
-            return NULL;
-        }
         Tensor* scaled = uop_mul(weight_broadcast, output);
-        tensor_free(weight_broadcast);
-        tensor_free(output);
-        if (!scaled) {
+        if (!scaled)
             return NULL;
-        }
+
+        Tensor* bias_4d = uop_reshape(bn->bias->tensor, &reshape_1d_to_4d);
+        if (!bias_4d)
+            return NULL;
+
         ExpandParams expand_bias;
         expand_bias.new_shape = input_shape;
         expand_bias.new_ndim  = 4;
+        Tensor* bias_broadcast = uop_expand(bias_4d, &expand_bias);
+        if (!bias_broadcast)
+            return NULL;
 
-        Tensor* bias_broadcast = uop_expand(bn->bias->tensor, &expand_bias);
-        if (!bias_broadcast) {
-            tensor_free(scaled);
-            return NULL;
-        }
         output = uop_add(scaled, bias_broadcast);
-        tensor_free(scaled);
-        tensor_free(bias_broadcast);
-        if (!output) {
+        if (!output)
             return NULL;
-        }
     }
 
     return output;

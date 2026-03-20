@@ -1,5 +1,6 @@
 #include "core/config.h"
 #include "core/logging.h"
+#include "core/threefry.h"
 #include "backend/device.h"
 #include <stdlib.h>
 #include <time.h>
@@ -44,6 +45,7 @@ void cml_seed(uint64_t seed) {
     g_rng_seeded = true;
     srand((unsigned int)seed);
     pthread_mutex_unlock(&g_config_mutex);
+    cml_rng_set_global_seed(seed);
 }
 
 uint64_t cml_random_seed(void) {

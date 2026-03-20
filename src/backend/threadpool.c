@@ -55,7 +55,6 @@ static void* worker_thread(void* arg) {
     while (1) {
         pthread_mutex_lock(&pool->mutex);
 
-        // Wait for tasks from queue or shutdown signal
         while (!pool->shutdown && pool->task_queue_head == NULL) {
             pthread_cond_wait(&pool->task_cond, &pool->mutex);
         }
@@ -72,7 +71,6 @@ static void* worker_thread(void* arg) {
             pool->active_tasks++;
             pthread_mutex_unlock(&pool->mutex);
 
-            // Execute task - distribute work across threads
             size_t chunk_size = task.total_size / pool->num_threads;
             size_t start      = worker->id * chunk_size;
             size_t end =
@@ -80,7 +78,6 @@ static void* worker_thread(void* arg) {
 
             task.func(task.data, start, end);
 
-            // Mark chunk as completed
             pthread_mutex_lock(&pool->mutex);
             task_node->completed_chunks++;
             pool->active_tasks--;
@@ -88,7 +85,6 @@ static void* worker_thread(void* arg) {
             // If all chunks completed, mark task as done and notify waiters
             if (task_node->completed_chunks >= task_node->total_chunks) {
                 task_node->completed = true;
-                // Remove from queue
                 pool->task_queue_head = task_node->next;
                 if (!pool->task_queue_head) {
                     pool->task_queue_tail = NULL;
@@ -162,7 +158,6 @@ void threadpool_destroy(ThreadPool* pool) {
         pthread_join(pool->workers[i].thread, NULL);
     }
 
-    // Clean up any remaining tasks
     TaskNode* node = pool->task_queue_head;
     while (node) {
         TaskNode* next = node->next;
@@ -182,7 +177,6 @@ int threadpool_submit(ThreadPool* pool, Task* task) {
         return -1;
     }
 
-    // Create task node
     TaskNode* task_node = malloc(sizeof(TaskNode));
     if (!task_node) {
         LOG_ERROR("Failed to allocate task node");
@@ -197,7 +191,6 @@ int threadpool_submit(ThreadPool* pool, Task* task) {
 
     pthread_mutex_lock(&pool->mutex);
 
-    // Add to queue
     if (pool->task_queue_tail) {
         pool->task_queue_tail->next = task_node;
     } else {
@@ -206,7 +199,6 @@ int threadpool_submit(ThreadPool* pool, Task* task) {
     pool->task_queue_tail = task_node;
     pool->queue_size++;
 
-    // Wake up workers
     pthread_cond_broadcast(&pool->task_cond);
     pthread_mutex_unlock(&pool->mutex);
 
@@ -220,7 +212,6 @@ void threadpool_wait(ThreadPool* pool) {
 
     pthread_mutex_lock(&pool->mutex);
 
-    // Wait for all tasks to complete
     while (pool->queue_size > 0 || pool->active_tasks > 0) {
         pthread_cond_wait(&pool->cond, &pool->mutex);
     }
@@ -263,12 +254,10 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
     }
 
     if (pool->num_threads == 1 || n < 1000) {
-        // Sequential execution for small tasks
         func(data, 0, n);
         return;
     }
 
-    // Distribute work across threads
     for (size_t i = 0; i < pool->num_threads; i++) {
         Task task               = {.func = func, .data = data, .total_size = n};
         pool->workers[i].task   = task;
@@ -277,7 +266,6 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
 
     pthread_cond_broadcast(&pool->cond);
 
-    // Wait for all workers to complete
     pthread_mutex_lock(&pool->mutex);
     bool all_completed = false;
     while (!all_completed) {

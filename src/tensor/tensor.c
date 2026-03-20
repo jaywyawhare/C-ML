@@ -14,6 +14,7 @@
 #include "backend/device.h"
 #include "core/error_stack.h"
 #include "core/config.h"
+#include "core/threefry.h"
 
 static inline uint16_t float_to_fp16(float f) {
     uint32_t x;
@@ -98,6 +99,80 @@ static inline float fp8_e5m2_to_float(uint8_t h) {
     if (exp == 0) { float f; uint32_t r = sign; memcpy(&f, &r, sizeof(f)); return f; }
     if (exp == 31) { float f; uint32_t r = sign | 0x7F800000 | (mant << 21); memcpy(&f, &r, sizeof(f)); return f; }
     uint32_t result = sign | ((exp - 15 + 127) << 23) | (mant << 21);
+    float f;
+    memcpy(&f, &result, sizeof(f));
+    return f;
+}
+
+static inline uint8_t float_to_fp8e4m3fnuz(float f) {
+    uint32_t x;
+    memcpy(&x, &f, sizeof(x));
+    uint32_t sign_bit = (x >> 31) & 1;
+    int32_t fp32_exp = ((x >> 23) & 0xFF);
+    uint32_t fp32_mant = x & 0x7FFFFF;
+
+    if (fp32_exp == 0xFF || (fp32_exp == 0 && fp32_mant == 0)) return 0x00;
+    if (f == 0.0f || f == -0.0f) return 0x00;
+
+    int32_t exp = fp32_exp - 127 + 8;
+    uint32_t mant = (fp32_mant >> 20) & 0x07;
+
+    if (exp <= 0) return 0x00;
+    if (exp >= 16) return (uint8_t)((sign_bit << 7) | 0x7F);
+
+    return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 3) | (uint8_t)mant);
+}
+
+static inline float fp8e4m3fnuz_to_float(uint8_t h) {
+    if (h == 0x80) return NAN;
+    if (h == 0x00) return 0.0f;
+    uint32_t sign = ((uint32_t)(h >> 7)) << 31;
+    uint32_t exp = (h >> 3) & 0x0F;
+    uint32_t mant = h & 0x07;
+    if (exp == 0) {
+        float f;
+        uint32_t r = sign;
+        memcpy(&f, &r, sizeof(f));
+        return f;
+    }
+    uint32_t result = sign | ((exp - 8 + 127) << 23) | (mant << 20);
+    float f;
+    memcpy(&f, &result, sizeof(f));
+    return f;
+}
+
+static inline uint8_t float_to_fp8e5m2fnuz(float f) {
+    uint32_t x;
+    memcpy(&x, &f, sizeof(x));
+    uint32_t sign_bit = (x >> 31) & 1;
+    int32_t fp32_exp = ((x >> 23) & 0xFF);
+    uint32_t fp32_mant = x & 0x7FFFFF;
+
+    if (fp32_exp == 0xFF || (fp32_exp == 0 && fp32_mant == 0)) return 0x00;
+    if (f == 0.0f || f == -0.0f) return 0x00;
+
+    int32_t exp = fp32_exp - 127 + 16;
+    uint32_t mant = (fp32_mant >> 21) & 0x03;
+
+    if (exp <= 0) return 0x00;
+    if (exp >= 32) return (uint8_t)((sign_bit << 7) | 0x7F);
+
+    return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 2) | (uint8_t)mant);
+}
+
+static inline float fp8e5m2fnuz_to_float(uint8_t h) {
+    if (h == 0x80) return NAN;
+    if (h == 0x00) return 0.0f;
+    uint32_t sign = ((uint32_t)(h >> 7)) << 31;
+    uint32_t exp = (h >> 2) & 0x1F;
+    uint32_t mant = h & 0x03;
+    if (exp == 0) {
+        float f;
+        uint32_t r = sign;
+        memcpy(&f, &r, sizeof(f));
+        return f;
+    }
+    uint32_t result = sign | ((exp - 16 + 127) << 23) | (mant << 21);
     float f;
     memcpy(&f, &result, sizeof(f));
     return f;
@@ -272,6 +347,18 @@ Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
             ((uint8_t*)t->data)[i] = one_e5m2;
         break;
     }
+    case DTYPE_FLOAT8_E4M3_FNUZ: {
+        uint8_t one_fnuz = float_to_fp8e4m3fnuz(1.0f);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = one_fnuz;
+        break;
+    }
+    case DTYPE_FLOAT8_E5M2_FNUZ: {
+        uint8_t one_fnuz = float_to_fp8e5m2fnuz(1.0f);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = one_fnuz;
+        break;
+    }
     }
 
     return t;
@@ -365,6 +452,18 @@ Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float valu
             ((uint8_t*)t->data)[i] = v8;
         break;
     }
+    case DTYPE_FLOAT8_E4M3_FNUZ: {
+        uint8_t v8 = float_to_fp8e4m3fnuz(value);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = v8;
+        break;
+    }
+    case DTYPE_FLOAT8_E5M2_FNUZ: {
+        uint8_t v8 = float_to_fp8e5m2fnuz(value);
+        for (size_t i = 0; i < total_size; i++)
+            ((uint8_t*)t->data)[i] = v8;
+        break;
+    }
     }
 
     return t;
@@ -381,7 +480,6 @@ void* tensor_data_ptr(Tensor* t) {
 
     // If not executed, execute now! (lazy evaluation)
     if (!t->is_executed) {
-        // Execute entire graph up to this node
         int ret = cml_ir_execute_up_to(t->ir_context, t->ir_node);
         if (ret == 0) {
             t->is_executed = true;
@@ -438,6 +536,8 @@ size_t cml_dtype_size(DType dtype) {
         return sizeof(uint64_t);
     case DTYPE_FLOAT8_E4M3:
     case DTYPE_FLOAT8_E5M2:
+    case DTYPE_FLOAT8_E4M3_FNUZ:
+    case DTYPE_FLOAT8_E5M2_FNUZ:
         return 1;
     default:
         return sizeof(float);
@@ -453,22 +553,26 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
 
     // Promotion hierarchy: BOOL < UINT8 < INT8 < INT32 < INT64 < FLOAT16 < BFLOAT16 < FLOAT32 < FLOAT64
     static const int dtype_rank[] = {
-        [DTYPE_FLOAT32]  = 9,
-        [DTYPE_FLOAT64]  = 10,
-        [DTYPE_INT32]    = 5,
-        [DTYPE_INT64]    = 7,
-        [DTYPE_BOOL]     = 0,
-        [DTYPE_FLOAT16]  = 8,
-        [DTYPE_BFLOAT16] = 8,
-        [DTYPE_INT8]     = 2,
-        [DTYPE_UINT8]    = 1,
-        [DTYPE_INT16]    = 3,
-        [DTYPE_UINT16]   = 3,
-        [DTYPE_UINT32]   = 5,
-        [DTYPE_UINT64]   = 6,
+        [DTYPE_FLOAT32]          = 9,
+        [DTYPE_FLOAT64]          = 10,
+        [DTYPE_INT32]            = 5,
+        [DTYPE_INT64]            = 7,
+        [DTYPE_BOOL]             = 0,
+        [DTYPE_FLOAT16]          = 8,
+        [DTYPE_BFLOAT16]         = 8,
+        [DTYPE_INT8]             = 2,
+        [DTYPE_UINT8]            = 1,
+        [DTYPE_INT16]            = 3,
+        [DTYPE_UINT16]           = 3,
+        [DTYPE_UINT32]           = 5,
+        [DTYPE_UINT64]           = 6,
+        [DTYPE_FLOAT8_E4M3]      = 8,
+        [DTYPE_FLOAT8_E5M2]      = 8,
+        [DTYPE_FLOAT8_E4M3_FNUZ] = 8,
+        [DTYPE_FLOAT8_E5M2_FNUZ] = 8,
     };
-    rank1 = (dtype1 <= DTYPE_UINT64) ? dtype_rank[dtype1] : 0;
-    rank2 = (dtype2 <= DTYPE_UINT64) ? dtype_rank[dtype2] : 0;
+    rank1 = (dtype1 <= DTYPE_FLOAT8_E5M2_FNUZ) ? dtype_rank[dtype1] : 0;
+    rank2 = (dtype2 <= DTYPE_FLOAT8_E5M2_FNUZ) ? dtype_rank[dtype2] : 0;
 
     return (rank1 > rank2) ? dtype1 : dtype2;
 }
@@ -543,7 +647,6 @@ int* tensor_shape_copy(int* shape, int ndim) {
 }
 
 float tensor_get_float(Tensor* t, size_t idx) {
-    // Trigger lazy execution if needed
     if (t && !t->is_executed) {
         void* data = tensor_data_ptr(t);
         if (!data)
@@ -595,6 +698,10 @@ float tensor_get_float(Tensor* t, size_t idx) {
         return fp8_e4m3_to_float(((uint8_t*)t->data)[offset]);
     case DTYPE_FLOAT8_E5M2:
         return fp8_e5m2_to_float(((uint8_t*)t->data)[offset]);
+    case DTYPE_FLOAT8_E4M3_FNUZ:
+        return fp8e4m3fnuz_to_float(((uint8_t*)t->data)[offset]);
+    case DTYPE_FLOAT8_E5M2_FNUZ:
+        return fp8e5m2fnuz_to_float(((uint8_t*)t->data)[offset]);
     default:
         return 0.0f;
     }
@@ -603,7 +710,6 @@ float tensor_get_float(Tensor* t, size_t idx) {
 void tensor_set_float(Tensor* t, size_t idx, float value) {
     if (!t || idx >= t->numel)
         return;
-    // Trigger lazy execution if needed
     if (!t->is_executed) {
         void* data = tensor_data_ptr(t);
         if (!data)
@@ -670,6 +776,12 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
     case DTYPE_FLOAT8_E5M2:
         ((uint8_t*)t->data)[offset] = float_to_fp8_e5m2(value);
         break;
+    case DTYPE_FLOAT8_E4M3_FNUZ:
+        ((uint8_t*)t->data)[offset] = float_to_fp8e4m3fnuz(value);
+        break;
+    case DTYPE_FLOAT8_E5M2_FNUZ:
+        ((uint8_t*)t->data)[offset] = float_to_fp8e5m2fnuz(value);
+        break;
     }
 }
 
@@ -684,7 +796,6 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->ir_node    = node;
     t->ir_context = ir_context;
 
-    // Link output tensor back to IR node
     node->output = t;
 
     // Shape from broadcasting
@@ -744,7 +855,6 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->buffer_handle  = NULL;
     t->user_data      = NULL;
 
-    // Link node to tensor
     node->output = t;
 
     return t;
@@ -756,7 +866,6 @@ int tensor_ensure_executed(Tensor* t) {
     if (t->is_executed)
         return 0;
 
-    // Trigger execution
     void* data = tensor_data_ptr(t);
     return data ? 0 : -1;
 }
@@ -779,7 +888,6 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
         return NULL;
     }
 
-    // Resolve config to actual values
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
@@ -827,7 +935,6 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
     t->is_contiguous = true;
     t->buffer_handle = NULL;
 
-    // Allocate backing buffer through backend buffer interface
     CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(device);
     if (buft) {
         size_t alloc_size = cml_backend_buffer_type_get_alloc_size(buft, t);
@@ -1005,7 +1112,6 @@ Tensor* tensor_from_flat(const float* data, int rows, int cols) {
         return NULL;
     }
 
-    // Copy data
     float* tensor_data = (float*)tensor_data_ptr(tensor);
     if (!tensor_data) {
         tensor_free(tensor);
@@ -1132,44 +1238,14 @@ Tensor* tensor_eye(int n, const TensorConfig* config) {
     return t;
 }
 
-// Simple xorshift128+ PRNG for portability
-static uint64_t _rng_state[2] = {0x12345678DEADBEEF, 0xFEDCBA9876543210};
-static bool _rng_seeded = false;
-
-static void _ensure_rng_seeded(void) {
-    if (!_rng_seeded) {
-        // Use address of local var as entropy source
-        uint64_t seed = (uint64_t)(uintptr_t)&_rng_seeded ^ 0xDEADBEEFCAFEBABE;
-        _rng_state[0] = seed;
-        _rng_state[1] = seed ^ 0x0123456789ABCDEF;
-        _rng_seeded = true;
-    }
-}
-
 void tensor_manual_seed(uint64_t seed) {
-    _rng_state[0] = seed;
-    _rng_state[1] = seed ^ 0x0123456789ABCDEF;
-    _rng_seeded = true;
+    cml_rng_set_global_seed(seed);
 }
 
 static float _rand_uniform(void) {
-    _ensure_rng_seeded();
-    uint64_t s0 = _rng_state[0];
-    uint64_t s1 = _rng_state[1];
-    uint64_t result = s0 + s1;
-    s1 ^= s0;
-    _rng_state[0] = ((s0 << 55) | (s0 >> 9)) ^ s1 ^ (s1 << 14);
-    _rng_state[1] = (s1 << 36) | (s1 >> 28);
-    // Convert to [0, 1) float
-    return (float)(result >> 11) * (1.0f / 9007199254740992.0f);
-}
-
-static float _rand_normal(void) {
-    // Box-Muller transform
-    float u1 = _rand_uniform();
-    float u2 = _rand_uniform();
-    if (u1 < 1e-10f) u1 = 1e-10f;
-    return sqrtf(-2.0f * logf(u1)) * cosf(2.0f * 3.14159265358979f * u2);
+    float val;
+    cml_rng_uniform(cml_rng_get_global(), &val, 1);
+    return val;
 }
 
 Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
@@ -1179,10 +1255,7 @@ Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
 
     Tensor* t = tensor_create(dtype, device, ndim, shape, false);
     if (!t) return NULL;
-    float* data = (float*)t->data;
-    for (size_t i = 0; i < t->numel; i++) {
-        data[i] = _rand_uniform();
-    }
+    cml_rng_uniform(cml_rng_get_global(), (float*)t->data, t->numel);
     return t;
 }
 
@@ -1193,10 +1266,7 @@ Tensor* tensor_randn(int* shape, int ndim, const TensorConfig* config) {
 
     Tensor* t = tensor_create(dtype, device, ndim, shape, false);
     if (!t) return NULL;
-    float* data = (float*)t->data;
-    for (size_t i = 0; i < t->numel; i++) {
-        data[i] = _rand_normal();
-    }
+    cml_rng_normal(cml_rng_get_global(), (float*)t->data, t->numel);
     return t;
 }
 
@@ -1333,7 +1403,6 @@ Tensor* tensor_flip(Tensor* a, int dim) {
                     out_data[r * cols + c] = data[r * cols + (cols - 1 - c)];
         }
     } else {
-        // Fallback: just copy
         memcpy(out_data, data, a->numel * sizeof(float));
     }
     return result;
@@ -1356,7 +1425,6 @@ Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
     tensor_ensure_executed(result);
     float* out_data = (float*)tensor_data_ptr(result);
 
-    // Simple case: 1D
     if (a->ndim == 1) {
         int n = a->shape[0];
         for (int r = 0; r < repeats[0]; r++)
@@ -1510,6 +1578,8 @@ Tensor* tensor_long(Tensor* a) { return tensor_cast(a, DTYPE_INT64); }
 Tensor* tensor_short(Tensor* a) { return tensor_cast(a, DTYPE_INT16); }
 Tensor* tensor_bool(Tensor* a) { return tensor_cast(a, DTYPE_BOOL); }
 Tensor* tensor_bfloat16(Tensor* a) { return tensor_cast(a, DTYPE_BFLOAT16); }
+Tensor* tensor_fp8e4m3fnuz(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT8_E4M3_FNUZ); }
+Tensor* tensor_fp8e5m2fnuz(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT8_E5M2_FNUZ); }
 
 Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode) {
     if (!a || !output_size || num_dims < 1) return NULL;
@@ -1608,7 +1678,6 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
     tensor_ensure_executed(src);
     if (!self->data || !index->data || !src->data) return NULL;
 
-    // Clone self as output
     Tensor* output = tensor_clone(self);
     if (!output) return NULL;
     tensor_ensure_executed(output);
@@ -1703,7 +1772,6 @@ Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
 
     size_t new_numel = total_bytes / dst_size;
 
-    // Compute new shape: same shape but last dim adjusted
     int new_ndim = a->ndim;
     int* new_shape = malloc(new_ndim * sizeof(int));
     if (!new_shape) return NULL;
@@ -1765,7 +1833,6 @@ QRResult tensor_qr(Tensor* a) {
         float sign = (R[j * n + j] >= 0.0f) ? 1.0f : -1.0f;
         v[j] += sign * norm;
 
-        // Normalize v
         float vnorm = 0.0f;
         for (int i = j; i < m; i++) vnorm += v[i] * v[i];
         if (vnorm < 1e-24f) continue;
@@ -1866,13 +1933,11 @@ SVDResult tensor_svd(Tensor* a) {
                 float c = 1.0f / sqrtf(1.0f + t * t);
                 float s = t * c;
 
-                // Rotate columns of W
                 for (int i = 0; i < m; i++) {
                     float wp = W[i * n + p], wq = W[i * n + q];
                     W[i * n + p] = c * wp - s * wq;
                     W[i * n + q] = s * wp + c * wq;
                 }
-                // Rotate columns of V
                 for (int i = 0; i < n; i++) {
                     float vp = V[i * n + p], vq = V[i * n + q];
                     V[i * n + p] = c * vp - s * vq;
@@ -1888,7 +1953,6 @@ SVDResult tensor_svd(Tensor* a) {
     float* U = malloc((size_t)m * k * sizeof(float));
     if (!sigma || !U) { free(W); free(V); free(sigma); free(U); return result; }
 
-    // Sort by descending singular value
     int* order = malloc((size_t)n * sizeof(int));
     if (!order) { free(W); free(V); free(sigma); free(U); return result; }
     for (int i = 0; i < n; i++) order[i] = i;
@@ -1952,7 +2016,6 @@ SVDResult tensor_svd(Tensor* a) {
 Tensor* tensor_from_url(const char* url) {
     if (!url) return NULL;
 
-    // Create temp file
     char tmppath[] = "/tmp/cml_tensor_XXXXXX";
     int fd = mkstemp(tmppath);
     if (fd < 0) {
@@ -1961,7 +2024,6 @@ Tensor* tensor_from_url(const char* url) {
     }
     close(fd);
 
-    // Download using curl or wget
     char cmd[2048];
     snprintf(cmd, sizeof(cmd),
              "curl -fsSL -o '%s' '%s' 2>/dev/null || wget -q -O '%s' '%s' 2>/dev/null",
@@ -1974,8 +2036,66 @@ Tensor* tensor_from_url(const char* url) {
         return NULL;
     }
 
-    // Load tensor from downloaded file
     Tensor* t = tensor_read_file(tmppath);
     remove(tmppath);
     return t;
+}
+
+int tensor_assign(Tensor* t, Tensor* src) {
+    if (!t || !src) return -1;
+    if (t->ndim != src->ndim) return -1;
+    for (int i = 0; i < t->ndim; i++) {
+        if (t->shape[i] != src->shape[i]) return -1;
+    }
+
+    tensor_ensure_executed(src);
+    if (!src->data) return -1;
+
+    size_t nbytes = t->numel * cml_dtype_size(t->dtype);
+
+    if (t->owns_data && t->data) {
+        if (t->buffer_handle) {
+            cml_backend_buffer_free(t->buffer_handle);
+            t->buffer_handle = NULL;
+        } else if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
+            free(t->data);
+        } else {
+            device_free(t->data, t->device);
+        }
+    }
+
+    if (t->device == src->device) {
+        t->data = src->data;
+        t->owns_data = false;
+        t->buffer_handle = NULL;
+        t->from_buffer_cache = false;
+    } else {
+        t->data = malloc(nbytes);
+        if (!t->data) return -1;
+        memcpy(t->data, src->data, nbytes);
+        t->owns_data = true;
+    }
+
+    if (src->ir_node)
+        t->ir_node = src->ir_node;
+
+    t->is_executed = true;
+    return 0;
+}
+
+int tensor_assign_data(Tensor* t, const void* data, size_t nbytes) {
+    if (!t || !data || nbytes == 0) return -1;
+
+    size_t expected = t->numel * cml_dtype_size(t->dtype);
+    if (nbytes > expected) return -1;
+
+    if (!t->data) {
+        t->data = malloc(expected);
+        if (!t->data) return -1;
+        t->owns_data = true;
+    }
+
+    memcpy(t->data, data, nbytes);
+    t->is_executed = true;
+    return 0;
 }
