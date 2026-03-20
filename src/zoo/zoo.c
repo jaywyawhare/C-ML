@@ -1,4 +1,13 @@
 #include "zoo/zoo.h"
+#include "zoo/resnet.h"
+#include "zoo/gpt2.h"
+#include "zoo/bert.h"
+#include "zoo/vit.h"
+#include "zoo/clip.h"
+#include "zoo/t5.h"
+#include "zoo/unet.h"
+#include "zoo/unet3d.h"
+#include "zoo/rnnt.h"
 #include "nn.h"
 #include "nn/layers.h"
 #include "nn/model_io.h"
@@ -21,7 +30,34 @@ static const char* zoo_model_names[] = {
     [CML_ZOO_VGG11]       = "vgg11",
     [CML_ZOO_VGG16]       = "vgg16",
     [CML_ZOO_GPT2_SMALL]  = "gpt2_small",
+    [CML_ZOO_GPT2_MEDIUM] = "gpt2_medium",
+    [CML_ZOO_GPT2_LARGE]  = "gpt2_large",
+    [CML_ZOO_GPT2_XL]     = "gpt2_xl",
     [CML_ZOO_BERT_TINY]   = "bert_tiny",
+    [CML_ZOO_BERT_MINI]   = "bert_mini",
+    [CML_ZOO_BERT_SMALL]  = "bert_small",
+    [CML_ZOO_BERT_BASE]   = "bert_base",
+    [CML_ZOO_BERT_LARGE]  = "bert_large",
+    [CML_ZOO_VIT_TINY]    = "vit_tiny",
+    [CML_ZOO_VIT_SMALL]   = "vit_small",
+    [CML_ZOO_VIT_BASE]    = "vit_base",
+    [CML_ZOO_VIT_LARGE]   = "vit_large",
+    [CML_ZOO_CLIP_VIT_B32]= "clip_vit_b32",
+    [CML_ZOO_CLIP_VIT_B16]= "clip_vit_b16",
+    [CML_ZOO_CLIP_VIT_L14]= "clip_vit_l14",
+    [CML_ZOO_T5_SMALL]    = "t5_small",
+    [CML_ZOO_T5_BASE]     = "t5_base",
+    [CML_ZOO_T5_LARGE]    = "t5_large",
+    [CML_ZOO_UNET_DEFAULT]    = "unet_default",
+    [CML_ZOO_CONVNEXT_TINY]   = "convnext_tiny",
+    [CML_ZOO_CONVNEXT_SMALL]  = "convnext_small",
+    [CML_ZOO_CONVNEXT_BASE]   = "convnext_base",
+    [CML_ZOO_CONVNEXT_LARGE]  = "convnext_large",
+    [CML_ZOO_INCEPTION_V3]    = "inception_v3",
+    [CML_ZOO_RETINANET]       = "retinanet",
+    [CML_ZOO_MASK_RCNN]       = "mask_rcnn",
+    [CML_ZOO_UNET3D]         = "unet3d",
+    [CML_ZOO_RNNT]           = "rnnt",
 };
 
 CMLZooConfig cml_zoo_default_config(void) {
@@ -154,7 +190,6 @@ Module* cml_zoo_mlp_cifar10(const CMLZooConfig* config) {
     return (Module*)model;
 }
 
-/* Helper: create a residual block (conv-bn-relu-conv-bn + skip connection) */
 static Module* create_resnet_block(int in_channels, int out_channels, int stride,
                                     DType dtype, DeviceType device) {
     /* ResNet basic block uses 2 conv layers with skip connection */
@@ -205,42 +240,48 @@ static Module* create_resnet(const int* layers, int num_layers, const CMLZooConf
 }
 
 Module* cml_zoo_resnet18(const CMLZooConfig* config) {
-    int layers[] = {2, 2, 2, 2};
-    Module* model = create_resnet(layers, 4, config);
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 1000;
 
-    if (config && config->pretrained) {
-        const char* path = cml_zoo_download_weights(CML_ZOO_RESNET18, config->weights_dir);
+    Module* model = cml_zoo_resnet18_create(num_classes, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_RESNET18, cfg.weights_dir);
         if (path) model_load(model, path);
     }
 
-    LOG_INFO("Created ResNet-18");
     return model;
 }
 
 Module* cml_zoo_resnet34(const CMLZooConfig* config) {
-    int layers[] = {3, 4, 6, 3};
-    Module* model = create_resnet(layers, 4, config);
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 1000;
 
-    if (config && config->pretrained) {
-        const char* path = cml_zoo_download_weights(CML_ZOO_RESNET34, config->weights_dir);
+    Module* model = cml_zoo_resnet34_create(num_classes, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_RESNET34, cfg.weights_dir);
         if (path) model_load(model, path);
     }
 
-    LOG_INFO("Created ResNet-34");
     return model;
 }
 
 Module* cml_zoo_resnet50(const CMLZooConfig* config) {
-    /* ResNet-50 uses bottleneck blocks (1x1 -> 3x3 -> 1x1) */
-    int layers[] = {3, 4, 6, 3};
-    Module* model = create_resnet(layers, 4, config);
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 1000;
 
-    if (config && config->pretrained) {
-        const char* path = cml_zoo_download_weights(CML_ZOO_RESNET50, config->weights_dir);
+    Module* model = cml_zoo_resnet50_create(num_classes, cfg.dtype, cfg.device);
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_RESNET50, cfg.weights_dir);
         if (path) model_load(model, path);
     }
 
-    LOG_INFO("Created ResNet-50");
     return model;
 }
 
@@ -300,66 +341,297 @@ Module* cml_zoo_vgg16(const CMLZooConfig* config) {
     return model;
 }
 
-Module* cml_zoo_gpt2_small(const CMLZooConfig* config) {
+static Module* create_gpt2_from_config(GPT2Config gpt2_cfg, const CMLZooConfig* config,
+                                        CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
-    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 50257; /* GPT-2 vocab */
 
-    /* GPT-2 small: 12 layers, 768 hidden, 12 heads */
-    Sequential* model = nn_sequential();
-
-    /* Token embedding + positional embedding */
-    sequential_add(model, (Module*)nn_linear(num_classes, 768, cfg.dtype, cfg.device, false));
-
-    /* Transformer layers */
-    for (int layer = 0; layer < 12; layer++) {
-        sequential_add(model, (Module*)nn_layernorm(768, 1e-5f, true, cfg.dtype, cfg.device));
-        sequential_add(model, (Module*)nn_linear(768, 768, cfg.dtype, cfg.device, true));
-        sequential_add(model, (Module*)nn_relu(false));
-        sequential_add(model, (Module*)nn_linear(768, 768, cfg.dtype, cfg.device, true));
-    }
-
-    /* LM head */
-    sequential_add(model, (Module*)nn_layernorm(768, 1e-5f, true, cfg.dtype, cfg.device));
-    sequential_add(model, (Module*)nn_linear(768, num_classes, cfg.dtype, cfg.device, false));
+    Module* model = cml_zoo_gpt2_create(&gpt2_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
 
     if (cfg.pretrained) {
-        const char* path = cml_zoo_download_weights(CML_ZOO_GPT2_SMALL, cfg.weights_dir);
-        if (path) model_load((Module*)model, path);
+        const char* path = cml_zoo_download_weights(zoo_model, cfg.weights_dir);
+        if (path) model_load(model, path);
     }
 
-    LOG_INFO("Created GPT-2 small (12 layers, 768 hidden)");
-    return (Module*)model;
+    return model;
+}
+
+Module* cml_zoo_gpt2_small(const CMLZooConfig* config) {
+    return create_gpt2_from_config(cml_zoo_gpt2_config_small(), config, CML_ZOO_GPT2_SMALL);
+}
+
+Module* cml_zoo_gpt2_medium(const CMLZooConfig* config) {
+    return create_gpt2_from_config(cml_zoo_gpt2_config_medium(), config, CML_ZOO_GPT2_MEDIUM);
+}
+
+Module* cml_zoo_gpt2_large(const CMLZooConfig* config) {
+    return create_gpt2_from_config(cml_zoo_gpt2_config_large(), config, CML_ZOO_GPT2_LARGE);
+}
+
+Module* cml_zoo_gpt2_xl(const CMLZooConfig* config) {
+    return create_gpt2_from_config(cml_zoo_gpt2_config_xl(), config, CML_ZOO_GPT2_XL);
+}
+
+static Module* create_bert_from_config(BERTConfig bert_cfg, const CMLZooConfig* config,
+                                        CMLZooModel zoo_model) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+
+    Module* model = cml_zoo_bert_create(&bert_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(zoo_model, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
 }
 
 Module* cml_zoo_bert_tiny(const CMLZooConfig* config) {
+    return create_bert_from_config(cml_zoo_bert_config_tiny(), config, CML_ZOO_BERT_TINY);
+}
+
+Module* cml_zoo_bert_mini(const CMLZooConfig* config) {
+    return create_bert_from_config(cml_zoo_bert_config_mini(), config, CML_ZOO_BERT_MINI);
+}
+
+Module* cml_zoo_bert_small(const CMLZooConfig* config) {
+    return create_bert_from_config(cml_zoo_bert_config_small(), config, CML_ZOO_BERT_SMALL);
+}
+
+Module* cml_zoo_bert_base(const CMLZooConfig* config) {
+    return create_bert_from_config(cml_zoo_bert_config_base(), config, CML_ZOO_BERT_BASE);
+}
+
+Module* cml_zoo_bert_large(const CMLZooConfig* config) {
+    return create_bert_from_config(cml_zoo_bert_config_large(), config, CML_ZOO_BERT_LARGE);
+}
+
+static Module* create_vit_from_config(ViTConfig vit_cfg, const CMLZooConfig* config,
+                                       CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
-    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 30522; /* BERT vocab */
+    if (cfg.num_classes > 0)
+        vit_cfg.num_classes = cfg.num_classes;
 
-    /* BERT-tiny: 2 layers, 128 hidden, 2 heads */
-    Sequential* model = nn_sequential();
-
-    /* Embedding */
-    sequential_add(model, (Module*)nn_linear(num_classes, 128, cfg.dtype, cfg.device, false));
-
-    /* Transformer layers */
-    for (int layer = 0; layer < 2; layer++) {
-        sequential_add(model, (Module*)nn_layernorm(128, 1e-5f, true, cfg.dtype, cfg.device));
-        sequential_add(model, (Module*)nn_linear(128, 128, cfg.dtype, cfg.device, true));
-        sequential_add(model, (Module*)nn_relu(false));
-        sequential_add(model, (Module*)nn_linear(128, 128, cfg.dtype, cfg.device, true));
-    }
-
-    /* Pooler */
-    sequential_add(model, (Module*)nn_layernorm(128, 1e-5f, true, cfg.dtype, cfg.device));
-    sequential_add(model, (Module*)nn_linear(128, num_classes, cfg.dtype, cfg.device, false));
+    Module* model = cml_zoo_vit_create(&vit_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
 
     if (cfg.pretrained) {
-        const char* path = cml_zoo_download_weights(CML_ZOO_BERT_TINY, cfg.weights_dir);
-        if (path) model_load((Module*)model, path);
+        const char* path = cml_zoo_download_weights(zoo_model, cfg.weights_dir);
+        if (path) model_load(model, path);
     }
 
-    LOG_INFO("Created BERT-tiny (2 layers, 128 hidden)");
-    return (Module*)model;
+    return model;
+}
+
+Module* cml_zoo_vit_tiny(const CMLZooConfig* config) {
+    return create_vit_from_config(cml_zoo_vit_config_tiny(), config, CML_ZOO_VIT_TINY);
+}
+
+Module* cml_zoo_vit_small(const CMLZooConfig* config) {
+    return create_vit_from_config(cml_zoo_vit_config_small(), config, CML_ZOO_VIT_SMALL);
+}
+
+Module* cml_zoo_vit_base(const CMLZooConfig* config) {
+    return create_vit_from_config(cml_zoo_vit_config_base(), config, CML_ZOO_VIT_BASE);
+}
+
+Module* cml_zoo_vit_large(const CMLZooConfig* config) {
+    return create_vit_from_config(cml_zoo_vit_config_large(), config, CML_ZOO_VIT_LARGE);
+}
+
+static Module* create_clip_from_config(CMLCLIPConfig clip_cfg, const CMLZooConfig* config,
+                                        CMLZooModel zoo_model) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+
+    Module* model = cml_zoo_clip_create(&clip_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(zoo_model, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_clip_vit_b32(const CMLZooConfig* config) {
+    return create_clip_from_config(cml_zoo_clip_config_vit_b32(), config, CML_ZOO_CLIP_VIT_B32);
+}
+
+Module* cml_zoo_clip_vit_b16(const CMLZooConfig* config) {
+    return create_clip_from_config(cml_zoo_clip_config_vit_b16(), config, CML_ZOO_CLIP_VIT_B16);
+}
+
+Module* cml_zoo_clip_vit_l14(const CMLZooConfig* config) {
+    return create_clip_from_config(cml_zoo_clip_config_vit_l14(), config, CML_ZOO_CLIP_VIT_L14);
+}
+
+static Module* create_t5_from_config(T5Config t5_cfg, const CMLZooConfig* config,
+                                      CMLZooModel zoo_model) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+
+    Module* model = cml_zoo_t5_create(&t5_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(zoo_model, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_t5_small(const CMLZooConfig* config) {
+    return create_t5_from_config(cml_zoo_t5_config_small(), config, CML_ZOO_T5_SMALL);
+}
+
+Module* cml_zoo_t5_base(const CMLZooConfig* config) {
+    return create_t5_from_config(cml_zoo_t5_config_base(), config, CML_ZOO_T5_BASE);
+}
+
+Module* cml_zoo_t5_large(const CMLZooConfig* config) {
+    return create_t5_from_config(cml_zoo_t5_config_large(), config, CML_ZOO_T5_LARGE);
+}
+
+Module* cml_zoo_unet_default(const CMLZooConfig* config) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    CMLUNetConfig unet_cfg = cml_zoo_unet_config_default();
+    if (cfg.num_classes > 0)
+        unet_cfg.num_classes = cfg.num_classes;
+
+    Module* model = cml_zoo_unet_create(&unet_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_UNET_DEFAULT, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+static Module* create_convnext(ConvNeXtConfig cnx_cfg, const CMLZooConfig* config,
+                                CMLZooModel zoo_model) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 1000;
+
+    Module* model = cml_zoo_convnext_create(&cnx_cfg, num_classes, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(zoo_model, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_convnext_tiny(const CMLZooConfig* config) {
+    return create_convnext(cml_zoo_convnext_config_tiny(), config, CML_ZOO_CONVNEXT_TINY);
+}
+
+Module* cml_zoo_convnext_small(const CMLZooConfig* config) {
+    return create_convnext(cml_zoo_convnext_config_small(), config, CML_ZOO_CONVNEXT_SMALL);
+}
+
+Module* cml_zoo_convnext_base(const CMLZooConfig* config) {
+    return create_convnext(cml_zoo_convnext_config_base(), config, CML_ZOO_CONVNEXT_BASE);
+}
+
+Module* cml_zoo_convnext_large(const CMLZooConfig* config) {
+    return create_convnext(cml_zoo_convnext_config_large(), config, CML_ZOO_CONVNEXT_LARGE);
+}
+
+Module* cml_zoo_inception_v3(const CMLZooConfig* config) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 1000;
+
+    Module* model = cml_zoo_inception_v3_create(num_classes, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_INCEPTION_V3, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_retinanet(const CMLZooConfig* config) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    RetinaNetConfig rt_cfg = cml_zoo_retinanet_default_config();
+    if (cfg.num_classes > 0)
+        rt_cfg.num_classes = cfg.num_classes;
+
+    Module* model = cml_zoo_retinanet_create(&rt_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_RETINANET, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_mask_rcnn(const CMLZooConfig* config) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    MaskRCNNConfig mr_cfg = cml_zoo_mask_rcnn_default_config();
+    if (cfg.num_classes > 0)
+        mr_cfg.num_classes = cfg.num_classes;
+
+    Module* model = cml_zoo_mask_rcnn_create(&mr_cfg, cfg.dtype, cfg.device);
+    if (!model)
+        return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_MASK_RCNN, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_unet3d(const CMLZooConfig* config) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    CMLUNet3DConfig u3_cfg = cml_zoo_unet3d_config_default();
+    if (cfg.num_classes > 0)
+        u3_cfg.num_classes = cfg.num_classes;
+
+    Module* model = cml_zoo_unet3d_create(&u3_cfg, cfg.dtype, cfg.device);
+    if (!model) return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_UNET3D, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
+}
+
+Module* cml_zoo_rnnt(const CMLZooConfig* config) {
+    CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
+    CMLRNNTConfig rt_cfg = cml_zoo_rnnt_config_default();
+
+    Module* model = cml_zoo_rnnt_create(&rt_cfg, cfg.dtype, cfg.device);
+    if (!model) return NULL;
+
+    if (cfg.pretrained) {
+        const char* path = cml_zoo_download_weights(CML_ZOO_RNNT, cfg.weights_dir);
+        if (path) model_load(model, path);
+    }
+
+    return model;
 }
 
 Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config) {
@@ -372,7 +644,34 @@ Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config) {
     case CML_ZOO_VGG11:       return cml_zoo_vgg11(config);
     case CML_ZOO_VGG16:       return cml_zoo_vgg16(config);
     case CML_ZOO_GPT2_SMALL:  return cml_zoo_gpt2_small(config);
+    case CML_ZOO_GPT2_MEDIUM: return cml_zoo_gpt2_medium(config);
+    case CML_ZOO_GPT2_LARGE:  return cml_zoo_gpt2_large(config);
+    case CML_ZOO_GPT2_XL:     return cml_zoo_gpt2_xl(config);
     case CML_ZOO_BERT_TINY:   return cml_zoo_bert_tiny(config);
+    case CML_ZOO_BERT_MINI:   return cml_zoo_bert_mini(config);
+    case CML_ZOO_BERT_SMALL:  return cml_zoo_bert_small(config);
+    case CML_ZOO_BERT_BASE:   return cml_zoo_bert_base(config);
+    case CML_ZOO_BERT_LARGE:  return cml_zoo_bert_large(config);
+    case CML_ZOO_VIT_TINY:    return cml_zoo_vit_tiny(config);
+    case CML_ZOO_VIT_SMALL:   return cml_zoo_vit_small(config);
+    case CML_ZOO_VIT_BASE:    return cml_zoo_vit_base(config);
+    case CML_ZOO_VIT_LARGE:   return cml_zoo_vit_large(config);
+    case CML_ZOO_CLIP_VIT_B32:return cml_zoo_clip_vit_b32(config);
+    case CML_ZOO_CLIP_VIT_B16:return cml_zoo_clip_vit_b16(config);
+    case CML_ZOO_CLIP_VIT_L14:return cml_zoo_clip_vit_l14(config);
+    case CML_ZOO_T5_SMALL:    return cml_zoo_t5_small(config);
+    case CML_ZOO_T5_BASE:     return cml_zoo_t5_base(config);
+    case CML_ZOO_T5_LARGE:    return cml_zoo_t5_large(config);
+    case CML_ZOO_UNET_DEFAULT:   return cml_zoo_unet_default(config);
+    case CML_ZOO_CONVNEXT_TINY:  return cml_zoo_convnext_tiny(config);
+    case CML_ZOO_CONVNEXT_SMALL: return cml_zoo_convnext_small(config);
+    case CML_ZOO_CONVNEXT_BASE:  return cml_zoo_convnext_base(config);
+    case CML_ZOO_CONVNEXT_LARGE: return cml_zoo_convnext_large(config);
+    case CML_ZOO_INCEPTION_V3:   return cml_zoo_inception_v3(config);
+    case CML_ZOO_RETINANET:      return cml_zoo_retinanet(config);
+    case CML_ZOO_MASK_RCNN:      return cml_zoo_mask_rcnn(config);
+    case CML_ZOO_UNET3D:         return cml_zoo_unet3d(config);
+    case CML_ZOO_RNNT:           return cml_zoo_rnnt(config);
     default:
         LOG_ERROR("Unknown zoo model: %d", model);
         return NULL;
