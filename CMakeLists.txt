@@ -191,6 +191,9 @@ set(CORE_SOURCES
     src/core/protobuf_mini.c
     src/core/pth_loader.c
     src/core/tinyfs.c
+    src/core/threefry.c
+    src/core/mlperf_logging.c
+    src/core/hevc.c
 )
 
 if(ENABLE_ONNX)
@@ -215,12 +218,16 @@ set(BACKEND_SOURCES
     src/backend/null_device.c
     src/backend/disk_backend.c
     src/backend/usb_device.c
+    src/backend/remote_device.c
+    src/backend/usb3_gpu.c
+    src/backend/thunder_executor.c
 )
 
 set(OPS_SOURCES
     src/ops/uops.c
     src/ops/winograd.c
     src/ops/ir/ir.c
+    src/ops/ir/intern.c
     src/ops/ir/context.c
     src/ops/ir/execution.c
     src/ops/ir/backward.c
@@ -229,10 +236,12 @@ set(OPS_SOURCES
     src/ops/ir/graph_cache.c
     src/ops/ir/aot.c
     src/ops/ir/kernel_cache.c
+    src/ops/ir/disk_cache.c
     src/ops/ir/fusion_patterns.c
     src/ops/ir/dispatch.c
     src/ops/ir/decompose.c
     src/ops/ir/pattern_matcher.c
+    src/ops/ir/tree_automaton.c
     src/ops/ir/hcq.c
     src/ops/ir/hcq_cuda.c
     src/ops/ir/hcq_opencl.c
@@ -240,12 +249,16 @@ set(OPS_SOURCES
     src/ops/ir/hcq_nv.c
     src/ops/ir/hcq_am.c
     src/ops/ir/beam_search.c
+    src/ops/ir/opt_transforms.c
+    src/ops/ir/tc_opt.c
+    src/ops/ir/heuristic_opt.c
     src/ops/ir/trace.c
     src/ops/ir/tiny_jit.c
     src/ops/ir/beam_cuda_timing.c
     src/ops/ir/schedule.c
     src/ops/ir/schedule_v2.c
     src/ops/ir/linearize.c
+    src/ops/ir/rangeify.c
     src/ops/ir/fused_codegen.c
     src/ops/ir/runtime_compiler.c
     src/ops/ir/graph_capture.c
@@ -253,16 +266,27 @@ set(OPS_SOURCES
     src/ops/ir/hcq_nir.c
     src/ops/ir/z3_verify.c
     src/ops/ir/compiler_viz.c
+    src/ops/ir/process_replay.c
+    src/ops/ir/memory_planner.c
     src/ops/ir/gpu/cuda_backend.c
+    src/ops/ir/gpu/cuda_graph_replay.c
+    src/ops/ir/multi_output.c
+    src/ops/ir/cross_boundary_fusion.c
     src/ops/ir/gpu/rocm_backend.c
     src/ops/ir/gpu/wmma.c
     src/ops/ir/gpu/wgsl_codegen.c
     src/ops/ir/gpu/metal_codegen.c
     src/ops/ir/gpu/ptx_codegen.c
     src/ops/ir/gpu/nv_driver.c
+    src/ops/ir/gpu/nv_qmd.c
     src/ops/ir/gpu/am_driver.c
     src/ops/ir/gpu/adreno_backend.c
     src/ops/ir/gpu/hexagon_backend.c
+    src/ops/ir/gpu/hexagon_sim.c
+    src/ops/ir/gpu/amd_profiling.c
+    src/ops/ir/gpu/amx.c
+    src/ops/ir/gpu/xmx.c
+    src/ops/ir/gpu/rdna3_emu.c
     src/ops/simd_utils.c
     src/ops/simd_math.c
     src/ops/simd_views.c
@@ -274,29 +298,42 @@ endif()
 
 list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
 
-if(ENABLE_VULKAN)
-    list(APPEND OPS_SOURCES
-        src/ops/ir/gpu/vulkan_backend.c
-        src/ops/ir/gpu/spirv_codegen.c
-    )
-endif()
+list(APPEND OPS_SOURCES
+    src/ops/ir/gpu/vulkan_backend.c
+    src/ops/ir/gpu/spirv_codegen.c
+)
 
 if(ENABLE_NIR)
     list(APPEND OPS_SOURCES src/ops/ir/nir_compiler.c src/ops/ir/hcq_nir.c)
 endif()
 
+option(ENABLE_NAK "Enable NAK (Nouveau Architecture Kompiler) backend" OFF)
+if(ENABLE_NAK)
+    add_definitions(-DCML_HAS_NAK)
+    message(STATUS "NAK backend enabled (dynamic loading)")
+endif()
+list(APPEND OPS_SOURCES src/ops/ir/gpu/nak_backend.c)
+
 list(APPEND OPS_SOURCES src/ops/ir/schedule_v2.c src/ops/ir/linearize.c)
+list(APPEND OPS_SOURCES src/ops/ir/spec.c src/ops/ir/late_passes.c)
 
 if(LLVM_BACKEND_FOUND)
-    list(APPEND OPS_SOURCES src/ops/ir/llvm/llvm_backend.c src/ops/ir/gpu/gpu_codegen.c)
+    list(APPEND OPS_SOURCES
+        src/ops/ir/llvm/llvm_backend.c
+        src/ops/ir/gpu/gpu_codegen.c
+        src/ops/ir/gpu/amd_llvm.c
+    )
 endif()
 
 set(TENSOR_SOURCES
     src/tensor/tensor.c
     src/tensor/tensor_views.c
     src/tensor/tensor_manipulation.c
+    src/tensor/tensor_ops_extra.c
     src/tensor/sparse_tensor.c
     src/tensor/image_dtype.c
+    src/tensor/shard.c
+    src/tensor/tensor_hash.c
 )
 
 set(AUTOGRAD_SOURCES
@@ -345,6 +382,7 @@ set(NN_SOURCES
     src/nn/paged_attention.c
     src/nn/serving.c
     src/nn/speculative.c
+    src/nn/openai_api.c
 )
 
 set(SYMBOLIC_SOURCES src/symbolic/symbolic.c)
@@ -355,29 +393,26 @@ option(ENABLE_DISTRIBUTED "Enable distributed training" OFF)
 option(ENABLE_NCCL "Enable NCCL backend (requires libnccl)" ON)
 option(ENABLE_MPI "Enable MPI backend (requires libmpi)" ON)
 
+option(ENABLE_IB_TRANSPORT "Enable InfiniBand RDMA transport (dynamic loading)" OFF)
+if(ENABLE_IB_TRANSPORT)
+    add_definitions(-DCML_HAS_IB_TRANSPORT)
+    message(STATUS "InfiniBand RDMA transport enabled (dynamic loading)")
+endif()
+
+set(DISTRIBUTED_SOURCES
+    src/distributed/distributed.c
+    src/distributed/comm_backend.c
+    src/distributed/gloo_backend.c
+    src/distributed/nccl_backend.c
+    src/distributed/mpi_backend.c
+    src/distributed/ring_allreduce.c
+    src/distributed/data_parallel.c
+    src/distributed/pipeline_parallel.c
+    src/distributed/tensor_parallel.c
+    src/distributed/ib_transport.c
+)
 if(ENABLE_DISTRIBUTED)
     add_definitions(-DCML_HAS_DISTRIBUTED)
-    set(DISTRIBUTED_SOURCES
-        src/distributed/distributed.c
-        src/distributed/comm_backend.c
-        src/distributed/gloo_backend.c
-        src/distributed/ring_allreduce.c
-        src/distributed/data_parallel.c
-        src/distributed/pipeline_parallel.c
-        src/distributed/tensor_parallel.c
-    )
-    if(ENABLE_NCCL)
-        list(APPEND DISTRIBUTED_SOURCES src/distributed/nccl_backend.c)
-        add_definitions(-DCML_HAS_NCCL)
-    endif()
-    if(ENABLE_MPI)
-        list(APPEND DISTRIBUTED_SOURCES src/distributed/mpi_backend.c)
-        add_definitions(-DCML_HAS_MPI)
-    endif()
-    message(STATUS "Distributed training enabled (NCCL: ${ENABLE_NCCL}, MPI: ${ENABLE_MPI})")
-else()
-    set(DISTRIBUTED_SOURCES src/distributed/tensor_parallel.c)
-    message(STATUS "Distributed training disabled (tensor parallelism still available)")
 endif()
 
 set(DATASET_SOURCES
@@ -385,11 +420,31 @@ set(DATASET_SOURCES
     src/datasets/csv_parser.c
     src/datasets/idx_parser.c
     src/datasets/builtin_data.c
+    src/datasets/loaders.c
 )
 
 option(BUILD_MODEL_ZOO "Build model zoo" ON)
 if(BUILD_MODEL_ZOO)
-    set(ZOO_SOURCES src/zoo/zoo.c)
+    set(ZOO_SOURCES
+        src/zoo/zoo.c
+        src/zoo/resnet.c
+        src/zoo/gpt2.c
+        src/zoo/bert.c
+        src/zoo/efficientnet.c
+        src/zoo/yolov8.c
+        src/zoo/whisper.c
+        src/zoo/stable_diffusion.c
+        src/zoo/vit.c
+        src/zoo/clip.c
+        src/zoo/t5.c
+        src/zoo/unet.c
+        src/zoo/convnext.c
+        src/zoo/inception.c
+        src/zoo/retinanet.c
+        src/zoo/mask_rcnn.c
+        src/zoo/unet3d.c
+        src/zoo/rnnt.c
+    )
     message(STATUS "Model zoo enabled")
 else()
     set(ZOO_SOURCES "")
@@ -476,6 +531,24 @@ if(BUILD_TESTS)
         cml_link_all(${test_name})
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
+
+    add_executable(test_nv_mock
+        tests/test_nv_driver.c
+        src/ops/ir/gpu/nv_mock.c
+        ${LIBRARY_SOURCES}
+    )
+    target_compile_definitions(test_nv_mock PRIVATE CML_NV_MOCK_GPU CML_HAS_NV_DRIVER)
+    cml_link_all(test_nv_mock)
+    add_test(NAME test_nv_mock COMMAND test_nv_mock)
+
+    add_executable(test_am_mock
+        tests/test_am_driver.c
+        src/ops/ir/gpu/am_mock.c
+        ${LIBRARY_SOURCES}
+    )
+    target_compile_definitions(test_am_mock PRIVATE CML_AM_MOCK_GPU CML_HAS_AM_DRIVER)
+    cml_link_all(test_am_mock)
+    add_test(NAME test_am_mock COMMAND test_am_mock)
 endif()
 
 # --- Examples ----------------------------------------------------------------
@@ -520,6 +593,24 @@ if(BUILD_EXAMPLES)
     cml_add_example(mnist_example examples/demos/mnist_example.c)
     cml_add_example(print_kernels examples/demos/print_kernels.c)
     cml_add_example(training_loop_example examples/demos/training_loop_example.c)
+    cml_add_example(resnet examples/demos/resnet.c)
+    cml_add_example(bert examples/demos/bert.c)
+    cml_add_example(gpt2 examples/demos/gpt2.c)
+    cml_add_example(vit examples/demos/vit.c)
+    cml_add_example(t5 examples/demos/t5.c)
+    cml_add_example(unet examples/demos/unet.c)
+    cml_add_example(clip examples/demos/clip.c)
+    cml_add_example(convnext examples/demos/convnext.c)
+    cml_add_example(inception examples/demos/inception.c)
+    cml_add_example(efficientnet examples/demos/efficientnet.c)
+    cml_add_example(whisper examples/demos/whisper.c)
+    cml_add_example(stable_diffusion examples/demos/stable_diffusion.c)
+    cml_add_example(yolov8 examples/demos/yolov8.c)
+    cml_add_example(mask_rcnn examples/demos/mask_rcnn.c)
+    cml_add_example(retinanet examples/demos/retinanet.c)
+    cml_add_example(unet3d examples/demos/unet3d.c)
+    cml_add_example(rnnt examples/demos/rnnt.c)
+    cml_add_example(mlperf_resnet50 examples/mlperf/mlperf_resnet50.c)
 endif()
 
 # --- Install -----------------------------------------------------------------
@@ -583,6 +674,6 @@ message(STATUS "")
 message(STATUS "C-ML ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
 message(STATUS "  LLVM: ${LLVM_BACKEND_FOUND}  CUDA: ${CUDAToolkit_FOUND}  ROCm: ${hip_FOUND}  Metal: ${METAL_FOUND}")
 message(STATUS "  Vulkan: ${ENABLE_VULKAN}  WebGPU: ${ENABLE_WEBGPU}  OpenCL: ${OpenCL_FOUND}")
-message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}  AM Driver: ${ENABLE_AM_DRIVER}  NIR: ${ENABLE_NIR}")
-message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Distributed: ${ENABLE_DISTRIBUTED}")
+message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}  AM Driver: ${ENABLE_AM_DRIVER}  NIR: ${ENABLE_NIR}  NAK: ${ENABLE_NAK}")
+message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Distributed: ${ENABLE_DISTRIBUTED}  IB: ${ENABLE_IB_TRANSPORT}")
 message(STATUS "")
