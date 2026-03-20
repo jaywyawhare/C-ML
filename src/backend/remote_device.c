@@ -10,8 +10,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifdef __linux__
+#include <dlfcn.h>
+#define CML_HAS_DLFCN 1
+#endif
 
 /* Wire format
  * Request:  [uint32 opcode][uint32 payload_size][payload...]
@@ -431,9 +437,158 @@ static void handle_client(int client_fd) {
             break;
         }
         case CML_REMOTE_OP_EXECUTE: {
-            /* Kernel execution is a stub; real implementation would compile + dispatch */
-            LOG_INFO("remote_server: execute request (kernel dispatch stub)");
+#ifdef CML_HAS_DLFCN
+            /* Parse payload:
+             * [src_len:uint32][kernel_source:src_len bytes]
+             * [num_buf:uint32][handles:num_buf*uint64]
+             * [grid:3*uint32][block:3*uint32]
+             */
+            if (psize < 8) {
+                LOG_ERROR("remote_server: execute payload too small (%u bytes)", psize);
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+            size_t off2 = 0;
+            uint32_t src_len2 = 0;
+            memcpy(&src_len2, payload + off2, 4); off2 += 4;
+            if (src_len2 == 0 || off2 + src_len2 > psize) {
+                LOG_ERROR("remote_server: execute bad src_len %u", src_len2);
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+            char* kernel_src = (char*)(payload + off2); off2 += src_len2;
+            /* ensure NUL-terminated within payload */
+            kernel_src[src_len2 - 1] = '\0';
+
+            if (off2 + 4 > psize) {
+                LOG_ERROR("remote_server: execute payload truncated at num_buf");
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+            uint32_t num_buf2 = 0;
+            memcpy(&num_buf2, payload + off2, 4); off2 += 4;
+
+            size_t handles_bytes = (size_t)num_buf2 * sizeof(uint64_t);
+            if (off2 + handles_bytes + 24 > psize) {
+                LOG_ERROR("remote_server: execute payload truncated at handles/grid/block");
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+            uint64_t* handles2 = (uint64_t*)(payload + off2); off2 += handles_bytes;
+            uint32_t grid2[3], block2[3];
+            memcpy(grid2,  payload + off2, 12); off2 += 12;
+            memcpy(block2, payload + off2, 12);
+
+            /* Resolve handles to buffer pointers */
+            float** bufs = NULL;
+            if (num_buf2 > 0) {
+                bufs = (float**)malloc((size_t)num_buf2 * sizeof(float*));
+                if (!bufs) {
+                    LOG_ERROR("remote_server: OOM resolving buffer handles");
+                    send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                    break;
+                }
+                int lookup_ok = 1;
+                for (uint32_t bi = 0; bi < num_buf2; bi++) {
+                    AllocEntry* ae = server_find(handles2[bi]);
+                    if (!ae) {
+                        LOG_ERROR("remote_server: unknown handle 0x%llx",
+                                  (unsigned long long)handles2[bi]);
+                        lookup_ok = 0;
+                        break;
+                    }
+                    bufs[bi] = (float*)ae->ptr;
+                }
+                if (!lookup_ok) {
+                    free(bufs);
+                    send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                    break;
+                }
+            }
+
+            /* Write kernel source to a temp file, compile with gcc/cc */
+            char src_path[] = "/tmp/cml_kernel_XXXXXX.c";
+            char so_path[]  = "/tmp/cml_kernel_XXXXXX.so";
+
+            /* Use mkstemp for the .c file, then build .so path from it */
+            int src_fd2 = mkstemps(src_path, 2); /* suffix len = 2 for ".c" */
+            if (src_fd2 < 0) {
+                LOG_ERROR("remote_server: mkstemps failed: %s", strerror(errno));
+                free(bufs);
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+            /* Derive .so path by replacing the last 2 chars (.c) with .so */
+            memcpy(so_path, src_path, sizeof(src_path));
+            size_t slen = strlen(so_path);
+            so_path[slen - 2] = '.';
+            so_path[slen - 1] = 's';
+            /* need one more char; so_path has room — adjust: use a local buf */
+            char so_path2[64];
+            snprintf(so_path2, sizeof(so_path2), "%.*s.so", (int)(slen - 2), so_path);
+
+            /* Write kernel source */
+            size_t src_written = 0;
+            size_t src_total = (size_t)(src_len2 - 1); /* exclude NUL */
+            while (src_written < src_total) {
+                ssize_t nw = write(src_fd2, kernel_src + src_written, src_total - src_written);
+                if (nw <= 0) break;
+                src_written += (size_t)nw;
+            }
+            close(src_fd2);
+
+            /* Compile */
+            char compile_cmd[512];
+            snprintf(compile_cmd, sizeof(compile_cmd),
+                     "gcc -O2 -shared -fPIC -o %s %s 2>/dev/null || "
+                     "cc  -O2 -shared -fPIC -o %s %s 2>/dev/null",
+                     so_path2, src_path,
+                     so_path2, src_path);
+            int compile_ret = system(compile_cmd);
+            unlink(src_path);
+
+            if (compile_ret != 0) {
+                LOG_ERROR("remote_server: kernel compilation failed (exit %d)", compile_ret);
+                unlink(so_path2);
+                free(bufs);
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+
+            /* Load and call the kernel */
+            void* dl = dlopen(so_path2, RTLD_NOW | RTLD_LOCAL);
+            if (!dl) {
+                LOG_ERROR("remote_server: dlopen failed: %s", dlerror());
+                unlink(so_path2);
+                free(bufs);
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+
+            typedef void (*kernel_fn_t)(float** bufs, int num_bufs, uint32_t* grid, uint32_t* block);
+            kernel_fn_t kfn = (kernel_fn_t)dlsym(dl, "cml_kernel");
+            if (!kfn) {
+                LOG_ERROR("remote_server: dlsym(cml_kernel) failed: %s", dlerror());
+                dlclose(dl);
+                unlink(so_path2);
+                free(bufs);
+                send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
+                break;
+            }
+
+            kfn(bufs, (int)num_buf2, grid2, block2);
+
+            dlclose(dl);
+            unlink(so_path2);
+            free(bufs);
+
+            LOG_INFO("remote_server: kernel executed successfully (%u bufs)", num_buf2);
             send_resp(client_fd, CML_REMOTE_STATUS_OK, NULL, 0);
+#else
+            /* No dlopen support: no-op stub */
+            LOG_INFO("remote_server: execute request (no-op: dlfcn unavailable)");
+            send_resp(client_fd, CML_REMOTE_STATUS_OK, NULL, 0);
+#endif
             break;
         }
         default:

@@ -817,3 +817,44 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
     ctx->used_mem += size;
     return tensor;
 }
+
+int cml_context_set_param(CMLContext_t ctx, Tensor* tensor) {
+    if (!ctx || !tensor)
+        return -1;
+
+    size_t size = tensor->numel * cml_dtype_size(tensor->dtype);
+
+    if (ctx->buffer && ctx->tensor_allocator.buffer) {
+        /* Context has a pre-allocated buffer: register the tensor into the
+         * context's bump allocator so it lives in the same arena as other
+         * context tensors.  If the tensor already owns external data we
+         * release that allocation first. */
+        if (tensor->owns_data && tensor->data) {
+            if (tensor->device == DEVICE_CPU || tensor->device == DEVICE_AUTO) {
+                free(tensor->data);
+            } else {
+                device_free(tensor->data, tensor->device);
+            }
+            tensor->data      = NULL;
+            tensor->owns_data = false;
+        }
+        if (tensor->buffer_handle && tensor->buffer_handle != ctx->buffer) {
+            cml_backend_buffer_free(tensor->buffer_handle);
+            tensor->buffer_handle = NULL;
+        }
+
+        if (cml_tensor_allocator_alloc(&ctx->tensor_allocator, tensor) != 0) {
+            LOG_ERROR("cml_context_set_param: context out of memory (used=%zu total=%zu need=%zu)",
+                      ctx->used_mem, ctx->mem_size, size);
+            return -1;
+        }
+        tensor->buffer_handle = ctx->buffer;
+    } else {
+        /* No context buffer — parameter is externally managed.  Just mark it
+         * as non-owning so the context does not attempt to free it. */
+        tensor->owns_data = false;
+    }
+
+    ctx->used_mem += size;
+    return 0;
+}

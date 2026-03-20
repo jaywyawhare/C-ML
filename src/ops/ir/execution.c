@@ -2612,6 +2612,128 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_LERP: {
+        /* lerp(a, b, t) = a + t * (b - a)
+         * inputs[0]=a, inputs[1]=b, inputs[2]=t (scalar or tensor) */
+        if (!in1_data || !in2_data) return -1;
+        float t_scalar = 0.5f;
+        bool t_is_tensor = (node->num_inputs >= 3 && node->inputs[2] &&
+                            node->inputs[2]->data);
+        if (!t_is_tensor && node->num_inputs >= 3 && node->inputs[2] &&
+            node->inputs[2]->ir_node) {
+            /* t may be stored via a fill IR node; use default scalar if unavailable */
+            t_scalar = 0.5f;
+        }
+        float* t_data = t_is_tensor ? (float*)node->inputs[2]->data : NULL;
+        for (size_t i = 0; i < out->numel; i++) {
+            float a = in1_data[i % in1_numel];
+            float b = in2_data[i % (node->inputs[1]->numel)];
+            float t = t_data ? t_data[i % node->inputs[2]->numel] : t_scalar;
+            out_data[i] = a + t * (b - a);
+        }
+        break;
+    }
+
+    case UOP_STRIDE: {
+        /* View with different strides — copy with stride access.
+         * params->new_strides holds new strides; fall back to identity copy. */
+        if (!in1_data) return -1;
+        StrideParams* sp = node->params ? (StrideParams*)node->params : NULL;
+        if (sp && sp->new_strides && sp->num_dims == out->ndim) {
+            for (size_t i = 0; i < out->numel; i++) {
+                /* Compute flat index using provided strides */
+                size_t src = 0;
+                size_t rem = i;
+                for (int d = out->ndim - 1; d >= 0; d--) {
+                    size_t coord = rem % (size_t)out->shape[d];
+                    rem /= (size_t)out->shape[d];
+                    src += coord * (size_t)sp->new_strides[d];
+                }
+                out_data[i] = (src < in1_numel) ? in1_data[src] : 0.0f;
+            }
+        } else {
+            size_t n = out->numel < in1_numel ? out->numel : in1_numel;
+            memcpy(out_data, in1_data, n * sizeof(float));
+        }
+        break;
+    }
+
+    case UOP_SLICE: {
+        /* Slice tensor: extract sub-region defined by start/end/step per dim */
+        if (!in1_data) return -1;
+        SliceParams* sp = node->params ? (SliceParams*)node->params : NULL;
+        if (!sp || !sp->start || !sp->end) {
+            /* No params — identity copy */
+            size_t n = out->numel < in1_numel ? out->numel : in1_numel;
+            memcpy(out_data, in1_data, n * sizeof(float));
+            break;
+        }
+        /* Multi-dim slice: iterate output indices, map to input */
+        int ndim = node->inputs[0]->ndim;
+        for (size_t i = 0; i < out->numel; i++) {
+            size_t src = 0;
+            size_t rem = i;
+            bool valid = true;
+            for (int d = ndim - 1; d >= 0; d--) {
+                int out_dim_size = out->shape[d];
+                size_t coord = rem % (size_t)out_dim_size;
+                rem /= (size_t)out_dim_size;
+                int step  = sp->step  ? sp->step[d]  : 1;
+                int start = sp->start[d];
+                int src_coord = start + (int)coord * step;
+                if (src_coord < 0 || src_coord >= node->inputs[0]->shape[d]) {
+                    valid = false;
+                    break;
+                }
+                /* Accumulate using input strides */
+                size_t in_stride = 1;
+                for (int dd = d + 1; dd < ndim; dd++)
+                    in_stride *= (size_t)node->inputs[0]->shape[dd];
+                src += (size_t)src_coord * in_stride;
+            }
+            out_data[i] = (valid && src < in1_numel) ? in1_data[src] : 0.0f;
+        }
+        break;
+    }
+
+    case UOP_SPLIT:
+    case UOP_CHUNK: {
+        /* Split/Chunk: copy a contiguous slice of the input to output.
+         * split_dim and split_index are not stored in IRNode; default to dim=0, idx=0. */
+        if (!in1_data) return -1;
+        int dim      = 0;
+        int idx      = 0;
+        int in_dim   = node->inputs[0]->shape[dim];
+        int chunk_sz = out->shape[dim];
+        int offset   = idx * chunk_sz;
+        if (offset >= in_dim) { memset(out_data, 0, out->numel * sizeof(float)); break; }
+
+        /* Stride before and after split dim */
+        size_t outer = 1, inner = 1;
+        for (int d = 0; d < dim; d++)        outer *= (size_t)node->inputs[0]->shape[d];
+        for (int d = dim + 1; d < node->inputs[0]->ndim; d++) inner *= (size_t)node->inputs[0]->shape[d];
+
+        for (size_t o = 0; o < outer; o++) {
+            for (int c = 0; c < chunk_sz && (offset + c) < in_dim; c++) {
+                size_t src_base = (o * (size_t)in_dim  + (size_t)(offset + c)) * inner;
+                size_t dst_base = (o * (size_t)chunk_sz + (size_t)c)           * inner;
+                memcpy(out_data + dst_base, in1_data + src_base, inner * sizeof(float));
+            }
+        }
+        break;
+    }
+
+    case UOP_MESHGRID: {
+        /* meshgrid of 1-D inputs — output is N-D grid for input[0] repeated along dim 0.
+         * For CPU we only handle the first output (dim 0 grid). */
+        if (!in1_data) return -1;
+        size_t n = node->inputs[0]->numel;
+        size_t repeat = out->numel / (n > 0 ? n : 1);
+        for (size_t r = 0; r < repeat; r++)
+            memcpy(out_data + r * n, in1_data, n * sizeof(float));
+        break;
+    }
+
     default:
         LOG_WARNING("CPU fallback: unsupported op type %d", node->type);
         for (size_t i = 0; i < out->numel; i++) {

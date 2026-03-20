@@ -67,7 +67,7 @@ size_t cml_context_total_mem(CMLContext_t ctx);
 Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType dtype,
                                  DeviceType device);
 
-void cml_context_set_param(CMLContext_t ctx, Tensor* tensor);
+int cml_context_set_param(CMLContext_t ctx, Tensor* tensor);
 
 #ifdef __cplusplus
 }

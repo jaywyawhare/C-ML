@@ -446,11 +446,8 @@ int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
             return -1;
         }
 
-        /* TODO: extract QP number from opaque ibv_qp pointer.
-         * In a real deployment the QP num is at a known offset in the
-         * ibv_qp struct; here we use peer_idx as a stand-in placeholder. */
         qp_info_t local_info = {
-            .qp_num = (uint32_t)(peer_idx + 1),
+            .qp_num = ((ibv_qp*)ib->qps[i])->qp_num,  /* libibverbs: ibv_qp.qp_num is public */
             .lid = port_attr.lid,
             .psn = local_psn
         };
