@@ -64,6 +64,44 @@ WhisperConfig whisper_small_config(void) {
     return cfg;
 }
 
+WhisperConfig whisper_medium_config(void) {
+    WhisperConfig cfg = {
+        .size = WHISPER_MEDIUM,
+        .n_mels = 80,
+        .n_audio_ctx = 1500,
+        .n_audio_state = 1024,
+        .n_audio_head = 16,
+        .n_audio_layer = 24,
+        .n_text_ctx = 448,
+        .n_text_state = 1024,
+        .n_text_head = 16,
+        .n_text_layer = 24,
+        .n_vocab = 51865,
+        .dtype = DTYPE_FLOAT32,
+        .device = DEVICE_CPU
+    };
+    return cfg;
+}
+
+WhisperConfig whisper_large_config(void) {
+    WhisperConfig cfg = {
+        .size = WHISPER_LARGE,
+        .n_mels = 128,
+        .n_audio_ctx = 1500,
+        .n_audio_state = 1280,
+        .n_audio_head = 20,
+        .n_audio_layer = 32,
+        .n_text_ctx = 448,
+        .n_text_state = 1280,
+        .n_text_head = 20,
+        .n_text_layer = 32,
+        .n_vocab = 51865,
+        .dtype = DTYPE_FLOAT32,
+        .device = DEVICE_CPU
+    };
+    return cfg;
+}
+
 static void build_audio_encoder(Sequential* model, const WhisperConfig* cfg) {
     DType dt = cfg->dtype;
     DeviceType dev = cfg->device;
@@ -123,6 +161,8 @@ Module* cml_zoo_whisper(const WhisperConfig* config) {
     const char* size_str = "base";
     if (cfg.size == WHISPER_TINY) size_str = "tiny";
     else if (cfg.size == WHISPER_SMALL) size_str = "small";
+    else if (cfg.size == WHISPER_MEDIUM) size_str = "medium";
+    else if (cfg.size == WHISPER_LARGE) size_str = "large";
 
     LOG_INFO("Created Whisper-%s: %d encoder layers, %d decoder layers, dim=%d",
              size_str, cfg.n_audio_layer, cfg.n_text_layer, cfg.n_audio_state);

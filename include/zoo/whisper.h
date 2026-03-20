@@ -11,7 +11,9 @@ extern "C" {
 typedef enum {
     WHISPER_TINY,
     WHISPER_BASE,
-    WHISPER_SMALL
+    WHISPER_SMALL,
+    WHISPER_MEDIUM,
+    WHISPER_LARGE
 } WhisperSize;
 
 typedef struct {
@@ -33,6 +35,8 @@ typedef struct {
 WhisperConfig whisper_tiny_config(void);
 WhisperConfig whisper_base_config(void);
 WhisperConfig whisper_small_config(void);
+WhisperConfig whisper_medium_config(void);
+WhisperConfig whisper_large_config(void);
 
 Module* cml_zoo_whisper(const WhisperConfig* config);
 
