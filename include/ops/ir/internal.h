@@ -10,6 +10,7 @@
 
 #include "ops/uops.h"
 #include "ops/ir/ir.h"
+#include "ops/ir/intern.h"
 #include "tensor/tensor.h"
 #include <stdbool.h>
 
@@ -46,6 +47,9 @@ struct IRNode {
     char* output_name;
     void* params;
     struct IRNode* next;
+
+    uint64_t hash;
+    int ref_count;
 
     Tensor** inputs; // Input tensors (lazy)
     Tensor* output;  // Output tensor (lazy facade)
@@ -97,7 +101,7 @@ struct CMLGraph {
 
     bool is_decomposed;
 
-    // (Using LLVM backend directly)
+    CMLInternTable* intern_table;
 };
 
 const char* uop_type_to_string(UOpType type);

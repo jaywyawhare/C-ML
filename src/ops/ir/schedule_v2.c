@@ -1,7 +1,8 @@
 /* Fusion rules:
  *   elem -> elem  YES
  *   elem -> reduce YES (softmax as one kernel)
- *   reduce -> elem NO  (barrier)
+ *   reduce -> elem CONDITIONAL (allowed when reduce has single consumer whose
+ *                   other inputs are the reduce's own inputs or constants)
  *   matmul/conv + elem YES (bias + activation)
  *   movement is free
  *
@@ -9,6 +10,7 @@
  * fusion group, the intermediate buffer is eliminated (kept in registers). */
 
 #include "ops/ir/schedule.h"
+#include "ops/ir/memory_planner.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
@@ -233,6 +235,35 @@ CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph,
             struct IRNode* last = cur->nodes[cur->num_nodes - 1];
             bool can_extend = cml_schedule_can_fuse(last->type, node->type);
 
+            if (!can_extend && opts->allow_reduce_elem_fusion &&
+                cml_schedule_is_reduction(last->type) &&
+                cml_schedule_is_elementwise(node->type)) {
+                int single_consumer = (last->use_count == 1);
+                if (single_consumer) {
+                    int inputs_ok = 1;
+                    for (int j = 0; j < node->num_inputs && inputs_ok; j++) {
+                        if (!node->inputs || !node->inputs[j]) continue;
+                        Tensor* inp = node->inputs[j];
+                        if (inp == last->output) continue;
+                        int found = 0;
+                        for (int k = 0; k < cur->num_nodes && !found; k++) {
+                            struct IRNode* gn = cur->nodes[k];
+                            if (!gn) continue;
+                            for (int m = 0; m < gn->num_inputs; m++) {
+                                if (gn->inputs && gn->inputs[m] == inp) {
+                                    found = 1;
+                                    break;
+                                }
+                            }
+                            if (gn->output == inp) found = 1;
+                        }
+                        if (!found && inp->data) found = 1;
+                        if (!found) inputs_ok = 0;
+                    }
+                    if (inputs_ok) can_extend = true;
+                }
+            }
+
             /* Respect max fused ops */
             if (can_extend && cur->num_nodes < opts->max_fused_ops) {
                 /* Check buffer elimination: if prev produced an output
@@ -292,13 +323,90 @@ CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph,
         sched->groups[sched->num_groups++] = cur;
     }
 
-    /* Build execution order (already topological since we walked linearly) */
+    /* Build execution order */
     sched->execution_order = calloc((size_t)sched->num_groups, sizeof(int));
     if (sched->execution_order) {
-        for (int i = 0; i < sched->num_groups; i++) {
-            sched->execution_order[i] = i;
+        if (opts->schedule_order == CML_SCHEDULE_ORDER_BFS && sched->num_groups > 1) {
+            int ng = sched->num_groups;
+            int* in_degree = calloc((size_t)ng, sizeof(int));
+            int** deps = calloc((size_t)ng, sizeof(int*));
+            int* dep_counts = calloc((size_t)ng, sizeof(int));
+
+            if (in_degree && deps && dep_counts) {
+                for (int i = 0; i < ng; i++) {
+                    deps[i] = calloc((size_t)ng, sizeof(int));
+                }
+
+                for (int i = 0; i < ng; i++) {
+                    CMLFusionGroup* consumer = sched->groups[i];
+                    if (!consumer) continue;
+                    for (int j = 0; j < i; j++) {
+                        CMLFusionGroup* producer = sched->groups[j];
+                        if (!producer) continue;
+                        int has_dep = 0;
+                        for (int ci = 0; ci < consumer->num_nodes && !has_dep; ci++) {
+                            struct IRNode* cn = consumer->nodes[ci];
+                            if (!cn) continue;
+                            for (int k = 0; k < cn->num_inputs && !has_dep; k++) {
+                                if (!cn->inputs || !cn->inputs[k]) continue;
+                                for (int pi = 0; pi < producer->num_nodes; pi++) {
+                                    if (producer->nodes[pi] &&
+                                        producer->nodes[pi]->output == cn->inputs[k]) {
+                                        has_dep = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (has_dep) {
+                            deps[i][dep_counts[i]++] = j;
+                            in_degree[i]++;
+                        }
+                    }
+                }
+
+                int* queue = calloc((size_t)ng, sizeof(int));
+                int qhead = 0, qtail = 0;
+
+                for (int i = 0; i < ng; i++) {
+                    if (in_degree[i] == 0)
+                        queue[qtail++] = i;
+                }
+
+                int ordered = 0;
+                while (qhead < qtail) {
+                    int level_end = qtail;
+                    while (qhead < level_end) {
+                        int idx = queue[qhead++];
+                        sched->execution_order[ordered++] = idx;
+
+                        for (int i = 0; i < ng; i++) {
+                            for (int d = 0; d < dep_counts[i]; d++) {
+                                if (deps[i][d] == idx) {
+                                    in_degree[i]--;
+                                    if (in_degree[i] == 0)
+                                        queue[qtail++] = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                sched->num_ordered = ordered;
+                free(queue);
+            }
+
+            for (int i = 0; i < ng; i++) free(deps[i]);
+            free(deps);
+            free(dep_counts);
+            free(in_degree);
+        } else {
+            for (int i = 0; i < sched->num_groups; i++) {
+                sched->execution_order[i] = i;
+            }
+            sched->num_ordered = sched->num_groups;
         }
-        sched->num_ordered = sched->num_groups;
     }
 
     /* Statistics */
@@ -308,6 +416,48 @@ CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph,
         ? (float)total_ops / (float)sched->num_groups
         : 0.0f;
     sched->memory_saved = total_memory_saved;
+
+    /* Build memory plan from fusion group buffer liveness */
+    sched->memory_plan = NULL;
+    if (sched->num_groups > 0) {
+        int nb = sched->num_groups;
+        size_t* buf_sizes = calloc((size_t)nb, sizeof(size_t));
+        int* buf_first    = calloc((size_t)nb, sizeof(int));
+        int* buf_last     = calloc((size_t)nb, sizeof(int));
+
+        if (buf_sizes && buf_first && buf_last) {
+            for (int i = 0; i < nb; i++) {
+                CMLFusionGroup* g = sched->groups[i];
+                if (!g) continue;
+                buf_sizes[i] = g->total_memory;
+                buf_first[i] = i;
+                buf_last[i]  = i;
+
+                /* Extend last_use to cover groups that consume this output */
+                for (int j = i + 1; j < nb; j++) {
+                    CMLFusionGroup* consumer = sched->groups[j];
+                    if (!consumer) continue;
+                    for (int ci = 0; ci < consumer->num_nodes; ci++) {
+                        struct IRNode* cn = consumer->nodes[ci];
+                        if (!cn) continue;
+                        for (int k = 0; k < cn->num_inputs; k++) {
+                            if (!cn->inputs || !cn->inputs[k]) continue;
+                            for (int pi = 0; pi < g->num_nodes; pi++) {
+                                if (g->nodes[pi] && g->nodes[pi]->output == cn->inputs[k]) {
+                                    if (j > buf_last[i]) buf_last[i] = j;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            sched->memory_plan = cml_memory_plan_create(nb, buf_sizes, buf_first, buf_last);
+        }
+
+        free(buf_sizes);
+        free(buf_first);
+        free(buf_last);
+    }
 
     return sched;
 }
@@ -320,6 +470,7 @@ void cml_schedule_v2_free(CMLScheduleV2* sched) {
     }
     free(sched->groups);
     free(sched->execution_order);
+    cml_memory_plan_free(sched->memory_plan);
     free(sched);
 }
 
@@ -365,6 +516,9 @@ void cml_schedule_v2_print(const CMLScheduleV2* sched) {
         }
     }
     printf("\n");
+
+    if (sched->memory_plan)
+        cml_memory_plan_print(sched->memory_plan);
 }
 
 int cml_ir_execute_v2(CMLGraph_t ir) {

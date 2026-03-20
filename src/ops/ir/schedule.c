@@ -19,7 +19,7 @@ bool cml_schedule_is_elementwise(UOpType type) {
         case UOP_LOG2: case UOP_EXP2: case UOP_ASIN: case UOP_ACOS:
         case UOP_ATAN: case UOP_SQUARE: case UOP_RSQRT: case UOP_ERF:
         case UOP_CLAMP:
-        /* Tinygrad-parity unary */
+        /* Extended unary */
         case UOP_LOG10: case UOP_SINH: case UOP_COSH:
         case UOP_ASINH: case UOP_ACOSH: case UOP_ATANH:
         case UOP_TRUNC: case UOP_ISINF: case UOP_ISNAN: case UOP_ISFINITE:
@@ -115,6 +115,8 @@ CMLScheduleOptions cml_schedule_default_options(void) {
     opts.max_fused_ops       = CML_SCHEDULE_MAX_FUSED_OPS;
     opts.estimate_costs      = true;
     opts.topological_sort    = true;
+    opts.allow_reduce_elem_fusion = true;
+    opts.schedule_order      = CML_SCHEDULE_ORDER_TOPO;
     return opts;
 }
 

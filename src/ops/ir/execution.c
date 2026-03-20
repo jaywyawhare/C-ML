@@ -12,6 +12,7 @@
 #include "backend/device.h"
 #include "ops/simd_utils.h"
 #include "ops/simd_math.h"
+#include "ops/winograd.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -242,7 +243,6 @@ static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
     for (int d = ndim - 2; d >= 0; d--)
         out_strides[d] = out_strides[d + 1] * (size_t)out_t->shape[d + 1];
 
-    // Compute input strides (only for non-broadcast dims)
     size_t inp_strides[8];
     int inp_ndim = inp->ndim;
     if (inp_ndim > 0) {
@@ -302,9 +302,6 @@ int cpu_execute_node(struct IRNode* node) {
         in2_numel = node->inputs[1]->numel;
     }
 
-// Helper macro for numpy-style broadcast indexing
-// For output flat index i, compute the corresponding flat index in a tensor
-// with potentially fewer elements (broadcast dimensions have size 1)
 #define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
 
     switch (node->type) {
@@ -549,11 +546,30 @@ int cpu_execute_node(struct IRNode* node) {
                     }
                 }
             } else {
-                /* Generic N-dim: fall back to global reduction for >2D */
-                float sum = simd_sum_float(in1_data, in1_numel);
-                if (node->type == UOP_MEAN && in1_numel > 0)
-                    sum /= (float)in1_numel;
-                out_data[0] = sum;
+                /* Generic N-dim per-dimension reduction */
+                int rdim = reduce_dim;
+                int reduce_size = inp->shape[rdim];
+
+                /* Compute the stride of the reduce dimension and outer/inner sizes */
+                size_t inner = 1;
+                for (int d = rdim + 1; d < inp->ndim; d++)
+                    inner *= (size_t)inp->shape[d];
+                size_t outer = 1;
+                for (int d = 0; d < rdim; d++)
+                    outer *= (size_t)inp->shape[d];
+
+                /* For each (outer, inner) position, sum along reduce_dim */
+                for (size_t o = 0; o < outer; o++) {
+                    for (size_t i = 0; i < inner; i++) {
+                        float acc = 0.0f;
+                        for (int r = 0; r < reduce_size; r++) {
+                            acc += in1_data[o * (size_t)reduce_size * inner + (size_t)r * inner + i];
+                        }
+                        if (node->type == UOP_MEAN && reduce_size > 0)
+                            acc /= (float)reduce_size;
+                        out_data[o * inner + i] = acc;
+                    }
+                }
             }
         } else {
             /* Global reduction */
@@ -623,14 +639,10 @@ int cpu_execute_node(struct IRNode* node) {
         int K = a->shape[a->ndim - 1];
         int N = b->shape[b->ndim - 1];
 
-        // Zero output first
         memset(out_data, 0, out->numel * sizeof(float));
 
-        // Try BLAS acceleration
         CMLBlasContext* blas = get_blas_context();
         if (blas && blas->initialized) {
-            // Use BLAS sgemm: C = alpha * A @ B + beta * C
-            // alpha = 1.0, beta = 0.0
             int result = cml_blas_sgemm(blas, in1_data, in2_data, out_data, M, N, K, 1.0f, 0.0f);
             if (result == 0) {
                 break; // BLAS succeeded
@@ -705,7 +717,6 @@ int cpu_execute_node(struct IRNode* node) {
         size_t a_numel    = node->inputs[1]->numel;
         size_t b_numel    = node->inputs[2]->numel;
 
-        // Fast path: all same size, use SIMD
         if (cond_numel == a_numel && a_numel == b_numel && a_numel == out->numel) {
             simd_where_f32(cond_data, a_data, b_data, out_data, out->numel);
         } else {
@@ -740,7 +751,6 @@ int cpu_execute_node(struct IRNode* node) {
     }
 
     case UOP_FILL: {
-        // Fill tensor with constant value
         FillParams* params = (FillParams*)node->params;
         float value        = params ? params->value : 0.0f;
         for (size_t i = 0; i < out->numel; i++) {
@@ -2006,7 +2016,6 @@ int cpu_execute_node(struct IRNode* node) {
             src_data = (float*)node->inputs[2]->data;
         if (!src_data) return -1;
 
-        // Copy input first
         memcpy(out_data, in1_data, out->numel * sizeof(float));
 
         // Scatter: out[index[i]] = src[i] along sdim
@@ -2077,7 +2086,6 @@ int cpu_execute_node(struct IRNode* node) {
         int offset = dp ? dp->offset : 0;
 
         if (inp->ndim == 1) {
-            // Create diagonal matrix
             int n = out->shape[0];
             memset(out_data, 0, out->numel * sizeof(float));
             for (int i = 0; i < inp->shape[0]; i++) {
@@ -2404,7 +2412,6 @@ int cpu_execute_node(struct IRNode* node) {
                 out_data[count++] = in1_data[i];
             }
         }
-        // Update actual output size
         out->numel = count;
         out->shape[0] = (int)count;
         break;
@@ -2476,6 +2483,135 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_CONV2D: {
+        if (!in1_data || !in2_data)
+            return -1;
+        Tensor* input_t  = node->inputs[0];
+        Tensor* weight_t = node->inputs[1];
+        if (input_t->ndim != 4 || weight_t->ndim != 4)
+            return -1;
+
+        Conv2DParams* p = (Conv2DParams*)node->params;
+        int batch       = input_t->shape[0];
+        int in_channels = input_t->shape[1];
+        int in_h        = input_t->shape[2];
+        int in_w        = input_t->shape[3];
+        int out_channels = weight_t->shape[0];
+        int kernel_h     = weight_t->shape[2];
+        int kernel_w     = weight_t->shape[3];
+        int stride_h   = p && p->stride   ? p->stride[0]   : 1;
+        int stride_w   = p && p->stride   ? p->stride[1]   : 1;
+        int pad_h      = p && p->padding  ? p->padding[0]  : 0;
+        int pad_w      = p && p->padding  ? p->padding[1]  : 0;
+        int dilation_h = p && p->dilation ? p->dilation[0] : 1;
+        int dilation_w = p && p->dilation ? p->dilation[1] : 1;
+        int groups     = p ? p->groups : 1;
+        if (groups < 1) groups = 1;
+
+        int out_h = out->shape[2];
+        int out_w = out->shape[3];
+
+        float* bias_data = NULL;
+        if (node->num_inputs >= 3 && node->inputs[2])
+            bias_data = (float*)node->inputs[2]->data;
+
+        /* Try Winograd for 3x3 stride-1 dilation-1 */
+        if (p && p->use_winograd &&
+            winograd_applicable(kernel_h, kernel_w, stride_h, stride_w,
+                                dilation_h, dilation_w)) {
+            WinogradConfig wcfg = winograd_select_variant(in_h, in_w);
+            if (winograd_conv2d(in1_data, in2_data, bias_data, out_data,
+                                batch, in_channels, out_channels,
+                                in_h, in_w, pad_h, pad_w,
+                                groups, &wcfg) == 0)
+                break;
+            /* Fall through to naive if Winograd fails */
+        }
+
+        /* Naive direct convolution */
+        memset(out_data, 0, out->numel * sizeof(float));
+        int ch_per_group_in  = in_channels  / groups;
+        int ch_per_group_out = out_channels / groups;
+
+        for (int b = 0; b < batch; b++) {
+            for (int g = 0; g < groups; g++) {
+                for (int oc = 0; oc < ch_per_group_out; oc++) {
+                    int oc_abs = g * ch_per_group_out + oc;
+                    for (int oh = 0; oh < out_h; oh++) {
+                        for (int ow = 0; ow < out_w; ow++) {
+                            float sum = 0.0f;
+                            for (int ic = 0; ic < ch_per_group_in; ic++) {
+                                int ic_abs = g * ch_per_group_in + ic;
+                                for (int kh = 0; kh < kernel_h; kh++) {
+                                    for (int kw = 0; kw < kernel_w; kw++) {
+                                        int ih = oh * stride_h - pad_h + kh * dilation_h;
+                                        int iw = ow * stride_w - pad_w + kw * dilation_w;
+                                        if (ih >= 0 && ih < in_h && iw >= 0 && iw < in_w) {
+                                            size_t in_idx = ((size_t)b * in_channels + ic_abs) *
+                                                            (in_h * in_w) + ih * in_w + iw;
+                                            size_t w_idx  = ((size_t)oc_abs * (in_channels / groups) + ic) *
+                                                            (kernel_h * kernel_w) + kh * kernel_w + kw;
+                                            sum += in1_data[in_idx] * in2_data[w_idx];
+                                        }
+                                    }
+                                }
+                            }
+                            if (bias_data)
+                                sum += bias_data[oc_abs];
+                            size_t out_idx = ((size_t)b * out_channels + oc_abs) *
+                                             (out_h * out_w) + oh * out_w + ow;
+                            out_data[out_idx] = sum;
+                        }
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_RESHAPE:
+        /* Reshape is a view — same data, different shape. Just copy. */
+        if (!in1_data)
+            return -1;
+        if (out_data == in1_data) {
+            /* View shares data — data is already in place, nothing to do */
+        } else if (in1_numel == out->numel) {
+            memcpy(out_data, in1_data, out->numel * sizeof(float));
+        } else {
+            for (size_t i = 0; i < out->numel; i++)
+                out_data[i] = in1_data[i % in1_numel];
+        }
+        break;
+
+    case UOP_EXPAND: {
+        /* Expand broadcasts input to output shape.
+         * The output may be a strided view sharing the input buffer,
+         * but the expanded numel can exceed the input buffer size,
+         * so we must allocate a fresh output buffer. */
+        if (!in1_data)
+            return -1;
+        if (in1_numel == out->numel) {
+            if (out_data != in1_data)
+                memcpy(out_data, in1_data, out->numel * sizeof(float));
+        } else {
+            /* Need a separate output buffer — the view buffer is too small */
+            if (out_data == in1_data || out->numel > in1_numel) {
+                size_t size = out->numel * cml_dtype_size(out->dtype);
+                float* new_buf = (float*)cml_buffer_cache_alloc(size);
+                if (!new_buf)
+                    return -1;
+                out->data      = new_buf;
+                out->owns_data = true;
+                out_data       = new_buf;
+            }
+            for (size_t i = 0; i < out->numel; i++) {
+                size_t src  = BROADCAST_IDX(node->inputs[0], out, i);
+                out_data[i] = in1_data[src];
+            }
+        }
+        break;
+    }
+
     default:
         LOG_WARNING("CPU fallback: unsupported op type %d", node->type);
         for (size_t i = 0; i < out->numel; i++) {
@@ -2510,12 +2646,16 @@ int cpu_execute_ir(CMLGraph_t ir) {
 
     struct IRNode* node = ir->head;
     while (node) {
-        // Ensure inputs are executed first
-        for (int i = 0; i < node->num_inputs; i++) {
-            if (node->inputs && node->inputs[i] && !node->inputs[i]->is_executed) {
-                // Input is from another IR node - should already be executed
-                // if traversal order is correct
-            }
+        // Skip nodes that have already been executed and still have valid output
+        if (node->is_executed && node->output && node->output->is_executed) {
+            node = node->next;
+            continue;
+        }
+
+        // Skip nodes whose output tensor has been freed (output == NULL)
+        if (!node->output) {
+            node = node->next;
+            continue;
         }
 
         if (cpu_execute_node(node) != 0) {

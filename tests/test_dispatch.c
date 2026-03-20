@@ -216,14 +216,12 @@ static int test_dispatch_execute_simple(void) {
 
     cml_dispatch_init(ctx);
 
-    // Create a simple IR with add operation
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     if (!ir) {
         cml_dispatch_free(ctx);
         return 0;
     }
 
-    // Set as global context for tensor operations
     cml_ir_set_global_context(ir);
 
     Tensor* a = tensor_empty_2d(2, 2);
@@ -331,7 +329,6 @@ static int test_statistics(void) {
         return 0;
     }
 
-    // Create and execute a simple IR
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
     cml_ir_set_global_context(ir);
 

@@ -3,6 +3,7 @@
 #include "ops/ir/gpu/gpu_codegen.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/execution.h"
+#include "ops/ir/process_replay.h"
 #include "core/logging.h"
 
 #include <llvm-c/Core.h>
@@ -157,7 +158,6 @@ static LLVMBasicBlockRef emit_bounds_check(LLVMBuilderRef bld, LLVMContextRef ct
     LLVMValueRef cond = LLVMBuildICmp(bld, LLVMIntULT, gid, n, "in_bounds");
     LLVMBuildCondBr(bld, cond, body, exit_bb);
 
-    // Exit block: just return
     LLVMPositionBuilderAtEnd(bld, exit_bb);
     LLVMBuildRetVoid(bld);
 
@@ -312,7 +312,6 @@ static LLVMModuleRef gpu_build_unary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef gep_in = LLVMBuildGEP2(bld, f32, in, &idx_64, 1, "pin");
     LLVMValueRef val = LLVMBuildLoad2(bld, f32, gep_in, "val");
 
-    // Intrinsic helper
     #define GPU_INTRINSIC1(name_str, arg, res_name) do { \
         LLVMTypeRef _params[] = { f32 }; \
         LLVMTypeRef _ft = LLVMFunctionType(f32, _params, 1, 0); \
@@ -1176,7 +1175,6 @@ static char* emit_gpu_code(CMLGPUCodegen* cg, LLVMModuleRef mod, size_t* out_siz
     }
     LLVMDisposeMessage(err);
 
-    // Create target machine
     LLVMTargetRef target = NULL;
     err = NULL;
     if (LLVMGetTargetFromTriple(cg->target_triple, &target, &err) != 0) {
@@ -1355,7 +1353,8 @@ static int gpu_compile_and_launch(CMLGPUCodegen* cg, LLVMModuleRef mod,
         return -1;
     }
 
-    // Module was consumed by emit_gpu_code verification only — dispose it now
+    cml_process_replay_record(fn_name, code, code_size);
+
     LLVMDisposeModule(mod);
 
     int block_size = cg->default_block_size;
@@ -1411,14 +1410,12 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
         out->owns_data = true;
     }
 
-    // Build unique kernel name
     char fn_name[64];
     snprintf(fn_name, sizeof(fn_name), "gpu_k%d", cg->kernel_count++);
 
     LLVMContextRef ctx = LLVMContextCreate();
     LLVMModuleRef mod = NULL;
 
-    // Build the GPU kernel module
     if (is_binary_op(type)) {
         mod = gpu_build_binary_op(ctx, type, fn_name, cg);
     } else if (is_unary_op(type)) {

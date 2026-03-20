@@ -63,7 +63,6 @@ static void append_format(char** buffer, size_t* offset, size_t* capacity, const
     va_list args;
     va_start(args, fmt);
 
-    // Calculate needed size
     va_list args_copy;
     va_copy(args_copy, args);
     int needed = vsnprintf(NULL, 0, fmt, args_copy);
@@ -106,11 +105,9 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
     int offset          = 0;
     const char* op_name = uop_type_to_string(node->type);
 
-    // Generate comment
     offset += snprintf(code + offset, buffer_size - (size_t)offset, "// %s: %s = ", op_name,
                        node->output_name ? node->output_name : "out");
 
-    // Generate operation expression
     switch (node->type) {
     case UOP_ADD:
         if (node->num_inputs >= 2) {
@@ -424,7 +421,6 @@ static void analyze_usage(CMLGraph_t ir) {
 
         // If node is used (or is a side-effect node, though we don't have those yet)
         if (curr->is_used) {
-            // Mark inputs as used
             for (int j = 0; j < curr->num_inputs; j++) {
                 if (curr->inputs && curr->inputs[j] && curr->inputs[j]->ir_node) {
                     struct IRNode* producer = curr->inputs[j]->ir_node;
@@ -442,7 +438,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     if (!ir)
         return NULL;
 
-    // Run analysis
     analyze_usage(ir);
 
     size_t capacity = 8192;
@@ -452,7 +447,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
     size_t offset = 0;
 
-    // Start JSON object
     append_format(&buffer, &offset, &capacity, "{");
 
     // Count nodes and analyze
@@ -473,14 +467,12 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         node = node->next;
     }
 
-    // Export metadata
     append_format(&buffer, &offset, &capacity,
                   "\"nodeCount\":%d,\"kernelCount\":%d,\"deadNodes\":%d,\"fusedKernels\":%d,"
                   "\"fusionOpportunities\":%d,",
                   total_nodes, total_nodes - dead_nodes, dead_nodes, fused_kernels,
                   fusion_opportunities);
 
-    // Export kernels array
     append_format(&buffer, &offset, &capacity, "\"kernels\":[");
 
     node              = ir->head;
@@ -488,7 +480,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     bool first_kernel = true;
 
     while (node) {
-        // Skip dead nodes if optimized view
         if (optimized && !node->is_used && node->use_count == 0) {
             node = node->next;
             continue;
@@ -502,7 +493,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         append_format(&buffer, &offset, &capacity, "{");
         append_format(&buffer, &offset, &capacity, "\"id\":%d,", kernel_idx++);
 
-        // Kernel name
         append_format(&buffer, &offset, &capacity, "\"name\":");
         char kernel_name[64];
         if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
@@ -514,12 +504,10 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         append_json_string(&buffer, &offset, &capacity, kernel_name);
         append_format(&buffer, &offset, &capacity, ",");
 
-        // Type
         append_format(&buffer, &offset, &capacity, "\"type\":");
         append_json_string(&buffer, &offset, &capacity, uop_type_to_string(node->type));
         append_format(&buffer, &offset, &capacity, ",");
 
-        // Code
         append_format(&buffer, &offset, &capacity, "\"code\":");
         char* code = NULL;
         if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
@@ -532,7 +520,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
             free(code);
         append_format(&buffer, &offset, &capacity, ",");
 
-        // Inputs
         append_format(&buffer, &offset, &capacity, "\"inputs\":[");
 
         if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
@@ -561,7 +548,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
                     }
 
                     if (!is_internal) {
-                        // Check if already in inputs list
                         bool exists = false;
                         for (int k = 0; k < num_inputs; k++) {
                             if (inputs[k] && strcmp(input, inputs[k]) == 0) {
@@ -596,7 +582,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         }
         append_format(&buffer, &offset, &capacity, "],");
 
-        // Output
         append_format(&buffer, &offset, &capacity, "\"output\":");
         if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
             // For fused kernel, output is the output of the LAST op
@@ -612,7 +597,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         }
         append_format(&buffer, &offset, &capacity, ",");
 
-        // Flags
         append_format(&buffer, &offset, &capacity, "\"isDead\":%s,\"isFused\":%s",
                       (!node->is_used && node->use_count == 0) ? "true" : "false",
                       (node->fused_kernel) ? "true" : "false");
@@ -623,7 +607,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
                           (void*)node->fused_kernel);
         }
 
-        // Export sub-ops for fused kernels
         if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
             append_format(&buffer, &offset, &capacity, ",\"ops\":[");
             FusedKernel* fk = node->fused_kernel;
@@ -633,12 +616,10 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
                     append_format(&buffer, &offset, &capacity, ",");
                 append_format(&buffer, &offset, &capacity, "{");
 
-                // Type
                 append_format(&buffer, &offset, &capacity, "\"type\":");
                 append_json_string(&buffer, &offset, &capacity, uop_type_to_string(sub->type));
                 append_format(&buffer, &offset, &capacity, ",");
 
-                // Inputs
                 append_format(&buffer, &offset, &capacity, "\"inputs\":[");
                 for (int j = 0; j < sub->num_inputs; j++) {
                     if (j > 0)
@@ -647,7 +628,6 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
                 }
                 append_format(&buffer, &offset, &capacity, "],");
 
-                // Output
                 append_format(&buffer, &offset, &capacity, "\"output\":");
                 append_json_string(&buffer, &offset, &capacity, sub->output_name);
 
@@ -711,7 +691,6 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
         temp     = temp->next;
     }
 
-    // Generate JSON
     node = ir->head;
     while (node) {
         if (!first_node)
@@ -720,7 +699,6 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
 
         append_format(&buffer, &offset, &capacity, "\"%d\":{", node_idx);
 
-        // Label
         append_format(&buffer, &offset, &capacity, "\"label\":");
         append_json_string(&buffer, &offset, &capacity, uop_type_to_string(node->type));
 
@@ -737,7 +715,6 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
                           (void*)node->fused_kernel);
         }
 
-        // Edges
         append_format(&buffer, &offset, &capacity, ",\"src\":[");
 
         bool first_edge = true;

@@ -1,4 +1,5 @@
 #include "ops/ir/pattern_matcher.h"
+#include "ops/ir/tree_automaton.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
 #include "core/logging.h"
@@ -336,6 +337,15 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
     if (!reg || !ir) return -1;
     if (reg->num_rules == 0) return 0;
 
+    /* Try automaton-accelerated path first */
+    CMLAutomaton* aut = cml_automaton_compile(reg);
+    if (aut) {
+        int result = cml_automaton_rewrite(aut, ir);
+        cml_automaton_free(aut);
+        return result;
+    }
+
+    /* Fallback: linear matching */
     int max_iter = (max_iterations > 0) ? max_iterations : CML_REWRITE_DEFAULT_MAX_ITER;
     int total_rewrites = 0;
 

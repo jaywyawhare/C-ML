@@ -46,7 +46,6 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     node->num_inputs = num_inputs;
     node->params = params;
 
-    // Copy input names
     if (num_inputs > 0 && inputs) {
         node->input_names = malloc((size_t)num_inputs * sizeof(char*));
         node->inputs = malloc((size_t)num_inputs * sizeof(Tensor*));
@@ -58,12 +57,10 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
         }
         for (int i = 0; i < num_inputs; i++) {
             node->inputs[i] = inputs[i];
-            // Get name from tensor's IR node if available
             if (inputs[i] && inputs[i]->ir_node &&
                 ((struct IRNode*)inputs[i]->ir_node)->output_name) {
                 node->input_names[i] = strdup(((struct IRNode*)inputs[i]->ir_node)->output_name);
             } else {
-                // Generate a placeholder name
                 node->input_names[i] = decompose_unique_name();
             }
         }
@@ -72,11 +69,9 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
         node->inputs = NULL;
     }
 
-    // Generate output name
     node->output_name = decompose_unique_name();
     node->next = NULL;
 
-    // Set output shape
     if (out_shape && out_ndim > 0) {
         node->output_shape = malloc((size_t)out_ndim * sizeof(int));
         if (node->output_shape) {
@@ -95,10 +90,8 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
         }
     }
 
-    // Create intermediate output tensor
     Tensor* out_tensor = calloc(1, sizeof(Tensor));
     if (!out_tensor) {
-        // Cleanup
         for (int i = 0; i < num_inputs; i++) free(node->input_names[i]);
         free(node->input_names);
         free(node->inputs);
@@ -140,7 +133,6 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     out_tensor->ref_count = 1;
     out_tensor->base = NULL;
 
-    // Compute strides
     if (out_ndim > 0 && out_tensor->shape) {
         out_tensor->strides = malloc((size_t)out_ndim * sizeof(size_t));
         if (out_tensor->strides) {
@@ -205,7 +197,6 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
         // Point chain_tail at the original output tensor
         chain_tail->output = orig_output;
 
-        // Update the chain_tail's output name to match original
         if (chain_tail->output_name) free(chain_tail->output_name);
         chain_tail->output_name = strdup(original->output_name ? original->output_name : "_decomp");
     }
@@ -234,12 +225,10 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
         ir->head = chain_head;
     }
 
-    // Update tail if needed
     if (ir->tail == original) {
         ir->tail = chain_tail;
     }
 
-    // Update node_count: replaced 1 node with chain_len nodes
     ir->node_count += (chain_len - 1);
 
     // Free the original node (but NOT its output tensor — we kept it)

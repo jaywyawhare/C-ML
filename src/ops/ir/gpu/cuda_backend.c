@@ -1,4 +1,5 @@
 #include "ops/ir/gpu/cuda_backend.h"
+#include "ops/ir/process_replay.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 
@@ -336,8 +337,13 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
     }
 
     char arch_flag[32];
-    snprintf(arch_flag, sizeof(arch_flag), "--gpu-architecture=compute_%d%d",
-             backend->compute_capability_major, backend->compute_capability_minor);
+    if (backend->compute_capability_major >= 10) {
+        snprintf(arch_flag, sizeof(arch_flag), "--gpu-architecture=sm_%d%d",
+                 backend->compute_capability_major, backend->compute_capability_minor);
+    } else {
+        snprintf(arch_flag, sizeof(arch_flag), "--gpu-architecture=compute_%d%d",
+                 backend->compute_capability_major, backend->compute_capability_minor);
+    }
 
     const char* options[] = {arch_flag, "-default-device"};
     void* result          = backend->nvrtcCompileProgram(prog, 2, options);
@@ -360,6 +366,8 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
     char* ptx = malloc(ptx_size);
     backend->nvrtcGetPTX(prog, ptx);
     backend->nvrtcDestroyProgram(&prog);
+
+    cml_process_replay_record(kernel_name, ptx, ptx_size);
 
     CMLCUDAKernel* kernel = cml_cuda_compile_ptx(backend, ptx, kernel_name);
     free(ptx);

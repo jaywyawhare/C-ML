@@ -141,6 +141,161 @@ static int emit_elementwise_chain(FusionMatch* match, struct CMLGraph* ir) {
     return 0;
 }
 
+static FusionMatch* match_softmax_ce_bwd(struct IRNode* start, struct CMLGraph* ir) {
+    (void)ir;
+    if (!start || start->type != UOP_EXP) return NULL;
+
+    struct IRNode* sum_node = NULL;
+    if (start->use_count >= 1 && start->users)
+        sum_node = start->users[0];
+    if (!sum_node || sum_node->type != UOP_SUM) return NULL;
+
+    struct IRNode* recip_node = NULL;
+    if (sum_node->use_count >= 1 && sum_node->users)
+        recip_node = sum_node->users[0];
+    if (!recip_node || recip_node->type != UOP_RECIP) return NULL;
+
+    struct IRNode* mul_node = NULL;
+    if (recip_node->use_count >= 1 && recip_node->users)
+        mul_node = recip_node->users[0];
+    if (!mul_node || mul_node->type != UOP_MUL) return NULL;
+
+    /* Check for SUB consumer (backward: softmax - one_hot) */
+    struct IRNode* sub_node = NULL;
+    if (mul_node->use_count >= 1 && mul_node->users)
+        sub_node = mul_node->users[0];
+    if (!sub_node || sub_node->type != UOP_SUB) return NULL;
+
+    FusionMatch* match = calloc(1, sizeof(FusionMatch));
+    if (!match) return NULL;
+
+    match->num_matched = 5;
+    match->matched_nodes = malloc(5 * sizeof(struct IRNode*));
+    if (!match->matched_nodes) { free(match); return NULL; }
+    match->matched_nodes[0] = start;
+    match->matched_nodes[1] = sum_node;
+    match->matched_nodes[2] = recip_node;
+    match->matched_nodes[3] = mul_node;
+    match->matched_nodes[4] = sub_node;
+
+    LOG_DEBUG("Fusion pattern matched: Softmax + CrossEntropy backward");
+    return match;
+}
+
+static int emit_softmax_ce_bwd(FusionMatch* match, struct CMLGraph* ir) {
+    if (!match || !ir || match->num_matched < 5) return -1;
+
+    for (int i = 0; i < match->num_matched; i++) {
+        match->matched_nodes[i]->is_fused = true;
+        match->matched_nodes[i]->fusion_type = FUSION_REDUCE_ELEMENTWISE;
+    }
+
+    struct IRNode* fwd = match->matched_nodes[0];
+    struct IRNode* bwd = match->matched_nodes[4];
+    fwd->backward_node = bwd;
+    bwd->forward_node = fwd;
+
+    LOG_DEBUG("Emitted fused Softmax+CE backward kernel");
+    return 0;
+}
+
+static FusionMatch* match_layernorm_bwd(struct IRNode* start, struct CMLGraph* ir) {
+    (void)ir;
+    if (!start || start->type != UOP_MEAN) return NULL;
+
+    struct IRNode* sub = NULL;
+    if (start->use_count >= 1 && start->users)
+        sub = start->users[0];
+    if (!sub || sub->type != UOP_SUB) return NULL;
+
+    struct IRNode* sq = NULL;
+    if (sub->use_count >= 1 && sub->users) {
+        for (int i = 0; i < sub->use_count; i++) {
+            if (sub->users[i] && sub->users[i]->type == UOP_SQUARE) {
+                sq = sub->users[i];
+                break;
+            }
+        }
+    }
+    if (!sq) return NULL;
+
+    struct IRNode* var_mean = NULL;
+    if (sq->use_count >= 1 && sq->users)
+        var_mean = sq->users[0];
+    if (!var_mean || var_mean->type != UOP_MEAN) return NULL;
+
+    struct IRNode* rsqrt = NULL;
+    if (var_mean->use_count >= 1 && var_mean->users) {
+        for (int i = 0; i < var_mean->use_count; i++) {
+            struct IRNode* u = var_mean->users[i];
+            if (u && (u->type == UOP_RSQRT || u->type == UOP_SQRT)) {
+                rsqrt = u;
+                break;
+            }
+        }
+    }
+    if (!rsqrt) return NULL;
+
+    FusionMatch* match = calloc(1, sizeof(FusionMatch));
+    if (!match) return NULL;
+
+    match->num_matched = 5;
+    match->matched_nodes = malloc(5 * sizeof(struct IRNode*));
+    if (!match->matched_nodes) { free(match); return NULL; }
+    match->matched_nodes[0] = start;
+    match->matched_nodes[1] = sub;
+    match->matched_nodes[2] = sq;
+    match->matched_nodes[3] = var_mean;
+    match->matched_nodes[4] = rsqrt;
+
+    LOG_DEBUG("Fusion pattern matched: LayerNorm + backward");
+    return match;
+}
+
+static int emit_layernorm_bwd(FusionMatch* match, struct CMLGraph* ir) {
+    if (!match || !ir || match->num_matched < 5) return -1;
+
+    for (int i = 0; i < match->num_matched; i++) {
+        match->matched_nodes[i]->is_fused = true;
+        match->matched_nodes[i]->fusion_type = FUSION_CHAIN_ELEMENTWISE;
+    }
+
+    LOG_DEBUG("Emitted fused LayerNorm+backward kernel (mean/var in registers)");
+    return 0;
+}
+
+static FusionMatch* match_gelu_bwd(struct IRNode* start, struct CMLGraph* ir) {
+    (void)ir;
+    if (!start) return NULL;
+
+    if (start->type == UOP_QUICK_GELU || start->type == UOP_SILU) {
+        if (start->backward_node || (start->use_count > 0 && start->users)) {
+            FusionMatch* match = calloc(1, sizeof(FusionMatch));
+            if (!match) return NULL;
+
+            match->num_matched = 1;
+            match->matched_nodes = malloc(sizeof(struct IRNode*));
+            if (!match->matched_nodes) { free(match); return NULL; }
+            match->matched_nodes[0] = start;
+
+            LOG_DEBUG("Fusion pattern matched: GELU/SiLU + backward");
+            return match;
+        }
+    }
+
+    return NULL;
+}
+
+static int emit_gelu_bwd(FusionMatch* match, struct CMLGraph* ir) {
+    if (!match || !ir || match->num_matched < 1) return -1;
+
+    match->matched_nodes[0]->is_fused = true;
+    match->matched_nodes[0]->fusion_type = FUSION_CHAIN_ELEMENTWISE;
+
+    LOG_DEBUG("Emitted fused GELU+backward kernel (sigmoid reuse)");
+    return 0;
+}
+
 static FusionPatternRegistry* g_default_registry = NULL;
 
 FusionPatternRegistry* cml_fusion_registry_create(void) {
@@ -160,6 +315,24 @@ FusionPatternRegistry* cml_fusion_registry_create(void) {
                                     (FusionTarget)t, 50,
                                     match_elementwise_chain,
                                     emit_elementwise_chain);
+
+        cml_fusion_register_pattern(reg, "softmax_ce_bwd",
+                                    FUSION_PATTERN_SOFTMAX_CE_BWD,
+                                    (FusionTarget)t, 90,
+                                    match_softmax_ce_bwd,
+                                    emit_softmax_ce_bwd);
+
+        cml_fusion_register_pattern(reg, "layernorm_bwd",
+                                    FUSION_PATTERN_LAYERNORM_BWD,
+                                    (FusionTarget)t, 85,
+                                    match_layernorm_bwd,
+                                    emit_layernorm_bwd);
+
+        cml_fusion_register_pattern(reg, "gelu_bwd",
+                                    FUSION_PATTERN_GELU_BWD,
+                                    (FusionTarget)t, 80,
+                                    match_gelu_bwd,
+                                    emit_gelu_bwd);
     }
 
     return reg;

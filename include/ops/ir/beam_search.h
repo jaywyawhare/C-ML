@@ -88,6 +88,13 @@ int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path);
 
 double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data);
 
+struct LinearProgram;
+
+int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
+                              struct LinearProgram* prog,
+                              CMLBeamTimingFn timing_fn, void* user_data,
+                              CMLBeamConfig* best_out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -4,6 +4,7 @@
 #include "ops/ir/llvm/llvm_backend.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/execution.h"
+#include "ops/ir/process_replay.h"
 #include "core/logging.h"
 #include "backend/blas.h"
 
@@ -41,7 +42,6 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
     CMLLLVMBackend* b = calloc(1, sizeof(CMLLLVMBackend));
     if (!b) return NULL;
 
-    // Create target machine for optimization passes
     char* triple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef target;
     char* err = NULL;
@@ -105,10 +105,8 @@ static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx,
     info.body   = LLVMAppendBasicBlockInContext(ctx, fn, body_name);
     info.exit   = LLVMAppendBasicBlockInContext(ctx, fn, exit_name);
 
-    // Current block -> header
     LLVMBuildBr(bld, info.header);
 
-    // Header: i = phi, cond branch
     LLVMPositionBuilderAtEnd(bld, info.header);
     info.i = LLVMBuildPhi(bld, i64, "i");
     LLVMValueRef cond = LLVMBuildICmp(bld, LLVMIntULT, info.i, n, "cond");
@@ -173,13 +171,11 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef mod1 = LLVMBuildURem(bld, loop.i, in1_n, "mod1");
     LLVMValueRef i1 = LLVMBuildSelect(bld, is_scalar1, zero_i64, mod1, "i1");
 
-    // Load inputs
     LLVMValueRef gep0 = LLVMBuildGEP2(bld, f32, in0, &i0, 1, "p0");
     LLVMValueRef gep1 = LLVMBuildGEP2(bld, f32, in1, &i1, 1, "p1");
     LLVMValueRef v0 = LLVMBuildLoad2(bld, f32, gep0, "v0");
     LLVMValueRef v1 = LLVMBuildLoad2(bld, f32, gep1, "v1");
 
-    // Apply operation
     LLVMValueRef result = NULL;
     switch (type) {
     case UOP_ADD: result = LLVMBuildFAdd(bld, v0, v1, "add"); break;
@@ -203,16 +199,12 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
     case UOP_POW: {
-        // Use llvm.pow intrinsic
         LLVMTypeRef pow_args[] = { f32 };
         LLVMValueRef pow_fn = LLVMGetIntrinsicDeclaration(
             mod, LLVMLookupIntrinsicID("llvm.pow", 8), pow_args, 1);
         LLVMValueRef args[] = { v0, v1 };
         result = LLVMBuildCall2(bld, LLVMGetReturnType(LLVMGlobalGetValueType(pow_fn)),
                                 pow_fn, args, 2, "pow");
-        // Actually: use LLVMBuildCall2 with proper fn type
-        LLVMTypeRef pow_fn_type = LLVMFunctionType(f32, (LLVMTypeRef[]){f32, f32}, 2, 0);
-        (void)pow_fn_type;
         break;
     }
     default:
@@ -220,7 +212,6 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
 
-    // Store result
     LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
     LLVMBuildStore(bld, result, gep_out);
 
@@ -260,7 +251,6 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
 
     LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "elem");
 
-    // Broadcast index
     LLVMValueRef one = LLVMConstInt(i64, 1, 0);
     LLVMValueRef is_scalar = LLVMBuildICmp(bld, LLVMIntEQ, in_n, one, "sc");
     LLVMValueRef mod_i = LLVMBuildURem(bld, loop.i, in_n, "mod_i");
@@ -403,11 +393,9 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     if (type == UOP_MAX_REDUCE) init_val = -HUGE_VALF;
     LLVMValueRef init = LLVMConstReal(f32, init_val);
 
-    // entry -> loop
     LLVMPositionBuilderAtEnd(bld, entry);
     LLVMBuildBr(bld, loop);
 
-    // loop
     LLVMPositionBuilderAtEnd(bld, loop);
     LLVMValueRef i   = LLVMBuildPhi(bld, i64, "i");
     LLVMValueRef acc = LLVMBuildPhi(bld, f32, "acc");
@@ -443,7 +431,6 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     LLVMValueRef acc_vals[] = { init, new_acc };
     LLVMAddIncoming(acc, acc_vals, i_bbs, 2);
 
-    // done: store result
     LLVMPositionBuilderAtEnd(bld, done);
     LLVMValueRef final_val = new_acc; // from loop block
 
@@ -925,7 +912,16 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
         // Continue without optimization — the IR is still valid
     }
 
-    // Create a fresh LLJIT for this kernel
+#ifdef CML_PROCESS_REPLAY_LLVM
+    {
+        char* ir_str = LLVMPrintModuleToString(mod);
+        if (ir_str) {
+            cml_process_replay_record(fn_name, ir_str, strlen(ir_str));
+            LLVMDisposeMessage(ir_str);
+        }
+    }
+#endif
+
     LLVMOrcLLJITRef jit = NULL;
     error = LLVMOrcCreateLLJIT(&jit, NULL);
     if (error) {
@@ -963,8 +959,6 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
         return NULL;
     }
 
-    // Store JIT for cleanup (we keep the latest one alive)
-    // Destroy old JIT, keep new
     if (backend->jit) {
         LLVMOrcDisposeLLJIT(backend->jit);
     }

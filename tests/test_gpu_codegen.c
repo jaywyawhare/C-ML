@@ -110,7 +110,6 @@ static int test_gpu_binary_add(void) {
 
     cml_init();
 
-    // Create tensors
     float a_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
     float b_data[] = {5.0f, 6.0f, 7.0f, 8.0f};
     Tensor* a = cml_tensor_1d(a_data, 4);

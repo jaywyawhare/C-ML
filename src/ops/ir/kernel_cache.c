@@ -94,7 +94,6 @@ void cml_kernel_cache_free(CMLKernelCache* cache) {
     if (!cache)
         return;
 
-    // Clear all entries
     kernel_cache_clear(cache);
 
     if (cache->lock_initialized) {

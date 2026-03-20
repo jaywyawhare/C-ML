@@ -1,4 +1,6 @@
 #include "ops/ir/beam_search.h"
+#include "ops/ir/opt_transforms.h"
+#include "ops/ir/linearize.h"
 #include "core/logging.h"
 
 #include <math.h>
@@ -476,5 +478,103 @@ int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path)
 
     fclose(fp);
     LOG_INFO("BEAM cache loaded: %d entries from %s", loaded, path);
+    return 0;
+}
+
+int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
+                              struct LinearProgram* prog,
+                              CMLBeamTimingFn timing_fn, void* user_data,
+                              CMLBeamConfig* best_out) {
+    if (!ctx || !prog || !best_out) return -1;
+
+    if (cml_beam_search_lookup(ctx, kernel_hash, best_out) == 0)
+        return 0;
+
+    CMLOptList** opt_lists = NULL;
+    int num_configs = 0;
+    int max_configs = CML_BEAM_MAX_CANDIDATES;
+
+    if (cml_opt_enumerate(prog, &opt_lists, &num_configs, max_configs) != 0)
+        return -1;
+
+    LOG_INFO("BEAM opt tune: %d opt configurations for hash 0x%016llx",
+             num_configs, (unsigned long long)kernel_hash);
+
+    int best_idx = -1;
+    double best_time = 1e18;
+
+    int keep = ctx->beam_width * 2;
+    if (keep > num_configs) keep = num_configs;
+
+    for (int i = 0; i < keep; i++) {
+        /* Build a config from the opt list. */
+        CMLBeamConfig cfg;
+        memset(&cfg, 0, sizeof(cfg));
+
+        cfg.block_size_x = 256;
+        cfg.block_size_y = 1;
+        cfg.block_size_z = 1;
+        cfg.unroll_factor = 1;
+        cfg.vec_width = 1;
+
+        for (int j = 0; j < opt_lists[i]->num_opts; j++) {
+            CMLOpt* o = &opt_lists[i]->opts[j];
+            switch (o->type) {
+                case OPT_UNROLL:
+                    cfg.unroll_factor = o->amount;
+                    break;
+                case OPT_UPCAST:
+                    cfg.vec_width = o->amount;
+                    break;
+                case OPT_GROUP:
+                    cfg.block_size_x = o->amount;
+                    break;
+                case OPT_LOCAL:
+                    cfg.shared_mem = (size_t)o->amount * sizeof(float);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        cfg.block[0] = (size_t)cfg.block_size_x;
+        cfg.block[1] = 1;
+        cfg.block[2] = 1;
+
+        double t;
+        if (timing_fn) {
+            CMLBeamVariant variant;
+            memset(&variant, 0, sizeof(variant));
+            variant.config = cfg;
+            t = timing_fn(&variant, user_data);
+            if (t < 0.0) continue;
+        } else {
+            double throughput = (double)cfg.block_size_x *
+                                (double)cfg.vec_width *
+                                (double)cfg.unroll_factor;
+            if (throughput < 1.0) throughput = 1.0;
+            t = 1.0 / throughput;
+        }
+
+        if (t < best_time) {
+            best_time = t;
+            best_idx = i;
+            *best_out = cfg;
+        }
+    }
+
+    for (int i = 0; i < num_configs; i++)
+        cml_opt_list_free(opt_lists[i]);
+    free(opt_lists);
+
+    if (best_idx < 0) {
+        LOG_WARNING("BEAM opt tune: no valid configuration found");
+        return -1;
+    }
+
+    cml_beam_search_store(ctx, kernel_hash, best_out, best_time);
+    LOG_INFO("BEAM opt tune: best block=%d unroll=%d vec=%d shared=%zu (%.2f us)",
+             best_out->block_size_x, best_out->unroll_factor,
+             best_out->vec_width, best_out->shared_mem, best_time);
     return 0;
 }

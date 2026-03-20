@@ -1,14 +1,14 @@
 /*
  * Automatic kernel scheduling and fusion.
  * Analyzes UOp graphs to determine optimal kernel boundaries, automatically
- * fusing compatible operations into minimal GPU kernels. Inspired by tinygrad's
- * schedule-based approach.
+ * fusing compatible operations into minimal GPU kernels.
  */
 
 #ifndef CML_SCHEDULE_H
 #define CML_SCHEDULE_H
 
 #include "ops/ir/ir.h"
+#include "ops/ir/memory_planner.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -62,12 +62,19 @@ typedef struct CMLSchedule {
     int* dep_counts;
 } CMLSchedule;
 
+typedef enum {
+    CML_SCHEDULE_ORDER_TOPO = 0,
+    CML_SCHEDULE_ORDER_BFS,
+} CMLScheduleOrder;
+
 typedef struct {
     bool enable_fusion;          /* default: true */
     bool enable_movement_fold;   /* Fold movements into loads/stores (default: true) */
     int max_fused_ops;           /* default: 64 */
     bool estimate_costs;         /* Compute FLOP/memory estimates (default: true) */
     bool topological_sort;       /* Sort items in dependency order (default: true) */
+    bool allow_reduce_elem_fusion; /* Allow reduce->elem fusion when safe (default: true) */
+    CMLScheduleOrder schedule_order; /* Kernel execution ordering (default: TOPO) */
 } CMLScheduleOptions;
 
 CMLScheduleOptions cml_schedule_default_options(void);
@@ -118,6 +125,8 @@ typedef struct CMLScheduleV2 {
     int total_groups_after;
     float fusion_ratio;
     size_t memory_saved;
+
+    CMLMemoryPlan* memory_plan;
 } CMLScheduleV2;
 
 CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph, const CMLScheduleOptions* opts);

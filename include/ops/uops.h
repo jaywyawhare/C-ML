@@ -1,8 +1,8 @@
 /*
  * Micro-Operations (UOps) - Minimal set of fundamental operations
  *
- * Inspired by tinygrad and ggml, C-ML provides a minimal set of uops
- * that can be composed to build complex operations.
+ * C-ML provides a minimal set of uops that can be composed to build
+ * complex operations.
  *
  * Philosophy:
  * - Minimal set of fundamental operations
@@ -105,7 +105,7 @@ typedef enum {
     UOP_NONZERO,     // indices of non-zero elements
     UOP_MASKED_FILL, // fill where mask is true
 
-    // Additional Unary Ops (tinygrad parity)
+    // Additional Unary Ops
     UOP_LOG10,       // log10(a)
     UOP_SINH,        // sinh(a)
     UOP_COSH,        // cosh(a)
@@ -118,7 +118,7 @@ typedef enum {
     UOP_ISFINITE,    // test for finite (returns 0 or 1)
     UOP_LOGICAL_NOT, // logical NOT (returns 0 or 1)
 
-    // Additional Binary Ops (tinygrad parity)
+    // Additional Binary Ops
     UOP_IDIV,        // integer division: floor(a / b)
     UOP_MOD,         // modulo: a % b (fmodf)
     UOP_MINIMUM,     // min(a, b)
@@ -129,14 +129,14 @@ typedef enum {
     UOP_LOGICAL_AND, // a && b (returns 0 or 1)
     UOP_LOGICAL_OR,  // a || b (returns 0 or 1)
 
-    // Comparison Ops (tinygrad parity)
+    // Comparison Ops
     UOP_CMPEQ,       // a == b (returns 0 or 1)
     UOP_CMPNE,       // a != b (returns 0 or 1)
     UOP_CMPLE,       // a <= b (returns 0 or 1)
     UOP_CMPGT,       // a > b (returns 0 or 1)
     UOP_CMPGE,       // a >= b (returns 0 or 1)
 
-    // Additional Reduction Ops (tinygrad parity)
+    // Additional Reduction Ops
     UOP_MIN_REDUCE,  // min along dimension(s)
     UOP_VAR,         // variance along dimension(s)
     UOP_STD,         // standard deviation along dimension(s)
@@ -146,7 +146,7 @@ typedef enum {
     UOP_CUMMAX,      // cumulative max along dimension
     UOP_CUMMIN,      // cumulative min along dimension
 
-    // Movement/Shape Ops (tinygrad parity)
+    // Movement/Shape Ops
     UOP_CAT,         // concatenate tensors along dimension
     UOP_STACK,       // stack tensors along new dimension
     UOP_SCATTER,     // scatter elements by index
@@ -156,20 +156,20 @@ typedef enum {
     UOP_DIAG,        // create/extract diagonal
     UOP_ONE_HOT,     // one-hot encoding
 
-    // Additional Unary Ops (tinygrad parity round 2)
+    // Additional Unary Ops
     UOP_ERFC,            // complementary error function erfc(a)
     UOP_LOGCUMSUMEXP,    // log(cumsum(exp(a))) along dimension
 
-    // Additional Binary Ops (tinygrad parity round 2)
+    // Additional Binary Ops
     UOP_LERP,            // linear interpolation: a + t*(b-a)
 
-    // Additional Movement/Shape Ops (tinygrad parity round 2)
+    // Additional Movement/Shape Ops
     UOP_TILE,            // repeat tensor along dimensions
     UOP_REPEAT_INTERLEAVE, // repeat elements along dimension
     UOP_TRACE,           // sum of diagonal elements
     UOP_SHRINK,          // shrink tensor (slice with start/end per dim)
 
-    // Activation Ops (tinygrad parity)
+    // Activation Ops
     UOP_RELU6,           // min(max(x, 0), 6)
     UOP_HARD_SIGMOID,    // clamp((x + 3) / 6, 0, 1)
     UOP_HARD_TANH,       // clamp(x, -1, 1)
@@ -179,20 +179,20 @@ typedef enum {
     UOP_SOFTSIGN,        // x / (1 + |x|)
     UOP_LOGSIGMOID,      // log(sigmoid(x))
 
-    // Additional Ops (tinygrad parity round 3)
+    // Additional Ops
     UOP_UNFOLD,          // sliding window extraction (im2col-like)
 
-    // Additional Activation Ops (tinygrad parity round 4)
+    // Additional Activation Ops
     UOP_ELU,             // x > 0 ? x : alpha*(exp(x)-1)
     UOP_SELU,            // scale*(x > 0 ? x : alpha*(exp(x)-1))
     UOP_MISH,            // x * tanh(softplus(x))
     UOP_SILU,            // x * sigmoid(x) (swish)
     UOP_HARDSWISH,       // x > 3 ? x : x < -3 ? 0 : x*(x+3)/6
 
-    // Masking/Selection Ops (tinygrad parity round 4)
+    // Masking/Selection Ops
     UOP_MASKED_SELECT,   // select elements where mask is true
 
-    // Movement/Shape Ops (tinygrad parity round 4)
+    // Movement/Shape Ops
     UOP_SPLIT,           // split tensor into chunks along dim
     UOP_CHUNK,           // split tensor into N chunks along dim
     UOP_MESHGRID,        // create coordinate matrices from vectors

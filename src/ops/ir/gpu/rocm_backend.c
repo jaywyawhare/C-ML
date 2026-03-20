@@ -128,9 +128,6 @@ int cml_rocm_backend_init(CMLROCmBackend* backend, int device_ordinal) {
     backend->hipSetDevice(device_ordinal);
     backend->device = device_ordinal;
 
-    // Get device properties via a temporary struct
-    // In a full implementation, we'd call hipGetDeviceProperties
-
     backend->hipStreamCreate(&backend->stream);
     backend->initialized = true;
 

@@ -460,8 +460,11 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         return -1;
 
     switch (backend) {
-    case CML_BACKEND_CPU_FALLBACK:
-        return cpu_execute_ir(ir);
+    case CML_BACKEND_CPU_FALLBACK: {
+        int r = cpu_execute_ir(ir);
+        if (r == 0) ctx->executions_total++;
+        return r;
+    }
 
 #ifdef CML_HAS_LLVM_BACKEND
     case CML_BACKEND_CPU_LLVM: {

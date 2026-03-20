@@ -277,6 +277,8 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->tensor_refs_count    = 0;
     ir->tensor_refs_capacity = 0;
 
+    ir->intern_table = cml_intern_table_create();
+
     return ir;
 }
 
@@ -611,6 +613,9 @@ static void free_ir_node(struct IRNode* node) {
     if (!node)
         return;
 
+    if (--node->ref_count > 0)
+        return;
+
     if (node->num_inputs < 0 || node->num_inputs > 1000) {
         fprintf(stderr,
                 "WARNING: free_ir_node: invalid num_inputs=%d, skipping input_names cleanup\n",
@@ -738,6 +743,9 @@ void cml_ir_free(CMLGraph_t ir) {
         ir->tensor_refs_count = 0;
     }
 
+    cml_intern_table_free(ir->intern_table);
+    ir->intern_table = NULL;
+
     /* Phase 2: free all nodes (safe now that tensor pointers are cleared) */
     node     = ir->head;
     node_idx = 0;
@@ -747,6 +755,7 @@ void cml_ir_free(CMLGraph_t ir) {
             fprintf(stderr, "WARNING: cml_ir_free phase 2: corrupt node %d, stopping\n", node_idx);
             break;
         }
+        node->ref_count = 1;
         free_ir_node(node);
         node = next;
         node_idx++;
@@ -764,6 +773,7 @@ void cml_ir_free(CMLGraph_t ir) {
                     node_idx);
             break;
         }
+        node->ref_count = 1;
         free_ir_node(node);
         node = next;
         node_idx++;
@@ -795,6 +805,38 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     if (!ir || (num_inputs > 0 && !inputs) || num_inputs < 0) {
         LOG_ERROR("Invalid parameters for cml_ir_add_uop");
         return -1;
+    }
+
+    if (ir->intern_table && num_inputs >= 0) {
+        /* Skip interning for parameterized ops: the intern hash does not
+           include param contents (arg_len is always 0), so ops with different
+           params but the same type/inputs would collide.  Also skip interning
+           for zero-input ops (e.g. FILL) to avoid conflating different
+           constants.  Finally, never reuse nodes that have already been
+           executed -- the underlying input data may have changed or tensor
+           pointers may have been recycled by malloc. */
+        bool can_intern = (params == NULL) && (num_inputs > 0);
+        if (can_intern) {
+            struct IRNode* input_nodes[8];
+            Tensor* raw_inputs_arr[8];
+            int lookup_count = num_inputs < 8 ? num_inputs : 8;
+            for (int i = 0; i < lookup_count; i++) {
+                input_nodes[i] = (inputs[i] && inputs[i]->ir_node) ? inputs[i]->ir_node : NULL;
+                raw_inputs_arr[i] = inputs[i];
+            }
+
+            int dtype = (num_inputs > 0 && inputs[0]) ? (int)inputs[0]->dtype : 0;
+            uint64_t hash = cml_intern_hash_node_ex((int)type, dtype, input_nodes,
+                                                    raw_inputs_arr, lookup_count, params, 0);
+
+            struct IRNode* existing = cml_intern_lookup_ex(ir->intern_table, hash, (int)type,
+                                                           dtype, input_nodes, raw_inputs_arr,
+                                                           lookup_count, params, 0);
+            if (existing && existing->output && !existing->is_executed) {
+                existing->ref_count++;
+                return 0;
+            }
+        }
     }
 
     struct IRNode* node = malloc(sizeof(struct IRNode));
@@ -946,6 +988,21 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     node->users_capacity = 0;
     node->chain_id       = -1;
 
+    node->ref_count = 1;
+    {
+        struct IRNode* input_nodes[8];
+        int hash_count = num_inputs < 8 ? num_inputs : 8;
+        for (int i = 0; i < hash_count; i++)
+            input_nodes[i] = (inputs[i] && inputs[i]->ir_node) ? inputs[i]->ir_node : NULL;
+
+        int dtype = (num_inputs > 0 && inputs[0]) ? (int)inputs[0]->dtype : 0;
+        node->hash = cml_intern_hash_node_ex((int)type, dtype, input_nodes,
+                                             inputs, hash_count, params, 0);
+    }
+
+    if (ir->intern_table)
+        cml_intern_insert(ir->intern_table, node);
+
     if (!ir->head) {
         ir->head = node;
         ir->tail = node;
@@ -955,6 +1012,8 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     }
 
     ir->node_count++;
+
+    ir->is_executed = false;
 
     return 0;
 }
