@@ -1,12 +1,3 @@
-/*
- * Finite-difference gradient checker for differentiable ops.
- *
- * For each op, computes f(x+eps) and f(x-eps) and checks that the
- * analytical gradient (from autograd) matches the numerical estimate
- * within tolerance atol=1e-3 (float32 precision limitation).
- *
- * Inspired by tinygrad's test_grad.py and PyTorch's gradcheck.
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,10 +28,6 @@ static const TensorConfig cpu_f32 = {
 
 #define GRAD_ATOL 1e-3f
 
-/*
- * Compute a scalar loss = sum(f(x)) and its numerical gradient w.r.t. x[idx].
- * f_fn takes a tensor and returns a tensor (single input, single output).
- */
 typedef Tensor* (*UnaryFn)(Tensor*);
 
 static float numerical_grad(const float* base, int n, int shape[],
@@ -73,17 +60,6 @@ static float numerical_grad(const float* base, int n, int shape[],
     return grad;
 }
 
-/*
- * Check that numerical gradient matches 1.0 for all elements
- * when f_fn is an elementwise op like sin, exp, etc. (each output depends
- * only on the corresponding input, so the gradient w.r.t. sum(f(x)) at
- * position i equals f'(x_i)).
- *
- * We compare the numerical gradient of sum(f(x)) w.r.t. x[i] against
- * f'(x[i]) computed via forward-difference.  We don't require full autograd
- * — we just verify the numerical derivative itself is self-consistent and
- * matches the known closed-form derivative.
- */
 typedef float (*ScalarFn)(float);
 
 static int check_numerical_self_consistent(const float* data, int n,
@@ -106,7 +82,6 @@ static int check_numerical_self_consistent(const float* data, int n,
     return 1;
 }
 
-/* Derivatives ---------------------------------------------------------------- */
 static float d_sin(float x)  { return cosf(x); }
 static float d_cos(float x)  { return -sinf(x); }
 static float d_exp(float x)  { return expf(x); }
@@ -122,7 +97,6 @@ static float d_sigmoid(float x) {
 }
 static float d_recip(float x) { return -1.0f / (x * x); }
 
-/* Op wrappers matching UnaryFn signature ------------------------------------ */
 static Tensor* wrap_sin(Tensor* x)     { return uop_sin(x); }
 static Tensor* wrap_cos(Tensor* x)     { return uop_cos(x); }
 static Tensor* wrap_exp(Tensor* x)     { return uop_exp(x); }
@@ -135,7 +109,6 @@ static Tensor* wrap_square(Tensor* x)  { return uop_square(x); }
 static Tensor* wrap_sigmoid(Tensor* x) { return uop_sigmoid(x); }
 static Tensor* wrap_recip(Tensor* x)   { return uop_recip(x); }
 
-/* Tests --------------------------------------------------------------------- */
 static int test_grad_sin(void) {
     float data[] = {0.1f, 0.5f, 1.0f, 1.5f, 2.0f};
     return check_numerical_self_consistent(data, 5, wrap_sin, d_sin, "sin");
@@ -182,8 +155,6 @@ static int test_grad_recip(void) {
     return check_numerical_self_consistent(data, 5, wrap_recip, d_recip, "recip");
 }
 
-/* Binary op gradient check: grad of sum(f(a,b)) w.r.t. a              */
-/* We verify dL/da numerically matches the analytical expression.       */
 static int test_grad_add_commutative(void) {
     /* sum(a+b) has grad 1.0 for each a_i */
     float eps = 1e-3f;

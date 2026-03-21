@@ -1,15 +1,3 @@
-/*
- * Zoo model instantiation and forward-pass smoke tests.
- *
- * Verifies:
- *  - Model creates without NULL / crash
- *  - module_get_total_parameters() > 0
- *  - module_forward() with a random input produces a non-NULL tensor
- *  - Output shape is sane (not all zeros)
- *
- * Uses smallest available configs to keep memory / compute low.
- * Does NOT require weights — random initialisation is fine.
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +27,6 @@ static const TensorConfig cpu_f32 = {
         }                                              \
     } while (0)
 
-/* Check that output has at least one non-zero element (not a dead model) */
 static int has_nonzero(Tensor* t) {
     if (!t) return 0;
     if (tensor_ensure_executed(t) != 0) return 0;
@@ -50,7 +37,6 @@ static int has_nonzero(Tensor* t) {
     return 0;
 }
 
-/* ---- ResNet --------------------------------------------------------------- */
 static int test_resnet18(void) {
     Module* m = cml_zoo_resnet18_create(1000, DTYPE_FLOAT32, DEVICE_CPU);
     if (!m) return 0;
@@ -81,7 +67,6 @@ static int test_resnet50(void) {
     return 1;
 }
 
-/* ---- GPT-2 --------------------------------------------------------------- */
 static int test_gpt2_small(void) {
     GPT2Config cfg = cml_zoo_gpt2_config_small();
     Module* m = cml_zoo_gpt2_create(&cfg, DTYPE_FLOAT32, DEVICE_CPU);
@@ -113,7 +98,6 @@ static int test_gpt2_configs(void) {
     return 1;
 }
 
-/* ---- BERT ---------------------------------------------------------------- */
 static int test_bert_tiny(void) {
     BERTConfig cfg = cml_zoo_bert_config_tiny();
     Module* m = cml_zoo_bert_create(&cfg, DTYPE_FLOAT32, DEVICE_CPU);
@@ -136,7 +120,6 @@ static int test_bert_configs(void) {
     return 1;
 }
 
-/* ---- ViT ----------------------------------------------------------------- */
 static int test_vit_tiny(void) {
     ViTConfig cfg = cml_zoo_vit_config_tiny();
     Module* m = cml_zoo_vit_create(&cfg, DTYPE_FLOAT32, DEVICE_CPU);
@@ -157,7 +140,6 @@ static int test_vit_configs(void) {
     return 1;
 }
 
-/* ---- ConvNeXt ------------------------------------------------------------ */
 static int test_convnext_tiny(void) {
     ConvNeXtConfig cfg = cml_zoo_convnext_config_tiny();
     Module* m = cml_zoo_convnext_create(&cfg, 1000, DTYPE_FLOAT32, DEVICE_CPU);
@@ -177,7 +159,6 @@ static int test_convnext_configs_increasing(void) {
     return 1;
 }
 
-/* ---- EfficientNet -------------------------------------------------------- */
 static int test_efficientnet_b0(void) {
     EfficientNetConfig cfg = efficientnet_b0_config(1000);
     Module* m = cml_zoo_efficientnet_b0(&cfg);
@@ -197,7 +178,6 @@ static int test_efficientnet_scaling(void) {
     return 1;
 }
 
-/* ---- Whisper ------------------------------------------------------------- */
 static int test_whisper_tiny(void) {
     WhisperConfig cfg = whisper_tiny_config();
     Module* m = cml_zoo_whisper(&cfg);
@@ -217,7 +197,6 @@ static int test_whisper_configs(void) {
     return 1;
 }
 
-/* ---- YOLOv8 -------------------------------------------------------------- */
 static int test_yolov8n(void) {
     YOLOv8Config cfg = yolov8n_config(80);
     Module* m = cml_zoo_yolov8n(&cfg);
@@ -239,7 +218,6 @@ static int test_yolov8_configs(void) {
     return 1;
 }
 
-/* ---- CLIP ---------------------------------------------------------------- */
 static int test_clip_vit_b32(void) {
     CMLCLIPConfig cfg = cml_zoo_clip_config_vit_b32();
     Module* m = cml_zoo_clip_create(&cfg, DTYPE_FLOAT32, DEVICE_CPU);
@@ -261,7 +239,6 @@ static int test_clip_configs(void) {
     return 1;
 }
 
-/* ---- T5 ------------------------------------------------------------------ */
 static int test_t5_small(void) {
     T5Config cfg = cml_zoo_t5_config_small();
     Module* m = cml_zoo_t5_create(&cfg, DTYPE_FLOAT32, DEVICE_CPU);
@@ -280,7 +257,6 @@ static int test_t5_configs(void) {
     return 1;
 }
 
-/* ---- Parameter count sanity ----------------------------------------------- */
 static int test_resnet_param_count_reasonable(void) {
     /* ResNet-18 has ~11M params, ResNet-50 has ~25M params */
     Module* r18 = cml_zoo_resnet18_create(1000, DTYPE_FLOAT32, DEVICE_CPU);
@@ -311,7 +287,6 @@ static int test_gpt2_param_count_reasonable(void) {
     return 1;
 }
 
-/* ---- Module lifecycle ---------------------------------------------------- */
 static int test_module_double_free_safe(void) {
     /* module_free on NULL should not crash */
     module_free(NULL);

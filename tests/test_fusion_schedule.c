@@ -1,18 +1,3 @@
-/*
- * Kernel fusion schedule tests.
- *
- * Inspired by tinygrad's test_schedule.py which asserts that specific
- * computation patterns result in a specific number of GPU kernels after
- * fusion. The scheduler should:
- *   - Fuse chains of elementwise ops into one kernel.
- *   - NOT fuse across reduction boundaries (each reduce is a new kernel).
- *   - Treat movement ops (reshape, permute) as zero-cost (no kernel).
- *   - Fuse elementwise ops after reductions when safe.
- *
- * We don't require exact kernel counts to be implementation-defined; instead
- * we assert upper bounds and fusion ratios to keep tests stable across
- * schedule version changes.
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,7 +27,6 @@ static const TensorConfig cpu_f32 = {
         }                                              \
     } while (0)
 
-/* Build a schedule for a tensor and return the kernel count, or -1 on error */
 static int kernel_count_for(Tensor* out) {
     if (!out) return -1;
     CMLGraph_t ctx = tensor_get_ir_context(out);
@@ -55,7 +39,6 @@ static int kernel_count_for(Tensor* out) {
     return n;
 }
 
-/* ---- Simple elementwise chain should be 1 kernel ----------------------- */
 static int test_elementwise_chain_fused(void) {
     /* sin(cos(tanh(x))) — three elementwise ops, should be 1 kernel */
     int shape[] = {64};
@@ -72,7 +55,6 @@ static int test_elementwise_chain_fused(void) {
     return (k <= 2);
 }
 
-/* ---- Single reduction is 1 kernel ------------------------------------- */
 static int test_single_reduction(void) {
     int shape[] = {128};
     Tensor* x   = tensor_rand(shape, 1, &cpu_f32);
@@ -84,7 +66,6 @@ static int test_single_reduction(void) {
     return (k >= 1 && k <= 2);
 }
 
-/* ---- Two independent reductions are 2 kernels ------------------------- */
 static int test_two_independent_reductions(void) {
     int shape[] = {128};
     Tensor* x    = tensor_rand(shape, 1, &cpu_f32);
@@ -101,7 +82,7 @@ static int test_two_independent_reductions(void) {
     return (k >= 2);
 }
 
-/* ---- Softmax pattern: max + sub + exp + sum + div should be few kernels */
+Softmax pattern: max + sub + exp + sum + div should be few kernels */
 static int test_softmax_kernels(void) {
     /*
      * softmax(x) = exp(x - max(x)) / sum(exp(x - max(x)))
@@ -123,7 +104,6 @@ static int test_softmax_kernels(void) {
     return (k <= 5);
 }
 
-/* ---- LayerNorm pattern -------------------------------------------------- */
 static int test_layernorm_kernels(void) {
     /*
      * mean = sum(x) / N
@@ -154,7 +134,6 @@ static int test_layernorm_kernels(void) {
     return (k <= 6);
 }
 
-/* ---- Reshape/permute adds no kernels ----------------------------------- */
 static int test_movement_ops_no_kernel(void) {
     /*
      * reshape + permute should not add GPU kernels — they're zero-cost views.
@@ -177,7 +156,6 @@ static int test_movement_ops_no_kernel(void) {
     return (k <= 2);
 }
 
-/* ---- Matmul is a single kernel ---------------------------------------- */
 static int test_matmul_single_kernel(void) {
     int sa[] = {16, 32};
     int sb[] = {32, 16};
@@ -191,7 +169,6 @@ static int test_matmul_single_kernel(void) {
     return (k >= 1 && k <= 2);
 }
 
-/* ---- Elementwise after matmul fuses ----------------------------------- */
 static int test_matmul_then_elementwise(void) {
     /*
      * C = A @ B
@@ -215,7 +192,6 @@ static int test_matmul_then_elementwise(void) {
     return (k <= 3);
 }
 
-/* ---- Fusion ratio sanity ---------------------------------------------- */
 static int test_fusion_ratio_positive(void) {
     /*
      * A long chain of elementwise ops should have fusion_ratio > 1.0,
@@ -252,7 +228,6 @@ static int test_fusion_ratio_positive(void) {
     return pass;
 }
 
-/* ---- cml_schedule_can_fuse API ---------------------------------------- */
 static int test_can_fuse_elementwise(void) {
     /* Two elementwise ops should be fuseable */
     if (!cml_schedule_can_fuse(UOP_SIN, UOP_COS)) return 0;
@@ -297,7 +272,6 @@ static int test_is_movement_predicate(void) {
     return 1;
 }
 
-/* ---- Schedule with NULL graph handles gracefully ---------------------- */
 static int test_null_graph_safe(void) {
     CMLScheduleOptions opts = cml_schedule_default_options();
     CMLSchedule* sched = cml_schedule_create(NULL, &opts);
@@ -309,7 +283,6 @@ static int test_null_graph_safe(void) {
     return 1;
 }
 
-/* ---- Default options are sane ----------------------------------------- */
 static int test_default_options(void) {
     CMLScheduleOptions opts = cml_schedule_default_options();
     if (!opts.enable_fusion) return 0;
@@ -317,7 +290,6 @@ static int test_default_options(void) {
     return 1;
 }
 
-/* ---- Schedule item access --------------------------------------------- */
 static int test_schedule_item_access(void) {
     int shape[] = {64};
     Tensor* x   = tensor_rand(shape, 1, &cpu_f32);

@@ -1,8 +1,3 @@
-/*
- * Numerical correctness tests for uop wrappers.
- * Tests mathematical identities: sin²+cos²=1, exp(log(x))=x,
- * floor(x) <= x < ceil(x), etc.
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,10 +28,8 @@ static const TensorConfig cpu_f32 = {
 #define APPROX(a, b)    (fabsf((a) - (b)) < 1e-4f)
 #define APPROX_REL(a,b) (fabsf((a)-(b)) <= 1e-3f * (0.5f*(fabsf(a)+fabsf(b)) + 1e-8f))
 
-/* Helper: make a 1D tensor from a literal array */
 #define MAKE1D(arr) tensor_from_data((arr), (int[]){(int)(sizeof(arr)/sizeof(arr[0]))}, 1, &cpu_f32)
 
-/* ---- identity: sin²(x) + cos²(x) == 1 ----------------------------------- */
 static int test_sin_cos_identity(void) {
     float data[] = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, -1.0f, -2.5f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -57,7 +50,6 @@ static int test_sin_cos_identity(void) {
     return 1;
 }
 
-/* ---- identity: exp(log(x)) == x for x > 0 -------------------------------- */
 static int test_exp_log_identity(void) {
     float data[] = {0.1f, 0.5f, 1.0f, 2.0f, 10.0f, 100.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -73,7 +65,6 @@ static int test_exp_log_identity(void) {
     return 1;
 }
 
-/* ---- identity: log2(2^x) == x -------------------------------------------- */
 static int test_log2_exp2_identity(void) {
     float data[] = {-3.0f, -1.0f, 0.0f, 1.0f, 3.0f, 7.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -89,7 +80,6 @@ static int test_log2_exp2_identity(void) {
     return 1;
 }
 
-/* ---- floor(x) <= x < ceil(x) --------------------------------------------- */
 static int test_floor_ceil_bounds(void) {
     float data[] = {-2.7f, -0.1f, 0.0f, 0.9f, 1.5f, 3.99f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -110,7 +100,6 @@ static int test_floor_ceil_bounds(void) {
     return 1;
 }
 
-/* ---- round: nearest integer ---------------------------------------------- */
 static int test_round_nearest(void) {
     float in[]  = {0.4f, 0.6f, -0.4f, -0.6f, 1.5f, 2.5f};
     float exp[] = {0.0f, 1.0f,  0.0f, -1.0f, 2.0f, 2.0f}; /* banker's rounding */
@@ -126,7 +115,6 @@ static int test_round_nearest(void) {
     return 1;
 }
 
-/* ---- trunc: towards zero -------------------------------------------------- */
 static int test_trunc(void) {
     float in[]  = {1.7f, -1.7f, 2.0f, -2.0f, 0.9f};
     float exp[] = {1.0f, -1.0f, 2.0f, -2.0f, 0.0f};
@@ -142,7 +130,6 @@ static int test_trunc(void) {
     return 1;
 }
 
-/* ---- sign: -1, 0, 1 ------------------------------------------------------ */
 static int test_sign_values(void) {
     float in[]  = {-5.0f, -0.0f, 0.0f, 0.001f, 3.14f};
     float exp[] = {-1.0f,  0.0f, 0.0f,  1.0f,   1.0f};
@@ -158,7 +145,6 @@ static int test_sign_values(void) {
     return 1;
 }
 
-/* ---- square: x*x --------------------------------------------------------- */
 static int test_square_vs_mul(void) {
     float data[] = {-3.0f, -1.0f, 0.0f, 2.0f, 5.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -176,7 +162,6 @@ static int test_square_vs_mul(void) {
     return 1;
 }
 
-/* ---- rsqrt: 1/sqrt(x) ---------------------------------------------------- */
 static int test_rsqrt(void) {
     float data[] = {1.0f, 4.0f, 9.0f, 0.25f};
     float exp[]  = {1.0f, 0.5f, 1.0f/3.0f, 2.0f};
@@ -192,7 +177,6 @@ static int test_rsqrt(void) {
     return 1;
 }
 
-/* ---- erf: erf(0)==0, erf(inf)~1 ------------------------------------------ */
 static int test_erf_bounds(void) {
     float in[]  = {-3.0f, 0.0f, 3.0f};
     float exp[] = {-1.0f, 0.0f, 1.0f};  /* erf(±3) ≈ ±0.99998 */
@@ -212,7 +196,6 @@ static int test_erf_bounds(void) {
     return 1;
 }
 
-/* ---- asin/acos/atan: inverse trig ---------------------------------------- */
 static int test_asin_acos_identity(void) {
     /* sin(asin(x)) == x for x in [-1, 1] */
     float data[] = {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f};
@@ -249,7 +232,6 @@ static int test_atan_range(void) {
     return 1;
 }
 
-/* ---- sinh, cosh: cosh² - sinh² == 1 -------------------------------------- */
 static int test_sinh_cosh_identity(void) {
     float data[] = {-2.0f, -0.5f, 0.0f, 0.5f, 2.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -269,7 +251,6 @@ static int test_sinh_cosh_identity(void) {
     return 1;
 }
 
-/* ---- asinh: sinh(asinh(x)) == x ------------------------------------------ */
 static int test_asinh_inverse(void) {
     float data[] = {-5.0f, -1.0f, 0.0f, 1.0f, 5.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -285,7 +266,6 @@ static int test_asinh_inverse(void) {
     return 1;
 }
 
-/* ---- log10: log10(10^x) == x --------------------------------------------- */
 static int test_log10_identity(void) {
     float data[] = {-2.0f, 0.0f, 1.0f, 2.0f, 3.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
@@ -306,7 +286,6 @@ static int test_log10_identity(void) {
     return 1;
 }
 
-/* ---- isinf, isnan, isfinite ---------------------------------------------- */
 static int test_isinf_isnan_isfinite(void) {
     float inf = 1.0f / 0.0f;
     float nan = 0.0f / 0.0f;
@@ -343,7 +322,6 @@ static int test_isinf_isnan_isfinite(void) {
     return 1;
 }
 
-/* ---- logical_not --------------------------------------------------------- */
 static int test_logical_not(void) {
     float data[] = {0.0f, 1.0f, -1.0f, 0.5f, 0.0f};
     float exp[]  = {1.0f, 0.0f,  0.0f, 0.0f, 1.0f};
@@ -359,7 +337,6 @@ static int test_logical_not(void) {
     return 1;
 }
 
-/* ---- logical_and / logical_or -------------------------------------------- */
 static int test_logical_and_or(void) {
     float a[]   = {0.0f, 1.0f, 0.0f, 1.0f};
     float b[]   = {0.0f, 0.0f, 1.0f, 1.0f};
@@ -383,7 +360,6 @@ static int test_logical_and_or(void) {
     return 1;
 }
 
-/* ---- comparison ops ------------------------------------------------------- */
 static int test_comparison_ops(void) {
     float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
     float b[] = {1.0f, 1.0f, 4.0f, 3.0f};
@@ -421,7 +397,6 @@ static int test_comparison_ops(void) {
     return 1;
 }
 
-/* ---- minimum vs max ------------------------------------------------------- */
 static int test_minimum(void) {
     float a[]  = {1.0f, 5.0f, -2.0f,  3.0f};
     float b[]  = {2.0f, 3.0f,  1.0f, -1.0f};
@@ -439,7 +414,6 @@ static int test_minimum(void) {
     return 1;
 }
 
-/* ---- mod: fmod behaviour ------------------------------------------------- */
 static int test_mod(void) {
     float a[]  = {7.0f, -7.0f,  7.0f, -7.0f};
     float b[]  = {3.0f,  3.0f, -3.0f, -3.0f};
@@ -458,7 +432,6 @@ static int test_mod(void) {
     return 1;
 }
 
-/* ---- logaddexp: log(exp(a)+exp(b)) --------------------------------------- */
 static int test_logaddexp(void) {
     float a[]  = {0.0f, 1.0f, 100.0f};
     float b[]  = {0.0f, 2.0f, 100.0f};
@@ -477,7 +450,6 @@ static int test_logaddexp(void) {
     return 1;
 }
 
-/* ---- copysign: magnitude from a, sign from b ----------------------------- */
 static int test_copysign(void) {
     float a[]  = {3.0f, -3.0f, 3.0f, -3.0f};
     float b[]  = {1.0f,  1.0f,-1.0f, -1.0f};
@@ -495,7 +467,6 @@ static int test_copysign(void) {
     return 1;
 }
 
-/* ---- idiv: floor division ------------------------------------------------ */
 static int test_idiv(void) {
     float a[]  = {7.0f, -7.0f,  7.0f, -7.0f};
     float b[]  = {3.0f,  3.0f, -3.0f, -3.0f};

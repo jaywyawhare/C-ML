@@ -1,20 +1,3 @@
-/*
- * Property-based / fuzz test for tensor ops.
- *
- * Strategy (inspired by tinygrad's test_ops.py random testing):
- *   - Generate random shapes and dtypes.
- *   - Apply random sequences of uop_* calls.
- *   - Assert: no NULL returns, no NaN/Inf in float outputs for benign
- *     inputs, no memory corruption (rely on asan if enabled), shape
- *     invariants hold.
- *
- * Compile with -fsanitize=address,undefined to catch memory bugs.
- *
- * Run seed variations:
- *   ./test_fuzzer_ops 0
- *   ./test_fuzzer_ops 42
- *   ./test_fuzzer_ops 1234567
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,12 +7,10 @@
 #include "tensor/tensor.h"
 #include "ops/uops.h"
 
-/* ---- PRNG ----------------------------------------------------------------- */
 static uint64_t rng_state;
 
 static void rng_seed(uint64_t seed) { rng_state = seed ^ 0xdeadbeef1337ULL; }
 
-/* xorshift64 */
 static uint64_t rng_next(void) {
     rng_state ^= rng_state << 13;
     rng_state ^= rng_state >> 7;
@@ -45,13 +26,11 @@ static float rng_float(float lo, float hi) {
     return lo + (hi - lo) * ((float)(rng_next() & 0xFFFFFF) / (float)0x1000000);
 }
 
-/* ---- Config --------------------------------------------------------------- */
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
     .has_dtype = true, .has_device = true
 };
 
-/* ---- Helpers -------------------------------------------------------------- */
 static int tests_passed = 0;
 static int tests_total  = 0;
 
@@ -77,7 +56,6 @@ static int has_nan_inf(Tensor* t) {
     return 0;
 }
 
-/* Generate a random 1D-4D shape, numel <= max_numel */
 static int make_shape(int* shape, int* ndim_out, int max_numel) {
     int ndim = rng_int(1, 5);
     *ndim_out = ndim;
@@ -92,7 +70,6 @@ static int make_shape(int* shape, int* ndim_out, int max_numel) {
     return numel;
 }
 
-/* Make a tensor with values in (0, range] to be safe for log/sqrt */
 static Tensor* make_positive_tensor(int* shape, int ndim, float range) {
     int n = 1;
     for (int i = 0; i < ndim; i++) n *= shape[i];
@@ -104,7 +81,6 @@ static Tensor* make_positive_tensor(int* shape, int ndim, float range) {
     return t;
 }
 
-/* Make a tensor with values in [-range, range] */
 static Tensor* make_signed_tensor(int* shape, int ndim, float range) {
     int n = 1;
     for (int i = 0; i < ndim; i++) n *= shape[i];
@@ -115,9 +91,6 @@ static Tensor* make_signed_tensor(int* shape, int ndim, float range) {
     free(data);
     return t;
 }
-
-/* ---- Fuzz: unary op on random shapes ------------------------------------- */
-
 typedef Tensor* (*UnaryOp)(Tensor*);
 
 static int fuzz_unary_op_no_crash(UnaryOp op, const char* name,
@@ -179,9 +152,6 @@ static int fuzz_sinh(void)        { return fuzz_unary_op_no_crash(uop_sinh, "uop
 static int fuzz_cosh(void)        { return fuzz_unary_op_no_crash(uop_cosh, "uop_cosh", 0, 20); }
 static int fuzz_asin(void)        { return fuzz_unary_op_no_crash(uop_asin, "uop_asin", 0, 20); }
 static int fuzz_logical_not(void) { return FUZZ_UNARY(uop_logical_not, 0); }
-
-/* ---- Fuzz: binary ops on matching shapes --------------------------------- */
-
 typedef Tensor* (*BinaryOp)(Tensor*, Tensor*);
 
 static int fuzz_binary_op_no_crash(BinaryOp op, const char* name,
@@ -235,9 +205,6 @@ static int fuzz_logical_and(void)  { return FUZZ_BINARY(uop_logical_and, 0); }
 static int fuzz_logical_or(void)   { return FUZZ_BINARY(uop_logical_or, 0); }
 static int fuzz_logaddexp(void)    { return FUZZ_BINARY(uop_logaddexp, 0); }
 static int fuzz_copysign(void)     { return FUZZ_BINARY(uop_copysign, 0); }
-
-/* ---- Fuzz: shape invariants for reductions ------------------------------- */
-
 static int fuzz_reduce_shape(void) {
     int failures = 0;
     for (int trial = 0; trial < 30; trial++) {
@@ -279,7 +246,6 @@ static int fuzz_mean_shape(void) {
     return (failures == 0);
 }
 
-/* ---- Fuzz: reshape preserves numel --------------------------------------- */
 static int fuzz_reshape_numel(void) {
     int failures = 0;
     for (int trial = 0; trial < 50; trial++) {
@@ -309,7 +275,6 @@ static int fuzz_reshape_numel(void) {
     return (failures == 0);
 }
 
-/* ---- Fuzz: random op chain ----------------------------------------------- */
 static int fuzz_random_op_chain(void) {
     /* Apply a random sequence of unary ops to a tensor; check no crash */
     int failures = 0;
@@ -344,7 +309,6 @@ static int fuzz_random_op_chain(void) {
     return (failures == 0);
 }
 
-/* ---- Fuzz: matmul shapes ------------------------------------------------- */
 static int fuzz_matmul_shapes(void) {
     int failures = 0;
     for (int trial = 0; trial < 20; trial++) {
@@ -378,7 +342,6 @@ static int fuzz_matmul_shapes(void) {
     return (failures == 0);
 }
 
-/* ---- Fuzz: empty tensor ops ----------------------------------------------- */
 static int fuzz_empty_tensor_safety(void) {
     /* 0-element tensors: should not crash */
     int shape[] = {0};
@@ -390,7 +353,6 @@ static int fuzz_empty_tensor_safety(void) {
     return 1;
 }
 
-/* ---- Fuzz: where op ------------------------------------------------------- */
 static int fuzz_where(void) {
     int failures = 0;
     for (int trial = 0; trial < 20; trial++) {
@@ -433,7 +395,6 @@ static int fuzz_where(void) {
     return (failures == 0);
 }
 
-/* ---- Fuzz: fill ----------------------------------------------------------- */
 static int fuzz_fill_value(void) {
     for (int trial = 0; trial < 20; trial++) {
         int n = rng_int(1, 128);
@@ -451,7 +412,6 @@ static int fuzz_fill_value(void) {
     return 1;
 }
 
-/* ---- Fuzz: dtype + shape stress test ------------------------------------- */
 static int fuzz_dtype_stress(void) {
     /* Create tensors of different dtypes and verify no crash on basic ops */
     DType dtypes[] = {DTYPE_FLOAT32, DTYPE_INT32};
