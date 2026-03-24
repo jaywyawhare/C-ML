@@ -97,6 +97,7 @@ typedef struct ibv_qp_attr {
     uint32_t qkey;
     uint32_t rq_psn;
     uint32_t sq_psn;
+    uint32_t qp_num;
     uint32_t dest_qp_num;
     int qp_access_flags;
     struct { uint16_t dlid; uint8_t sl; uint8_t src_path_bits; uint8_t static_rate; uint8_t is_global; uint8_t port_num; struct { uint32_t flow_label; uint8_t sgid_index; uint8_t hop_limit; uint8_t traffic_class; } grh; } ah_attr;
@@ -131,6 +132,7 @@ typedef int          (*fn_ibv_post_send_t)(ibv_qp* qp, ibv_send_wr* wr, ibv_send
 typedef int          (*fn_ibv_post_recv_t)(ibv_qp* qp, ibv_recv_wr* wr, ibv_recv_wr** bad_wr);
 typedef int          (*fn_ibv_poll_cq_t)(ibv_cq* cq, int num_entries, ibv_wc* wc);
 typedef int          (*fn_ibv_query_port_t)(ibv_context* context, uint8_t port_num, ibv_port_attr* port_attr);
+typedef int          (*fn_ibv_query_qp_t)(ibv_qp* qp, ibv_qp_attr* attr, int attr_mask, ibv_qp_init_attr* init_attr);
 
 static struct {
     void* lib;
@@ -151,6 +153,7 @@ static struct {
     fn_ibv_post_recv_t         post_recv;
     fn_ibv_poll_cq_t           poll_cq;
     fn_ibv_query_port_t        query_port;
+    fn_ibv_query_qp_t          query_qp;
 } ib_api = {0};
 
 static bool load_ib_symbols(void* lib) {
@@ -176,6 +179,7 @@ static bool load_ib_symbols(void* lib) {
     LOAD_SYM(post_recv);
     LOAD_SYM(poll_cq);
     LOAD_SYM(query_port);
+    LOAD_SYM(query_qp);
 #undef LOAD_SYM
     return true;
 }
@@ -278,6 +282,12 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
         return NULL;
     }
 
+    ib->qp_nums = calloc((size_t)world_size, sizeof(uint32_t));
+    if (!ib->qp_nums) {
+        cml_ib_free(ib);
+        return NULL;
+    }
+
     for (int i = 0; i < world_size; i++) {
         if (i == rank) continue;
 
@@ -300,6 +310,16 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
             return NULL;
         }
         ib->qps[i] = qp;
+        {
+            ibv_qp_attr attr;
+            ibv_qp_init_attr init_attr;
+            if (ib_api.query_qp(qp, &attr, 0, &init_attr) != 0) {
+                LOG_ERROR("Failed to query QP for peer %d", i);
+                cml_ib_free(ib);
+                return NULL;
+            }
+            ib->qp_nums[i] = attr.qp_num;
+        }
     }
 
     LOG_INFO("IB transport created: rank %d/%d, %d QPs", rank, world_size, world_size - 1);
@@ -447,7 +467,7 @@ int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
         }
 
         qp_info_t local_info = {
-            .qp_num = ((ibv_qp*)ib->qps[i])->qp_num,  /* libibverbs: ibv_qp.qp_num is public */
+            .qp_num = ib->qp_nums[i],
             .lid = port_attr.lid,
             .psn = local_psn
         };
@@ -487,6 +507,8 @@ void cml_ib_free(CMLIBTransport* ib) {
         }
         free(ib->qps);
     }
+
+    free(ib->qp_nums);
 
     if (ib->cq) ib_api.destroy_cq(ib->cq);
     if (ib->pd) ib_api.dealloc_pd(ib->pd);

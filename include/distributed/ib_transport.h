@@ -14,6 +14,7 @@ typedef struct CMLIBTransport {
     void* pd;
     void* cq;
     void** qps;
+    uint32_t* qp_nums;
     int num_peers;
     int rank;
     int world_size;
