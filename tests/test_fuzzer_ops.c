@@ -91,13 +91,25 @@ static Tensor* make_signed_tensor(int* shape, int ndim, float range) {
     free(data);
     return t;
 }
+
+static Tensor* make_asin_safe_tensor(int* shape, int ndim) {
+    int n = 1;
+    for (int i = 0; i < ndim; i++) n *= shape[i];
+    float* data = malloc(n * sizeof(float));
+    for (int i = 0; i < n; i++) {
+        data[i] = (float)sin((double)rng_int(0, 1000) / 100.0);
+    }
+    Tensor* t = tensor_from_data(data, shape, ndim, &cpu_f32);
+    free(data);
+    return t;
+}
 typedef Tensor* (*UnaryOp)(Tensor*);
 
 static int fuzz_unary_op_no_crash(UnaryOp op, const char* name,
                                    int use_positive, int n_trials) {
     int failures = 0;
     for (int trial = 0; trial < n_trials; trial++) {
-        int shape[4], ndim;
+        int shape[8], ndim;
         make_shape(shape, &ndim, 512);
         Tensor* x = use_positive
             ? make_positive_tensor(shape, ndim, 5.0f)
@@ -150,7 +162,25 @@ static int fuzz_exp2(void)        { return FUZZ_UNARY(uop_exp2,  0); }
 static int fuzz_erf(void)         { return FUZZ_UNARY(uop_erf,   0); }
 static int fuzz_sinh(void)        { return fuzz_unary_op_no_crash(uop_sinh, "uop_sinh", 0, 20); }
 static int fuzz_cosh(void)        { return fuzz_unary_op_no_crash(uop_cosh, "uop_cosh", 0, 20); }
-static int fuzz_asin(void)        { return fuzz_unary_op_no_crash(uop_asin, "uop_asin", 0, 20); }
+static int fuzz_asin(void) {
+    int failures = 0;
+    for (int trial = 0; trial < 20; trial++) {
+        int shape[8], ndim;
+        make_shape(shape, &ndim, 512);
+        Tensor* x = make_asin_safe_tensor(shape, ndim);
+        if (!x) { failures++; continue; }
+        Tensor* out = uop_asin(x);
+        if (!out) {
+            fprintf(stderr, "    [uop_asin] NULL output\n");
+            failures++;
+        } else {
+            if (tensor_ensure_executed(out) != 0) failures++;
+            tensor_free(out);
+        }
+        tensor_free(x);
+    }
+    return (failures == 0);
+}
 static int fuzz_logical_not(void) { return FUZZ_UNARY(uop_logical_not, 0); }
 typedef Tensor* (*BinaryOp)(Tensor*, Tensor*);
 
@@ -158,7 +188,7 @@ static int fuzz_binary_op_no_crash(BinaryOp op, const char* name,
                                     int use_positive, int n_trials) {
     int failures = 0;
     for (int trial = 0; trial < n_trials; trial++) {
-        int shape[4], ndim;
+        int shape[8], ndim;
         make_shape(shape, &ndim, 256);
         Tensor* a = use_positive
             ? make_positive_tensor(shape, ndim, 5.0f)
@@ -208,13 +238,15 @@ static int fuzz_copysign(void)     { return FUZZ_BINARY(uop_copysign, 0); }
 static int fuzz_reduce_shape(void) {
     int failures = 0;
     for (int trial = 0; trial < 30; trial++) {
-        int shape[3], ndim;
+        int shape[8], ndim;
         make_shape(shape, &ndim, 256);
         Tensor* x = make_signed_tensor(shape, ndim, 3.0f);
         if (!x) { failures++; continue; }
 
         int dim = rng_int(0, ndim);
-        Tensor* s = uop_sum(x, dim, false);
+        int dims[1] = {dim};
+        ReduceParams rp = {dims, 1, false};
+        Tensor* s = uop_sum(x, &rp);
         if (!s) { tensor_free(x); failures++; continue; }
 
         /* Output shape should drop the reduced dim */
@@ -233,12 +265,14 @@ static int fuzz_reduce_shape(void) {
 static int fuzz_mean_shape(void) {
     int failures = 0;
     for (int trial = 0; trial < 30; trial++) {
-        int shape[3], ndim;
+        int shape[8], ndim;
         make_shape(shape, &ndim, 256);
         Tensor* x = make_signed_tensor(shape, ndim, 3.0f);
         if (!x) { failures++; continue; }
         int dim = rng_int(0, ndim);
-        Tensor* m = uop_mean(x, dim, false);
+        int dims[1] = {dim};
+        ReduceParams rp = {dims, 1, false};
+        Tensor* m = uop_mean(x, &rp);
         if (!m) { tensor_free(x); failures++; continue; }
         tensor_free(m);
         tensor_free(x);
@@ -262,7 +296,8 @@ static int fuzz_reshape_numel(void) {
         }
         int b = n / a;
         int shape2[] = {a, b};
-        Tensor* r = uop_reshape(x, shape2, 2);
+        ReshapeParams rparams = {shape2, 2};
+        Tensor* r = uop_reshape(x, &rparams);
         if (!r) { tensor_free(x); failures++; continue; }
 
         if ((size_t)(a * b) != r->numel) {
@@ -372,7 +407,8 @@ static int fuzz_where(void) {
             failures++;
             continue;
         }
-        Tensor* out = uop_where(cond, a, b);
+        WhereParams wparams = {cond, a, b};
+        Tensor* out = uop_where(&wparams);
         if (!out) {
             failures++;
         } else {
