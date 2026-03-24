@@ -242,6 +242,11 @@ static void estimate_item_cost(CMLScheduleItem* item) {
     for (int i = 0; i < item->num_ops; i++) {
         struct IRNode* nd = item->ops[i];
         if (!nd) continue;
+        /* Skip dead nodes: if the output tensor was freed (output==NULL) we
+           cannot safely read input tensor metadata — those pointers may be
+           dangling.  Cost estimation is a best-effort statistic, so skipping
+           these nodes is harmless. */
+        if (!nd->output && nd->num_inputs > 0) continue;
 
         size_t out_elems = nd->output ? tensor_total_elements(nd->output) : 0;
         CMLScheduleItemType kind = classify_op(nd->type);
