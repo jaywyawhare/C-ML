@@ -265,7 +265,7 @@ int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
     LLVMTypeRef fn_ty = LLVMFunctionType(LLVMVoidTypeInContext(ctx), param_types, 4, 0);
 
     LLVMValueRef func = LLVMAddFunction(mod, "vector_add", fn_ty);
-    LLVMSetFunctionCallConv(func, 91); /* AMDGPU_KERNEL */
+    LLVMSetFunctionCallConv(func, 91); 
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, func, "entry");
     LLVMBuilderRef builder = LLVMCreateBuilderInContext(ctx);
@@ -344,7 +344,7 @@ int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
     return 0;
 }
 
-#else /* !CML_HAS_LLVM_BACKEND */
+#else 
 
 #include "ops/ir/gpu/amd_llvm.h"
 #include <stddef.h>

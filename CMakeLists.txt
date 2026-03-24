@@ -8,8 +8,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# -march=native is critical: without it the compiler emits SSE2 only
-# and our AVX2 microkernels are dead code.
 include(CheckCCompilerFlag)
 check_c_compiler_flag("-march=native" HAS_MARCH_NATIVE)
 if(HAS_MARCH_NATIVE)
@@ -27,8 +25,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
-
-# --- LLVM Backend -----------------------------------------------------------
 
 option(ENABLE_LLVM_BACKEND "Enable direct LLVM IR JIT backend" ON)
 
@@ -72,8 +68,6 @@ else()
     set(LLVM_BACKEND_FOUND FALSE)
 endif()
 
-# --- GPU SDK Detection ------------------------------------------------------
-
 option(ENABLE_CUDA "Enable CUDA backend" ON)
 if(ENABLE_CUDA)
     find_package(CUDAToolkit QUIET)
@@ -81,7 +75,6 @@ if(ENABLE_CUDA)
         message(STATUS "CUDA Toolkit found: ${CUDAToolkit_VERSION}")
         add_definitions(-DCML_HAS_CUDA)
         include_directories(${CUDAToolkit_INCLUDE_DIRS})
-        # Don't link libcuda.so — we dlopen it. The stub causes hangs without a GPU.
         set(CUDA_LIBS "")
     else()
         message(STATUS "CUDA Toolkit not found - CUDA backend uses dynamic loading")
@@ -167,8 +160,6 @@ if(ENABLE_ONNX)
     add_definitions(-DCML_HAS_ONNX)
     message(STATUS "ONNX runtime enabled")
 endif()
-
-# --- Sources -----------------------------------------------------------------
 
 set(CORE_SOURCES
     src/cml.c
@@ -480,8 +471,6 @@ set(LIBRARY_SOURCES
     ${DATASET_SOURCES}
 )
 
-# --- Helper to link all optional backends to a target ------------------------
-
 function(cml_link_all target)
     target_link_libraries(${target} m dl pthread)
     if(LLVM_BACKEND_FOUND)
@@ -500,8 +489,6 @@ function(cml_link_all target)
         target_link_libraries(${target} ${METAL_LIBS})
     endif()
 endfunction()
-
-# --- Targets -----------------------------------------------------------------
 
 add_executable(cml main.c ${LIBRARY_SOURCES})
 set_target_properties(cml PROPERTIES
@@ -533,8 +520,6 @@ if(BUILD_SHARED_LIBS)
     cml_link_all(cml_shared)
 endif()
 
-# --- Tests -------------------------------------------------------------------
-
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
     enable_testing()
@@ -564,8 +549,6 @@ if(BUILD_TESTS)
     cml_link_all(test_am_mock)
     add_test(NAME test_am_mock COMMAND test_am_mock)
 endif()
-
-# --- Examples ----------------------------------------------------------------
 
 option(BUILD_EXAMPLES "Build example programs" ON)
 
@@ -627,8 +610,6 @@ if(BUILD_EXAMPLES)
     cml_add_example(mlperf_resnet50 examples/mlperf/mlperf_resnet50.c)
 endif()
 
-# --- Install -----------------------------------------------------------------
-
 install(TARGETS cml cml_static
     EXPORT CMLTargets
     RUNTIME DESTINATION bin
@@ -682,8 +663,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/viz-ui/dist")
     install(DIRECTORY viz-ui/dist DESTINATION ${VIZ_INSTALL_DIR}/viz-ui)
 endif()
 
-# --- Summary -----------------------------------------------------------------
-
 message(STATUS "")
 message(STATUS "C-ML ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
 message(STATUS "  LLVM: ${LLVM_BACKEND_FOUND}  CUDA: ${CUDAToolkit_FOUND}  ROCm: ${hip_FOUND}  Metal: ${METAL_FOUND}")
@@ -691,3 +670,4 @@ message(STATUS "  Vulkan: ${ENABLE_VULKAN}  WebGPU: ${ENABLE_WEBGPU}  OpenCL: ${
 message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}  AM Driver: ${ENABLE_AM_DRIVER}  NIR: ${ENABLE_NIR}  NAK: ${ENABLE_NAK}")
 message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Distributed: ${ENABLE_DISTRIBUTED}  IB: ${ENABLE_IB_TRANSPORT}")
 message(STATUS "")
+

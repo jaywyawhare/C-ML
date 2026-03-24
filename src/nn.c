@@ -45,14 +45,14 @@ void module_free(Module* module) {
     if (!module)
         return;
 
-    // Remove from tracking list to prevent double-free during cleanup
+    
     cml_untrack_module(module);
 
-    // Specialized free functions (e.g., sequential_free) handle their own cleanup
-    // and call free(module) themselves
+    
+    
     void (*specialized_free)(Module*) = module->free;
 
-    // Clear the free pointer to prevent re-entry if specialized_free calls module_free
+    
     module->free = NULL;
 
     if (module->name) {
@@ -60,7 +60,7 @@ void module_free(Module* module) {
         module->name = NULL;
     }
 
-    // Tensors inside are managed separately
+    
     if (module->parameters) {
         for (int i = 0; i < module->num_parameters; i++) {
             if (module->parameters[i]) {
@@ -76,14 +76,14 @@ void module_free(Module* module) {
         module->parameters = NULL;
     }
 
-    // Call specialized free function if it exists
-    // The specialized free function is responsible for:
-    // 1. Freeing module-specific resources (child modules, cached data, etc.)
-    // 2. Calling free(module) to free the struct itself
+    
+    
+    
+    
     if (specialized_free) {
         specialized_free(module);
     } else {
-        // No specialized free, just free the base struct
+        
         free(module);
     }
 }
@@ -271,19 +271,19 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
     if (!module || !params_out || !num_params_out)
         return -1;
 
-    // First pass: count total parameters
+    
     int total_params = module->num_parameters;
     if (recursive) {
-        // Follow next chain
+        
         Module* current = module->next;
         while (current) {
             total_params += current->num_parameters;
             current = current->next;
         }
 
-        // Sequential module already collects parameters from child modules in sequential_add
-        // So all parameters should already be in Sequential's parameter list
-        // No need to recurse into Sequential's modules array
+        
+        
+        
     }
 
     if (total_params == 0) {
@@ -298,17 +298,17 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
         return -1;
     }
 
-    // Second pass: collect parameters
+    
     int idx = 0;
 
-    // Collect from main module
+    
     for (int i = 0; i < module->num_parameters; i++) {
         if (module->parameters[i]) {
             params[idx++] = module->parameters[i];
         }
     }
 
-    // Collect from chained modules if recursive
+    
     if (recursive) {
         Module* current = module->next;
         while (current) {
@@ -335,14 +335,14 @@ int module_to_device(Module* module, DeviceType device) {
         return -1;
     }
 
-    // Collect all parameters
+    
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) != 0) {
         return -1;
     }
 
-    // Move each parameter to device
+    
     for (int i = 0; i < num_params; i++) {
         if (params[i] && params[i]->tensor) {
             if (device_move_tensor(params[i]->tensor, device) != 0) {

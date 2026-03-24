@@ -1001,10 +1001,10 @@ Tensor* uop_gelu(Tensor* x) {
         return NULL;
     }
 
-    // GELU: x * 0.5 * (1 + erf(x / sqrt(2)))
-    // Approximate: x * 0.5 * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x^3)))
+    
+    
 
-    // Constants (all created lazily with uop_fill)
+    
     const float sqrt_2_pi = 0.7978845608f;
     const float coeff     = 0.044715f;
 
@@ -2121,13 +2121,13 @@ Tensor* uop_diag(Tensor* a, int offset) {
 
     struct IRNode* node = cml_ir_get_tail(ir);
     if (a->ndim == 1) {
-        // 1D -> 2D diagonal matrix
+        
         int n = a->shape[0] + abs(offset);
         int out_shape[] = {n, n};
         node->output_shape = tensor_shape_copy(out_shape, 2);
         node->output_ndim = 2;
     } else if (a->ndim == 2) {
-        // 2D -> 1D extract diagonal
+        
         int rows = a->shape[0], cols = a->shape[1];
         int diag_len = 0;
         if (offset >= 0) diag_len = (rows < cols - offset) ? rows : cols - offset;
@@ -2187,7 +2187,7 @@ Tensor* uop_erfc(Tensor* a) {
 
 Tensor* uop_lerp(Tensor* a, Tensor* b, Tensor* t) {
     if (!a || !b || !t) return NULL;
-    // lerp(a, b, t) = a + t * (b - a)
+    
     Tensor* diff = uop_sub(b, a);
     if (!diff) return NULL;
     Tensor* scaled = uop_mul(t, diff);
@@ -2343,13 +2343,13 @@ Tensor* uop_logcumsumexp(Tensor* a, int dim) {
 
 Tensor* uop_relu6(Tensor* x) {
     if (!x) return NULL;
-    // relu6(x) = min(max(x, 0), 6) = clamp(x, 0, 6)
+    
     return uop_clamp(x, 0.0f, 6.0f);
 }
 
 Tensor* uop_hard_sigmoid(Tensor* x) {
     if (!x) return NULL;
-    // hard_sigmoid(x) = clamp((x + 3) / 6, 0, 1)
+    
     Tensor* three = uop_fill(x->shape, x->ndim, 3.0f);
     if (!three) return NULL;
     Tensor* shifted = uop_add(x, three);
@@ -2373,8 +2373,8 @@ Tensor* uop_celu(Tensor* x, float alpha) {
 
     ClampParams* params = malloc(sizeof(ClampParams));
     if (!params) return NULL;
-    params->min_val = alpha; // store alpha in min_val
-    params->max_val = 0.0f;  // unused
+    params->min_val = alpha; 
+    params->max_val = 0.0f;  
 
     Tensor* inputs[] = {x};
     if (cml_ir_add_uop(ir, UOP_CELU, inputs, 1, params) != 0) {
@@ -2393,7 +2393,7 @@ Tensor* uop_celu(Tensor* x, float alpha) {
 
 Tensor* uop_quick_gelu(Tensor* x) {
     if (!x) return NULL;
-    // quick_gelu(x) = x * sigmoid(1.702 * x)
+    
     Tensor* coeff = uop_fill(x->shape, x->ndim, 1.702f);
     if (!coeff) return NULL;
     Tensor* scaled = uop_mul(coeff, x);
@@ -2474,8 +2474,8 @@ Tensor* uop_unfold(Tensor* a, int kernel_size, int stride) {
     }
 
     struct IRNode* node = cml_ir_get_tail(ir);
-    // Output shape: for 1D [L] -> [num_windows, kernel_size]
-    // For 2D [N, L] -> [N, num_windows, kernel_size]
+    
+    
     int last_dim = a->shape[a->ndim - 1];
     int num_windows = (last_dim - kernel_size) / params->stride + 1;
     if (num_windows <= 0) {
@@ -2508,7 +2508,6 @@ void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** ou
     *out_std = uop_std(a, params);
 }
 
-
 Tensor* uop_elu(Tensor* x, float alpha) {
     if (!x) return NULL;
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -2517,7 +2516,7 @@ Tensor* uop_elu(Tensor* x, float alpha) {
     ClampParams* params = malloc(sizeof(ClampParams));
     if (!params) return NULL;
     params->min_val = alpha;
-    params->max_val = 0.0f; // unused
+    params->max_val = 0.0f; 
 
     Tensor* inputs[] = {x};
     if (cml_ir_add_uop(ir, UOP_ELU, inputs, 1, params) != 0) {
@@ -2607,11 +2606,10 @@ Tensor* uop_hardswish(Tensor* x) {
     return tensor_from_ir_node(node, ir);
 }
 
-
 Tensor* uop_masked_select(Tensor* a, Tensor* mask) {
     if (!a || !mask) return NULL;
-    // masked_select flattens and selects where mask is true
-    // We need to count nonzeros at execution time, so we use a special UOp
+    
+    
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) return NULL;
 
@@ -2619,10 +2617,10 @@ Tensor* uop_masked_select(Tensor* a, Tensor* mask) {
     if (cml_ir_add_uop(ir, UOP_MASKED_SELECT, inputs, 2, NULL) != 0) return NULL;
 
     struct IRNode* node = cml_ir_get_tail(ir);
-    // Output is 1D with at most a->numel elements (actual size determined at execution)
+    
     node->output_shape = malloc(sizeof(int));
     if (!node->output_shape) return NULL;
-    node->output_shape[0] = (int)a->numel; // upper bound, actual may be less
+    node->output_shape[0] = (int)a->numel; 
     node->output_ndim = 1;
     return tensor_from_ir_node(node, ir);
 }
@@ -2644,7 +2642,7 @@ Tensor** uop_split(Tensor* a, int split_size, int dim, int* num_splits) {
         int end = start + split_size;
         if (end > dim_size) end = dim_size;
 
-        // Use slice to extract each split
+        
         int* starts = calloc((size_t)a->ndim, sizeof(int));
         int* ends = malloc((size_t)a->ndim * sizeof(int));
         int* steps = malloc((size_t)a->ndim * sizeof(int));
@@ -2686,7 +2684,7 @@ Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
     if (!tensors || num_tensors <= 0 || !num_outputs) return NULL;
     *num_outputs = num_tensors;
 
-    // Compute output shape: [len(t0), len(t1), ...]
+    
     int* out_shape = malloc((size_t)num_tensors * sizeof(int));
     if (!out_shape) return NULL;
     for (int i = 0; i < num_tensors; i++) {
@@ -2698,7 +2696,7 @@ Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
     if (!results) { free(out_shape); return NULL; }
 
     for (int i = 0; i < num_tensors; i++) {
-        // Reshape tensor[i] so it broadcasts to out_shape
+        
         int* reshape = malloc((size_t)num_tensors * sizeof(int));
         if (!reshape) { free(out_shape); free(results); return NULL; }
         for (int j = 0; j < num_tensors; j++) {
@@ -2708,7 +2706,7 @@ Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
         free(reshape);
         if (!reshaped) { free(out_shape); free(results); return NULL; }
 
-        // Expand to full shape
+        
         ExpandParams ep = {.new_shape = out_shape, .new_ndim = num_tensors};
         results[i] = uop_expand(reshaped, &ep);
     }
@@ -2738,7 +2736,7 @@ Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2) {
 
     struct IRNode* node = cml_ir_get_tail(ir);
 
-    // Compute output shape: replace dim1,dim2 with diag_size
+    
     int rows = a->shape[dim1];
     int cols = a->shape[dim2];
     int diag_size;
@@ -2749,7 +2747,7 @@ Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2) {
     }
     if (diag_size < 0) diag_size = 0;
 
-    // Output has ndim-1 dimensions
+    
     int out_ndim = a->ndim - 1;
     int* out_shape = malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape) return NULL;
@@ -2758,7 +2756,7 @@ Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2) {
         if (d == dim1) {
             out_shape[oi++] = diag_size;
         } else if (d == dim2) {
-            continue; // skip
+            continue; 
         } else {
             out_shape[oi++] = a->shape[d];
         }
@@ -2838,13 +2836,13 @@ Tensor* uop_pad_replicate(Tensor* a, int* pad_widths, int num_dims) {
 
 Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask) {
     if (!q || !k || !v) return NULL;
-    // SDPA: softmax(Q*K^T / sqrt(d_k)) * V
-    // Q: [..., seq_len, d_k], K: [..., seq_len, d_k], V: [..., seq_len, d_v]
+    
+    
 
     int d_k = q->shape[q->ndim - 1];
     float scale = 1.0f / sqrtf((float)d_k);
 
-    // K^T: permute last two dims
+    
     PermuteParams perm_params = {0};
     int* perm = malloc((size_t)k->ndim * sizeof(int));
     if (!perm) return NULL;
@@ -2858,27 +2856,27 @@ Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor
     free(perm);
     if (!kt) return NULL;
 
-    // Q * K^T
+    
     Tensor* scores = uop_matmul(q, kt);
     if (!scores) return NULL;
 
-    // / sqrt(d_k)
+    
     Tensor* scale_t = uop_fill(scores->shape, scores->ndim, scale);
     if (!scale_t) return NULL;
     Tensor* scaled = uop_mul(scores, scale_t);
     if (!scaled) return NULL;
 
-    // Apply mask if provided
+    
     if (mask) {
         scaled = uop_masked_fill(scaled, mask, -1e9f);
         if (!scaled) return NULL;
     }
 
-    // softmax along last dim
+    
     Tensor* attn = uop_softmax(scaled, scaled->ndim - 1);
     if (!attn) return NULL;
 
-    // * V
+    
     return uop_matmul(attn, v);
 }
 
@@ -2898,9 +2896,9 @@ int uop_execute(UOp* uop) {
 }
 
 Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, void* params) {
-    // Note: params is used for WHERE, SUM, MEAN, MAX_REDUCE, CONV2D operations
-    // For other operations, params may be NULL or unused (intentional)
-    (void)params; // Suppress warning for operations that don't use params (intentional)
+    
+    
+    (void)params; 
 
     if (!inputs || num_inputs <= 0) {
         LOG_ERROR("Invalid inputs for uop");
@@ -3003,7 +3001,7 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
     case UOP_EXPAND:
     case UOP_STRIDE:
     case UOP_SLICE:
-        // Movement ops require params, handled by specific uop functions
+        
         LOG_ERROR("Movement ops (RESHAPE, PERMUTE, EXPAND, STRIDE, SLICE) must be called directly, "
                   "not via uop_create_and_execute");
         break;
@@ -3090,7 +3088,7 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
         }
         break;
     case UOP_FILL:
-        // UOP_FILL is a source node, handled separately
+        
         break;
     case UOP_GATHER:
         if (num_inputs >= 2 && params) {

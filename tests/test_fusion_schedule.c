@@ -40,7 +40,7 @@ static int kernel_count_for(Tensor* out) {
 }
 
 static int test_elementwise_chain_fused(void) {
-    /* sin(cos(tanh(x))) — three elementwise ops, should be 1 kernel */
+    
     int shape[] = {64};
     Tensor* x   = tensor_rand(shape, 1, &cpu_f32);
     Tensor* t   = uop_tanh(x);
@@ -50,8 +50,8 @@ static int test_elementwise_chain_fused(void) {
     int k = kernel_count_for(out);
     tensor_free(x); tensor_free(t); tensor_free(c); tensor_free(out);
 
-    if (k < 0) return 0;   /* scheduler error */
-    /* Should fuse into ≤ 2 kernels (ideally 1) */
+    if (k < 0) return 0;   
+    
     return (k <= 2);
 }
 
@@ -160,14 +160,11 @@ static int test_matmul_then_elementwise(void) {
 }
 
 static int test_fusion_ratio_positive(void) {
-    /*
-     * A long chain of elementwise ops should have fusion_ratio > 1.0,
-     * meaning the scheduler is doing useful work.
-     */
+    
     int shape[] = {128};
     Tensor* x = tensor_rand(shape, 1, &cpu_f32);
     Tensor* cur = x;
-    /* chain of 8 elementwise ops */
+    
     Tensor* chain[8];
     chain[0] = uop_sin(cur);
     chain[1] = uop_cos(chain[0]);
@@ -184,7 +181,7 @@ static int test_fusion_ratio_positive(void) {
         CMLScheduleOptions opts = cml_schedule_default_options();
         CMLSchedule* sched = cml_schedule_create(ctx, &opts);
         if (sched) {
-            /* fusion_ratio = total_ops / total_kernels; should be > 1 for a chain */
+            
             pass = (sched->fusion_ratio >= 1.0f);
             cml_schedule_free(sched);
         }
@@ -196,7 +193,7 @@ static int test_fusion_ratio_positive(void) {
 }
 
 static int test_can_fuse_elementwise(void) {
-    /* Two elementwise ops should be fuseable */
+    
     if (!cml_schedule_can_fuse(UOP_SIN, UOP_COS)) return 0;
     if (!cml_schedule_can_fuse(UOP_ADD, UOP_MUL)) return 0;
     if (!cml_schedule_can_fuse(UOP_EXP, UOP_NEG)) return 0;
@@ -204,12 +201,12 @@ static int test_can_fuse_elementwise(void) {
 }
 
 static int test_cannot_fuse_reduction(void) {
-    /* A reduction followed by a reduction should NOT be auto-fused */
-    /* The API says what can be fused into a single pass */
-    /* Two reductions are typically not fuseable in the same pass */
+    
+    
+    
     bool fuse = cml_schedule_can_fuse(UOP_SUM, UOP_SUM);
     (void)fuse;
-    /* This is implementation-defined; we just verify the API doesn't crash */
+    
     return 1;
 }
 
@@ -284,7 +281,7 @@ static int test_schedule_item_access(void) {
 int main(void) {
     printf("Kernel Fusion Schedule Tests\n");
 
-    /* Predicate API */
+    
     TEST(can_fuse_elementwise);
     TEST(cannot_fuse_reduction);
     TEST(is_elementwise_predicate);
@@ -293,7 +290,7 @@ int main(void) {
     TEST(default_options);
     TEST(null_graph_safe);
 
-    /* Kernel count assertions */
+    
     TEST(elementwise_chain_fused);
     TEST(single_reduction);
     TEST(two_independent_reductions);
@@ -304,7 +301,7 @@ int main(void) {
     TEST(matmul_then_elementwise);
     TEST(fusion_ratio_positive);
 
-    /* Item access */
+    
     TEST(schedule_item_access);
 
     printf("\nResults: %d/%d passed\n", tests_passed, tests_total);

@@ -22,11 +22,6 @@
 #  define sock_close   close
 #endif
 
-/* =========================================================================
- * Embedded HTML/JS graph viewer
- * ========================================================================= */
-
-/* Two-part template — JSON is inserted between them. */
 static const char VIZ_HTML_PRE[] =
 "<!DOCTYPE html>\n"
 "<html lang='en'><head><meta charset='UTF-8'/>\n"
@@ -116,10 +111,6 @@ static const char VIZ_HTML_POST[] =
 "});\n"
 "</script></body></html>\n";
 
-/* =========================================================================
- * JSON serialisation
- * ========================================================================= */
-
 static const char* dtype_name(DType d) {
     switch (d) {
         case DTYPE_FLOAT32:  return "float32";
@@ -156,7 +147,6 @@ static const char* op_class(UOpType op) {
 char* viz_graph_to_json(CMLGraph_t ir) {
     if (!ir) return NULL;
 
-    /* Collect nodes */
     int n = ir->node_count;
     struct IRNode** nodes = malloc((size_t)(n + 1) * sizeof(struct IRNode*));
     if (!nodes) return NULL;
@@ -231,10 +221,6 @@ int viz_export_html(CMLGraph_t ir, const char* path) {
     LOG_INFO("Exported IR graph to %s", path);
     return 0;
 }
-
-/* =========================================================================
- * HTTP server
- * ========================================================================= */
 
 struct VizServer {
     sock_t     listen_fd;

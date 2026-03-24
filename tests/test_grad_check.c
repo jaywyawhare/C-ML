@@ -46,7 +46,7 @@ static float numerical_grad(const float* base, int n, int shape[],
     tensor_ensure_executed(op);
     tensor_ensure_executed(om);
 
-    /* scalar loss = sum of outputs */
+    
     float sp = 0.0f, sm = 0.0f;
     float* dp = op->data;
     float* dm = om->data;
@@ -122,11 +122,11 @@ static int test_grad_exp(void) {
     return check_numerical_self_consistent(data, 5, wrap_exp, d_exp, "exp");
 }
 static int test_grad_log(void) {
-    float data[] = {0.1f, 0.5f, 1.0f, 2.0f, 5.0f}; /* must be positive */
+    float data[] = {0.1f, 0.5f, 1.0f, 2.0f, 5.0f}; 
     return check_numerical_self_consistent(data, 5, wrap_log, d_log, "log");
 }
 static int test_grad_sqrt(void) {
-    float data[] = {0.1f, 0.5f, 1.0f, 2.0f, 9.0f}; /* must be positive */
+    float data[] = {0.1f, 0.5f, 1.0f, 2.0f, 9.0f}; 
     return check_numerical_self_consistent(data, 5, wrap_sqrt, d_sqrt, "sqrt");
 }
 static int test_grad_tanh(void) {
@@ -134,7 +134,7 @@ static int test_grad_tanh(void) {
     return check_numerical_self_consistent(data, 5, wrap_tanh, d_tanh, "tanh");
 }
 static int test_grad_abs(void) {
-    /* skip zero — derivative undefined there */
+    
     float data[] = {-3.0f, -0.5f, 0.5f, 2.0f, 4.0f};
     return check_numerical_self_consistent(data, 5, wrap_abs, d_abs, "abs");
 }
@@ -151,12 +151,12 @@ static int test_grad_sigmoid(void) {
     return check_numerical_self_consistent(data, 5, wrap_sigmoid, d_sigmoid, "sigmoid");
 }
 static int test_grad_recip(void) {
-    float data[] = {0.5f, 1.0f, 2.0f, -1.0f, -3.0f}; /* avoid zero */
+    float data[] = {0.5f, 1.0f, 2.0f, -1.0f, -3.0f}; 
     return check_numerical_self_consistent(data, 5, wrap_recip, d_recip, "recip");
 }
 
 static int test_grad_add_commutative(void) {
-    /* sum(a+b) has grad 1.0 for each a_i */
+    
     float eps = 1e-3f;
     float a[] = {1.0f, 2.0f, 3.0f};
     float b[] = {4.0f, 5.0f, 6.0f};
@@ -230,11 +230,7 @@ static int test_grad_mul(void) {
 }
 
 static int test_grad_matmul(void) {
-    /*
-     * A (2x3), B (3x2) -> C (2x2), loss = sum(C).
-     * dL/dA[i,j] = sum_k(dL/dC[i,k] * B[j,k]^T) = sum_k B[j,k] = rowsum(B^T)[j]
-     * For uniform ones loss: dL/dA[i,j] = sum_k(1 * B[j,k]) = rowsum(B)[j].
-     */
+    
     float a_data[] = {1,2,3, 4,5,6};
     float b_data[] = {1,2, 3,4, 5,6};
     int sa[] = {2, 3};
@@ -244,9 +240,9 @@ static int test_grad_matmul(void) {
     Tensor* B = tensor_from_data(b_data, sb, 2, &cpu_f32);
     Tensor* C = uop_matmul(A, B);
     tensor_ensure_executed(C);
-    /* Just verify output shape and no crash */
+    
     if (C->shape[0] != 2 || C->shape[1] != 2) return 0;
-    /* C[0,0] = 1*1+2*3+3*5=22, C[0,1]=1*2+2*4+3*6=28 */
+    
     float* d = C->data;
     if (fabsf(d[0] - 22.0f) > 1e-3f) return 0;
     if (fabsf(d[1] - 28.0f) > 1e-3f) return 0;

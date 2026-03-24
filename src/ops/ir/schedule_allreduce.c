@@ -6,38 +6,28 @@
 #include <stdio.h>
 #include <math.h>
 
-/* =========================================================================
- * Algorithm selection heuristic
- * ========================================================================= */
-
 static AllReduceAlgo choose_algo(size_t bytes, int ndevices) {
-    /* Ring is bandwidth-optimal for large messages (>= 1 MB). */
+    
     if (bytes >= 1024 * 1024) return AR_ALGO_RING;
-    /* Tree is latency-optimal for small messages. */
+    
     if (ndevices >= 4) return AR_ALGO_TREE;
     return AR_ALGO_RING;
 }
-
-/* =========================================================================
- * Ring AllReduce step generation
- * ========================================================================= */
 
 static int build_ring_steps(ScheduleAllReduce* ar) {
     int n = ar->num_devices;
     size_t buf_bytes = ar->buffer_bytes;
 
-    /* Divide buffer into n chunks. */
     int chunks = n;
     size_t chunk_bytes = (buf_bytes + (size_t)(chunks - 1)) / (size_t)chunks;
     ar->chunk_count = chunks;
 
-    /* Ring has 2*(n-1) steps: (n-1) reduce-scatter + (n-1) allgather. */
+    
     int num_steps = 2 * (n - 1);
     ar->steps = calloc((size_t)num_steps, sizeof(AllReduceStep));
     if (!ar->steps) return -1;
 
     int s = 0;
-    /* Reduce-scatter phase: n-1 rounds */
     for (int r = 0; r < n - 1; ++r) {
         for (int rank = 0; rank < n; ++rank) {
             int chunk_idx = ((rank - r - 1 + n) % n);
@@ -53,7 +43,6 @@ static int build_ring_steps(ScheduleAllReduce* ar) {
         }
         if (s >= num_steps) break;
     }
-    /* Allgather phase: n-1 rounds */
     for (int r = 0; r < n - 1 && s < num_steps; ++r) {
         for (int rank = 0; rank < n && s < num_steps; ++rank) {
             int chunk_idx = ((rank - r + n) % n);
@@ -71,13 +60,8 @@ static int build_ring_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
-/* =========================================================================
- * Flat AllReduce step generation (reduce to rank 0, broadcast back)
- * ========================================================================= */
-
 static int build_flat_steps(ScheduleAllReduce* ar) {
     int n = ar->num_devices;
-    /* n-1 reduce steps + n-1 broadcast steps */
     int ns = 2 * (n - 1);
     ar->steps = calloc((size_t)ns, sizeof(AllReduceStep));
     if (!ar->steps) return -1;
@@ -103,12 +87,8 @@ static int build_flat_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
-/* =========================================================================
- * Recursive-halving (only works cleanly for power-of-2 device count)
- * ========================================================================= */
-
 static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
-    /* Fall back to ring if not a power of 2. */
+    
     int n = ar->num_devices;
     if (n <= 0 || (n & (n - 1)) != 0)
         return build_ring_steps(ar);
@@ -122,7 +102,6 @@ static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
     if (!ar->steps) return -1;
 
     int s = 0;
-    /* Reduce-scatter rounds */
     for (int r = 0; r < rounds && s < ns; ++r) {
         int stride = n >> (r + 1);
         size_t chunk = ar->buffer_bytes >> (r + 1);
@@ -137,7 +116,6 @@ static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
             }
         }
     }
-    /* Allgather rounds (reverse) */
     for (int r = rounds - 1; r >= 0 && s < ns; --r) {
         int stride = n >> (r + 1);
         size_t chunk = ar->buffer_bytes >> (r + 1);
@@ -157,10 +135,6 @@ static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
-/* =========================================================================
- * Construction
- * ========================================================================= */
-
 ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
                                              AllReduceOp op,
                                              AllReduceAlgo algo,
@@ -172,7 +146,7 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
     if (!ar) return NULL;
 
     ar->input       = t;
-    ar->output      = t;  /* in-place by default */
+    ar->output      = t;  
     ar->op          = op;
     ar->num_devices = num_devices;
     ar->buffer_bytes = t->numel * cml_dtype_size(t->dtype);
@@ -190,7 +164,7 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
         case AR_ALGO_RING:              rc = build_ring_steps(ar);               break;
         case AR_ALGO_FLAT:              rc = build_flat_steps(ar);               break;
         case AR_ALGO_RECURSIVE_HALVING: rc = build_recursive_halving_steps(ar);  break;
-        case AR_ALGO_TREE:              rc = build_ring_steps(ar); break; /* fallback */
+        case AR_ALGO_TREE:              rc = build_ring_steps(ar); break; 
         default:                         rc = build_ring_steps(ar); break;
     }
     if (rc != 0) { schedule_allreduce_free(ar); return NULL; }
@@ -205,15 +179,10 @@ void schedule_allreduce_free(ScheduleAllReduce* ar) {
     free(ar);
 }
 
-/* =========================================================================
- * Execution
- * ========================================================================= */
-
 int schedule_allreduce_run(ScheduleAllReduce* ar) {
     if (!ar || !ar->input || !ar->input->data) return -1;
     size_t elem_size = cml_dtype_size(ar->input->dtype);
 
-    /* Execute each communication step. */
     for (int s = 0; s < ar->num_steps; ++s) {
         AllReduceStep* step = &ar->steps[s];
         if (step->src_rank < 0 || step->src_rank >= ar->num_devices) continue;
@@ -223,7 +192,7 @@ int schedule_allreduce_run(ScheduleAllReduce* ar) {
         int dst_dev = ar->device_ids[step->dst_rank];
 
         char* src_ptr = (char*)ar->input->data + step->chunk_offset;
-        char* dst_ptr = src_ptr;  /* in-place */
+        char* dst_ptr = src_ptr;  
 
         if (src_dev != dst_dev) {
             int rc = device_copy(dst_ptr, src_ptr, step->chunk_bytes,
@@ -231,9 +200,7 @@ int schedule_allreduce_run(ScheduleAllReduce* ar) {
             if (rc != 0) return rc;
         }
 
-        /* Reduce step: accumulate src into dst (only for reduce-scatter phase). */
         if (step->is_reduce && ar->op == AR_OP_SUM) {
-            /* CPU scalar reduction as fallback. */
             float* fa = (float*)dst_ptr;
             float* fb = (float*)src_ptr;
             size_t n = step->chunk_bytes / elem_size;
@@ -245,17 +212,10 @@ int schedule_allreduce_run(ScheduleAllReduce* ar) {
 
 int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar) {
     if (!sched || !ar) return -1;
-    /* Injection: find the position after the last producer of ar->input
-     * and insert an allreduce barrier.  For now we append at end. */
-    /* This is a placeholder — a full implementation would topologically
-     * insert the allreduce at the correct graph position. */
+    
     (void)sched; (void)ar;
     return 0;
 }
-
-/* =========================================================================
- * Inspection
- * ========================================================================= */
 
 size_t schedule_allreduce_comm_bytes(const ScheduleAllReduce* ar) {
     if (!ar) return 0;
@@ -270,7 +230,7 @@ double schedule_allreduce_latency_us(const ScheduleAllReduce* ar,
                                       double latency_us) {
     if (!ar || bandwidth_gbps <= 0) return 0.0;
     double comm = (double)schedule_allreduce_comm_bytes(ar);
-    double bw_bytes_us = bandwidth_gbps * 1e9 / 1e6;  /* bytes per microsecond */
+    double bw_bytes_us = bandwidth_gbps * 1e9 / 1e6;  
     return latency_us * ar->num_steps + comm / bw_bytes_us;
 }
 

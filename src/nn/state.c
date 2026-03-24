@@ -5,10 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* =========================================================================
- * StateDict lifecycle
- * ========================================================================= */
-
 #define SD_INIT_CAP 32
 
 StateDict* nn_state_dict_create(void) {
@@ -25,21 +21,19 @@ void nn_state_dict_free(StateDict* sd) {
     if (!sd) return;
     for (int i = 0; i < sd->count; ++i)
         free(sd->entries[i].key);
-    /* Tensors are borrowed — we do not free them. */
+    
     free(sd->entries);
     free(sd);
 }
 
 int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value) {
     if (!sd || !key) return -1;
-    /* Update existing entry. */
     for (int i = 0; i < sd->count; ++i) {
         if (strcmp(sd->entries[i].key, key) == 0) {
             sd->entries[i].value = value;
             return 0;
         }
     }
-    /* Grow if needed. */
     if (sd->count >= sd->capacity) {
         int new_cap = sd->capacity * 2;
         StateDictEntry* tmp = realloc(sd->entries,
@@ -76,10 +70,6 @@ int nn_state_dict_remove(StateDict* sd, const char* key) {
     return 0;
 }
 
-/* =========================================================================
- * Building from a Module
- * ========================================================================= */
-
 static int collect_params(const Module* module, StateDict* sd, const char* prefix) {
     if (!module || !sd) return -1;
     char key[256];
@@ -94,7 +84,6 @@ static int collect_params(const Module* module, StateDict* sd, const char* prefi
                      p->name ? p->name : "param");
         if (nn_state_dict_set(sd, key, p->tensor) != 0) return -1;
     }
-    /* Recurse into chained submodules (Sequential, etc.). */
     Module* sub = module->next;
     int idx = 0;
     while (sub) {
@@ -124,12 +113,10 @@ StateDict* nn_get_state_dict(const Module* module, const char* prefix) {
 
 int nn_load_state_dict(Module* module, const StateDict* sd, bool strict) {
     if (!module || !sd) return -1;
-    /* Build the module's state dict so we can check which keys exist. */
     StateDict* mod_sd = nn_get_state_dict(module, NULL);
     if (!mod_sd) return -1;
 
     int rc = 0;
-    /* Apply each entry in sd to the module. */
     for (int i = 0; i < sd->count; ++i) {
         const char* key   = sd->entries[i].key;
         Tensor* src       = sd->entries[i].value;
@@ -141,7 +128,6 @@ int nn_load_state_dict(Module* module, const StateDict* sd, bool strict) {
             }
             continue;
         }
-        /* Copy data from src into dst (in-place update of existing tensor). */
         if (src->numel != dst->numel) {
             LOG_ERROR("nn_load_state_dict: size mismatch for key '%s': "
                           "source %zu != dest %zu", key, src->numel, dst->numel);
@@ -157,10 +143,6 @@ int nn_load_state_dict(Module* module, const StateDict* sd, bool strict) {
     nn_state_dict_free(mod_sd);
     return rc;
 }
-
-/* =========================================================================
- * Serialisation
- * ========================================================================= */
 
 int nn_save(const StateDict* sd, const char* path) {
     if (!sd || !path) return -1;
@@ -195,10 +177,6 @@ StateDict* nn_load(const char* path) {
     safetensors_close(ctx);
     return sd;
 }
-
-/* =========================================================================
- * Utilities
- * ========================================================================= */
 
 size_t nn_state_dict_num_params(const StateDict* sd) {
     if (!sd) return 0;

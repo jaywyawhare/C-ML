@@ -92,9 +92,9 @@ static int test_floor_ceil_bounds(void) {
     float* f = fl->data;
     float* c = cl->data;
     for (int i = 0; i < n; i++) {
-        if (f[i] > data[i] + 1e-6f) return 0;  /* floor <= x */
-        if (c[i] < data[i] - 1e-6f) return 0;  /* ceil  >= x */
-        if (c[i] - f[i] > 1.0f + 1e-5f) return 0; /* diff <= 1 */
+        if (f[i] > data[i] + 1e-6f) return 0;  
+        if (c[i] < data[i] - 1e-6f) return 0;  
+        if (c[i] - f[i] > 1.0f + 1e-5f) return 0; 
     }
     tensor_free(x); tensor_free(fl); tensor_free(cl);
     return 1;
@@ -184,25 +184,25 @@ static int test_rsqrt(void) {
 
 static int test_erf_bounds(void) {
     float in[]  = {-3.0f, 0.0f, 3.0f};
-    float exp[] = {-1.0f, 0.0f, 1.0f};  /* erf(±3) ≈ ±0.99998 */
+    float exp[] = {-1.0f, 0.0f, 1.0f};  
     int n = 3;
     int shape[] = {n};
     Tensor* x   = tensor_from_data(in, shape, 1, &cpu_f32);
     Tensor* out = uop_erf(x);
     tensor_ensure_executed(out);
     float* d = out->data;
-    /* erf(0) == 0 exactly */
+    
     if (!APPROX(d[1], 0.0f)) return 0;
-    /* erf(3) > 0.999 */
+    
     if (d[2] < 0.999f) return 0;
-    /* erf(-3) < -0.999 */
+    
     if (d[0] > -0.999f) return 0;
     tensor_free(x); tensor_free(out);
     return 1;
 }
 
 static int test_asin_acos_identity(void) {
-    /* sin(asin(x)) == x for x in [-1, 1] */
+    
     float data[] = {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
     int shape[] = {n};
@@ -218,7 +218,7 @@ static int test_asin_acos_identity(void) {
 }
 
 static int test_atan_range(void) {
-    /* atan(x) in (-pi/2, pi/2) */
+    
     float data[] = {-1000.0f, -1.0f, 0.0f, 1.0f, 1000.0f};
     int n = (int)(sizeof(data)/sizeof(data[0]));
     int shape[] = {n};
@@ -231,7 +231,7 @@ static int test_atan_range(void) {
         if (d[i] <= -half_pi - 1e-4f) return 0;
         if (d[i] >=  half_pi + 1e-4f) return 0;
     }
-    /* atan(0) == 0 */
+    
     if (!APPROX(d[2], 0.0f)) return 0;
     tensor_free(x); tensor_free(out);
     return 1;
@@ -246,7 +246,7 @@ static int test_sinh_cosh_identity(void) {
     Tensor* ch  = uop_cosh(x);
     Tensor* sh2 = uop_mul(sh, sh);
     Tensor* ch2 = uop_mul(ch, ch);
-    Tensor* r   = uop_sub(ch2, sh2);  /* should be 1 */
+    Tensor* r   = uop_sub(ch2, sh2);  
     tensor_ensure_executed(r);
     float* d = r->data;
     for (int i = 0; i < n; i++)
@@ -276,7 +276,7 @@ static int test_log10_identity(void) {
     int n = (int)(sizeof(data)/sizeof(data[0]));
     int shape[] = {n};
     Tensor* x    = tensor_from_data(data, shape, 1, &cpu_f32);
-    /* 10^x = exp(x * ln10) */
+    
     float ln10 = 2.302585f;
     float scaled[5];
     for (int i = 0; i < n; i++) scaled[i] = data[i] * ln10;
@@ -310,16 +310,16 @@ static int test_isinf_isnan_isfinite(void) {
     float* fn = is_nan->data;
     float* ff = is_finite->data;
 
-    /* 1.0f: finite, not inf, not nan */
+    
     if (fi[0] != 0.0f) return 0;
     if (fn[0] != 0.0f) return 0;
     if (ff[0] != 1.0f) return 0;
 
-    /* +inf: is_inf, not nan, not finite */
+    
     if (fi[1] != 1.0f) return 0;
     if (ff[1] != 0.0f) return 0;
 
-    /* nan: is_nan, not inf, not finite */
+    
     if (fn[3] != 1.0f) return 0;
     if (ff[3] != 0.0f) return 0;
 
@@ -386,7 +386,7 @@ static int test_comparison_ops(void) {
     float* dle = le->data; float* dgt = gt->data;
     float* dge = ge->data;
 
-    /* a==b: [1,0,0,0] */
+    
     float eeq[] = {1,0,0,0}, ene[] = {0,1,1,1};
     float ele[] = {1,0,1,0}, egt[] = {0,1,0,1}, ege[] = {1,1,0,1};
     for (int i = 0; i < n; i++) {
@@ -422,7 +422,7 @@ static int test_minimum(void) {
 static int test_mod(void) {
     float a[]  = {7.0f, -7.0f,  7.0f, -7.0f};
     float b[]  = {3.0f,  3.0f, -3.0f, -3.0f};
-    /* fmodf semantics: sign follows dividend */
+    
     float exp[]= {1.0f, -1.0f,  1.0f, -1.0f};
     int n = 4;
     int shape[] = {n};
@@ -447,9 +447,9 @@ static int test_logaddexp(void) {
     Tensor* out = uop_logaddexp(ta, tb);
     tensor_ensure_executed(out);
     float* d = out->data;
-    /* logaddexp(0,0) = log(2) */
+    
     if (!APPROX(d[0], logf(2.0f))) return 0;
-    /* logaddexp(1,2) = log(e + e²) */
+    
     if (!APPROX_REL(d[1], logf(expf(1.0f) + expf(2.0f)))) return 0;
     tensor_free(ta); tensor_free(tb); tensor_free(out);
     return 1;
@@ -475,7 +475,7 @@ static int test_copysign(void) {
 static int test_idiv(void) {
     float a[]  = {7.0f, -7.0f,  7.0f, -7.0f};
     float b[]  = {3.0f,  3.0f, -3.0f, -3.0f};
-    float exp[]= {2.0f, -3.0f, -3.0f,  2.0f}; /* floor division */
+    float exp[]= {2.0f, -3.0f, -3.0f,  2.0f}; 
     int n = 4;
     int shape[] = {n};
     Tensor* ta  = tensor_from_data(a, shape, 1, &cpu_f32);

@@ -18,7 +18,7 @@ static uint64_t rng_next(void) {
     return rng_state;
 }
 
-static int rng_int(int lo, int hi) { /* [lo, hi) */
+static int rng_int(int lo, int hi) { 
     return lo + (int)(rng_next() % (unsigned)(hi - lo));
 }
 
@@ -62,7 +62,7 @@ static int make_shape(int* shape, int* ndim_out, int max_numel) {
     int numel = 1;
     for (int i = 0; i < ndim; i++) {
         int dim = rng_int(1, (int)cbrtf((float)max_numel) + 2);
-        /* clamp to not exceed budget */
+        
         while (numel * dim > max_numel && dim > 1) dim--;
         shape[i] = dim;
         numel *= dim;
@@ -125,7 +125,7 @@ static int fuzz_unary_op_no_crash(UnaryOp op, const char* name,
         } else {
             if (tensor_ensure_executed(out) != 0) failures++;
             else if (has_nan_inf(out)) {
-                /* NaN/Inf from legitimate inputs is a bug */
+                
                 fprintf(stderr, "    [%s] NaN/Inf in output\n", name);
                 failures++;
             }
@@ -249,7 +249,7 @@ static int fuzz_reduce_shape(void) {
         Tensor* s = uop_sum(x, &rp);
         if (!s) { tensor_free(x); failures++; continue; }
 
-        /* Output shape should drop the reduced dim */
+        
         int expected_ndim = ndim - 1;
         if (expected_ndim < 1) expected_ndim = 1;
         if (s->ndim != expected_ndim && ndim > 1) {
@@ -283,13 +283,13 @@ static int fuzz_mean_shape(void) {
 static int fuzz_reshape_numel(void) {
     int failures = 0;
     for (int trial = 0; trial < 50; trial++) {
-        /* Start with a known shape, reshape to a different valid shape */
+        
         int n = rng_int(2, 64);
         int shape1[] = {n};
         Tensor* x = make_signed_tensor(shape1, 1, 2.0f);
         if (!x) { failures++; continue; }
 
-        /* Find factors of n */
+        
         int a = 1;
         for (int f = 2; f <= n; f++) {
             if (n % f == 0) { a = f; break; }
@@ -311,7 +311,7 @@ static int fuzz_reshape_numel(void) {
 }
 
 static int fuzz_random_op_chain(void) {
-    /* Apply a random sequence of unary ops to a tensor; check no crash */
+    
     int failures = 0;
     UnaryOp ops[] = {uop_sin, uop_cos, uop_tanh, uop_sigmoid, uop_abs,
                      uop_neg, uop_floor, uop_ceil, uop_round, uop_square};
@@ -378,10 +378,10 @@ static int fuzz_matmul_shapes(void) {
 }
 
 static int fuzz_empty_tensor_safety(void) {
-    /* 0-element tensors: should not crash */
+    
     int shape[] = {0};
     Tensor* x = tensor_empty(shape, 1, &cpu_f32);
-    if (!x) return 1; /* not supported -> skip, not a failure */
+    if (!x) return 1; 
     Tensor* out = uop_neg(x);
     if (out) tensor_free(out);
     tensor_free(x);
@@ -393,7 +393,7 @@ static int fuzz_where(void) {
     for (int trial = 0; trial < 20; trial++) {
         int n = rng_int(2, 64);
         int shape[] = {n};
-        /* condition: binary (0 or 1) */
+        
         float* cd = malloc(n * sizeof(float));
         for (int i = 0; i < n; i++) cd[i] = (float)(rng_int(0, 2));
         Tensor* cond = tensor_from_data(cd, shape, 1, &cpu_f32);
@@ -413,7 +413,7 @@ static int fuzz_where(void) {
             failures++;
         } else {
             tensor_ensure_executed(out);
-            /* Every output element should be exactly a[i] or b[i] */
+            
             float* dc = cond->data; float* da = a->data;
             float* db = b->data;   float* do_ = out->data;
             if (tensor_ensure_executed(cond) == 0 &&
@@ -449,7 +449,7 @@ static int fuzz_fill_value(void) {
 }
 
 static int fuzz_dtype_stress(void) {
-    /* Create tensors of different dtypes and verify no crash on basic ops */
+    
     DType dtypes[] = {DTYPE_FLOAT32, DTYPE_INT32};
     int failures = 0;
 

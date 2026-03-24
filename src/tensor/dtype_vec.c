@@ -15,9 +15,9 @@ VecDType dtype_vec(DType d, int n) {
 
 bool dtype_vec_valid(VecDType vt) {
     if (!is_valid_width(vt.n)) return false;
-    /* Float8 types only support scalar or width-2. */
+    
     if (vt.scalar >= DTYPE_FLOAT8_E4M3 && vt.n > 2) return false;
-    /* BOOL only makes sense as scalar. */
+    
     if (vt.scalar == DTYPE_BOOL && vt.n > 1) return false;
     return true;
 }
@@ -28,13 +28,12 @@ size_t dtype_vec_size(VecDType vt) {
 
 size_t dtype_vec_alignment(VecDType vt) {
     size_t sz = dtype_vec_size(vt);
-    /* Alignment = min(16, next power of two of sz). */
+    
     size_t align = 1;
     while (align < sz && align < 16) align <<= 1;
     return align;
 }
 
-/* Table: DType -> base C type name */
 static const char* dtype_c_base(DType d) {
     switch (d) {
         case DTYPE_FLOAT32:       return "float";
@@ -62,55 +61,55 @@ const char* dtype_vec_c_name(VecDType vt) {
     if (!dtype_vec_valid(vt)) return "";
     if (vt.n == 1) return dtype_c_base(vt.scalar);
 
-    /* Use a static table for the common cases. */
+    
     static const struct { DType d; int n; const char* name; } table[] = {
-        /* float */
+        
         { DTYPE_FLOAT32, 2,  "float2"  },
         { DTYPE_FLOAT32, 4,  "float4"  },
         { DTYPE_FLOAT32, 8,  "float8"  },
         { DTYPE_FLOAT32, 16, "float16" },
-        /* half */
+        
         { DTYPE_FLOAT16, 2,  "half2"   },
         { DTYPE_FLOAT16, 4,  "half4"   },
         { DTYPE_FLOAT16, 8,  "half8"   },
         { DTYPE_FLOAT16, 16, "half16"  },
-        /* bfloat16 */
+        
         { DTYPE_BFLOAT16, 2, "__bf16x2"  },
         { DTYPE_BFLOAT16, 4, "__bf16x4"  },
-        /* int32 */
+        
         { DTYPE_INT32, 2,  "int2"   },
         { DTYPE_INT32, 4,  "int4"   },
         { DTYPE_INT32, 8,  "int8"   },
         { DTYPE_INT32, 16, "int16"  },
-        /* uint32 */
+        
         { DTYPE_UINT32, 2, "uint2"  },
         { DTYPE_UINT32, 4, "uint4"  },
         { DTYPE_UINT32, 8, "uint8"  },
-        /* int8 */
+        
         { DTYPE_INT8, 2,  "char2"  },
         { DTYPE_INT8, 4,  "char4"  },
         { DTYPE_INT8, 8,  "char8"  },
         { DTYPE_INT8, 16, "char16" },
-        /* uint8 */
+        
         { DTYPE_UINT8, 2,  "uchar2"  },
         { DTYPE_UINT8, 4,  "uchar4"  },
         { DTYPE_UINT8, 8,  "uchar8"  },
         { DTYPE_UINT8, 16, "uchar16" },
-        /* int16 */
+        
         { DTYPE_INT16, 2,  "short2"  },
         { DTYPE_INT16, 4,  "short4"  },
         { DTYPE_INT16, 8,  "short8"  },
-        /* uint16 */
+        
         { DTYPE_UINT16, 2, "ushort2" },
         { DTYPE_UINT16, 4, "ushort4" },
         { DTYPE_UINT16, 8, "ushort8" },
-        /* int64 */
+        
         { DTYPE_INT64, 2, "long2"   },
         { DTYPE_INT64, 4, "long4"   },
-        /* double */
+        
         { DTYPE_FLOAT64, 2, "double2" },
         { DTYPE_FLOAT64, 4, "double4" },
-        /* float8 */
+        
         { DTYPE_FLOAT8_E4M3, 2, "__fp8_e4m3x2" },
         { DTYPE_FLOAT8_E5M2, 2, "__fp8_e5m2x2" },
     };
@@ -162,7 +161,7 @@ int dtype_vec_lane(VecDType vt, int lane, const char* vec_name,
                    char* buf, size_t buf_size) {
     if (!buf || buf_size == 0 || !vec_name) return -1;
     if (lane < 0 || lane >= vt.n) return -1;
-    /* OpenCL / CUDA style: .x .y .z .w for n<=4, .s0-.sf for n>4 */
+    
     if (vt.n <= 4) {
         const char* lanes[] = {"x", "y", "z", "w"};
         return snprintf(buf, buf_size, "%s.%s", vec_name, lanes[lane]) < 0 ? -1 : 0;

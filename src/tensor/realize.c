@@ -3,10 +3,6 @@
 #include "core/logging.h"
 #include <stdlib.h>
 
-/* =========================================================================
- * realize
- * ========================================================================= */
-
 bool tensor_is_realized(const Tensor* t) {
     return t != NULL && t->data != NULL;
 }
@@ -14,7 +10,7 @@ bool tensor_is_realized(const Tensor* t) {
 int tensor_realize(Tensor* t) {
     if (!t) return -1;
     if (tensor_is_realized(t)) return 0;
-    /* Delegate to the existing lazy-execution path. */
+    
     return tensor_ensure_executed(t);
 }
 
@@ -45,19 +41,10 @@ int tensor_realize_with_grads(Tensor* t) {
     return rc;
 }
 
-/*
- * tensor_schedule: enqueue kernels for async execution.
- * We execute synchronously here; a true async path would require
- * backend-specific command-queue support.
- */
 int tensor_schedule(Tensor* t) {
     return tensor_realize(t);
 }
 
-/*
- * tensor_sync: wait for previously scheduled operations.
- * With the current synchronous execution model this is a no-op.
- */
 int tensor_sync(Tensor* t) {
     (void)t;
     return 0;

@@ -6,10 +6,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-/* =========================================================================
- * Helpers
- * ========================================================================= */
-
 CMLValidateOpts cml_validate_default_opts(void) {
     CMLValidateOpts o;
     o.check_shapes = true;
@@ -34,7 +30,6 @@ static void push_diag(CMLValidateDiag* diags, int max_diags, int* count,
     va_end(ap);
 }
 
-/* Collect linked-list nodes into flat array.  Caller frees array. */
 static struct IRNode** collect_nodes(CMLGraph_t ir, int* out_count) {
     *out_count = 0;
     if (!ir || ir->node_count == 0) return NULL;
@@ -50,15 +45,12 @@ static struct IRNode** collect_nodes(CMLGraph_t ir, int* out_count) {
     return arr;
 }
 
-/* Expected input counts per op (returns -1 = variadic) */
 static int expected_inputs(UOpType t) {
     switch (t) {
-        /* binary */
         case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV:
         case UOP_MAX: case UOP_CMPLT: case UOP_POW: case UOP_MATMUL:
         case UOP_CONV2D: case UOP_WHERE:
             return 2;
-        /* unary */
         case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
         case UOP_RECIP: case UOP_ABS: case UOP_SIN: case UOP_COS:
         case UOP_TAN: case UOP_TANH: case UOP_SIGMOID:
@@ -66,19 +58,16 @@ static int expected_inputs(UOpType t) {
         case UOP_LOG2: case UOP_EXP2: case UOP_ASIN: case UOP_ACOS:
         case UOP_ATAN: case UOP_SQUARE: case UOP_RSQRT: case UOP_ERF:
             return 1;
-        /* reductions */
         case UOP_SUM: case UOP_MEAN: case UOP_MAX_REDUCE:
         case UOP_PROD: case UOP_ARGMAX: case UOP_ARGMIN: case UOP_CUMSUM:
             return 1;
-        /* movement */
         case UOP_RESHAPE: case UOP_PERMUTE: case UOP_EXPAND:
         case UOP_STRIDE: case UOP_SLICE:
             return 1;
-        /* fill / clamp */
         case UOP_FILL:  return 0;
         case UOP_CLAMP: return 1;
         case UOP_GATHER: return 2;
-        default: return -1; /* variadic / unknown */
+        default: return -1;
     }
 }
 
@@ -86,7 +75,6 @@ static bool is_binary(UOpType t) {
     return expected_inputs(t) == 2;
 }
 
-/* DFS cycle detection: color 0=white, 1=gray, 2=black */
 static bool dfs_has_cycle(struct IRNode** arr, int n, uint8_t* color, int idx,
                           CMLValidateDiag* diags, int max_diags, int* ndiags) {
     if (color[idx] == 2) return false;
@@ -112,10 +100,6 @@ static bool dfs_has_cycle(struct IRNode** arr, int n, uint8_t* color, int idx,
     color[idx] = 2;
     return false;
 }
-
-/* =========================================================================
- * Main validation
- * ========================================================================= */
 
 CMLValidateCode cml_validate_graph(CMLGraph_t ir,
                                    const CMLValidateOpts* opts,
@@ -147,7 +131,6 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
         goto done;
     }
 
-    /* Null node check */
     for (int i = 0; i < num_nodes; ++i) {
         if (!nodes[i]) {
             RECORD(CML_VALID_NULL_NODE, i, "Node slot %d is NULL", i);
@@ -155,7 +138,6 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
     }
     if (first != CML_VALID_OK) { free(nodes); goto done; }
 
-    /* Input slot checks */
     for (int i = 0; i < num_nodes; ++i) {
         struct IRNode* n = nodes[i];
         int exp = expected_inputs(n->type);
@@ -175,7 +157,6 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
         }
     }
 
-    /* Cycle check */
     if (opts->check_cycles) {
         uint8_t* color = calloc((size_t)num_nodes, 1);
         if (color) {
@@ -187,7 +168,6 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
         }
     }
 
-    /* Dtype mismatch on binary ops */
     if (opts->check_dtypes) {
         for (int i = 0; i < num_nodes; ++i) {
             struct IRNode* n = nodes[i];
@@ -203,7 +183,6 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
         }
     }
 
-    /* Shape: output must be allocated if node is executed */
     if (opts->check_shapes) {
         for (int i = 0; i < num_nodes; ++i) {
             struct IRNode* n = nodes[i];

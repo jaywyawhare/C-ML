@@ -10,7 +10,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-/* InfiniBand verbs constants */
 #define IBV_QPT_RC          2
 #define IBV_QPS_INIT        1
 #define IBV_QPS_RTR         2
@@ -22,7 +21,6 @@
 #define IBV_ACCESS_REMOTE_READ  (1 << 2)
 #define IBV_WC_SUCCESS      0
 
-/* Opaque IB structures - we only use pointers */
 typedef struct ibv_device      ibv_device;
 typedef struct ibv_context     ibv_context;
 typedef struct ibv_pd          ibv_pd;
@@ -114,7 +112,6 @@ typedef struct ibv_qp_attr {
     uint8_t alt_timeout;
 } ibv_qp_attr;
 
-/* Function pointer types */
 typedef ibv_device** (*fn_ibv_get_device_list_t)(int* num_devices);
 typedef void         (*fn_ibv_free_device_list_t)(ibv_device** list);
 typedef ibv_context* (*fn_ibv_open_device_t)(ibv_device* device);
@@ -326,7 +323,6 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
     return ib;
 }
 
-/* QP info exchanged via TCP out-of-band */
 typedef struct {
     uint32_t qp_num;
     uint16_t lid;
@@ -341,7 +337,7 @@ static int transition_qp_init(CMLIBTransport* ib, int peer) {
     attr._port_num = 1;
     attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ;
 
-    int mask = (1 << 0) | (1 << 16) | (1 << 17) | (1 << 20); /* QP_STATE | PKEY_INDEX | PORT | ACCESS_FLAGS */
+    int mask = (1 << 0) | (1 << 16) | (1 << 17) | (1 << 20); 
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
 }
 
@@ -349,7 +345,7 @@ static int transition_qp_rtr(CMLIBTransport* ib, int peer, qp_info_t* remote) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
     attr.qp_state = IBV_QPS_RTR;
-    attr.path_mtu = 3; /* IBV_MTU_1024 */
+    attr.path_mtu = 3; 
     attr.dest_qp_num = remote->qp_num;
     attr.rq_psn = remote->psn;
     attr.max_dest_rd_atomic = 4;
@@ -552,8 +548,7 @@ int cml_ib_send(CMLIBTransport* ib, int peer, const void* buf, size_t size) {
         return -1;
     }
 
-    /* Extract lkey from ibv_mr - it's at a known offset (typically after addr+length+handle).
-     * We store 0 as placeholder; real code reads mr->lkey. */
+    
     ibv_sge sge = {
         .addr = (uint64_t)(uintptr_t)buf,
         .length = (uint32_t)size,
@@ -637,7 +632,7 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
 
     float* data = (float*)buf;
 
-    /* Phase 1: reduce-scatter */
+    
     for (int step = 0; step < ws - 1; step++) {
         int send_chunk = (rank - step + ws) % ws;
         int recv_chunk = (rank - step - 1 + ws) % ws;
@@ -659,7 +654,7 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
             data[recv_off + i] += recv_buf[i];
     }
 
-    /* Phase 2: allgather */
+    
     for (int step = 0; step < ws - 1; step++) {
         int send_chunk = (rank - step + 1 + ws) % ws;
         int recv_chunk = (rank - step + ws) % ws;

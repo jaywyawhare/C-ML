@@ -4,10 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* =========================================================================
- * IndexMap
- * ========================================================================= */
-
 IndexMap* index_map_create(SymExpr* flat_index, SymExpr* valid, int num_vars) {
     if (!flat_index) return NULL;
     IndexMap* im = calloc(1, sizeof(IndexMap));
@@ -33,10 +29,6 @@ IndexMap* index_map_copy(const IndexMap* im) {
     if (!im) return NULL;
     return index_map_create(im->flat_index, im->valid, im->num_vars);
 }
-
-/* =========================================================================
- * LoopVar
- * ========================================================================= */
 
 LoopVar* loop_vars_create(const int* shape, int n) {
     if (!shape || n <= 0) return NULL;
@@ -64,18 +56,10 @@ void loop_vars_free(LoopVar* vars, int n) {
     free(vars);
 }
 
-/* =========================================================================
- * Index map construction from ShapeTracker
- * ========================================================================= */
-
-/*
- * Build flat index expression for a single STView given loop variables.
- *   index = offset + sum_i(loop_vars[i].expr * strides[i])
- */
 static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars) {
     SymExpr* acc = sym_const((int64_t)v->offset);
     for (int i = 0; i < v->ndim && i < nvars; ++i) {
-        if (v->strides[i] == 0) continue;  /* broadcast dim */
+        if (v->strides[i] == 0) continue;
         SymExpr* stride = sym_const(v->strides[i]);
         SymExpr* term   = sym_mul(vars[i].expr, stride);
         sym_expr_release(stride);
@@ -87,26 +71,20 @@ static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars)
     return acc;
 }
 
-/*
- * Build validity expression for a masked STView.
- *   valid = AND_i(idx_i >= mask_begin[i] && idx_i < mask_end[i])
- */
 static SymExpr* view_valid_expr(const STView* v, const LoopVar* vars, int nvars) {
     if (!v->has_mask) return NULL;
     SymExpr* acc = NULL;
     for (int i = 0; i < v->ndim && i < nvars; ++i) {
         if (v->mask_begin[i] == 0 && v->mask_end[i] == (int64_t)v->shape[i])
             continue;
-        /* (idx_i >= begin) expressed as: NOT (idx_i < begin) */
+        
         SymExpr* cond = NULL;
         if (v->mask_begin[i] > 0) {
             SymExpr* begin = sym_const(v->mask_begin[i]);
-            /* idx >= begin  <=>  !(idx < begin): represent as (idx - begin) >= 0 */
+            
             SymExpr* diff  = sym_add(vars[i].expr, sym_mul(sym_const(-1), begin));
             sym_expr_release(begin);
-            /* Use max(diff, 0) == diff as the positive guard — represent as diff >= 0.
-             * Since we don't have a CMP sym node, we encode it as max(diff,0) - diff == 0.
-             * Simpler: just leave it as a symbolic NOTE — codegen will emit the C guard. */
+            
             cond = sym_max_expr(diff, sym_const(0));
             sym_expr_release(diff);
         }
@@ -142,8 +120,6 @@ IndexMap* schedule_build_index_map(const ShapeTracker* st,
                                    const LoopVar* loop_vars,
                                    int num_vars) {
     if (!st || !loop_vars || num_vars <= 0) return NULL;
-    /* Use only the top (innermost) view for index generation.
-     * Multi-view composition is handled by schedule_build_index_map_simplified. */
     const STView* v = st->views[st->num_views - 1];
     if (!v) return NULL;
 
@@ -160,7 +136,6 @@ IndexMap* schedule_build_index_map_simplified(const ShapeTracker* st,
                                                int num_vars) {
     IndexMap* im = schedule_build_index_map(st, loop_vars, num_vars);
     if (!im) return NULL;
-    /* Simplify expressions. */
     SymExpr* sf = sym_simplify(im->flat_index);
     sym_expr_release(im->flat_index);
     im->flat_index = sf;
@@ -172,21 +147,13 @@ IndexMap* schedule_build_index_map_simplified(const ShapeTracker* st,
     return im;
 }
 
-/* =========================================================================
- * Code emission
- * ========================================================================= */
-
 int index_map_to_c(const IndexMap* im,
                    const char* const* var_names, int num_vars,
                    char* index_buf, size_t index_buf_size,
                    char* valid_buf, size_t valid_buf_size) {
     if (!im || !var_names || !index_buf || index_buf_size == 0) return -1;
 
-    /* Evaluate the symbolic expression with var_names substituted.
-     * Since we can't render arbitrary SymExpr trees to C strings here
-     * (that would require a full sym→C renderer), we use sym_expr_to_string
-     * which gives a symbolic representation matching the variable names
-     * used when the LoopVars were created. */
+    
     int r = sym_expr_to_string(im->flat_index, index_buf, (int)index_buf_size);
     if (r < 0) return -1;
 
@@ -201,15 +168,9 @@ int index_map_to_c(const IndexMap* im,
     return 0;
 }
 
-/* =========================================================================
- * Composition and debug
- * ========================================================================= */
-
 IndexMap* index_map_compose(const IndexMap* outer, const IndexMap* inner) {
     if (!outer || !inner) return NULL;
-    /* Compose: result.flat_index = outer.flat_index substituted with
-     * inner.flat_index.  We encode this as outer(inner(x)) = addition of offsets
-     * (a full symbolic substitution would require a more capable sym engine). */
+    
     SymExpr* composed = sym_add(outer->flat_index, inner->flat_index);
     SymExpr* valid = NULL;
     if (outer->valid && inner->valid)

@@ -126,11 +126,10 @@ static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtyp
     Linear* mlp_proj = nn_linear(ff_dim, n_embd, dtype, device, true);
     sequential_add(block->mlp, (Module*)mlp_proj);
 
-    /* Scale residual path weights by 1/sqrt(2*n_layer) to prevent
-       activation explosion through deep residual connections (GPT-2 style). */
+    
     if (n_layer > 1) {
         float scale = 1.0f / sqrtf(2.0f * (float)n_layer);
-        /* Scale MLP output projection */
+        
         if (mlp_proj && mlp_proj->weight) {
             float* w = (float*)tensor_data_ptr(mlp_proj->weight->tensor);
             if (w) {
@@ -138,7 +137,7 @@ static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtyp
                     w[i] *= scale;
             }
         }
-        /* Scale attention output projection (W_o) */
+        
         if (block->attn && block->attn->W_o) {
             float* w = (float*)tensor_data_ptr(block->attn->W_o->tensor);
             if (w) {
@@ -173,7 +172,7 @@ static Tensor* gpt2_forward(Module* module, Tensor* input) {
     if (!tok)
         return NULL;
 
-    /* Create position indices [0, 1, 2, ..., seq_len-1] */
+    
     int seq_len = input->shape[input->ndim - 1];
     int pos_shape[] = {1, seq_len};
     TensorConfig tcfg = {.dtype = input->dtype, .device = input->device,

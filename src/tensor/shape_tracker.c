@@ -5,10 +5,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-/* =========================================================================
- * STView
- * ========================================================================= */
-
 static int64_t* dup_i64(const int64_t* src, int n) {
     if (!src) return NULL;
     int64_t* dst = malloc((size_t)n * sizeof(int64_t));
@@ -64,7 +60,7 @@ STView* st_view_from_shape(const int* shape, int ndim) {
     if (!shape || ndim <= 0) return NULL;
     int64_t* strides = malloc((size_t)ndim * sizeof(int64_t));
     if (!strides) return NULL;
-    /* row-major (C-order) strides */
+    
     int64_t stride = 1;
     for (int i = ndim - 1; i >= 0; --i) {
         strides[i] = (shape[i] == 1) ? 0 : stride;
@@ -84,10 +80,6 @@ bool st_view_is_contiguous(const STView* v) {
     }
     return true;
 }
-
-/* =========================================================================
- * ShapeTracker
- * ========================================================================= */
 
 #define ST_INIT_CAPACITY 4
 
@@ -166,20 +158,18 @@ int64_t shape_tracker_numel(const ShapeTracker* st) {
     return n;
 }
 
-/* ---- Movement ops ---- */
-
 int shape_tracker_reshape(ShapeTracker* st, const int* new_shape, int new_ndim) {
     if (!st || !new_shape || new_ndim <= 0) return -1;
     STView* top = st_top(st);
     if (!top) return -1;
 
-    /* Verify element count matches. */
+    
     int64_t old_numel = 1, new_numel = 1;
     for (int i = 0; i < top->ndim; ++i) old_numel *= top->shape[i];
     for (int i = 0; i < new_ndim; ++i) new_numel *= new_shape[i];
     if (old_numel != new_numel) return -1;
 
-    /* If top is contiguous and has no mask, replace strides in-place. */
+    
     if (st_view_is_contiguous(top)) {
         free(top->shape);
         free(top->strides);
@@ -195,7 +185,7 @@ int shape_tracker_reshape(ShapeTracker* st, const int* new_shape, int new_ndim) 
         return 0;
     }
 
-    /* Otherwise push a new view. */
+    
     STView* v = st_view_from_shape(new_shape, new_ndim);
     if (!v) return -1;
     return st_push(st, v);
@@ -218,7 +208,7 @@ int shape_tracker_permute(ShapeTracker* st, const int* perm) {
         new_strides[i] = top->strides[p];
     }
 
-    /* Update top view in-place. */
+    
     memcpy(top->shape,   new_shape,   (size_t)ndim * sizeof(int));
     memcpy(top->strides, new_strides, (size_t)ndim * sizeof(int64_t));
     free(new_shape);
@@ -249,12 +239,12 @@ int shape_tracker_expand(ShapeTracker* st, const int* new_shape, int new_ndim) {
     int64_t* ss = malloc((size_t)new_ndim * sizeof(int64_t));
     if (!ns || !ss) { free(ns); free(ss); return -1; }
 
-    /* Pad existing dims from the left. */
+    
     int offset = new_ndim - top->ndim;
     for (int i = 0; i < new_ndim; ++i) {
         if (i < offset) {
             ns[i] = new_shape[i];
-            ss[i] = 0; /* broadcast */
+            ss[i] = 0; 
         } else {
             int old_i = i - offset;
             ns[i] = new_shape[i];
@@ -305,7 +295,7 @@ int shape_tracker_pad(ShapeTracker* st, const int64_t* before, const int64_t* af
         top->mask_end[i]   += before[i];
         top->shape[i]      += (int)(before[i] + after[i]);
     }
-    /* Adjust offset: the origin shifts by before[i] * stride[i]. */
+    
     for (int i = 0; i < ndim; ++i)
         top->offset -= before[i] * top->strides[i];
     return 0;
@@ -338,8 +328,6 @@ int shape_tracker_flip(ShapeTracker* st, const bool* flip_dims) {
     return 0;
 }
 
-/* ---- Index expression ---- */
-
 int shape_tracker_index_expr(const ShapeTracker* st,
                               const char* const* loop_vars,
                               char* out_buf,   size_t out_size,
@@ -348,7 +336,7 @@ int shape_tracker_index_expr(const ShapeTracker* st,
     STView* v = st_top(st);
     if (!v) return -1;
 
-    /* Build index expression: offset + sum_i(var_i * strides[i]) */
+    
     char tmp[4096] = {0};
     int  pos = 0;
     pos += snprintf(tmp + pos, sizeof(tmp) - (size_t)pos, "%lld", (long long)v->offset);
@@ -388,8 +376,6 @@ int shape_tracker_index_expr(const ShapeTracker* st,
     return 0;
 }
 
-/* ---- Simplification ---- */
-
 int shape_tracker_simplify(ShapeTracker* st) {
     if (!st || st->num_views < 2) return 0;
     int collapsed = 0;
@@ -397,7 +383,7 @@ int shape_tracker_simplify(ShapeTracker* st) {
     while (i > 0) {
         STView* inner = st->views[i];
         STView* outer = st->views[i - 1];
-        /* Only collapse if inner is contiguous and neither has a mask. */
+        
         if (st_view_is_contiguous(inner) && !outer->has_mask) {
             st_view_free(inner);
             for (int j = i; j < st->num_views - 1; ++j)
