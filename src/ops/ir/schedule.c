@@ -227,7 +227,7 @@ static size_t tensor_total_elements(const Tensor* t) {
     if (!t || !t->shape || t->ndim <= 0) return 0;
     size_t n = 1;
     for (int i = 0; i < t->ndim; i++) {
-        if (t->shape[i] <= 0) return 0;
+        if (!t->shape || t->shape[i] <= 0) return 0;
         n *= (size_t)t->shape[i];
     }
     return n;
