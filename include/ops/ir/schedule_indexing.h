@@ -1,8 +1,6 @@
 /*
  * schedule_indexing — tensor index arithmetic for the lowering pipeline.
  *
- * Mirrors TinyGrad's tinygrad/schedule/indexing.py.
- *
  * When a kernel accesses a tensor whose ShapeTracker has multiple views or
  * a non-trivial stride/mask, the codegen must emit correct index arithmetic.
  * This module computes IndexMap objects: for each loop variable (one per

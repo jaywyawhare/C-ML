@@ -1,8 +1,6 @@
 /*
  * schedule_allreduce — AllReduce operations integrated into the IR schedule.
  *
- * Mirrors TinyGrad's tinygrad/schedule/allreduce.py.
- *
  * Unlike the standalone ring-allreduce in distributed/ring_allreduce.h,
  * this module generates AllReduce as first-class IR schedule items so the
  * compiler can fuse them with surrounding elementwise kernels and overlap

@@ -1,7 +1,6 @@
 /*
  * ShapeTracker — composable view stack for zero-copy tensor transformations.
  *
- * Mirrors TinyGrad's ShapeTracker: a tensor is represented as a stack of Views.
  * Each View encodes a linear index mapping:
  *   flat_index = offset + sum_i(index_i * strides[i])
  * with an optional per-dimension validity mask for pad/shrink.

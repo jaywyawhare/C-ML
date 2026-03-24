@@ -1,8 +1,6 @@
 /*
  * nn/state — model state dict API.
  *
- * Mirrors TinyGrad's tinygrad/nn/state.py.
- *
  * Provides clean utilities for:
  *   - Collecting all named parameters from a Module tree (state dict)
  *   - Loading a state dict back into a Module (in-place weight assignment)

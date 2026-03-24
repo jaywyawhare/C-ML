@@ -1,8 +1,6 @@
 /*
  * symbolic/divandmod — algebraic simplification of division and modulo.
  *
- * Mirrors TinyGrad's tinygrad/uop/divandmod.py.
- *
  * Index arithmetic in kernel codegen frequently involves patterns like:
  *   (a * b) // b  → a
  *   (a + b * k) % b → a % b   (when 0 ≤ a < b)

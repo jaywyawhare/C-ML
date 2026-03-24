@@ -1,7 +1,6 @@
 /*
  * viz_server — embedded HTTP server for interactive IR graph visualization.
  *
- * Mirrors TinyGrad's tinygrad/viz/ web interface.
  * Starts a lightweight single-threaded HTTP server that serves an HTML/JS
  * page rendering the computation graph.  The graph JSON is regenerated on
  * each page load, so re-loading the browser reflects the latest IR state.

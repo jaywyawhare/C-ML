@@ -1,6 +1,5 @@
 /*
- * IR graph validation — mirrors TinyGrad's uop/validate.py.
- *
+ * IR graph validation 
  * Checks structural and semantic correctness of a CMLGraph before lowering:
  *   - No NULL or dangling inputs
  *   - No cycles (DAG check)

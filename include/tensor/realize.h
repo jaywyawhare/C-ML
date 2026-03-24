@@ -1,7 +1,6 @@
 /*
  * realize — explicit tensor materialization API.
  *
- * Mirrors TinyGrad's Tensor.realize() / Tensor.is_realized().
  * C-ML tensors are lazy: data is NULL until realized.  These helpers
  * give callers explicit control over when execution occurs.
  */

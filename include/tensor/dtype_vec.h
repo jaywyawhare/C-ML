@@ -1,7 +1,6 @@
 /*
  * dtype_vec — vector (SIMD) data type descriptors.
  *
- * Mirrors TinyGrad's dtypes.float.vec(4) → float4 pattern.
  * A VecDType pairs a scalar DType with a vector width n ∈ {2,4,8,16}.
  * The codegen uses this to emit "float4", "half8", etc. and to select
  * vectorised load/store instructions.

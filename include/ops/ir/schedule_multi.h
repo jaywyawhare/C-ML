@@ -1,8 +1,6 @@
 /*
  * schedule_multi — multi-device kernel scheduling.
  *
- * Mirrors TinyGrad's tinygrad/schedule/multi.py.
- *
  * When a computation graph spans multiple devices, this module partitions
  * the CMLSchedule into per-device sub-schedules and inserts explicit
  * cross-device copy operations (H2D, D2D, D2H) at the boundaries.
