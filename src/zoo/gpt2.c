@@ -3,6 +3,8 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 GPT2Config cml_zoo_gpt2_config_small(void) {

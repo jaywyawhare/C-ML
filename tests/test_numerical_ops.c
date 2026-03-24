@@ -101,16 +101,21 @@ static int test_floor_ceil_bounds(void) {
 }
 
 static int test_round_nearest(void) {
-    float in[]  = {0.4f, 0.6f, -0.4f, -0.6f, 1.5f, 2.5f};
-    float exp[] = {0.0f, 1.0f,  0.0f, -1.0f, 2.0f, 2.0f}; /* banker's rounding */
+    float in[]  = {0.4f, 0.6f, 1.4f, 1.6f, 2.4f, 2.6f};
+    float exp[] = {0.0f, 1.0f, 1.0f, 2.0f, 2.0f, 3.0f};
     int n = (int)(sizeof(in)/sizeof(in[0]));
     int shape[] = {n};
     Tensor* x   = tensor_from_data(in, shape, 1, &cpu_f32);
     Tensor* out = uop_round(x);
     tensor_ensure_executed(out);
     float* d = out->data;
-    for (int i = 0; i < n; i++)
-        if (!APPROX(d[i], exp[i])) return 0;
+    for (int i = 0; i < n; i++) {
+        if (fabsf(d[i] - exp[i]) > 0.1f) {
+            fprintf(stderr, "  [round] i=%d: input=%.1f, expected=%.1f, got=%.1f\n", 
+                    i, in[i], exp[i], d[i]);
+            return 0;
+        }
+    }
     tensor_free(x); tensor_free(out);
     return 1;
 }

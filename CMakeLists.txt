@@ -316,6 +316,13 @@ list(APPEND OPS_SOURCES src/ops/ir/gpu/nak_backend.c)
 
 list(APPEND OPS_SOURCES src/ops/ir/schedule_v2.c src/ops/ir/linearize.c)
 list(APPEND OPS_SOURCES src/ops/ir/spec.c src/ops/ir/late_passes.c)
+list(APPEND OPS_SOURCES
+    src/ops/ir/validate.c
+    src/ops/ir/viz_server.c
+    src/ops/ir/schedule_indexing.c
+    src/ops/ir/schedule_multi.c
+    src/ops/ir/schedule_allreduce.c
+)
 
 if(LLVM_BACKEND_FOUND)
     list(APPEND OPS_SOURCES
@@ -334,6 +341,9 @@ set(TENSOR_SOURCES
     src/tensor/image_dtype.c
     src/tensor/shard.c
     src/tensor/tensor_hash.c
+    src/tensor/shape_tracker.c
+    src/tensor/dtype_vec.c
+    src/tensor/realize.c
 )
 
 set(AUTOGRAD_SOURCES
@@ -383,9 +393,13 @@ set(NN_SOURCES
     src/nn/serving.c
     src/nn/speculative.c
     src/nn/openai_api.c
+    src/nn/state.c
 )
 
-set(SYMBOLIC_SOURCES src/symbolic/symbolic.c)
+set(SYMBOLIC_SOURCES
+    src/symbolic/symbolic.c
+    src/symbolic/divandmod.c
+)
 
 set(OPTIM_SOURCES src/optim.c src/optim/lr_scheduler.c)
 
