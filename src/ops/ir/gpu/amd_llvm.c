@@ -143,8 +143,8 @@ static int run_opt_passes(LLVMModuleRef mod, LLVMTargetMachineRef tm, int opt_le
     }
 
     LLVMPassBuilderOptionsRef opts = LLVMCreatePassBuilderOptions();
-    LLVMPassBuilderOptionSetLoopVectorization(opts, opt_level >= 2);
-    LLVMPassBuilderOptionSetSLPVectorization(opts, opt_level >= 2);
+    LLVMPassBuilderOptionsSetLoopVectorization(opts, opt_level >= 2);
+    LLVMPassBuilderOptionsSetSLPVectorization(opts, opt_level >= 2);
 
     LLVMErrorRef err = LLVMRunPasses(mod, passes, tm, opts);
     LLVMDisposePassBuilderOptions(opts);
