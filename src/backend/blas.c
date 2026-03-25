@@ -32,14 +32,13 @@
 #define LIB_CLOSE(handle) ((void)0)
 #endif
 
-static pthread_mutex_t g_blas_lock;
-static bool g_blas_lock_initialized = false;
+static pthread_mutex_t g_blas_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static inline void blas_lock(void) {
-    if (g_blas_lock_initialized) pthread_mutex_lock(&g_blas_lock);
+    pthread_mutex_lock(&g_blas_lock);
 }
 static inline void blas_unlock(void) {
-    if (g_blas_lock_initialized) pthread_mutex_unlock(&g_blas_lock);
+    pthread_mutex_unlock(&g_blas_lock);
 }
 
 static CMLBlasContext* g_blas_ctx = NULL;
@@ -137,20 +136,38 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
 
     /* OpenBLAS: set threading via openblas_set_num_threads.
        OpenBLAS built with OpenMP ignores this and reads OMP_NUM_THREADS,
-       so we must also set that env var to guarantee single-threaded mode. */
+       so we must also set that env var to propagate the thread count. */
     void (*openblas_set)(int) = LIB_SYM(ctx->lib_handle, "openblas_set_num_threads");
     if (openblas_set) {
         if (!getenv("OPENBLAS_NUM_THREADS") && !getenv("OMP_NUM_THREADS")) {
-            openblas_set(1);
-            setenv("OMP_NUM_THREADS", "1", 0);
-            setenv("GOTO_NUM_THREADS", "1", 0);
+            int ncores = 1;
+#ifdef __linux__
+            ncores = sysconf(_SC_NPROCESSORS_ONLN);
+            if (ncores < 1) ncores = 1;
+#endif
+            openblas_set(ncores);
+            char ncores_str[16];
+            snprintf(ncores_str, sizeof(ncores_str), "%d", ncores);
+            setenv("OMP_NUM_THREADS", ncores_str, 0);
+            setenv("GOTO_NUM_THREADS", ncores_str, 0);
+            LOG_INFO("OpenBLAS threads set to %d", ncores);
         }
         ctx->is_openblas = true;
+        return;
     }
 
     /* BLIS: set threading via bli_thread_set_num_threads */
     void (*blis_set)(int) = LIB_SYM(ctx->lib_handle, "bli_thread_set_num_threads");
     if (blis_set) {
+        if (!getenv("BLIS_NUM_THREADS") && !getenv("OMP_NUM_THREADS")) {
+            int ncores = 1;
+#ifdef __linux__
+            ncores = sysconf(_SC_NPROCESSORS_ONLN);
+            if (ncores < 1) ncores = 1;
+#endif
+            blis_set(ncores);
+            LOG_INFO("BLIS threads set to %d", ncores);
+        }
         ctx->is_blis = true;
     }
 }
@@ -229,16 +246,12 @@ CMLBlasContext* cml_blas_get_context(void) {
         return ctx;
 
     /* Slow path: first call, initialize under lock */
-    if (!g_blas_lock_initialized) {
-        pthread_mutex_init(&g_blas_lock, NULL);
-        g_blas_lock_initialized = true;
-    }
     blas_lock();
-    if (!g_blas_ctx) {
-        g_blas_ctx = cml_blas_init();
+    ctx = atomic_load_explicit((_Atomic(CMLBlasContext*)*)&g_blas_ctx, memory_order_relaxed);
+    if (!ctx) {
+        ctx = cml_blas_init();
+        atomic_store_explicit((_Atomic(CMLBlasContext*)*)&g_blas_ctx, ctx, memory_order_release);
     }
-    ctx = g_blas_ctx;
-    atomic_thread_fence(memory_order_release);
     blas_unlock();
     return ctx;
 }
@@ -422,18 +435,13 @@ int cml_blas_sscal(CMLBlasContext* ctx, float* x, int n, float alpha) {
 }
 
 float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n) {
+    if (!x || !y || n <= 0)
+        return 0.0f;
+
     if (!ctx)
         ctx = cml_blas_get_context();
-    if (!ctx || !ctx->initialized || !x || !y || n <= 0) {
-        // Fallback
-        float sum = 0.0f;
-        for (int i = 0; i < n; i++) {
-            sum += x[i] * y[i];
-        }
-        return sum;
-    }
 
-    if (ctx->cblas_sdot) {
+    if (ctx && ctx->cblas_sdot) {
         return ctx->cblas_sdot(n, x, 1, y, 1);
     }
 
@@ -446,18 +454,13 @@ float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n) 
 }
 
 float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n) {
+    if (!x || n <= 0)
+        return 0.0f;
+
     if (!ctx)
         ctx = cml_blas_get_context();
-    if (!ctx || !ctx->initialized || !x || n <= 0) {
-        // Fallback
-        float sum = 0.0f;
-        for (int i = 0; i < n; i++) {
-            sum += x[i] * x[i];
-        }
-        return sqrtf(sum);
-    }
 
-    if (ctx->cblas_snrm2) {
+    if (ctx && ctx->cblas_snrm2) {
         return ctx->cblas_snrm2(n, x, 1);
     }
 
