@@ -33,9 +33,9 @@ int main(void) {
     float* b_data = (float*)tensor_data_ptr(b);
     float* c_data = (float*)tensor_data_ptr(c);
     for (int i = 0; i < 8; i++) {
-        a_data[i] = (float)(i + 1) * 0.5f;
-        b_data[i] = (float)(i + 2) * 0.3f;
-        c_data[i] = (float)(i + 3) * 0.2f;
+        a_data[i] = (float)(i + 1) * 0.5f;  /* 0.5 .. 4.0 */
+        b_data[i] = (float)(i + 2) * 0.3f;  /* 0.6 .. 2.7 */
+        c_data[i] = (float)(i + 3) * 0.2f;  /* 0.6 .. 2.0 */
     }
 
     printf("Input tensors initialized\n");
@@ -48,57 +48,62 @@ int main(void) {
 
     printf("\nCreating computation graph\n");
 
+    /* Test 1: FUSION_FMA - MUL + ADD -> FMA
+       result1 = a * b + c */
     printf("\n1. FUSION_FMA test: result1 = a * b + c\n");
-    Tensor* mul_result = tensor_mul(a, b);
-    Tensor* result1    = tensor_add(mul_result, c);
+    Tensor* mul_ab  = tensor_mul(a, b);
+    Tensor* result1 = tensor_add(mul_ab, c);
 
-    printf("2. Long chain test: result2 = exp(log(sqrt((a+b)*(a-b))))\n");
-    Tensor* add_ab     = tensor_add(a, b);
-    Tensor* sub_ab     = tensor_sub(a, b);
-    Tensor* mul_chain  = tensor_mul(add_ab, sub_ab);
-    Tensor* sqrt_chain = tensor_sqrt(mul_chain);
-    Tensor* log_chain  = tensor_log(sqrt_chain);
-    Tensor* result2    = tensor_exp(log_chain);
+    /* Test 2: Long elementwise chain (should fuse into one kernel)
+       result2 = sqrt(exp(log(a + c)))
+       (using a+c to avoid duplicate a+b; values always positive) */
+    printf("2. Long chain test: result2 = sqrt(exp(log(a + c)))\n");
+    Tensor* add_ac     = tensor_add(a, c);
+    Tensor* log_chain  = tensor_log(add_ac);
+    Tensor* exp_chain  = tensor_exp(log_chain);
+    Tensor* result2    = tensor_sqrt(exp_chain);
 
-    printf("3. Complex chain: result3 = exp((a*b)/(c+a)) - sqrt(a)\n");
-    Tensor* mul_ab     = tensor_mul(a, b);
-    Tensor* add_ca     = tensor_add(c, a);
-    Tensor* div_result = tensor_div(mul_ab, add_ca);
+    /* Test 3: Complex chain with multiple operations
+       result3 = exp((a * c) / (b + c)) - sqrt(b) */
+    printf("3. Complex chain: result3 = exp((a*c)/(b+c)) - sqrt(b)\n");
+    Tensor* mul_ac     = tensor_mul(a, c);
+    Tensor* add_bc     = tensor_add(b, c);
+    Tensor* div_result = tensor_div(mul_ac, add_bc);
     Tensor* exp_result = tensor_exp(div_result);
-    Tensor* sqrt_a     = tensor_sqrt(a);
-    Tensor* result3    = tensor_sub(exp_result, sqrt_a);
+    Tensor* sqrt_b     = tensor_sqrt(b);
+    Tensor* result3    = tensor_sub(exp_result, sqrt_b);
 
+    /* Test 4: Dead code - operations that won't be used
+       These should be eliminated by dead code elimination */
     printf("4. Dead code test: Creating unused operations\n");
     Tensor* dead_mul = tensor_mul(b, c);
     Tensor* dead_add = tensor_add(dead_mul, a);
     Tensor* dead_exp = tensor_exp(dead_add);
 
-    printf("5. NEG fusion test: result4 = exp(-a) + log(-b)\n");
-    Tensor* zeros_a   = tensor_ones(shape, 1, &config);
-    float* zeros_data = (float*)tensor_data_ptr(zeros_a);
-    for (int i = 0; i < 8; i++)
-        zeros_data[i] = 0.0f;
-    Tensor* neg_a       = tensor_sub(zeros_a, a);
-    Tensor* exp_neg_a   = tensor_exp(neg_a);
-    Tensor* zeros_b     = tensor_ones(shape, 1, &config);
-    float* zeros_b_data = (float*)tensor_data_ptr(zeros_b);
-    for (int i = 0; i < 8; i++)
-        zeros_b_data[i] = 0.0f;
-    Tensor* neg_b     = tensor_sub(zeros_b, b);
-    Tensor* log_neg_b = tensor_log(neg_b);
-    Tensor* result4   = tensor_add(exp_neg_a, log_neg_b);
+    /* Test 5: NEG + operations (should fuse)
+       result4 = exp(-a) + log(b) */
+    printf("5. NEG fusion test: result4 = exp(-a) + log(b)\n");
+    Tensor* neg_a     = tensor_neg(a);
+    Tensor* exp_neg_a = tensor_exp(neg_a);
+    Tensor* log_b     = tensor_log(b);
+    Tensor* result4   = tensor_add(exp_neg_a, log_b);
 
-    printf("6. Very long chain: result5 = sqrt(exp(log(exp(sqrt(a+b)))))\n");
-    Tensor* add_long   = tensor_add(a, b);
-    Tensor* sqrt_long1 = tensor_sqrt(add_long);
-    Tensor* exp_long1  = tensor_exp(sqrt_long1);
-    Tensor* log_long   = tensor_log(exp_long1);
-    Tensor* exp_long2  = tensor_exp(log_long);
-    Tensor* result5    = tensor_sqrt(exp_long2);
+    /* Test 6: Very long chain (testing max fusion)
+       result5 = sqrt(exp(log(sqrt(a + b)))) */
+    printf("6. Very long chain: result5 = sqrt(exp(log(sqrt(a+b))))\n");
+    Tensor* add_ab     = tensor_add(a, b);
+    Tensor* sqrt_long1 = tensor_sqrt(add_ab);
+    Tensor* log_long   = tensor_log(sqrt_long1);
+    Tensor* exp_long   = tensor_exp(log_long);
+    Tensor* result5    = tensor_sqrt(exp_long);
 
-    printf("7. Simple fusion: result6 = a * b\n");
-    Tensor* result6 = tensor_mul(a, b);
+    /* Test 7: Simple elementwise
+       result6 = a + (b * c) */
+    printf("7. Simple fusion: result6 = a + (b * c)\n");
+    Tensor* mul_bc  = tensor_mul(b, c);
+    Tensor* result6 = tensor_add(a, mul_bc);
 
+    /* Combine ALL results into one final output so they are all "live" */
     printf("\n8. Combining all results so they are reachable...\n");
     Tensor* sum1         = tensor_add(result1, result2);
     Tensor* sum2         = tensor_add(sum1, result3);
@@ -114,28 +119,67 @@ int main(void) {
     float* r4 = (float*)tensor_data_ptr(result4);
     float* r5 = (float*)tensor_data_ptr(result5);
     float* r6 = (float*)tensor_data_ptr(result6);
+    float* rf = (float*)tensor_data_ptr(final_result);
 
-    printf("\nResults (first 4 elements):\n");
-    printf("result1[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r1[0], (double)r1[1], (double)r1[2],
-           (double)r1[3]);
-    printf("result2[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r2[0], (double)r2[1], (double)r2[2],
-           (double)r2[3]);
-    printf("result3[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r3[0], (double)r3[1], (double)r3[2],
-           (double)r3[3]);
-    printf("result4[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r4[0], (double)r4[1], (double)r4[2],
-           (double)r4[3]);
-    printf("result5[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r5[0], (double)r5[1], (double)r5[2],
-           (double)r5[3]);
-    printf("result6[0-3]: [%.4f, %.4f, %.4f, %.4f]\n", (double)r6[0], (double)r6[1], (double)r6[2],
-           (double)r6[3]);
+    int ok = 1;
+    if (!r1 || !r2 || !r3 || !r4 || !r5 || !r6 || !rf) {
+        printf("ERROR: One or more results returned NULL\n");
+        if (!r1) printf("  result1 is NULL\n");
+        if (!r2) printf("  result2 is NULL\n");
+        if (!r3) printf("  result3 is NULL\n");
+        if (!r4) printf("  result4 is NULL\n");
+        if (!r5) printf("  result5 is NULL\n");
+        if (!r6) printf("  result6 is NULL\n");
+        if (!rf) printf("  final_result is NULL\n");
+        ok = 0;
+    }
 
-    printf("\nExporting raw kernel analysis\n");
+    if (ok) {
+        printf("\nResults (first 4 elements):\n");
+        printf("result1[0-3]: [%.4f, %.4f, %.4f, %.4f]\n",
+               (double)r1[0], (double)r1[1], (double)r1[2], (double)r1[3]);
+        printf("result2[0-3]: [%.4f, %.4f, %.4f, %.4f]\n",
+               (double)r2[0], (double)r2[1], (double)r2[2], (double)r2[3]);
+        printf("result3[0-3]: [%.4f, %.4f, %.4f, %.4f]\n",
+               (double)r3[0], (double)r3[1], (double)r3[2], (double)r3[3]);
+        printf("result4[0-3]: [%.4f, %.4f, %.4f, %.4f]\n",
+               (double)r4[0], (double)r4[1], (double)r4[2], (double)r4[3]);
+        printf("result5[0-3]: [%.4f, %.4f, %.4f, %.4f]\n",
+               (double)r5[0], (double)r5[1], (double)r5[2], (double)r5[3]);
+        printf("result6[0-3]: [%.4f, %.4f, %.4f, %.4f]\n",
+               (double)r6[0], (double)r6[1], (double)r6[2], (double)r6[3]);
+
+        /* Verify results manually */
+        printf("\nVerification:\n");
+        int pass = 1;
+        for (int i = 0; i < 4; i++) {
+            float ai = a_data[i], bi = b_data[i], ci = c_data[i];
+
+            /* result1 = a*b + c */
+            float e1 = ai * bi + ci;
+            int ok1 = fabsf(r1[i] - e1) < 1e-3f;
+            if (!ok1) { printf("  FAIL result1[%d]: got=%.4f expected=%.4f\n", i, (double)r1[i], (double)e1); pass = 0; }
+
+            /* result2 = sqrt(exp(log(a+c))) ~ sqrt(a+c), with float precision loss */
+            float e2 = sqrtf(ai + ci);
+            int ok2 = fabsf(r2[i] - e2) < 0.01f;
+            if (!ok2) { printf("  FAIL result2[%d]: got=%.4f expected=%.4f\n", i, (double)r2[i], (double)e2); pass = 0; }
+
+            /* result6 = a + b*c */
+            float e6 = ai + bi * ci;
+            int ok6 = fabsf(r6[i] - e6) < 1e-3f;
+            if (!ok6) { printf("  FAIL result6[%d]: got=%.4f expected=%.4f\n", i, (double)r6[i], (double)e6); pass = 0; }
+        }
+        if (pass) printf("  All verifications passed!\n");
+    }
+
+    /* Export kernel analysis */
+    printf("\nExporting kernel analysis\n");
     char* raw_json = cml_ir_export_kernel_analysis(ir, false);
 
-    printf("\nOptimizing IR (fusion, dead code elimination, etc.)\n");
+    printf("Optimizing IR (fusion, dead code elimination)\n");
     cml_ir_optimize(ir);
 
-    printf("\nExporting optimized kernel analysis\n");
     char* opt_json = cml_ir_export_kernel_analysis(ir, true);
 
     if (raw_json && opt_json) {
@@ -144,16 +188,11 @@ int main(void) {
             fprintf(f, "{\"unoptimized\":%s,\"optimized\":%s}", raw_json, opt_json);
             fclose(f);
             printf("Exported kernel analysis to kernels.json\n");
-        } else {
-            printf("Failed to open kernels.json for writing\n");
         }
     }
-    if (raw_json)
-        free(raw_json);
-    if (opt_json)
-        free(opt_json);
+    free(raw_json);
+    free(opt_json);
 
-    printf("\nExporting graph topology\n");
     char* graph_json = cml_ir_export_graph_json(ir);
     if (graph_json) {
         FILE* f = fopen("graph.json", "w");
@@ -161,59 +200,49 @@ int main(void) {
             fprintf(f, "%s", graph_json);
             fclose(f);
             printf("Exported graph topology to graph.json\n");
-        } else {
-            printf("Failed to open graph.json for writing\n");
         }
         free(graph_json);
     }
 
-    printf("\nGenerated CUDA code (after optimization)\n");
-    char* cuda_code = cml_ir_compile(ir, NULL);
-    if (cuda_code) {
-        printf("%s\n", cuda_code);
-        free(cuda_code);
-    } else {
-        printf("Failed to generate CUDA code\n");
-    }
-
+    /* Print IR summary */
     char* ir_str = cml_ir_to_string(ir);
     if (ir_str) {
-        printf("\nIR Summary\n%s\n", ir_str);
+        printf("\nIR Summary:\n%s\n", ir_str);
         free(ir_str);
     }
 
-    printf("\nCleaning up\n");
+    /* Clean up */
     tensor_free(final_result);
     tensor_free(sum4);
     tensor_free(sum3);
     tensor_free(sum2);
     tensor_free(sum1);
     tensor_free(result6);
+    tensor_free(mul_bc);
     tensor_free(result5);
+    tensor_free(exp_long);
+    tensor_free(log_long);
+    tensor_free(sqrt_long1);
+    tensor_free(add_ab);
     tensor_free(result4);
-    tensor_free(log_neg_b);
-    tensor_free(neg_b);
-    tensor_free(zeros_b);
+    tensor_free(log_b);
     tensor_free(exp_neg_a);
     tensor_free(neg_a);
-    tensor_free(zeros_a);
     tensor_free(dead_exp);
     tensor_free(dead_add);
     tensor_free(dead_mul);
     tensor_free(result3);
-    tensor_free(sqrt_a);
+    tensor_free(sqrt_b);
     tensor_free(exp_result);
     tensor_free(div_result);
-    tensor_free(add_ca);
-    tensor_free(mul_ab);
+    tensor_free(add_bc);
+    tensor_free(mul_ac);
     tensor_free(result2);
+    tensor_free(exp_chain);
     tensor_free(log_chain);
-    tensor_free(sqrt_chain);
-    tensor_free(mul_chain);
-    tensor_free(sub_ab);
-    tensor_free(add_ab);
+    tensor_free(add_ac);
     tensor_free(result1);
-    tensor_free(mul_result);
+    tensor_free(mul_ab);
     tensor_free(c);
     tensor_free(b);
     tensor_free(a);
@@ -222,6 +251,6 @@ int main(void) {
     cml_ir_free(ir);
     cml_cleanup();
 
-    printf("\nExample completed successfully\n");
+    printf("\nExecution completed successfully\n");
     return 0;
 }
