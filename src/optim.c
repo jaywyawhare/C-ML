@@ -595,6 +595,41 @@ static void adam_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
+    /* Gradient clipping: compute global L2 norm, then scale all grads down */
+    if (optimizer->grad_clip_norm > 0.0f) {
+        float global_norm = 0.0f;
+        for (int g = 0; g < optimizer->num_param_groups; g++) {
+            ParameterGroup* grp = &optimizer->param_groups[g];
+            for (int i = 0; i < grp->num_parameters; i++) {
+                Parameter* p = grp->parameters[i];
+                if (!p || !p->tensor || !p->requires_grad) continue;
+                Tensor* grad = tensor_get_grad(p->tensor);
+                if (!grad) continue;
+                float* gd = (float*)tensor_data_ptr(grad);
+                if (!gd) continue;
+                for (size_t j = 0; j < p->tensor->numel; j++)
+                    global_norm += gd[j] * gd[j];
+            }
+        }
+        global_norm = sqrtf(global_norm);
+        if (global_norm > optimizer->grad_clip_norm) {
+            float scale = optimizer->grad_clip_norm / (global_norm + 1e-6f);
+            for (int g = 0; g < optimizer->num_param_groups; g++) {
+                ParameterGroup* grp = &optimizer->param_groups[g];
+                for (int i = 0; i < grp->num_parameters; i++) {
+                    Parameter* p = grp->parameters[i];
+                    if (!p || !p->tensor || !p->requires_grad) continue;
+                    Tensor* grad = tensor_get_grad(p->tensor);
+                    if (!grad) continue;
+                    float* gd = (float*)tensor_data_ptr(grad);
+                    if (!gd) continue;
+                    for (size_t j = 0; j < p->tensor->numel; j++)
+                        gd[j] *= scale;
+                }
+            }
+        }
+    }
+
     for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
         ParameterGroup* group = &optimizer->param_groups[g_idx];
         float lr              = group->lr;
