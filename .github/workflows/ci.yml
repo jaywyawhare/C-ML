@@ -9,7 +9,6 @@ on:
       - 'tests/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
-      - '.github/workflows/ci.yml'
   push:
     branches: [master]
     paths:
@@ -18,7 +17,6 @@ on:
       - 'tests/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
-      - '.github/workflows/ci.yml'
 
 concurrency:
   group: ci-${{ github.ref }}
