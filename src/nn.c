@@ -263,8 +263,6 @@ void module_set_next(Module* module, Module* next) {
     }
 }
 
-static int collect_container_params(Module* container, Parameter*** params_out, int* num_params_out,
-                                   bool recursive);
 
 int module_collect_parameters(Module* module, Parameter*** params_out, int* num_params_out,
                               bool recursive) {

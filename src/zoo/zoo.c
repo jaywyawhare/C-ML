@@ -206,6 +206,7 @@ static Module* create_resnet_block(int in_channels, int out_channels, int stride
     return (Module*)block;
 }
 
+static Module* create_resnet(const int* layers, int num_layers, const CMLZooConfig* cfg_ptr) __attribute__((unused));
 static Module* create_resnet(const int* layers, int num_layers, const CMLZooConfig* cfg_ptr) {
     CMLZooConfig cfg = cfg_ptr ? *cfg_ptr : cml_zoo_default_config();
     int num_classes = cfg.num_classes > 0 ? cfg.num_classes : 1000;

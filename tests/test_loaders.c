@@ -37,7 +37,7 @@ static void write_ppm(const char* path, int w, int h, unsigned char r, unsigned 
     fclose(f);
 }
 
-static char tmpdir[256];
+static char tmpdir[512];
 
 static void setup_image_dir(void) {
     snprintf(tmpdir, sizeof(tmpdir), "/tmp/cml_test_loaders_%d", getpid());

@@ -152,6 +152,7 @@ int index_map_to_c(const IndexMap* im,
                    char* index_buf, size_t index_buf_size,
                    char* valid_buf, size_t valid_buf_size) {
     if (!im || !var_names || !index_buf || index_buf_size == 0) return -1;
+    (void)num_vars;
 
     
     int r = sym_expr_to_string(im->flat_index, index_buf, (int)index_buf_size);

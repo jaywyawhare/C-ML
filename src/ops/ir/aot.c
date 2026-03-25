@@ -17,6 +17,7 @@
 
 /* Rejects strings containing shell metacharacters that could allow
  * arbitrary command execution when passed to popen/system. */
+static bool aot_validate_path(const char* path) __attribute__((unused));
 static bool aot_validate_path(const char* path) {
     if (!path) return false;
     for (const char* p = path; *p; p++) {

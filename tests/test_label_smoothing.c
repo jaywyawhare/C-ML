@@ -17,11 +17,6 @@ static int tests_passed = 0;
     else { printf("FAIL\n"); } \
 } while(0)
 
-static float get_scalar(Tensor* t) {
-    if (!t || !t->data) return NAN;
-    return ((float*)t->data)[0];
-}
-
 static int test_smooth_zero_delegates(void) {
     cml_init();
 

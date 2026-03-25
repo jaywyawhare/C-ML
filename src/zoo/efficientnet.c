@@ -123,7 +123,6 @@ static Module* build_efficientnet(float width_mult, float depth_mult,
     int prev_out = stem_out;
     for (int s = 0; s < num_stages; s++) {
         const EfficientNetBlockConfig* blk = &b0_blocks[s];
-        int stage_in  = round_channels(blk->in_channels,  width_mult);
         int stage_out = round_channels(blk->out_channels, width_mult);
         int num_reps  = scale_depth(blk->num_blocks, depth_mult);
 

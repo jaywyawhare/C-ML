@@ -83,7 +83,7 @@ static int scan_usb_bus(char* path, size_t path_size) {
     while ((bus_ent = readdir(buses)) != NULL) {
         if (bus_ent->d_name[0] == '.') continue;
 
-        char bus_path[256];
+        char bus_path[512];
         snprintf(bus_path, sizeof(bus_path), "/dev/bus/usb/%s", bus_ent->d_name);
         DIR* devs = opendir(bus_path);
         if (!devs) continue;
@@ -92,7 +92,7 @@ static int scan_usb_bus(char* path, size_t path_size) {
         while ((dev_ent = readdir(devs)) != NULL) {
             if (dev_ent->d_name[0] == '.') continue;
 
-            char dev_path[512];
+            char dev_path[1024];
             snprintf(dev_path, sizeof(dev_path), "%s/%s", bus_path, dev_ent->d_name);
 
             int fd = open(dev_path, O_RDWR);

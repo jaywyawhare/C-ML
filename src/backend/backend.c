@@ -413,33 +413,35 @@ static void simd_matmul(const void* a, const void* b, void* out, int m, int n, i
         float* out_f     = (float*)out;
 
 #ifdef __AVX__
-        const int TILE_SIZE = 64; // Tile size for cache optimization
-
+        const int TILE_SIZE = 64; /* Tile k-dimension for L1/L2 cache reuse */
         memset(out_f, 0, m * n * sizeof(float));
 
         for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j += 8) {
-                __m256 sum_vec = _mm256_setzero_ps();
-                int j_end      = (j + 8 < n) ? j + 8 : n;
+            for (int kk_tile = 0; kk_tile < k; kk_tile += TILE_SIZE) {
+                int kk_end = kk_tile + TILE_SIZE < k ? kk_tile + TILE_SIZE : k;
+                for (int j = 0; j < n; j += 8) {
+                    __m256 sum_vec = _mm256_loadu_ps(&out_f[i * n + j]);
+                    int j_end      = (j + 8 < n) ? j + 8 : n;
 
-                for (int kk = 0; kk < k; kk++) {
-                    __m256 a_vec = _mm256_set1_ps(a_f[i * k + kk]);
-                    if (j_end - j == 8) {
-                        __m256 b_vec = _mm256_loadu_ps(&b_f[kk * n + j]);
+                    for (int kk = kk_tile; kk < kk_end; kk++) {
+                        __m256 a_vec = _mm256_set1_ps(a_f[i * k + kk]);
+                        if (j_end - j == 8) {
+                            __m256 b_vec = _mm256_loadu_ps(&b_f[kk * n + j]);
 #ifdef __FMA__
-                        sum_vec = _mm256_fmadd_ps(a_vec, b_vec, sum_vec);
+                            sum_vec = _mm256_fmadd_ps(a_vec, b_vec, sum_vec);
 #else
-                        sum_vec = _mm256_add_ps(sum_vec, _mm256_mul_ps(a_vec, b_vec));
+                            sum_vec = _mm256_add_ps(sum_vec, _mm256_mul_ps(a_vec, b_vec));
 #endif
-                    } else {
-                                        for (int jj = j; jj < j_end; jj++) {
-                            out_f[i * n + jj] += a_f[i * k + kk] * b_f[kk * n + jj];
+                        } else {
+                            for (int jj = j; jj < j_end; jj++) {
+                                out_f[i * n + jj] += a_f[i * k + kk] * b_f[kk * n + jj];
+                            }
                         }
                     }
-                }
 
-                if (j_end - j == 8) {
-                    _mm256_storeu_ps(&out_f[i * n + j], sum_vec);
+                    if (j_end - j == 8) {
+                        _mm256_storeu_ps(&out_f[i * n + j], sum_vec);
+                    }
                 }
             }
         }

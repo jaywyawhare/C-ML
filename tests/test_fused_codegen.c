@@ -1,5 +1,6 @@
 #include "ops/ir/fused_codegen.h"
 #include "ops/ir/schedule.h"
+#include "ops/ir/gpu/ptx_codegen.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 #include <stdio.h>
@@ -100,8 +101,50 @@ static void test_ptx_codegen(void) {
 
     printf("  Generated PTX (%zu bytes)\n", strlen(kernel->source));
 
+    FILE* f = fopen("/tmp/cml_fused_kernel.ptx", "w");
+    if (f) {
+        fprintf(f, "%s", kernel->source);
+        fclose(f);
+        printf("  PTX saved to /tmp/cml_fused_kernel.ptx\n");
+    }
+
     cml_fused_kernel_free(kernel);
     cml_linear_program_free(prog);
+    tests_passed++;
+    printf("  PASS\n");
+}
+
+static void test_cuda_codegen(void) {
+    printf("test_cuda_codegen...\n");
+
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(75, NULL);
+    ASSERT(cg != NULL, "PTX codegen create");
+
+    char* cuda_src = cml_ptx_gen_tiled_matmul(cg, "matmul_kernel");
+    ASSERT(cuda_src != NULL, "matmul CUDA source");
+    printf("  Generated CUDA source for matmul (%zu bytes)\n", strlen(cuda_src));
+
+    FILE* f = fopen("/tmp/cml_matmul.cu", "w");
+    if (f) {
+        fprintf(f, "%s", cuda_src);
+        fclose(f);
+        printf("  CUDA source saved to /tmp/cml_matmul.cu\n");
+    }
+    free(cuda_src);
+
+    cuda_src = cml_ptx_gen_conv2d(cg, "conv2d_kernel");
+    ASSERT(cuda_src != NULL, "conv2d CUDA source");
+    printf("  Generated CUDA source for conv2d (%zu bytes)\n", strlen(cuda_src));
+
+    f = fopen("/tmp/cml_conv2d.cu", "w");
+    if (f) {
+        fprintf(f, "%s", cuda_src);
+        fclose(f);
+        printf("  CUDA source saved to /tmp/cml_conv2d.cu\n");
+    }
+    free(cuda_src);
+
+    cml_ptx_codegen_destroy(cg);
     tests_passed++;
     printf("  PASS\n");
 }
@@ -187,6 +230,7 @@ int main(void) {
 
     test_c_codegen();
     test_ptx_codegen();
+    test_cuda_codegen();
     test_spirv_codegen();
     test_linear_program_print();
     test_mul_chain_codegen();

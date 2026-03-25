@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 
+static bool tensor_on_device(const Tensor* t, int device_id) __attribute__((unused));
 static bool tensor_on_device(const Tensor* t, int device_id) {
     return t && (int)t->device == device_id;
 }
@@ -16,6 +17,7 @@ static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
     return 0;
 }
 
+static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t) __attribute__((unused));
 static CrossDeviceOp* xfer_create(XferDirection dir,
                                   int src, int dst, Tensor* t) {
     CrossDeviceOp* op = calloc(1, sizeof(CrossDeviceOp));

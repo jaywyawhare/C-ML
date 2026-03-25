@@ -126,8 +126,9 @@ int cml_multi_output_analyze(CMLScheduleV2* sched, int** merge_groups, int* num_
         return 0;
     }
 
-    *merge_groups = realloc(pairs, (size_t)(count * 2) * sizeof(int));
-    if (!*merge_groups) *merge_groups = pairs;
+    int* tmp = realloc(pairs, (size_t)(count * 2) * sizeof(int));
+    if (!tmp) { free(pairs); *merge_groups = NULL; *num_merges = 0; return 0; }
+    *merge_groups = tmp;
     *num_merges = count;
     return count;
 }
