@@ -621,30 +621,34 @@ if(BUILD_SHARED_LIBS)
     install(TARGETS cml_shared EXPORT CMLTargets LIBRARY DESTINATION lib)
 endif()
 
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMLConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
-    INSTALL_DESTINATION lib/cmake/CML
-)
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
-)
-install(EXPORT CMLTargets FILE CMLTargets.cmake NAMESPACE CML:: DESTINATION lib/cmake/CML)
-install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
-    DESTINATION lib/cmake/CML
-)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMLConfig.cmake.in)
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMLConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
+        INSTALL_DESTINATION lib/cmake/CML
+    )
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
+    install(EXPORT CMLTargets FILE CMLTargets.cmake NAMESPACE CML:: DESTINATION lib/cmake/CML)
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/CMLConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/CMLConfigVersion.cmake
+        DESTINATION lib/cmake/CML
+    )
+endif()
 
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cml.pc.in
-    ${CMAKE_CURRENT_BINARY_DIR}/cml.pc
-    @ONLY
-)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cml.pc DESTINATION lib/pkgconfig)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cml.pc.in)
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cml.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/cml.pc
+        @ONLY
+    )
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cml.pc DESTINATION lib/pkgconfig)
+endif()
 
 install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
 
