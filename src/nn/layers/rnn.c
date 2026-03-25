@@ -1,6 +1,8 @@
 #include "nn/layers/rnn.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "autograd/forward_ops.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
@@ -175,99 +177,63 @@ void lstm_cell_forward(LSTMCell* cell, Tensor* input,
                        Tensor** h_out, Tensor** c_out) {
     if (!cell || !input || !h_out || !c_out) return;
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(cell->weight_ih->tensor);
-    tensor_ensure_executed(cell->weight_hh->tensor);
-
     int batch = input->shape[0];
     int hs    = cell->hidden_size;
-    int is    = cell->input_size;
-    int gs    = 4 * hs; /* gate size */
+    (void)(4 * hs); /* gs unused after autograd rewrite */
 
     /* Initialise states to zeros when NULL */
-    bool free_h = false, free_c = false;
     if (!h_prev) {
         int s[] = {batch, hs};
         TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
                             .has_dtype = true, .has_device = true};
         h_prev = tensor_zeros(s, 2, &cfg);
-        free_h = true;
     }
     if (!c_prev) {
         int s[] = {batch, hs};
         TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
                             .has_dtype = true, .has_device = true};
         c_prev = tensor_zeros(s, 2, &cfg);
-        free_c = true;
-    }
-    tensor_ensure_executed(h_prev);
-    tensor_ensure_executed(c_prev);
-
-    float* x_data = (float*)tensor_data_ptr(input);
-    float* h_data = (float*)tensor_data_ptr(h_prev);
-    float* c_data = (float*)tensor_data_ptr(c_prev);
-    float* wih    = (float*)tensor_data_ptr(cell->weight_ih->tensor);
-    float* whh    = (float*)tensor_data_ptr(cell->weight_hh->tensor);
-
-    float* bih = NULL;
-    float* bhh = NULL;
-    if (cell->bias_ih) {
-        tensor_ensure_executed(cell->bias_ih->tensor);
-        bih = (float*)tensor_data_ptr(cell->bias_ih->tensor);
-    }
-    if (cell->bias_hh) {
-        tensor_ensure_executed(cell->bias_hh->tensor);
-        bhh = (float*)tensor_data_ptr(cell->bias_hh->tensor);
     }
 
-    /* Compute gates = W_ih @ x + b_ih + W_hh @ h + b_hh */
-    float* ih_out = calloc((size_t)(batch * gs), sizeof(float));
-    float* hh_out = calloc((size_t)(batch * gs), sizeof(float));
-    if (!ih_out || !hh_out) {
-        free(ih_out);
-        free(hh_out);
-        if (free_h) tensor_free(h_prev);
-        if (free_c) tensor_free(c_prev);
-        return;
-    }
+    /* gates = input @ W_ih^T + h_prev @ W_hh^T + b_ih + b_hh
+     * All ops go through autograd so gradients reach the weight parameters. */
+    Tensor* wih_t = tensor_transpose(cell->weight_ih->tensor, 0, 1); /* [is, 4*hs] */
+    Tensor* whh_t = tensor_transpose(cell->weight_hh->tensor, 0, 1); /* [hs, 4*hs] */
 
-    matmul_add(ih_out, wih, x_data, bih, gs, is, batch);
-    matmul_add(hh_out, whh, h_data, bhh, gs, hs, batch);
+    Tensor* gates = tensor_add(tensor_matmul(input, wih_t),
+                               tensor_matmul(h_prev, whh_t));  /* [batch, 4*hs] */
 
-    /* Allocate output tensors */
-    int s[] = {batch, hs};
-    TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
-                        .has_dtype = true, .has_device = true};
-    Tensor* h_new = tensor_empty(s, 2, &cfg);
-    Tensor* c_new = tensor_empty(s, 2, &cfg);
-    tensor_ensure_executed(h_new);
-    tensor_ensure_executed(c_new);
-    float* h_new_data = (float*)tensor_data_ptr(h_new);
-    float* c_new_data = (float*)tensor_data_ptr(c_new);
+    if (cell->bias_ih)
+        gates = tensor_add(gates, cell->bias_ih->tensor);
+    if (cell->bias_hh)
+        gates = tensor_add(gates, cell->bias_hh->tensor);
 
-    for (int b = 0; b < batch; b++) {
-        for (int j = 0; j < hs; j++) {
-            int base = b * gs;
-            float gate_i = ih_out[base + 0 * hs + j] + hh_out[base + 0 * hs + j];
-            float gate_f = ih_out[base + 1 * hs + j] + hh_out[base + 1 * hs + j];
-            float gate_g = ih_out[base + 2 * hs + j] + hh_out[base + 2 * hs + j];
-            float gate_o = ih_out[base + 3 * hs + j] + hh_out[base + 3 * hs + j];
+    /* Split gates into i, f, g, o via shrink — each [batch, hs] */
+    int starts_full[] = {0, 0};
+    int ends_full[]   = {batch, hs};
 
-            float i = sigmoid_f(gate_i);
-            float f = sigmoid_f(gate_f);
-            float g = tanh_f(gate_g);
-            float o = sigmoid_f(gate_o);
+    int starts_i[] = {0, 0 * hs}, ends_i[] = {batch, 1 * hs};
+    int starts_f[] = {0, 1 * hs}, ends_f[] = {batch, 2 * hs};
+    int starts_g[] = {0, 2 * hs}, ends_g[] = {batch, 3 * hs};
+    int starts_o[] = {0, 3 * hs}, ends_o[] = {batch, 4 * hs};
+    (void)starts_full; (void)ends_full;
 
-            int idx = b * hs + j;
-            c_new_data[idx] = f * c_data[idx] + i * g;
-            h_new_data[idx] = o * tanh_f(c_new_data[idx]);
-        }
-    }
+    Tensor* gate_i = uop_shrink(gates, starts_i, ends_i, 2); /* input gate   */
+    Tensor* gate_f = uop_shrink(gates, starts_f, ends_f, 2); /* forget gate  */
+    Tensor* gate_g = uop_shrink(gates, starts_g, ends_g, 2); /* cell gate    */
+    Tensor* gate_o = uop_shrink(gates, starts_o, ends_o, 2); /* output gate  */
 
-    free(ih_out);
-    free(hh_out);
-    if (free_h) tensor_free(h_prev);
-    if (free_c) tensor_free(c_prev);
+    Tensor* i_act = uop_sigmoid(gate_i);
+    Tensor* f_act = uop_sigmoid(gate_f);
+    Tensor* g_act = uop_tanh(gate_g);
+    Tensor* o_act = uop_sigmoid(gate_o);
+
+    /* c_new = f ⊙ c_prev + i ⊙ g */
+    Tensor* c_new = tensor_add(tensor_mul(f_act, c_prev),
+                               tensor_mul(i_act, g_act));
+
+    /* h_new = o ⊙ tanh(c_new) */
+    Tensor* h_new = tensor_mul(o_act, uop_tanh(c_new));
 
     *h_out = h_new;
     *c_out = c_new;
