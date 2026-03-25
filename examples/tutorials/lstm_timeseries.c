@@ -40,7 +40,8 @@ int main(void) {
     params[np++] = linear_get_weight(fc);
     params[np++] = linear_get_bias(fc);
 
-    Optimizer* opt = cml_optim_adam(params, np, 0.005f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* opt = cml_optim_adam(params, np, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    optimizer_set_grad_clip_norm(opt, 1.0f);
 
     for (int epoch = 1; epoch <= 50; epoch++) {
         float total_loss = 0;
@@ -55,8 +56,8 @@ int main(void) {
             Tensor* h_out = NULL;
             Tensor* c_out = NULL;
             lstm_cell_forward(lstm, x_t, h, c, &h_out, &c_out);
-            h = h_out;
-            c = c_out;
+            h = cml_detach(h_out);
+            c = cml_detach(c_out);
 
             Tensor* pred = linear_forward((Module*)fc, h);
             Tensor* loss = cml_nn_mse_loss(pred, y_t);
