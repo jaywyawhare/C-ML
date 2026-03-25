@@ -51,12 +51,15 @@ test_bin/**
 bin/**
 lib/**
 
-# Build outputs
-build/
+# Build outputs (build/, build_asan/, build_debug/, build_comment_test/, etc.)
+build*/
 cmake-build*/
+out/
+out-*/
 **/CMakeFiles/
 **/CMakeCache.txt
 **/cmake_install.cmake
+CMakeUserPresets.json
 
 # Python
 __pycache__/
@@ -73,7 +76,6 @@ venv/
 .hypothesis/
 *.egg-info/
 *.egg
-build/
 develop-eggs/
 downloads/
 eggs/
