@@ -9,6 +9,20 @@ int main(void) {
     if (!ds) { printf("Failed to load boston dataset\n"); return 1; }
 
     dataset_normalize(ds, "minmax");
+
+    /* Also normalize targets to [0,1] for stable training */
+    float* y_data = (float*)tensor_data_ptr(ds->y);
+    float y_min = y_data[0], y_max = y_data[0];
+    for (int i = 1; i < ds->num_samples; i++) {
+        if (y_data[i] < y_min) y_min = y_data[i];
+        if (y_data[i] > y_max) y_max = y_data[i];
+    }
+    float y_range = y_max - y_min;
+    if (y_range < 1e-8f) y_range = 1.0f;
+    for (int i = 0; i < ds->num_samples; i++) {
+        y_data[i] = (y_data[i] - y_min) / y_range;
+    }
+
     Dataset *train, *test;
     dataset_split(ds, 0.8f, &train, &test);
 
@@ -37,8 +51,8 @@ int main(void) {
     Tensor* test_pred = cml_nn_sequential_forward(model, test->X);
     float mse = 0;
     for (int i = 0; i < test->num_samples; i++) {
-        float p = tensor_get_float(test_pred, i);
-        float t = tensor_get_float(test->y, i);
+        float p = tensor_get_float(test_pred, i) * y_range + y_min;
+        float t = tensor_get_float(test->y, i) * y_range + y_min;
         mse += (p - t) * (p - t);
     }
     printf("\nTest MSE: %.6f (on %d samples)\n", mse / test->num_samples, test->num_samples);
@@ -46,8 +60,8 @@ int main(void) {
     printf("\nSample predictions:\n");
     for (int i = 0; i < 5 && i < test->num_samples; i++) {
         printf("  pred=%.3f  target=%.3f\n",
-               tensor_get_float(test_pred, i),
-               tensor_get_float(test->y, i));
+               tensor_get_float(test_pred, i) * y_range + y_min,
+               tensor_get_float(test->y, i) * y_range + y_min);
     }
 
     cml_cleanup();

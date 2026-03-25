@@ -39,7 +39,8 @@ int main(void) {
     params[np++] = linear_get_weight(fc);
     params[np++] = linear_get_bias(fc);
 
-    Optimizer* opt = cml_optim_adam(params, np, 0.005f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* opt = cml_optim_adam(params, np, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    optimizer_set_grad_clip_norm(opt, 1.0f);
 
     int train_seqs = n_seqs * 3 / 4;
     if (train_seqs > 20) train_seqs = 20; /* Keep fast for demo */
@@ -50,7 +51,8 @@ int main(void) {
             Tensor* h = cml_zeros(h_shape, 2, NULL);
             for (int t = 0; t < SEQ_LEN; t++) {
                 Tensor* x_t = cml_tensor(&seqs[s + t], step_shape, 2, NULL);
-                h = rnn_cell_forward(rnn, x_t, h);
+                Tensor* h_new = rnn_cell_forward(rnn, x_t, h);
+                h = cml_detach(h_new);
             }
             Tensor* out = linear_forward((Module*)fc, h);
             float target = seqs[s + SEQ_LEN];
@@ -61,6 +63,7 @@ int main(void) {
             cml_backward(loss, NULL, false, false);
             cml_optim_step(opt);
             total_loss += tensor_get_float(loss, 0);
+            cml_reset_ir_context();
         }
 
         if (epoch % 10 == 0)
@@ -74,7 +77,8 @@ int main(void) {
         Tensor* h = cml_zeros(h_shape, 2, NULL);
         for (int t = 0; t < SEQ_LEN; t++) {
             Tensor* x_t = cml_tensor(&seqs[s + t], step_shape, 2, NULL);
-            h = rnn_cell_forward(rnn, x_t, h);
+            Tensor* h_new = rnn_cell_forward(rnn, x_t, h);
+            h = cml_detach(h_new);
         }
         Tensor* out = linear_forward((Module*)fc, h);
         float p = tensor_get_float(out, 0);

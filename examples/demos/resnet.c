@@ -77,6 +77,7 @@ int main(void) {
 
         tensor_free(images);
         tensor_free(labels);
+        cml_reset_ir_context();
     }
 
     printf("\nDone.\n");

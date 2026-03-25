@@ -38,8 +38,10 @@ int main(void) {
     params[np++] = gru->bias_ih;
     params[np++] = gru->bias_hh;
 
-    Optimizer* gru_opt = cml_optim_adam(params, np, 0.005f, 0.0f, 0.9f, 0.999f, 1e-8f);
-    Optimizer* head_opt = cml_optim_adam_for_model((Module*)head, 0.005f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* gru_opt = cml_optim_adam(params, np, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    optimizer_set_grad_clip_norm(gru_opt, 1.0f);
+    Optimizer* head_opt = cml_optim_adam_for_model((Module*)head, 0.001f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    optimizer_set_grad_clip_norm(head_opt, 1.0f);
 
     float* train_X = (float*)tensor_data_ptr(train->X);
     float* train_y = (float*)tensor_data_ptr(train->y);
@@ -53,7 +55,8 @@ int main(void) {
             for (int t = 0; t < SEQ_LEN; t++) {
                 float val = train_X[s * 4 + t];
                 Tensor* x_t = cml_tensor(&val, x_shape, 2, NULL);
-                h = gru_cell_forward(gru, x_t, h);
+                Tensor* h_new = gru_cell_forward(gru, x_t, h);
+                h = cml_detach(h_new);
             }
             Tensor* pred = cml_nn_sequential_forward(head, h);
             float label = (train_y[s] > 0.5f) ? 1.0f : 0.0f;
@@ -67,6 +70,7 @@ int main(void) {
             cml_optim_step(head_opt);
 
             total_loss += tensor_get_float(loss, 0);
+            cml_reset_ir_context();
         }
         if (epoch % 10 == 0)
             printf("Epoch %3d  Avg Loss: %.6f\n", epoch, total_loss / train->num_samples);
@@ -79,7 +83,8 @@ int main(void) {
         for (int t = 0; t < SEQ_LEN; t++) {
             float val = test_X[s * 4 + t];
             Tensor* x_t = cml_tensor(&val, x_shape, 2, NULL);
-            h = gru_cell_forward(gru, x_t, h);
+            Tensor* h_new = gru_cell_forward(gru, x_t, h);
+            h = cml_detach(h_new);
         }
         Tensor* pred = cml_nn_sequential_forward(head, h);
         float p = tensor_get_float(pred, 0);

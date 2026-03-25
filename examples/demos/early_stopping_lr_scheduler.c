@@ -232,10 +232,7 @@ int main(void) {
                    (double)current_lr, no_improve_epochs, patience);
         }
 
-        if (loss)
-            tensor_free(loss);
-        if (outputs)
-            tensor_free(outputs);
+        cml_reset_ir_context();
     }
 
     printf("\nTraining Summary\n");

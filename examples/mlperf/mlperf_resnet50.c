@@ -160,7 +160,6 @@ int main(int argc, char** argv) {
     int steps_per_epoch = samples_per_epoch / cfg.batch_size;
 
     int input_shape[] = { cfg.batch_size, img_c, img_h, img_w };
-    int label_shape[] = { cfg.batch_size };
 
     float* batch_data = malloc(sizeof(float) * cfg.batch_size * img_c * img_h * img_w);
     int* batch_labels = malloc(sizeof(int) * cfg.batch_size);
@@ -228,6 +227,7 @@ int main(int argc, char** argv) {
             }
 
             free(label_floats);
+            cml_reset_ir_context();
         }
 
         double epoch_time = time_seconds() - epoch_start;

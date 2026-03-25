@@ -68,6 +68,8 @@ int main(void) {
         printf("%-6d  %-12.6f  %-11.1f%%  %-14s\n",
                epoch, loss_val, pixel_acc, shape_str);
 
+        tensor_free(pred);
+        tensor_free(loss);
         tensor_free(image);
         tensor_free(mask);
     }

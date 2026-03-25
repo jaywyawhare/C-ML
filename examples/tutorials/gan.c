@@ -117,6 +117,7 @@ int main(void) {
         tensor_free(loss_d_real); tensor_free(label_fake); tensor_free(d_fake);
         tensor_free(loss_d_fake); tensor_free(loss_d);
         tensor_free(d_out); tensor_free(loss_g);
+        cml_reset_ir_context();
         cml_ir_reset_global_context();
     }
 

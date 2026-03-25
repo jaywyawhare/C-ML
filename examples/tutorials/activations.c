@@ -78,6 +78,7 @@ int main(void) {
             cml_backward(loss, NULL, false, false);
             cml_optim_step(opt);
             if (ep == N_EPOCHS) final_loss = tensor_get_float(loss, 0);
+            cml_reset_ir_context();
         }
 
         Tensor* pred = cml_nn_sequential_forward(m, ds->X);

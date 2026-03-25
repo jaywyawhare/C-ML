@@ -67,6 +67,7 @@ int main(void) {
             cml_optim_step(opt);
 
             total_loss += tensor_get_float(loss, 0);
+            cml_reset_ir_context();
         }
 
         if (epoch % 10 == 0)
