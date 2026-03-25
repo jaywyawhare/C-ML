@@ -156,6 +156,26 @@ static int cpu_backward_node(struct IRNode* node) {
         }
         break;
 
+    case UOP_POW: {
+        // d(a^b)/da = b * a^(b-1), d(a^b)/db = a^b * log(a)
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data && out->data) {
+                float* g1_data  = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                float* out_data = (float*)out->data;
+                if (in2 && in2->numel == 1) {
+                    float exp_val = ((float*)in2->data)[0];
+                    for (size_t i = 0; i < out_numel; i++) {
+                        size_t i1 = i % in1->numel;
+                        g1_data[i1] += out_grad[i] * exp_val * powf(in1_data[i1], exp_val - 1.0f);
+                    }
+                }
+            }
+        }
+        break;
+    }
+
     case UOP_EXP:
         // d(exp(a))/da = exp(a)
         if (in1 && in1->requires_grad && out->data) {
@@ -194,6 +214,20 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* out_data = (float*)out->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     g1_data[i % in1->numel] += out_grad[i] * 0.5f / (out_data[i] + 1e-8f);
+                }
+            }
+        }
+        break;
+
+    case UOP_SQUARE:
+        // d(x^2)/dx = 2*x
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data  = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    g1_data[i % in1->numel] += out_grad[i] * 2.0f * in1_data[i % in1->numel];
                 }
             }
         }
@@ -395,6 +429,36 @@ static int cpu_backward_node(struct IRNode* node) {
                             sum += in1_data[m * K + k] * out_grad[m * N + n];
                         }
                         g2_data[k * N + n] += sum;
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SHRINK: {
+        // Forward: out[...] = in[starts[d] + ..., ...]  (contiguous sub-region)
+        // Backward: scatter out_grad back into the corresponding region of in.grad
+        if (in1 && in1->requires_grad) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                ShrinkParams* sp = (ShrinkParams*)node->params;
+                if (sp) {
+                    if (in1->ndim == 1) {
+                        int start = sp->starts[0];
+                        int len   = sp->ends[0] - start;
+                        for (int i = 0; i < len; i++)
+                            g1_data[start + i] += out_grad[i];
+                    } else if (in1->ndim == 2) {
+                        int in_cols  = in1->shape[1];
+                        int r_start  = sp->starts[0], c_start = sp->starts[1];
+                        int out_rows = sp->ends[0] - r_start;
+                        int out_cols = sp->ends[1] - c_start;
+                        for (int r = 0; r < out_rows; r++)
+                            for (int c = 0; c < out_cols; c++)
+                                g1_data[(r_start + r) * in_cols + (c_start + c)] +=
+                                    out_grad[r * out_cols + c];
                     }
                 }
             }
