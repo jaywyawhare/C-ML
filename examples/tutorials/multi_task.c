@@ -83,6 +83,7 @@ int main(void) {
         cml_optim_step(opt_bb);
         cml_optim_step(opt_cls);
         cml_optim_step(opt_reg);
+        cml_reset_ir_context();
 
         if (epoch % 20 == 0)
             printf("Epoch %3d  cls_loss: %.4f  reg_loss: %.4f\n",

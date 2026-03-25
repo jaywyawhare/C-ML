@@ -77,6 +77,7 @@ int main() {
 
         training_metrics_auto_capture_train_accuracy(accuracy);
         cml_sleep_ms(5);
+        cml_reset_ir_context();
 
         if (epoch % 100 == 0 || epoch == epochs) {
             printf("%d\t\t%.6f\n", epoch, tensor_get_float(loss, 0));

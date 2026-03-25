@@ -44,16 +44,19 @@ int main(void) {
 
     Optimizer* opt = cml_optim_adam_for_model((Module*)model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
-    for (int epoch = 1; epoch <= 100; epoch++) {
+    for (int epoch = 1; epoch <= 500; epoch++) {
         Tensor* pred = cml_nn_sequential_forward(model, train->X);
         Tensor* loss = cml_nn_bce_loss(pred, y_oh);
         cml_optim_zero_grad(opt);
         cml_backward(loss, NULL, false, false);
         cml_optim_step(opt);
+        cml_reset_ir_context();
 
-        if (epoch % 20 == 0)
+        if (epoch % 100 == 0)
             printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
     }
+
+    cml_reset_ir_context();
 
     float* test_y_raw = (float*)tensor_data_ptr(test->y);
     Tensor* test_pred = cml_nn_sequential_forward(model, test->X);

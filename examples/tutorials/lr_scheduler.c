@@ -24,6 +24,7 @@ static void train_with_scheduler(const char* name, Sequential* model,
         cml_optim_zero_grad(opt);
         cml_backward(loss, NULL, false, false);
         cml_optim_step(opt);
+        cml_reset_ir_context();
 
         float current_lr = lr_scheduler_get_lr(sched);
         if (epoch % 10 == 0 || epoch == 1)

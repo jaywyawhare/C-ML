@@ -193,6 +193,7 @@ static void training_example(void) {
             }
 
             optimizer_step(optimizer);
+            cml_reset_ir_context();
 
             if (loss)
                 tensor_free(loss);

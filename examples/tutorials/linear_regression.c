@@ -28,6 +28,7 @@ int main(void) {
         cml_optim_zero_grad(opt);
         cml_backward(loss, NULL, false, false);
         cml_optim_step(opt);
+        cml_reset_ir_context();
 
         if (epoch % 20 == 0 || epoch == 1)
             printf("Epoch %3d  Loss: %.6f\n", epoch, tensor_get_float(loss, 0));

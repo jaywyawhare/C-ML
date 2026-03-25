@@ -43,6 +43,7 @@ int main(void) {
         cml_optim_zero_grad(opt);
         cml_backward(loss, NULL, false, false);
         cml_optim_step(opt);
+        cml_reset_ir_context();
 
         if (epoch % 20 == 0)
             printf("Epoch %4d  Reconstruction Loss: %.6f\n", epoch, tensor_get_float(loss, 0));
