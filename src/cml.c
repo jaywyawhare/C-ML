@@ -233,10 +233,14 @@ void cml_register_cleanup_context(CleanupContext* ctx) {
     g_cleanup_contexts[g_num_cleanup_contexts++] = ctx;
 }
 
-static void check_and_launch_viz(void) __attribute__((constructor));
+/* Constructor disabled: call check_and_launch_viz() from cml_init() instead */
 static void check_and_launch_viz(void) {
+    /* Quick exit: only activate when VIZ env var is explicitly set */
     const char* viz = getenv("VIZ");
-    if (!viz || (viz[0] != '1' && strcmp(viz, "true") != 0)) {
+    if (!viz || viz[0] == '\0') {
+        return;
+    }
+    if (viz[0] != '1' && strcmp(viz, "true") != 0) {
         return;
     }
 
@@ -401,6 +405,7 @@ int cml_init(void) {
         g_cml_initialized = true;
         g_cml_init_count  = 1;
         LOG_INFO("C-ML Library initialized successfully");
+        check_and_launch_viz();
     } else {
         LOG_ERROR("Failed to initialize C-ML Library");
     }

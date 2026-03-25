@@ -9,22 +9,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* out[b][r] = sum_c(weight[r][c] * input[b][c]) + bias[r] */
-static void matmul_add(float* out, const float* weight, const float* input,
-                       const float* bias, int rows, int cols, int batch) {
-    for (int b = 0; b < batch; b++) {
-        for (int r = 0; r < rows; r++) {
-            float sum = bias ? bias[r] : 0.0f;
-            for (int c = 0; c < cols; c++) {
-                sum += weight[r * cols + c] * input[b * cols + c];
-            }
-            out[b * rows + r] = sum;
-        }
-    }
-}
-
-static float sigmoid_f(float x) { return 1.0f / (1.0f + expf(-x)); }
-static float tanh_f(float x) { return tanhf(x); }
 
 static Tensor* rnn_cell_module_forward(Module* module, Tensor* input) {
     /* The Module interface does not carry the hidden state, so users
@@ -39,69 +23,31 @@ static void rnn_cell_free(Module* module) { free(module); }
 Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input) return NULL;
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(cell->weight_ih->tensor);
-    tensor_ensure_executed(cell->weight_hh->tensor);
-
     int batch = input->shape[0];
     int hs    = cell->hidden_size;
-    int is    = cell->input_size;
 
     /* Initialise hidden to zeros when NULL */
-    bool free_hidden = false;
     if (!hidden) {
         int h_shape[] = {batch, hs};
         TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
                             .has_dtype = true, .has_device = true};
         hidden = tensor_zeros(h_shape, 2, &cfg);
-        free_hidden = true;
-    }
-    tensor_ensure_executed(hidden);
-
-    float* x_data = (float*)tensor_data_ptr(input);
-    float* h_data = (float*)tensor_data_ptr(hidden);
-    float* wih    = (float*)tensor_data_ptr(cell->weight_ih->tensor);
-    float* whh    = (float*)tensor_data_ptr(cell->weight_hh->tensor);
-
-    float* bih = NULL;
-    float* bhh = NULL;
-    if (cell->bias_ih) {
-        tensor_ensure_executed(cell->bias_ih->tensor);
-        bih = (float*)tensor_data_ptr(cell->bias_ih->tensor);
-    }
-    if (cell->bias_hh) {
-        tensor_ensure_executed(cell->bias_hh->tensor);
-        bhh = (float*)tensor_data_ptr(cell->bias_hh->tensor);
     }
 
-    /* Temporary buffers for the two matrix-vector products */
-    float* ih_out = calloc((size_t)(batch * hs), sizeof(float));
-    float* hh_out = calloc((size_t)(batch * hs), sizeof(float));
-    if (!ih_out || !hh_out) {
-        free(ih_out);
-        free(hh_out);
-        if (free_hidden) tensor_free(hidden);
-        return NULL;
-    }
+    /* h_new = tanh(input @ W_ih^T + hidden @ W_hh^T + b_ih + b_hh)
+     * All ops go through autograd so gradients reach the weight parameters. */
+    Tensor* wih_t = tensor_transpose(cell->weight_ih->tensor, 0, 1);
+    Tensor* whh_t = tensor_transpose(cell->weight_hh->tensor, 0, 1);
 
-    matmul_add(ih_out, wih, x_data, bih, hs, is, batch);
-    matmul_add(hh_out, whh, h_data, bhh, hs, hs, batch);
+    Tensor* h_new = tensor_add(tensor_matmul(input, wih_t),
+                               tensor_matmul(hidden, whh_t));
 
-    /* Allocate output tensor */
-    int h_shape[] = {batch, hs};
-    TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
-                        .has_dtype = true, .has_device = true};
-    Tensor* h_new = tensor_empty(h_shape, 2, &cfg);
-    tensor_ensure_executed(h_new);
-    float* h_new_data = (float*)tensor_data_ptr(h_new);
+    if (cell->bias_ih)
+        h_new = tensor_add(h_new, cell->bias_ih->tensor);
+    if (cell->bias_hh)
+        h_new = tensor_add(h_new, cell->bias_hh->tensor);
 
-    for (int i = 0; i < batch * hs; i++) {
-        h_new_data[i] = tanh_f(ih_out[i] + hh_out[i]);
-    }
-
-    free(ih_out);
-    free(hh_out);
-    if (free_hidden) tensor_free(hidden);
+    h_new = uop_tanh(h_new);
 
     return h_new;
 }
@@ -309,82 +255,53 @@ static void gru_cell_free(Module* module) { free(module); }
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input) return NULL;
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(cell->weight_ih->tensor);
-    tensor_ensure_executed(cell->weight_hh->tensor);
-
     int batch = input->shape[0];
     int hs    = cell->hidden_size;
-    int is    = cell->input_size;
-    int gs    = 3 * hs; /* gate size */
 
     /* Initialise hidden to zeros when NULL */
-    bool free_hidden = false;
     if (!hidden) {
         int s[] = {batch, hs};
         TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
                             .has_dtype = true, .has_device = true};
         hidden = tensor_zeros(s, 2, &cfg);
-        free_hidden = true;
-    }
-    tensor_ensure_executed(hidden);
-
-    float* x_data = (float*)tensor_data_ptr(input);
-    float* h_data = (float*)tensor_data_ptr(hidden);
-    float* wih    = (float*)tensor_data_ptr(cell->weight_ih->tensor);
-    float* whh    = (float*)tensor_data_ptr(cell->weight_hh->tensor);
-
-    float* bih = NULL;
-    float* bhh = NULL;
-    if (cell->bias_ih) {
-        tensor_ensure_executed(cell->bias_ih->tensor);
-        bih = (float*)tensor_data_ptr(cell->bias_ih->tensor);
-    }
-    if (cell->bias_hh) {
-        tensor_ensure_executed(cell->bias_hh->tensor);
-        bhh = (float*)tensor_data_ptr(cell->bias_hh->tensor);
     }
 
-    /* Compute ih = W_ih @ x + b_ih  and  hh = W_hh @ h + b_hh */
-    float* ih_out = calloc((size_t)(batch * gs), sizeof(float));
-    float* hh_out = calloc((size_t)(batch * gs), sizeof(float));
-    if (!ih_out || !hh_out) {
-        free(ih_out);
-        free(hh_out);
-        if (free_hidden) tensor_free(hidden);
-        return NULL;
-    }
+    /* GRU forward using autograd ops so gradients flow to parameters.
+     * ih = input @ W_ih^T + b_ih   [batch, 3*hs]
+     * hh = hidden @ W_hh^T + b_hh  [batch, 3*hs] */
+    Tensor* wih_t = tensor_transpose(cell->weight_ih->tensor, 0, 1);
+    Tensor* whh_t = tensor_transpose(cell->weight_hh->tensor, 0, 1);
 
-    matmul_add(ih_out, wih, x_data, bih, gs, is, batch);
-    matmul_add(hh_out, whh, h_data, bhh, gs, hs, batch);
+    Tensor* ih = tensor_matmul(input, wih_t);
+    Tensor* hh = tensor_matmul(hidden, whh_t);
 
-    /* Allocate output tensor */
-    int s[] = {batch, hs};
-    TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
-                        .has_dtype = true, .has_device = true};
-    Tensor* h_new = tensor_empty(s, 2, &cfg);
-    tensor_ensure_executed(h_new);
-    float* h_new_data = (float*)tensor_data_ptr(h_new);
+    if (cell->bias_ih)
+        ih = tensor_add(ih, cell->bias_ih->tensor);
+    if (cell->bias_hh)
+        hh = tensor_add(hh, cell->bias_hh->tensor);
 
-    for (int b = 0; b < batch; b++) {
-        for (int j = 0; j < hs; j++) {
-            int base = b * gs;
+    /* Split ih and hh into 3 gates of size hs each */
+    int s_r[] = {0, 0 * hs}, e_r[] = {batch, 1 * hs};
+    int s_z[] = {0, 1 * hs}, e_z[] = {batch, 2 * hs};
+    int s_n[] = {0, 2 * hs}, e_n[] = {batch, 3 * hs};
 
-            /* Reset and update gates combine ih and hh linearly */
-            float r = sigmoid_f(ih_out[base + 0 * hs + j] + hh_out[base + 0 * hs + j]);
-            float z = sigmoid_f(ih_out[base + 1 * hs + j] + hh_out[base + 1 * hs + j]);
+    Tensor* ih_r = uop_shrink(ih, s_r, e_r, 2);
+    Tensor* ih_z = uop_shrink(ih, s_z, e_z, 2);
+    Tensor* ih_n = uop_shrink(ih, s_n, e_n, 2);
 
-            /* New gate: ih_n + r * hh_n */
-            float n = tanh_f(ih_out[base + 2 * hs + j] + r * hh_out[base + 2 * hs + j]);
+    Tensor* hh_r = uop_shrink(hh, s_r, e_r, 2);
+    Tensor* hh_z = uop_shrink(hh, s_z, e_z, 2);
+    Tensor* hh_n = uop_shrink(hh, s_n, e_n, 2);
 
-            int idx = b * hs + j;
-            h_new_data[idx] = (1.0f - z) * n + z * h_data[idx];
-        }
-    }
+    /* r = sigmoid(ih_r + hh_r), z = sigmoid(ih_z + hh_z) */
+    Tensor* r = uop_sigmoid(tensor_add(ih_r, hh_r));
+    Tensor* z = uop_sigmoid(tensor_add(ih_z, hh_z));
 
-    free(ih_out);
-    free(hh_out);
-    if (free_hidden) tensor_free(hidden);
+    /* n = tanh(ih_n + r * hh_n) */
+    Tensor* n = uop_tanh(tensor_add(ih_n, tensor_mul(r, hh_n)));
+
+    /* h_new = (1-z)*n + z*hidden = n + z*(hidden - n) */
+    Tensor* h_new = tensor_add(n, tensor_mul(z, tensor_sub(hidden, n)));
 
     return h_new;
 }

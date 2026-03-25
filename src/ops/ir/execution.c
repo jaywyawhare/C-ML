@@ -792,10 +792,34 @@ int cpu_execute_node(struct IRNode* node) {
                 out_data[i] = input_data[i * n_cols + (size_t)idx];
             }
         } else {
-            // Generic N-dimensional gather (fallback - slower)
-            LOG_WARNING("UOP_GATHER: using generic N-dim implementation");
-            for (size_t i = 0; i < out->numel; i++) {
-                out_data[i] = 0.0f;
+            // Generic N-dimensional gather along specified dim
+            // out[i0,...,i_{dim-1}, j, i_{dim+1},...] = input[i0,...,i_{dim-1}, indices[j], i_{dim+1},...]
+            if (dim < 0 || dim >= input->ndim) {
+                LOG_ERROR("UOP_GATHER: dim %d out of range for %d-dim input", dim, input->ndim);
+                return -1;
+            }
+
+            // Compute strides for input
+            size_t outer_size = 1, inner_size = 1;
+            for (int d = 0; d < dim; d++) outer_size *= (size_t)input->shape[d];
+            for (int d = dim + 1; d < input->ndim; d++) inner_size *= (size_t)input->shape[d];
+            size_t dim_size = (size_t)input->shape[dim];
+
+            size_t out_idx = 0;
+            for (size_t o = 0; o < outer_size; o++) {
+                for (size_t j = 0; j < indices->numel; j++) {
+                    int idx = (int)index_data[j];
+                    if (idx < 0 || idx >= (int)dim_size) {
+                        LOG_ERROR("UOP_GATHER: index %d out of bounds [0, %zu)", idx, dim_size);
+                        return -1;
+                    }
+                    for (size_t k = 0; k < inner_size; k++) {
+                        size_t src = o * dim_size * inner_size + (size_t)idx * inner_size + k;
+                        if (out_idx < out->numel) {
+                            out_data[out_idx++] = input_data[src];
+                        }
+                    }
+                }
             }
         }
         break;

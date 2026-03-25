@@ -93,7 +93,8 @@ const char* cml_dataset_download(const char* url, const char* filename) {
     /* Download */
     char cmd[4096];
     snprintf(cmd, sizeof(cmd),
-             "curl -fsSL -o '%s' '%s' 2>/dev/null || wget -q -O '%s' '%s' 2>/dev/null",
+             "curl -fsSL --connect-timeout 10 --max-time 60 -o '%s' '%s' 2>/dev/null "
+             "|| wget -q --timeout=10 -O '%s' '%s' 2>/dev/null",
              path, url, path, url);
 
     LOG_INFO("[datasets] Downloading %s ...", url);

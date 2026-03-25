@@ -83,6 +83,7 @@ struct CMLGraph {
     IRTarget target;
     struct IRNode* head; // Forward graph (lazy)
     struct IRNode* tail;
+    struct IRNode* last_result; // Last node from cml_ir_add_uop (may be interned)
     struct IRNode* backward_head; // Backward graph (lazy)
     int node_count;
 

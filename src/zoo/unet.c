@@ -58,10 +58,10 @@ static Tensor* unet_forward(Module* module, Tensor* input) {
     if (!x) return NULL;
 
     for (int i = unet->depth - 1; i >= 0; i--) {
-        x = module_forward((Module*)unet->ups[i], x);
-        if (!x) return NULL;
+        Tensor* up = module_forward((Module*)unet->ups[i], x);
+        if (!up) return NULL;
 
-        Tensor* cat_tensors[] = {x, skips[i]};
+        Tensor* cat_tensors[] = {up, skips[i]};
         x = tensor_concat(cat_tensors, 2, 1);
         if (!x) return NULL;
 

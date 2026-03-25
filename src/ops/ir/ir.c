@@ -260,6 +260,7 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->target        = target;
     ir->head          = NULL;
     ir->tail          = NULL;
+    ir->last_result   = NULL;
     ir->backward_head = NULL;
     ir->node_count    = 0;
 
@@ -834,6 +835,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
                                                            lookup_count, params, 0);
             if (existing && existing->output && !existing->is_executed) {
                 existing->ref_count++;
+                ir->last_result = existing;
                 return 0;
             }
         }
@@ -1012,6 +1014,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     }
 
     ir->node_count++;
+    ir->last_result = node;
 
     ir->is_executed = false;
 
@@ -1021,7 +1024,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
 struct IRNode* cml_ir_get_tail(CMLGraph_t ir) {
     if (!ir)
         return NULL;
-    return ir->tail;
+    return ir->last_result ? ir->last_result : ir->tail;
 }
 
 char* cml_ir_compile(CMLGraph_t ir, const char* output_file) {

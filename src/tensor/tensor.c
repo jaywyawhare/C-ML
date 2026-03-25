@@ -789,6 +789,12 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     if (!node || !ir_context)
         return NULL;
 
+    /* If this node was interned and already has an output tensor, reuse it */
+    if (node->output) {
+        node->output->ref_count++;
+        return node->output;
+    }
+
     Tensor* t = (Tensor*)malloc(sizeof(Tensor));
     if (!t)
         return NULL;

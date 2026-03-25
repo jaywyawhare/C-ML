@@ -163,7 +163,6 @@ static int cpu_backward_node(struct IRNode* node) {
             if (g1 && g1->data && out->data) {
                 float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
-                float* out_data = (float*)out->data;
                 if (in2 && in2->numel == 1) {
                     float exp_val = ((float*)in2->data)[0];
                     for (size_t i = 0; i < out_numel; i++) {
@@ -858,6 +857,40 @@ static int cpu_backward_node(struct IRNode* node) {
                             float t = t_data[i % in_t->numel];
                             gb_data[i % in_b->numel] += out_grad[i] * t;
                         }
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_GATHER: {
+        // Gather backward: scatter grad_output back to input positions
+        // Forward: out[i] = input[i, indices[i]]  (2D input, 1D indices, dim=1)
+        // Backward: grad_input[i, indices[i]] += grad_output[i]
+        if (node->num_inputs >= 2) {
+            Tensor* input_t = node->inputs[0];
+            Tensor* indices_t = node->inputs[1];
+            if (input_t && input_t->requires_grad && input_t->data && indices_t && indices_t->data) {
+                Tensor* g1 = ensure_grad(input_t);
+                if (g1 && g1->data) {
+                    float* g1_data = (float*)g1->data;
+                    float* idx_data = (float*)indices_t->data;
+                    GatherParams* params = (GatherParams*)node->params;
+                    int dim = params ? params->dim : -1;
+                    if (dim < 0) dim = input_t->ndim + dim;
+
+                    if (input_t->ndim == 2 && indices_t->ndim == 1 && dim == 1) {
+                        size_t n_cols = (size_t)input_t->shape[1];
+                        size_t n_rows = (size_t)indices_t->numel;
+                        for (size_t i = 0; i < n_rows && i < out_numel; i++) {
+                            int idx = (int)idx_data[i];
+                            if (idx >= 0 && idx < (int)n_cols) {
+                                g1_data[i * n_cols + (size_t)idx] += out_grad[i];
+                            }
+                        }
+                    } else {
+                        LOG_DEBUG("CPU backward: UOP_GATHER generic N-dim grad not implemented");
                     }
                 }
             }
