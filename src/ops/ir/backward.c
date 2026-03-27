@@ -7,6 +7,19 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
+#include "backend/blas.h"
+#include "ops/simd_math.h"
+
+#ifdef __SSE__
+#include <xmmintrin.h>
+#include <emmintrin.h>
+#endif
+#ifdef __AVX__
+#include <immintrin.h>
+#endif
+
+/* Access the shared BLAS context from execution.c */
+extern CMLBlasContext* get_blas_context(void);
 
 int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
     if (!ir || !output_node) {
@@ -39,8 +52,35 @@ static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     float* g_data  = (float*)g->data;
     size_t t_numel = t->numel;
 
-    for (size_t i = 0; i < numel; i++) {
-        g_data[i % t_numel] += grad_data[i];
+    if (t_numel == numel) {
+        /* Fast path: SIMD-accelerated direct accumulation */
+        simd_add_f32(g_data, grad_data, g_data, numel);
+    } else if (t_numel == 1) {
+        /* Scalar gradient: sum all */
+        float sum = 0.0f;
+#ifdef __AVX__
+        size_t i = 0;
+        __m256 vsum = _mm256_setzero_ps();
+        for (; i + 8 <= numel; i += 8)
+            vsum = _mm256_add_ps(vsum, _mm256_loadu_ps(grad_data + i));
+        /* Horizontal sum of 8 floats */
+        __m128 lo = _mm256_castps256_ps128(vsum);
+        __m128 hi = _mm256_extractf128_ps(vsum, 1);
+        lo = _mm_add_ps(lo, hi);
+        lo = _mm_add_ps(lo, _mm_movehl_ps(lo, lo));
+        lo = _mm_add_ss(lo, _mm_shuffle_ps(lo, lo, 1));
+        sum = _mm_cvtss_f32(lo);
+        for (; i < numel; i++)
+            sum += grad_data[i];
+#else
+        for (size_t i = 0; i < numel; i++)
+            sum += grad_data[i];
+#endif
+        g_data[0] += sum;
+    } else {
+        /* Broadcast: accumulate with modulo */
+        for (size_t i = 0; i < numel; i++)
+            g_data[i % t_numel] += grad_data[i];
     }
 }
 
@@ -49,6 +89,7 @@ static int cpu_backward_node(struct IRNode* node) {
         return 0;
 
     Tensor* out = node->output;
+
     if (!out->grad || !out->grad->data)
         return 0;
 
@@ -78,8 +119,12 @@ static int cpu_backward_node(struct IRNode* node) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
                 float* g2_data = (float*)g2->data;
-                for (size_t i = 0; i < out_numel; i++) {
-                    g2_data[i % in2->numel] -= out_grad[i];
+                if (in2->numel == out_numel) {
+                    /* Fast path: SIMD subtract */
+                    simd_sub_f32(g2_data, out_grad, g2_data, out_numel);
+                } else {
+                    for (size_t i = 0; i < out_numel; i++)
+                        g2_data[i % in2->numel] -= out_grad[i];
                 }
             }
         }
@@ -92,10 +137,23 @@ static int cpu_backward_node(struct IRNode* node) {
             if (g1 && g1->data) {
                 float* g1_data  = (float*)g1->data;
                 float* in2_data = (float*)in2->data;
-                for (size_t i = 0; i < out_numel; i++) {
-                    size_t i1 = i % in1->numel;
-                    size_t i2 = i % in2->numel;
-                    g1_data[i1] += out_grad[i] * in2_data[i2];
+                if (in1->numel == out_numel && in2->numel == out_numel) {
+                    /* Fast path: no broadcast, SIMD fused multiply-add */
+                    size_t i = 0;
+#ifdef __AVX__
+                    for (; i + 8 <= out_numel; i += 8) {
+                        __m256 og = _mm256_loadu_ps(out_grad + i);
+                        __m256 b  = _mm256_loadu_ps(in2_data + i);
+                        __m256 cur = _mm256_loadu_ps(g1_data + i);
+                        cur = _mm256_add_ps(cur, _mm256_mul_ps(og, b));
+                        _mm256_storeu_ps(g1_data + i, cur);
+                    }
+#endif
+                    for (; i < out_numel; i++)
+                        g1_data[i] += out_grad[i] * in2_data[i];
+                } else {
+                    for (size_t i = 0; i < out_numel; i++)
+                        g1_data[i % in1->numel] += out_grad[i] * in2_data[i % in2->numel];
                 }
             }
         }
@@ -104,10 +162,22 @@ static int cpu_backward_node(struct IRNode* node) {
             if (g2 && g2->data) {
                 float* g2_data  = (float*)g2->data;
                 float* in1_data = (float*)in1->data;
-                for (size_t i = 0; i < out_numel; i++) {
-                    size_t i1 = i % in1->numel;
-                    size_t i2 = i % in2->numel;
-                    g2_data[i2] += out_grad[i] * in1_data[i1];
+                if (in1->numel == out_numel && in2->numel == out_numel) {
+                    size_t i = 0;
+#ifdef __AVX__
+                    for (; i + 8 <= out_numel; i += 8) {
+                        __m256 og = _mm256_loadu_ps(out_grad + i);
+                        __m256 a  = _mm256_loadu_ps(in1_data + i);
+                        __m256 cur = _mm256_loadu_ps(g2_data + i);
+                        cur = _mm256_add_ps(cur, _mm256_mul_ps(og, a));
+                        _mm256_storeu_ps(g2_data + i, cur);
+                    }
+#endif
+                    for (; i < out_numel; i++)
+                        g2_data[i] += out_grad[i] * in1_data[i];
+                } else {
+                    for (size_t i = 0; i < out_numel; i++)
+                        g2_data[i % in2->numel] += out_grad[i] * in1_data[i % in1->numel];
                 }
             }
         }
@@ -344,9 +414,24 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* g1_data = (float*)g1->data;
                 float scale =
                     (node->type == UOP_MEAN && in1->numel > 0) ? 1.0f / (float)in1->numel : 1.0f;
-                for (size_t i = 0; i < in1->numel; i++) {
-                    g1_data[i] += out_grad[0] * scale;
+                float val = out_grad[0] * scale;
+                size_t n = in1->numel;
+                size_t i = 0;
+#ifdef __AVX__
+                __m256 vval = _mm256_set1_ps(val);
+                for (; i + 8 <= n; i += 8) {
+                    __m256 cur = _mm256_loadu_ps(g1_data + i);
+                    _mm256_storeu_ps(g1_data + i, _mm256_add_ps(cur, vval));
                 }
+#elif defined(__SSE__)
+                __m128 vval = _mm_set1_ps(val);
+                for (; i + 4 <= n; i += 4) {
+                    __m128 cur = _mm_loadu_ps(g1_data + i);
+                    _mm_storeu_ps(g1_data + i, _mm_add_ps(cur, vval));
+                }
+#endif
+                for (; i < n; i++)
+                    g1_data[i] += val;
             }
         }
         break;
@@ -362,11 +447,25 @@ static int cpu_backward_node(struct IRNode* node) {
                 Tensor* g1 = ensure_grad(in1);
                 if (g1 && g1->data) {
                     float* g1_data = (float*)g1->data;
-                    for (size_t i = 0; i < out_numel; i++) {
-                        size_t i1 = i % in1->numel;
-                        size_t i2 = i % in2->numel;
-                        if (in1_data[i1] >= in2_data[i2]) {
-                            g1_data[i1] += out_grad[i];
+                    if (in1->numel == out_numel && in2->numel == out_numel) {
+                        /* Fast path: no broadcasting */
+                        for (size_t i = 0; i < out_numel; i++) {
+                            if (in1_data[i] >= in2_data[i])
+                                g1_data[i] += out_grad[i];
+                        }
+                    } else if (in2->numel == 1) {
+                        /* Common: relu = max(x, 0) — scalar broadcast */
+                        float threshold = in2_data[0];
+                        for (size_t i = 0; i < out_numel; i++) {
+                            if (in1_data[i % in1->numel] >= threshold)
+                                g1_data[i % in1->numel] += out_grad[i];
+                        }
+                    } else {
+                        for (size_t i = 0; i < out_numel; i++) {
+                            size_t i1 = i % in1->numel;
+                            size_t i2 = i % in2->numel;
+                            if (in1_data[i1] >= in2_data[i2])
+                                g1_data[i1] += out_grad[i];
                         }
                     }
                 }
@@ -375,11 +474,17 @@ static int cpu_backward_node(struct IRNode* node) {
                 Tensor* g2 = ensure_grad(in2);
                 if (g2 && g2->data) {
                     float* g2_data = (float*)g2->data;
-                    for (size_t i = 0; i < out_numel; i++) {
-                        size_t i1 = i % in1->numel;
-                        size_t i2 = i % in2->numel;
-                        if (in2_data[i2] > in1_data[i1]) {
-                            g2_data[i2] += out_grad[i];
+                    if (in1->numel == out_numel && in2->numel == out_numel) {
+                        for (size_t i = 0; i < out_numel; i++) {
+                            if (in2_data[i] > in1_data[i])
+                                g2_data[i] += out_grad[i];
+                        }
+                    } else {
+                        for (size_t i = 0; i < out_numel; i++) {
+                            size_t i1 = i % in1->numel;
+                            size_t i2 = i % in2->numel;
+                            if (in2_data[i2] > in1_data[i1])
+                                g2_data[i2] += out_grad[i];
                         }
                     }
                 }
@@ -388,8 +493,6 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
 
     case UOP_MATMUL: {
-        // d(A @ B)/dA = grad @ B^T
-        // d(A @ B)/dB = A^T @ grad
         if (!in1 || !in2 || in1->ndim < 2 || in2->ndim < 2)
             break;
 
@@ -397,37 +500,119 @@ static int cpu_backward_node(struct IRNode* node) {
         int K = in1->shape[in1->ndim - 1];
         int N = in2->shape[in2->ndim - 1];
 
-        // Gradient w.r.t. first input: grad @ B^T
+        CMLBlasContext* blas = get_blas_context();
+
         if (in1->requires_grad && in2->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 float* g1_data  = (float*)g1->data;
                 float* in2_data = (float*)in2->data;
-                for (int m = 0; m < M; m++) {
-                    for (int k = 0; k < K; k++) {
-                        float sum = 0.0f;
-                        for (int n = 0; n < N; n++) {
-                            sum += out_grad[m * N + n] * in2_data[k * N + n];
+                if (blas && blas->initialized) {
+                    cml_blas_sgemm_ex(blas, out_grad, in2_data, g1_data,
+                                      M, K, N, 1.0f, 1.0f, false, true);
+                } else {
+                    for (int m = 0; m < M; m++) {
+                        for (int k = 0; k < K; k++) {
+                            float sum = 0.0f;
+                            for (int n = 0; n < N; n++) {
+                                sum += out_grad[m * N + n] * in2_data[k * N + n];
+                            }
+                            g1_data[m * K + k] += sum;
                         }
-                        g1_data[m * K + k] += sum;
                     }
                 }
             }
         }
 
-        // Gradient w.r.t. second input: A^T @ grad
         if (in2->requires_grad && in1->data) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
                 float* g2_data  = (float*)g2->data;
                 float* in1_data = (float*)in1->data;
-                for (int k = 0; k < K; k++) {
-                    for (int n = 0; n < N; n++) {
-                        float sum = 0.0f;
-                        for (int m = 0; m < M; m++) {
-                            sum += in1_data[m * K + k] * out_grad[m * N + n];
+                if (blas && blas->initialized) {
+                    cml_blas_sgemm_ex(blas, in1_data, out_grad, g2_data,
+                                      K, N, M, 1.0f, 1.0f, true, false);
+                } else {
+                    for (int k = 0; k < K; k++) {
+                        for (int n = 0; n < N; n++) {
+                            float sum = 0.0f;
+                            for (int m = 0; m < M; m++) {
+                                sum += in1_data[m * K + k] * out_grad[m * N + n];
+                            }
+                            g2_data[k * N + n] += sum;
                         }
-                        g2_data[k * N + n] += sum;
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_LINEAR: {
+        if (!in1 || !in2 || in1->ndim < 2 || in2->ndim != 2)
+            break;
+
+        int M = in1->shape[in1->ndim - 2];
+        int K = in1->shape[in1->ndim - 1];
+        int N = in2->shape[0];
+
+        CMLBlasContext* blas = get_blas_context();
+
+        if (in1->requires_grad && in2->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* w_data = (float*)in2->data;
+                if (blas && blas->initialized) {
+                    cml_blas_sgemm(blas, out_grad, w_data, g1_data,
+                                   M, K, N, 1.0f, 1.0f);
+                } else {
+                    for (int m = 0; m < M; m++)
+                        for (int k = 0; k < K; k++) {
+                            float sum = 0.0f;
+                            for (int n = 0; n < N; n++)
+                                sum += out_grad[m * N + n] * w_data[n * K + k];
+                            g1_data[m * K + k] += sum;
+                        }
+                }
+            }
+        }
+
+        if (in2->requires_grad && in1->data) {
+            Tensor* g2 = ensure_grad(in2);
+            if (g2 && g2->data) {
+                float* g2_data = (float*)g2->data;
+                float* i_data = (float*)in1->data;
+                if (blas && blas->initialized) {
+                    cml_blas_sgemm_ex(blas, out_grad, i_data, g2_data,
+                                      N, K, M, 1.0f, 1.0f, true, false);
+                } else {
+                    for (int n = 0; n < N; n++)
+                        for (int k = 0; k < K; k++) {
+                            float sum = 0.0f;
+                            for (int m = 0; m < M; m++)
+                                sum += out_grad[m * N + n] * i_data[m * K + k];
+                            g2_data[n * K + k] += sum;
+                        }
+                }
+            }
+        }
+
+        if (node->num_inputs >= 3 && node->inputs[2]) {
+            Tensor* bias_t = node->inputs[2];
+            if (bias_t && bias_t->requires_grad) {
+                Tensor* gb = ensure_grad(bias_t);
+                if (gb && gb->data) {
+                    float* gb_data = (float*)gb->data;
+                    if (blas && blas->initialized) {
+                        for (int m = 0; m < M; m++)
+                            cml_blas_saxpy(blas, out_grad + m * N, gb_data, N, 1.0f);
+                    } else {
+                        for (int m = 0; m < M; m++) {
+                            const float* row = out_grad + m * N;
+                            for (int n = 0; n < N; n++)
+                                gb_data[n] += row[n];
+                        }
                     }
                 }
             }
@@ -504,86 +689,133 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
 
     case UOP_CONV2D: {
-        // Backward for 2D convolution: input gradient via "full" correlation
-        // grad_input = conv2d_full(grad_output, rot180(weight))
-        // grad_weight = conv2d(input, grad_output)
+        /* Backward for 2D convolution using im2col + GEMM (BLAS-accelerated).
+         * Forward:  out[co, spatial] = weight[co, ci*kh*kw] @ im2col(input)[ci*kh*kw, spatial]
+         * Input grad:  col_grad = weight^T @ out_grad, then col2im → input_grad
+         * Weight grad: weight_grad += out_grad @ im2col(input)^T
+         */
         if (!in1 || !in2)
             break;
-
-        // in1 = input [N, C_in, H, W], in2 = weight [C_out, C_in, kH, kW]
-        int ndim_in = in1->ndim;
-        int ndim_w  = in2->ndim;
-        if (ndim_in != 4 || ndim_w != 4)
+        if (in1->ndim != 4 || in2->ndim != 4)
             break;
 
-        int N = in1->shape[0], C_in = in1->shape[1];
+        int NB = in1->shape[0], C_in = in1->shape[1];
         int H = in1->shape[2], W = in1->shape[3];
         int C_out = in2->shape[0], kH = in2->shape[2], kW = in2->shape[3];
         int oH = out->shape[2], oW = out->shape[3];
 
-        // Gradient w.r.t. input
-        if (in1->requires_grad && in2->data) {
-            Tensor* g1 = ensure_grad(in1);
-            if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
-                float* w_data  = (float*)in2->data;
-                // Full convolution: pad grad_output by (kH-1, kW-1), convolve with rot180(weight)
-                for (int n = 0; n < N; n++) {
-                    for (int ci = 0; ci < C_in; ci++) {
-                        for (int h = 0; h < H; h++) {
-                            for (int w_idx = 0; w_idx < W; w_idx++) {
-                                float sum = 0.0f;
-                                for (int co = 0; co < C_out; co++) {
-                                    for (int kh = 0; kh < kH; kh++) {
-                                        for (int kw = 0; kw < kW; kw++) {
-                                            int oh = h - kh;
-                                            int ow = w_idx - kw;
-                                            if (oh >= 0 && oh < oH && ow >= 0 && ow < oW) {
-                                                float g =
-                                                    out_grad[((n * C_out + co) * oH + oh) * oW +
-                                                             ow];
-                                                float wt =
-                                                    w_data[((co * C_in + ci) * kH + kh) * kW + kw];
-                                                sum += g * wt;
-                                            }
-                                        }
+        int col_h = C_in * kH * kW;
+        int col_w = oH * oW;
+        CMLBlasContext* blas = get_blas_context();
+
+        if (blas && blas->initialized) {
+            /* BLAS im2col+GEMM path */
+            float* col_buf = (float*)malloc((size_t)col_h * col_w * sizeof(float));
+            if (!col_buf) break;
+
+            /* Input gradient: weight^T @ out_grad → col_grad, then col2im */
+            if (in1->requires_grad && in2->data) {
+                Tensor* g1 = ensure_grad(in1);
+                if (g1 && g1->data) {
+                    float* g1_data = (float*)g1->data;
+                    float* w_data  = (float*)in2->data;
+                    for (int n = 0; n < NB; n++) {
+                        const float* og_n = out_grad + (size_t)n * C_out * oH * oW;
+                        /* col_buf[col_h, col_w] = w^T[col_h, C_out] @ og[C_out, col_w] */
+                        cml_blas_sgemm_ex(blas, w_data, og_n, col_buf,
+                                          col_h, col_w, C_out, 1.0f, 0.0f, true, false);
+                        /* col2im: scatter col_buf into input gradient */
+                        for (int ci = 0; ci < C_in; ci++) {
+                            for (int kh = 0; kh < kH; kh++) {
+                                for (int kw = 0; kw < kW; kw++) {
+                                    int col_row = (ci * kH + kh) * kW + kw;
+                                    const float* col_r = col_buf + (size_t)col_row * col_w;
+                                    for (int oh = 0; oh < oH; oh++) {
+                                        int ih = oh + kh;
+                                        float* g1_row = g1_data + ((size_t)(n * C_in + ci) * H + ih) * W;
+                                        const float* cr = col_r + oh * oW;
+                                        for (int ow = 0; ow < oW; ow++)
+                                            g1_row[ow + kw] += cr[ow];
                                     }
                                 }
-                                g1_data[((n * C_in + ci) * H + h) * W + w_idx] += sum;
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Gradient w.r.t. weight
-        if (in2->requires_grad && in1->data) {
-            Tensor* g2 = ensure_grad(in2);
-            if (g2 && g2->data) {
-                float* g2_data = (float*)g2->data;
-                float* in_data = (float*)in1->data;
-                for (int co = 0; co < C_out; co++) {
-                    for (int ci = 0; ci < C_in; ci++) {
-                        for (int kh = 0; kh < kH; kh++) {
-                            for (int kw = 0; kw < kW; kw++) {
-                                float sum = 0.0f;
-                                for (int n = 0; n < N; n++) {
+            /* Weight gradient: out_grad @ im2col(input)^T */
+            if (in2->requires_grad && in1->data) {
+                Tensor* g2 = ensure_grad(in2);
+                if (g2 && g2->data) {
+                    float* g2_data = (float*)g2->data;
+                    float* in_data = (float*)in1->data;
+                    for (int n = 0; n < NB; n++) {
+                        /* im2col: input_n → col_buf */
+                        for (int ci = 0; ci < C_in; ci++) {
+                            const float* in_ch = in_data + ((size_t)n * C_in + ci) * H * W;
+                            for (int kh = 0; kh < kH; kh++) {
+                                for (int kw = 0; kw < kW; kw++) {
+                                    int col_row = (ci * kH + kh) * kW + kw;
+                                    float* col_r = col_buf + (size_t)col_row * col_w;
                                     for (int oh = 0; oh < oH; oh++) {
-                                        for (int ow = 0; ow < oW; ow++) {
-                                            float g =
-                                                out_grad[((n * C_out + co) * oH + oh) * oW + ow];
-                                            float inp =
-                                                in_data[((n * C_in + ci) * H + (oh + kh)) * W +
-                                                        (ow + kw)];
-                                            sum += g * inp;
-                                        }
+                                        const float* src = in_ch + (oh + kh) * W + kw;
+                                        float* dst = col_r + oh * oW;
+                                        memcpy(dst, src, (size_t)oW * sizeof(float));
                                     }
                                 }
-                                g2_data[((co * C_in + ci) * kH + kh) * kW + kw] += sum;
                             }
                         }
+                        const float* og_n = out_grad + (size_t)n * C_out * oH * oW;
+                        /* g2[C_out, col_h] += og[C_out, col_w] @ col^T[col_w, col_h] */
+                        cml_blas_sgemm_ex(blas, og_n, col_buf, g2_data,
+                                          C_out, col_h, col_w, 1.0f, 1.0f, false, true);
                     }
+                }
+            }
+
+            free(col_buf);
+        } else {
+            /* Naive fallback (no BLAS) — 7-deep nested loops */
+            if (in1->requires_grad && in2->data) {
+                Tensor* g1 = ensure_grad(in1);
+                if (g1 && g1->data) {
+                    float* g1_data = (float*)g1->data;
+                    float* w_data  = (float*)in2->data;
+                    for (int n = 0; n < NB; n++)
+                        for (int ci = 0; ci < C_in; ci++)
+                            for (int h = 0; h < H; h++)
+                                for (int w_idx = 0; w_idx < W; w_idx++) {
+                                    float sum = 0.0f;
+                                    for (int co = 0; co < C_out; co++)
+                                        for (int kh = 0; kh < kH; kh++)
+                                            for (int kw = 0; kw < kW; kw++) {
+                                                int oh = h - kh, ow = w_idx - kw;
+                                                if (oh >= 0 && oh < oH && ow >= 0 && ow < oW)
+                                                    sum += out_grad[((n * C_out + co) * oH + oh) * oW + ow]
+                                                         * w_data[((co * C_in + ci) * kH + kh) * kW + kw];
+                                            }
+                                    g1_data[((n * C_in + ci) * H + h) * W + w_idx] += sum;
+                                }
+                }
+            }
+            if (in2->requires_grad && in1->data) {
+                Tensor* g2 = ensure_grad(in2);
+                if (g2 && g2->data) {
+                    float* g2_data = (float*)g2->data;
+                    float* in_data = (float*)in1->data;
+                    for (int co = 0; co < C_out; co++)
+                        for (int ci = 0; ci < C_in; ci++)
+                            for (int kh = 0; kh < kH; kh++)
+                                for (int kw = 0; kw < kW; kw++) {
+                                    float sum = 0.0f;
+                                    for (int n = 0; n < NB; n++)
+                                        for (int oh = 0; oh < oH; oh++)
+                                            for (int ow = 0; ow < oW; ow++)
+                                                sum += out_grad[((n * C_out + co) * oH + oh) * oW + ow]
+                                                     * in_data[((n * C_in + ci) * H + (oh + kh)) * W + (ow + kw)];
+                                    g2_data[((co * C_in + ci) * kH + kh) * kW + kw] += sum;
+                                }
                 }
             }
         }
@@ -701,6 +933,44 @@ static int cpu_backward_node(struct IRNode* node) {
                     float x = in1_data[i % in1->numel];
                     float sig = 1.0f / (1.0f + expf(-x));
                     g1_data[i % in1->numel] += out_grad[i] * sig;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_RELU: {
+        // d(relu)/dx = x > 0 ? 1 : 0
+        if (in1 && in1->requires_grad && in1->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                size_t i = 0;
+#ifdef __AVX__
+                __m256 zero = _mm256_setzero_ps();
+                for (; i + 8 <= out_numel; i += 8) {
+                    __m256 x = _mm256_loadu_ps(in1_data + i);
+                    __m256 g = _mm256_loadu_ps(out_grad + i);
+                    __m256 mask = _mm256_cmp_ps(x, zero, _CMP_GE_OQ);
+                    __m256 cur = _mm256_loadu_ps(g1_data + i);
+                    cur = _mm256_add_ps(cur, _mm256_and_ps(g, mask));
+                    _mm256_storeu_ps(g1_data + i, cur);
+                }
+#elif defined(__SSE__)
+                __m128 zero = _mm_setzero_ps();
+                for (; i + 4 <= out_numel; i += 4) {
+                    __m128 x = _mm_loadu_ps(in1_data + i);
+                    __m128 g = _mm_loadu_ps(out_grad + i);
+                    __m128 mask = _mm_cmpge_ps(x, zero);
+                    __m128 cur = _mm_loadu_ps(g1_data + i);
+                    cur = _mm_add_ps(cur, _mm_and_ps(g, mask));
+                    _mm_storeu_ps(g1_data + i, cur);
+                }
+#endif
+                for (; i < out_numel; i++) {
+                    if (in1_data[i] >= 0.0f)
+                        g1_data[i] += out_grad[i];
                 }
             }
         }
@@ -933,7 +1203,10 @@ static int cpu_execute_backward(CMLGraph_t ir) {
     if (node_count == 0)
         return 0;
 
-    struct IRNode** nodes = malloc(node_count * sizeof(struct IRNode*));
+    /* Use stack buffer for small graphs to avoid malloc/free overhead */
+    struct IRNode* stack_buf[64];
+    struct IRNode** nodes = (node_count <= 64) ? stack_buf
+                                               : malloc(node_count * sizeof(struct IRNode*));
     if (!nodes) {
         LOG_ERROR("Failed to allocate node array for backward pass");
         return -1;
@@ -945,26 +1218,14 @@ static int cpu_execute_backward(CMLGraph_t ir) {
         n        = n->next;
     }
 
-    struct IRNode* loss_node = ir->tail;
-    if (loss_node && loss_node->output && loss_node->output->requires_grad) {
-        Tensor* loss = loss_node->output;
-        if (!loss->grad) {
-            TensorConfig config = {.dtype      = loss->dtype,
-                                   .device     = loss->device,
-                                   .has_dtype  = true,
-                                   .has_device = true};
-            loss->grad          = tensor_zeros(loss->shape, loss->ndim, &config);
-        }
-        if (loss->grad && loss->grad->data && loss->numel == 1) {
-            *(float*)loss->grad->data = 1.0f;
-        }
-    }
+    /* Loss gradient is already set up by cml_ir_execute_backward — no need to redo here */
 
     for (int i = node_count - 1; i >= 0; i--) {
         cpu_backward_node(nodes[i]);
     }
 
-    free(nodes);
+    if (nodes != stack_buf)
+        free(nodes);
     return 0;
 }
 
