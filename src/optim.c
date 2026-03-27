@@ -4,6 +4,7 @@
 #include "core/error_stack.h"
 #include "tensor/tensor.h"
 #include "autograd/autograd.h"
+#include "backend/blas.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -559,13 +560,23 @@ static void sgd_step(Optimizer* optimizer) {
                         param_data[j] += momentum_data[j];
                     }
                 } else {
-                    for (size_t j = 0; j < numel; j++) {
-                        param_data[j] -= lr * grad_data[j];
+                    CMLBlasContext* blas = cml_blas_get_context();
+                    if (blas && blas->initialized &&
+                        cml_blas_saxpy(blas, grad_data, param_data, (int)numel, -lr) == 0) {
+                    } else {
+                        for (size_t j = 0; j < numel; j++) {
+                            param_data[j] -= lr * grad_data[j];
+                        }
                     }
                 }
             } else {
-                for (size_t j = 0; j < numel; j++) {
-                    param_data[j] -= lr * grad_data[j];
+                CMLBlasContext* blas = cml_blas_get_context();
+                if (blas && blas->initialized &&
+                    cml_blas_saxpy(blas, grad_data, param_data, (int)numel, -lr) == 0) {
+                } else {
+                    for (size_t j = 0; j < numel; j++) {
+                        param_data[j] -= lr * grad_data[j];
+                    }
                 }
             }
         }
