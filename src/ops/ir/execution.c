@@ -13,9 +13,11 @@
 #include "ops/simd_utils.h"
 #include "ops/simd_math.h"
 #include "ops/winograd.h"
+#include "ops/ir/dispatch.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <math.h>
 
 #ifdef __SSE__
@@ -108,7 +110,7 @@ void* cml_buffer_cache_alloc(size_t size) {
     if (bucket_idx < 0) {
         g_buffer_cache.cache_misses++;
         g_buffer_cache.bytes_allocated += size;
-        return calloc(1, size);
+        return malloc(size);
     }
 
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
@@ -124,13 +126,14 @@ void* cml_buffer_cache_alloc(size_t size) {
         g_buffer_cache.cache_hits++;
         g_buffer_cache.bytes_cached -= bucket->bucket_size;
 
-        memset(data, 0, size);
+        /* Don't zero — callers that need zeroing (e.g. reduce ops) do it themselves.
+         * Most ops (matmul, add, relu, conv) write every output element. */
         return data;
     }
 
     g_buffer_cache.cache_misses++;
     g_buffer_cache.bytes_allocated += bucket->bucket_size;
-    return calloc(1, bucket->bucket_size);
+    return malloc(bucket->bucket_size);
 }
 
 void cml_buffer_cache_free(void* ptr, size_t size) {
@@ -222,6 +225,259 @@ CMLBlasContext* get_blas_context(void) {
     return g_exec_blas_ctx;
 }
 
+/* Winograd F(2,3) hardcoded transforms — adds/subs only, no multiply.
+ * Input transform: V = B^T * d * B for a 4x4 tile
+ * B^T = [1,0,-1,0; 0,1,1,0; 0,-1,1,0; 0,1,0,-1] */
+#ifdef __SSE__
+static inline void wino_f23_input_transform(const float d[16], float V[16]) {
+    /* SSE: process all 4 columns simultaneously.
+     * Step 1: B^T * d (column-wise, 4 columns in parallel) */
+    __m128 d0 = _mm_loadu_ps(&d[0]);   /* row 0 */
+    __m128 d1 = _mm_loadu_ps(&d[4]);   /* row 1 */
+    __m128 d2 = _mm_loadu_ps(&d[8]);   /* row 2 */
+    __m128 d3 = _mm_loadu_ps(&d[12]);  /* row 3 */
+
+    __m128 t0 = _mm_sub_ps(d0, d2);        /* d0 - d2 */
+    __m128 t1 = _mm_add_ps(d1, d2);        /* d1 + d2 */
+    __m128 t2 = _mm_sub_ps(d2, d1);        /* -d1 + d2 */
+    __m128 t3 = _mm_sub_ps(d1, d3);        /* d1 - d3 */
+
+    /* Step 2: Transpose to get columns as rows, apply B again, transpose back.
+     * _MM_TRANSPOSE4_PS does in-place 4x4 transpose. */
+    _MM_TRANSPOSE4_PS(t0, t1, t2, t3);
+
+    __m128 v0 = _mm_sub_ps(t0, t2);        /* t[col0] - t[col2] */
+    __m128 v1 = _mm_add_ps(t1, t2);        /* t[col1] + t[col2] */
+    __m128 v2 = _mm_sub_ps(t2, t1);        /* -t[col1] + t[col2] */
+    __m128 v3 = _mm_sub_ps(t1, t3);        /* t[col1] - t[col3] */
+
+    /* Transpose back to row-major layout */
+    _MM_TRANSPOSE4_PS(v0, v1, v2, v3);
+
+    _mm_storeu_ps(&V[0],  v0);
+    _mm_storeu_ps(&V[4],  v1);
+    _mm_storeu_ps(&V[8],  v2);
+    _mm_storeu_ps(&V[12], v3);
+}
+#else
+static inline void wino_f23_input_transform(const float d[16], float V[16]) {
+    float t[16];
+    for (int j = 0; j < 4; j++) {
+        t[0*4+j] = d[0*4+j] - d[2*4+j];
+        t[1*4+j] = d[1*4+j] + d[2*4+j];
+        t[2*4+j] = -d[1*4+j] + d[2*4+j];
+        t[3*4+j] = d[1*4+j] - d[3*4+j];
+    }
+    for (int i = 0; i < 4; i++) {
+        V[i*4+0] = t[i*4+0] - t[i*4+2];
+        V[i*4+1] = t[i*4+1] + t[i*4+2];
+        V[i*4+2] = -t[i*4+1] + t[i*4+2];
+        V[i*4+3] = t[i*4+1] - t[i*4+3];
+    }
+}
+#endif
+
+/* Weight transform: U = G * g * G^T for 3x3 filter
+ * G = [1,0,0; 0.5,0.5,0.5; 0.5,-0.5,0.5; 0,0,1] */
+static inline void wino_f23_weight_transform(const float g[9], float U[16]) {
+    float t[12]; /* 4x3 */
+    for (int j = 0; j < 3; j++) {
+        t[0*3+j] = g[0*3+j];
+        t[1*3+j] = 0.5f*(g[0*3+j] + g[1*3+j] + g[2*3+j]);
+        t[2*3+j] = 0.5f*(g[0*3+j] - g[1*3+j] + g[2*3+j]);
+        t[3*3+j] = g[2*3+j];
+    }
+    for (int i = 0; i < 4; i++) {
+        U[i*4+0] = t[i*3+0];
+        U[i*4+1] = 0.5f*(t[i*3+0] + t[i*3+1] + t[i*3+2]);
+        U[i*4+2] = 0.5f*(t[i*3+0] - t[i*3+1] + t[i*3+2]);
+        U[i*4+3] = t[i*3+2];
+    }
+}
+
+/* Output transform: Y = A^T * M * A for 4x4 → 2x2
+ * A^T = [1,1,1,0; 0,1,-1,-1] */
+#ifdef __SSE__
+static inline void wino_f23_output_transform(const float M[16], float Y[4]) {
+    /* SSE: A^T * M (process 4 columns in parallel), then * A */
+    __m128 m0 = _mm_loadu_ps(&M[0]);
+    __m128 m1 = _mm_loadu_ps(&M[4]);
+    __m128 m2 = _mm_loadu_ps(&M[8]);
+    __m128 m3 = _mm_loadu_ps(&M[12]);
+
+    /* A^T * M: t0 = m0+m1+m2, t1 = m1-m2-m3 */
+    __m128 t0 = _mm_add_ps(_mm_add_ps(m0, m1), m2);
+    __m128 t1 = _mm_sub_ps(_mm_sub_ps(m1, m2), m3);
+
+    /* Now t0 and t1 are 1x4 rows. Apply * A column-wise:
+     * Y[0,0] = t0[0]+t0[1]+t0[2], Y[0,1] = t0[1]-t0[2]-t0[3]
+     * Y[1,0] = t1[0]+t1[1]+t1[2], Y[1,1] = t1[1]-t1[2]-t1[3]
+     * Extract scalar since output is only 2x2 */
+    float t0v[4], t1v[4];
+    _mm_storeu_ps(t0v, t0);
+    _mm_storeu_ps(t1v, t1);
+    Y[0] = t0v[0] + t0v[1] + t0v[2];
+    Y[1] = t0v[1] - t0v[2] - t0v[3];
+    Y[2] = t1v[0] + t1v[1] + t1v[2];
+    Y[3] = t1v[1] - t1v[2] - t1v[3];
+}
+#else
+static inline void wino_f23_output_transform(const float M[16], float Y[4]) {
+    float t[8];
+    for (int j = 0; j < 4; j++) {
+        t[0*4+j] = M[0*4+j] + M[1*4+j] + M[2*4+j];
+        t[1*4+j] = M[1*4+j] - M[2*4+j] - M[3*4+j];
+    }
+    Y[0] = t[0] + t[1] + t[2];
+    Y[1] = t[1] - t[2] - t[3];
+    Y[2] = t[4] + t[5] + t[6];
+    Y[3] = t[5] - t[6] - t[7];
+}
+#endif
+
+/* BLAS-batched Winograd F(2,3) with hardcoded transforms.
+ * Uses add/sub-only transforms (no generic matmul) + batched GEMM/inline
+ * multiply at each of the 16 Winograd points. */
+static int winograd_conv2d_blas(
+    CMLBlasContext* blas,
+    const float* input, const float* weight, const float* bias, float* output,
+    int batch, int in_channels, int out_channels,
+    int H, int W, int pad_h, int pad_w, int groups)
+{
+    const int ks = 3, ot = 2;
+    int out_h = H + 2 * pad_h - ks + 1;
+    int out_w = W + 2 * pad_w - ks + 1;
+    if (out_h <= 0 || out_w <= 0) return -1;
+
+    int tiles_h = (out_h + ot - 1) / ot;
+    int tiles_w = (out_w + ot - 1) / ot;
+    int total_tiles = batch * tiles_h * tiles_w;
+
+    int ic_pg = in_channels / groups;
+    int oc_pg = out_channels / groups;
+
+    /* U[16][oc_pg * ic_pg], V[16][ic_pg * total_tiles], M[16][oc_pg * total_tiles] */
+    size_t U_sz = (size_t)16 * oc_pg * ic_pg;
+    size_t V_sz = (size_t)16 * ic_pg * total_tiles;
+    size_t M_sz = (size_t)16 * oc_pg * total_tiles;
+    float* U_buf = (float*)malloc(U_sz * sizeof(float));
+    float* V_buf = (float*)malloc(V_sz * sizeof(float));
+    float* M_buf = (float*)malloc(M_sz * sizeof(float));
+    if (!U_buf || !V_buf || !M_buf) {
+        free(U_buf); free(V_buf); free(M_buf);
+        return -1;
+    }
+
+    memset(output, 0, (size_t)batch * out_channels * out_h * out_w * sizeof(float));
+
+    for (int g = 0; g < groups; g++) {
+        int ic_start = g * ic_pg;
+        int oc_start = g * oc_pg;
+
+        /* Step 1: Transform weights with hardcoded add/sub formula */
+        for (int oc = 0; oc < oc_pg; oc++) {
+            for (int ic = 0; ic < ic_pg; ic++) {
+                const float* w = weight + ((size_t)(oc_start+oc) * in_channels + (ic_start+ic)) * 9;
+                float U[16];
+                wino_f23_weight_transform(w, U);
+                for (int p = 0; p < 16; p++)
+                    U_buf[p * oc_pg * ic_pg + oc * ic_pg + ic] = U[p];
+            }
+        }
+
+        /* Step 2: Transform input tiles with hardcoded add/sub formula */
+        for (int b = 0; b < batch; b++) {
+            for (int th = 0; th < tiles_h; th++) {
+                for (int tw = 0; tw < tiles_w; tw++) {
+                    int tile_idx = b * tiles_h * tiles_w + th * tiles_w + tw;
+                    int trow = th * ot, tcol = tw * ot;
+
+                    for (int ic = 0; ic < ic_pg; ic++) {
+                        const float* in_ch = input + ((size_t)b * in_channels + ic_start + ic) * H * W;
+                        float d[16];
+                        for (int i = 0; i < 4; i++) {
+                            int r = trow + i - pad_h;
+                            for (int j = 0; j < 4; j++) {
+                                int c = tcol + j - pad_w;
+                                d[i*4+j] = (r >= 0 && r < H && c >= 0 && c < W)
+                                            ? in_ch[r * W + c] : 0.0f;
+                            }
+                        }
+                        float V[16];
+                        wino_f23_input_transform(d, V);
+                        for (int p = 0; p < 16; p++)
+                            V_buf[p * ic_pg * total_tiles + ic * total_tiles + tile_idx] = V[p];
+                    }
+                }
+            }
+        }
+
+        /* Step 3: Pointwise multiply — BLAS GEMM for large K, inline for small */
+        if (ic_pg >= 8) {
+            for (int p = 0; p < 16; p++) {
+                float* Up = U_buf + (size_t)p * oc_pg * ic_pg;
+                float* Vp = V_buf + (size_t)p * ic_pg * total_tiles;
+                float* Mp = M_buf + (size_t)p * oc_pg * total_tiles;
+                cml_blas_sgemm(blas, Up, Vp, Mp, oc_pg, total_tiles, ic_pg, 1.0f, 0.0f);
+            }
+        } else {
+            for (int p = 0; p < 16; p++) {
+                const float* Up = U_buf + (size_t)p * oc_pg * ic_pg;
+                const float* Vp = V_buf + (size_t)p * ic_pg * total_tiles;
+                float* Mp = M_buf + (size_t)p * oc_pg * total_tiles;
+                for (int oc = 0; oc < oc_pg; oc++) {
+                    const float* u_row = Up + oc * ic_pg;
+                    float* m_row = Mp + oc * total_tiles;
+                    memset(m_row, 0, total_tiles * sizeof(float));
+                    for (int ic = 0; ic < ic_pg; ic++) {
+                        float u_val = u_row[ic];
+                        const float* v_row = Vp + ic * total_tiles;
+                        for (int t = 0; t < total_tiles; t++)
+                            m_row[t] += u_val * v_row[t];
+                    }
+                }
+            }
+        }
+
+        /* Step 4: Inverse transform with hardcoded formula */
+        for (int b = 0; b < batch; b++) {
+            for (int th = 0; th < tiles_h; th++) {
+                for (int tw = 0; tw < tiles_w; tw++) {
+                    int tile_idx = b * tiles_h * tiles_w + th * tiles_w + tw;
+                    int out_row = th * ot, out_col = tw * ot;
+
+                    for (int oc = 0; oc < oc_pg; oc++) {
+                        float Mtile[16];
+                        for (int p = 0; p < 16; p++)
+                            Mtile[p] = M_buf[p * oc_pg * total_tiles + oc * total_tiles + tile_idx];
+
+                        float Y[4];
+                        wino_f23_output_transform(Mtile, Y);
+
+                        float* out_plane = output + ((size_t)b * out_channels + oc_start + oc) * out_h * out_w;
+                        for (int i = 0; i < 2 && out_row + i < out_h; i++)
+                            for (int j = 0; j < 2 && out_col + j < out_w; j++)
+                                out_plane[(out_row+i) * out_w + (out_col+j)] += Y[i*2+j];
+                    }
+                }
+            }
+        }
+
+        if (bias) {
+            for (int b = 0; b < batch; b++)
+                for (int oc = 0; oc < oc_pg; oc++) {
+                    float bv = bias[oc_start + oc];
+                    float* out_plane = output + ((size_t)b * out_channels + oc_start + oc) * out_h * out_w;
+                    for (int i = 0; i < out_h * out_w; i++)
+                        out_plane[i] += bv;
+                }
+        }
+    }
+
+    free(U_buf); free(V_buf); free(M_buf);
+    return 0;
+}
+
 // Numpy-style broadcast index: given a flat index in the output tensor,
 // compute the corresponding flat index in a (possibly smaller) input tensor.
 // Handles cases like [N,M] op [N,1] or [N,M] op [1,M] correctly.
@@ -269,6 +525,48 @@ static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
     return idx;
 }
 
+/* Broadcast pattern detection for 2D binary ops.
+ * Returns: 0=use generic, 1=[R,C]op[1,C] (row broadcast), 2=[R,C]op[R,1] (col broadcast) */
+static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out,
+                                        size_t* rows, size_t* cols) {
+    if (out->ndim != 2) return 0;
+    *rows = (size_t)out->shape[0];
+    *cols = (size_t)out->shape[1];
+
+    /* a is the big tensor, b is the broadcast one */
+    if (a->numel == out->numel) {
+        /* [R,C] op [1,C] — b is a row vector broadcast across rows */
+        if (b->ndim == 2 && b->shape[0] == 1 && (size_t)b->shape[1] == *cols) return 1;
+        if (b->ndim == 1 && (size_t)b->shape[0] == *cols) return 1;
+        /* [R,C] op [R,1] — b is a column vector broadcast across cols */
+        if (b->ndim == 2 && (size_t)b->shape[0] == *rows && b->shape[1] == 1) return 2;
+    }
+    return 0;
+}
+
+/* Fast broadcast binary op for 2D: [R,C] op [1,C] (row broadcast) */
+#define BROADCAST_ROW_OP(op_expr) do { \
+    for (size_t r = 0; r < rows; r++) { \
+        const float* a_row = in1_data + r * cols; \
+        float* o_row = out_data + r * cols; \
+        for (size_t c = 0; c < cols; c++) { \
+            o_row[c] = a_row[c] op_expr in2_data[c]; \
+        } \
+    } \
+} while(0)
+
+/* Fast broadcast binary op for 2D: [R,C] op [R,1] (col broadcast) */
+#define BROADCAST_COL_OP(op_expr) do { \
+    for (size_t r = 0; r < rows; r++) { \
+        const float* a_row = in1_data + r * cols; \
+        float* o_row = out_data + r * cols; \
+        float bval = in2_data[r]; \
+        for (size_t c = 0; c < cols; c++) { \
+            o_row[c] = a_row[c] op_expr bval; \
+        } \
+    } \
+} while(0)
+
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
@@ -283,7 +581,8 @@ int cpu_execute_node(struct IRNode* node) {
             LOG_ERROR("Failed to allocate output tensor data");
             return -1;
         }
-        out->owns_data = true;
+        out->owns_data        = true;
+        out->from_buffer_cache = true;
     }
 
     float* out_data = (float*)out->data;
@@ -311,10 +610,16 @@ int cpu_execute_node(struct IRNode* node) {
         if (in1_numel == in2_numel && in1_numel == out->numel) {
             simd_add_f32(in1_data, in2_data, out_data, out->numel);
         } else {
-            for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
-                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
-                out_data[i] = in1_data[i1] + in2_data[i2];
+            size_t rows, cols;
+            int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
+            if (bcast == 1) { BROADCAST_ROW_OP(+); }
+            else if (bcast == 2) { BROADCAST_COL_OP(+); }
+            else {
+                for (size_t i = 0; i < out->numel; i++) {
+                    size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                    size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
+                    out_data[i] = in1_data[i1] + in2_data[i2];
+                }
             }
         }
         break;
@@ -325,10 +630,16 @@ int cpu_execute_node(struct IRNode* node) {
         if (in1_numel == in2_numel && in1_numel == out->numel) {
             simd_sub_f32(in1_data, in2_data, out_data, out->numel);
         } else {
-            for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
-                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
-                out_data[i] = in1_data[i1] - in2_data[i2];
+            size_t rows, cols;
+            int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
+            if (bcast == 1) { BROADCAST_ROW_OP(-); }
+            else if (bcast == 2) { BROADCAST_COL_OP(-); }
+            else {
+                for (size_t i = 0; i < out->numel; i++) {
+                    size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                    size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
+                    out_data[i] = in1_data[i1] - in2_data[i2];
+                }
             }
         }
         break;
@@ -339,10 +650,16 @@ int cpu_execute_node(struct IRNode* node) {
         if (in1_numel == in2_numel && in1_numel == out->numel) {
             simd_mul_f32(in1_data, in2_data, out_data, out->numel);
         } else {
-            for (size_t i = 0; i < out->numel; i++) {
-                size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
-                size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
-                out_data[i] = in1_data[i1] * in2_data[i2];
+            size_t rows, cols;
+            int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
+            if (bcast == 1) { BROADCAST_ROW_OP(*); }
+            else if (bcast == 2) { BROADCAST_COL_OP(*); }
+            else {
+                for (size_t i = 0; i < out->numel; i++) {
+                    size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
+                    size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
+                    out_data[i] = in1_data[i1] * in2_data[i2];
+                }
             }
         }
         break;
@@ -639,10 +956,24 @@ int cpu_execute_node(struct IRNode* node) {
         int K = a->shape[a->ndim - 1];
         int N = b->shape[b->ndim - 1];
 
-        memset(out_data, 0, out->numel * sizeof(float));
-
         CMLBlasContext* blas = get_blas_context();
         if (blas && blas->initialized) {
+            /* Check if input B is a transpose node — fuse transpose into sgemm */
+            struct IRNode* b_node = b->ir_node;
+            if (b_node && b_node->type == UOP_PERMUTE && b_node->num_inputs == 1 &&
+                b_node->inputs[0] && b_node->inputs[0]->ndim == 2) {
+                /* B = transpose(B_orig), so matmul A @ B = A @ B_orig^T
+                 * Use sgemm_ex with transB=true on the original (non-transposed) data */
+                Tensor* b_orig = b_node->inputs[0];
+                float* b_orig_data = (float*)b_orig->data;
+                if (!b_orig_data) b_orig_data = (float*)tensor_data_ptr(b_orig);
+                if (b_orig_data) {
+                    /* B_orig is [N, K], we want A[M,K] @ B_orig[N,K]^T = [M,N] */
+                    int result = cml_blas_sgemm_ex(blas, in1_data, b_orig_data, out_data,
+                                                    M, N, K, 1.0f, 0.0f, false, true);
+                    if (result == 0) break;
+                }
+            }
             int result = cml_blas_sgemm(blas, in1_data, in2_data, out_data, M, N, K, 1.0f, 0.0f);
             if (result == 0) {
                 break; // BLAS succeeded
@@ -652,7 +983,7 @@ int cpu_execute_node(struct IRNode* node) {
         }
 
         // Naive matmul fallback with cache-friendly access pattern
-        // Use blocking for better cache utilization
+        memset(out_data, 0, out->numel * sizeof(float));
         const int BLOCK = 32;
         for (int m0 = 0; m0 < M; m0 += BLOCK) {
             for (int n0 = 0; n0 < N; n0 += BLOCK) {
@@ -2303,6 +2634,22 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_RELU:
+        if (!in1_data) return -1;
+        if (in1_numel == out->numel) {
+            /* Same-size: vectorizable loop */
+            for (size_t i = 0; i < out->numel; i++) {
+                float x = in1_data[i];
+                out_data[i] = x > 0.0f ? x : 0.0f;
+            }
+        } else {
+            for (size_t i = 0; i < out->numel; i++) {
+                float x = in1_data[i % in1_numel];
+                out_data[i] = x > 0.0f ? x : 0.0f;
+            }
+        }
+        break;
+
     case UOP_RELU6:
         if (!in1_data) return -1;
         for (size_t i = 0; i < out->numel; i++) {
@@ -2507,6 +2854,53 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_LINEAR: {
+        /* Fused linear: output = input[M,K] @ weight[N,K]^T + bias[N]
+         * inputs[0] = input, inputs[1] = weight, inputs[2] = bias (optional)
+         */
+        if (!in1_data || !in2_data)
+            return -1;
+        Tensor* input_t = node->inputs[0];
+        Tensor* weight_t = node->inputs[1];
+        if (input_t->ndim < 2 || weight_t->ndim != 2)
+            return -1;
+
+        int M = input_t->shape[input_t->ndim - 2]; /* batch (or rows) */
+        int K = input_t->shape[input_t->ndim - 1]; /* in_features */
+        int N = weight_t->shape[0];                 /* out_features */
+
+        CMLBlasContext* blas = get_blas_context();
+        if (blas && blas->initialized) {
+            /* C[M,N] = input[M,K] @ weight[N,K]^T */
+            cml_blas_sgemm_ex(blas, in1_data, in2_data, out_data,
+                              M, N, K, 1.0f, 0.0f, false, true);
+        } else {
+            /* Naive fallback: C = A @ B^T */
+            memset(out_data, 0, out->numel * sizeof(float));
+            for (int m = 0; m < M; m++) {
+                for (int n = 0; n < N; n++) {
+                    float sum = 0.0f;
+                    for (int k = 0; k < K; k++)
+                        sum += in1_data[m * K + k] * in2_data[n * K + k];
+                    out_data[m * N + n] = sum;
+                }
+            }
+        }
+
+        /* Add bias if present */
+        if (node->num_inputs >= 3 && node->inputs[2]) {
+            float* bias_data = (float*)node->inputs[2]->data;
+            if (bias_data) {
+                for (int m = 0; m < M; m++) {
+                    float* row = out_data + m * N;
+                    for (int n = 0; n < N; n++)
+                        row[n] += bias_data[n];
+                }
+            }
+        }
+        break;
+    }
+
     case UOP_CONV2D: {
         if (!in1_data || !in2_data)
             return -1;
@@ -2539,52 +2933,205 @@ int cpu_execute_node(struct IRNode* node) {
         if (node->num_inputs >= 3 && node->inputs[2])
             bias_data = (float*)node->inputs[2]->data;
 
-        /* Try Winograd for 3x3 stride-1 dilation-1 */
-        if (p && p->use_winograd &&
-            winograd_applicable(kernel_h, kernel_w, stride_h, stride_w,
-                                dilation_h, dilation_w)) {
-            WinogradConfig wcfg = winograd_select_variant(in_h, in_w);
-            if (winograd_conv2d(in1_data, in2_data, bias_data, out_data,
-                                batch, in_channels, out_channels,
-                                in_h, in_w, pad_h, pad_w,
-                                groups, &wcfg) == 0)
-                break;
-            /* Fall through to naive if Winograd fails */
-        }
-
-        /* Naive direct convolution */
-        memset(out_data, 0, out->numel * sizeof(float));
         int ch_per_group_in  = in_channels  / groups;
         int ch_per_group_out = out_channels / groups;
 
-        for (int b = 0; b < batch; b++) {
-            for (int g = 0; g < groups; g++) {
-                for (int oc = 0; oc < ch_per_group_out; oc++) {
-                    int oc_abs = g * ch_per_group_out + oc;
-                    for (int oh = 0; oh < out_h; oh++) {
-                        for (int ow = 0; ow < out_w; ow++) {
-                            float sum = 0.0f;
-                            for (int ic = 0; ic < ch_per_group_in; ic++) {
-                                int ic_abs = g * ch_per_group_in + ic;
-                                for (int kh = 0; kh < kernel_h; kh++) {
-                                    for (int kw = 0; kw < kernel_w; kw++) {
-                                        int ih = oh * stride_h - pad_h + kh * dilation_h;
-                                        int iw = ow * stride_w - pad_w + kw * dilation_w;
-                                        if (ih >= 0 && ih < in_h && iw >= 0 && iw < in_w) {
-                                            size_t in_idx = ((size_t)b * in_channels + ic_abs) *
-                                                            (in_h * in_w) + ih * in_w + iw;
-                                            size_t w_idx  = ((size_t)oc_abs * (in_channels / groups) + ic) *
-                                                            (kernel_h * kernel_w) + kh * kernel_w + kw;
-                                            sum += in1_data[in_idx] * in2_data[w_idx];
+        CMLBlasContext* conv_blas = get_blas_context();
+
+        /* Winograd F(2,3) for 3x3, stride 1, dilation 1 convolutions.
+         * Only beneficial when in_channels >= 16 (BLAS GEMM needs K >= 8).
+         * For shallow channels (e.g., 3 RGB), im2col+GEMM is faster. */
+        if (p && p->use_winograd && conv_blas && conv_blas->initialized &&
+            ch_per_group_in >= 16 &&
+            kernel_h == 3 && kernel_w == 3 &&
+            stride_h == 1 && stride_w == 1 &&
+            dilation_h == 1 && dilation_w == 1) {
+            int ret = winograd_conv2d_blas(conv_blas,
+                in1_data, in2_data, bias_data, out_data,
+                batch, in_channels, out_channels,
+                in_h, in_w, pad_h, pad_w, groups);
+            if (ret == 0) break;
+            /* Fall through to im2col on failure */
+        }
+
+        /* im2col + BLAS matmul path (fast) or naive fallback */
+        size_t col_h = (size_t)ch_per_group_in * kernel_h * kernel_w;
+        size_t col_w = (size_t)out_h * out_w;
+        int spatial = out_h * out_w;
+        int fast_im2col = (stride_h == 1 && stride_w == 1 &&
+                           dilation_h == 1 && dilation_w == 1 &&
+                           pad_h == 0 && pad_w == 0);
+
+        /* Batched im2col only helps when per-batch GEMMs are very small
+         * (BLAS dispatch overhead dominates). For typical conv sizes, per-batch
+         * im2col+GEMM is faster since it avoids the output rearrangement. */
+        int use_batched = (groups == 1 && fast_im2col && batch > 1 &&
+                           col_h * col_w < 4096);
+        size_t total_col_w = use_batched ? col_w * batch : col_w;
+        size_t needed = col_h * total_col_w * sizeof(float);
+
+        float* col_buf = NULL;
+        static float* s_col_buf = NULL;
+        static size_t s_col_buf_size = 0;
+
+        if (conv_blas && conv_blas->initialized) {
+            if (needed > s_col_buf_size) {
+                free(s_col_buf);
+                s_col_buf = (float*)malloc(needed);
+                s_col_buf_size = s_col_buf ? needed : 0;
+            }
+            col_buf = s_col_buf;
+        }
+
+        if (col_buf && use_batched) {
+            /* Batched im2col: all batch items into col_buf[col_h, batch*col_w] */
+            for (int b = 0; b < batch; b++) {
+                size_t b_offset = (size_t)b * col_w;
+                for (int ic = 0; ic < ch_per_group_in; ic++) {
+                    const float* in_ch = in1_data + ((size_t)b * in_channels + ic) * (in_h * in_w);
+                    for (int kh_i = 0; kh_i < kernel_h; kh_i++) {
+                        for (int kw_i = 0; kw_i < kernel_w; kw_i++) {
+                            size_t col_row = ((size_t)ic * kernel_h + kh_i) * kernel_w + kw_i;
+                            float* col_dst = col_buf + col_row * total_col_w + b_offset;
+                            for (int oh_i = 0; oh_i < out_h; oh_i++) {
+                                memcpy(col_dst + oh_i * out_w,
+                                       in_ch + (oh_i + kh_i) * in_w + kw_i,
+                                       (size_t)out_w * sizeof(float));
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* Single GEMM: result[oc, batch*spatial] = W[oc, col_h] @ col[col_h, batch*spatial] */
+            /* Use a static temp buffer for the rearrangement */
+            static float* s_gemm_buf = NULL;
+            static size_t s_gemm_buf_size = 0;
+            size_t gemm_sz = (size_t)out_channels * total_col_w * sizeof(float);
+            if (gemm_sz > s_gemm_buf_size) {
+                free(s_gemm_buf);
+                s_gemm_buf = (float*)malloc(gemm_sz);
+                s_gemm_buf_size = s_gemm_buf ? gemm_sz : 0;
+            }
+
+            if (s_gemm_buf) {
+                cml_blas_sgemm(conv_blas, in2_data, col_buf, s_gemm_buf,
+                               out_channels, (int)total_col_w, (int)col_h, 1.0f, 0.0f);
+
+                /* Rearrange: result[oc][b*spatial+s] → out[b][oc][s] */
+                for (int oc = 0; oc < out_channels; oc++) {
+                    const float* src_row = s_gemm_buf + (size_t)oc * total_col_w;
+                    for (int b = 0; b < batch; b++) {
+                        float* dst = out_data + ((size_t)b * out_channels + oc) * spatial;
+                        memcpy(dst, src_row + (size_t)b * col_w, spatial * sizeof(float));
+                    }
+                }
+
+                /* Add bias */
+                if (bias_data) {
+                    for (int b = 0; b < batch; b++) {
+                        for (int oc = 0; oc < out_channels; oc++) {
+                            float bv = bias_data[oc];
+                            float* row = out_data + ((size_t)b * out_channels + oc) * spatial;
+                            for (int j = 0; j < spatial; j++)
+                                row[j] += bv;
+                        }
+                    }
+                }
+            }
+        } else if (col_buf) {
+            /* Per-batch im2col + GEMM (for groups > 1 or general stride/pad) */
+            for (int b = 0; b < batch; b++) {
+                for (int g = 0; g < groups; g++) {
+                    if (fast_im2col) {
+                        for (int ic = 0; ic < ch_per_group_in; ic++) {
+                            int ic_abs = g * ch_per_group_in + ic;
+                            const float* in_ch = in1_data + ((size_t)b * in_channels + ic_abs) * (in_h * in_w);
+                            for (int kh_i = 0; kh_i < kernel_h; kh_i++) {
+                                for (int kw_i = 0; kw_i < kernel_w; kw_i++) {
+                                    size_t col_row = ((size_t)ic * kernel_h + kh_i) * kernel_w + kw_i;
+                                    float* col_dst = col_buf + col_row * col_w;
+                                    for (int oh_i = 0; oh_i < out_h; oh_i++) {
+                                        memcpy(col_dst + oh_i * out_w,
+                                               in_ch + (oh_i + kh_i) * in_w + kw_i,
+                                               (size_t)out_w * sizeof(float));
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        for (int ic = 0; ic < ch_per_group_in; ic++) {
+                            int ic_abs = g * ch_per_group_in + ic;
+                            for (int kh_i = 0; kh_i < kernel_h; kh_i++) {
+                                for (int kw_i = 0; kw_i < kernel_w; kw_i++) {
+                                    size_t col_row = ((size_t)ic * kernel_h + kh_i) * kernel_w + kw_i;
+                                    for (int oh_i = 0; oh_i < out_h; oh_i++) {
+                                        for (int ow_i = 0; ow_i < out_w; ow_i++) {
+                                            int ih = oh_i * stride_h - pad_h + kh_i * dilation_h;
+                                            int iw = ow_i * stride_w - pad_w + kw_i * dilation_w;
+                                            size_t col_col = (size_t)oh_i * out_w + ow_i;
+                                            if (ih >= 0 && ih < in_h && iw >= 0 && iw < in_w) {
+                                                size_t in_idx = ((size_t)b * in_channels + ic_abs) *
+                                                                (in_h * in_w) + ih * in_w + iw;
+                                                col_buf[col_row * col_w + col_col] = in1_data[in_idx];
+                                            } else {
+                                                col_buf[col_row * col_w + col_col] = 0.0f;
+                                            }
                                         }
                                     }
                                 }
                             }
-                            if (bias_data)
-                                sum += bias_data[oc_abs];
-                            size_t out_idx = ((size_t)b * out_channels + oc_abs) *
-                                             (out_h * out_w) + oh * out_w + ow;
-                            out_data[out_idx] = sum;
+                        }
+                    }
+
+                    int oc_offset = g * ch_per_group_out;
+                    float* out_ptr = out_data + ((size_t)b * out_channels + oc_offset) * spatial;
+                    const float* w_ptr = in2_data + (size_t)oc_offset * col_h;
+
+                    cml_blas_sgemm(conv_blas, w_ptr, col_buf, out_ptr,
+                                   ch_per_group_out, (int)col_w, (int)col_h, 1.0f, 0.0f);
+
+                    if (bias_data) {
+                        for (int oc = oc_offset; oc < oc_offset + ch_per_group_out; oc++) {
+                            float bv = bias_data[oc];
+                            float* row = out_data + ((size_t)b * out_channels + oc) * spatial;
+                            for (int j = 0; j < spatial; j++)
+                                row[j] += bv;
+                        }
+                    }
+                }
+            }
+        } else {
+            /* Naive direct convolution fallback */
+            for (int b = 0; b < batch; b++) {
+                for (int g = 0; g < groups; g++) {
+                    for (int oc = 0; oc < ch_per_group_out; oc++) {
+                        int oc_abs = g * ch_per_group_out + oc;
+                        for (int oh_i = 0; oh_i < out_h; oh_i++) {
+                            for (int ow_i = 0; ow_i < out_w; ow_i++) {
+                                float sum = 0.0f;
+                                for (int ic = 0; ic < ch_per_group_in; ic++) {
+                                    int ic_abs = g * ch_per_group_in + ic;
+                                    for (int kh_i = 0; kh_i < kernel_h; kh_i++) {
+                                        for (int kw_i = 0; kw_i < kernel_w; kw_i++) {
+                                            int ih = oh_i * stride_h - pad_h + kh_i * dilation_h;
+                                            int iw = ow_i * stride_w - pad_w + kw_i * dilation_w;
+                                            if (ih >= 0 && ih < in_h && iw >= 0 && iw < in_w) {
+                                                size_t in_idx = ((size_t)b * in_channels + ic_abs) *
+                                                                (in_h * in_w) + ih * in_w + iw;
+                                                size_t w_idx  = ((size_t)oc_abs * (in_channels / groups) + ic) *
+                                                                (kernel_h * kernel_w) + kh_i * kernel_w + kw_i;
+                                                sum += in1_data[in_idx] * in2_data[w_idx];
+                                            }
+                                        }
+                                    }
+                                }
+                                if (bias_data)
+                                    sum += bias_data[oc_abs];
+                                size_t out_idx = ((size_t)b * out_channels + oc_abs) *
+                                                 (out_h * out_w) + oh_i * out_w + ow_i;
+                                out_data[out_idx] = sum;
+                            }
                         }
                     }
                 }
@@ -2790,6 +3337,37 @@ int cpu_execute_ir(CMLGraph_t ir) {
         cml_ir_decompose(ir);
     }
 
+    /* Graph cache: reuse pre-allocated buffers for repeated graph structures.
+     * Compute signature → lookup → if hit, assign cached buffers to node outputs
+     * so cpu_execute_node() doesn't need to malloc per-node. */
+    static uint64_t s_last_sig = 0;
+    static CMLExecutionPlan* s_last_plan = NULL;
+    uint64_t sig = cml_graph_compute_signature(ir);
+    CMLGraphCache* cache = cml_get_graph_cache();
+    CMLExecutionPlan* plan;
+    if (sig == s_last_sig && s_last_plan && s_last_plan->valid) {
+        plan = s_last_plan; /* fast path: same graph as last time */
+    } else {
+        plan = cache ? cml_graph_cache_lookup(cache, sig) : NULL;
+        if (plan) { s_last_sig = sig; s_last_plan = plan; }
+    }
+
+    if (plan && plan->valid) {
+        /* Cache hit: pre-assign buffers to matching nodes */
+        struct IRNode* node = ir->head;
+        size_t idx = 0;
+        while (node && idx < plan->num_nodes) {
+            if (node->output && node->output->numel > 0 && !node->output->data) {
+                if (plan->buffers[idx] && plan->buffer_sizes[idx] == (size_t)node->output->numel) {
+                    node->output->data = plan->buffers[idx];
+                    node->output->owns_data = false; /* cache owns the buffer */
+                }
+            }
+            idx++;
+            node = node->next;
+        }
+    }
+
     struct IRNode* node = ir->head;
     while (node) {
         // Skip nodes that have already been executed and still have valid output
@@ -2810,6 +3388,27 @@ int cpu_execute_ir(CMLGraph_t ir) {
         g_total_nodes_executed++;
 
         node = node->next;
+    }
+
+    /* Cache miss: create plan and cache it for future iterations */
+    if (cache && !plan) {
+        CMLExecutionPlan* new_plan = cml_create_execution_plan(ir);
+        if (new_plan) {
+            /* Copy current output data into plan buffers so they persist
+             * across cml_reset_ir_context() calls */
+            struct IRNode* n = ir->head;
+            size_t idx = 0;
+            while (n && idx < new_plan->num_nodes) {
+                if (n->output && n->output->data && new_plan->buffers[idx] &&
+                    new_plan->buffer_sizes[idx] == (size_t)n->output->numel) {
+                    memcpy(new_plan->buffers[idx], n->output->data,
+                           n->output->numel * sizeof(float));
+                }
+                idx++;
+                n = n->next;
+            }
+            cml_graph_cache_insert(cache, sig, new_plan);
+        }
     }
 
     ir->is_executed = true;
@@ -2837,10 +3436,27 @@ int cml_ir_execute(CMLGraph_t ir) {
         return -1;
     }
 
-    /* Use V2 fusion scheduler when CML_SCHEDULE_V2=1 */
-    const char* v2_env = getenv("CML_SCHEDULE_V2");
-    if (v2_env && v2_env[0] == '1') {
-        return cml_ir_execute_v2(ir);
+    /* Check if graph should target a GPU backend via CML_BACKEND env */
+    const char* backend_env = getenv("CML_BACKEND");
+    if (backend_env && (strcasecmp(backend_env, "opencl") == 0 ||
+                        strcasecmp(backend_env, "cl") == 0)) {
+        CMLDispatchContext* ctx = cml_dispatch_get_global();
+        if (ctx) {
+            int r = cml_dispatch_execute_on(ctx, CML_BACKEND_OPENCL, ir, NULL, 0, NULL, 0);
+            if (r == 0) return 0;
+        }
+        /* Fall through to CPU if OpenCL fails */
+    }
+
+    /* Use V2 fusion scheduler when CML_SCHEDULE_V2=1 (cached) */
+    {
+        static int s_v2_checked = 0, s_use_v2 = 0;
+        if (!s_v2_checked) {
+            const char* v2_env = getenv("CML_SCHEDULE_V2");
+            s_use_v2 = (v2_env && v2_env[0] == '1');
+            s_v2_checked = 1;
+        }
+        if (s_use_v2) return cml_ir_execute_v2(ir);
     }
 
     return cpu_execute_ir(ir);
@@ -2852,7 +3468,36 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
         return -1;
     }
 
-    // Use direct CPU execution
     target_node->is_used = true;
+
+    /* Check if graph should target a GPU backend via CML_BACKEND env.
+     * Cache env check + dispatch context to avoid repeated getenv()/lookup. */
+    static int s_opencl_checked = 0;
+    static int s_use_opencl = 0;
+    static CMLDispatchContext* s_dispatch_ctx = NULL;
+    if (!s_opencl_checked) {
+        const char* backend_env = getenv("CML_BACKEND");
+        s_use_opencl = (backend_env && (strcasecmp(backend_env, "opencl") == 0 ||
+                                         strcasecmp(backend_env, "cl") == 0));
+        if (s_use_opencl)
+            s_dispatch_ctx = cml_dispatch_get_global();
+        s_opencl_checked = 1;
+    }
+    if (s_use_opencl && s_dispatch_ctx) {
+        int r = cml_dispatch_execute_on(s_dispatch_ctx, CML_BACKEND_OPENCL, ir, NULL, 0, NULL, 0);
+        if (r == 0) return 0;
+    }
+
+    /* Use V2 fusion scheduler when CML_SCHEDULE_V2=1 (cached) */
+    {
+        static int s_v2_checked = 0, s_use_v2 = 0;
+        if (!s_v2_checked) {
+            const char* v2_env = getenv("CML_SCHEDULE_V2");
+            s_use_v2 = (v2_env && v2_env[0] == '1');
+            s_v2_checked = 1;
+        }
+        if (s_use_v2) return cml_ir_execute_v2(ir);
+    }
+
     return cpu_execute_ir(ir);
 }
