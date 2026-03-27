@@ -15,6 +15,7 @@ typedef enum {
     DEVICE_CUDA,    // NVIDIA CUDA GPUs
     DEVICE_METAL,   // Apple Metal GPUs
     DEVICE_ROCM,    // AMD ROCm GPUs
+    DEVICE_OPENCL,  // OpenCL GPUs
     DEVICE_SIM_GPU, // Simulated GPU (CPU-backed, for testing multi-GPU without hardware)
     DEVICE_AUTO     // Auto-select best available device
 } DeviceType;
