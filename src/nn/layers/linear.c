@@ -26,24 +26,15 @@ Tensor* linear_forward(Module* module, Tensor* input) {
 
     Tensor* weight = weight_param->tensor;
 
-    LOG_DEBUG("Linear forward: Computing output = input @ weight.T + bias (IR-based)");
-    Tensor* weight_t = tensor_transpose(weight, 0, 1);
-    if (!weight_t) {
-        LOG_ERROR("Linear layer: failed to transpose weight");
-        return NULL;
-    }
-    Tensor* output = tensor_matmul(input, weight_t);
+    Tensor* bias = NULL;
+    if (linear->use_bias && bias_param && bias_param->tensor)
+        bias = bias_param->tensor;
+
+    /* Single fused IR node: output = input @ weight^T + bias */
+    Tensor* output = uop_linear(input, weight, bias);
     if (!output) {
-        LOG_ERROR("Linear layer: matmul failed");
+        LOG_ERROR("Linear layer: uop_linear failed");
         return NULL;
-    }
-    if (linear->use_bias && bias_param && bias_param->tensor) {
-        Tensor* bias = bias_param->tensor;
-        output       = tensor_add(output, bias);
-        if (!output) {
-            LOG_ERROR("Linear layer: bias addition failed");
-            return NULL;
-        }
     }
 
     return output;
