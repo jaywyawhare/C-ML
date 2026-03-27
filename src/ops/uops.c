@@ -650,6 +650,54 @@ Tensor* uop_slice(Tensor* a, SliceParams* params) {
     return result;
 }
 
+Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
+    if (!input || !weight) {
+        LOG_ERROR("NULL tensor input to uop_linear");
+        return NULL;
+    }
+    if (input->ndim < 2 || weight->ndim != 2) {
+        LOG_ERROR("uop_linear: input must be >=2D, weight must be 2D");
+        return NULL;
+    }
+
+    int M = input->shape[input->ndim - 2]; /* batch */
+    int K = input->shape[input->ndim - 1]; /* in_features */
+    int N = weight->shape[0];              /* out_features */
+
+    if (weight->shape[1] != K) {
+        LOG_ERROR("uop_linear: weight in_features (%d) != input features (%d)",
+                  weight->shape[1], K);
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    Tensor* inputs[3] = {input, weight, bias};
+    int num_inputs = bias ? 3 : 2;
+
+    if (cml_ir_add_uop(ir, UOP_LINEAR, inputs, num_inputs, NULL) != 0)
+        return NULL;
+
+    struct IRNode* node   = cml_ir_get_tail(ir);
+    node->output_shape    = malloc(2 * sizeof(int));
+    node->output_shape[0] = M;
+    node->output_shape[1] = N;
+    node->output_ndim     = 2;
+
+    if (input->requires_grad || weight->requires_grad ||
+        (bias && bias->requires_grad)) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = input->requires_grad;
+        node->needs_input_grad[1] = weight->requires_grad;
+        if (bias && num_inputs >= 3)
+            node->needs_input_grad[2] = bias->requires_grad;
+    }
+
+    return tensor_from_ir_node(node, ir);
+}
+
 Tensor* uop_matmul(Tensor* a, Tensor* b) {
     if (!a || !b) {
         LOG_ERROR("NULL tensor input to uop_matmul");
@@ -925,10 +973,22 @@ Tensor* uop_relu(Tensor* x) {
         return NULL;
     }
 
-    Tensor* zeros = uop_fill(x->shape, x->ndim, 0.0f);
-    if (!zeros)
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
         return NULL;
-    return uop_max(x, zeros);
+
+    Tensor* inputs[] = {x};
+    if (cml_ir_add_uop(ir, UOP_RELU, inputs, 1, NULL) != 0)
+        return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    node->output_shape = tensor_shape_copy(x->shape, x->ndim);
+    node->output_ndim  = x->ndim;
+
+    return tensor_from_ir_node(node, ir);
 }
 
 Tensor* uop_sigmoid(Tensor* x) {

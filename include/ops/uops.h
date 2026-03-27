@@ -170,6 +170,7 @@ typedef enum {
     UOP_SHRINK,          // shrink tensor (slice with start/end per dim)
 
     // Activation Ops
+    UOP_RELU,            // max(x, 0)
     UOP_RELU6,           // min(max(x, 0), 6)
     UOP_HARD_SIGMOID,    // clamp((x + 3) / 6, 0, 1)
     UOP_HARD_TANH,       // clamp(x, -1, 1)
@@ -197,6 +198,9 @@ typedef enum {
     UOP_CHUNK,           // split tensor into N chunks along dim
     UOP_MESHGRID,        // create coordinate matrices from vectors
     UOP_DIAGONAL,        // extract diagonal with offset, dim1, dim2
+
+    // Fused Ops
+    UOP_LINEAR,          // fused linear: output = input @ weight^T + bias
 
     UOP_COUNT // Total count
 } UOpType;
@@ -272,6 +276,7 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params);
 Tensor* uop_stride(Tensor* a, StrideParams* params);
 Tensor* uop_slice(Tensor* a, SliceParams* params);
 Tensor* uop_matmul(Tensor* a, Tensor* b);
+Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias);
 
 typedef struct {
     int* kernel_size;
