@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 typedef enum CMLBlasOrder { CML_BLAS_ROW_MAJOR = 101 } CMLBlasOrder;
-typedef enum CMLBlasTranspose { CML_BLAS_NO_TRANS = 111 } CMLBlasTranspose;
+typedef enum CMLBlasTranspose { CML_BLAS_NO_TRANS = 111, CML_BLAS_TRANS = 112 } CMLBlasTranspose;
 
 typedef struct CMLBlasContext {
     void* lib_handle;   // Dynamic library handle
@@ -51,6 +51,10 @@ CMLBlasContext* cml_blas_get_context(void);
 /* C = alpha * A @ B + beta * C */
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                    int K, float alpha, float beta);
+
+/* C = alpha * op(A) @ op(B) + beta * C, where op(X) = X or X^T */
+int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
+                      int K, float alpha, float beta, bool transA, bool transB);
 
 /* y = alpha * A @ x + beta * y */
 int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y, int M, int N,

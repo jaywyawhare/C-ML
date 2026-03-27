@@ -202,7 +202,6 @@ CMLBlasContext* cml_blas_init(void) {
         if (ctx->lib_handle) {
             load_cblas_functions(ctx);
 
-            // Verify we have at least sgemm
             if (ctx->cblas_sgemm || ctx->sgemm_) {
                 strncpy(ctx->lib_name, blas_library_paths[i], sizeof(ctx->lib_name) - 1);
                 ctx->initialized = true;
@@ -342,19 +341,10 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
 #endif
 
     if (ctx->cblas_sgemm) {
-        // CBLAS interface (row-major)
-        // C = alpha * A @ B + beta * C
-        // A is M x K, B is K x N, C is M x N
         ctx->cblas_sgemm(CML_BLAS_ROW_MAJOR, CML_BLAS_NO_TRANS, CML_BLAS_NO_TRANS, M, N, K, alpha,
-                         A, K,      // A is M x K, leading dimension is K
-                         B, N,      // B is K x N, leading dimension is N
-                         beta, C, N // C is M x N, leading dimension is N
-        );
+                         A, K, B, N, beta, C, N);
         return 0;
     } else if (ctx->sgemm_) {
-        // Fortran BLAS interface (column-major)
-        // Need to transpose: C^T = B^T @ A^T
-        // This effectively computes row-major result
         char transA = 'N';
         char transB = 'N';
         ctx->sgemm_(&transA, &transB, &N, &M, &K, &alpha, B, &N, A, &K, &beta, C, &N);
@@ -362,6 +352,38 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
     }
 
     LOG_ERROR("No sgemm function available");
+    return -1;
+}
+
+int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
+                      int K, float alpha, float beta, bool transA, bool transB) {
+    if (!ctx)
+        ctx = cml_blas_get_context();
+    if (!ctx || !ctx->initialized || !A || !B || !C || M <= 0 || N <= 0 || K <= 0)
+        return -1;
+
+    int ta = transA ? CML_BLAS_TRANS : CML_BLAS_NO_TRANS;
+    int tb = transB ? CML_BLAS_TRANS : CML_BLAS_NO_TRANS;
+    /* Leading dimensions in row-major:
+     * If no trans: A is (rows x cols), lda = cols
+     * If trans:    A is stored as (cols x rows), lda = rows (the actual storage cols) */
+    int lda = transA ? M : K;  /* A storage: transA ? [K,M] : [M,K] */
+    int ldb = transB ? K : N;  /* B storage: transB ? [N,K] : [K,N] */
+
+    if (ctx->cblas_sgemm) {
+        ctx->cblas_sgemm(CML_BLAS_ROW_MAJOR, ta, tb, M, N, K, alpha,
+                         A, lda, B, ldb, beta, C, N);
+        return 0;
+    } else if (ctx->sgemm_) {
+        /* Fortran column-major: to compute row-major C = op(A) @ op(B),
+         * we compute C^T = op(B)^T @ op(A)^T in column-major */
+        char fta = transB ? 'T' : 'N';  /* swapped */
+        char ftb = transA ? 'T' : 'N';
+        int flda = transB ? K : N;
+        int fldb = transA ? M : K;
+        ctx->sgemm_(&fta, &ftb, &N, &M, &K, &alpha, B, &flda, A, &fldb, &beta, C, &N);
+        return 0;
+    }
     return -1;
 }
 
@@ -381,7 +403,6 @@ int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y
         return 0;
     }
 
-    // Fallback: manual implementation
     for (int i = 0; i < M; i++) {
         float sum = 0.0f;
         for (int j = 0; j < N; j++) {
@@ -406,7 +427,6 @@ int cml_blas_saxpy(CMLBlasContext* ctx, const float* x, float* y, int n, float a
         return 0;
     }
 
-    // Fallback
     for (int i = 0; i < n; i++) {
         y[i] += alpha * x[i];
     }
@@ -427,7 +447,6 @@ int cml_blas_sscal(CMLBlasContext* ctx, float* x, int n, float alpha) {
         return 0;
     }
 
-    // Fallback
     for (int i = 0; i < n; i++) {
         x[i] *= alpha;
     }
@@ -445,7 +464,6 @@ float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n) 
         return ctx->cblas_sdot(n, x, 1, y, 1);
     }
 
-    // Fallback
     float sum = 0.0f;
     for (int i = 0; i < n; i++) {
         sum += x[i] * y[i];
@@ -464,7 +482,6 @@ float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n) {
         return ctx->cblas_snrm2(n, x, 1);
     }
 
-    // Fallback
     float sum = 0.0f;
     for (int i = 0; i < n; i++) {
         sum += x[i] * x[i];
