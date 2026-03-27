@@ -41,6 +41,10 @@
 #include "ops/ir/gpu/webgpu_backend.h"
 #endif
 
+#ifdef CML_HAS_OPENCL
+#include "ops/ir/gpu/opencl_ir_backend.h"
+#endif
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -67,6 +71,11 @@ static CMLAMDriver* g_am_driver = NULL;
 static bool g_am_init_attempted = false;
 #endif
 
+#ifdef CML_HAS_OPENCL
+static CMLOpenCLIRBackend* g_opencl_backend = NULL;
+static bool g_opencl_init_attempted = false;
+#endif
+
 static CMLDispatchContext* g_dispatch_ctx = NULL;
 
 static const char* backend_names[] = {
@@ -80,6 +89,7 @@ static const char* backend_names[] = {
     "Metal",
     "Vulkan",
     "WebGPU",
+    "OpenCL",
 };
 
 static const char* backend_descriptions[] = {
@@ -93,6 +103,7 @@ static const char* backend_descriptions[] = {
     "Apple Metal GPU acceleration",
     "Vulkan/SPIR-V compute",
     "WebGPU via wgpu-native",
+    "OpenCL GPU compute",
 };
 
 CMLDispatchContext* cml_dispatch_create(void) {
@@ -123,10 +134,11 @@ CMLDispatchContext* cml_dispatch_create(void) {
     ctx->fallback_chain[4] = CML_BACKEND_NIR;
     ctx->fallback_chain[5] = CML_BACKEND_METAL;
     ctx->fallback_chain[6] = CML_BACKEND_VULKAN;
-    ctx->fallback_chain[7] = CML_BACKEND_WEBGPU;
-    ctx->fallback_chain[8] = CML_BACKEND_CPU_LLVM;
-    ctx->fallback_chain[9] = CML_BACKEND_CPU_FALLBACK;
-    ctx->fallback_count    = 10;
+    ctx->fallback_chain[7] = CML_BACKEND_OPENCL;
+    ctx->fallback_chain[8] = CML_BACKEND_WEBGPU;
+    ctx->fallback_chain[9] = CML_BACKEND_CPU_LLVM;
+    ctx->fallback_chain[10] = CML_BACKEND_CPU_FALLBACK;
+    ctx->fallback_count    = 11;
 
     ctx->preferred   = CML_BACKEND_CPU_LLVM;
     ctx->active      = CML_BACKEND_CPU_FALLBACK;
@@ -186,6 +198,13 @@ void cml_dispatch_free(CMLDispatchContext* ctx) {
     if (g_am_driver) {
         cml_am_driver_free(g_am_driver);
         g_am_driver = NULL;
+    }
+#endif
+
+#ifdef CML_HAS_OPENCL
+    if (g_opencl_backend) {
+        cml_opencl_ir_backend_free(g_opencl_backend);
+        g_opencl_backend = NULL;
     }
 #endif
 
@@ -281,6 +300,30 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
         ctx->backends[CML_BACKEND_VULKAN].device_count   = 1;
         ctx->backends[CML_BACKEND_VULKAN].supports_async = true;
         ctx->backend_contexts[CML_BACKEND_VULKAN]        = g_vulkan_backend;
+        available++;
+    }
+#endif
+
+#ifdef CML_HAS_OPENCL
+    if (!g_opencl_init_attempted && cml_opencl_ir_available()) {
+        g_opencl_init_attempted = true;
+        g_opencl_backend = cml_opencl_ir_backend_create();
+        if (g_opencl_backend && cml_opencl_ir_backend_init(g_opencl_backend) == 0) {
+            ctx->backends[CML_BACKEND_OPENCL].status        = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_OPENCL].device_count   = 1;
+            ctx->backends[CML_BACKEND_OPENCL].supports_async = true;
+            ctx->backend_contexts[CML_BACKEND_OPENCL]        = g_opencl_backend;
+            available++;
+            LOG_INFO("OpenCL IR backend initialized: %s", g_opencl_backend->device_name);
+        } else if (g_opencl_backend) {
+            cml_opencl_ir_backend_free(g_opencl_backend);
+            g_opencl_backend = NULL;
+        }
+    } else if (g_opencl_backend) {
+        ctx->backends[CML_BACKEND_OPENCL].status        = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backends[CML_BACKEND_OPENCL].device_count   = 1;
+        ctx->backends[CML_BACKEND_OPENCL].supports_async = true;
+        ctx->backend_contexts[CML_BACKEND_OPENCL]        = g_opencl_backend;
         available++;
     }
 #endif
@@ -626,6 +669,23 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         return -1;
 #endif
 
+    case CML_BACKEND_OPENCL:
+#ifdef CML_HAS_OPENCL
+    {
+        CMLOpenCLIRBackend* ocl =
+            (CMLOpenCLIRBackend*)ctx->backend_contexts[CML_BACKEND_OPENCL];
+        if (ocl) {
+            int r = cml_opencl_execute_graph(ocl, ir);
+            if (r == 0) { ctx->executions_total++; return 0; }
+        }
+        LOG_DEBUG("OpenCL backend execution failed");
+        return -1;
+    }
+#else
+        LOG_DEBUG("OpenCL backend not compiled");
+        return -1;
+#endif
+
     default:
         return -1;
     }
@@ -871,6 +931,8 @@ int cml_dispatch_set_from_env(CMLDispatchContext* ctx) {
         backend = CML_BACKEND_NIR;
     } else if (strcasecmp(env, "webgpu") == 0 || strcasecmp(env, "wgpu") == 0) {
         backend = CML_BACKEND_WEBGPU;
+    } else if (strcasecmp(env, "opencl") == 0 || strcasecmp(env, "cl") == 0) {
+        backend = CML_BACKEND_OPENCL;
     } else {
         LOG_WARNING("Unknown CML_BACKEND value: %s", env);
         return -1;

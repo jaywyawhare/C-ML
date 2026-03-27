@@ -31,6 +31,7 @@ typedef enum CMLBackendType {
     CML_BACKEND_METAL,            // Metal GPU (macOS)
     CML_BACKEND_VULKAN,           // Vulkan/SPIR-V compute
     CML_BACKEND_WEBGPU,           // WebGPU via wgpu-native
+    CML_BACKEND_OPENCL,           // OpenCL compute
     CML_BACKEND_COUNT
 } CMLBackendType;
 
