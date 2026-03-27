@@ -1054,7 +1054,11 @@ void tensor_free(Tensor* t) {
             t->buffer_handle = NULL;
         } else {
             if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
-                free(t->data);
+                if (t->from_buffer_cache && t->numel > 0) {
+                    cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
+                } else {
+                    free(t->data);
+                }
             } else {
                 device_free(t->data, t->device);
             }
