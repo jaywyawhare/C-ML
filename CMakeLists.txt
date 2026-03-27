@@ -292,6 +292,7 @@ list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
 list(APPEND OPS_SOURCES
     src/ops/ir/gpu/vulkan_backend.c
     src/ops/ir/gpu/spirv_codegen.c
+    src/ops/ir/gpu/opencl_ir_backend.c
 )
 
 if(ENABLE_NIR)
@@ -581,6 +582,11 @@ if(BUILD_EXAMPLES)
     cml_add_example(activations examples/tutorials/activations.c)
     cml_add_example(bench_forward examples/benchmarks/bench_forward.c)
     cml_add_example(bench_gemm examples/benchmarks/bench_gemm.c)
+    cml_add_example(bench_cross_framework benchmarks/bench_cross_framework.c)
+    cml_add_example(profile_overhead benchmarks/profile_overhead.c)
+    cml_add_example(profile_mlp_conv benchmarks/profile_mlp_conv.c)
+    cml_add_example(profile_overhead_detailed benchmarks/profile_overhead_detailed.c)
+    cml_add_example(profile_train_conv benchmarks/profile_train_conv.c)
     cml_add_example(llama_inference examples/llama_inference.c)
     cml_add_example(autograd_example examples/demos/autograd_example.c)
     cml_add_example(auto_capture_example examples/demos/auto_capture_example.c)
