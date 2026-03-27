@@ -186,7 +186,10 @@ void tensor_zero_grad(Tensor* tensor) {
     if (!tensor)
         return;
 
-    if (tensor->grad) {
+    if (tensor->grad && tensor->grad->data) {
+        /* Zero in-place instead of freeing — avoids reallocation in backward */
+        memset(tensor->grad->data, 0, tensor->grad->numel * cml_dtype_size(tensor->grad->dtype));
+    } else if (tensor->grad) {
         tensor_free(tensor->grad);
         tensor->grad = NULL;
     }
@@ -252,21 +255,41 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     training_metrics_auto_capture_loss(tensor);
 
     if (!gradient) {
-        TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
-                                             .device     = tensor->device,
-                                             .has_dtype  = true,
-                                             .has_device = true};
-        gradient            = tensor_ones(tensor->shape, tensor->ndim, &config);
-        if (!gradient) {
-            LOG_ERROR("Failed to initialize gradient");
-            return;
+        /* For scalar tensors (loss), set grad = 1.0 directly instead of
+         * allocating a tensor_ones each call */
+        if (tensor->numel == 1) {
+            if (!tensor->grad) {
+                TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                     .device     = tensor->device,
+                                                     .has_dtype  = true,
+                                                     .has_device = true};
+                tensor->grad = tensor_zeros(tensor->shape, tensor->ndim, &config);
+            }
+            if (tensor->grad && tensor->grad->data) {
+                *(float*)tensor->grad->data = 1.0f;
+            }
+        } else {
+            TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
+                                                 .device     = tensor->device,
+                                                 .has_dtype  = true,
+                                                 .has_device = true};
+            gradient            = tensor_ones(tensor->shape, tensor->ndim, &config);
+            if (!gradient) {
+                LOG_ERROR("Failed to initialize gradient");
+                return;
+            }
+            if (!tensor->grad) {
+                tensor->grad = tensor_clone(gradient);
+            } else {
+                tensor_accumulate_grad(tensor, gradient);
+            }
         }
-    }
-
-    if (!tensor->grad) {
-        tensor->grad = tensor_clone(gradient);
     } else {
-        tensor_accumulate_grad(tensor, gradient);
+        if (!tensor->grad) {
+            tensor->grad = tensor_clone(gradient);
+        } else {
+            tensor_accumulate_grad(tensor, gradient);
+        }
     }
 
     if (cml_ir_build_backward(tensor->ir_context, tensor->ir_node) != 0) {
