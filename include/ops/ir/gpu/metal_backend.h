@@ -110,6 +110,17 @@ char* cml_metal_generate_msl(struct IRNode* node);
 
 int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph);
 
+bool cml_mps_init(void);
+void cml_mps_cleanup(void);
+bool cml_mps_available(void);
+
+int cml_mps_matmul(const float* A, const float* B, float* C,
+                    int M, int N, int K);
+int cml_mps_matmul_fused_bias_relu(const float* A, const float* B, const float* bias,
+                                    float* C, int M, int N, int K);
+int cml_mps_relu(const float* in, float* out, int n);
+int cml_mps_add(const float* a, const float* b, float* out, int n);
+
 #ifdef __cplusplus
 }
 #endif
