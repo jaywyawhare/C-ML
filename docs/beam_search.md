@@ -1,20 +1,27 @@
 # BEAM Search Auto-Tuning
 
-BEAM search is C-ML's parametric kernel auto-tuning framework that automatically finds optimal GPU kernel launch configurations. It evaluates candidate configurations across multiple dimensions and selects the best-performing one, with optional hardware-level CUDA timing for precise measurements.
+C-ML has two related BEAM autotuning systems:
+
+1. **Generic BEAM search** (`beam_search.h`) — tunes any kernel's block size, unroll factor, and vector width. Supports optional CUDA hardware timing.
+2. **OpenCL GEMM BEAM** (built into `opencl_ir_backend`) — tunes tile parameters for GEMM kernels on OpenCL GPUs using OpenCL profiling events.
 
 
 ## Table of Contents
 
-1. [Overview](#overview)
-1. [How It Works](#how-it-works)
-1. [API Reference](#api-reference)
-1. [Configuration](#configuration)
-1. [CUDA Hardware Timing](#cuda-hardware-timing)
-1. [Cache Persistence](#cache-persistence)
-1. [Usage Example](#usage-example)
+1. [Generic BEAM Search](#generic-beam-search)
+   - [Overview](#overview)
+   - [How It Works](#how-it-works)
+   - [API Reference](#api-reference)
+   - [Configuration](#configuration)
+   - [CUDA Hardware Timing](#cuda-hardware-timing)
+   - [Cache Persistence](#cache-persistence)
+   - [Usage Example](#usage-example)
+2. [OpenCL GEMM BEAM Autotuner](#opencl-gemm-beam-autotuner)
 
 
-## Overview
+## Generic BEAM Search
+
+### Overview
 
 When launching GPU kernels, performance depends heavily on the block size, unroll factor, and vector width. BEAM search automates this tuning by:
 
@@ -26,7 +33,7 @@ When launching GPU kernels, performance depends heavily on the block size, unrol
 **Files:** `include/ops/ir/beam_search.h`, `src/ops/ir/beam_search.c`, `src/ops/ir/beam_cuda_timing.c`
 
 
-## How It Works
+### How It Works
 
 ```
 Parameter Space (54 configs)
@@ -65,7 +72,7 @@ Candidates are scored based on:
 - The top `beam_width` candidates survive for evaluation
 
 
-## API Reference
+### API Reference
 
 ### Core Structs
 
@@ -102,7 +109,7 @@ typedef struct {
 | `cml_beam_cuda_timing_fn(variant, user_data)` | CUDA hardware timing callback |
 
 
-## Configuration
+### Configuration
 
 ### Environment Variable
 
@@ -122,7 +129,7 @@ export CML_BEAM=16   # Exhaustive search
 | `timing_runs` | 5 | Actual measurement iterations |
 
 
-## CUDA Hardware Timing
+### CUDA Hardware Timing
 
 The `cml_beam_cuda_timing_fn()` callback provides precise GPU measurements using CUDA events. It replaces CPU-side heuristic estimation with actual kernel execution timing.
 
@@ -151,7 +158,7 @@ The hardware path pre-filters to `beam_width * 2` candidates using heuristics be
 **Requires:** `CML_HAS_CUDA` compile flag. Without it, `cml_beam_cuda_timing_fn()` returns -1.0 (error).
 
 
-## Cache Persistence
+### Cache Persistence
 
 Tuning results are cached in a 256-entry hash table with linear probing. Caches can be saved to and loaded from disk in a binary format with magic number `BMCH` (0x424D4348).
 
@@ -161,7 +168,7 @@ cml_beam_cache_load(ctx, "beam_cache.bin");
 ```
 
 
-## Usage Example
+### Usage Example
 
 ```c
 #include "ops/ir/beam_search.h"
@@ -187,4 +194,74 @@ rc = cml_beam_search_tune_hw(ctx, kernel_hash, 1024*1024,
 cml_beam_cache_save(ctx, "beam_cache.bin");
 
 cml_beam_search_free(ctx);
+```
+
+
+## OpenCL GEMM BEAM Autotuner
+
+**File:** `src/ops/ir/gpu/opencl_ir_backend.c`
+
+The OpenCL IR backend has a built-in GEMM-specific autotuner that generates and benchmarks parameterized tile kernels. Unlike the generic BEAM search above, it is specialized for GEMM and uses OpenCL profiling events for timing.
+
+### How It Works
+
+At backend init, a set of parameterized `beam_gemm_N` kernels is compiled — each with different tile sizes and register blocks. On the first GEMM call for a given (M, N, K) shape, the autotuner benchmarks all applicable variants and caches the winner. Subsequent calls for the same shape use the cached variant with zero tuning overhead.
+
+```
+Backend init:
+  compile beam_gemm_0 .. beam_gemm_N  (all valid tile variants)
+
+First GEMM for shape (M, N, K):
+  for each applicable variant:
+    1 warmup run
+    probe run → skip if >4× slower than current best
+    3 timed runs via CL_PROFILING_COMMAND_START/END
+    take median
+  store winner in 64-entry cache keyed by (M<<40)|(N<<20)|K
+
+Subsequent calls:
+  cache hit → dispatch cached variant directly
+```
+
+### Parameter Space
+
+| Parameter | Values | Notes |
+|-----------|--------|-------|
+| Tile M × N | 128×128, 128×64, 64×128, 64×64 | Larger tiles preferred first |
+| K tile (TSK) | 16, 8 | |
+| Register block M × N | 8×8, 8×4, 4×8, 4×4 | Higher compute density preferred first |
+| SLM row padding | 0, 1 | Avoids bank conflicts |
+| A layout | always transposed | Proven faster on Intel Xe |
+
+Variants are rejected before compilation if:
+- WG size > 512
+- Tile loading is not evenly divisible across threads
+- Register pressure (acc + a + b) > 80 floats
+- SLM usage > 64 KB
+
+A variant is skipped during autotuning if M < TSM or N < TSN or M/N/K not divisible by the tile sizes.
+
+### Environment Variable
+
+```bash
+export CML_BEAM=0    # Disable: use static matmul / matmul_naive only
+# unset or nonzero  # Enable with all compiled variants (default)
+export CML_BEAM=4    # Limit search to the first 4 applicable variants
+```
+
+When disabled, the backend falls back to:
+- `matmul` — for M,N multiples of 128 and K multiple of 16
+- `matmul_naive` — for all other shapes
+
+### Logging
+
+Set log level to INFO to see autotuning progress:
+
+```
+BEAM: compiled 32 GEMM variants
+BEAM: autotuning GEMM M=1024 N=1024 K=1024 (width=32, 32 variants)...
+BEAM:   V0: TSM=128 TSN=128 TSK=16 reg=8x8 pad=0 -> 142.3 GFLOPS (7.55 ms)
+BEAM:   V1: TSM=128 TSN=128 TSK=16 reg=8x8 pad=1 -> 139.1 GFLOPS (7.72 ms)
+BEAM:   V2: TSM=128 TSN=64  TSK=16 reg=8x8 pad=0 -> SKIP (probe 31.2ms, best 7.5ms)
+BEAM: WINNER V0 (TSM=128 TSN=128 TSK=16 reg=8x8 pad=0) -> 142.3 GFLOPS
 ```
