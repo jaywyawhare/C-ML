@@ -1,6 +1,8 @@
+/*
  * Objective-C implementation using the Metal framework.
  * Entirely guarded by CML_HAS_METAL -- on non-Apple platforms every
  * public function compiles to a safe stub that returns false/NULL/-1.
+ */
 
 #include "ops/ir/gpu/metal_backend.h"
 #include "core/logging.h"
@@ -288,7 +290,7 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
             backend->device = NULL;
             return -1;
         }
-        backend->command_queue = (__bridge_retained void*)queue;
+        backend->command_queue = (void*)CFBridgingRetain(queue);
 
         const char* name = [[device name] UTF8String];
         if (name) {
@@ -314,7 +316,7 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
         } else {
 #define COMPILE_PSO(field, name) \
             { id<MTLComputePipelineState> pso = compile_pipeline(device, lib, name); \
-              if (pso) backend->field = (__bridge_retained void*)pso; }
+              if (pso) backend->field = (void*)CFBridgingRetain(pso); }
 
             COMPILE_PSO(k_fill,                   "k_fill");
             COMPILE_PSO(k_relu,                   "k_relu");
@@ -432,9 +434,9 @@ CMLMetalKernel* cml_metal_compile_msl(CMLMetalBackend* backend,
             return NULL;
         }
 
-        kernel->pipeline = (__bridge_retained void*)pipeline;
-        kernel->library  = (__bridge_retained void*)library;
-        kernel->function = (__bridge_retained void*)function;
+        kernel->pipeline = (void*)CFBridgingRetain(pipeline);
+        kernel->library  = (void*)CFBridgingRetain(library);
+        kernel->function = (void*)CFBridgingRetain(function);
         strncpy(kernel->name, function_name, sizeof(kernel->name) - 1);
         kernel->name[sizeof(kernel->name) - 1] = '\0';
 
@@ -562,7 +564,7 @@ void* cml_metal_alloc(CMLMetalBackend* backend, size_t size) {
             return NULL;
         }
 
-        return (__bridge_retained void*)buffer;
+        return (void*)CFBridgingRetain(buffer);
     }
 }
 
@@ -667,7 +669,7 @@ void* cml_metal_get_or_upload_buffer(CMLMetalBackend* backend,
         }
         memcpy([buf contents], data_ptr, size);
 
-        void* retained_buf = (__bridge_retained void*)buf;
+        void* retained_buf = (void*)CFBridgingRetain(buf);
 
         CMLMetalBufferEntry* e = &backend->buffers[backend->buffer_count++];
         e->data_ptr = data_ptr;
@@ -705,7 +707,7 @@ void* cml_metal_alloc_output_buffer(CMLMetalBackend* backend,
             return NULL;
         }
 
-        void* retained_buf = (__bridge_retained void*)buf;
+        void* retained_buf = (void*)CFBridgingRetain(buf);
 
         CMLMetalBufferEntry* e = &backend->buffers[backend->buffer_count++];
         e->data_ptr = tensor_key;
