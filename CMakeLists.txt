@@ -285,6 +285,8 @@ set(OPS_SOURCES
 if(METAL_FOUND)
     list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_backend.m)
     list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_codegen.m)
+    list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_mps.m)
+    list(APPEND METAL_LIBS "-framework MetalPerformanceShaders")
 endif()
 
 list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
