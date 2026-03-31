@@ -67,10 +67,15 @@ CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
     queue->backend = CML_HCQ_OPENCL;
 
     cl_int err;
+#ifdef __APPLE__
+    cl_command_queue cq = clCreateCommandQueue(
+        g_ocl_ctx.context, g_ocl_ctx.device, 0, &err);
+#else
     cl_command_queue cq = clCreateCommandQueueWithProperties(
         g_ocl_ctx.context, g_ocl_ctx.device, NULL, &err);
+#endif
     if (err != CL_SUCCESS) {
-        LOG_ERROR("OpenCL HCQ: clCreateCommandQueueWithProperties failed (err=%d)", err);
+        LOG_ERROR("OpenCL HCQ: clCreateCommandQueue failed (err=%d)", err);
         free(queue);
         return NULL;
     }

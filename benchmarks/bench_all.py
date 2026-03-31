@@ -385,7 +385,12 @@ def main():
     print(f"\nRunning CML (GPU) benchmarks...")
     cml_gpu = bench_cml(cml_binary, env_extra={"CML_BACKEND": "opencl"})
     if cml_gpu:
-        all_results["cml(GPU)"] = cml_gpu
+        all_results["cml(OpenCL)"] = cml_gpu
+
+    print(f"\nRunning CML (Metal) benchmarks...")
+    cml_metal = bench_cml(cml_binary, env_extra={"CML_BACKEND": "metal"})
+    if cml_metal:
+        all_results["cml(Metal)"] = cml_metal
 
     try:
         import torch

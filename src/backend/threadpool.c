@@ -1,4 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 #include "backend/threadpool.h"
 #include "core/logging.h"
 #include <pthread.h>
