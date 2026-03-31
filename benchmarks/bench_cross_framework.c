@@ -10,6 +10,7 @@
  *   5. Conv2d forward: batch=8, 3x32x32 -> 16x30x30
  *
  * Set CML_BACKEND=opencl to benchmark OpenCL GPU path.
+ * Set CML_BACKEND=metal to benchmark Metal GPU path (macOS).
  */
 #define _POSIX_C_SOURCE 199309L
 #include "cml.h"
@@ -260,7 +261,10 @@ static double bench_conv2d(void) {
 
 int main(void) {
     const char* backend = getenv("CML_BACKEND");
-    if (backend && strcmp(backend, "opencl") == 0) {
+    if (backend && strcmp(backend, "metal") == 0) {
+        g_device = DEVICE_METAL;
+        fprintf(stderr, "bench: using Metal GPU backend\n");
+    } else if (backend && strcmp(backend, "opencl") == 0) {
         g_device = DEVICE_OPENCL;
         fprintf(stderr, "bench: using OpenCL GPU backend\n");
     }
