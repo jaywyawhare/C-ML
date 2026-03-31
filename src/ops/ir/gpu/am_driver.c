@@ -23,6 +23,9 @@
 #include <time.h>
 #endif
 
+#define AM_VA_START   0x100000000ULL
+#define AM_VA_END     0x800000000ULL
+
 #ifdef CML_AM_MOCK_GPU
 #include "ops/ir/gpu/am_mock.h"
 #define open(...)    cml_am_mock_open(__VA_ARGS__)
@@ -156,9 +159,6 @@ struct kfd_ioctl_unmap_memory_from_gpu_args {
 
 #define AM_PAGE_SIZE         4096
 #define AM_PAGE_ALIGN(x)     (((x) + AM_PAGE_SIZE - 1) & ~(uint64_t)(AM_PAGE_SIZE - 1))
-
-#define AM_VA_START   0x100000000ULL
-#define AM_VA_END     0x800000000ULL
 
 #define AM_SIGNAL_INIT 0
 
