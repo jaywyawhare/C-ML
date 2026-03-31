@@ -3472,19 +3472,27 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
 
     /* Check if graph should target a GPU backend via CML_BACKEND env.
      * Cache env check + dispatch context to avoid repeated getenv()/lookup. */
-    static int s_opencl_checked = 0;
-    static int s_use_opencl = 0;
+    static int s_backend_checked = 0;
+    static int s_use_backend = 0;
+    static CMLBackendType s_backend_type = CML_BACKEND_CPU_FALLBACK;
     static CMLDispatchContext* s_dispatch_ctx = NULL;
-    if (!s_opencl_checked) {
+    if (!s_backend_checked) {
         const char* backend_env = getenv("CML_BACKEND");
-        s_use_opencl = (backend_env && (strcasecmp(backend_env, "opencl") == 0 ||
-                                         strcasecmp(backend_env, "cl") == 0));
-        if (s_use_opencl)
+        if (backend_env) {
+            if (strcasecmp(backend_env, "metal") == 0 || strcasecmp(backend_env, "mtl") == 0) {
+                s_backend_type = CML_BACKEND_METAL;
+                s_use_backend = 1;
+            } else if (strcasecmp(backend_env, "opencl") == 0 || strcasecmp(backend_env, "cl") == 0) {
+                s_backend_type = CML_BACKEND_OPENCL;
+                s_use_backend = 1;
+            }
+        }
+        if (s_use_backend)
             s_dispatch_ctx = cml_dispatch_get_global();
-        s_opencl_checked = 1;
+        s_backend_checked = 1;
     }
-    if (s_use_opencl && s_dispatch_ctx) {
-        int r = cml_dispatch_execute_on(s_dispatch_ctx, CML_BACKEND_OPENCL, ir, NULL, 0, NULL, 0);
+    if (s_use_backend && s_dispatch_ctx) {
+        int r = cml_dispatch_execute_on(s_dispatch_ctx, s_backend_type, ir, NULL, 0, NULL, 0);
         if (r == 0) return 0;
     }
 
