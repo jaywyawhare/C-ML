@@ -18,6 +18,9 @@ cmake --build build -j$(nproc)
 
 # Backend comparison benchmark
 ./build/bin/bench_backends
+
+# Cross-framework benchmark (CML vs PyTorch vs TinyGrad vs NumPy)
+python3 benchmarks/bench_all.py
 ```
 
 ## Available Benchmarks
@@ -50,6 +53,66 @@ Comprehensive backend comparison benchmark (located in `tests/`):
 - **Operations**: Matrix multiplication, kernel cache, element-wise ops
 - **Backends**: CPU fallback, BLAS, CPU LLVM JIT, CUDA
 - **Also measures**: Dispatch overhead
+
+### bench_cross_framework (C binary + Python driver)
+
+A rigorous cross-framework comparison covering five workloads on float32:
+
+| Benchmark | Details |
+|-----------|---------|
+| GEMM | Square NxN matmul, N ∈ {512, 1024, 2048} |
+| Fused | matmul + bias_add + relu, same sizes |
+| MLP forward | batch=64, 784→128→ReLU→10, 100 iters |
+| MLP training step | forward + MSE loss + backward + SGD, 50 iters |
+| Conv2d forward | batch=8, 3×32×32 → 16×30×30, 100 iters |
+
+**C binary** (`benchmarks/bench_cross_framework.c`):
+- Compiles to `build/bin/bench_cross_framework`
+- Outputs JSON so the Python driver can parse it
+- Respects `CML_BACKEND=opencl` to benchmark the GPU path
+- Uses median of 5 rounds; 3 iterations/round for N=2048 to reduce thermal throttle
+- Includes cooldown sleeps between heavy 2048-size runs
+
+```bash
+# CPU benchmark (JSON output)
+./build/bin/bench_cross_framework
+
+# GPU benchmark via OpenCL
+CML_BACKEND=opencl ./build/bin/bench_cross_framework
+```
+
+**Python driver** (`benchmarks/bench_all.py`):
+- Runs CML (CPU), CML (GPU/OpenCL), PyTorch, TinyGrad, and NumPy in sequence
+- All frameworks use all available cores by default; override with `OMP_NUM_THREADS=N`
+- TinyGrad benchmarks use `TinyJit` for compiled-kernel dispatch and `.numpy()` to force GPU sync
+- Results grouped by operation type (GEMM, Fused, MLP, Conv2d), median ms, lower is better
+
+```bash
+# Run all frameworks (all cores)
+python3 benchmarks/bench_all.py
+
+# Single-threaded run for controlled comparison
+OMP_NUM_THREADS=1 python3 benchmarks/bench_all.py
+
+# Example output:
+#   Cross-Framework Benchmark  (float32, 12 threads)
+#
+#   Results  (median ms, lower is better)
+#
+#   Benchmark                      numpy    cml  pytorch  cml(GPU)  tinygrad(CL)
+#
+#   GEMM
+#     512x512                      2.0ms   2.2ms    2.4ms    0.5ms        1.4ms
+#     1024x1024                   16.5ms  18.3ms   20.2ms    3.3ms        6.7ms
+#     2048x2048                  131.3ms 148.8ms  174.0ms   34.7ms       79.2ms
+#   ...
+#
+#   GFLOPS  (GEMM)
+#     512                         134GF   122GF    112GF    351GF        191GF
+#   ...
+```
+
+PyTorch and TinyGrad are optional — the script skips frameworks that aren't installed.
 
 ## Methodology
 
