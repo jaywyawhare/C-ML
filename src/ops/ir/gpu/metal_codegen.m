@@ -3,6 +3,8 @@
 #include "ops/uops.h"
 #include "core/logging.h"
 
+#import <Metal/Metal.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
