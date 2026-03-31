@@ -83,10 +83,8 @@ typedef struct CMLOpenCLIRBackend {
 
     /* Pre-compiled kernels */
     cl_kernel k_matmul_naive;
-    cl_kernel k_matmul_tiled;
-    cl_kernel k_matmul_large;
-    cl_kernel k_matmul_huge;
-    cl_kernel k_matmul_v2;
+    cl_kernel k_matmul;
+    cl_kernel k_matmul_fused_bias_relu;
     cl_kernel k_add;
     cl_kernel k_sub;
     cl_kernel k_mul;
@@ -103,11 +101,9 @@ typedef struct CMLOpenCLIRBackend {
     cl_kernel k_mean_reduce;
     cl_kernel k_fill;
 
-    /* Buffer tracker — maps Tensor* to GPU cl_mem */
     CMLOCLBufferEntry buffers[CML_OCL_MAX_TRACKED_BUFFERS];
     int buffer_count;
 
-    /* BEAM autotuner for GEMM kernels */
     CMLGemmVariant    gemm_variants[CML_OCL_MAX_GEMM_VARIANTS];
     int               gemm_variant_count;
     CMLGemmCacheEntry gemm_cache[CML_OCL_GEMM_CACHE_SIZE];
