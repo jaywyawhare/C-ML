@@ -2,19 +2,24 @@
  * Cross-framework benchmark for CML.
  * Outputs JSON so the Python driver can parse and compare.
  *
- * Benchmarks (all float32, CPU, single-threaded):
+ * Benchmarks (all float32):
  *   1. GEMM: NxN matmul (N=512, 1024, 2048)
  *   2. Fused: matmul + bias + relu (same sizes)
  *   3. MLP forward: batch=64, 784->128->ReLU->10, 100 iters
  *   4. MLP training step: forward + MSE loss + backward + SGD step
  *   5. Conv2d forward: batch=8, 3x32x32 -> 16x30x30
+ *
+ * Set CML_BACKEND=opencl to benchmark OpenCL GPU path.
  */
 #define _POSIX_C_SOURCE 199309L
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <math.h>
+
+static DeviceType g_device = DEVICE_CPU;
 
 static void cooldown_ms(int ms) {
     struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L };
@@ -42,10 +47,9 @@ static double median(double* arr, int n) {
     return (n % 2) ? arr[n/2] : (arr[n/2 - 1] + arr[n/2]) / 2.0;
 }
 
-/* ── GEMM ── */
 static double bench_gemm(int N) {
     int shape[] = {N, N};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = g_device,
                         .has_dtype = true, .has_device = true};
 
     float* a_data = malloc(sizeof(float) * N * N);
@@ -56,7 +60,6 @@ static double bench_gemm(int N) {
     Tensor* A = cml_tensor(a_data, shape, 2, &cfg);
     Tensor* B = cml_tensor(b_data, shape, 2, &cfg);
 
-    /* warmup */
     for (int i = 0; i < 3; i++) {
         Tensor* C = cml_matmul(A, B);
         (void)tensor_data_ptr(C);
@@ -82,11 +85,10 @@ static double bench_gemm(int N) {
     return median(times, rounds);
 }
 
-/* ── Fused matmul + bias + relu ── */
 static double bench_fused(int N) {
     int mat_shape[] = {N, N};
     int bias_shape[] = {1, N};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = g_device,
                         .has_dtype = true, .has_device = true};
 
     float* a_data = malloc(sizeof(float) * N * N);
@@ -100,7 +102,6 @@ static double bench_fused(int N) {
     Tensor* B = cml_tensor(b_data, mat_shape, 2, &cfg);
     Tensor* bias = cml_tensor(bias_data, bias_shape, 2, &cfg);
 
-    /* warmup */
     for (int i = 0; i < 3; i++) {
         Tensor* C = cml_relu(cml_add(cml_matmul(A, B), bias));
         (void)tensor_data_ptr(C);
@@ -126,11 +127,10 @@ static double bench_fused(int N) {
     return median(times, rounds);
 }
 
-/* ── MLP forward ── */
 static double bench_mlp_forward(void) {
     int batch = 64, in_f = 784, hid = 128, out_f = 10;
     int x_shape[] = {batch, in_f};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = g_device,
                         .has_dtype = true, .has_device = true};
 
     float* x_data = malloc(sizeof(float) * batch * in_f);
@@ -143,7 +143,6 @@ static double bench_mlp_forward(void) {
     cml_nn_sequential_add(model, (Module*)cml_nn_linear(hid, out_f, DTYPE_FLOAT32, DEVICE_CPU, true));
     module_set_training((Module*)model, false);
 
-    /* warmup */
     for (int i = 0; i < 5; i++) {
         Tensor* out = cml_nn_sequential_forward(model, X);
         (void)tensor_data_ptr(out);
@@ -167,12 +166,11 @@ static double bench_mlp_forward(void) {
     return median(times, 5);
 }
 
-/* ── MLP training step ── */
 static double bench_mlp_train(void) {
     int batch = 64, in_f = 784, hid = 128, out_f = 10;
     int x_shape[] = {batch, in_f};
     int y_shape[] = {batch, out_f};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = g_device,
                         .has_dtype = true, .has_device = true};
 
     float* x_data = malloc(sizeof(float) * batch * in_f);
@@ -191,7 +189,6 @@ static double bench_mlp_train(void) {
 
     Optimizer* opt = cml_optim_sgd_for_model((Module*)model, 0.01f, 0.0f, 0.0f);
 
-    /* warmup */
     for (int i = 0; i < 5; i++) {
         Tensor* out = cml_nn_sequential_forward(model, X);
         Tensor* loss = cml_nn_mse_loss(out, Y);
@@ -223,11 +220,10 @@ static double bench_mlp_train(void) {
     return median(times, 5);
 }
 
-/* ── Conv2d forward ── */
 static double bench_conv2d(void) {
     int batch = 8, ic = 3, h = 32, w = 32, oc = 16, ksize = 3;
     int x_shape[] = {batch, ic, h, w};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = g_device,
                         .has_dtype = true, .has_device = true};
 
     int numel = batch * ic * h * w;
@@ -239,7 +235,6 @@ static double bench_conv2d(void) {
     Module* conv = (Module*)conv_layer;
     module_set_training(conv, false);
 
-    /* warmup */
     for (int i = 0; i < 5; i++) {
         Tensor* out = module_forward(conv, X);
         (void)tensor_data_ptr(out);
@@ -264,16 +259,20 @@ static double bench_conv2d(void) {
 }
 
 int main(void) {
+    const char* backend = getenv("CML_BACKEND");
+    if (backend && strcmp(backend, "opencl") == 0) {
+        g_device = DEVICE_OPENCL;
+        fprintf(stderr, "bench: using OpenCL GPU backend\n");
+    }
+
     cml_init();
     srand(42);
 
-    /* Interleave sizes to distribute thermal load evenly across benchmarks.
-     * Each size pair (gemm+fused) followed by a brief cooldown. */
     double gemm_512  = bench_gemm(512);
     double fused_512  = bench_fused(512);
     double gemm_1024 = bench_gemm(1024);
     double fused_1024 = bench_fused(1024);
-    cooldown_ms(200); /* let CPU recover before heavy 2048 work */
+    cooldown_ms(200);
     double gemm_2048 = bench_gemm(2048);
     cooldown_ms(200);
     double fused_2048 = bench_fused(2048);
