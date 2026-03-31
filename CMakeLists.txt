@@ -266,7 +266,6 @@ set(OPS_SOURCES
     src/ops/ir/gpu/rocm_backend.c
     src/ops/ir/gpu/wmma.c
     src/ops/ir/gpu/wgsl_codegen.c
-    src/ops/ir/gpu/metal_codegen.c
     src/ops/ir/gpu/ptx_codegen.c
     src/ops/ir/gpu/nv_driver.c
     src/ops/ir/gpu/nv_qmd.c
@@ -285,6 +284,7 @@ set(OPS_SOURCES
 
 if(METAL_FOUND)
     list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_backend.m)
+    list(APPEND OPS_SOURCES src/ops/ir/gpu/metal_codegen.m)
 endif()
 
 list(APPEND OPS_SOURCES src/ops/ir/gpu/webgpu_backend.c)
