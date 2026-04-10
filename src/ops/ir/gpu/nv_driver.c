@@ -1,12 +1,12 @@
-#include "ops/ir/gpu/nv_driver.h"
-#include "ops/ir/gpu/nv_qmd.h"
-#include "ops/ir/internal.h"
-#include "core/logging.h"
-
 #define _POSIX_C_SOURCE 200809L
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE
 #endif
+
+#include "ops/ir/gpu/nv_driver.h"
+#include "ops/ir/gpu/nv_qmd.h"
+#include "ops/ir/internal.h"
+#include "core/logging.h"
 
 #include <stdlib.h>
 #include <string.h>
