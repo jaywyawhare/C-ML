@@ -51,6 +51,9 @@ test_bin/**
 bin/**
 lib/**
 
+# CTest (cost data, last tests failed, etc.)
+**/Testing/Temporary/
+
 # Build outputs (build/, build_asan/, build_debug/, build_comment_test/, etc.)
 build*/
 cmake-build*/
