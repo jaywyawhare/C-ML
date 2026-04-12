@@ -37,6 +37,7 @@ C-ML is a production-ready machine learning library written in pure C, providing
 - **[Distributed Training](distributed.md)** - DDP, Pipeline Parallel, Tensor Parallel, collective ops
 - **[Model I/O](model_io.md)** - GGUF, SafeTensors, ONNX, PyTorch .pth, quantization
 - **[Memory Management](memory_management.md)** - TLSF allocator, graph allocator, memory pools, timeline planner
+- **[IR Graph Management](ir_graph_management.md)** - Graph lifecycle, capture, versioning, and debugging hooks
 
 ### Reference
 
@@ -46,9 +47,13 @@ C-ML is a production-ready machine learning library written in pure C, providing
 - **[BEAM Search](beam_search.md)** - GPU kernel auto-tuning
 - **[Speculative Decoding](speculative_decoding.md)** - Draft-verify generation
 - **[Kernel Studio](kernel_studio.md)** - Visualization and debugging
+- **[Kernel Studio Quick Reference](kernel_studio_quickref.md)** - Shortcuts and UI map
 - **[Benchmarks](benchmarks.md)** - Performance benchmarks
+- **[Examples](examples.md)** - `examples/` walkthrough and patterns
+- **[Python Bindings](python_installation.md)** - CFFI install, NumPy, packaging
 - **[Miscellaneous](miscellaneous.md)** - Sparse tensors, SIMD, Winograd, augmentation, symbolic, CMake integration
 - **[External Dependencies](EXTERNAL_DEPENDENCIES.md)** - Build dependencies
+- **[License](license.md)** - MIT terms
 
 ## Quick Start
 
@@ -124,7 +129,7 @@ Compiler   schedule -> linearize -> fused codegen -> kernel cache
 Runtime    SIMD (SSE/AVX/AVX-512/NEON), BLAS, threading, memory pools
      |
      v
-Hardware   CPU, CUDA, ROCm, Vulkan, WebGPU, Metal, OpenCL
+Hardware   CPU, CUDA, ROCm, Vulkan, WebGPU, Metal, OpenCL, Adreno, Hexagon
 ```
 
 ## Examples
