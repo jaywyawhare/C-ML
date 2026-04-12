@@ -95,7 +95,7 @@ compiler        IR -> schedule -> linearize -> codegen -> cache
      |
 drivers         HCQ, NV (RM ioctl), AM (KFD), TLSF, pools
      |
-hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, CPU
+hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, Adreno, Hexagon, CPU
 ```
 
 ---
@@ -110,11 +110,15 @@ hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, CPU
 | [Training](docs/training.md) | [Compiler Pipeline](docs/compiler_pipeline.md) |
 | [GPU Backends](docs/gpu_backends.md) | [Distributed Training](docs/distributed.md) |
 | [Model I/O](docs/model_io.md) | [Memory Management](docs/memory_management.md) |
+| [IR Graph Management](docs/ir_graph_management.md) | [Linearization](docs/linearization.md) |
 | [Datasets](docs/datasets.md) | [Optimizations](docs/optimizations.md) |
 | [Autograd](docs/autograd.md) | [Graph Mode](docs/graph_mode.md) |
 | [BEAM Search](docs/beam_search.md) | [Speculative Decoding](docs/speculative_decoding.md) |
-| [Kernel Studio](docs/kernel_studio.md) | [Benchmarks](docs/benchmarks.md) |
-| [External Deps](docs/EXTERNAL_DEPENDENCIES.md) | [Python Setup](python/INSTALLATION.md) |
+| [Kernel Studio](docs/kernel_studio.md) | [Kernel Studio Quick Ref](docs/kernel_studio_quickref.md) |
+| [Benchmarks](docs/benchmarks.md) | [Examples](docs/examples.md) |
+| [Miscellaneous](docs/miscellaneous.md) | [External Deps](docs/EXTERNAL_DEPENDENCIES.md) |
+| [Python Bindings](docs/python_installation.md) | [Python (repo)](python/INSTALLATION.md) |
+| [License](docs/license.md) | [Documentation index](docs/index.md) |
 
 </details>
 
