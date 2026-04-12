@@ -534,7 +534,7 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
                 qp = json_skip_ws(qp);
                 if (*qp == ':') qp++;
                 qp = json_expect(qp, '[');
-                if (!qp) { free(context); p = json_skip_value(p - 1); continue; }
+                if (!qp) { p = json_skip_value(p - 1); continue; }
 
                 while (qp && *qp) {
                     qp = json_skip_ws(qp);
@@ -612,9 +612,8 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
                         qp++;
                     }
                 }
-            } else {
-                free(context);
             }
+            free(context);
 
             /* Skip to end of this paragraph object */
             int depth = 1;

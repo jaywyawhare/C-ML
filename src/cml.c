@@ -27,6 +27,7 @@
 #include "nn/layers/upsample.h"
 #include "nn/layers/pixel_shuffle.h"
 #include "ops/ir/context.h"
+#include "ops/ir/execution.h"
 #include "ops/uops.h"
 #include "core/gguf.h"
 #include "core/safetensors.h"
@@ -210,6 +211,8 @@ static void cml_auto_cleanup(void) {
     }
 
     error_stack_cleanup();
+
+    cml_cleanup_buffer_cache();
 
     g_cml_initialized = false;
     g_cml_init_count  = 0;
@@ -491,6 +494,8 @@ int cml_cleanup(void) {
     }
 
     error_stack_cleanup();
+
+    cml_cleanup_buffer_cache();
 
     LOG_INFO("C-ML Library cleanup completed");
     return 0;

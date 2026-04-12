@@ -242,16 +242,7 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
     free(original->inputs);
     free(original->output_name);
     free(original->output_shape);
-    // Don't free params — some nodes share params or they were shallow-copied
-    // The original node owned them, but since we're decomposing, the params
-    // are no longer needed. Free them here for composite ops.
-    if (original->params) {
-        // For safety, free known param types
-        switch (original->type) {
-        case UOP_CLAMP: free(original->params); break;
-        default: break; // Most composite ops have no params
-        }
-    }
+    cml_ir_free_node_params(original);
     free(original);
 }
 

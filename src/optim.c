@@ -1125,9 +1125,8 @@ Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, flo
     }
 
     Optimizer* optimizer = optim_adam(params, num_params, lr, weight_decay, beta1, beta2, eps);
-    // Note: params array is owned by optimizer, don't free here
+    free(params);
 
-    // Automatically track for cleanup
     if (optimizer) {
         extern void cml_track_optimizer(Optimizer*);
         cml_track_optimizer(optimizer);
@@ -1604,9 +1603,7 @@ Optimizer* optim_sgd_for_model(Module* model, float lr, float momentum, float we
     }
 
     Optimizer* optimizer = optim_sgd(params, num_params, lr, momentum, weight_decay);
-    // Note: params array is owned by optimizer, don't free here
-
-    // Automatically track for cleanup
+    free(params);
 
     return optimizer;
 }

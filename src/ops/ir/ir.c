@@ -1,6 +1,7 @@
 
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/context.h"
 #include "ops/uops.h"
 #include "autograd/autograd.h"
 #include "core/logging.h"
@@ -283,7 +284,7 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     return ir;
 }
 
-static void free_node_params(struct IRNode* node) {
+void cml_ir_free_node_params(struct IRNode* node) {
     if (!node || !node->params)
         return;
 
@@ -303,8 +304,6 @@ static void free_node_params(struct IRNode* node) {
     case UOP_COS:
     case UOP_TAN:
     case UOP_POW:
-    case UOP_SUM:
-    case UOP_MAX_REDUCE:
     case UOP_MATMUL:
     case UOP_WHERE:
     case UOP_CMPLT:
@@ -329,7 +328,10 @@ static void free_node_params(struct IRNode* node) {
     }
     case UOP_PROD:
     case UOP_ARGMAX:
-    case UOP_ARGMIN: {
+    case UOP_ARGMIN:
+    case UOP_SUM:
+    case UOP_MAX_REDUCE:
+    case UOP_MEAN: {
         ReduceParams* p = (ReduceParams*)node->params;
         if (p) {
             if (p->dims) free(p->dims);
@@ -417,15 +419,6 @@ static void free_node_params(struct IRNode* node) {
                 free(p->end);
             if (p->step)
                 free(p->step);
-            free(p);
-        }
-        break;
-    }
-    case UOP_MEAN: {
-        ReduceParams* p = (ReduceParams*)node->params;
-        if (p) {
-            if (p->dims)
-                free(p->dims);
             free(p);
         }
         break;
@@ -686,7 +679,7 @@ static void free_ir_node(struct IRNode* node) {
         free_fused_kernel(node->fused_kernel);
     }
 
-    free_node_params(node);
+    cml_ir_free_node_params(node);
 
     /* execution_result is owned by the tensor -- do not free here */
     free(node);
@@ -696,19 +689,19 @@ void cml_ir_free(CMLGraph_t ir) {
     if (!ir)
         return;
 
-    /* Phase 1: detach output tensors (owned by user code, not freed here) */
+    cml_ir_clear_global_if_current(ir);
+
     struct IRNode* node = ir->head;
     int node_idx        = 0;
     while (node) {
         if (node->num_inputs < 0 || node->num_inputs > 1000) {
             fprintf(stderr, "WARNING: cml_ir_free phase 1: corrupt node %d, num_inputs=%d\n",
                     node_idx, node->num_inputs);
-            break; // Stop traversing corrupt list
+            break; 
         }
         if (node->output) {
-            node->output->ir_node    = NULL;
-            node->output->ir_context = NULL;
-            node->output             = NULL;
+            tensor_free(node->output);
+            node->output = NULL;
         }
         node = node->next;
         node_idx++;
@@ -722,9 +715,8 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            node->output->ir_node    = NULL;
-            node->output->ir_context = NULL;
-            node->output             = NULL;
+            tensor_free(node->output);
+            node->output = NULL;
         }
         node = node->next;
         node_idx++;

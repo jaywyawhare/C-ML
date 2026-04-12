@@ -233,9 +233,10 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->strides        = NULL;
     t->storage_offset = 0;
     t->is_contiguous  = true;
-    t->buffer_handle  = NULL;
-    t->user_data      = NULL;
-    t->owns_data      = true;
+    t->buffer_handle     = NULL;
+    t->user_data         = NULL;
+    t->owns_data         = true;
+    t->from_buffer_cache = false;
 
     t->numel = 1;
     for (int i = 0; i < ndim; i++) {
@@ -508,6 +509,7 @@ void* tensor_data_ptr(Tensor* t) {
 
     return t->data;
 }
+            // Stop traversing corrupt list
 
 size_t cml_dtype_size(DType dtype) {
     switch (dtype) {
@@ -856,10 +858,11 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         free(t);
         return NULL;
     }
-    t->storage_offset = 0;
-    t->is_contiguous  = true;
-    t->buffer_handle  = NULL;
-    t->user_data      = NULL;
+    t->storage_offset    = 0;
+    t->is_contiguous     = true;
+    t->buffer_handle     = NULL;
+    t->user_data         = NULL;
+    t->from_buffer_cache = false;
 
     node->output = t;
 
@@ -991,10 +994,12 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
         }
     }
 
-    t->grad          = NULL;
-    t->requires_grad = false;
-    t->ref_count     = 1;
-    t->base          = NULL;
+    t->grad              = NULL;
+    t->requires_grad     = false;
+    t->ref_count         = 1;
+    t->base              = NULL;
+    t->user_data         = NULL;
+    t->from_buffer_cache = false;
 
     return t;
 }
@@ -1048,20 +1053,19 @@ void tensor_free(Tensor* t) {
         t->ir_context = NULL;
     }
 
-    if (t->owns_data && t->data) {
-        if (t->buffer_handle) {
-            cml_backend_buffer_free(t->buffer_handle);
-            t->buffer_handle = NULL;
-        } else {
-            if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
-                if (t->from_buffer_cache && t->numel > 0) {
-                    cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
-                } else {
-                    free(t->data);
-                }
+    if (t->buffer_handle) {
+        cml_backend_buffer_free(t->buffer_handle);
+        t->buffer_handle = NULL;
+        t->data          = NULL;
+    } else if (t->owns_data && t->data) {
+        if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
+            if (t->from_buffer_cache && t->numel > 0) {
+                cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
             } else {
-                device_free(t->data, t->device);
+                free(t->data);
             }
+        } else {
+            device_free(t->data, t->device);
         }
     }
 
@@ -1073,6 +1077,11 @@ void tensor_free(Tensor* t) {
     if (t->grad) {
         tensor_free(t->grad);
         t->grad = NULL;
+    }
+
+    if (t->user_data) {
+        free(t->user_data);
+        t->user_data = NULL;
     }
 
     free(t);
