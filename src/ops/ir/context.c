@@ -1,6 +1,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/execution.h"
 #include "core/logging.h"
 #include "autograd/autograd.h"
 #include <stdio.h>
@@ -142,6 +143,14 @@ CMLGraph_t cml_ir_get_or_create_context(void) {
 
 void cml_ir_set_global_context(CMLGraph_t ir) { g_global_ir_context = ir; }
 
+void cml_ir_clear_global_if_current(CMLGraph_t ir) {
+    if (!ir || g_global_ir_context != ir)
+        return;
+    if (atomic_load(&g_auto_capture_ir) == ir)
+        cml_ir_disable_auto_capture();
+    g_global_ir_context = NULL;
+}
+
 void cml_ir_reset_global_context(void) {
     if (g_global_ir_context) {
         if (atomic_load(&g_auto_capture_ir) == g_global_ir_context) {
@@ -150,6 +159,7 @@ void cml_ir_reset_global_context(void) {
         cml_ir_free(g_global_ir_context);
         g_global_ir_context = NULL;
     }
+    cml_cleanup_buffer_cache();
 }
 
 void cml_ir_ensure_gradients_executed(CMLGraph_t ir) {

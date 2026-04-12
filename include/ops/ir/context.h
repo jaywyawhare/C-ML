@@ -24,6 +24,12 @@ int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_input
 CMLGraph_t cml_ir_get_or_create_context(void);
 void cml_ir_set_global_context(CMLGraph_t ir);
 
+/**
+ * @brief If @a ir is the current global IR pointer, clear that pointer (and auto-capture).
+ *        Called from cml_ir_free so freeing a graph cannot leave a dangling global reference.
+ */
+void cml_ir_clear_global_if_current(CMLGraph_t ir);
+
 /* Frees the current global IR context and sets it to NULL.
    Useful for clearing the graph after a training step. */
 void cml_ir_reset_global_context(void);
