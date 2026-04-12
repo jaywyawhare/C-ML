@@ -4,10 +4,16 @@
 #include "core/logging.h"
 #include "core/error_stack.h"
 #include "backend/device.h"
+#include "tensor/tensor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
+void nn_tensor_param_alias(Tensor* t) {
+    if (t)
+        t->ref_count++;
+}
 
 int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free) {
     if (!module || !name)
@@ -64,11 +70,16 @@ void module_free(Module* module) {
     if (module->parameters) {
         for (int i = 0; i < module->num_parameters; i++) {
             if (module->parameters[i]) {
-                if (module->parameters[i]->name) {
-                    free(module->parameters[i]->name);
-                    module->parameters[i]->name = NULL;
+                Parameter* p = module->parameters[i];
+                if (p->name) {
+                    free(p->name);
+                    p->name = NULL;
                 }
-                free(module->parameters[i]);
+                if (p->tensor) {
+                    tensor_free(p->tensor);
+                    p->tensor = NULL;
+                }
+                free(p);
                 module->parameters[i] = NULL;
             }
         }
@@ -179,6 +190,9 @@ int module_set_parameter(Module* module, const char* name, Tensor* tensor) {
         LOG_WARNING("Parameter '%s' not found in module '%s'", name, module->name);
         return -1;
     }
+
+    if (param->tensor && param->tensor != tensor)
+        tensor_free(param->tensor);
 
     param->tensor         = tensor;
     tensor->requires_grad = param->requires_grad;

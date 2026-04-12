@@ -46,6 +46,8 @@ void module_free(Module* module);
 
 int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool requires_grad);
 
+void nn_tensor_param_alias(Tensor* t);
+
 int module_get_parameters(Module* module, Parameter** params, int* num_parameters);
 
 Parameter* module_get_parameter(Module* module, const char* name);
