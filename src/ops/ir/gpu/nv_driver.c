@@ -1028,6 +1028,7 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
                 kernel->gpu_addr = code_buf->gpu_va;
 
             kernel->handle = code_buf->handle;
+            kernel->code_buffer = code_buf;
         }
     }
 
@@ -1078,6 +1079,7 @@ CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver *drv, const void *cubin, size_
             else
                 kernel->gpu_addr = code_buf->gpu_va;
             kernel->handle = code_buf->handle;
+            kernel->code_buffer = code_buf;
         }
     }
 
@@ -1088,7 +1090,11 @@ void cml_nv_kernel_free(CMLNVDriver *drv, CMLNVKernel *kernel) {
     if (!kernel) return;
 
 #ifdef __linux__
-    if (drv && drv->initialized && kernel->handle) {
+    if (kernel->code_buffer) {
+        cml_nv_buffer_free(drv, kernel->code_buffer);
+        kernel->code_buffer = NULL;
+        kernel->handle      = 0;
+    } else if (drv && drv->initialized && kernel->handle) {
         nv_rm_free(drv->fd_ctl, drv->client_handle,
                    drv->device_handle, kernel->handle);
     }

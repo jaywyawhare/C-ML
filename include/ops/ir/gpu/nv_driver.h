@@ -133,6 +133,7 @@ typedef struct CMLNVKernel {
     int      param_size;
     int      bar_count;
     NVKernelMeta meta;
+    struct CMLNVBuffer* code_buffer; 
 } CMLNVKernel;
 
 typedef struct CMLNVGPFIFO {
