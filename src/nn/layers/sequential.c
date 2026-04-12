@@ -304,9 +304,12 @@ int sequential_add(Sequential* seq, Module* module) {
                 char param_name[256];
                 snprintf(param_name, sizeof(param_name), "%d.%s.%s", module_index, module->name,
                          params[i]->name ? params[i]->name : "unnamed");
-                int result = module_add_parameter((Module*)seq, params[i]->tensor, param_name,
+                Tensor* pt = params[i]->tensor;
+                nn_tensor_param_alias(pt);
+                int result = module_add_parameter((Module*)seq, pt, param_name,
                                                   params[i]->requires_grad);
                 if (result != 0) {
+                    pt->ref_count--;
                     LOG_WARNING(
                         "Failed to add parameter '%s' from module '%s' (index %d) to Sequential",
                         param_name, module->name, module_index);

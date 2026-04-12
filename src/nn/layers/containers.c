@@ -15,10 +15,12 @@ static void module_list_free(Module* module) {
     ModuleList* list = (ModuleList*)module;
     if (!list) return;
 
-    // Only free the pointer array, NOT the child modules themselves.
-    // Child modules are tracked by the global cleanup system (cml_track_module)
-    // and will be freed during cml_cleanup(). Freeing them here causes double-free.
     if (list->modules) {
+        for (int i = 0; i < list->num_modules; i++) {
+            if (list->modules[i]) {
+                module_free(list->modules[i]);
+            }
+        }
         free(list->modules);
     }
 
@@ -61,6 +63,10 @@ int module_list_append(ModuleList* list, Module* module) {
         list->capacity = new_cap;
     }
 
+    /* Transfer ownership: the list is now responsible for freeing this child. */
+    extern void cml_untrack_module(Module*);
+    cml_untrack_module(module);
+
     list->modules[list->num_modules] = module;
     int module_index = list->num_modules;
     list->num_modules++;
@@ -72,8 +78,11 @@ int module_list_append(ModuleList* list, Module* module) {
                 char param_name[256];
                 snprintf(param_name, sizeof(param_name), "%d.%s.%s", module_index, module->name,
                          params[i]->name ? params[i]->name : "unnamed");
-                module_add_parameter((Module*)list, params[i]->tensor, param_name,
-                                     params[i]->requires_grad);
+                Tensor* pt = params[i]->tensor;
+                nn_tensor_param_alias(pt);
+                if (module_add_parameter((Module*)list, pt, param_name,
+                                         params[i]->requires_grad) != 0)
+                    pt->ref_count--;
             }
         }
         if (params) free(params);
@@ -94,6 +103,10 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
         list->capacity = new_cap;
     }
 
+    /* Transfer ownership: the list is now responsible for freeing this child. */
+    extern void cml_untrack_module(Module*);
+    cml_untrack_module(module);
+
     /* Shift right */
     for (int i = list->num_modules; i > index; i--) {
         list->modules[i] = list->modules[i - 1];
@@ -108,8 +121,11 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
                 char param_name[256];
                 snprintf(param_name, sizeof(param_name), "%d.%s.%s", index, module->name,
                          params[i]->name ? params[i]->name : "unnamed");
-                module_add_parameter((Module*)list, params[i]->tensor, param_name,
-                                     params[i]->requires_grad);
+                Tensor* pt = params[i]->tensor;
+                nn_tensor_param_alias(pt);
+                if (module_add_parameter((Module*)list, pt, param_name,
+                                         params[i]->requires_grad) != 0)
+                    pt->ref_count--;
             }
         }
         if (params) free(params);
@@ -150,8 +166,9 @@ static void module_dict_free(Module* module) {
     if (dict->entries) {
         for (int i = 0; i < dict->num_entries; i++) {
             free(dict->entries[i].key);
-            // Do NOT free dict->entries[i].module — child modules are tracked
-            // by the global cleanup system and freed during cml_cleanup().
+            if (dict->entries[i].module) {
+                module_free(dict->entries[i].module);
+            }
         }
         free(dict->entries);
     }
@@ -186,11 +203,14 @@ ModuleDict* nn_module_dict(void) {
 
 int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     if (!dict || !key || !module) return -1;
+
+    /* Transfer ownership: the dict is now responsible for freeing this child. */
+    extern void cml_untrack_module(Module*);
+    cml_untrack_module(module);
+
     for (int i = 0; i < dict->num_entries; i++) {
         if (strcmp(dict->entries[i].key, key) == 0) {
-            // Do NOT free the old module here — it's tracked by global cleanup
-            // (cml_track_module) and will be freed during cml_cleanup().
-            // Calling module_free() here causes double-free.
+            module_free(dict->entries[i].module);
             dict->entries[i].module = module;
             return 0;
         }
@@ -216,8 +236,11 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
                 char param_name[256];
                 snprintf(param_name, sizeof(param_name), "%s.%s.%s", key, module->name,
                          params[i]->name ? params[i]->name : "unnamed");
-                module_add_parameter((Module*)dict, params[i]->tensor, param_name,
-                                     params[i]->requires_grad);
+                Tensor* pt = params[i]->tensor;
+                nn_tensor_param_alias(pt);
+                if (module_add_parameter((Module*)dict, pt, param_name,
+                                         params[i]->requires_grad) != 0)
+                    pt->ref_count--;
             }
         }
         if (params) free(params);

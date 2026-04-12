@@ -18,7 +18,27 @@ static Tensor* rnn_cell_module_forward(Module* module, Tensor* input) {
     return NULL;
 }
 
-static void rnn_cell_free(Module* module) { free(module); }
+static void rnn_cell_free(Module* module) {
+    if (module->parameters) {
+        for (int i = 0; i < module->num_parameters; i++) {
+            Parameter* p = module->parameters[i];
+            if (!p)
+                continue;
+            if (p->name)
+                free(p->name);
+            if (p->tensor)
+                tensor_free(p->tensor);
+            free(p);
+        }
+        free(module->parameters);
+        module->parameters = NULL;
+    }
+    if (module->name) {
+        free(module->name);
+        module->name = NULL;
+    }
+    free(module);
+}
 
 Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input) return NULL;
@@ -116,7 +136,27 @@ static Tensor* lstm_cell_module_forward(Module* module, Tensor* input) {
     return NULL;
 }
 
-static void lstm_cell_free(Module* module) { free(module); }
+static void lstm_cell_free(Module* module) {
+    if (module->parameters) {
+        for (int i = 0; i < module->num_parameters; i++) {
+            Parameter* p = module->parameters[i];
+            if (!p)
+                continue;
+            if (p->name)
+                free(p->name);
+            if (p->tensor)
+                tensor_free(p->tensor);
+            free(p);
+        }
+        free(module->parameters);
+        module->parameters = NULL;
+    }
+    if (module->name) {
+        free(module->name);
+        module->name = NULL;
+    }
+    free(module);
+}
 
 void lstm_cell_forward(LSTMCell* cell, Tensor* input,
                        Tensor* h_prev, Tensor* c_prev,
@@ -250,7 +290,27 @@ static Tensor* gru_cell_module_forward(Module* module, Tensor* input) {
     return NULL;
 }
 
-static void gru_cell_free(Module* module) { free(module); }
+static void gru_cell_free(Module* module) {
+    if (module->parameters) {
+        for (int i = 0; i < module->num_parameters; i++) {
+            Parameter* p = module->parameters[i];
+            if (!p)
+                continue;
+            if (p->name)
+                free(p->name);
+            if (p->tensor)
+                tensor_free(p->tensor);
+            free(p);
+        }
+        free(module->parameters);
+        module->parameters = NULL;
+    }
+    if (module->name) {
+        free(module->name);
+        module->name = NULL;
+    }
+    free(module);
+}
 
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input) return NULL;
@@ -377,8 +437,10 @@ static void register_cell_params(Module* parent, Module* cell,
                 snprintf(pname, sizeof(pname), "layers.%d.%s.%s",
                          layer, dir_str,
                          params[i]->name ? params[i]->name : "unnamed");
-                module_add_parameter(parent, params[i]->tensor, pname,
-                                     params[i]->requires_grad);
+                Tensor* pt = params[i]->tensor;
+                nn_tensor_param_alias(pt);
+                if (module_add_parameter(parent, pt, pname, params[i]->requires_grad) != 0)
+                    pt->ref_count--;
             }
         }
         if (params) free(params);
