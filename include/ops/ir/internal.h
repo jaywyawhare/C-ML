@@ -79,6 +79,8 @@ struct IRNode {
     int chain_id;              // ID for chained callables
 };
 
+void cml_ir_free_node_params(struct IRNode* node);
+
 struct CMLGraph {
     IRTarget target;
     struct IRNode* head; // Forward graph (lazy)
