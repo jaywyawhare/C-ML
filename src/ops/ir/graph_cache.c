@@ -16,6 +16,10 @@
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
 
+static size_t cml_alloc_size_aligned(size_t size, size_t alignment) {
+    return (size + alignment - 1) & ~(alignment - 1);
+}
+
 static CMLGraphCache* g_graph_cache = NULL;
 
 static uint64_t hash_combine(uint64_t h, uint64_t val) {
@@ -208,7 +212,9 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
 
         if (node->output && node->output->numel > 0) {
             plan->buffer_sizes[idx] = node->output->numel;
-            plan->buffers[idx]      = aligned_alloc(32, node->output->numel * sizeof(float));
+            size_t nbytes           = (size_t)node->output->numel * sizeof(float);
+            plan->buffers[idx] =
+                aligned_alloc(32, cml_alloc_size_aligned(nbytes, 32));
             if (!plan->buffers[idx]) {
                 cml_free_execution_plan(plan);
                 return NULL;

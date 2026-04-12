@@ -14,6 +14,10 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+static size_t alloc_size_aligned(size_t size, size_t alignment) {
+    return (size + alignment - 1) & ~(alignment - 1);
+}
+
 static void free_cached_graph(CachedModelGraph* cache) {
     if (!cache)
         return;
@@ -63,7 +67,8 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     memcpy(cache->input_shape, input->shape, sizeof(int) * input->ndim);
     cache->input_numel = input->numel;
 
-    cache->input_buffer = aligned_alloc(32, input->numel * sizeof(float));
+    cache->input_buffer =
+        aligned_alloc(32, alloc_size_aligned((size_t)input->numel * sizeof(float), 32));
     if (!cache->input_buffer) {
         free(cache->input_shape);
         free(cache);
@@ -71,7 +76,8 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     }
 
     cache->output_numel  = output->numel;
-    cache->output_buffer = aligned_alloc(32, output->numel * sizeof(float));
+    cache->output_buffer =
+        aligned_alloc(32, alloc_size_aligned((size_t)output->numel * sizeof(float), 32));
     if (!cache->output_buffer) {
         free(cache->input_buffer);
         free(cache->input_shape);
