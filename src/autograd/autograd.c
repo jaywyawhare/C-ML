@@ -218,7 +218,6 @@ void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
 
     /* Propagate gradient to ir_node->output so the next backward node can find it */
     if (tensor->ir_node && tensor->ir_node->output && tensor->ir_node->output != tensor) {
-        fflush(stdout);
         if (!tensor->ir_node->output->grad) {
             tensor->ir_node->output->grad = tensor_clone(tensor->grad);
         }
@@ -228,8 +227,8 @@ void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
 Tensor* tensor_get_grad(Tensor* tensor) { return tensor ? tensor->grad : NULL; }
 
 void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
-    (void)retain_graph; // Reserved for future use
-    (void)create_graph; // Reserved for future use
+    (void)retain_graph;
+    (void)create_graph;
 
     if (!tensor) {
         LOG_ERROR("Cannot compute gradients for NULL tensor");
@@ -273,16 +272,22 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                                                  .device     = tensor->device,
                                                  .has_dtype  = true,
                                                  .has_device = true};
-            gradient            = tensor_ones(tensor->shape, tensor->ndim, &config);
-            if (!gradient) {
+            Tensor* ones_grad = tensor_ones(tensor->shape, tensor->ndim, &config);
+            if (!ones_grad) {
                 LOG_ERROR("Failed to initialize gradient");
                 return;
             }
             if (!tensor->grad) {
-                tensor->grad = tensor_clone(gradient);
+                tensor->grad = tensor_clone(ones_grad);
+                if (!tensor->grad) {
+                    LOG_ERROR("Failed to clone gradient");
+                    tensor_free(ones_grad);
+                    return;
+                }
             } else {
-                tensor_accumulate_grad(tensor, gradient);
+                tensor_accumulate_grad(tensor, ones_grad);
             }
+            tensor_free(ones_grad);
         }
     } else {
         if (!tensor->grad) {
@@ -299,8 +304,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
 
     if (cml_ir_execute_backward(tensor->ir_context) != 0) {
         LOG_ERROR("Failed to execute backward pass");
-        LOG_ERROR("Aborting training run to avoid repeated failing executions");
-        exit(1);
+        return;
     }
 
     const char* viz     = getenv("CML_VIZ");

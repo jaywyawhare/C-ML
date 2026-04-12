@@ -76,6 +76,7 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
     Tensor* ones = tensor_ones(input->shape, input->ndim, &config);
     if (!ones) return NULL;
     Tensor* one_minus_input = uop_sub(ones, input);
+    tensor_free(ones);
     if (!one_minus_input) return NULL;
 
     Tensor* log_1_minus_input = uop_log(one_minus_input);
@@ -87,6 +88,7 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
     Tensor* ones_target = tensor_ones(target->shape, target->ndim, &config);
     if (!ones_target) return NULL;
     Tensor* one_minus_target = uop_sub(ones_target, target);
+    tensor_free(ones_target);
     if (!one_minus_target) return NULL;
     Tensor* term2 = uop_mul(one_minus_target, log_1_minus_input);
     if (!term2) return NULL;
@@ -530,10 +532,8 @@ Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* neg
     Tensor* dist_diff_sum = uop_sum(dist_diff, &reduce_all);
     if (!dist_diff_sum) return NULL;
 
-    TensorConfig config = (TensorConfig){
-        .dtype = anchor->dtype, .device = anchor->device, .has_dtype = true, .has_device = true};
     int scalar_shape[] = {1};
-    Tensor* margin_tensor = tensor_full(scalar_shape, 1, &config, margin);
+    Tensor* margin_tensor = uop_fill(scalar_shape, 1, margin);
     if (!margin_tensor) return NULL;
 
     Tensor* with_margin = uop_add(dist_diff_sum, margin_tensor);
@@ -553,8 +553,6 @@ Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, flo
         return NULL;
     }
 
-    TensorConfig config = (TensorConfig){
-        .dtype = x1->dtype, .device = x1->device, .has_dtype = true, .has_device = true};
     ReduceParams reduce_all = {0};
     int scalar_shape[] = {1};
 
@@ -576,26 +574,26 @@ Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, flo
     Tensor* cos_sim = uop_div(dot, uop_mul(x1_norm, x2_norm));
     if (!cos_sim) return NULL;
 
-    Tensor* ones = tensor_full(scalar_shape, 1, &config, 1.0f);
+    Tensor* ones = uop_fill(scalar_shape, 1, 1.0f);
     if (!ones) return NULL;
     Tensor* pos_loss = uop_sub(ones, cos_sim);
     if (!pos_loss) return NULL;
 
-    Tensor* margin_tensor = tensor_full(scalar_shape, 1, &config, margin);
+    Tensor* margin_tensor = uop_fill(scalar_shape, 1, margin);
     if (!margin_tensor) return NULL;
     Tensor* neg_loss = uop_clamp(uop_sub(cos_sim, margin_tensor), 0.0f, INFINITY);
     if (!neg_loss) return NULL;
 
-    Tensor* half = tensor_full(scalar_shape, 1, &config, 0.5f);
+    Tensor* half = uop_fill(scalar_shape, 1, 0.5f);
     if (!half) return NULL;
-    Tensor* ones2 = tensor_full(scalar_shape, 1, &config, 1.0f);
+    Tensor* ones2 = uop_fill(scalar_shape, 1, 1.0f);
     if (!ones2) return NULL;
     Tensor* weight_pos = uop_mul(uop_add(ones2, target), half);
     if (!weight_pos) return NULL;
 
-    Tensor* half2 = tensor_full(scalar_shape, 1, &config, 0.5f);
+    Tensor* half2 = uop_fill(scalar_shape, 1, 0.5f);
     if (!half2) return NULL;
-    Tensor* ones3 = tensor_full(scalar_shape, 1, &config, 1.0f);
+    Tensor* ones3 = uop_fill(scalar_shape, 1, 1.0f);
     if (!ones3) return NULL;
     Tensor* weight_neg = uop_mul(uop_sub(ones3, target), half2);
     if (!weight_neg) return NULL;
@@ -664,21 +662,19 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     Tensor* sum_neg_log = uop_mean(neg_log_softmax, &all_reduce);
     if (!sum_neg_log) return NULL;
 
+    int scalar_shape[] = {1};
     float inv_k = 1.0f / (float)num_classes;
-    float inv_k_arr[1] = {inv_k};
-    Tensor* inv_k_t = tensor_from_array_2d(inv_k_arr, 1, 1);
+    Tensor* inv_k_t = uop_fill(scalar_shape, 1, inv_k);
     if (!inv_k_t) return NULL;
 
     Tensor* uniform_loss = uop_mul(sum_neg_log, inv_k_t);
     if (!uniform_loss) return NULL;
 
     float eps = label_smoothing;
-    float one_minus_eps_arr[1] = {1.0f - eps};
-    Tensor* one_minus_eps_t = tensor_from_array_2d(one_minus_eps_arr, 1, 1);
+    Tensor* one_minus_eps_t = uop_fill(scalar_shape, 1, 1.0f - eps);
     if (!one_minus_eps_t) return NULL;
 
-    float eps_arr[1] = {eps};
-    Tensor* eps_t = tensor_from_array_2d(eps_arr, 1, 1);
+    Tensor* eps_t = uop_fill(scalar_shape, 1, eps);
     if (!eps_t) return NULL;
 
     Tensor* weighted_ce = uop_mul(one_minus_eps_t, ce_loss);
@@ -751,36 +747,23 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     Tensor* ce_loss = uop_mean(loss_per_sample, &mean_params);
     if (!ce_loss) return NULL;
 
-    Tensor* neg_input = uop_neg(input);
-    if (!neg_input) return NULL;
-
-    Tensor* exp_for_lse = uop_exp(input);
-    if (!exp_for_lse) return NULL;
-
-    Tensor* sum_exp_2 = uop_sum(exp_for_lse, &sum_params);
-    if (!sum_exp_2) return NULL;
-
-    Tensor* log_sum_exp_2 = uop_log(sum_exp_2);
-    if (!log_sum_exp_2) return NULL;
-
     ReduceParams class_reduce = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
     Tensor* input_sum = uop_sum(input, &class_reduce);
     if (!input_sum) return NULL;
 
+    int scalar_shape[] = {1};
     float k_f = (float)num_classes;
-    float k_arr[1] = {k_f};
-    Tensor* k_t = tensor_from_array_2d(k_arr, 1, 1);
+    Tensor* k_t = uop_fill(scalar_shape, 1, k_f);
     if (!k_t) return NULL;
 
-    Tensor* scaled_lse = uop_mul(k_t, log_sum_exp_2);
+    Tensor* scaled_lse = uop_mul(k_t, log_sum_exp);
     if (!scaled_lse) return NULL;
 
     Tensor* uniform_per_sample = uop_sub(scaled_lse, input_sum);
     if (!uniform_per_sample) return NULL;
 
     float inv_k = 1.0f / k_f;
-    float inv_k_arr[1] = {inv_k};
-    Tensor* inv_k_t = tensor_from_array_2d(inv_k_arr, 1, 1);
+    Tensor* inv_k_t = uop_fill(scalar_shape, 1, inv_k);
     if (!inv_k_t) return NULL;
 
     Tensor* uniform_scaled = uop_mul(inv_k_t, uniform_per_sample);
@@ -791,12 +774,10 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     if (!uniform_loss) return NULL;
 
     float eps = label_smoothing;
-    float one_minus_eps_arr[1] = {1.0f - eps};
-    Tensor* one_minus_eps_t = tensor_from_array_2d(one_minus_eps_arr, 1, 1);
+    Tensor* one_minus_eps_t = uop_fill(scalar_shape, 1, 1.0f - eps);
     if (!one_minus_eps_t) return NULL;
 
-    float eps_arr[1] = {eps};
-    Tensor* eps_t = tensor_from_array_2d(eps_arr, 1, 1);
+    Tensor* eps_t = uop_fill(scalar_shape, 1, eps);
     if (!eps_t) return NULL;
 
     Tensor* weighted_ce = uop_mul(one_minus_eps_t, ce_loss);
