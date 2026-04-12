@@ -4,6 +4,7 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include "cml.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
 
@@ -333,6 +334,8 @@ static int fuzz_random_op_chain(void) {
                 cur = NULL;
                 break;
             }
+            if (tensor_ensure_executed(next) != 0)
+                failures++;
             tensor_free(cur);
             cur = next;
         }
@@ -340,6 +343,7 @@ static int fuzz_random_op_chain(void) {
             tensor_ensure_executed(cur);
             tensor_free(cur);
         }
+        cml_reset_ir_context();
     }
     return (failures == 0);
 }
@@ -509,6 +513,8 @@ int main(int argc, char* argv[]) {
     TEST(where);
     TEST(fill_value);
     TEST(dtype_stress);
+
+    cml_reset_ir_context();
 
     printf("\nResults: %d/%d passed\n", tests_passed, tests_total);
     return (tests_passed == tests_total) ? 0 : 1;

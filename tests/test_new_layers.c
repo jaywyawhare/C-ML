@@ -293,10 +293,12 @@ static int test_triplet_loss(void) {
     Tensor* loss = tensor_triplet_margin_loss(anchor, positive, negative, 1.0f);
     if (!loss) { tensor_free(anchor); tensor_free(positive); tensor_free(negative); return 0; }
 
+    tensor_ensure_executed(loss);
     tensor_free(loss);
     tensor_free(anchor);
     tensor_free(positive);
     tensor_free(negative);
+    cml_reset_ir_context();
     return 1;
 }
 
@@ -318,10 +320,12 @@ static int test_cosine_embedding_loss(void) {
     Tensor* loss = tensor_cosine_embedding_loss(x1, x2, target, 0.0f);
     if (!loss) { tensor_free(x1); tensor_free(x2); tensor_free(target); return 0; }
 
+    tensor_ensure_executed(loss);
     tensor_free(loss);
     tensor_free(x1);
     tensor_free(x2);
     tensor_free(target);
+    cml_reset_ir_context();
     return 1;
 }
 
@@ -343,10 +347,12 @@ static int test_nll_loss(void) {
     Tensor* loss = tensor_nll_loss(log_probs, targets_1d);
     if (!loss) { tensor_free(targets_1d); tensor_free(log_probs); tensor_free(targets); return 0; }
 
+    tensor_ensure_executed(loss);
     tensor_free(loss);
     tensor_free(targets_1d);
     tensor_free(log_probs);
     tensor_free(targets);
+    cml_reset_ir_context();
     return 1;
 }
 
@@ -377,6 +383,8 @@ int main(void) {
     TEST(triplet_loss);
     TEST(cosine_embedding_loss);
     TEST(nll_loss);
+
+    cml_reset_ir_context();
 
     printf("\n%d/%d passed\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;

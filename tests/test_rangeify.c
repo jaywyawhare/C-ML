@@ -97,6 +97,8 @@ static int test_rangeify_graph(void) {
     int converted = cml_rangeify(graph);
     int ok = (converted >= 0);
 
+    tensor_free(a);
+    tensor_free(b);
     cml_ir_free(graph);
     cml_cleanup();
     return ok;

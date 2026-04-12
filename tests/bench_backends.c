@@ -68,6 +68,7 @@ static void bench_matmul(int size, int iterations) {
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
             total_time += bench_timer_stop(&timer);
+            tensor_free(C);
             cml_ir_free(ir);
         }
 
@@ -136,6 +137,7 @@ static void bench_matmul(int size, int iterations) {
             printf("  CPU LLVM JIT:    %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
                    total_time / iterations, total_time, cache_hits, cache_misses);
 
+            tensor_free(C);
             cml_ir_free(ir);
         } else {
             printf("  CPU LLVM JIT:    Not available\n");
@@ -181,6 +183,7 @@ static void bench_matmul(int size, int iterations) {
             printf("  CUDA:            %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
                    total_time / iterations, total_time, cache_hits, cache_misses);
 
+            tensor_free(C);
             cml_ir_free(ir);
         } else {
             printf("  CUDA:            Not available\n");
@@ -274,6 +277,7 @@ static void bench_elementwise(int size, int iterations) {
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
             total_time += bench_timer_stop(&timer);
+            tensor_free(C);
             cml_ir_free(ir);
         }
 
@@ -295,6 +299,7 @@ static void bench_elementwise(int size, int iterations) {
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
             total_time += bench_timer_stop(&timer);
+            tensor_free(C);
             cml_ir_free(ir);
         }
 
@@ -316,6 +321,7 @@ static void bench_elementwise(int size, int iterations) {
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 1, outputs, 1);
             total_time += bench_timer_stop(&timer);
+            tensor_free(C);
             cml_ir_free(ir);
         }
 

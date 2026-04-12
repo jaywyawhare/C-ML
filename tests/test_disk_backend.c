@@ -80,7 +80,8 @@ static int test_stats(void) {
     if (!t) { cml_disk_backend_free(b); return 0; }
 
     cml_disk_save_tensor(b, "stats_test", t);
-    cml_disk_load_tensor(b, "stats_test");
+    Tensor* loaded = cml_disk_load_tensor(b, "stats_test");
+    tensor_free(loaded);
 
     uint64_t rd, wr, nr, nw;
     cml_disk_backend_stats(b, &rd, &wr, &nr, &nw);
