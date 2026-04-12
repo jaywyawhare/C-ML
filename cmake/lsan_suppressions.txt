@@ -1,0 +1,3 @@
+# Allocations from dlopen() of OpenBLAS / libgomp pulled in via cml_blas_*; not owned by C-ML.
+leak:cml_blas_init
+leak:cml_blas_available

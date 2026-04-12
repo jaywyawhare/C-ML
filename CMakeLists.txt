@@ -20,6 +20,27 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra ${NATIVE_FLAG}")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG ${NATIVE_FLAG}")
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG ${NATIVE_FLAG}")
 
+option(ENABLE_SANITIZERS "AddressSanitizer + LeakSanitizer (Linux) + UndefinedBehaviorSanitizer (GCC/Clang)" OFF)
+if(ENABLE_SANITIZERS)
+    if(NOT CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
+        message(FATAL_ERROR "ENABLE_SANITIZERS requires GCC or Clang")
+    endif()
+    add_compile_options(
+        -fsanitize=address
+        -fsanitize=undefined
+        -fno-omit-frame-pointer
+        -fno-common
+        -g
+    )
+    add_link_options(
+        -fsanitize=address
+        -fsanitize=undefined
+        -fno-omit-frame-pointer
+        -fno-common
+    )
+    message(STATUS "Sanitizers: address (leak detection on Linux), undefined behavior")
+endif()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -552,6 +573,17 @@ if(BUILD_TESTS)
     target_compile_definitions(test_am_mock PRIVATE CML_AM_MOCK_GPU CML_HAS_AM_DRIVER)
     cml_link_all(test_am_mock)
     add_test(NAME test_am_mock COMMAND test_am_mock)
+
+    if(ENABLE_SANITIZERS)
+        set(CML_LSAN_SUPP "${CMAKE_SOURCE_DIR}/cmake/lsan_suppressions.txt")
+        foreach(test_source ${TEST_SOURCES})
+            get_filename_component(test_name ${test_source} NAME_WE)
+            set_tests_properties(${test_name} PROPERTIES
+                ENVIRONMENT "LSAN_OPTIONS=suppressions=${CML_LSAN_SUPP}:print_suppressions=0")
+        endforeach()
+        set_tests_properties(test_nv_mock test_am_mock PROPERTIES
+            ENVIRONMENT "LSAN_OPTIONS=suppressions=${CML_LSAN_SUPP}:print_suppressions=0")
+    endif()
 endif()
 
 option(BUILD_EXAMPLES "Build example programs" ON)
