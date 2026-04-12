@@ -21,9 +21,9 @@ const features = [
     tags: ['LoRA', 'LLaMA', 'Serving'],
   },
   {
-    name: '7 GPU Backends',
-    text: 'CUDA (PTX), ROCm (KFD), Vulkan (SPIR-V), WebGPU (WGSL), Metal (MSL), OpenCL, LLVM JIT. Automatic dispatch with CPU fallback.',
-    tags: ['CUDA', 'Vulkan', 'Metal'],
+    name: 'GPU & accelerator targets',
+    text: 'CUDA (PTX), ROCm/HIP, NV/AM userspace drivers, Vulkan (SPIR-V), WebGPU (WGSL), Metal (MSL), OpenCL, Adreno, Hexagon HVX, LLVM JIT. Automatic dispatch with CPU fallback.',
+    tags: ['CUDA', 'Vulkan', 'OpenCL'],
   },
   {
     name: 'Compiler Pipeline',

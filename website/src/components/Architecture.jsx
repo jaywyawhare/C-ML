@@ -81,20 +81,31 @@ const layers = [
       { label: 'AM Driver', sub: 'KFD ioctl, AQL dispatch' },
     ],
   },
-  // Layer 8: Hardware backends
+  // Layer 8: Hardware backends (two rows — nine equal columns overflow 640px layout)
   {
     label: null,
     sub: null,
     tier: 'bottom',
-    cols: 7,
-    items: [
-      { label: 'CUDA' },
-      { label: 'ROCm' },
-      { label: 'Vulkan' },
-      { label: 'Metal' },
-      { label: 'WebGPU' },
-      { label: 'OpenCL' },
-      { label: 'CPU' },
+    hardwareRows: [
+      {
+        cols: 5,
+        items: [
+          { label: 'CUDA' },
+          { label: 'ROCm' },
+          { label: 'Vulkan' },
+          { label: 'Metal' },
+          { label: 'WebGPU' },
+        ],
+      },
+      {
+        cols: 4,
+        items: [
+          { label: 'OpenCL' },
+          { label: 'Adreno' },
+          { label: 'Hexagon' },
+          { label: 'CPU' },
+        ],
+      },
     ],
   },
 ]
@@ -163,7 +174,19 @@ export default function Architecture() {
         {layers.map((layer, i) => (
           <div key={i}>
             {i > 0 && <Connector style={{ opacity: 0 }} />}
-            {layer.items ? (
+            {layer.hardwareRows ? (
+              <div className="arch-hardware-stack">
+                {layer.hardwareRows.map((row, ri) => (
+                  <MultiLayer
+                    key={ri}
+                    items={row.items}
+                    tier={layer.tier}
+                    cols={row.cols}
+                    style={{ opacity: 0 }}
+                  />
+                ))}
+              </div>
+            ) : layer.items ? (
               <MultiLayer items={layer.items} tier={layer.tier} cols={layer.cols} style={{ opacity: 0 }} />
             ) : (
               <SingleLayer label={layer.label} sub={layer.sub} tier={layer.tier} style={{ opacity: 0 }} />

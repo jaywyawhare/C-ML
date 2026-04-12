@@ -30,8 +30,8 @@ export default function Numbers() {
         <div className="num-label">Optimizers</div>
       </div>
       <div className="num-item" style={{ opacity: 0 }}>
-        <div className="num-val">7</div>
-        <div className="num-label">GPU Backends</div>
+        <div className="num-val">9</div>
+        <div className="num-label">Compute targets</div>
       </div>
       <div className="num-item" style={{ opacity: 0 }}>
         <div className="num-val">9</div>

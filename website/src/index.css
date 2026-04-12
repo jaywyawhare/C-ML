@@ -556,14 +556,22 @@ section {
   gap: 6px;
 }
 
+.arch-hardware-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .arch-row-3 { grid-template-columns: repeat(3, 1fr); }
 .arch-row-4 { grid-template-columns: repeat(4, 1fr); }
+.arch-row-5 { grid-template-columns: repeat(5, 1fr); }
 .arch-row-6 { grid-template-columns: repeat(6, 1fr); }
 .arch-row-7 { grid-template-columns: repeat(7, 1fr); }
 
 @media (max-width: 640px) {
   .arch-row-3 { grid-template-columns: 1fr; }
   .arch-row-4 { grid-template-columns: repeat(2, 1fr); }
+  .arch-row-5 { grid-template-columns: repeat(3, 1fr); }
   .arch-row-6 { grid-template-columns: repeat(3, 1fr); }
   .arch-row-7 { grid-template-columns: repeat(3, 1fr); }
   .arch-diagram { max-width: 100%; }
