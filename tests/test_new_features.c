@@ -5,6 +5,7 @@
 #include <string.h>
 #include "tensor/tensor.h"
 #include "ops/uops.h"
+#include "ops/ir/internal.h"
 #include "nn/layers.h"
 #include "optim.h"
 #include "nn.h"
@@ -1007,5 +1008,6 @@ int main(void) {
     TEST(tensor_from_url_api);
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_total);
+    cml_ir_reset_global_context();
     return (tests_passed == tests_total) ? 0 : 1;
 }

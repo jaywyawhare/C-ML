@@ -36,7 +36,9 @@ static int test_zeros_tensor(void) {
     int shape[] = {3, 4};
     Tensor* t = cml_zeros(shape, 2, NULL);
     if (!t) return 0;
+    tensor_ensure_executed(t);
     float* data = (float*)t->data;
+    if (!data) { tensor_free(t); return 0; }
     for (size_t i = 0; i < t->numel; i++) {
         if (data[i] != 0.0f) { tensor_free(t); return 0; }
     }
@@ -48,7 +50,9 @@ static int test_ones_tensor(void) {
     int shape[] = {2, 2};
     Tensor* t = cml_ones(shape, 2, NULL);
     if (!t) return 0;
+    tensor_ensure_executed(t);
     float* data = (float*)t->data;
+    if (!data) { tensor_free(t); return 0; }
     for (size_t i = 0; i < t->numel; i++) {
         if (data[i] != 1.0f) { tensor_free(t); return 0; }
     }
@@ -60,7 +64,9 @@ static int test_from_data(void) {
     float values[] = {1.0f, 2.0f, 3.0f, 4.0f};
     Tensor* t = cml_tensor_2d(values, 2, 2);
     if (!t) return 0;
+    tensor_ensure_executed(t);
     float* data = (float*)t->data;
+    if (!data) { tensor_free(t); return 0; }
     for (int i = 0; i < 4; i++) {
         if (!APPROX_EQ(data[i], values[i])) { tensor_free(t); return 0; }
     }
@@ -73,8 +79,11 @@ static int test_1d_creation(void) {
     Tensor* o = cml_ones_1d(5);
     if (!z || !o) return 0;
     if (z->numel != 5 || o->numel != 5) return 0;
+    tensor_ensure_executed(z);
+    tensor_ensure_executed(o);
     float* zd = (float*)z->data;
     float* od = (float*)o->data;
+    if (!zd || !od) { tensor_free(z); tensor_free(o); return 0; }
     if (zd[0] != 0.0f || od[0] != 1.0f) return 0;
     tensor_free(z);
     tensor_free(o);

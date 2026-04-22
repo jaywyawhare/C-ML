@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "cml.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
 #include "ops/ir/schedule.h"
@@ -25,6 +26,7 @@ static const TensorConfig cpu_f32 = {
         } else {                                       \
             printf("FAILED\n");                         \
         }                                              \
+        cml_reset_ir_context();                        \
     } while (0)
 
 static int kernel_count_for(Tensor* out) {

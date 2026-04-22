@@ -31,7 +31,7 @@ static int test_assign_basic(void) {
     if (ret != 0) return 0;
     if (dst != saved_ptr) return 0;
 
-    float* data = (float*)dst->data;
+    float* data = (float*)tensor_data_ptr(dst);
     for (size_t i = 0; i < dst->numel; i++) {
         if (!APPROX_EQ(data[i], 1.0f)) {
             tensor_free(src);

@@ -49,6 +49,7 @@ int main(void) {
         tensor_free(mul);
         tensor_free(a);
         tensor_free(b);
+        cml_reset_ir_context();
     }
 
     {
@@ -81,6 +82,7 @@ int main(void) {
         tensor_free(out);
         module_free((Module*)fc);
         tensor_free(inp);
+        cml_reset_ir_context();
     }
 
     {
@@ -128,6 +130,7 @@ int main(void) {
         tensor_free(logv);
         tensor_free(expv);
         tensor_free(x);
+        cml_reset_ir_context();
     }
 
     {
@@ -153,6 +156,7 @@ int main(void) {
         tensor_free(mm);
         tensor_free(A);
         tensor_free(B);
+        cml_reset_ir_context();
     }
 
     {
@@ -198,6 +202,7 @@ int main(void) {
         tensor_free(tgt);
         tensor_free(relu);
         tensor_free(x);
+        cml_reset_ir_context();
     }
 
     {

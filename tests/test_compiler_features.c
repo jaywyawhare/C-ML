@@ -39,7 +39,7 @@ static int test_multi_output_analyze_no_merge(void) {
     cml_ir_add_uop(g, UOP_SUM, (Tensor*[]){ a }, 1, NULL);
     cml_ir_add_uop(g, UOP_MUL, ins_ac, 2, NULL);
 
-    CMLScheduleV2* s = cml_schedule_v2_create(g, NULL);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, NULL);
     int* merge_groups = NULL;
     int num_merges = 0;
     cml_multi_output_analyze(s, &merge_groups, &num_merges);
@@ -47,7 +47,7 @@ static int test_multi_output_analyze_no_merge(void) {
     int ok = (num_merges == 0);
 
     free(merge_groups);
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     tensor_free(b);
@@ -79,7 +79,7 @@ static int test_multi_output_same_inputs(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.allow_reduce_elem_fusion = false;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int groups_before = s->num_groups;
 
@@ -94,7 +94,7 @@ static int test_multi_output_same_inputs(void) {
     }
 
     free(merge_groups);
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     tensor_free(b);
@@ -118,14 +118,14 @@ static int test_reduce_elem_fusion_enabled(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.allow_reduce_elem_fusion = true;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_groups == 1);
     if (ok) {
         ok = (s->groups[0]->num_nodes == 2);
     }
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     return ok;
@@ -146,11 +146,11 @@ static int test_reduce_elem_fusion_disabled(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.allow_reduce_elem_fusion = false;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_groups == 2);
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     return ok;
@@ -170,11 +170,11 @@ static int test_reduce_elem_multi_consumer_blocked(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.allow_reduce_elem_fusion = true;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_groups == 2);
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     return ok;
@@ -200,11 +200,11 @@ static int test_reduce_elem_softmax_pattern(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.allow_reduce_elem_fusion = true;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_groups == 1 && s->groups[0]->num_nodes == 3);
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(x);
     return ok;
@@ -221,13 +221,13 @@ static int test_bfs_single_group(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.schedule_order = CML_SCHEDULE_ORDER_BFS;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_groups == 1
               && s->num_ordered == 1
               && s->execution_order[0] == 0);
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     tensor_free(b);
@@ -248,7 +248,7 @@ static int test_bfs_linear_chain(void) {
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.schedule_order = CML_SCHEDULE_ORDER_BFS;
     opts.allow_reduce_elem_fusion = false;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_ordered == s->num_groups);
     if (ok) {
@@ -260,7 +260,7 @@ static int test_bfs_linear_chain(void) {
         }
     }
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     tensor_free(b);
@@ -283,7 +283,7 @@ static int test_bfs_all_groups_visited(void) {
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.schedule_order = CML_SCHEDULE_ORDER_BFS;
     opts.allow_reduce_elem_fusion = false;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_ordered == s->num_groups);
 
@@ -298,7 +298,7 @@ static int test_bfs_all_groups_visited(void) {
     }
     free(visited);
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     tensor_free(b);
@@ -316,7 +316,7 @@ static int test_bfs_topo_default(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.allow_reduce_elem_fusion = false;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_ordered == s->num_groups);
     if (ok) {
@@ -325,7 +325,7 @@ static int test_bfs_topo_default(void) {
         }
     }
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
     return ok;
@@ -336,11 +336,11 @@ static int test_bfs_empty_graph(void) {
 
     CMLScheduleOptions opts = cml_schedule_default_options();
     opts.schedule_order = CML_SCHEDULE_ORDER_BFS;
-    CMLScheduleV2* s = cml_schedule_v2_create(g, &opts);
+    CMLFusionSchedule* s = cml_fusion_schedule_create(g, &opts);
 
     int ok = (s != NULL && s->num_groups == 0 && s->num_ordered == 0);
 
-    cml_schedule_v2_free(s);
+    cml_fusion_schedule_free(s);
     cml_ir_free(g);
     return ok;
 }

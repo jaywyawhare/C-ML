@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "cml.h"
+#include "tensor/realize.h"
 
 static float get_scalar(Tensor* t) {
     float* p = (float*)tensor_data_ptr(t);
@@ -37,6 +38,8 @@ static int test_xor_mlp(void) {
 
     Tensor* X = cml_tensor_2d(xor_inputs,  4, 2);
     Tensor* Y = cml_tensor_2d(xor_targets, 4, 1);
+    if (X) tensor_realize(X);
+    if (Y) tensor_realize(Y);
 
     float final_loss = INFINITY;
 
@@ -100,6 +103,8 @@ static int test_linear_regression(void) {
 
     Tensor* X = cml_tensor_2d(x_data, LR_N, 1);
     Tensor* Y = cml_tensor_2d(y_data, LR_N, 1);
+    if (X) tensor_realize(X);
+    if (Y) tensor_realize(Y);
 
     float final_loss = INFINITY;
 
@@ -209,6 +214,8 @@ static int test_conv2d_pattern(void) {
     TensorConfig cfg = { .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true };
     Tensor* X = cml_tensor(img_data, img_shape, 2, &cfg);
     Tensor* Y = cml_tensor_2d(target_data, CONV_N, 2);
+    if (X) tensor_realize(X);
+    if (Y) tensor_realize(Y);
 
     float final_loss = INFINITY;
 

@@ -26,7 +26,7 @@ static int test_analyze_null(void) {
 }
 
 static int test_analyze_empty_schedule(void) {
-    CMLScheduleV2 sched = {0};
+    CMLFusionSchedule sched = {0};
     CMLCrossBoundaryFusion* out = NULL;
     int count = 0;
     int ret = cml_cross_boundary_analyze(&sched, &out, &count);
@@ -39,7 +39,7 @@ static int test_fuse_null(void) {
 }
 
 static int test_fuse_empty(void) {
-    CMLScheduleV2 sched = {0};
+    CMLFusionSchedule sched = {0};
     CMLCrossBoundaryFusion f = {0};
     int ret = cml_cross_boundary_fuse(&sched, &f, 0);
     return ret == -1;
@@ -124,7 +124,7 @@ static int test_analyze_with_schedule(void) {
     group.num_nodes = 1;
 
     CMLFusionGroup* groups[1] = { &group };
-    CMLScheduleV2 sched = {
+    CMLFusionSchedule sched = {
         .groups = groups,
         .num_groups = 1,
     };
