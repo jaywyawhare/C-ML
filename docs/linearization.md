@@ -28,7 +28,7 @@ After the IR graph scheduler groups operations into `CMLFusionGroup`s, each grou
 IR Graph
      |
      v
-Schedule V2  (cml_schedule_v2_create)
+Fusion Schedule  (cml_fusion_schedule_create)
   topological walk, group ops by fusibility, detect buffer elimination
      |
      v  CMLFusionGroup[]

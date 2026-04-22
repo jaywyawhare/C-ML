@@ -45,8 +45,8 @@ IR Graph (CMLGraph_t)
 [7] Execution
     |-- Runtime JIT   (runtime_compiler.h)
     |-- AOT compile   (aot.h)
-    |-- TinyJit replay (tiny_jit.h)
     |-- Graph capture  (graph_capture.h)
+    |-- (TinyJit replay: UNUSED - tiny_jit.c not integrated)
 ```
 
 
@@ -135,15 +135,15 @@ void cml_schedule_free(CMLSchedule* sched);
 
 `CMLSchedule` contains topologically sorted `CMLScheduleItem[]` with dependency tracking, FLOP estimates, and arithmetic intensity.
 
-### V2 Scheduler (Recommended)
+### Fusion Scheduler (Recommended)
 
 ```c
-CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph, const CMLScheduleOptions* opts);
-void cml_schedule_v2_free(CMLScheduleV2* sched);
+CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opts);
+void cml_fusion_schedule_free(CMLFusionSchedule* sched);
 CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b);
 ```
 
-V2 produces `CMLFusionGroup[]` with buffer elimination tracking. Each `CMLFusionGroup` records which intermediate buffers can stay in registers.
+The fusion scheduler produces `CMLFusionGroup[]` with buffer elimination tracking. Each `CMLFusionGroup` records which intermediate buffers can stay in registers.
 
 ### Scheduling Options
 
@@ -355,21 +355,22 @@ int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* 
 | `include_weights` | Bundle weights into the binary |
 | `generate_header` | Emit companion `.h` file |
 
-### TinyJit (Capture-and-Replay)
+### TinyJit (Capture-and-Replay) - **NOT INTEGRATED**
 
 **Header:** `include/ops/ir/tiny_jit.h`
 
-On first execution, runs the graph normally and records the kernel launch trace. Subsequent calls with the same graph hash and shapes replay the cached trace, bypassing scheduling and codegen entirely.
+> **WARNING:** This module is dead code - it was never integrated into the execution pipeline.
 
-```c
-CMLTinyJit* cml_tinyjit_create(void);
-void cml_tinyjit_free(CMLTinyJit* jit);
-int  cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir);
-void cml_tinyjit_stats(const CMLTinyJit* jit,
-                        size_t* hits, size_t* misses, size_t* invalidations);
-```
+The TinyJit module was designed to provide capture-and-replay JIT compilation:
+- On first execution, runs the graph normally and records the kernel launch trace
+- Subsequent calls with the same graph hash and shapes replay the cached trace
+- Bypasses scheduling and codegen entirely
 
-Cache: 64 entries keyed by graph hash + shape signature.
+However, the module is **never called** anywhere in the codebase. All functions are dead:
+- `cml_tinyjit_create()` - defined but never invoked
+- `cml_tinyjit_execute()` - defined but never invoked
+
+**Recommendation:** Remove `tiny_jit.c` and `tiny_jit.h` from the build when ready to clean up dead code.
 
 ### GPU Graph Capture
 
@@ -429,12 +430,16 @@ cml_aot_execute(model, inputs, 1, outputs, 1);
 cml_aot_free(model);
 ```
 
-### TinyJit path (training loops)
+### TinyJit path (training loops) - **NOT AVAILABLE**
+
+> **WARNING:** This code example demonstrates intended but unimplemented functionality.
+> The TinyJit module is dead code and is never called anywhere in the codebase.
 
 ```c
-CMLTinyJit* jit = cml_tinyjit_create();
-for (int step = 0; step < 1000; step++) {
-    cml_tinyjit_execute(jit, ir);  // first call compiles, rest replay
-}
-cml_tinyjit_free(jit);
+// NOT FUNCTIONAL - TinyJit is dead code
+// CMLTinyJit* jit = cml_tinyjit_create();
+// for (int step = 0; step < 1000; step++) {
+//     cml_tinyjit_execute(jit, ir);  // never called
+// }
+// cml_tinyjit_free(jit);
 ```
