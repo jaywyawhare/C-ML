@@ -42,20 +42,15 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
         return NULL;
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* eps_tensor = tensor_zeros(mean_sq->shape, mean_sq->ndim, &config);
+    Tensor* eps_tensor = tensor_full(mean_sq->shape, mean_sq->ndim, &config, rn->eps);
     if (!eps_tensor)
         return NULL;
 
-    float* eps_data = (float*)tensor_data_ptr(eps_tensor);
-    if (eps_data) {
-        for (size_t i = 0; i < eps_tensor->numel; i++) {
-            eps_data[i] = rn->eps;
-        }
-    }
-
     Tensor* mean_sq_eps = uop_add(mean_sq, eps_tensor);
+    tensor_free(eps_tensor);
     if (!mean_sq_eps)
         return NULL;
+    tensor_free(eps_tensor);
     Tensor* rms = uop_sqrt(mean_sq_eps);
     if (!rms)
         return NULL;
@@ -69,14 +64,10 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
         expand_weight.new_ndim  = input->ndim;
 
         Tensor* weight_broadcast = uop_expand(rn->weight->tensor, &expand_weight);
-        if (!weight_broadcast) {
-            tensor_free(output);
+        if (!weight_broadcast)
             return NULL;
-        }
 
         Tensor* scaled = uop_mul(weight_broadcast, output);
-        tensor_free(weight_broadcast);
-        tensor_free(output);
         if (!scaled)
             return NULL;
 

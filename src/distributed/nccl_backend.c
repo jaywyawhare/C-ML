@@ -4,6 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
+#include <errno.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#define NCCL_UNIQUE_ID_BYTES 128
+#define NCCL_BOOTSTRAP_DEFAULT_ADDR "127.0.0.1"
+#define NCCL_BOOTSTRAP_DEFAULT_PORT 29510
+#define NCCL_BOOTSTRAP_RETRIES 100
+#define NCCL_BOOTSTRAP_RETRY_US 100000
 
 typedef void* ncclComm_t;
 typedef int ncclResult_t;
@@ -30,6 +41,170 @@ typedef struct {
 
 /* Static context pointer (same pattern as MPI backend) */
 static NCCLContext* g_nccl_ctx = NULL;
+
+static int send_all_bytes(int fd, const void* buf, size_t len) {
+    const char* p = (const char*)buf;
+    size_t remaining = len;
+    while (remaining > 0) {
+        ssize_t n = send(fd, p, remaining, 0);
+        if (n <= 0) {
+            if (n < 0 && errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+        p += n;
+        remaining -= (size_t)n;
+    }
+    return 0;
+}
+
+static int recv_all_bytes(int fd, void* buf, size_t len) {
+    char* p = (char*)buf;
+    size_t remaining = len;
+    while (remaining > 0) {
+        ssize_t n = recv(fd, p, remaining, 0);
+        if (n <= 0) {
+            if (n < 0 && errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+        p += n;
+        remaining -= (size_t)n;
+    }
+    return 0;
+}
+
+static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, void* unique_id) {
+    if (!nccl || !unique_id || world_size <= 0 || rank < 0 || rank >= world_size) {
+        return -1;
+    }
+    if (!nccl->ncclGetUniqueId) {
+        return -1;
+    }
+
+    if (world_size == 1) {
+        return nccl->ncclGetUniqueId(unique_id);
+    }
+
+    const char* master_addr = getenv("CML_MASTER_ADDR");
+    if (!master_addr || master_addr[0] == '\0') {
+        master_addr = NCCL_BOOTSTRAP_DEFAULT_ADDR;
+    }
+    int port = NCCL_BOOTSTRAP_DEFAULT_PORT;
+    const char* port_env = getenv("CML_NCCL_PORT");
+    if (port_env && port_env[0] != '\0') {
+        int parsed = atoi(port_env);
+        if (parsed > 0) {
+            port = parsed;
+        }
+    }
+
+    if (rank == 0) {
+        int rc = nccl->ncclGetUniqueId(unique_id);
+        if (rc != 0) {
+            return rc;
+        }
+
+        int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (listen_fd < 0) {
+            LOG_ERROR("NCCL bootstrap: failed to create listen socket");
+            return -1;
+        }
+
+        int opt = 1;
+        setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons((uint16_t)port);
+        addr.sin_addr.s_addr = INADDR_ANY;
+
+        if (bind(listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+            LOG_ERROR("NCCL bootstrap: bind failed on port %d", port);
+            close(listen_fd);
+            return -1;
+        }
+        if (listen(listen_fd, world_size) < 0) {
+            LOG_ERROR("NCCL bootstrap: listen failed");
+            close(listen_fd);
+            return -1;
+        }
+
+        for (int i = 1; i < world_size; i++) {
+            int client_fd = accept(listen_fd, NULL, NULL);
+            if (client_fd < 0) {
+                LOG_ERROR("NCCL bootstrap: accept failed");
+                close(listen_fd);
+                return -1;
+            }
+
+            int peer_rank = -1;
+            if (recv_all_bytes(client_fd, &peer_rank, sizeof(peer_rank)) != 0) {
+                LOG_ERROR("NCCL bootstrap: failed to receive peer rank");
+                close(client_fd);
+                close(listen_fd);
+                return -1;
+            }
+            if (send_all_bytes(client_fd, unique_id, NCCL_UNIQUE_ID_BYTES) != 0) {
+                LOG_ERROR("NCCL bootstrap: failed to send unique id to rank %d", peer_rank);
+                close(client_fd);
+                close(listen_fd);
+                return -1;
+            }
+            close(client_fd);
+        }
+
+        close(listen_fd);
+        return 0;
+    }
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        LOG_ERROR("NCCL bootstrap: failed to create socket for rank %d", rank);
+        return -1;
+    }
+
+    struct sockaddr_in master;
+    memset(&master, 0, sizeof(master));
+    master.sin_family = AF_INET;
+    master.sin_port = htons((uint16_t)port);
+    if (inet_pton(AF_INET, master_addr, &master.sin_addr) <= 0) {
+        LOG_ERROR("NCCL bootstrap: invalid CML_MASTER_ADDR '%s'", master_addr);
+        close(sock);
+        return -1;
+    }
+
+    int connected = 0;
+    for (int retry = 0; retry < NCCL_BOOTSTRAP_RETRIES; retry++) {
+        if (connect(sock, (struct sockaddr*)&master, sizeof(master)) == 0) {
+            connected = 1;
+            break;
+        }
+        usleep(NCCL_BOOTSTRAP_RETRY_US);
+    }
+    if (!connected) {
+        LOG_ERROR("NCCL bootstrap: failed to connect to %s:%d", master_addr, port);
+        close(sock);
+        return -1;
+    }
+
+    if (send_all_bytes(sock, &rank, sizeof(rank)) != 0) {
+        LOG_ERROR("NCCL bootstrap: failed to send rank %d", rank);
+        close(sock);
+        return -1;
+    }
+    if (recv_all_bytes(sock, unique_id, NCCL_UNIQUE_ID_BYTES) != 0) {
+        LOG_ERROR("NCCL bootstrap: failed to receive unique id at rank %d", rank);
+        close(sock);
+        return -1;
+    }
+
+    close(sock);
+    return 0;
+}
 
 static int nccl_map_reduce_op(DistReduceOp op) {
     switch (op) {
@@ -261,12 +436,12 @@ static int nccl_init(void* ctx, int world_size, int rank) {
     if (!nccl)
         return -1;
 
-    /* Get unique ID and init communicator */
-    char unique_id[128];
+    /* Bootstrap one shared unique ID across all ranks, then init communicator. */
+    char unique_id[NCCL_UNIQUE_ID_BYTES];
     memset(unique_id, 0, sizeof(unique_id));
-
-    if (nccl->ncclGetUniqueId) {
-        nccl->ncclGetUniqueId(unique_id);
+    if (nccl_exchange_unique_id(nccl, world_size, rank, unique_id) != 0) {
+        LOG_ERROR("NCCL bootstrap failed for rank %d/%d", rank, world_size);
+        return -1;
     }
 
     if (nccl->ncclCommInitRank) {

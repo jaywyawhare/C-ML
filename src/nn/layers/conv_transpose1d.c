@@ -53,7 +53,7 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     int out_shape[] = {batch, out_channels, out_length};
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_zeros(out_shape, 3, &config);
+    Tensor* output = tensor_empty(out_shape, 3, &config);
     if (!output)
         return NULL;
 
@@ -65,6 +65,7 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
         tensor_free(output);
         return NULL;
     }
+    memset(out_data, 0, (size_t)batch * out_channels * out_length * sizeof(float));
     for (int b = 0; b < batch; b++) {
         for (int ic = 0; ic < in_channels; ic++) {
             for (int il = 0; il < in_length; il++) {

@@ -447,86 +447,32 @@ static void register_cell_params(Module* parent, Module* cell,
     }
 }
 
-/* Extract [batch, features] slice at time-step t from [seq_len, batch, features]. */
-static Tensor* slice_timestep(Tensor* src, int t, DType dtype, DeviceType device) {
+/* Lazy slice: [seq, batch, feat] -> [batch, feat] at time step t. */
+static Tensor* slice_timestep(Tensor* src, int t) {
     int batch = src->shape[1];
     int feat  = src->shape[2];
-    int out_shape[] = {batch, feat};
-    TensorConfig cfg = {.dtype = dtype, .device = device,
-                        .has_dtype = true, .has_device = true};
-    Tensor* out = tensor_empty(out_shape, 2, &cfg);
-    tensor_ensure_executed(out);
-    float* dst_data = (float*)tensor_data_ptr(out);
-    float* src_data = (float*)tensor_data_ptr(src);
-    size_t stride = (size_t)(batch * feat);
-    memcpy(dst_data, src_data + (size_t)t * stride, stride * sizeof(float));
-    return out;
+    int starts[] = {t, 0, 0};
+    int ends[]   = {t + 1, batch, feat};
+    int steps[]  = {1, 1, 1};
+    SliceParams sp = {.start = starts, .end = ends, .step = steps, .num_dims = 3};
+    Tensor* sliced = uop_slice(src, &sp);   /* [1, batch, feat] */
+    if (!sliced) return NULL;
+    int shape2[] = {batch, feat};
+    ReshapeParams rp = {.new_shape = shape2, .new_ndim = 2};
+    return uop_reshape(sliced, &rp);        /* [batch, feat] */
 }
 
-static void write_timestep(Tensor* dst, int t, Tensor* src) {
-    int batch = dst->shape[1];
-    int feat  = dst->shape[2];
-    float* dst_data = (float*)tensor_data_ptr(dst);
-    float* src_data = (float*)tensor_data_ptr(src);
-    size_t stride = (size_t)(batch * feat);
-    memcpy(dst_data + (size_t)t * stride, src_data, stride * sizeof(float));
-}
-
-/* Transpose dims 0 and 1 of a 3-D tensor (batch_first <-> seq_first). */
+/* Lazy transpose of dims 0 and 1 of a 3-D tensor (batch_first <-> seq_first). */
 static Tensor* transpose_01(Tensor* src) {
-    int d0 = src->shape[0];
-    int d1 = src->shape[1];
-    int d2 = src->shape[2];
-    int out_shape[] = {d1, d0, d2};
-    TensorConfig cfg = {.dtype = src->dtype, .device = src->device,
-                        .has_dtype = true, .has_device = true};
-    Tensor* out = tensor_empty(out_shape, 3, &cfg);
-    tensor_ensure_executed(out);
-    float* s = (float*)tensor_data_ptr(src);
-    float* d = (float*)tensor_data_ptr(out);
-    for (int i = 0; i < d0; i++) {
-        for (int j = 0; j < d1; j++) {
-            memcpy(d + ((size_t)j * d0 + i) * d2,
-                   s + ((size_t)i * d1 + j) * d2,
-                   (size_t)d2 * sizeof(float));
-        }
-    }
-    return out;
+    int perm[] = {1, 0, 2};
+    PermuteParams pp = {.perm = perm, .num_dims = 3};
+    return uop_permute(src, &pp);
 }
 
+/* Lazy concatenation of forward and reverse outputs along the feature axis. */
 static Tensor* concat_features(Tensor* a, Tensor* b) {
-    int seq   = a->shape[0];
-    int batch = a->shape[1];
-    int fa    = a->shape[2];
-    int fb    = b->shape[2];
-    int fc    = fa + fb;
-    int out_shape[] = {seq, batch, fc};
-    TensorConfig cfg = {.dtype = a->dtype, .device = a->device,
-                        .has_dtype = true, .has_device = true};
-    Tensor* out = tensor_empty(out_shape, 3, &cfg);
-    tensor_ensure_executed(out);
-    float* od = (float*)tensor_data_ptr(out);
-    float* ad = (float*)tensor_data_ptr(a);
-    float* bd = (float*)tensor_data_ptr(b);
-    for (int t = 0; t < seq; t++) {
-        for (int n = 0; n < batch; n++) {
-            size_t o_off = ((size_t)t * batch + n) * fc;
-            size_t a_off = ((size_t)t * batch + n) * fa;
-            size_t b_off = ((size_t)t * batch + n) * fb;
-            memcpy(od + o_off,      ad + a_off, (size_t)fa * sizeof(float));
-            memcpy(od + o_off + fa, bd + b_off, (size_t)fb * sizeof(float));
-        }
-    }
-    return out;
-}
-
-static void write_hidden(Tensor* h_n, int index, Tensor* h) {
-    int batch = h_n->shape[1];
-    int hs    = h_n->shape[2];
-    float* dst = (float*)tensor_data_ptr(h_n);
-    float* src = (float*)tensor_data_ptr(h);
-    size_t stride = (size_t)(batch * hs);
-    memcpy(dst + (size_t)index * stride, src, stride * sizeof(float));
+    Tensor* inputs[] = {a, b};
+    return uop_cat(inputs, 2, 2);   /* cat along dim 2 (feature) */
 }
 
 static Tensor* rnn_module_forward(Module* module, Tensor* input) {
@@ -595,121 +541,61 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
                  Tensor** output, Tensor** h_n) {
     if (!rnn || !input || !output || !h_n) return;
 
-    tensor_ensure_executed(input);
-
     int nd = rnn->num_directions;
-    int hs = rnn->hidden_size;
-    DType dt = rnn->dtype;
-    DeviceType dv = rnn->device;
 
-    /* batch_first: [batch, seq, feat] -> [seq, batch, feat] */
-    Tensor* x = input;
-    bool did_transpose = false;
-    if (rnn->batch_first) {
-        x = transpose_01(input);
-        did_transpose = true;
-    }
+    Tensor* x = rnn->batch_first ? transpose_01(input) : input;
 
     int seq_len = x->shape[0];
-    int batch   = x->shape[1];
+    int total_dirs = rnn->num_layers * nd;
 
-    /* Allocate h_n: [num_layers * num_directions, batch, hidden_size] */
-    int hn_shape[] = {rnn->num_layers * nd, batch, hs};
-    TensorConfig cfg = {.dtype = dt, .device = dv,
-                        .has_dtype = true, .has_device = true};
-    Tensor* hn = tensor_zeros(hn_shape, 3, &cfg);
-    tensor_ensure_executed(hn);
-
-    /* Current layer input starts as x */
+    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
     Tensor* layer_input = x;
-    bool free_layer_input = false;
 
     for (int l = 0; l < rnn->num_layers; l++) {
-        (void)layer_input->shape[2]; // feature dim used implicitly by cells
-
-
         RNNCell* fwd_cell = rnn->cells[l * nd + 0];
 
-        /* Get initial hidden for this layer/direction from h_0 */
-        Tensor* h_fwd = NULL;
-        bool free_h_fwd_init = false;
-        if (h_0) {
-            tensor_ensure_executed(h_0);
-            h_fwd = slice_timestep(h_0, l * nd + 0, dt, dv);
-            free_h_fwd_init = true;
-        }
-
-        /* Output buffer: [seq_len, batch, hidden_size] */
-        int fwd_shape[] = {seq_len, batch, hs};
-        Tensor* fwd_out = tensor_empty(fwd_shape, 3, &cfg);
-        tensor_ensure_executed(fwd_out);
+        Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
+        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
 
         for (int t = 0; t < seq_len; t++) {
-            Tensor* xt = slice_timestep(layer_input, t, dt, dv);
-            Tensor* h_new = rnn_cell_forward(fwd_cell, xt, h_fwd);
-            tensor_ensure_executed(h_new);
-            write_timestep(fwd_out, t, h_new);
-            if (h_fwd) tensor_free(h_fwd);
-            h_fwd = h_new;
-            tensor_free(xt);
+            Tensor* xt = slice_timestep(layer_input, t);
+            h_fwd = rnn_cell_forward(fwd_cell, xt, h_fwd);
+            fwd_steps[t] = h_fwd;
         }
-        if (free_h_fwd_init) { /* already freed in loop */ }
+        final_h[l * nd + 0] = h_fwd;
 
-        /* Save final hidden state */
-        write_hidden(hn, l * nd + 0, h_fwd);
-        tensor_free(h_fwd);
+        Tensor* fwd_out = uop_stack(fwd_steps, seq_len, 0);
+        free(fwd_steps);
 
         Tensor* layer_output;
-
         if (nd == 2) {
-
             RNNCell* rev_cell = rnn->cells[l * nd + 1];
-
-            Tensor* h_rev = NULL;
-            if (h_0) {
-                h_rev = slice_timestep(h_0, l * nd + 1, dt, dv);
-            }
-
-            int rev_shape[] = {seq_len, batch, hs};
-            Tensor* rev_out = tensor_empty(rev_shape, 3, &cfg);
-            tensor_ensure_executed(rev_out);
+            Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
+            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
 
             for (int t = seq_len - 1; t >= 0; t--) {
-                Tensor* xt = slice_timestep(layer_input, t, dt, dv);
-                Tensor* h_new = rnn_cell_forward(rev_cell, xt, h_rev);
-                tensor_ensure_executed(h_new);
-                write_timestep(rev_out, t, h_new);
-                if (h_rev) tensor_free(h_rev);
-                h_rev = h_new;
-                tensor_free(xt);
+                Tensor* xt = slice_timestep(layer_input, t);
+                h_rev = rnn_cell_forward(rev_cell, xt, h_rev);
+                rev_steps[t] = h_rev;
             }
+            final_h[l * nd + 1] = h_rev;
 
-            write_hidden(hn, l * nd + 1, h_rev);
-            tensor_free(h_rev);
+            Tensor* rev_out = uop_stack(rev_steps, seq_len, 0);
+            free(rev_steps);
 
-            /* Concatenate forward and reverse along feature dim */
             layer_output = concat_features(fwd_out, rev_out);
-            tensor_free(fwd_out);
-            tensor_free(rev_out);
         } else {
             layer_output = fwd_out;
         }
 
-        /* Free previous layer input (unless it is the original x) */
-        if (free_layer_input) tensor_free(layer_input);
         layer_input = layer_output;
-        free_layer_input = true;
     }
 
-    /* batch_first: [seq, batch, feat] -> [batch, seq, feat] */
-    if (rnn->batch_first) {
-        Tensor* tmp = transpose_01(layer_input);
-        if (free_layer_input) tensor_free(layer_input);
-        layer_input = tmp;
-        free_layer_input = true;
-    }
+    Tensor* hn = uop_stack(final_h, total_dirs, 0);
+    free(final_h);
 
-    if (did_transpose) tensor_free(x);
+    if (rnn->batch_first)
+        layer_input = transpose_01(layer_input);
 
     *output = layer_input;
     *h_n = hn;
@@ -781,137 +667,76 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
                   Tensor** output, Tensor** h_n, Tensor** c_n) {
     if (!lstm || !input || !output || !h_n || !c_n) return;
 
-    tensor_ensure_executed(input);
-
     int nd = lstm->num_directions;
-    int hs = lstm->hidden_size;
-    DType dt = lstm->dtype;
-    DeviceType dv = lstm->device;
+    int total_dirs = lstm->num_layers * nd;
 
-    /* batch_first: [batch, seq, feat] -> [seq, batch, feat] */
-    Tensor* x = input;
-    bool did_transpose = false;
-    if (lstm->batch_first) {
-        x = transpose_01(input);
-        did_transpose = true;
-    }
+    Tensor* x = lstm->batch_first ? transpose_01(input) : input;
 
     int seq_len = x->shape[0];
-    int batch   = x->shape[1];
 
-    TensorConfig cfg = {.dtype = dt, .device = dv,
-                        .has_dtype = true, .has_device = true};
-
-    /* Allocate h_n, c_n: [num_layers * num_directions, batch, hidden_size] */
-    int hn_shape[] = {lstm->num_layers * nd, batch, hs};
-    Tensor* hn = tensor_zeros(hn_shape, 3, &cfg);
-    Tensor* cn = tensor_zeros(hn_shape, 3, &cfg);
-    tensor_ensure_executed(hn);
-    tensor_ensure_executed(cn);
-
+    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
+    Tensor** final_c = calloc((size_t)total_dirs, sizeof(Tensor*));
     Tensor* layer_input = x;
-    bool free_layer_input = false;
 
     for (int l = 0; l < lstm->num_layers; l++) {
-
-
         LSTMCell* fwd_cell = lstm->cells[l * nd + 0];
 
-        Tensor* h_fwd = NULL;
-        Tensor* c_fwd = NULL;
-        if (h_0) {
-            tensor_ensure_executed(h_0);
-            h_fwd = slice_timestep(h_0, l * nd + 0, dt, dv);
-        }
-        if (c_0) {
-            tensor_ensure_executed(c_0);
-            c_fwd = slice_timestep(c_0, l * nd + 0, dt, dv);
-        }
-
-        int fwd_shape[] = {seq_len, batch, hs};
-        Tensor* fwd_out = tensor_empty(fwd_shape, 3, &cfg);
-        tensor_ensure_executed(fwd_out);
+        Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
+        Tensor* c_fwd = c_0 ? slice_timestep(c_0, l * nd + 0) : NULL;
+        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
 
         for (int t = 0; t < seq_len; t++) {
-            Tensor* xt = slice_timestep(layer_input, t, dt, dv);
+            Tensor* xt = slice_timestep(layer_input, t);
             Tensor* h_new = NULL;
             Tensor* c_new = NULL;
             lstm_cell_forward(fwd_cell, xt, h_fwd, c_fwd, &h_new, &c_new);
-            tensor_ensure_executed(h_new);
-            tensor_ensure_executed(c_new);
-            write_timestep(fwd_out, t, h_new);
-            if (h_fwd) tensor_free(h_fwd);
-            if (c_fwd) tensor_free(c_fwd);
             h_fwd = h_new;
             c_fwd = c_new;
-            tensor_free(xt);
+            fwd_steps[t] = h_fwd;
         }
+        final_h[l * nd + 0] = h_fwd;
+        final_c[l * nd + 0] = c_fwd;
 
-        write_hidden(hn, l * nd + 0, h_fwd);
-        write_hidden(cn, l * nd + 0, c_fwd);
-        tensor_free(h_fwd);
-        tensor_free(c_fwd);
+        Tensor* fwd_out = uop_stack(fwd_steps, seq_len, 0);
+        free(fwd_steps);
 
         Tensor* layer_output;
-
         if (nd == 2) {
-
             LSTMCell* rev_cell = lstm->cells[l * nd + 1];
-
-            Tensor* h_rev = NULL;
-            Tensor* c_rev = NULL;
-            if (h_0) {
-                h_rev = slice_timestep(h_0, l * nd + 1, dt, dv);
-            }
-            if (c_0) {
-                c_rev = slice_timestep(c_0, l * nd + 1, dt, dv);
-            }
-
-            int rev_shape[] = {seq_len, batch, hs};
-            Tensor* rev_out = tensor_empty(rev_shape, 3, &cfg);
-            tensor_ensure_executed(rev_out);
+            Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
+            Tensor* c_rev = c_0 ? slice_timestep(c_0, l * nd + 1) : NULL;
+            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
 
             for (int t = seq_len - 1; t >= 0; t--) {
-                Tensor* xt = slice_timestep(layer_input, t, dt, dv);
+                Tensor* xt = slice_timestep(layer_input, t);
                 Tensor* h_new = NULL;
                 Tensor* c_new = NULL;
                 lstm_cell_forward(rev_cell, xt, h_rev, c_rev, &h_new, &c_new);
-                tensor_ensure_executed(h_new);
-                tensor_ensure_executed(c_new);
-                write_timestep(rev_out, t, h_new);
-                if (h_rev) tensor_free(h_rev);
-                if (c_rev) tensor_free(c_rev);
                 h_rev = h_new;
                 c_rev = c_new;
-                tensor_free(xt);
+                rev_steps[t] = h_rev;
             }
+            final_h[l * nd + 1] = h_rev;
+            final_c[l * nd + 1] = c_rev;
 
-            write_hidden(hn, l * nd + 1, h_rev);
-            write_hidden(cn, l * nd + 1, c_rev);
-            tensor_free(h_rev);
-            tensor_free(c_rev);
+            Tensor* rev_out = uop_stack(rev_steps, seq_len, 0);
+            free(rev_steps);
 
             layer_output = concat_features(fwd_out, rev_out);
-            tensor_free(fwd_out);
-            tensor_free(rev_out);
         } else {
             layer_output = fwd_out;
         }
 
-        if (free_layer_input) tensor_free(layer_input);
         layer_input = layer_output;
-        free_layer_input = true;
     }
 
-    /* batch_first: [seq, batch, feat] -> [batch, seq, feat] */
-    if (lstm->batch_first) {
-        Tensor* tmp = transpose_01(layer_input);
-        if (free_layer_input) tensor_free(layer_input);
-        layer_input = tmp;
-        free_layer_input = true;
-    }
+    Tensor* hn = uop_stack(final_h, total_dirs, 0);
+    Tensor* cn = uop_stack(final_c, total_dirs, 0);
+    free(final_h);
+    free(final_c);
 
-    if (did_transpose) tensor_free(x);
+    if (lstm->batch_first)
+        layer_input = transpose_01(layer_input);
 
     *output = layer_input;
     *h_n = hn;
@@ -984,112 +809,61 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
                  Tensor** output, Tensor** h_n) {
     if (!gru || !input || !output || !h_n) return;
 
-    tensor_ensure_executed(input);
-
     int nd = gru->num_directions;
-    int hs = gru->hidden_size;
-    DType dt = gru->dtype;
-    DeviceType dv = gru->device;
+    int total_dirs = gru->num_layers * nd;
 
-    /* batch_first: [batch, seq, feat] -> [seq, batch, feat] */
-    Tensor* x = input;
-    bool did_transpose = false;
-    if (gru->batch_first) {
-        x = transpose_01(input);
-        did_transpose = true;
-    }
+    Tensor* x = gru->batch_first ? transpose_01(input) : input;
 
     int seq_len = x->shape[0];
-    int batch   = x->shape[1];
 
-    TensorConfig cfg = {.dtype = dt, .device = dv,
-                        .has_dtype = true, .has_device = true};
-
-    /* Allocate h_n: [num_layers * num_directions, batch, hidden_size] */
-    int hn_shape[] = {gru->num_layers * nd, batch, hs};
-    Tensor* hn = tensor_zeros(hn_shape, 3, &cfg);
-    tensor_ensure_executed(hn);
-
+    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
     Tensor* layer_input = x;
-    bool free_layer_input = false;
 
     for (int l = 0; l < gru->num_layers; l++) {
-
-
         GRUCell* fwd_cell = gru->cells[l * nd + 0];
 
-        Tensor* h_fwd = NULL;
-        if (h_0) {
-            tensor_ensure_executed(h_0);
-            h_fwd = slice_timestep(h_0, l * nd + 0, dt, dv);
-        }
-
-        int fwd_shape[] = {seq_len, batch, hs};
-        Tensor* fwd_out = tensor_empty(fwd_shape, 3, &cfg);
-        tensor_ensure_executed(fwd_out);
+        Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
+        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
 
         for (int t = 0; t < seq_len; t++) {
-            Tensor* xt = slice_timestep(layer_input, t, dt, dv);
-            Tensor* h_new = gru_cell_forward(fwd_cell, xt, h_fwd);
-            tensor_ensure_executed(h_new);
-            write_timestep(fwd_out, t, h_new);
-            if (h_fwd) tensor_free(h_fwd);
-            h_fwd = h_new;
-            tensor_free(xt);
+            Tensor* xt = slice_timestep(layer_input, t);
+            h_fwd = gru_cell_forward(fwd_cell, xt, h_fwd);
+            fwd_steps[t] = h_fwd;
         }
+        final_h[l * nd + 0] = h_fwd;
 
-        write_hidden(hn, l * nd + 0, h_fwd);
-        tensor_free(h_fwd);
+        Tensor* fwd_out = uop_stack(fwd_steps, seq_len, 0);
+        free(fwd_steps);
 
         Tensor* layer_output;
-
         if (nd == 2) {
-
             GRUCell* rev_cell = gru->cells[l * nd + 1];
-
-            Tensor* h_rev = NULL;
-            if (h_0) {
-                h_rev = slice_timestep(h_0, l * nd + 1, dt, dv);
-            }
-
-            int rev_shape[] = {seq_len, batch, hs};
-            Tensor* rev_out = tensor_empty(rev_shape, 3, &cfg);
-            tensor_ensure_executed(rev_out);
+            Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
+            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
 
             for (int t = seq_len - 1; t >= 0; t--) {
-                Tensor* xt = slice_timestep(layer_input, t, dt, dv);
-                Tensor* h_new = gru_cell_forward(rev_cell, xt, h_rev);
-                tensor_ensure_executed(h_new);
-                write_timestep(rev_out, t, h_new);
-                if (h_rev) tensor_free(h_rev);
-                h_rev = h_new;
-                tensor_free(xt);
+                Tensor* xt = slice_timestep(layer_input, t);
+                h_rev = gru_cell_forward(rev_cell, xt, h_rev);
+                rev_steps[t] = h_rev;
             }
+            final_h[l * nd + 1] = h_rev;
 
-            write_hidden(hn, l * nd + 1, h_rev);
-            tensor_free(h_rev);
+            Tensor* rev_out = uop_stack(rev_steps, seq_len, 0);
+            free(rev_steps);
 
             layer_output = concat_features(fwd_out, rev_out);
-            tensor_free(fwd_out);
-            tensor_free(rev_out);
         } else {
             layer_output = fwd_out;
         }
 
-        if (free_layer_input) tensor_free(layer_input);
         layer_input = layer_output;
-        free_layer_input = true;
     }
 
-    /* batch_first: [seq, batch, feat] -> [batch, seq, feat] */
-    if (gru->batch_first) {
-        Tensor* tmp = transpose_01(layer_input);
-        if (free_layer_input) tensor_free(layer_input);
-        layer_input = tmp;
-        free_layer_input = true;
-    }
+    Tensor* hn = uop_stack(final_h, total_dirs, 0);
+    free(final_h);
 
-    if (did_transpose) tensor_free(x);
+    if (gru->batch_first)
+        layer_input = transpose_01(layer_input);
 
     *output = layer_input;
     *h_n = hn;

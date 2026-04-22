@@ -716,7 +716,9 @@ Tensor* cml_selu(Tensor* x) { return tensor_selu(x); }
 Tensor* cml_mish(Tensor* x) { return tensor_mish(x); }
 Tensor* cml_silu(Tensor* x) { return tensor_silu(x); }
 Tensor* cml_hardswish(Tensor* x) { return tensor_hardswish(x); }
-Tensor* cml_leaky_relu(Tensor* x, float negative_slope) { return tensor_leaky_relu(x, negative_slope); }
+Tensor* cml_leaky_relu(Tensor* x, float negative_slope) {
+    return tensor_leaky_relu(x, negative_slope);
+}
 Tensor* cml_sum(Tensor* a, int dim, bool keepdim) { return tensor_sum(a, dim, keepdim); }
 Tensor* cml_mean(Tensor* a, int dim, bool keepdim) { return tensor_mean(a, dim, keepdim); }
 Tensor* cml_max(Tensor* a, int dim, bool keepdim) { return tensor_max(a, dim, keepdim); }
@@ -959,7 +961,7 @@ Tensor* cml_clamp(Tensor* a, float min_val, float max_val) {
 }
 
 Tensor* cml_prod(Tensor* a, int dim, bool keepdim) {
-    int dims[] = {dim};
+    int dims[]          = {dim};
     ReduceParams params = {.dims = dims, .num_dims = 1, .keepdim = keepdim};
     return uop_prod(a, &params);
 }
@@ -967,9 +969,7 @@ Tensor* cml_prod(Tensor* a, int dim, bool keepdim) {
 Tensor* cml_argmax(Tensor* a, int dim) { return tensor_argmax(a, dim); }
 Tensor* cml_argmin(Tensor* a, int dim) { return tensor_argmin(a, dim); }
 
-Tensor* cml_cumsum(Tensor* a, int dim) {
-    return uop_cumsum(a, dim);
-}
+Tensor* cml_cumsum(Tensor* a, int dim) { return uop_cumsum(a, dim); }
 
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return tensor_var(a, dim, unbiased, keepdim);
@@ -992,13 +992,9 @@ Tensor** cml_chunk(Tensor* a, int chunks, int dim, int* out_count) {
     return tensor_chunk(a, chunks, dim, out_count);
 }
 
-Tensor* cml_triu(Tensor* a, int diagonal) {
-    return uop_triu(a, diagonal);
-}
+Tensor* cml_triu(Tensor* a, int diagonal) { return uop_triu(a, diagonal); }
 
-Tensor* cml_tril(Tensor* a, int diagonal) {
-    return uop_tril(a, diagonal);
-}
+Tensor* cml_tril(Tensor* a, int diagonal) { return uop_tril(a, diagonal); }
 
 Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value) {
     return uop_pad(a, pad_widths, num_dims, value);
@@ -1040,52 +1036,52 @@ Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig*
     return tensor_kaiming_normal(shape, ndim, fan_in, config);
 }
 Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
-                            const TensorConfig* config) {
+                           const TensorConfig* config) {
     return tensor_glorot_uniform(shape, ndim, fan_in, fan_out, config);
 }
 Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
-                           const TensorConfig* config) {
+                          const TensorConfig* config) {
     return tensor_xavier_normal(shape, ndim, fan_in, fan_out, config);
 }
 
 Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                           float beta1, float beta2, float epsilon) {
+                          float beta1, float beta2, float epsilon) {
     return optim_lamb(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
 }
 Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
-                           float weight_decay, float trust_coefficient) {
+                          float weight_decay, float trust_coefficient) {
     return optim_lars(parameters, num_parameters, lr, momentum, weight_decay, trust_coefficient);
 }
 
 InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
-                                       DeviceType device) {
+                                      DeviceType device) {
     return nn_instancenorm2d(num_features, eps, affine, dtype, device);
 }
 ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
-                                          int stride, int padding, int output_padding,
-                                          bool use_bias, DType dtype, DeviceType device) {
+                                         int stride, int padding, int output_padding, bool use_bias,
+                                         DType dtype, DeviceType device) {
     return nn_conv_transpose1d(in_channels, out_channels, kernel_size, stride, padding,
                                output_padding, use_bias, dtype, device);
 }
 BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
-                                 bool track_running_stats, DType dtype, DeviceType device) {
+                                bool track_running_stats, DType dtype, DeviceType device) {
     return nn_batchnorm3d(num_features, eps, momentum, affine, track_running_stats, dtype, device);
 }
 LayerNorm2d* cml_nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
-                                 DeviceType device) {
+                                DeviceType device) {
     return nn_layernorm2d(num_channels, eps, affine, dtype, device);
 }
 
 Optimizer* cml_optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
-                           float weight_decay, bool nesterov) {
+                          float weight_decay, bool nesterov) {
     return optim_muon(parameters, num_parameters, lr, momentum, weight_decay, nesterov);
 }
 Optimizer* cml_optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                            float beta1, float beta2, float epsilon) {
+                           float beta1, float beta2, float epsilon) {
     return optim_adamw(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
 }
 Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
-                               float weight_decay, float epsilon) {
+                              float weight_decay, float epsilon) {
     return optim_adadelta(parameters, num_parameters, rho, weight_decay, epsilon);
 }
 
@@ -1113,7 +1109,8 @@ Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mo
 
 Tensor* cml_dot(Tensor* a, Tensor* b) { return tensor_dot(a, b); }
 
-MaxPool1d* cml_nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
+MaxPool1d* cml_nn_maxpool1d(int kernel_size, int stride, int padding, int dilation,
+                            bool ceil_mode) {
     return nn_maxpool1d(kernel_size, stride, padding, dilation, ceil_mode);
 }
 AvgPool1d* cml_nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode,
@@ -1127,7 +1124,8 @@ AdaptiveAvgPool1d* cml_nn_adaptive_avgpool1d(int output_size) {
     return nn_adaptive_avgpool1d(output_size);
 }
 
-MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
+MaxPool3d* cml_nn_maxpool3d(int kernel_size, int stride, int padding, int dilation,
+                            bool ceil_mode) {
     return nn_maxpool3d(kernel_size, stride, padding, dilation, ceil_mode);
 }
 AvgPool3d* cml_nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode,
@@ -1141,12 +1139,11 @@ AdaptiveMaxPool1d* cml_nn_adaptive_maxpool1d(int output_size) {
     return nn_adaptive_maxpool1d(output_size);
 }
 
-Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode) {
+Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
+                           ScatterReduceMode mode) {
     return tensor_scatter_reduce(self, dim, index, src, mode);
 }
-Tensor* cml_bitcast(Tensor* a, DType target_dtype) {
-    return tensor_bitcast(a, target_dtype);
-}
+Tensor* cml_bitcast(Tensor* a, DType target_dtype) { return tensor_bitcast(a, target_dtype); }
 
 QRResult cml_qr(Tensor* a) { return tensor_qr(a); }
 SVDResult cml_svd(Tensor* a) { return tensor_svd(a); }
@@ -1156,7 +1153,9 @@ Tensor* cml_from_url(const char* url) { return tensor_from_url(url); }
 GGUFContext* cml_gguf_open_read(const char* p) { return gguf_open_read(p); }
 GGUFContext* cml_gguf_open_write(const char* p) { return gguf_open_write(p); }
 void cml_gguf_close(GGUFContext* c) { gguf_close(c); }
-int cml_gguf_write_tensor(GGUFContext* c, const char* n, Tensor* t) { return gguf_write_tensor(c, n, t); }
+int cml_gguf_write_tensor(GGUFContext* c, const char* n, Tensor* t) {
+    return gguf_write_tensor(c, n, t);
+}
 Tensor* cml_gguf_read_tensor(GGUFContext* c, const char* n) { return gguf_read_tensor(c, n); }
 int cml_module_save_gguf(Module* m, const char* p) { return module_save_gguf(m, p); }
 int cml_module_load_gguf(Module* m, const char* p) { return module_load_gguf(m, p); }
@@ -1164,32 +1163,39 @@ int cml_module_load_gguf(Module* m, const char* p) { return module_load_gguf(m, 
 SafeTensorsContext* cml_safetensors_open_read(const char* p) { return safetensors_open_read(p); }
 SafeTensorsContext* cml_safetensors_open_write(const char* p) { return safetensors_open_write(p); }
 void cml_safetensors_close(SafeTensorsContext* c) { safetensors_close(c); }
-int cml_safetensors_write_tensor(SafeTensorsContext* c, const char* n, Tensor* t) { return safetensors_write_tensor(c, n, t); }
-Tensor* cml_safetensors_read_tensor(SafeTensorsContext* c, const char* n) { return safetensors_read_tensor(c, n); }
+int cml_safetensors_write_tensor(SafeTensorsContext* c, const char* n, Tensor* t) {
+    return safetensors_write_tensor(c, n, t);
+}
+Tensor* cml_safetensors_read_tensor(SafeTensorsContext* c, const char* n) {
+    return safetensors_read_tensor(c, n);
+}
 int cml_module_save_safetensors(Module* m, const char* p) { return module_save_safetensors(m, p); }
 int cml_module_load_safetensors(Module* m, const char* p) { return module_load_safetensors(m, p); }
 
 TransformerEncoder* cml_nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
-                                                float dropout, int num_layers,
-                                                DType dtype, DeviceType device) {
-    return nn_transformer_encoder(d_model, nhead, dim_feedforward, dropout, num_layers, dtype, device);
+                                               float dropout, int num_layers, DType dtype,
+                                               DeviceType device) {
+    return nn_transformer_encoder(d_model, nhead, dim_feedforward, dropout, num_layers, dtype,
+                                  device);
 }
-TransformerDecoderLayer* cml_nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
-                                                           float dropout, DType dtype, DeviceType device) {
+TransformerDecoderLayer* cml_nn_transformer_decoder_layer(int d_model, int nhead,
+                                                          int dim_feedforward, float dropout,
+                                                          DType dtype, DeviceType device) {
     return nn_transformer_decoder_layer(d_model, nhead, dim_feedforward, dropout, dtype, device);
 }
 TransformerDecoder* cml_nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
-                                                float dropout, int num_layers,
-                                                DType dtype, DeviceType device) {
-    return nn_transformer_decoder(d_model, nhead, dim_feedforward, dropout, num_layers, dtype, device);
+                                               float dropout, int num_layers, DType dtype,
+                                               DeviceType device) {
+    return nn_transformer_decoder(d_model, nhead, dim_feedforward, dropout, num_layers, dtype,
+                                  device);
 }
 
 Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                            float beta1, float beta2, float epsilon) {
+                           float beta1, float beta2, float epsilon) {
     return optim_nadam(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
 }
-Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                             float beta1, float beta2, float epsilon) {
+Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr,
+                            float weight_decay, float beta1, float beta2, float epsilon) {
     return optim_adamax(parameters, num_parameters, lr, weight_decay, beta1, beta2, epsilon);
 }
 
@@ -1209,38 +1215,32 @@ GRU* cml_nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectio
                   use_bias, dtype, device);
 }
 ConvTranspose3d* cml_nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
-                                          int stride, int padding, int output_padding,
-                                          bool use_bias, DType dtype, DeviceType device) {
+                                         int stride, int padding, int output_padding, bool use_bias,
+                                         DType dtype, DeviceType device) {
     return nn_conv_transpose3d(in_channels, out_channels, kernel_size, stride, padding,
                                output_padding, use_bias, dtype, device);
 }
 Upsample* cml_nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
-                           UpsampleMode mode, bool align_corners) {
+                          UpsampleMode mode, bool align_corners) {
     return nn_upsample(scale_factor, output_size, num_output_dims, mode, align_corners);
 }
-PixelShuffle* cml_nn_pixel_shuffle(int upscale_factor) {
-    return nn_pixel_shuffle(upscale_factor);
-}
+PixelShuffle* cml_nn_pixel_shuffle(int upscale_factor) { return nn_pixel_shuffle(upscale_factor); }
 PixelUnshuffle* cml_nn_pixel_unshuffle(int downscale_factor) {
     return nn_pixel_unshuffle(downscale_factor);
 }
 
-Flatten* cml_nn_flatten(int start_dim, int end_dim) {
-    return nn_flatten(start_dim, end_dim);
-}
-Identity* cml_nn_identity(void) {
-    return nn_identity();
-}
+Flatten* cml_nn_flatten(int start_dim, int end_dim) { return nn_flatten(start_dim, end_dim); }
+Identity* cml_nn_identity(void) { return nn_identity(); }
 BatchNorm1d* cml_nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
-                                 bool track_running_stats, DType dtype, DeviceType device) {
+                                bool track_running_stats, DType dtype, DeviceType device) {
     return nn_batchnorm1d(num_features, eps, momentum, affine, track_running_stats, dtype, device);
 }
 PReLU* cml_nn_prelu(int num_parameters, float init, DType dtype, DeviceType device) {
     return nn_prelu(num_parameters, init, dtype, device);
 }
 
-Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims,
-                           UpsampleMode mode, bool align_corners) {
+Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims, UpsampleMode mode,
+                          bool align_corners) {
     return f_interpolate(input, output_size, num_dims, mode, align_corners);
 }
 Tensor* cml_f_pixel_shuffle(Tensor* input, int upscale_factor) {
@@ -1253,8 +1253,8 @@ Tensor* cml_f_pixel_unshuffle(Tensor* input, int downscale_factor) {
 void cml_autocast_enter(DType target_dtype) { autocast_enter(target_dtype); }
 void cml_autocast_exit(void) { autocast_exit(); }
 bool cml_autocast_is_enabled(void) { return autocast_is_enabled(); }
-GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor,
-                                     float backoff_factor, int growth_interval) {
+GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
+                                   int growth_interval) {
     return grad_scaler_create(init_scale, growth_factor, backoff_factor, growth_interval);
 }
 void cml_grad_scaler_free(GradScaler* scaler) { grad_scaler_free(scaler); }
@@ -1269,8 +1269,8 @@ void cml_grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* opti
 }
 void cml_grad_scaler_update(GradScaler* scaler) { grad_scaler_update(scaler); }
 
-SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values,
-                                      const int* dense_shape, int dense_ndim) {
+SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values, const int* dense_shape,
+                                     int dense_ndim) {
     return sparse_coo_tensor(indices, values, dense_shape, dense_ndim);
 }
 SparseCOOData* cml_sparse_from_dense(Tensor* dense) { return sparse_from_dense(dense); }
@@ -1302,7 +1302,7 @@ LRScheduler* cml_lr_scheduler_step(Optimizer* opt, int step_size, float gamma) {
     return lr_scheduler_step(opt, step_size, gamma);
 }
 LRScheduler* cml_lr_scheduler_reduce_on_plateau(Optimizer* opt, float factor, int patience,
-                                                  float min_lr) {
+                                                float min_lr) {
     return lr_scheduler_reduce_on_plateau(opt, factor, patience, min_lr);
 }
 LRScheduler* cml_lr_scheduler_exponential(Optimizer* opt, float gamma) {
@@ -1312,27 +1312,24 @@ LRScheduler* cml_lr_scheduler_cosine(Optimizer* opt, int T_max, float eta_min) {
     return lr_scheduler_cosine(opt, T_max, eta_min);
 }
 LRScheduler* cml_lr_scheduler_one_cycle(Optimizer* opt, float max_lr, int total_steps,
-                                         float pct_start, float div_factor, float final_div_factor) {
-    return lr_scheduler_one_cycle(opt, max_lr, total_steps, pct_start, div_factor, final_div_factor);
+                                        float pct_start, float div_factor, float final_div_factor) {
+    return lr_scheduler_one_cycle(opt, max_lr, total_steps, pct_start, div_factor,
+                                  final_div_factor);
 }
 LRScheduler* cml_lr_scheduler_multi_step(Optimizer* opt, int* milestones, int num_milestones,
-                                          float gamma) {
+                                         float gamma) {
     return lr_scheduler_multi_step(opt, milestones, num_milestones, gamma);
 }
 LRScheduler* cml_lr_scheduler_polynomial(Optimizer* opt, int total_iters, float power,
-                                          float min_lr) {
+                                         float min_lr) {
     return lr_scheduler_polynomial(opt, total_iters, power, min_lr);
 }
 LRScheduler* cml_lr_scheduler_warmup(LRScheduler* inner, int warmup_steps,
-                                      float warmup_start_factor) {
+                                     float warmup_start_factor) {
     return lr_scheduler_warmup(inner, warmup_steps, warmup_start_factor);
 }
 float cml_lr_scheduler_update(LRScheduler* scheduler, float metric) {
     return lr_scheduler_update(scheduler, metric);
 }
-float cml_lr_scheduler_get_lr(LRScheduler* scheduler) {
-    return lr_scheduler_get_lr(scheduler);
-}
-void cml_lr_scheduler_free(LRScheduler* scheduler) {
-    lr_scheduler_free(scheduler);
-}
+float cml_lr_scheduler_get_lr(LRScheduler* scheduler) { return lr_scheduler_get_lr(scheduler); }
+void cml_lr_scheduler_free(LRScheduler* scheduler) { lr_scheduler_free(scheduler); }

@@ -146,7 +146,7 @@ static bool output_only_consumed_by_backward(struct IRNode* fwd_node) {
     return fwd_node->use_count > 0;
 }
 
-static int find_node_index_in_schedule(CMLScheduleV2* sched, struct IRNode* node) {
+static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* node) {
     for (int g = 0; g < sched->num_groups; g++) {
         CMLFusionGroup* group = sched->groups[g];
         if (!group) continue;
@@ -158,7 +158,7 @@ static int find_node_index_in_schedule(CMLScheduleV2* sched, struct IRNode* node
     return -1;
 }
 
-int cml_cross_boundary_analyze(CMLScheduleV2* sched,
+int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
                                CMLCrossBoundaryFusion** out, int* count) {
     if (!sched || !out || !count) return -1;
 
@@ -241,7 +241,7 @@ int cml_cross_boundary_analyze(CMLScheduleV2* sched,
  *   - Set fusion metadata so the codegen can emit combined kernels
  *   - Update memory estimates (register-kept intermediates save bandwidth)
  */
-int cml_cross_boundary_fuse(CMLScheduleV2* sched,
+int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
                             CMLCrossBoundaryFusion* fusions, int count) {
     if (!sched || !fusions || count <= 0) return -1;
 

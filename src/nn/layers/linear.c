@@ -49,7 +49,7 @@ static void linear_free_fn(Module* module) {
 }
 
 static void xavier_init(Tensor* tensor, int in_features, int out_features) {
-    if (!tensor || !tensor->data)
+    if (!tensor)
         return;
 
     float* data = (float*)tensor_data_ptr(tensor);
@@ -66,7 +66,7 @@ static void xavier_init(Tensor* tensor, int in_features, int out_features) {
 
 static void zeros_init(Tensor* tensor, int out_features) {
     (void)out_features;
-    if (!tensor || !tensor->data)
+    if (!tensor)
         return;
 
     float* data = (float*)tensor_data_ptr(tensor);

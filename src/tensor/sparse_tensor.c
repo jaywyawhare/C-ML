@@ -208,6 +208,7 @@ Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
 
     tensor_ensure_executed(sparse->indices);
     tensor_ensure_executed(sparse->values);
+    tensor_ensure_executed(output);
 
     int32_t* idx_data = (int32_t*)sparse->indices->data;
     float* val_data   = (float*)sparse->values->data;
@@ -284,6 +285,8 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
 
     tensor_ensure_executed(sparse->indices);
     tensor_ensure_executed(sparse->values);
+    tensor_ensure_executed(dense);
+    tensor_ensure_executed(output);
 
     int32_t* idx_data   = (int32_t*)sparse->indices->data;
     float* val_data     = (float*)sparse->values->data;

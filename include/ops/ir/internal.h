@@ -58,6 +58,11 @@ struct IRNode {
     int* input_ndims;
     int* output_shape; // Computed from broadcasting rule
     int output_ndim;
+    /* For zero-input creation ops (FILL, CONST, RAND, ARANGE, EYE, ALLOC):
+     * dtype/device are set explicitly here since there are no input tensors to
+     * infer from.  Zero value = DTYPE_FLOAT32 / DEVICE_CPU (correct defaults). */
+    DType output_dtype;
+    DeviceType output_device;
     BroadcastInfo* broadcast;
 
     bool requires_grad;

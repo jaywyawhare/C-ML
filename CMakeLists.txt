@@ -242,6 +242,7 @@ set(OPS_SOURCES
     src/ops/ir/intern.c
     src/ops/ir/context.c
     src/ops/ir/execution.c
+    src/ops/ir/cpu_lazy_materialize.c
     src/ops/ir/backward.c
     src/ops/ir/export.c
     src/ops/ir/optimization.c
@@ -268,7 +269,7 @@ set(OPS_SOURCES
     src/ops/ir/tiny_jit.c
     src/ops/ir/beam_cuda_timing.c
     src/ops/ir/schedule.c
-    src/ops/ir/schedule_v2.c
+    src/ops/ir/fusion_schedule.c
     src/ops/ir/linearize.c
     src/ops/ir/rangeify.c
     src/ops/ir/fused_codegen.c
@@ -329,7 +330,7 @@ if(ENABLE_NAK)
 endif()
 list(APPEND OPS_SOURCES src/ops/ir/gpu/nak_backend.c)
 
-list(APPEND OPS_SOURCES src/ops/ir/schedule_v2.c src/ops/ir/linearize.c)
+list(APPEND OPS_SOURCES src/ops/ir/fusion_schedule.c src/ops/ir/linearize.c)
 list(APPEND OPS_SOURCES src/ops/ir/spec.c src/ops/ir/late_passes.c)
 list(APPEND OPS_SOURCES
     src/ops/ir/validate.c
@@ -715,4 +716,3 @@ message(STATUS "  Vulkan: ${ENABLE_VULKAN}  WebGPU: ${ENABLE_WEBGPU}  OpenCL: ${
 message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}  AM Driver: ${ENABLE_AM_DRIVER}  NIR: ${ENABLE_NIR}  NAK: ${ENABLE_NAK}")
 message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Distributed: ${ENABLE_DISTRIBUTED}  IB: ${ENABLE_IB_TRANSPORT}")
 message(STATUS "")
-

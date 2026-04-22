@@ -80,7 +80,7 @@ static void conv2d_free(Module* module) {
 
 static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int kernel_size) {
     (void)out_channels;
-    if (!tensor || !tensor->data)
+    if (!tensor)
         return;
 
     float* data = (float*)tensor_data_ptr(tensor);

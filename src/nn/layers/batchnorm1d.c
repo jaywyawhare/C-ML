@@ -49,7 +49,6 @@ static Tensor* batchnorm1d_forward(Module* module, Tensor* input) {
         float* current_mean_data = (float*)tensor_data_ptr(bn->current_mean);
         if (mean_reduced_data && current_mean_data)
             memcpy(current_mean_data, mean_reduced_data, (size_t)features * sizeof(float));
-        tensor_free(mean_reduced);
 
         int input_shape[] = {batch, features};
         ExpandParams expand_params = { .new_shape = input_shape, .new_ndim = 2 };
@@ -57,24 +56,20 @@ static Tensor* batchnorm1d_forward(Module* module, Tensor* input) {
         if (!mean_broadcast) return NULL;
 
         Tensor* diff = uop_sub(input, mean_broadcast);
-        tensor_free(mean_broadcast);
         if (!diff) return NULL;
 
         Tensor* diff_sq = uop_mul(diff, diff);
-        tensor_free(diff);
         if (!diff_sq) return NULL;
 
         int var_dims[] = {0};
         ReduceParams var_params = { .dims = var_dims, .num_dims = 1, .keepdim = false };
         Tensor* var_reduced = uop_mean(diff_sq, &var_params);
-        tensor_free(diff_sq);
         if (!var_reduced) return NULL;
 
         float* var_reduced_data = (float*)tensor_data_ptr(var_reduced);
         float* current_var_data = (float*)tensor_data_ptr(bn->current_var);
         if (var_reduced_data && current_var_data)
             memcpy(current_var_data, var_reduced_data, (size_t)features * sizeof(float));
-        tensor_free(var_reduced);
 
         if (bn->track_running_stats && bn->running_mean && bn->running_var) {
             float* running_mean = (float*)tensor_data_ptr(bn->running_mean);
@@ -107,36 +102,26 @@ static Tensor* batchnorm1d_forward(Module* module, Tensor* input) {
     if (!mean_broadcast) return NULL;
 
     Tensor* centered = uop_sub(input, mean_broadcast);
-    tensor_free(mean_broadcast);
     if (!centered) return NULL;
 
     int var_shape[]     = {features};
     TensorConfig config = (TensorConfig){.dtype = input->dtype, .device = input->device,
                                           .has_dtype = true, .has_device = true};
-    Tensor* eps_tensor  = tensor_zeros(var_shape, 1, &config);
-    if (!eps_tensor) { tensor_free(centered); return NULL; }
-
-    float* eps_data = (float*)tensor_data_ptr(eps_tensor);
-    if (eps_data) {
-        for (int c = 0; c < features; c++) eps_data[c] = bn->eps;
-    }
+    Tensor* eps_tensor  = tensor_full(var_shape, 1, &config, bn->eps);
+    if (!eps_tensor) return NULL;
 
     Tensor* var_eps = uop_add(var_tensor, eps_tensor);
     tensor_free(eps_tensor);
-    if (!var_eps) { tensor_free(centered); return NULL; }
+    if (!var_eps) return NULL;
 
     Tensor* std_tensor = uop_sqrt(var_eps);
-    tensor_free(var_eps);
-    if (!std_tensor) { tensor_free(centered); return NULL; }
+    if (!std_tensor) return NULL;
 
     ExpandParams expand_std = { .new_shape = input_shape, .new_ndim = 2 };
     Tensor* std_broadcast = uop_expand(std_tensor, &expand_std);
-    tensor_free(std_tensor);
-    if (!std_broadcast) { tensor_free(centered); return NULL; }
+    if (!std_broadcast) return NULL;
 
     Tensor* normalized = uop_div(centered, std_broadcast);
-    tensor_free(centered);
-    tensor_free(std_broadcast);
     if (!normalized) return NULL;
 
     Tensor* output = normalized;
@@ -144,20 +129,16 @@ static Tensor* batchnorm1d_forward(Module* module, Tensor* input) {
     if (bn->affine && bn->weight && bn->bias) {
         ExpandParams expand_weight = { .new_shape = input_shape, .new_ndim = 2 };
         Tensor* weight_broadcast = uop_expand(bn->weight->tensor, &expand_weight);
-        if (!weight_broadcast) { tensor_free(output); return NULL; }
+        if (!weight_broadcast) return NULL;
 
         Tensor* scaled = uop_mul(weight_broadcast, output);
-        tensor_free(weight_broadcast);
-        tensor_free(output);
         if (!scaled) return NULL;
 
         ExpandParams expand_bias = { .new_shape = input_shape, .new_ndim = 2 };
         Tensor* bias_broadcast = uop_expand(bn->bias->tensor, &expand_bias);
-        if (!bias_broadcast) { tensor_free(scaled); return NULL; }
+        if (!bias_broadcast) return NULL;
 
         output = uop_add(scaled, bias_broadcast);
-        tensor_free(scaled);
-        tensor_free(bias_broadcast);
         if (!output) return NULL;
     }
 

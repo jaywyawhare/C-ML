@@ -1,4 +1,6 @@
 #include "optim.h"
+#include "tensor/realize.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include "core/training_metrics.h"
 #include "core/error_stack.h"
@@ -106,48 +108,57 @@ static void* optimizer_alloc_state(ParameterGroup* group, size_t state_size, Sta
     return states;
 }
 
+/* Helper: create a realized zero tensor for optimizer state.
+ * Optimizer state tensors are long-lived (must survive IR graph resets).
+ * tensor_realize() both executes the lazy fill AND detaches from the IR graph. */
+static Tensor* optim_zeros(int* shape, int ndim, TensorConfig* config) {
+    Tensor* t = tensor_zeros(shape, ndim, config);
+    tensor_realize(t);
+    return t;
+}
+
 static void sgd_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     SGDMomentumState* s = (SGDMomentumState*)state;
-    s->momentum_buffer = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->momentum_buffer = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 static void adam_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     AdamState* s = (AdamState*)state;
-    s->exp_avg = tensor_zeros(tensor->shape, tensor->ndim, config);
-    s->exp_avg_sq = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->exp_avg        = optim_zeros(tensor->shape, tensor->ndim, config);
+    s->exp_avg_sq     = optim_zeros(tensor->shape, tensor->ndim, config);
     s->max_exp_avg_sq = NULL;
 }
 
 static void rmsprop_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     RMSpropState* s = (RMSpropState*)state;
-    s->square_avg = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->square_avg = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 static void adagrad_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     AdagradState* s = (AdagradState*)state;
-    s->sum_sq_grad = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->sum_sq_grad = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 static void adadelta_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     AdaDeltaState* s = (AdaDeltaState*)state;
-    s->acc_grad = tensor_zeros(tensor->shape, tensor->ndim, config);
-    s->acc_update = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->acc_grad   = optim_zeros(tensor->shape, tensor->ndim, config);
+    s->acc_update = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 static void lamb_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     LAMBState* s = (LAMBState*)state;
-    s->exp_avg = tensor_zeros(tensor->shape, tensor->ndim, config);
-    s->exp_avg_sq = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->exp_avg    = optim_zeros(tensor->shape, tensor->ndim, config);
+    s->exp_avg_sq = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 static void lars_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     LARSState* s = (LARSState*)state;
-    s->momentum_buffer = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->momentum_buffer = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 static void muon_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     MuonState* s = (MuonState*)state;
-    s->momentum_buffer = tensor_zeros(tensor->shape, tensor->ndim, config);
+    s->momentum_buffer = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
 void optimizer_free(Optimizer* optimizer) {
@@ -532,53 +543,37 @@ static void sgd_step(Optimizer* optimizer) {
 
             Tensor* tensor = param->tensor;
             Tensor* grad   = tensor_get_grad(tensor);
-
             if (!grad)
                 continue;
 
-            float* param_data = (float*)tensor_data_ptr(tensor);
-            float* grad_data  = (float*)tensor_data_ptr(grad);
+            Tensor* mom_buf = (momentum > 0.0f && states && states[i])
+                              ? states[i]->momentum_buffer : NULL;
 
-            if (!param_data || !grad_data)
-                continue;
+            /* Record SGD update as an IR node so it can be scheduled/fused
+             * with the backward pass in the same execution graph. */
+            SgdStepParams sp = {
+                .lr           = lr,
+                .momentum     = momentum,
+                .weight_decay = weight_decay,
+                .dampening    = 0.0f,
+                .nesterov     = false,
+            };
+            Tensor* new_p = uop_sgd_step(tensor, grad, mom_buf, &sp);
+            if (!new_p) continue;
 
-            size_t numel = tensor->numel;
+            tensor_ensure_executed(new_p);
 
-            if (weight_decay > 0.0f) {
-                for (size_t j = 0; j < numel; j++) {
-                    grad_data[j] += weight_decay * param_data[j];
-                }
-            }
-
-            if (momentum > 0.0f && states && states[i] && states[i]->momentum_buffer) {
-                float* momentum_data = (float*)tensor_data_ptr(states[i]->momentum_buffer);
-                if (momentum_data) {
-                    for (size_t j = 0; j < numel; j++) {
-                        momentum_data[j] = momentum * momentum_data[j] - lr * grad_data[j];
-                    }
-                    for (size_t j = 0; j < numel; j++) {
-                        param_data[j] += momentum_data[j];
-                    }
-                } else {
-                    CMLBlasContext* blas = cml_blas_get_context();
-                    if (blas && blas->initialized &&
-                        cml_blas_saxpy(blas, grad_data, param_data, (int)numel, -lr) == 0) {
-                    } else {
-                        for (size_t j = 0; j < numel; j++) {
-                            param_data[j] -= lr * grad_data[j];
-                        }
-                    }
-                }
-            } else {
-                CMLBlasContext* blas = cml_blas_get_context();
-                if (blas && blas->initialized &&
-                    cml_blas_saxpy(blas, grad_data, param_data, (int)numel, -lr) == 0) {
-                } else {
-                    for (size_t j = 0; j < numel; j++) {
-                        param_data[j] -= lr * grad_data[j];
-                    }
-                }
-            }
+            /* Swap new param data into the live parameter tensor */
+            void* old_data  = tensor->data;
+            bool  old_owns  = tensor->owns_data;
+            bool  old_cache = tensor->from_buffer_cache;
+            tensor->data             = new_p->data;
+            tensor->owns_data        = new_p->owns_data;
+            tensor->from_buffer_cache = new_p->from_buffer_cache;
+            new_p->data              = old_data;
+            new_p->owns_data         = old_owns;
+            new_p->from_buffer_cache  = old_cache;
+            tensor_free(new_p);
         }
 
         group->step_count++;
@@ -662,7 +657,7 @@ static void adam_step(Optimizer* optimizer) {
                     Tensor* t = group->parameters[i]->tensor;
                     TensorConfig cfg = {.dtype = t->dtype, .device = t->device,
                                         .has_dtype = true, .has_device = true};
-                    st[i]->max_exp_avg_sq = tensor_zeros(t->shape, t->ndim, &cfg);
+                    st[i]->max_exp_avg_sq = optim_zeros(t->shape, t->ndim, &cfg);
                 }
             }
         }
@@ -670,8 +665,6 @@ static void adam_step(Optimizer* optimizer) {
         AdamState** states = (AdamState**)group->state;
         int step           = group->step_count + 1;
 
-        float bias_correction1 = 1.0f - powf(beta1, (float)step);
-        float bias_correction2 = 1.0f - powf(beta2, (float)step);
 
         for (int i = 0; i < group->num_parameters; i++) {
             Parameter* param = group->parameters[i];
@@ -680,44 +673,40 @@ static void adam_step(Optimizer* optimizer) {
 
             Tensor* tensor = param->tensor;
             Tensor* grad   = tensor_get_grad(tensor);
-
             if (!grad || !states[i])
                 continue;
 
-            float* param_data      = (float*)tensor_data_ptr(tensor);
-            float* grad_data       = (float*)tensor_data_ptr(grad);
-            float* exp_avg_data    = (float*)tensor_data_ptr(states[i]->exp_avg);
-            float* exp_avg_sq_data = (float*)tensor_data_ptr(states[i]->exp_avg_sq);
+            Tensor* max_sq = optimizer->amsgrad ? states[i]->max_exp_avg_sq : NULL;
 
-            if (!param_data || !grad_data || !exp_avg_data || !exp_avg_sq_data)
-                continue;
+            /* Record Adam update as an IR node so it is scheduled alongside
+             * the backward pass in the same execution graph. */
+            AdamStepParams ap = {
+                .lr           = lr,
+                .beta1        = beta1,
+                .beta2        = beta2,
+                .eps          = epsilon,
+                .weight_decay = weight_decay,
+                .step         = step,
+                .amsgrad      = optimizer->amsgrad,
+            };
+            Tensor* new_p = uop_adam_step(tensor, grad,
+                                          states[i]->exp_avg, states[i]->exp_avg_sq,
+                                          max_sq, &ap);
+            if (!new_p) continue;
 
-            size_t numel = tensor->numel;
+            tensor_ensure_executed(new_p);
 
-            for (size_t j = 0; j < numel; j++) {
-                float grad_val = grad_data[j];
-
-                if (weight_decay > 0.0f) {
-                    grad_val += weight_decay * param_data[j];
-                }
-
-                exp_avg_data[j] = beta1 * exp_avg_data[j] + (1.0f - beta1) * grad_val;
-                exp_avg_sq_data[j] =
-                    beta2 * exp_avg_sq_data[j] + (1.0f - beta2) * grad_val * grad_val;
-
-                float m = exp_avg_data[j] / bias_correction1;
-                float v = exp_avg_sq_data[j] / bias_correction2;
-
-                if (optimizer->amsgrad && states[i]->max_exp_avg_sq) {
-                    float* max_exp_avg_sq_data = (float*)tensor_data_ptr(states[i]->max_exp_avg_sq);
-                    if (max_exp_avg_sq_data) {
-                        max_exp_avg_sq_data[j] = fmaxf(max_exp_avg_sq_data[j], v);
-                        v                      = max_exp_avg_sq_data[j];
-                    }
-                }
-
-                param_data[j] -= lr * m / (sqrtf(v) + epsilon);
-            }
+            /* Swap new param data into the live parameter tensor */
+            void* old_data  = tensor->data;
+            bool  old_owns  = tensor->owns_data;
+            bool  old_cache = tensor->from_buffer_cache;
+            tensor->data             = new_p->data;
+            tensor->owns_data        = new_p->owns_data;
+            tensor->from_buffer_cache = new_p->from_buffer_cache;
+            new_p->data              = old_data;
+            new_p->owns_data         = old_owns;
+            new_p->from_buffer_cache  = old_cache;
+            tensor_free(new_p);
         }
 
         group->step_count++;
@@ -864,7 +853,7 @@ static void adamw_step(Optimizer* optimizer) {
                     Tensor* t = group->parameters[i]->tensor;
                     TensorConfig cfg = {.dtype = t->dtype, .device = t->device,
                                         .has_dtype = true, .has_device = true};
-                    st[i]->max_exp_avg_sq = tensor_zeros(t->shape, t->ndim, &cfg);
+                    st[i]->max_exp_avg_sq = optim_zeros(t->shape, t->ndim, &cfg);
                 }
             }
         }

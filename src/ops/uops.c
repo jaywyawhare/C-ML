@@ -294,17 +294,22 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
         return NULL;
     }
 
-    if (params->num_dims != a->ndim) {
-        LOG_ERROR("Permute: num_dims (%d) must match tensor ndim (%d)", params->num_dims, a->ndim);
+    int actual_ndim = a->ndim;
+    if (a->ir_node && a->ir_node->output_shape && a->ir_node->output_ndim > 0) {
+        actual_ndim = a->ir_node->output_ndim;
+    }
+
+    if (params->num_dims != actual_ndim) {
+        LOG_ERROR("Permute: num_dims (%d) must match tensor ndim (%d)", params->num_dims, actual_ndim);
         return NULL;
     }
 
-    bool* used = calloc((size_t)a->ndim, sizeof(bool));
+    bool* used = calloc((size_t)actual_ndim, sizeof(bool));
     if (!used)
         return NULL;
 
     for (int i = 0; i < params->num_dims; i++) {
-        if (params->perm[i] < 0 || params->perm[i] >= a->ndim) {
+        if (params->perm[i] < 0 || params->perm[i] >= actual_ndim) {
             free(used);
             LOG_ERROR("Permute: invalid dimension %d in permutation", params->perm[i]);
             return NULL;
@@ -317,6 +322,11 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
         used[params->perm[i]] = true;
     }
     free(used);
+
+    int* a_shape = a->shape;
+    if (a->ir_node && a->ir_node->output_shape && a->ir_node->output_ndim > 0) {
+        a_shape = a->ir_node->output_shape;
+    }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
@@ -343,16 +353,16 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
 
     struct IRNode* node = cml_ir_get_tail(ir);
 
-    int* out_shape = malloc((size_t)a->ndim * sizeof(int));
+    int* out_shape = malloc((size_t)actual_ndim * sizeof(int));
     if (!out_shape)
         return NULL;
 
-    for (int i = 0; i < a->ndim; i++) {
-        out_shape[i] = a->shape[params->perm[i]];
+    for (int i = 0; i < actual_ndim; i++) {
+        out_shape[i] = a_shape[params->perm[i]];
     }
 
     node->output_shape = out_shape;
-    node->output_ndim  = a->ndim;
+    node->output_ndim  = actual_ndim;
 
     if (a->requires_grad) {
         node->requires_grad       = true;
@@ -680,11 +690,14 @@ Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     if (cml_ir_add_uop(ir, UOP_LINEAR, inputs, num_inputs, NULL) != 0)
         return NULL;
 
-    struct IRNode* node   = cml_ir_get_tail(ir);
-    node->output_shape    = malloc(2 * sizeof(int));
-    node->output_shape[0] = M;
-    node->output_shape[1] = N;
-    node->output_ndim     = 2;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    /* Output preserves all leading dims: [..., M, K] -> [..., M, N] */
+    node->output_ndim   = input->ndim;
+    node->output_shape  = malloc((size_t)input->ndim * sizeof(int));
+    for (int i = 0; i < input->ndim - 1; i++)
+        node->output_shape[i] = input->shape[i];
+    node->output_shape[input->ndim - 1] = N;
+    (void)M; /* M implicit in leading dims */
 
     if (input->requires_grad || weight->requires_grad ||
         (bias && bias->requires_grad)) {
@@ -720,6 +733,282 @@ static void conv2d_params_free_local(Conv2DParams* p) {
     if (p->dilation)
         free(p->dilation);
     free(p);
+}
+
+static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
+    if (!input || !params) {
+        LOG_ERROR("NULL input to uop_pool2d");
+        return NULL;
+    }
+    if (input->ndim != 4) {
+        LOG_ERROR("Pool2D expects 4D input [batch, channels, height, width], got %dD",
+                  input->ndim);
+        return NULL;
+    }
+
+    int kernel_h = params->kernel_size[0];
+    int kernel_w = params->kernel_size[1];
+    int stride_h = params->stride[0] > 0 ? params->stride[0] : kernel_h;
+    int stride_w = params->stride[1] > 0 ? params->stride[1] : kernel_w;
+    int padding_h = params->padding[0];
+    int padding_w = params->padding[1];
+    int dilation_h = params->dilation[0] > 0 ? params->dilation[0] : 1;
+    int dilation_w = params->dilation[1] > 0 ? params->dilation[1] : 1;
+    int in_height = input->shape[2];
+    int in_width = input->shape[3];
+
+    if (kernel_h <= 0 || kernel_w <= 0 || stride_h <= 0 || stride_w <= 0 ||
+        dilation_h <= 0 || dilation_w <= 0) {
+        LOG_ERROR("uop_pool2d: invalid kernel/stride/dilation");
+        return NULL;
+    }
+
+    int out_height =
+        (in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
+    int out_width =
+        (in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
+    if (params->ceil_mode) {
+        int numer_h = in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1;
+        int numer_w = in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1;
+        if ((numer_h % stride_h) != 0)
+            out_height++;
+        if ((numer_w % stride_w) != 0)
+            out_width++;
+    }
+    if (out_height <= 0 || out_width <= 0) {
+        LOG_ERROR("uop_pool2d: invalid output dimensions (%d x %d)", out_height, out_width);
+        return NULL;
+    }
+
+    Pool2DParams* params_copy = malloc(sizeof(Pool2DParams));
+    if (!params_copy)
+        return NULL;
+    memcpy(params_copy, params, sizeof(Pool2DParams));
+    params_copy->stride[0] = stride_h;
+    params_copy->stride[1] = stride_w;
+    params_copy->dilation[0] = dilation_h;
+    params_copy->dilation[1] = dilation_w;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) {
+        free(params_copy);
+        return NULL;
+    }
+
+    Tensor* inputs[] = {input};
+    if (cml_ir_add_uop(ir, type, inputs, 1, params_copy) != 0) {
+        free(params_copy);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    int output_shape[4] = {input->shape[0], input->shape[1], out_height, out_width};
+    node->output_shape = tensor_shape_copy(output_shape, 4);
+    node->output_ndim = 4;
+    if (input->requires_grad) {
+        node->requires_grad = true;
+        node->needs_input_grad[0] = true;
+    }
+
+    return tensor_from_ir_node(node, ir);
+}
+
+static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
+                               const Conv3DParams* params) {
+    if (!input || !weight) {
+        LOG_ERROR("NULL tensor input to uop_conv3d");
+        return NULL;
+    }
+    if (input->ndim != 5 || weight->ndim != 5) {
+        LOG_ERROR("Conv3D expects input [N,C,D,H,W] and weight [O,C,Kd,Kh,Kw]");
+        return NULL;
+    }
+
+    int batch = input->shape[0];
+    int in_channels = input->shape[1];
+    int in_depth = input->shape[2];
+    int in_height = input->shape[3];
+    int in_width = input->shape[4];
+    int out_channels = weight->shape[0];
+    int weight_in_channels = weight->shape[1];
+    int kernel_d = weight->shape[2];
+    int kernel_h = weight->shape[3];
+    int kernel_w = weight->shape[4];
+
+    if (in_channels != weight_in_channels) {
+        LOG_ERROR("Conv3D: input channels (%d) don't match weight channels (%d)",
+                  in_channels, weight_in_channels);
+        return NULL;
+    }
+
+    int stride_d = params ? params->stride[0] : 1;
+    int stride_h = params ? params->stride[1] : 1;
+    int stride_w = params ? params->stride[2] : 1;
+    int pad_d = params ? params->padding[0] : 0;
+    int pad_h = params ? params->padding[1] : 0;
+    int pad_w = params ? params->padding[2] : 0;
+    int dilation_d = params ? params->dilation[0] : 1;
+    int dilation_h = params ? params->dilation[1] : 1;
+    int dilation_w = params ? params->dilation[2] : 1;
+
+    int out_depth =
+        (in_depth + 2 * pad_d - dilation_d * (kernel_d - 1) - 1) / stride_d + 1;
+    int out_height =
+        (in_height + 2 * pad_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
+    int out_width =
+        (in_width + 2 * pad_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
+    if (out_depth <= 0 || out_height <= 0 || out_width <= 0)
+        return NULL;
+
+    Conv3DParams* params_copy = calloc(1, sizeof(Conv3DParams));
+    if (!params_copy)
+        return NULL;
+    if (params)
+        memcpy(params_copy, params, sizeof(Conv3DParams));
+    params_copy->kernel_size[0] = kernel_d;
+    params_copy->kernel_size[1] = kernel_h;
+    params_copy->kernel_size[2] = kernel_w;
+    if (!params) {
+        params_copy->stride[0] = params_copy->stride[1] = params_copy->stride[2] = 1;
+        params_copy->dilation[0] = params_copy->dilation[1] = params_copy->dilation[2] = 1;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) {
+        free(params_copy);
+        return NULL;
+    }
+
+    Tensor* inputs[3] = {input, weight, bias};
+    int num_inputs = bias ? 3 : 2;
+    if (cml_ir_add_uop(ir, UOP_CONV3D, inputs, num_inputs, params_copy) != 0) {
+        free(params_copy);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int output_shape[5] = {batch, out_channels, out_depth, out_height, out_width};
+    node->output_shape = tensor_shape_copy(output_shape, 5);
+    node->output_ndim = 5;
+    return tensor_from_ir_node(node, ir);
+}
+
+static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* bias,
+                                         const ConvTranspose2DParams* params) {
+    if (!input || !weight || !params) {
+        LOG_ERROR("NULL input to uop_conv_transpose2d");
+        return NULL;
+    }
+    if (input->ndim != 4 || weight->ndim != 4) {
+        LOG_ERROR("ConvTranspose2D expects input [N,C,H,W] and weight [Cin,Cout,Kh,Kw]");
+        return NULL;
+    }
+
+    int batch = input->shape[0];
+    int in_channels = input->shape[1];
+    int in_height = input->shape[2];
+    int in_width = input->shape[3];
+    int weight_in_channels = weight->shape[0];
+    int out_channels = weight->shape[1];
+    int kernel_h = weight->shape[2];
+    int kernel_w = weight->shape[3];
+    if (in_channels != weight_in_channels)
+        return NULL;
+
+    int out_height = (in_height - 1) * params->stride[0] - 2 * params->padding[0] +
+                     params->dilation[0] * (kernel_h - 1) + params->output_padding[0] + 1;
+    int out_width = (in_width - 1) * params->stride[1] - 2 * params->padding[1] +
+                    params->dilation[1] * (kernel_w - 1) + params->output_padding[1] + 1;
+    if (out_height <= 0 || out_width <= 0)
+        return NULL;
+
+    ConvTranspose2DParams* params_copy = malloc(sizeof(ConvTranspose2DParams));
+    if (!params_copy)
+        return NULL;
+    memcpy(params_copy, params, sizeof(ConvTranspose2DParams));
+    params_copy->kernel_size[0] = kernel_h;
+    params_copy->kernel_size[1] = kernel_w;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) {
+        free(params_copy);
+        return NULL;
+    }
+    Tensor* inputs[3] = {input, weight, bias};
+    int num_inputs = bias ? 3 : 2;
+    if (cml_ir_add_uop(ir, UOP_CONV_TRANSPOSE2D, inputs, num_inputs, params_copy) != 0) {
+        free(params_copy);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int output_shape[4] = {batch, out_channels, out_height, out_width};
+    node->output_shape = tensor_shape_copy(output_shape, 4);
+    node->output_ndim = 4;
+    return tensor_from_ir_node(node, ir);
+}
+
+static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* bias,
+                                         const ConvTranspose3DParams* params) {
+    if (!input || !weight || !params) {
+        LOG_ERROR("NULL input to uop_conv_transpose3d");
+        return NULL;
+    }
+    if (input->ndim != 5 || weight->ndim != 5) {
+        LOG_ERROR("ConvTranspose3D expects input [N,C,D,H,W] and weight [Cin,Cout,Kd,Kh,Kw]");
+        return NULL;
+    }
+
+    int batch = input->shape[0];
+    int in_channels = input->shape[1];
+    int in_depth = input->shape[2];
+    int in_height = input->shape[3];
+    int in_width = input->shape[4];
+    int weight_in_channels = weight->shape[0];
+    int out_channels = weight->shape[1];
+    int kernel_d = weight->shape[2];
+    int kernel_h = weight->shape[3];
+    int kernel_w = weight->shape[4];
+    if (in_channels != weight_in_channels)
+        return NULL;
+
+    int out_depth = (in_depth - 1) * params->stride[0] - 2 * params->padding[0] +
+                    params->dilation[0] * (kernel_d - 1) + params->output_padding[0] + 1;
+    int out_height = (in_height - 1) * params->stride[1] - 2 * params->padding[1] +
+                     params->dilation[1] * (kernel_h - 1) + params->output_padding[1] + 1;
+    int out_width = (in_width - 1) * params->stride[2] - 2 * params->padding[2] +
+                    params->dilation[2] * (kernel_w - 1) + params->output_padding[2] + 1;
+    if (out_depth <= 0 || out_height <= 0 || out_width <= 0)
+        return NULL;
+
+    ConvTranspose3DParams* params_copy = malloc(sizeof(ConvTranspose3DParams));
+    if (!params_copy)
+        return NULL;
+    memcpy(params_copy, params, sizeof(ConvTranspose3DParams));
+    params_copy->kernel_size[0] = kernel_d;
+    params_copy->kernel_size[1] = kernel_h;
+    params_copy->kernel_size[2] = kernel_w;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) {
+        free(params_copy);
+        return NULL;
+    }
+    Tensor* inputs[3] = {input, weight, bias};
+    int num_inputs = bias ? 3 : 2;
+    if (cml_ir_add_uop(ir, UOP_CONV_TRANSPOSE3D, inputs, num_inputs, params_copy) != 0) {
+        free(params_copy);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    int output_shape[5] = {batch, out_channels, out_depth, out_height, out_width};
+    node->output_shape = tensor_shape_copy(output_shape, 5);
+    node->output_ndim = 5;
+    return tensor_from_ir_node(node, ir);
 }
 
 Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* params) {
@@ -849,6 +1138,28 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
     return tensor_from_ir_node(node, ir);
 }
 
+Tensor* uop_maxpool2d(Tensor* input, Pool2DParams* params) {
+    return uop_pool2d(input, params, UOP_MAXPOOL2D);
+}
+
+Tensor* uop_avgpool2d(Tensor* input, Pool2DParams* params) {
+    return uop_pool2d(input, params, UOP_AVGPOOL2D);
+}
+
+Tensor* uop_conv3d(Tensor* input, Tensor* weight, Tensor* bias, Conv3DParams* params) {
+    return uop_conv3d_like(input, weight, bias, params);
+}
+
+Tensor* uop_conv_transpose2d(Tensor* input, Tensor* weight, Tensor* bias,
+                             ConvTranspose2DParams* params) {
+    return uop_conv_transpose2d_like(input, weight, bias, params);
+}
+
+Tensor* uop_conv_transpose3d(Tensor* input, Tensor* weight, Tensor* bias,
+                             ConvTranspose3DParams* params) {
+    return uop_conv_transpose3d_like(input, weight, bias, params);
+}
+
 Tensor* uop_fill(int* shape, int ndim, float value) {
     if (!shape || ndim <= 0) {
         LOG_ERROR("Invalid shape for uop_fill");
@@ -863,9 +1174,11 @@ Tensor* uop_fill(int* shape, int ndim, float value) {
     if (!params)
         return NULL;
 
-    params->value = value;
-    params->ndim  = ndim;
-    params->shape = malloc((size_t)ndim * sizeof(int));
+    params->value  = value;
+    params->ndim   = ndim;
+    params->dtype  = DTYPE_FLOAT32;
+    params->device = DEVICE_CPU;
+    params->shape  = malloc((size_t)ndim * sizeof(int));
     if (!params->shape) {
         free(params);
         return NULL;
@@ -883,8 +1196,303 @@ Tensor* uop_fill(int* shape, int ndim, float value) {
         return NULL;
     }
 
-    node->output_shape = tensor_shape_copy(shape, ndim);
-    node->output_ndim  = ndim;
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = DTYPE_FLOAT32;
+    node->output_device = DEVICE_CPU;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType device) {
+    if (!shape || ndim <= 0) {
+        LOG_ERROR("Invalid shape for uop_fill_ex");
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    FillParams* params = malloc(sizeof(FillParams));
+    if (!params)
+        return NULL;
+
+    params->value  = value;
+    params->ndim   = ndim;
+    params->dtype  = dtype;
+    params->device = device;
+    params->shape  = malloc((size_t)ndim * sizeof(int));
+    if (!params->shape) {
+        free(params);
+        return NULL;
+    }
+    memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
+
+    if (cml_ir_add_uop(ir, UOP_FILL, NULL, 0, params) != 0) {
+        free(params->shape);
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim,
+                  DType dtype, DeviceType device) {
+    if (!data || data_size == 0 || !shape || ndim <= 0) {
+        LOG_ERROR("Invalid arguments for uop_const");
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    ConstParams* params = malloc(sizeof(ConstParams));
+    if (!params)
+        return NULL;
+
+    params->data = malloc(data_size);
+    if (!params->data) {
+        free(params);
+        return NULL;
+    }
+    memcpy(params->data, data, data_size);
+    params->data_size = data_size;
+    params->dtype     = dtype;
+    params->device    = device;
+    params->ndim      = ndim;
+    params->shape     = malloc((size_t)ndim * sizeof(int));
+    if (!params->shape) {
+        free(params->data);
+        free(params);
+        return NULL;
+    }
+    memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
+
+    if (cml_ir_add_uop(ir, UOP_CONST, NULL, 0, params) != 0) {
+        free(params->shape);
+        free(params->data);
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device) {
+    if (!shape || ndim <= 0) {
+        LOG_ERROR("Invalid shape for uop_rand_uniform");
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    RandParams* params = malloc(sizeof(RandParams));
+    if (!params)
+        return NULL;
+    params->dtype  = dtype;
+    params->device = device;
+
+    if (cml_ir_add_uop(ir, UOP_RAND_UNIFORM, NULL, 0, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device) {
+    if (!shape || ndim <= 0) {
+        LOG_ERROR("Invalid shape for uop_rand_normal");
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    RandParams* params = malloc(sizeof(RandParams));
+    if (!params)
+        return NULL;
+    params->dtype  = dtype;
+    params->device = device;
+
+    if (cml_ir_add_uop(ir, UOP_RAND_NORMAL, NULL, 0, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceType device) {
+    if (step == 0.0f) {
+        LOG_ERROR("uop_arange_op: step cannot be zero");
+        return NULL;
+    }
+
+    int n = (int)ceilf((end - start) / step);
+    if (n <= 0) {
+        LOG_ERROR("uop_arange_op: empty range (start=%g end=%g step=%g)", start, end, step);
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    ArangeParams* params = malloc(sizeof(ArangeParams));
+    if (!params)
+        return NULL;
+    params->start  = start;
+    params->end    = end;
+    params->step   = step;
+    params->dtype  = dtype;
+    params->device = device;
+
+    if (cml_ir_add_uop(ir, UOP_ARANGE_OP, NULL, 0, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    int* out_shape = malloc(sizeof(int));
+    if (!out_shape)
+        return NULL;
+    out_shape[0]        = n;
+    node->output_shape  = out_shape;
+    node->output_ndim   = 1;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_eye_op(int n, DType dtype, DeviceType device) {
+    if (n <= 0) {
+        LOG_ERROR("uop_eye_op: n must be positive, got %d", n);
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    EyeParams* params = malloc(sizeof(EyeParams));
+    if (!params)
+        return NULL;
+    params->n      = n;
+    params->dtype  = dtype;
+    params->device = device;
+
+    if (cml_ir_add_uop(ir, UOP_EYE_OP, NULL, 0, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    int* out_shape = malloc(2 * sizeof(int));
+    if (!out_shape)
+        return NULL;
+    out_shape[0]        = n;
+    out_shape[1]        = n;
+    node->output_shape  = out_shape;
+    node->output_ndim   = 2;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_rand_int(int low, int high, int* shape, int ndim,
+                     DType dtype, DeviceType device) {
+    if (!shape || ndim <= 0) {
+        LOG_ERROR("Invalid shape for uop_rand_int");
+        return NULL;
+    }
+    if (low >= high) {
+        LOG_ERROR("uop_rand_int: low (%d) must be less than high (%d)", low, high);
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    RandIntParams* params = malloc(sizeof(RandIntParams));
+    if (!params)
+        return NULL;
+    params->low    = low;
+    params->high   = high;
+    params->dtype  = dtype;
+    params->device = device;
+
+    if (cml_ir_add_uop(ir, UOP_RAND_INT, NULL, 0, params) != 0) {
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node)
+        return NULL;
+
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = dtype;
+    node->output_device = device;
     node->requires_grad = false;
 
     return tensor_from_ir_node(node, ir);
@@ -910,28 +1518,50 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
         return NULL;
     }
 
-    CMLGraph_t ir = cml_ir_get_or_create_context();
-    if (!ir)
+    /* Output shape: indices.shape + input.shape[gather_dim+1:] (NumPy-style gather). */
+    int out_ndim = indices->ndim + input->ndim - 1;
+    if (out_ndim <= 0) {
+        LOG_ERROR("uop_gather: invalid output rank");
         return NULL;
+    }
+    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!out_shape)
+        return NULL;
+    memcpy(out_shape, indices->shape, (size_t)indices->ndim * sizeof(int));
+    int tail = input->ndim - 1 - gather_dim;
+    if (tail > 0) {
+        memcpy(out_shape + indices->ndim, input->shape + gather_dim + 1,
+               (size_t)tail * sizeof(int));
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) {
+        free(out_shape);
+        return NULL;
+    }
 
     GatherParams* params = malloc(sizeof(GatherParams));
-    if (!params)
+    if (!params) {
+        free(out_shape);
         return NULL;
+    }
     params->dim = gather_dim;
 
     Tensor* inputs[] = {input, indices};
     if (cml_ir_add_uop(ir, UOP_GATHER, inputs, 2, params) != 0) {
         free(params);
+        free(out_shape);
         return NULL;
     }
 
     struct IRNode* node = cml_ir_get_tail(ir);
     if (!node) {
+        free(out_shape);
         return NULL;
     }
 
-    node->output_shape = tensor_shape_copy(indices->shape, indices->ndim);
-    node->output_ndim  = indices->ndim;
+    node->output_shape = out_shape;
+    node->output_ndim  = out_ndim;
 
     if (input->requires_grad) {
         node->requires_grad       = true;
@@ -3072,6 +3702,31 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
             return uop_conv2d(inputs[0], inputs[1], bias, conv_params);
         }
         break;
+    case UOP_CONV3D:
+        if (num_inputs >= 2)
+            return uop_conv3d(inputs[0], inputs[1], num_inputs >= 3 ? inputs[2] : NULL,
+                              (Conv3DParams*)params);
+        break;
+    case UOP_CONV_TRANSPOSE2D:
+        if (num_inputs >= 2)
+            return uop_conv_transpose2d(inputs[0], inputs[1],
+                                        num_inputs >= 3 ? inputs[2] : NULL,
+                                        (ConvTranspose2DParams*)params);
+        break;
+    case UOP_CONV_TRANSPOSE3D:
+        if (num_inputs >= 2)
+            return uop_conv_transpose3d(inputs[0], inputs[1],
+                                        num_inputs >= 3 ? inputs[2] : NULL,
+                                        (ConvTranspose3DParams*)params);
+        break;
+    case UOP_MAXPOOL2D:
+        if (num_inputs >= 1 && params)
+            return uop_maxpool2d(inputs[0], (Pool2DParams*)params);
+        break;
+    case UOP_AVGPOOL2D:
+        if (num_inputs >= 1 && params)
+            return uop_avgpool2d(inputs[0], (Pool2DParams*)params);
+        break;
     case UOP_SIGN:
         if (num_inputs >= 1) return uop_sign(inputs[0]);
         break;
@@ -3207,6 +3862,26 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
             return uop_unfold(inputs[0], up->kernel_size, up->stride);
         }
         break;
+    case UOP_ALLOC:
+        if (params) {
+            AllocParams* ap = (AllocParams*)params;
+            return uop_alloc(ap->shape, ap->ndim, ap->dtype, ap->device);
+        }
+        break;
+    case UOP_SGD_STEP:
+        if (num_inputs >= 2 && params) {
+            SgdStepParams* sp = (SgdStepParams*)params;
+            Tensor* mb = (num_inputs >= 3) ? inputs[2] : NULL;
+            return uop_sgd_step(inputs[0], inputs[1], mb, sp);
+        }
+        break;
+    case UOP_ADAM_STEP:
+        if (num_inputs >= 4 && params) {
+            AdamStepParams* ap = (AdamStepParams*)params;
+            Tensor* max_sq = (num_inputs >= 5) ? inputs[4] : NULL;
+            return uop_adam_step(inputs[0], inputs[1], inputs[2], inputs[3], max_sq, ap);
+        }
+        break;
     case UOP_COUNT:
         break;
     default:
@@ -3215,4 +3890,119 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
     }
 
     return NULL;
+}
+
+/* ── Lazy allocation ─────────────────────────────────────────────────────── */
+
+Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device) {
+    if (!shape || ndim <= 0) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    AllocParams* params = malloc(sizeof(AllocParams));
+    if (!params) return NULL;
+
+    params->ndim   = ndim;
+    params->dtype  = dtype;
+    params->device = device;
+    params->shape  = malloc((size_t)ndim * sizeof(int));
+    if (!params->shape) { free(params); return NULL; }
+    memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
+
+    if (cml_ir_add_uop(ir, UOP_ALLOC, NULL, 0, params) != 0) {
+        free(params->shape);
+        free(params);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node) return NULL;
+
+    node->output_shape  = tensor_shape_copy(shape, ndim);
+    node->output_ndim   = ndim;
+    node->output_dtype  = dtype;
+    node->output_device = device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+/* ── In-graph optimizer steps ────────────────────────────────────────────── */
+
+Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf,
+                     SgdStepParams* p) {
+    if (!param || !grad || !p) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    SgdStepParams* cp = malloc(sizeof(SgdStepParams));
+    if (!cp) return NULL;
+    *cp = *p;
+
+    Tensor* inputs[3];
+    int n_inputs = 2;
+    inputs[0] = param;
+    inputs[1] = grad;
+    if (momentum_buf) {
+        inputs[2] = momentum_buf;
+        n_inputs  = 3;
+    }
+
+    if (cml_ir_add_uop(ir, UOP_SGD_STEP, inputs, n_inputs, cp) != 0) {
+        free(cp);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node) return NULL;
+
+    node->output_shape  = tensor_shape_copy(param->shape, param->ndim);
+    node->output_ndim   = param->ndim;
+    node->output_dtype  = param->dtype;
+    node->output_device = param->device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+Tensor* uop_adam_step(Tensor* param, Tensor* grad, Tensor* exp_avg,
+                      Tensor* exp_avg_sq, Tensor* max_exp_avg_sq,
+                      AdamStepParams* p) {
+    if (!param || !grad || !exp_avg || !exp_avg_sq || !p) return NULL;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    AdamStepParams* cp = malloc(sizeof(AdamStepParams));
+    if (!cp) return NULL;
+    *cp = *p;
+
+    Tensor* inputs[5];
+    int n_inputs = 4;
+    inputs[0] = param;
+    inputs[1] = grad;
+    inputs[2] = exp_avg;
+    inputs[3] = exp_avg_sq;
+    if (max_exp_avg_sq) {
+        inputs[4] = max_exp_avg_sq;
+        n_inputs  = 5;
+    }
+
+    if (cml_ir_add_uop(ir, UOP_ADAM_STEP, inputs, n_inputs, cp) != 0) {
+        free(cp);
+        return NULL;
+    }
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    if (!node) return NULL;
+
+    node->output_shape  = tensor_shape_copy(param->shape, param->ndim);
+    node->output_ndim   = param->ndim;
+    node->output_dtype  = param->dtype;
+    node->output_device = param->device;
+    node->requires_grad = false;
+
+    return tensor_from_ir_node(node, ir);
 }

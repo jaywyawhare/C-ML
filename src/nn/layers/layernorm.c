@@ -56,13 +56,21 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
     if (!var_reduced)
         return NULL;
 
-    Tensor* eps_tensor = uop_fill(var_reduced->shape, var_reduced->ndim, ln->eps);
+    TensorConfig eps_cfg = (TensorConfig){.dtype      = var_reduced->dtype,
+                                          .device     = var_reduced->device,
+                                          .has_dtype  = true,
+                                          .has_device = true};
+    Tensor* eps_tensor =
+        tensor_full(var_reduced->shape, var_reduced->ndim, &eps_cfg, ln->eps);
     if (!eps_tensor)
         return NULL;
 
     Tensor* var_eps = uop_add(var_reduced, eps_tensor);
-    if (!var_eps)
+    if (!var_eps) {
+        tensor_free(eps_tensor);
         return NULL;
+    }
+    tensor_free(eps_tensor);
 
     Tensor* std_tensor = uop_sqrt(var_eps);
     if (!std_tensor)

@@ -5,6 +5,7 @@
 #include "nn.h"
 #include "optim.h"
 #include "tensor/tensor.h"
+#include "tensor/realize.h"
 #include "autograd/forward_ops.h"
 #include "autograd/loss_functions.h"
 #include "autograd/autograd.h"
@@ -423,6 +424,10 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             if (callbacks.on_batch_begin) {
                 callbacks.on_batch_begin(epoch, batch->batch_index, callbacks.user_data);
             }
+            /* Realize batch tensors so they survive the graph reset, then
+             * clear the previous iteration's computation graph. */
+            if (batch->X) tensor_realize(batch->X);
+            if (batch->y) tensor_realize(batch->y);
             cml_ir_reset_global_context();
             Tensor* output = module_forward(model, batch->X);
             if (!output) {
@@ -624,6 +629,10 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
             if (callbacks.on_batch_begin) {
                 callbacks.on_batch_begin(epoch, batch->batch_index, callbacks.user_data);
             }
+            /* Realize batch tensors so they survive the graph reset, then
+             * clear the previous iteration's computation graph. */
+            if (batch->X) tensor_realize(batch->X);
+            if (batch->y) tensor_realize(batch->y);
             cml_ir_reset_global_context();
             Tensor* output = module_forward(model, batch->X);
             if (!output) {

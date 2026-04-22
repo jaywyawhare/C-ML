@@ -8,36 +8,13 @@
 #include <math.h>
 #include <float.h>
 
-static Tensor* create_pooling_window_view(Tensor* input, int b, int c, int oh, int ow, int kernel_h,
-                                          int kernel_w, int stride_h, int stride_w, int padding_h,
-                                          int padding_w, int dilation_h, int dilation_w,
-                                          int in_height, int in_width) {
-    int start_h = oh * stride_h - padding_h;
-    int start_w = ow * stride_w - padding_w;
-    int window_shape[] = {kernel_h, kernel_w};
-    size_t* window_strides = malloc(2 * sizeof(size_t));
-    if (!window_strides)
-        return NULL;
-    size_t input_h_stride = input->strides ? input->strides[2] : (size_t)(in_width);
-    size_t input_w_stride = input->strides ? input->strides[3] : 1;
-    window_strides[0] = (size_t)input_h_stride * (size_t)dilation_h;
-    window_strides[1] = (size_t)input_w_stride * (size_t)dilation_w;
-    size_t storage_offset = 0;
-    if (input->strides) {
-        int indices[]      = {b, c, start_h, start_w};
-        size_t elem_offset = tensor_compute_offset(input, indices);
-        storage_offset     = elem_offset * cml_dtype_size(input->dtype);
-    } else {
-        size_t elem_offset =
-            ((size_t)b * (size_t)input->shape[1] * (size_t)in_height * (size_t)in_width +
-             (size_t)c * (size_t)in_height * (size_t)in_width + (size_t)start_h * (size_t)in_width +
-             (size_t)start_w);
-        storage_offset = elem_offset * cml_dtype_size(input->dtype);
-    }
-    Tensor* window_view = tensor_as_strided(input, window_shape, 2, window_strides, storage_offset);
-
-    free(window_strides);
-    return window_view;
+static int pool2d_out_dim(int in_size, int kernel, int stride, int padding,
+                          int dilation, bool ceil_mode) {
+    int numer = in_size + 2 * padding - dilation * (kernel - 1) - 1;
+    int out = numer / stride + 1;
+    if (ceil_mode && (numer % stride) != 0)
+        out++;
+    return out;
 }
 
 static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
@@ -51,8 +28,6 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    int batch     = input->shape[0];
-    int channels  = input->shape[1];
     int in_height = input->shape[2];
     int in_width  = input->shape[3];
 
@@ -64,64 +39,27 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
     int padding_w  = pool->padding[1];
     int dilation_h = pool->dilation[0];
     int dilation_w = pool->dilation[1];
-    int out_height = (in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
-    int out_width  = (in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
-    if (pool->ceil_mode) {
-        int actual_h = (in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
-        int actual_w = (in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
-        if ((in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1) % stride_h != 0) {
-            out_height = actual_h + 1;
-        }
-        if ((in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) % stride_w != 0) {
-            out_width = actual_w + 1;
-        }
-    }
-    int output_shape[]  = {batch, channels, out_height, out_width};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(output_shape, 4, &config);
-    if (!output)
+    if (dilation_h != 1 || dilation_w != 1) {
+        LOG_WARNING("MaxPool2d lazy path currently requires dilation=1");
         return NULL;
-    for (int b = 0; b < batch; b++) {
-        for (int c = 0; c < channels; c++) {
-            for (int oh = 0; oh < out_height; oh++) {
-                for (int ow = 0; ow < out_width; ow++) {
-                    Tensor* window = create_pooling_window_view(
-                        input, b, c, oh, ow, kernel_h, kernel_w, stride_h, stride_w, padding_h,
-                        padding_w, dilation_h, dilation_w, in_height, in_width);
-                    if (!window) {
-                        tensor_free(output);
-                        return NULL;
-                    }
-                    ReduceParams reduce_params;
-                    int dims[]             = {0, 1};
-                    reduce_params.dims     = dims;
-                    reduce_params.num_dims = 2;
-                    reduce_params.keepdim  = false;
-
-                    Tensor* reduced = uop_max_reduce(window, &reduce_params);
-                    tensor_free(window);
-
-                    if (!reduced) {
-                        tensor_free(output);
-                        return NULL;
-                    }
-                    float* reduced_data = (float*)tensor_data_ptr(reduced);
-                    if (reduced_data) {
-                        int output_indices[] = {b, c, oh, ow};
-                        size_t output_offset = tensor_compute_offset(output, output_indices);
-                        float* output_data   = (float*)tensor_data_ptr(output);
-                        if (output_data) {
-                            output_data[output_offset] = reduced_data[0];
-                        }
-                    }
-                    tensor_free(reduced);
-                }
-            }
-        }
     }
 
-    return output;
+    int out_height = pool2d_out_dim(in_height, kernel_h, stride_h, padding_h, dilation_h,
+                                    pool->ceil_mode);
+    int out_width = pool2d_out_dim(in_width, kernel_w, stride_w, padding_w, dilation_w,
+                                   pool->ceil_mode);
+    if (out_height <= 0 || out_width <= 0)
+        return NULL;
+
+    Pool2DParams params = {
+        .kernel_size = {kernel_h, kernel_w},
+        .stride = {stride_h, stride_w},
+        .padding = {padding_h, padding_w},
+        .dilation = {dilation_h, dilation_w},
+        .ceil_mode = pool->ceil_mode,
+        .count_include_pad = false,
+    };
+    return uop_maxpool2d(input, &params);
 }
 
 static void maxpool2d_free(Module* module) { free(module); }
@@ -160,8 +98,6 @@ static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    int batch     = input->shape[0];
-    int channels  = input->shape[1];
     int in_height = input->shape[2];
     int in_width  = input->shape[3];
 
@@ -171,65 +107,20 @@ static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
     int stride_w  = pool->stride[1];
     int padding_h = pool->padding[0];
     int padding_w = pool->padding[1];
-    int out_height = (in_height + 2 * padding_h - kernel_h) / stride_h + 1;
-    int out_width  = (in_width + 2 * padding_w - kernel_w) / stride_w + 1;
-    if (pool->ceil_mode) {
-        int actual_h = (in_height + 2 * padding_h - kernel_h) / stride_h + 1;
-        int actual_w = (in_width + 2 * padding_w - kernel_w) / stride_w + 1;
-        if ((in_height + 2 * padding_h - kernel_h) % stride_h != 0) {
-            out_height = actual_h + 1;
-        }
-        if ((in_width + 2 * padding_w - kernel_w) % stride_w != 0) {
-            out_width = actual_w + 1;
-        }
-    }
-    int output_shape[]  = {batch, channels, out_height, out_width};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(output_shape, 4, &config);
-    if (!output)
+    int out_height = pool2d_out_dim(in_height, kernel_h, stride_h, padding_h, 1, pool->ceil_mode);
+    int out_width = pool2d_out_dim(in_width, kernel_w, stride_w, padding_w, 1, pool->ceil_mode);
+    if (out_height <= 0 || out_width <= 0)
         return NULL;
-    for (int b = 0; b < batch; b++) {
-        for (int c = 0; c < channels; c++) {
-            for (int oh = 0; oh < out_height; oh++) {
-                for (int ow = 0; ow < out_width; ow++) {
-                    Tensor* window = create_pooling_window_view(
-                        input, b, c, oh, ow, kernel_h, kernel_w, stride_h, stride_w, padding_h,
-                        padding_w, 1, 1,
-                        in_height, in_width);
-                    if (!window) {
-                        tensor_free(output);
-                        return NULL;
-                    }
-                    ReduceParams reduce_params;
-                    int dims[]             = {0, 1};
-                    reduce_params.dims     = dims;
-                    reduce_params.num_dims = 2;
-                    reduce_params.keepdim  = false;
 
-                    Tensor* reduced = uop_mean(window, &reduce_params);
-                    tensor_free(window);
-
-                    if (!reduced) {
-                        tensor_free(output);
-                        return NULL;
-                    }
-                    float* reduced_data = (float*)tensor_data_ptr(reduced);
-                    if (reduced_data) {
-                        int output_indices[] = {b, c, oh, ow};
-                        size_t output_offset = tensor_compute_offset(output, output_indices);
-                        float* output_data   = (float*)tensor_data_ptr(output);
-                        if (output_data) {
-                            output_data[output_offset] = reduced_data[0];
-                        }
-                    }
-                    tensor_free(reduced);
-                }
-            }
-        }
-    }
-
-    return output;
+    Pool2DParams params = {
+        .kernel_size = {kernel_h, kernel_w},
+        .stride = {stride_h, stride_w},
+        .padding = {padding_h, padding_w},
+        .dilation = {1, 1},
+        .ceil_mode = pool->ceil_mode,
+        .count_include_pad = pool->count_include_pad,
+    };
+    return uop_avgpool2d(input, &params);
 }
 
 static void avgpool2d_free(Module* module) { free(module); }

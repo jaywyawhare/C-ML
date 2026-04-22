@@ -2,6 +2,7 @@
 #include "ops/ir/context.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/execution.h"
+#include "ops/ir/graph_cache.h"
 #include "core/logging.h"
 #include "autograd/autograd.h"
 #include <stdio.h>
@@ -152,6 +153,9 @@ void cml_ir_clear_global_if_current(CMLGraph_t ir) {
 }
 
 void cml_ir_reset_global_context(void) {
+    /* Tear down execution cache before IR tensors: plans hold Tensor* for buffer detach. */
+    cml_graph_cache_reset_global();
+    cml_cpu_execute_cache_reset();
     if (g_global_ir_context) {
         if (atomic_load(&g_auto_capture_ir) == g_global_ir_context) {
             cml_ir_disable_auto_capture();

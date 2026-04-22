@@ -1,6 +1,7 @@
 #include "nn/layers/conv1d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
@@ -23,8 +24,10 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
+    Tensor* weight = weight_param->tensor;
+
     int in_channels        = input->shape[1];
-    int weight_in_channels = weight_param->tensor->shape[1];
+    int weight_in_channels = weight->shape[1];
     if (in_channels != weight_in_channels) {
         LOG_ERROR("Conv1d: input channels (%d) doesn't match weight in_channels (%d)", in_channels,
                   weight_in_channels);
@@ -34,8 +37,7 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
         LOG_ERROR("Conv1d: input dimensions don't match layer configuration");
         return NULL;
     }
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(weight_param->tensor);
+
     int batch   = input->shape[0];
     int in_ch   = input->shape[1];
     int length  = input->shape[2];
@@ -44,65 +46,46 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
     int s       = conv->stride;
     int p       = conv->padding;
     int d       = conv->dilation;
+
+    if (weight->shape[0] != out_ch || weight->shape[2] != ks) {
+        LOG_ERROR("Conv1d: weight shape mismatch");
+        return NULL;
+    }
+
+    /* Map 1D conv to 2D: [B,C,L] -> [B,C,1,L], weight [OC,IC,K] -> [OC,IC,1,K]. */
+    int in4_shape[]  = {batch, in_ch, 1, length};
+    int w4_shape[]   = {out_ch, in_ch, 1, ks};
+    ReshapeParams rp_in = {.new_shape = in4_shape, .new_ndim = 4};
+    ReshapeParams rp_w  = {.new_shape = w4_shape, .new_ndim = 4};
+
+    Tensor* in4 = uop_reshape(input, &rp_in);
+    if (!in4)
+        return NULL;
+    Tensor* w4 = uop_reshape(weight, &rp_w);
+    if (!w4)
+        return NULL;
+
+    int stride_arr[]   = {1, s};
+    int padding_arr[]  = {0, p};
+    int dilation_arr[] = {1, d};
+    Conv2DParams conv_params;
+    conv_params.stride   = stride_arr;
+    conv_params.padding  = padding_arr;
+    conv_params.dilation = dilation_arr;
+    conv_params.groups   = 1;
+
+    Tensor* bias = NULL;
+    if (conv->use_bias && bias_param && bias_param->tensor)
+        bias = bias_param->tensor;
+
+    Tensor* out4 = uop_conv2d(in4, w4, bias, &conv_params);
+    if (!out4)
+        return NULL;
+
     int out_len = (length + 2 * p - d * (ks - 1) - 1) / s + 1;
-
-    if (out_len <= 0) {
-        LOG_ERROR("Conv1d: invalid output length %d (input=%d, kernel=%d, stride=%d, padding=%d, dilation=%d)",
-                  out_len, length, ks, s, p, d);
-        return NULL;
-    }
-    int out_shape[] = {batch, out_ch, out_len};
-    TensorConfig config =
-        (TensorConfig){.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_zeros(out_shape, 3, &config);
-    if (!output) {
-        LOG_ERROR("Conv1d: failed to allocate output tensor");
-        return NULL;
-    }
-    tensor_ensure_executed(output);
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* w_data   = (float*)tensor_data_ptr(weight_param->tensor);
-    float* out_data = (float*)tensor_data_ptr(output);
-
-    if (!in_data || !w_data || !out_data) {
-        LOG_ERROR("Conv1d: failed to get data pointers");
-        return NULL;
-    }
-    for (int b = 0; b < batch; b++) {
-        for (int oc = 0; oc < out_ch; oc++) {
-            for (int ol = 0; ol < out_len; ol++) {
-                float sum = 0.0f;
-                for (int ic = 0; ic < in_ch; ic++) {
-                    for (int k = 0; k < ks; k++) {
-                        int il = ol * s - p + k * d;
-                        if (il >= 0 && il < length) {
-                            int in_idx = b * in_ch * length + ic * length + il;
-                            int w_idx  = oc * in_ch * ks + ic * ks + k;
-                            sum += in_data[in_idx] * w_data[w_idx];
-                        }
-                    }
-                }
-                int out_idx       = b * out_ch * out_len + oc * out_len + ol;
-                out_data[out_idx] = sum;
-            }
-        }
-    }
-    if (conv->use_bias && bias_param && bias_param->tensor) {
-        tensor_ensure_executed(bias_param->tensor);
-        float* bias_data = (float*)tensor_data_ptr(bias_param->tensor);
-        if (bias_data) {
-            for (int b = 0; b < batch; b++) {
-                for (int oc = 0; oc < out_ch; oc++) {
-                    for (int ol = 0; ol < out_len; ol++) {
-                        out_data[b * out_ch * out_len + oc * out_len + ol] += bias_data[oc];
-                    }
-                }
-            }
-        }
-    }
-
-    return output;
+    int out3_shape[] = {batch, out_ch, out_len};
+    ReshapeParams rp_out = {.new_shape = out3_shape, .new_ndim = 3};
+    return uop_reshape(out4, &rp_out);
 }
 
 static void conv1d_free(Module* module) {
@@ -114,7 +97,7 @@ static void conv1d_free(Module* module) {
 }
 
 static void kaiming_init_1d(Tensor* tensor, int in_channels, int kernel_size) {
-    if (!tensor || !tensor->data)
+    if (!tensor)
         return;
 
     float* data = (float*)tensor_data_ptr(tensor);

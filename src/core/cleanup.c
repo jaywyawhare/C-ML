@@ -3,6 +3,7 @@
 #include "nn.h"
 #include "optim.h"
 #include "tensor/tensor.h"
+#include "tensor/realize.h"
 #include "core/dataset.h"
 #include "core/logging.h"
 #include <stdlib.h>
@@ -85,6 +86,14 @@ int cleanup_register_tensor(CleanupContext* ctx, Tensor* tensor) {
 
     if (ensure_tensor_capacity(ctx, 1) != 0) {
         return -1;
+    }
+
+    /* Lazy tensors must be realized and detached from the IR graph before
+     * they're handed off to the cleanup context for lifecycle management.
+     * Otherwise cml_ir_free and cleanup_clear_all would both call tensor_free
+     * on the same tensor. */
+    if (tensor->ir_node) {
+        tensor_realize(tensor);
     }
 
     ctx->tensors[ctx->num_tensors++] = tensor;

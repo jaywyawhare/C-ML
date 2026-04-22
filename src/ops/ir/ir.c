@@ -246,6 +246,18 @@ const char* uop_type_to_string(UOpType type) {
         return "LOGSIGMOID";
     case UOP_UNFOLD:
         return "UNFOLD";
+    case UOP_CONST:
+        return "CONST";
+    case UOP_RAND_UNIFORM:
+        return "RAND_UNIFORM";
+    case UOP_RAND_NORMAL:
+        return "RAND_NORMAL";
+    case UOP_ARANGE_OP:
+        return "ARANGE_OP";
+    case UOP_EYE_OP:
+        return "EYE_OP";
+    case UOP_RAND_INT:
+        return "RAND_INT";
     case UOP_COUNT:
         return "COUNT";
     default:
@@ -544,6 +556,27 @@ void cml_ir_free_node_params(struct IRNode* node) {
         if (p) free(p);
         break;
     }
+    case UOP_MAXPOOL2D:
+    case UOP_AVGPOOL2D: {
+        Pool2DParams* p = (Pool2DParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_CONV3D: {
+        Conv3DParams* p = (Conv3DParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_CONV_TRANSPOSE2D: {
+        ConvTranspose2DParams* p = (ConvTranspose2DParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_CONV_TRANSPOSE3D: {
+        ConvTranspose3DParams* p = (ConvTranspose3DParams*)node->params;
+        if (p) free(p);
+        break;
+    }
     case UOP_LOGCUMSUMEXP: {
         CumsumParams* p = (CumsumParams*)node->params;
         if (p) free(p);
@@ -597,6 +630,46 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_TANH:
     case UOP_SIGMOID:
         break;
+    case UOP_CONST: {
+        ConstParams* p = (ConstParams*)node->params;
+        if (p) {
+            if (p->data)  free(p->data);
+            if (p->shape) free(p->shape);
+            free(p);
+        }
+        break;
+    }
+    case UOP_RAND_UNIFORM:
+    case UOP_RAND_NORMAL: {
+        RandParams* p = (RandParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_ARANGE_OP: {
+        ArangeParams* p = (ArangeParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_EYE_OP: {
+        EyeParams* p = (EyeParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_RAND_INT: {
+        RandIntParams* p = (RandIntParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_SGD_STEP: {
+        SgdStepParams* p = (SgdStepParams*)node->params;
+        if (p) free(p);
+        break;
+    }
+    case UOP_ADAM_STEP: {
+        AdamStepParams* p = (AdamStepParams*)node->params;
+        if (p) free(p);
+        break;
+    }
     default:
         break;
     }
@@ -691,22 +764,28 @@ void cml_ir_free(CMLGraph_t ir) {
 
     cml_ir_clear_global_if_current(ir);
 
+    /* Phase 1: Free forward output tensors.
+     * Do not auto-execute pending nodes during teardown: lazy tensors can be
+     * freed safely without materializing their outputs. */
     struct IRNode* node = ir->head;
     int node_idx        = 0;
     while (node) {
         if (node->num_inputs < 0 || node->num_inputs > 1000) {
             fprintf(stderr, "WARNING: cml_ir_free phase 1: corrupt node %d, num_inputs=%d\n",
                     node_idx, node->num_inputs);
-            break; 
+            break;
         }
         if (node->output) {
-            tensor_free(node->output);
+            Tensor* out   = node->output;
+            out->ref_count = 1;
+            tensor_free(out);
             node->output = NULL;
         }
         node = node->next;
         node_idx++;
     }
 
+    /* Phase 1b: Free backward output tensors */
     node     = ir->backward_head;
     node_idx = 0;
     while (node) {
@@ -715,7 +794,9 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            tensor_free(node->output);
+            Tensor* out   = node->output;
+            out->ref_count = 1;
+            tensor_free(out);
             node->output = NULL;
         }
         node = node->next;
@@ -725,9 +806,13 @@ void cml_ir_free(CMLGraph_t ir) {
     if (ir->tensor_refs) {
         for (int i = 0; i < ir->tensor_refs_count; i++) {
             if (ir->tensor_refs[i]) {
-                ir->tensor_refs[i]->ir_node    = NULL;
-                ir->tensor_refs[i]->ir_context = NULL;
-                tensor_free(ir->tensor_refs[i]);
+                Tensor* tr = ir->tensor_refs[i];
+                /* Only detach from THIS graph's context. Do NOT clear ir_node
+                 * before tensor_free — tensor_free needs ir_node to clear the
+                 * original node's output pointer when ref_count reaches 0. */
+                if (tr->ir_context == ir)
+                    tr->ir_context = NULL;
+                tensor_free(tr);
                 ir->tensor_refs[i] = NULL;
             }
         }
@@ -792,6 +877,15 @@ void cml_ir_free(CMLGraph_t ir) {
     }
 
     free(ir);
+}
+
+/** Undo refcount bumps on inputs wired as lazy tensors in this IR graph. */
+static void cml_ir_release_same_graph_input_refs(CMLGraph_t ir, Tensor** inputs, int n) {
+    for (int j = 0; j < n; j++) {
+        Tensor* u = inputs[j];
+        if (u && u->ir_node && u->ir_context == ir && u->ir_node->output_name)
+            u->ref_count--;
+    }
 }
 
 int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params) {
@@ -882,8 +976,16 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         if (t) {
             if (t->ir_node && t->ir_context == ir && t->ir_node->output_name) {
                 name = strdup(t->ir_node->output_name);
-            }
-            else {
+                if (!name) {
+                    cml_ir_release_same_graph_input_refs(ir, inputs, i);
+                    for (int j = 0; j < i; j++)
+                        free(node->input_names[j]);
+                    free(node->input_names);
+                    free(node);
+                    return -1;
+                }
+                t->ref_count++;
+            } else {
                 for (int j = 0; j < ir->tensor_count; j++) {
                     if (ir->tensor_refs[j] == t) {
                         name = strdup(ir->tensor_names[j]);
@@ -892,18 +994,33 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
                 }
 
                 if (!name) {
+                    char* new_name = malloc(32);
+                    if (!new_name) {
+                        cml_ir_release_same_graph_input_refs(ir, inputs, i);
+                        for (int j = 0; j < i; j++)
+                            free(node->input_names[j]);
+                        free(node->input_names);
+                        free(node);
+                        return -1;
+                    }
+                    snprintf(new_name, 32, "t%d", ir->tensor_count + ir->node_count);
                     ir->tensor_refs[ir->tensor_count] = t;
                     t->ref_count++;
-
-                    char* new_name = malloc(32);
-                    if (new_name) {
-                        snprintf(new_name, 32, "t%d", ir->tensor_count + ir->node_count);
-                        ir->tensor_names[ir->tensor_count] = new_name;
-                        name                               = strdup(new_name);
-
-                        ir->tensor_count++;
-                        ir->tensor_refs_count = ir->tensor_count;
+                    ir->tensor_names[ir->tensor_count] = new_name;
+                    name                               = strdup(new_name);
+                    if (!name) {
+                        free(new_name);
+                        ir->tensor_refs[ir->tensor_count] = NULL;
+                        t->ref_count--;
+                        cml_ir_release_same_graph_input_refs(ir, inputs, i);
+                        for (int j = 0; j < i; j++)
+                            free(node->input_names[j]);
+                        free(node->input_names);
+                        free(node);
+                        return -1;
                     }
+                    ir->tensor_count++;
+                    ir->tensor_refs_count = ir->tensor_count;
                 }
             }
         } else {
@@ -911,6 +1028,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         }
 
         if (!name) {
+            cml_ir_release_same_graph_input_refs(ir, inputs, i);
             for (int j = 0; j < i; j++)
                 free(node->input_names[j]);
             free(node->input_names);
@@ -922,6 +1040,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
 
     char* output_name = malloc(32);
     if (!output_name) {
+        cml_ir_release_same_graph_input_refs(ir, inputs, num_inputs);
         for (int i = 0; i < num_inputs; i++)
             free(node->input_names[i]);
         free(node->input_names);
@@ -937,6 +1056,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     if (num_inputs > 0) {
         node->inputs = malloc((size_t)num_inputs * sizeof(Tensor*));
         if (!node->inputs) {
+            cml_ir_release_same_graph_input_refs(ir, inputs, num_inputs);
             for (int i = 0; i < num_inputs; i++) {
                 free(node->input_names[i]);
             }

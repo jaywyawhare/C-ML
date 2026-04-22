@@ -6,9 +6,13 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include "tensor/tensor.h"
+#include "tensor/realize.h"
 #include "core/serialization.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/cpu_lazy_materialize.h"
+#include "ops/ir/graph_cache.h"
+#include "ops/uops.h"
 #include "backend/backend_buffer.h"
 #include "core/logging.h"
 #include "backend/device.h"
@@ -230,7 +234,13 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->grad           = NULL;
     t->ref_count      = 1;
     t->base           = NULL;
-    t->strides        = NULL;
+    t->strides        = compute_contiguous_strides(t->shape, ndim);
+    if (!t->strides && ndim > 0) {
+        free(t->data);
+        free(t->shape);
+        free(t);
+        return NULL;
+    }
     t->storage_offset = 0;
     t->is_contiguous  = true;
     t->buffer_handle     = NULL;
@@ -251,17 +261,9 @@ Tensor* tensor_zeros(int* shape, int ndim, const TensorConfig* config) {
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t)
+    if (!shape || ndim <= 0)
         return NULL;
-
-    size_t total_size = 1;
-    for (int i = 0; i < ndim; i++) {
-        total_size *= shape[i];
-    }
-
-    memset(t->data, 0, total_size * cml_dtype_size(dtype));
-    return t;
+    return uop_fill_ex(shape, ndim, 0.0f, dtype, device);
 }
 
 Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
@@ -269,100 +271,9 @@ Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t)
+    if (!shape || ndim <= 0)
         return NULL;
-
-    size_t total_size = 1;
-    for (int i = 0; i < ndim; i++) {
-        total_size *= shape[i];
-    }
-
-    switch (dtype) {
-    case DTYPE_BOOL:
-        memset(t->data, 1, total_size * sizeof(uint8_t));
-        break;
-    case DTYPE_INT32:
-        for (size_t i = 0; i < total_size; i++) {
-            ((int32_t*)t->data)[i] = 1;
-        }
-        break;
-    case DTYPE_INT64:
-        for (size_t i = 0; i < total_size; i++) {
-            ((int64_t*)t->data)[i] = 1;
-        }
-        break;
-    case DTYPE_FLOAT32:
-        for (size_t i = 0; i < total_size; i++) {
-            ((float*)t->data)[i] = 1.0f;
-        }
-        break;
-    case DTYPE_FLOAT64:
-        for (size_t i = 0; i < total_size; i++) {
-            ((double*)t->data)[i] = 1.0;
-        }
-        break;
-    case DTYPE_FLOAT16: {
-        uint16_t one_fp16 = float_to_fp16(1.0f);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint16_t*)t->data)[i] = one_fp16;
-        break;
-    }
-    case DTYPE_BFLOAT16: {
-        uint16_t one_bf16 = float_to_bf16(1.0f);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint16_t*)t->data)[i] = one_bf16;
-        break;
-    }
-    case DTYPE_INT8:
-        memset(t->data, 1, total_size);
-        break;
-    case DTYPE_UINT8:
-        memset(t->data, 1, total_size);
-        break;
-    case DTYPE_INT16:
-        for (size_t i = 0; i < total_size; i++)
-            ((int16_t*)t->data)[i] = 1;
-        break;
-    case DTYPE_UINT16:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint16_t*)t->data)[i] = 1;
-        break;
-    case DTYPE_UINT32:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint32_t*)t->data)[i] = 1;
-        break;
-    case DTYPE_UINT64:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint64_t*)t->data)[i] = 1;
-        break;
-    case DTYPE_FLOAT8_E4M3: {
-        uint8_t one_e4m3 = float_to_fp8_e4m3(1.0f);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = one_e4m3;
-        break;
-    }
-    case DTYPE_FLOAT8_E5M2: {
-        uint8_t one_e5m2 = float_to_fp8_e5m2(1.0f);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = one_e5m2;
-        break;
-    }
-    case DTYPE_FLOAT8_E4M3_FNUZ: {
-        uint8_t one_fnuz = float_to_fp8e4m3fnuz(1.0f);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = one_fnuz;
-        break;
-    }
-    case DTYPE_FLOAT8_E5M2_FNUZ: {
-        uint8_t one_fnuz = float_to_fp8e5m2fnuz(1.0f);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = one_fnuz;
-        break;
-    }
-    }
-
-    return t;
+    return uop_fill_ex(shape, ndim, 1.0f, dtype, device);
 }
 
 Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float value) {
@@ -370,104 +281,9 @@ Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float valu
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t)
+    if (!shape || ndim <= 0)
         return NULL;
-
-    size_t total_size = 1;
-    for (int i = 0; i < ndim; i++) {
-        total_size *= shape[i];
-    }
-
-    switch (dtype) {
-    case DTYPE_FLOAT32:
-        for (size_t i = 0; i < total_size; i++) {
-            ((float*)t->data)[i] = (float)value;
-        }
-        break;
-    case DTYPE_FLOAT64:
-        for (size_t i = 0; i < total_size; i++) {
-            ((double*)t->data)[i] = (double)value;
-        }
-        break;
-    case DTYPE_INT32:
-        for (size_t i = 0; i < total_size; i++) {
-            ((int32_t*)t->data)[i] = (int32_t)value;
-        }
-        break;
-    case DTYPE_INT64:
-        for (size_t i = 0; i < total_size; i++) {
-            ((int64_t*)t->data)[i] = (int64_t)value;
-        }
-        break;
-    case DTYPE_BOOL:
-        for (size_t i = 0; i < total_size; i++) {
-            ((uint8_t*)t->data)[i] = (uint8_t)(fabsf(value) > 1e-9f);
-        }
-        break;
-    case DTYPE_FLOAT16: {
-        uint16_t v16 = float_to_fp16(value);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint16_t*)t->data)[i] = v16;
-        break;
-    }
-    case DTYPE_BFLOAT16: {
-        uint16_t vbf = float_to_bf16(value);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint16_t*)t->data)[i] = vbf;
-        break;
-    }
-    case DTYPE_INT8:
-        for (size_t i = 0; i < total_size; i++)
-            ((int8_t*)t->data)[i] = (int8_t)value;
-        break;
-    case DTYPE_UINT8:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = (uint8_t)value;
-        break;
-    case DTYPE_INT16:
-        for (size_t i = 0; i < total_size; i++)
-            ((int16_t*)t->data)[i] = (int16_t)value;
-        break;
-    case DTYPE_UINT16:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint16_t*)t->data)[i] = (uint16_t)value;
-        break;
-    case DTYPE_UINT32:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint32_t*)t->data)[i] = (uint32_t)value;
-        break;
-    case DTYPE_UINT64:
-        for (size_t i = 0; i < total_size; i++)
-            ((uint64_t*)t->data)[i] = (uint64_t)value;
-        break;
-    case DTYPE_FLOAT8_E4M3: {
-        uint8_t v8 = float_to_fp8_e4m3(value);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = v8;
-        break;
-    }
-    case DTYPE_FLOAT8_E5M2: {
-        uint8_t v8 = float_to_fp8_e5m2(value);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = v8;
-        break;
-    }
-    case DTYPE_FLOAT8_E4M3_FNUZ: {
-        uint8_t v8 = float_to_fp8e4m3fnuz(value);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = v8;
-        break;
-    }
-    case DTYPE_FLOAT8_E5M2_FNUZ: {
-        uint8_t v8 = float_to_fp8e5m2fnuz(value);
-        for (size_t i = 0; i < total_size; i++)
-            ((uint8_t*)t->data)[i] = v8;
-        break;
-    }
-    }
-
-    return t;
+    return uop_fill_ex(shape, ndim, value, dtype, device);
 }
 
 void* tensor_data_ptr(Tensor* t) {
@@ -484,6 +300,14 @@ void* tensor_data_ptr(Tensor* t) {
         int ret = cml_ir_execute_up_to(t->ir_context, t->ir_node);
         if (ret == 0) {
             t->is_executed = true;
+            // After execution, update tensor metadata from IR node's output shape
+            // (e.g., reshape operations may have changed dimensions)
+            if (t->ir_node && t->ir_node->output_shape && t->ir_node->output_ndim > 0) {
+                if (t->shape) free(t->shape);
+                t->shape = tensor_shape_copy(t->ir_node->output_shape, t->ir_node->output_ndim);
+                t->ndim  = t->ir_node->output_ndim;
+                t->numel = tensor_numel(t->ir_node->output_shape, t->ir_node->output_ndim);
+            }
             // JIT execution uses destination-passing style, so data is written
             // directly to t->data by the JIT function. If data is still NULL,
             // allocate it (shouldn't happen, but be safe).
@@ -509,7 +333,6 @@ void* tensor_data_ptr(Tensor* t) {
 
     return t->data;
 }
-            // Stop traversing corrupt list
 
 size_t cml_dtype_size(DType dtype) {
     switch (dtype) {
@@ -831,12 +654,14 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         }
     }
 
-    if (node->inputs && node->inputs[0]) {
+    if (node->num_inputs > 0 && node->inputs && node->inputs[0]) {
         t->dtype  = node->inputs[0]->dtype;
         t->device = node->inputs[0]->device;
     } else {
-        t->dtype  = DTYPE_FLOAT32;
-        t->device = DEVICE_CPU;
+        /* Zero-input creation ops store their desired dtype/device on the node.
+         * Both fields default to 0 which equals DTYPE_FLOAT32 / DEVICE_CPU. */
+        t->dtype  = node->output_dtype;
+        t->device = node->output_device;
     }
 
     // Execution state (lazy)
@@ -901,107 +726,10 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    Tensor* t = (Tensor*)malloc(sizeof(Tensor));
-    if (!t) {
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
-                         "Failed to allocate memory for Tensor structure", __FILE__, __LINE__,
-                         __func__);
-        return NULL;
-    }
-
-    t->shape = tensor_shape_copy(shape, ndim);
-    if (!t->shape) {
-        LOG_ERROR("Failed to allocate memory for tensor shape copy in tensor_empty");
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for tensor shape",
-                         __FILE__, __LINE__, __func__);
-        free(t);
-        return NULL;
-    }
-
-    t->strides = compute_contiguous_strides(shape, ndim);
-    if (!t->strides) {
-        LOG_ERROR("Failed to allocate memory for tensor strides in tensor_empty");
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for tensor strides",
-                         __FILE__, __LINE__, __func__);
-        free(t->shape);
-        free(t);
-        return NULL;
-    }
-
-    t->ndim           = ndim;
-    t->numel          = tensor_numel(shape, ndim);
-    t->dtype          = dtype;
-    t->device         = device;
-    t->storage_offset = 0;
-
-    // IR fields (leaf tensors are not IR nodes)
-    t->ir_node     = NULL;
-    t->ir_context  = NULL;
-    t->is_executed = true; // Leaf tensors have data immediately
-    t->data        = NULL;
-    t->owns_data   = true;
-
-    t->is_contiguous = true;
-    t->buffer_handle = NULL;
-
-    CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(device);
-    if (buft) {
-        size_t alloc_size = cml_backend_buffer_type_get_alloc_size(buft, t);
-        if (alloc_size == 0) {
-            alloc_size = t->numel * cml_dtype_size(dtype);
-        }
-
-        CMLBackendBuffer_t buffer = cml_backend_buffer_type_alloc_buffer(buft, alloc_size);
-        fflush(stderr);
-        if (!buffer) {
-            LOG_ERROR("Failed to allocate backend buffer of size %zu for device %s", alloc_size,
-                      device_get_name(device));
-            char error_msg[256];
-            snprintf(error_msg, sizeof(error_msg),
-                     "Failed to allocate %zu bytes for tensor data on device %s", alloc_size,
-                     device_get_name(device));
-            error_stack_push(CM_MEMORY_ALLOCATION_ERROR, error_msg, __FILE__, __LINE__, __func__);
-            free(t->strides);
-            free(t->shape);
-            free(t);
-            return NULL;
-        }
-
-        if (cml_backend_buffer_init_tensor(buffer, t) != 0) {
-            LOG_ERROR("Backend buffer initialization failed for device %s",
-                      device_get_name(device));
-            cml_backend_buffer_free(buffer);
-            free(t->strides);
-            free(t->shape);
-            free(t);
-            return NULL;
-        }
-
-        t->buffer_handle = buffer;
-    } else {
-        size_t data_size = t->numel * cml_dtype_size(dtype);
-        t->data          = malloc(data_size);
-        if (!t->data) {
-            LOG_ERROR("Failed to allocate fallback memory for tensor data");
-            char error_msg[256];
-            snprintf(error_msg, sizeof(error_msg),
-                     "Failed to allocate %zu bytes for tensor data (fallback)", data_size);
-            error_stack_push(CM_MEMORY_ALLOCATION_ERROR, error_msg, __FILE__, __LINE__, __func__);
-            free(t->strides);
-            free(t->shape);
-            free(t);
-            return NULL;
-        }
-    }
-
-    t->grad              = NULL;
-    t->requires_grad     = false;
-    t->ref_count         = 1;
-    t->base              = NULL;
-    t->user_data         = NULL;
-    t->from_buffer_cache = false;
-
-    return t;
+    /* tensor_empty is intentionally EAGER: it allocates immediately via
+     * tensor_create so callers can write directly to ->data without
+     * triggering lazy execution or IR graph interactions. */
+    return tensor_create(dtype, device, ndim, shape, false);
 }
 
 Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorConfig* config) {
@@ -1010,27 +738,24 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
                          __FILE__, __LINE__, __func__);
         return NULL;
     }
-
-    Tensor* t = tensor_empty(shape, ndim, config);
-    if (!t)
+    if (!shape || ndim < 0) {
+        error_stack_push(CM_INVALID_ARGUMENT, "Invalid argument to tensor_from_data: bad shape/ndim",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    // Use device-specific copy (assumes source data is on CPU)
-    size_t data_size = t->numel * cml_dtype_size(dtype);
-    int result       = device_copy_to_device(t->data, data, data_size, device);
-    if (result != 0) {
-        LOG_ERROR("Failed to copy data to device %s", device_get_name(device));
-        char error_msg[256];
-        snprintf(error_msg, sizeof(error_msg), "Failed to copy data to device %s",
-                 device_get_name(device));
-        error_stack_push(CM_OPERATION_FAILED, error_msg, __FILE__, __LINE__, __func__);
-        tensor_free(t);
-        return NULL;
-    }
+    /* Create an eager tensor with a copy of the user's data.  Unlike other
+     * creation ops, tensor_from_data receives data that is already available,
+     * so there is no benefit to deferring.  Making it eager also means the
+     * tensor survives IR graph resets without needing tensor_realize(). */
+    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
+    if (!t) return NULL;
+    size_t nbytes = t->numel * cml_dtype_size(dtype);
+    memcpy(t->data, data, nbytes);
     return t;
 }
 
@@ -1041,6 +766,8 @@ void tensor_free(Tensor* t) {
     t->ref_count--;
     if (t->ref_count > 0)
         return;
+
+    cml_graph_cache_forget_tensor(t);
 
     // CRITICAL: Clear IR node's output pointer BEFORE freeing the tensor
     // This prevents dangling pointers when cml_ir_free is called later
@@ -1096,8 +823,7 @@ Tensor* tensor_clone(Tensor* t) {
     if (!t->data)
         return NULL;
 
-    TensorConfig config = (TensorConfig){t->dtype, t->device, true, true};
-    Tensor* clone       = tensor_empty(t->shape, t->ndim, &config);
+    Tensor* clone = tensor_create(t->dtype, t->device, t->ndim, t->shape, false);
     if (!clone)
         return NULL;
 
@@ -1116,29 +842,14 @@ Tensor* tensor_clone(Tensor* t) {
 }
 
 Tensor* tensor_from_flat(const float* data, int rows, int cols) {
-    if (!data || rows <= 0 || cols <= 0) {
+    if (!data || rows <= 0 || cols <= 0)
         return NULL;
-    }
 
     int shape[2] = {rows, cols};
-
-    DType dtype         = cml_get_default_dtype();
-    DeviceType device   = cml_get_default_device();
-    TensorConfig config = (TensorConfig){dtype, device, true, true};
-
-    Tensor* tensor = tensor_empty(shape, 2, &config);
-    if (!tensor) {
-        return NULL;
-    }
-
-    float* tensor_data = (float*)tensor_data_ptr(tensor);
-    if (!tensor_data) {
-        tensor_free(tensor);
-        return NULL;
-    }
-
-    memcpy(tensor_data, data, (size_t)(rows * cols) * sizeof(float));
-    return tensor;
+    DType dtype       = cml_get_default_dtype();
+    DeviceType device = cml_get_default_device();
+    return uop_const(data, (size_t)(rows * cols) * sizeof(float),
+                     shape, 2, dtype, device);
 }
 
 Tensor* tensor_from_array_2d(const float* data, int rows, int cols) {
@@ -1202,21 +913,10 @@ int tensor_to_device(Tensor* tensor, DeviceType device) {
 
 Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config) {
     if (step == 0.0f) return NULL;
-    int count = (int)ceilf((end - start) / step);
-    if (count <= 0) count = 0;
-
-    int shape[] = {count};
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
-
-    Tensor* t = tensor_create(dtype, device, 1, shape, false);
-    if (!t) return NULL;
-    float* data = (float*)t->data;
-    for (int i = 0; i < count; i++) {
-        data[i] = start + (float)i * step;
-    }
-    return t;
+    return uop_arange_op(start, end, step, dtype, device);
 }
 
 Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* config) {
@@ -1226,83 +926,53 @@ Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* c
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    Tensor* t = tensor_create(dtype, device, 1, shape, false);
-    if (!t) return NULL;
-    float* data = (float*)t->data;
+    size_t esz = cml_dtype_size(dtype);
+    void* buf  = malloc((size_t)steps * esz);
+    if (!buf)
+        return NULL;
     if (steps == 1) {
-        data[0] = start;
+        cml_cpu_lazy_store_float_elem(buf, 0, dtype, start);
     } else {
         float step = (end - start) / (float)(steps - 1);
-        for (int i = 0; i < steps; i++) {
-            data[i] = start + (float)i * step;
-        }
+        for (int i = 0; i < steps; i++)
+            cml_cpu_lazy_store_float_elem(buf, (size_t)i, dtype, start + (float)i * step);
     }
-    return t;
+    Tensor* out = uop_const(buf, (size_t)steps * esz, shape, 1, dtype, device);
+    free(buf);
+    return out;
 }
 
 Tensor* tensor_eye(int n, const TensorConfig* config) {
     if (n <= 0) return NULL;
-    int shape[] = {n, n};
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
-
-    Tensor* t = tensor_create(dtype, device, 2, shape, false);
-    if (!t) return NULL;
-    float* data = (float*)t->data;
-    memset(data, 0, (size_t)(n * n) * sizeof(float));
-    for (int i = 0; i < n; i++) {
-        data[i * n + i] = 1.0f;
-    }
-    return t;
+    return uop_eye_op(n, dtype, device);
 }
 
 void tensor_manual_seed(uint64_t seed) {
     cml_rng_set_global_seed(seed);
 }
 
-static float _rand_uniform(void) {
-    float val;
-    cml_rng_uniform(cml_rng_get_global(), &val, 1);
-    return val;
-}
-
 Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
-
-    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t) return NULL;
-    cml_rng_uniform(cml_rng_get_global(), (float*)t->data, t->numel);
-    return t;
+    return uop_rand_uniform(shape, ndim, dtype, device);
 }
 
 Tensor* tensor_randn(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
-
-    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t) return NULL;
-    cml_rng_normal(cml_rng_get_global(), (float*)t->data, t->numel);
-    return t;
+    return uop_rand_normal(shape, ndim, dtype, device);
 }
 
 Tensor* tensor_randint(int low, int high, int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
-
-    Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t) return NULL;
-    float* data = (float*)t->data;
-    int range = high - low;
-    if (range <= 0) range = 1;
-    for (size_t i = 0; i < t->numel; i++) {
-        data[i] = (float)(low + (int)(_rand_uniform() * (float)range));
-    }
-    return t;
+    return uop_rand_int(low, high, shape, ndim, dtype, device);
 }
 
 Tensor* tensor_zeros_like(Tensor* a) {
@@ -1429,42 +1099,7 @@ Tensor* tensor_flip(Tensor* a, int dim) {
 
 Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
     if (!a || !repeats || num_repeats != a->ndim) return NULL;
-    tensor_ensure_executed(a);
-    float* data = (float*)tensor_data_ptr(a);
-    if (!data) return NULL;
-
-    int* new_shape = malloc((size_t)a->ndim * sizeof(int));
-    if (!new_shape) return NULL;
-    for (int i = 0; i < a->ndim; i++)
-        new_shape[i] = a->shape[i] * repeats[i];
-
-    TensorConfig config = {.dtype = a->dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
-    Tensor* result = tensor_empty(new_shape, a->ndim, &config);
-    if (!result) { free(new_shape); return NULL; }
-    tensor_ensure_executed(result);
-    float* out_data = (float*)tensor_data_ptr(result);
-
-    if (a->ndim == 1) {
-        int n = a->shape[0];
-        for (int r = 0; r < repeats[0]; r++)
-            memcpy(out_data + r * n, data, (size_t)n * sizeof(float));
-    } else if (a->ndim == 2) {
-        int rows = a->shape[0], cols = a->shape[1];
-        int out_cols = new_shape[1];
-        for (int rr = 0; rr < repeats[0]; rr++) {
-            for (int r = 0; r < rows; r++) {
-                for (int cr = 0; cr < repeats[1]; cr++) {
-                    memcpy(out_data + (rr * rows + r) * out_cols + cr * cols,
-                           data + r * cols, (size_t)cols * sizeof(float));
-                }
-            }
-        }
-    } else {
-        memcpy(out_data, data, a->numel * sizeof(float));
-    }
-
-    free(new_shape);
-    return result;
+    return uop_tile(a, repeats, num_repeats);
 }
 
 // tensor_split is defined in tensor_manipulation.c
@@ -1478,7 +1113,11 @@ Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count) {
 Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
     if (!t) return NULL;
-    float* data = (float*)t->data;
+    if (tensor_ensure_executed(t) != 0) {
+        tensor_free(t);
+        return NULL;
+    }
+    float* data = (float*)tensor_data_ptr(t);
     float bound = sqrtf(6.0f / (float)fan_in); // gain=sqrt(2) for ReLU, a=sqrt(5)
     for (size_t i = 0; i < t->numel; i++)
         data[i] = data[i] * 2.0f * bound - bound; // Scale [0,1) to [-bound, bound)
@@ -1488,7 +1127,11 @@ Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorCon
 Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_randn(shape, ndim, config);
     if (!t) return NULL;
-    float* data = (float*)t->data;
+    if (tensor_ensure_executed(t) != 0) {
+        tensor_free(t);
+        return NULL;
+    }
+    float* data = (float*)tensor_data_ptr(t);
     float std_val = sqrtf(2.0f / (float)fan_in);
     for (size_t i = 0; i < t->numel; i++)
         data[i] *= std_val;
@@ -1498,7 +1141,11 @@ Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConf
 Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
     if (!t) return NULL;
-    float* data = (float*)t->data;
+    if (tensor_ensure_executed(t) != 0) {
+        tensor_free(t);
+        return NULL;
+    }
+    float* data = (float*)tensor_data_ptr(t);
     float bound = sqrtf(6.0f / (float)(fan_in + fan_out));
     for (size_t i = 0; i < t->numel; i++)
         data[i] = data[i] * 2.0f * bound - bound;
@@ -1508,7 +1155,11 @@ Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, con
 Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config) {
     Tensor* t = tensor_randn(shape, ndim, config);
     if (!t) return NULL;
-    float* data = (float*)t->data;
+    if (tensor_ensure_executed(t) != 0) {
+        tensor_free(t);
+        return NULL;
+    }
+    float* data = (float*)tensor_data_ptr(t);
     float std_val = sqrtf(2.0f / (float)(fan_in + fan_out));
     for (size_t i = 0; i < t->numel; i++)
         data[i] *= std_val;
@@ -1521,11 +1172,8 @@ Tensor* tensor_cast(Tensor* a, DType dtype) {
     tensor_ensure_executed(a);
     if (!a->data) return NULL;
 
-    TensorConfig config = {.dtype = dtype, .device = a->device, .has_dtype = true, .has_device = true};
-    Tensor* out = tensor_empty(a->shape, a->ndim, &config);
+    Tensor* out = tensor_create(dtype, a->device, a->ndim, a->shape, false);
     if (!out) return NULL;
-    tensor_ensure_executed(out);
-    if (!out->data) { tensor_free(out); return NULL; }
 
     for (size_t i = 0; i < a->numel; i++) {
         float val = tensor_get_float(a, i);
@@ -1571,22 +1219,22 @@ Tensor* tensor_randperm(int n, const TensorConfig* config) {
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    TensorConfig int_config = {.dtype = DTYPE_FLOAT32, .device = device, .has_dtype = true, .has_device = true};
-    Tensor* t = tensor_empty(shape, 1, &int_config);
-    if (!t) return NULL;
-    tensor_ensure_executed(t);
-    if (!t->data) { tensor_free(t); return NULL; }
-
-    float* data = (float*)t->data;
-    // Fisher-Yates shuffle
-    for (int i = 0; i < n; i++) data[i] = (float)i;
+    size_t esz = cml_dtype_size(dtype);
+    void* buf  = malloc((size_t)n * esz);
+    if (!buf)
+        return NULL;
+    for (int i = 0; i < n; i++)
+        cml_cpu_lazy_store_float_elem(buf, (size_t)i, dtype, (float)i);
     for (int i = n - 1; i > 0; i--) {
         int j = rand() % (i + 1);
-        float tmp = data[i];
-        data[i] = data[j];
-        data[j] = tmp;
+        uint8_t tmp[16];
+        memcpy(tmp, (uint8_t*)buf + (size_t)i * esz, esz);
+        memcpy((uint8_t*)buf + (size_t)i * esz, (uint8_t*)buf + (size_t)j * esz, esz);
+        memcpy((uint8_t*)buf + (size_t)j * esz, tmp, esz);
     }
-    return t;
+    Tensor* out = uop_const(buf, (size_t)n * esz, shape, 1, dtype, device);
+    free(buf);
+    return out;
 }
 
 Tensor* tensor_half(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT16); }
@@ -2072,6 +1720,16 @@ int tensor_assign(Tensor* t, Tensor* src) {
 
     size_t nbytes = t->numel * cml_dtype_size(t->dtype);
 
+    /* Detach t from its lazy IR node before overwriting its data pointer.
+     * This prevents the old IR node from holding a dangling output pointer. */
+    if (t->ir_node) {
+        struct IRNode* old_node = (struct IRNode*)t->ir_node;
+        if (old_node->output == t)
+            old_node->output = NULL;
+        t->ir_node    = NULL;
+        t->ir_context = NULL;
+    }
+
     if (t->owns_data && t->data) {
         if (t->buffer_handle) {
             cml_backend_buffer_free(t->buffer_handle);
@@ -2094,9 +1752,6 @@ int tensor_assign(Tensor* t, Tensor* src) {
         memcpy(t->data, src->data, nbytes);
         t->owns_data = true;
     }
-
-    if (src->ir_node)
-        t->ir_node = src->ir_node;
 
     t->is_executed = true;
     return 0;

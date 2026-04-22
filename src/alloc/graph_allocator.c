@@ -755,13 +755,11 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
     }
 
     if (ctx->buffer && ctx->tensor_allocator.buffer) {
-        TensorConfig config = {
-            .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-        Tensor* tensor = tensor_empty(shape, ndim, &config);
+        Tensor* tensor = tensor_create(dtype, device, ndim, shape, false);
         if (!tensor)
             return NULL;
 
-        // Release the default buffer allocated by tensor_empty; we'll use the context buffer
+        // Release the default buffer allocated by tensor_create; we'll use the context buffer
         if (tensor->buffer_handle) {
             cml_backend_buffer_free(tensor->buffer_handle);
             tensor->buffer_handle = NULL;
@@ -790,9 +788,7 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
     CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(device);
     if (!buft) {
         // Fallback to standard allocation
-        TensorConfig config = {
-            .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-        return tensor_empty(shape, ndim, &config);
+        return tensor_create(dtype, device, ndim, shape, false);
     }
 
     CMLBackendBuffer_t buffer = cml_backend_buffer_type_alloc_buffer(buft, size);
@@ -801,8 +797,7 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         return NULL;
     }
 
-    TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-    Tensor* tensor      = tensor_empty(shape, ndim, &config);
+    Tensor* tensor = tensor_create(dtype, device, ndim, shape, false);
     if (!tensor) {
         cml_backend_buffer_free(buffer);
         return NULL;

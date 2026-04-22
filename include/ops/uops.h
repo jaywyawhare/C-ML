@@ -201,6 +201,26 @@ typedef enum {
 
     // Fused Ops
     UOP_LINEAR,          // fused linear: output = input @ weight^T + bias
+    UOP_MAXPOOL2D,       // 2D max pooling
+    UOP_AVGPOOL2D,       // 2D average pooling
+    UOP_CONV3D,          // 3D convolution
+    UOP_CONV_TRANSPOSE2D,// 2D transposed convolution
+    UOP_CONV_TRANSPOSE3D,// 3D transposed convolution
+
+    // Lazy creation ops (zero-input; all computation deferred to realization)
+    UOP_CONST,           // constant tensor from a data array (ConstParams)
+    UOP_RAND_UNIFORM,    // random uniform [0, 1)  (RandParams)
+    UOP_RAND_NORMAL,     // random normal  N(0,1)  (RandParams)
+    UOP_ARANGE_OP,       // range tensor start:step:end  (ArangeParams)
+    UOP_EYE_OP,          // n×n identity matrix  (EyeParams)
+    UOP_RAND_INT,        // random integers [low, high)  (RandIntParams)
+
+    // Lazy allocation op (zero-input; allocates uninitialized buffer at execution)
+    UOP_ALLOC,           // allocate buffer, shape/dtype from params (AllocParams)
+
+    // In-graph optimizer steps (inputs: param, grad[, moment states...])
+    UOP_SGD_STEP,        // SGD / SGD-momentum in-place update  (SgdStepParams)
+    UOP_ADAM_STEP,       // Adam in-place update                (AdamStepParams)
 
     UOP_COUNT // Total count
 } UOpType;
@@ -289,15 +309,52 @@ typedef struct {
 } Conv2DParams;
 
 typedef struct {
+    int kernel_size[2];
+    int stride[2];
+    int padding[2];
+    int dilation[2];
+    bool ceil_mode;
+    bool count_include_pad;
+} Pool2DParams;
+
+typedef struct {
+    int kernel_size[3];
+    int stride[3];
+    int padding[3];
+    int dilation[3];
+    bool use_bias;
+} Conv3DParams;
+
+typedef struct {
+    int kernel_size[2];
+    int stride[2];
+    int padding[2];
+    int output_padding[2];
+    int dilation[2];
+    bool use_bias;
+} ConvTranspose2DParams;
+
+typedef struct {
+    int kernel_size[3];
+    int stride[3];
+    int padding[3];
+    int output_padding[3];
+    int dilation[3];
+    bool use_bias;
+} ConvTranspose3DParams;
+
+typedef struct {
     Tensor* cond;
     Tensor* a;
     Tensor* b;
 } WhereParams;
 
 typedef struct {
-    float value; // Value to fill
-    int* shape;  // Output shape
-    int ndim;    // Number of dimensions
+    float value;       // Value to fill
+    int* shape;        // Output shape
+    int ndim;          // Number of dimensions
+    DType dtype;       // Output dtype  (0 = DTYPE_FLOAT32)
+    DeviceType device; // Output device (0 = DEVICE_CPU)
 } FillParams;
 
 typedef struct {
@@ -345,15 +402,112 @@ typedef struct {
     float value;
 } MaskedFillParams;
 
+/* Parameters for lazy creation ops */
+typedef struct {
+    void*      data;       // Copied constant data (heap-owned by the node)
+    size_t     data_size;  // Size in bytes
+    DType      dtype;
+    DeviceType device;
+    int*       shape;
+    int        ndim;
+} ConstParams;
+
+typedef struct {
+    DType      dtype;
+    DeviceType device;
+} RandParams;
+
+typedef struct {
+    float      start;
+    float      end;
+    float      step;
+    DType      dtype;
+    DeviceType device;
+} ArangeParams;
+
+typedef struct {
+    int        n;
+    DType      dtype;
+    DeviceType device;
+} EyeParams;
+
+typedef struct {
+    int        low;
+    int        high;
+    DType      dtype;
+    DeviceType device;
+} RandIntParams;
+
+typedef struct {
+    int*       shape;
+    int        ndim;
+    DType      dtype;
+    DeviceType device;
+} AllocParams;
+
+typedef struct {
+    float lr;
+    float momentum;   /* 0 = plain SGD */
+    float weight_decay;
+    float dampening;
+    bool  nesterov;
+} SgdStepParams;
+
+typedef struct {
+    float lr;
+    float beta1;
+    float beta2;
+    float eps;
+    float weight_decay;
+    int   step;       /* current step count (for bias correction) */
+    bool  amsgrad;
+} AdamStepParams;
+
 /* Lazy - data filled on execution */
 Tensor* uop_fill(int* shape, int ndim, float value);
+/* Like uop_fill but with explicit dtype and device */
+Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType device);
+/* Constant tensor from existing data (data is copied) */
+Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim,
+                  DType dtype, DeviceType device);
+/* Random uniform [0, 1) */
+Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device);
+/* Random normal N(0, 1) */
+Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device);
+/* Range tensor: values start, start+step, ... < end */
+Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceType device);
+/* n×n identity matrix */
+Tensor* uop_eye_op(int n, DType dtype, DeviceType device);
+/* Random integers in [low, high) */
+Tensor* uop_rand_int(int low, int high, int* shape, int ndim,
+                     DType dtype, DeviceType device);
+
+/* Lazy uninitialized allocation (shape/dtype deferred to execution) */
+Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device);
+
+/* In-graph SGD update: outputs updated param (inputs: param, grad[, momentum_buf]) */
+Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf,
+                     SgdStepParams* p);
+
+/* In-graph Adam update: outputs updated param (inputs: param, grad, exp_avg,
+ * exp_avg_sq[, max_exp_avg_sq for amsgrad]) */
+Tensor* uop_adam_step(Tensor* param, Tensor* grad, Tensor* exp_avg,
+                      Tensor* exp_avg_sq, Tensor* max_exp_avg_sq,
+                      AdamStepParams* p);
 Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* params);
+Tensor* uop_maxpool2d(Tensor* input, Pool2DParams* params);
+Tensor* uop_avgpool2d(Tensor* input, Pool2DParams* params);
+Tensor* uop_conv3d(Tensor* input, Tensor* weight, Tensor* bias, Conv3DParams* params);
+Tensor* uop_conv_transpose2d(Tensor* input, Tensor* weight, Tensor* bias,
+                             ConvTranspose2DParams* params);
+Tensor* uop_conv_transpose3d(Tensor* input, Tensor* weight, Tensor* bias,
+                             ConvTranspose3DParams* params);
 Tensor* uop_where(WhereParams* params);
 
 /*
- * For 2D input [N, C] and 1D indices [N]:
- *   out[i] = input[i, indices[i]]
- * Used for cross-entropy loss to select log probabilities.
+ * indices must be 1D. Output shape is indices.shape plus input.shape[dim+1:].
+ * For 2D input [N, C], indices [N], dim=1: out[i] = input[i, indices[i]] (shape [N]).
+ * For 2D input [V, D], indices [N], dim=0: embedding rows (shape [N, D]).
  */
 Tensor* uop_gather(Tensor* input, Tensor* indices, int dim);
 

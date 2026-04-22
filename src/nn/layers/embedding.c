@@ -1,6 +1,7 @@
 #include "nn/layers/embedding.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
@@ -8,51 +9,71 @@
 
 static Tensor* embedding_forward(Module* module, Tensor* input) {
     Embedding* emb = (Embedding*)module;
-    if (!emb || !input) return NULL;
+    if (!emb || !input)
+        return NULL;
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(emb->weight->tensor);
+    int nidx = (int)input->numel;
+    if (nidx <= 0)
+        return NULL;
+
+    int flat_shape[] = {nidx};
+    ReshapeParams rpf  = {.new_shape = flat_shape, .new_ndim = 1};
+    Tensor* idxf       = uop_reshape(input, &rpf);
+    if (!idxf)
+        return NULL;
+
+    Tensor* gathered = uop_gather(emb->weight->tensor, idxf, 0);
+    if (!gathered)
+        return NULL;
+
+    Tensor* out_body = gathered;
+    if (emb->padding_idx >= 0 && emb->padding_idx < emb->num_embeddings) {
+        TensorConfig cfg = {.dtype      = input->dtype,
+                            .device     = input->device,
+                            .has_dtype  = true,
+                            .has_device = true};
+        Tensor* padv = tensor_full(flat_shape, 1, &cfg, (float)emb->padding_idx);
+        if (!padv)
+            return NULL;
+        Tensor* mask1 = uop_cmpeq(idxf, padv);
+        tensor_free(padv);
+        if (!mask1)
+            return NULL;
+
+        int m21[] = {nidx, 1};
+        ReshapeParams rm = {.new_shape = m21, .new_ndim = 2};
+        Tensor* mask2    = uop_reshape(mask1, &rm);
+        if (!mask2)
+            return NULL;
+
+        int exp_s[] = {nidx, emb->embedding_dim};
+        ExpandParams ep = {.new_shape = exp_s, .new_ndim = 2};
+        Tensor* mask_e  = uop_expand(mask2, &ep);
+        if (!mask_e)
+            return NULL;
+
+        Tensor* z = tensor_zeros(exp_s, 2, &cfg);
+        if (!z)
+            return NULL;
+
+        WhereParams wp = {.cond = mask_e, .a = z, .b = gathered};
+        out_body         = uop_where(&wp);
+        if (!out_body)
+            return NULL;
+    }
 
     int out_ndim = input->ndim + 1;
     int* out_shape = malloc((size_t)out_ndim * sizeof(int));
-    if (!out_shape) return NULL;
-    for (int i = 0; i < input->ndim; i++) out_shape[i] = input->shape[i];
+    if (!out_shape)
+        return NULL;
+    for (int i = 0; i < input->ndim; i++)
+        out_shape[i] = input->shape[i];
     out_shape[input->ndim] = emb->embedding_dim;
 
-    TensorConfig config = {.dtype = emb->weight->tensor->dtype, .device = input->device,
-                           .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, out_ndim, &config);
+    ReshapeParams rout = {.new_shape = out_shape, .new_ndim = out_ndim};
+    Tensor* out        = uop_reshape(out_body, &rout);
     free(out_shape);
-    if (!output) return NULL;
-    tensor_ensure_executed(output);
-
-    float* out_data = (float*)tensor_data_ptr(output);
-    float* weight_data = (float*)tensor_data_ptr(emb->weight->tensor);
-
-    float* in_data = (float*)tensor_data_ptr(input);
-
-    int dim = emb->embedding_dim;
-    for (size_t i = 0; i < input->numel; i++) {
-        int idx = (int)in_data[i];
-        if (idx < 0 || idx >= emb->num_embeddings) {
-            LOG_ERROR("Embedding index %d out of range [0, %d)", idx, emb->num_embeddings);
-            tensor_free(output);
-            return NULL;
-        }
-        memcpy(&out_data[i * dim], &weight_data[idx * dim], (size_t)dim * sizeof(float));
-    }
-
-    // Zero out padding_idx if set
-    if (emb->padding_idx >= 0 && emb->padding_idx < emb->num_embeddings) {
-        for (size_t i = 0; i < input->numel; i++) {
-            int idx = (int)in_data[i];
-            if (idx == emb->padding_idx) {
-                memset(&out_data[i * dim], 0, (size_t)dim * sizeof(float));
-            }
-        }
-    }
-
-    return output;
+    return out;
 }
 
 static void embedding_free(Module* module) { free(module); }
@@ -60,7 +81,8 @@ static void embedding_free(Module* module) { free(module); }
 Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
                         DType dtype, DeviceType device) {
     Embedding* emb = malloc(sizeof(Embedding));
-    if (!emb) return NULL;
+    if (!emb)
+        return NULL;
 
     if (module_init((Module*)emb, "Embedding", embedding_forward, embedding_free) != 0) {
         free(emb);
@@ -68,11 +90,12 @@ Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
     }
 
     emb->num_embeddings = num_embeddings;
-    emb->embedding_dim = embedding_dim;
-    emb->padding_idx = padding_idx;
+    emb->embedding_dim  = embedding_dim;
+    emb->padding_idx    = padding_idx;
 
     int weight_shape[] = {num_embeddings, embedding_dim};
-    TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    TensorConfig config =
+        (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 2, &config);
     if (!weight) {
         module_free((Module*)emb);

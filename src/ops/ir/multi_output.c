@@ -75,7 +75,7 @@ static int groups_have_distinct_outputs(const CMLFusionGroup* a, const CMLFusion
     return 1;
 }
 
-int cml_multi_output_analyze(CMLScheduleV2* sched, int** merge_groups, int* num_merges) {
+int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* num_merges) {
     if (!sched || !merge_groups || !num_merges) return -1;
     *merge_groups = NULL;
     *num_merges = 0;
@@ -133,7 +133,7 @@ int cml_multi_output_analyze(CMLScheduleV2* sched, int** merge_groups, int* num_
     return count;
 }
 
-int cml_multi_output_fuse(CMLScheduleV2* sched, int* merge_groups, int num_merges) {
+int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_merges) {
     if (!sched || !merge_groups || num_merges <= 0) return -1;
 
     for (int m = 0; m < num_merges; m++) {

@@ -194,7 +194,7 @@ done_cycle:
 static void validate_kernel_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head) return;
 
-    CMLScheduleV2* sched = cml_schedule_v2_create(graph, NULL);
+    CMLFusionSchedule* sched = cml_fusion_schedule_create(graph, NULL);
     if (!sched) {
         spec_add_error(result, -1, "failed to create schedule", CML_SPEC_KERNEL);
         return;
@@ -252,13 +252,13 @@ static void validate_kernel_level(CMLGraph_t graph, CMLSpecResult* result) {
         }
     }
 
-    cml_schedule_v2_free(sched);
+    cml_fusion_schedule_free(sched);
 }
 
 static void validate_linear_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head) return;
 
-    CMLScheduleV2* sched = cml_schedule_v2_create(graph, NULL);
+    CMLFusionSchedule* sched = cml_fusion_schedule_create(graph, NULL);
     if (!sched) return;
 
     for (int g = 0; g < sched->num_groups; g++) {
@@ -327,13 +327,13 @@ static void validate_linear_level(CMLGraph_t graph, CMLSpecResult* result) {
         linear_program_free(prog);
     }
 
-    cml_schedule_v2_free(sched);
+    cml_fusion_schedule_free(sched);
 }
 
 static void validate_program_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head) return;
 
-    CMLScheduleV2* sched = cml_schedule_v2_create(graph, NULL);
+    CMLFusionSchedule* sched = cml_fusion_schedule_create(graph, NULL);
     if (!sched) return;
 
     for (int g = 0; g < sched->num_groups; g++) {
@@ -376,7 +376,7 @@ static void validate_program_level(CMLGraph_t graph, CMLSpecResult* result) {
         linear_program_free(prog);
     }
 
-    cml_schedule_v2_free(sched);
+    cml_fusion_schedule_free(sched);
 }
 
 CMLSpecResult* cml_spec_validate(CMLGraph_t graph, CMLSpecLevel level) {

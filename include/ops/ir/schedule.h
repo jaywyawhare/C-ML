@@ -89,7 +89,7 @@ bool cml_schedule_is_movement(UOpType type);
 void cml_schedule_print(const CMLSchedule* sched);
 char* cml_schedule_to_string(const CMLSchedule* sched);
 
-/* ── V2 Fusion Scheduler ── */
+/* ── Fusion Scheduler ── */
 
 typedef struct CMLFusionAnalysis {
     bool can_fuse;
@@ -113,7 +113,7 @@ typedef struct CMLFusionGroup {
     int color;                 /* Graph coloring ID */
 } CMLFusionGroup;
 
-typedef struct CMLScheduleV2 {
+typedef struct CMLFusionSchedule {
     CMLFusionGroup** groups;
     int num_groups;
     int group_capacity;
@@ -127,12 +127,12 @@ typedef struct CMLScheduleV2 {
     size_t memory_saved;
 
     CMLMemoryPlan* memory_plan;
-} CMLScheduleV2;
+} CMLFusionSchedule;
 
-CMLScheduleV2* cml_schedule_v2_create(CMLGraph_t graph, const CMLScheduleOptions* opts);
-void cml_schedule_v2_free(CMLScheduleV2* sched);
+CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opts);
+void cml_fusion_schedule_free(CMLFusionSchedule* sched);
 CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b);
-void cml_schedule_v2_print(const CMLScheduleV2* sched);
+void cml_fusion_schedule_print(const CMLFusionSchedule* sched);
 
 #ifdef __cplusplus
 }

@@ -33,10 +33,10 @@ typedef struct CMLCrossBoundaryStats {
     size_t flops_saved;
 } CMLCrossBoundaryStats;
 
-int cml_cross_boundary_analyze(CMLScheduleV2* sched,
+int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
                                CMLCrossBoundaryFusion** out, int* count);
 
-int cml_cross_boundary_fuse(CMLScheduleV2* sched,
+int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
                             CMLCrossBoundaryFusion* fusions, int count);
 
 void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions);

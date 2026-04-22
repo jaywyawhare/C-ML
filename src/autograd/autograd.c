@@ -1,4 +1,5 @@
 #include "autograd/autograd.h"
+#include "tensor/realize.h"
 #include "core/training_metrics.h"
 #include "nn.h"
 #include "ops/ir/ir.h"
@@ -91,7 +92,14 @@ void tensor_set_requires_grad(Tensor* t, bool requires_grad) {
     t->requires_grad = requires_grad;
 }
 
-bool tensor_is_leaf(Tensor* t) { return t && (t->ir_node == NULL); }
+bool tensor_is_leaf(Tensor* t) {
+    if (!t) return false;
+    /* A leaf tensor has no IR node, or is a zero-input creation op
+     * (FILL, CONST, RAND, etc.) — i.e., not computed from other tensors. */
+    if (!t->ir_node) return true;
+    struct IRNode* node = (struct IRNode*)t->ir_node;
+    return node->num_inputs == 0;
+}
 
 Tensor* tensor_detach(Tensor* t) {
     if (!t)
@@ -262,7 +270,10 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                                                      .device     = tensor->device,
                                                      .has_dtype  = true,
                                                      .has_device = true};
-                tensor->grad = tensor_zeros(tensor->shape, tensor->ndim, &config);
+                tensor->grad = tensor_empty(tensor->shape, tensor->ndim, &config);
+                if (tensor->grad && tensor->grad->data)
+                    memset(tensor->grad->data, 0,
+                           tensor->grad->numel * cml_dtype_size(tensor->grad->dtype));
             }
             if (tensor->grad && tensor->grad->data) {
                 *(float*)tensor->grad->data = 1.0f;

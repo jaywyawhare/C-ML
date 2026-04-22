@@ -5,6 +5,7 @@
 #include "core/error_stack.h"
 #include "backend/device.h"
 #include "tensor/tensor.h"
+#include "tensor/realize.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -103,6 +104,15 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
     if (!module || !tensor || !name) {
         LOG_ERROR("Invalid arguments to module_add_parameter");
         return -1;
+    }
+
+    /* Parameters must be leaf tensors (realized, detached from the IR graph)
+     * so they survive across cml_ir_free() calls between training steps. */
+    if (tensor->ir_node) {
+        if (tensor_realize(tensor) != 0) {
+            LOG_ERROR("module_add_parameter: failed to realize lazy tensor '%s'", name);
+            return -1;
+        }
     }
 
     if (module_get_parameter(module, name) != NULL) {

@@ -504,7 +504,7 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
 
     switch (backend) {
     case CML_BACKEND_CPU_FALLBACK: {
-        int r = cpu_execute_ir(ir);
+        int r = cml_ir_execute_cpu(ir);
         if (r == 0) ctx->executions_total++;
         return r;
     }

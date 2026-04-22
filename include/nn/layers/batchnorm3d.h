@@ -21,6 +21,9 @@ typedef struct BatchNorm3d {
 
     Tensor* running_mean;
     Tensor* running_var;
+
+    Tensor* current_mean;
+    Tensor* current_var;
 } BatchNorm3d;
 
 BatchNorm3d* nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,

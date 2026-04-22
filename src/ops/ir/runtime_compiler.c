@@ -284,7 +284,7 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     if (!rc || !ir) return -1;
 
-    CMLScheduleV2* sched = cml_schedule_v2_create(ir, NULL);
+    CMLFusionSchedule* sched = cml_fusion_schedule_create(ir, NULL);
     if (!sched) {
         LOG_ERROR("Runtime compiler: failed to create schedule");
         return -1;
@@ -363,7 +363,7 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
         }
     }
 
-    cml_schedule_v2_free(sched);
+    cml_fusion_schedule_free(sched);
     return rc_val;
 }
 

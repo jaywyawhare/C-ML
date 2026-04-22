@@ -1,9 +1,9 @@
 #include "nn/layers/instancenorm.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 
 static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
@@ -26,58 +26,113 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
                   channels, in->num_features);
         return NULL;
     }
-    tensor_ensure_executed(input);
-    float* input_data = (float*)tensor_data_ptr(input);
-    if (!input_data)
-        return NULL;
 
     int spatial = height * width;
-    TensorConfig config = (TensorConfig){.dtype      = input->dtype,
-                                         .device     = input->device,
-                                         .has_dtype  = true,
-                                         .has_device = true};
-    Tensor* output = tensor_empty(input->shape, input->ndim, &config);
+    ReshapeParams rp;
+    int rs[]     = {batch * channels, spatial};
+    rp.new_shape = rs;
+    rp.new_ndim  = 2;
+
+    Tensor* x2 = uop_reshape(input, &rp);
+    if (!x2)
+        return NULL;
+
+    ReduceParams mp;
+    int md[]    = {1};
+    mp.dims     = md;
+    mp.num_dims = 1;
+    mp.keepdim  = false;
+
+    Tensor* mean_1d = uop_mean(x2, &mp);
+    if (!mean_1d)
+        return NULL;
+
+    int mean2[] = {batch * channels, 1};
+    ReshapeParams rmean = {.new_shape = mean2, .new_ndim = 2};
+    Tensor* mean_r      = uop_reshape(mean_1d, &rmean);
+    if (!mean_r)
+        return NULL;
+
+    ExpandParams ep;
+    ep.new_shape = rs;
+    ep.new_ndim  = 2;
+
+    Tensor* mean_b = uop_expand(mean_r, &ep);
+    if (!mean_b)
+        return NULL;
+
+    Tensor* diff = uop_sub(x2, mean_b);
+    if (!diff)
+        return NULL;
+
+    Tensor* dsq = uop_mul(diff, diff);
+    if (!dsq)
+        return NULL;
+
+    Tensor* var_1d = uop_mean(dsq, &mp);
+    if (!var_1d)
+        return NULL;
+
+    Tensor* var_r = uop_reshape(var_1d, &rmean);
+    if (!var_r)
+        return NULL;
+
+    TensorConfig cfg = {.dtype      = input->dtype,
+                        .device     = input->device,
+                        .has_dtype  = true,
+                        .has_device = true};
+    int eps_sh[]  = {batch * channels, 1};
+    Tensor* eps_t = tensor_full(eps_sh, 2, &cfg, in->eps);
+    if (!eps_t)
+        return NULL;
+
+    Tensor* ve = uop_add(var_r, eps_t);
+    if (!ve)
+        return NULL;
+
+    Tensor* std = uop_sqrt(ve);
+    if (!std)
+        return NULL;
+
+    Tensor* std_b = uop_expand(std, &ep);
+    if (!std_b)
+        return NULL;
+
+    Tensor* norm2 = uop_div(diff, std_b);
+    if (!norm2)
+        return NULL;
+
+    int out4[] = {batch, channels, height, width};
+    ReshapeParams rout = {.new_shape = out4, .new_ndim = 4};
+    Tensor* output     = uop_reshape(norm2, &rout);
     if (!output)
         return NULL;
 
-    tensor_ensure_executed(output);
-    float* output_data = (float*)tensor_data_ptr(output);
+    if (in->affine && in->weight && in->bias) {
+        ReshapeParams rstat;
+        int st[]     = {1, channels, 1, 1};
+        rstat.new_shape = st;
+        rstat.new_ndim  = 4;
 
-    float* weight_data = NULL;
-    float* bias_data   = NULL;
+        Tensor* w4 = uop_reshape(in->weight->tensor, &rstat);
+        Tensor* b4 = uop_reshape(in->bias->tensor, &rstat);
+        if (!w4 || !b4)
+            return NULL;
 
-    if (in->affine && in->weight && in->weight->tensor) {
-        tensor_ensure_executed(in->weight->tensor);
-        weight_data = (float*)tensor_data_ptr(in->weight->tensor);
-    }
-    if (in->affine && in->bias && in->bias->tensor) {
-        tensor_ensure_executed(in->bias->tensor);
-        bias_data = (float*)tensor_data_ptr(in->bias->tensor);
-    }
-    for (int n = 0; n < batch; n++) {
-        for (int c = 0; c < channels; c++) {
-            int offset = (n * channels + c) * spatial;
+        ExpandParams ex;
+        ex.new_ndim  = 4;
+        ex.new_shape = out4;
+        Tensor* wb   = uop_expand(w4, &ex);
+        Tensor* bb   = uop_expand(b4, &ex);
+        if (!wb || !bb)
+            return NULL;
 
-            float mean = 0.0f;
-            for (int s = 0; s < spatial; s++) {
-                mean += input_data[offset + s];
-            }
-            mean /= (float)spatial;
-            float var = 0.0f;
-            for (int s = 0; s < spatial; s++) {
-                float diff = input_data[offset + s] - mean;
-                var += diff * diff;
-            }
-            var /= (float)spatial;
-
-            float inv_std = 1.0f / sqrtf(var + in->eps);
-            float w = weight_data ? weight_data[c] : 1.0f;
-            float b = bias_data ? bias_data[c] : 0.0f;
-
-            for (int s = 0; s < spatial; s++) {
-                output_data[offset + s] = (input_data[offset + s] - mean) * inv_std * w + b;
-            }
-        }
+        Tensor* sc = uop_mul(wb, output);
+        if (!sc)
+            return NULL;
+        output = uop_add(sc, bb);
+        if (!output)
+            return NULL;
     }
 
     return output;
@@ -91,12 +146,13 @@ static void instancenorm2d_free(Module* module) {
 }
 
 InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
-                                   DeviceType device) {
+                                  DeviceType device) {
     InstanceNorm2d* in = malloc(sizeof(InstanceNorm2d));
     if (!in)
         return NULL;
 
-    if (module_init((Module*)in, "InstanceNorm2d", instancenorm2d_forward, instancenorm2d_free) != 0) {
+    if (module_init((Module*)in, "InstanceNorm2d", instancenorm2d_forward, instancenorm2d_free) !=
+        0) {
         free(in);
         return NULL;
     }
@@ -104,28 +160,22 @@ InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DTyp
     in->num_features = num_features;
     in->eps          = eps > 0.0f ? eps : 1e-5f;
     in->affine       = affine;
-    in->weight       = NULL;
-    in->bias         = NULL;
+
+    TensorConfig config =
+        (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
     if (affine) {
         int param_shape[] = {num_features};
-        TensorConfig config = (TensorConfig){.dtype      = dtype,
-                                             .device     = device,
-                                             .has_dtype  = true,
-                                             .has_device = true};
-
-        Tensor* weight = tensor_ones(param_shape, 1, &config);
+        Tensor* weight    = tensor_ones(param_shape, 1, &config);
         if (!weight) {
             module_free((Module*)in);
             return NULL;
         }
-
         if (module_add_parameter((Module*)in, weight, "weight", true) != 0) {
             tensor_free(weight);
             module_free((Module*)in);
             return NULL;
         }
-
         in->weight = module_get_parameter((Module*)in, "weight");
 
         Tensor* bias = tensor_zeros(param_shape, 1, &config);
@@ -133,14 +183,15 @@ InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DTyp
             module_free((Module*)in);
             return NULL;
         }
-
         if (module_add_parameter((Module*)in, bias, "bias", true) != 0) {
             tensor_free(bias);
             module_free((Module*)in);
             return NULL;
         }
-
         in->bias = module_get_parameter((Module*)in, "bias");
+    } else {
+        in->weight = NULL;
+        in->bias   = NULL;
     }
 
     return in;

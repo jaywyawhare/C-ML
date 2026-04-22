@@ -85,40 +85,40 @@ static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     Tensor* mean_sq = uop_mean(x_sq, &rp);
     if (mean_sq)
         tensor_ensure_executed(mean_sq);
-    tensor_free(x_sq);
-    if (!mean_sq) return NULL;
+    if (!mean_sq)
+        return NULL;
 
     /* Create eps tensor for addition */
     Tensor* eps_t = tensor_full(mean_sq->shape, mean_sq->ndim, NULL, eps);
-    if (!eps_t) { tensor_free(mean_sq); return NULL; }
+    if (!eps_t)
+        return NULL;
 
     /* mean_sq_eps = mean_sq + eps */
     Tensor* mean_sq_eps = uop_add(mean_sq, eps_t);
     if (mean_sq_eps)
         tensor_ensure_executed(mean_sq_eps);
-    tensor_free(mean_sq);
     tensor_free(eps_t);
-    if (!mean_sq_eps) return NULL;
+    if (!mean_sq_eps)
+        return NULL;
 
     /* rsqrt_val = rsqrt(mean_sq_eps) */
     Tensor* rsqrt_val = uop_rsqrt(mean_sq_eps);
     if (rsqrt_val)
         tensor_ensure_executed(rsqrt_val);
-    tensor_free(mean_sq_eps);
-    if (!rsqrt_val) return NULL;
+    if (!rsqrt_val)
+        return NULL;
 
     /* normed = x * rsqrt_val */
     Tensor* normed = uop_mul(x, rsqrt_val);
     if (normed)
         tensor_ensure_executed(normed);
-    tensor_free(rsqrt_val);
-    if (!normed) return NULL;
+    if (!normed)
+        return NULL;
 
     /* result = normed * weight (broadcast weight across seq dim) */
     Tensor* result = uop_mul(normed, weight);
     if (result)
         tensor_ensure_executed(result);
-    tensor_free(normed);
 
     return result;
 }
@@ -134,26 +134,22 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
     Tensor* gate_activated = uop_silu(gate_out);
     if (gate_activated)
         tensor_ensure_executed(gate_activated);
-    tensor_free(gate_out);
     if (!gate_activated) return NULL;
 
     /* up_out = x @ up_proj -> [seq_len, intermediate_size] */
     Tensor* up_out = uop_matmul(x, up_proj);
-    if (!up_out) { tensor_free(gate_activated); return NULL; }
+    if (!up_out) return NULL;
 
     /* combined = gate_activated * up_out */
     Tensor* combined = uop_mul(gate_activated, up_out);
     if (combined)
         tensor_ensure_executed(combined);
-    tensor_free(gate_activated);
-    tensor_free(up_out);
     if (!combined) return NULL;
 
     /* output = combined @ down_proj -> [seq_len, hidden_size] */
     Tensor* output = uop_matmul(combined, down_proj);
     if (output)
         tensor_ensure_executed(output);
-    tensor_free(combined);
 
     return output;
 }
@@ -474,14 +470,9 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
         tensor_ensure_executed(K);
     if (V)
         tensor_ensure_executed(V);
-    tensor_free(normed);
 
-    if (!Q || !K || !V) {
-        if (Q) tensor_free(Q);
-        if (K) tensor_free(K);
-        if (V) tensor_free(V);
+    if (!Q || !K || !V)
         return NULL;
-    }
 
     CMLRoPEConfig rope_cfg = {
         .dim         = head_dim,
@@ -496,12 +487,8 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
     if (Q_rope != Q) tensor_free(Q);
     if (K_rope != K) tensor_free(K);
 
-    if (!Q_rope || !K_rope) {
-        if (Q_rope) tensor_free(Q_rope);
-        if (K_rope) tensor_free(K_rope);
-        tensor_free(V);
+    if (!Q_rope || !K_rope)
         return NULL;
-    }
 
     CMLGQAConfig gqa_cfg = {
         .num_heads    = cfg->num_heads,
@@ -526,9 +513,6 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
     tensor_free(Q3);
     tensor_free(K3);
     tensor_free(V3);
-    tensor_free(Q_rope);
-    tensor_free(K_rope);
-    tensor_free(V);
 
     if (!attn_out) return NULL;
 
@@ -546,23 +530,19 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer,
     Tensor* residual1 = uop_add(hidden, attn_proj);
     if (residual1)
         tensor_ensure_executed(residual1);
-    tensor_free(attn_proj);
     if (!residual1) return NULL;
 
     Tensor* normed2 = rms_norm(residual1, layer->post_attn_layernorm, cfg->rms_norm_eps);
-    if (!normed2) { tensor_free(residual1); return NULL; }
+    if (!normed2) return NULL;
 
     Tensor* ffn_out = swiglu_ffn(normed2, layer->gate_proj, layer->up_proj, layer->down_proj);
     if (ffn_out)
         tensor_ensure_executed(ffn_out);
-    tensor_free(normed2);
-    if (!ffn_out) { tensor_free(residual1); return NULL; }
+    if (!ffn_out) return NULL;
 
     Tensor* output = uop_add(residual1, ffn_out);
     if (output)
         tensor_ensure_executed(output);
-    tensor_free(residual1);
-    tensor_free(ffn_out);
 
     return output;
 }
@@ -589,7 +569,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
     for (int i = 0; i < model->num_layers; i++) {
         Tensor* next_hidden = cml_llama_layer_forward(model, model->layers[i],
                                                        hidden, start_pos);
-        tensor_free(hidden);
         if (!next_hidden) {
             LOG_ERROR("cml_llama_forward: layer %d failed", i);
             return NULL;
@@ -599,7 +578,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
 
     if (model->norm) {
         Tensor* normed = rms_norm(hidden, model->norm, model->config.rms_norm_eps);
-        tensor_free(hidden);
         if (!normed) {
             LOG_ERROR("cml_llama_forward: final norm failed");
             return NULL;
@@ -621,10 +599,8 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
         Tensor* embed_t = uop_permute(model->embed_tokens, &pp);
         if (embed_t) {
             logits = uop_matmul(hidden, embed_t);
-            tensor_free(embed_t);
         }
     }
-    tensor_free(hidden);
 
     if (!logits) {
         LOG_ERROR("cml_llama_forward: lm_head projection failed");

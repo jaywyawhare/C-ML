@@ -20,7 +20,9 @@ typedef struct CMLExecutionPlan {
     size_t num_nodes;
     float** buffers;       // Pre-allocated output buffers
     size_t* buffer_sizes;  // Buffer sizes in floats
-    uint64_t signature;    // Graph structure hash
+    /** Parallel to @a buffers: output tensors that may borrow a buffer (evict / free detaches). */
+    struct Tensor** output_tensors;
+    uint64_t signature; // Graph structure hash
     bool valid;
 } CMLExecutionPlan;
 
@@ -51,6 +53,12 @@ int cml_execute_plan(CMLExecutionPlan* plan, struct Tensor** inputs, size_t num_
 void cml_free_execution_plan(CMLExecutionPlan* plan);
 CMLGraphCache* cml_get_graph_cache(void);
 void cml_graph_cache_print_stats(CMLGraphCache* cache);
+
+/** Drop all cached plans (call when the IR graph is torn down). */
+void cml_graph_cache_reset_global(void);
+
+/** Clear cached references to @a t (call when @a t is about to be destroyed). */
+void cml_graph_cache_forget_tensor(struct Tensor* t);
 
 int cml_execute_node_fast(struct IRNode* node, float* out_buf);
 

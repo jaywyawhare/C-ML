@@ -2,6 +2,7 @@
 #include "core/dataset.h"
 #include "datasets/datasets.h"
 #include "tensor/tensor.h"
+#include "tensor/realize.h"
 #include "core/logging.h"
 #include "core/config.h"
 #include "backend/threadpool.h"
@@ -311,6 +312,8 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
         LOG_ERROR("Failed to create input tensor");
         return -1;
     }
+    /* Realize immediately: dataset tensors must survive IR graph resets. */
+    tensor_realize(dataset->X);
 
     int y_shape[2] = {num_samples, output_size};
     dataset->y     = tensor_from_data(y, y_shape, 2, &config);
@@ -320,6 +323,7 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
         dataset->X = NULL;
         return -1;
     }
+    tensor_realize(dataset->y);
 
     dataset->num_samples = num_samples;
     dataset->input_size  = input_size;
@@ -1347,8 +1351,24 @@ int dataloader_get_batch_tensors(DataLoader* loader, Tensor*** batch_inputs,
         return 0;
     }
 
-    (*batch_inputs)[0]  = batch_get_input(batch);
-    (*batch_targets)[0] = batch_get_targets(batch);
+    /* Clone tensors so returned pointers remain valid after batch_free(). */
+    (*batch_inputs)[0]  = tensor_clone(batch_get_input(batch));
+    (*batch_targets)[0] = tensor_clone(batch_get_targets(batch));
+
+    if (!(*batch_inputs)[0] || !(*batch_targets)[0]) {
+        if ((*batch_inputs)[0]) {
+            tensor_free((*batch_inputs)[0]);
+        }
+        if ((*batch_targets)[0]) {
+            tensor_free((*batch_targets)[0]);
+        }
+        free(*batch_inputs);
+        free(*batch_targets);
+        *batch_inputs = NULL;
+        *batch_targets = NULL;
+        batch_free(batch);
+        return 0;
+    }
 
     int batch_size = batch_get_size(batch);
     batch_free(batch);

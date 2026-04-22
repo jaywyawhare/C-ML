@@ -1,6 +1,7 @@
 #include "nn/layers/conv3d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
@@ -15,86 +16,15 @@ static Tensor* conv3d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(conv->weight->tensor);
-
-    int batch = input->shape[0];
-    int in_ch = input->shape[1];
-    int id    = input->shape[2];
-    int ih    = input->shape[3];
-    int iw    = input->shape[4];
-
-    int out_ch = conv->out_channels;
-    int kd = conv->kernel_size[0], kh = conv->kernel_size[1], kw = conv->kernel_size[2];
-    int sd = conv->stride[0],      sh = conv->stride[1],      sw = conv->stride[2];
-    int pd = conv->padding[0],     ph = conv->padding[1],     pw = conv->padding[2];
-    int dd = conv->dilation[0],    dh = conv->dilation[1],    dw = conv->dilation[2];
-
-    int od = (id + 2 * pd - dd * (kd - 1) - 1) / sd + 1;
-    int oh = (ih + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
-    int ow = (iw + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
-
-    int out_shape[] = {batch, out_ch, od, oh, ow};
-    TensorConfig config =
-        (TensorConfig){.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_zeros(out_shape, 5, &config);
-    tensor_ensure_executed(output);
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* w_data   = (float*)tensor_data_ptr(conv->weight->tensor);
-    float* out_data = (float*)tensor_data_ptr(output);
-
-    for (int b = 0; b < batch; b++) {
-        for (int oc = 0; oc < out_ch; oc++) {
-            for (int d = 0; d < od; d++) {
-                for (int h = 0; h < oh; h++) {
-                    for (int w = 0; w < ow; w++) {
-                        float sum = 0.0f;
-                        for (int ic = 0; ic < in_ch; ic++) {
-                            for (int kdi = 0; kdi < kd; kdi++) {
-                                for (int khi = 0; khi < kh; khi++) {
-                                    for (int kwi = 0; kwi < kw; kwi++) {
-                                        int iz = d * sd - pd + kdi * dd;
-                                        int iy = h * sh - ph + khi * dh;
-                                        int ix = w * sw - pw + kwi * dw;
-                                        if (iz >= 0 && iz < id && iy >= 0 && iy < ih &&
-                                            ix >= 0 && ix < iw) {
-                                            int in_idx = ((b * in_ch + ic) * id + iz) * ih * iw +
-                                                         iy * iw + ix;
-                                            int w_idx = ((oc * in_ch + ic) * kd + kdi) * kh * kw +
-                                                        khi * kw + kwi;
-                                            sum += in_data[in_idx] * w_data[w_idx];
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        int out_idx =
-                            ((b * out_ch + oc) * od + d) * oh * ow + h * ow + w;
-                        out_data[out_idx] = sum;
-                    }
-                }
-            }
-        }
-    }
-    if (conv->use_bias && conv->bias && conv->bias->tensor) {
-        tensor_ensure_executed(conv->bias->tensor);
-        float* bias_data = (float*)tensor_data_ptr(conv->bias->tensor);
-        for (int b = 0; b < batch; b++) {
-            for (int oc = 0; oc < out_ch; oc++) {
-                for (int d = 0; d < od; d++) {
-                    for (int h = 0; h < oh; h++) {
-                        for (int w = 0; w < ow; w++) {
-                            out_data[((b * out_ch + oc) * od + d) * oh * ow + h * ow + w] +=
-                                bias_data[oc];
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return output;
+    Conv3DParams params = {
+        .kernel_size = {conv->kernel_size[0], conv->kernel_size[1], conv->kernel_size[2]},
+        .stride = {conv->stride[0], conv->stride[1], conv->stride[2]},
+        .padding = {conv->padding[0], conv->padding[1], conv->padding[2]},
+        .dilation = {conv->dilation[0], conv->dilation[1], conv->dilation[2]},
+        .use_bias = conv->use_bias,
+    };
+    Tensor* bias = (conv->use_bias && conv->bias) ? conv->bias->tensor : NULL;
+    return uop_conv3d(input, conv->weight->tensor, bias, &params);
 }
 
 static void conv3d_free(Module* module) {
@@ -106,7 +36,7 @@ static void conv3d_free(Module* module) {
 }
 
 static void kaiming_init_3d(Tensor* tensor, int in_channels, int kernel_size) {
-    if (!tensor || !tensor->data)
+    if (!tensor)
         return;
 
     float* data = (float*)tensor_data_ptr(tensor);

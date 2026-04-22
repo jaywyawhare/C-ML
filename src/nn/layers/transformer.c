@@ -1,80 +1,12 @@
 #include "nn/layers/transformer.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
 
-// Batch matrix multiply: [B, M, K] @ [B, K, N] -> [B, M, N]
-static void batch_matmul(float* out, const float* a, const float* b,
-                          int batch, int M, int K, int N) {
-    for (int bi = 0; bi < batch; bi++) {
-        for (int m = 0; m < M; m++) {
-            for (int n = 0; n < N; n++) {
-                float sum = 0.0f;
-                for (int k = 0; k < K; k++) {
-                    sum += a[bi*M*K + m*K + k] * b[bi*K*N + k*N + n];
-                }
-                out[bi*M*N + m*N + n] = sum;
-            }
-        }
-    }
-}
-
-// Softmax over last dim for [total_rows, dim]
-static void softmax_inplace(float* data, int total_rows, int dim) {
-    for (int r = 0; r < total_rows; r++) {
-        float max_val = data[r * dim];
-        for (int d = 1; d < dim; d++) {
-            if (data[r * dim + d] > max_val) max_val = data[r * dim + d];
-        }
-        float sum = 0.0f;
-        for (int d = 0; d < dim; d++) {
-            data[r * dim + d] = expf(data[r * dim + d] - max_val);
-            sum += data[r * dim + d];
-        }
-        for (int d = 0; d < dim; d++) {
-            data[r * dim + d] /= sum;
-        }
-    }
-}
-
-// Linear projection: y = x @ W^T + b for [total, in_dim] -> [total, out_dim]
-static void linear_project(float* out, const float* in, const float* weight, const float* bias,
-                            int total, int in_dim, int out_dim) {
-    for (int t = 0; t < total; t++) {
-        for (int o = 0; o < out_dim; o++) {
-            float sum = bias ? bias[o] : 0.0f;
-            for (int i = 0; i < in_dim; i++) {
-                sum += in[t * in_dim + i] * weight[o * in_dim + i];
-            }
-            out[t * out_dim + o] = sum;
-        }
-    }
-}
-
-// Layer normalization in-place over last dim
-static void layer_norm_inplace(float* data, int total, int dim, float* weight, float* bias, float eps) {
-    for (int t = 0; t < total; t++) {
-        float mean = 0.0f;
-        for (int d = 0; d < dim; d++) mean += data[t * dim + d];
-        mean /= dim;
-        float var = 0.0f;
-        for (int d = 0; d < dim; d++) {
-            float diff = data[t * dim + d] - mean;
-            var += diff * diff;
-        }
-        var /= dim;
-        float inv_std = 1.0f / sqrtf(var + eps);
-        for (int d = 0; d < dim; d++) {
-            data[t * dim + d] = (data[t * dim + d] - mean) * inv_std;
-            if (weight) data[t * dim + d] = data[t * dim + d] * weight[d] + bias[d];
-        }
-    }
-}
-
-// Xavier initialization
 static void xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
     float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
     for (size_t i = 0; i < numel; i++) {
@@ -82,8 +14,44 @@ static void xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
     }
 }
 
+/* Compose LayerNorm from primitives so it records into the IR (fully lazy). */
+static Tensor* apply_layernorm(Tensor* x, Tensor* weight, Tensor* bias, float eps) {
+    if (!x) return NULL;
+    int last_dim = x->ndim - 1;
+    ReduceParams rp = {.dims = &last_dim, .num_dims = 1, .keepdim = true};
+
+    Tensor* mean     = uop_mean(x, &rp);
+    if (!mean) return NULL;
+    Tensor* centered = uop_sub(x, mean);
+    if (!centered) return NULL;
+    Tensor* sq       = uop_mul(centered, centered);
+    if (!sq) return NULL;
+    Tensor* var      = uop_mean(sq, &rp);
+    if (!var) return NULL;
+
+    TensorConfig cfg = {.dtype = x->dtype, .device = x->device,
+                        .has_dtype = true, .has_device = true};
+    Tensor* eps_t = tensor_full(var->shape, var->ndim, &cfg, eps);
+    if (!eps_t) return NULL;
+
+    Tensor* std = uop_sqrt(uop_add(var, eps_t));
+    if (!std) return NULL;
+    Tensor* norm = uop_div(centered, std);
+    if (!norm) return NULL;
+
+    if (weight && bias) {
+        ExpandParams ep = {.new_shape = x->shape, .new_ndim = x->ndim};
+        Tensor* w_b = uop_expand(weight, &ep);
+        Tensor* b_b = uop_expand(bias, &ep);
+        if (!w_b || !b_b) return NULL;
+        Tensor* scaled = uop_mul(w_b, norm);
+        if (!scaled) return NULL;
+        return uop_add(scaled, b_b);
+    }
+    return norm;
+}
+
 static Tensor* mha_module_forward(Module* module, Tensor* input) {
-    // Module forward wraps multihead_attention_forward with query=key=value=input, no mask
     MultiHeadAttention* mha = (MultiHeadAttention*)module;
     return multihead_attention_forward(mha, input, input, input, NULL);
 }
@@ -122,7 +90,6 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     int weight_shape[] = {embed_dim, embed_dim};
     int bias_shape[] = {embed_dim};
 
-    // Helper struct for parameter creation
     struct { const char* w_name; const char* b_name; Parameter** w_ptr; Parameter** b_ptr; } params[] = {
         {"W_q", "b_q", &mha->W_q, &mha->b_q},
         {"W_k", "b_k", &mha->W_k, &mha->b_k},
@@ -131,33 +98,21 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     };
 
     for (int i = 0; i < 4; i++) {
-        // Weight
         Tensor* w = tensor_empty(weight_shape, 2, &config);
-        if (!w) {
-            module_free((Module*)mha);
-            return NULL;
-        }
+        if (!w) { module_free((Module*)mha); return NULL; }
         float* w_data = (float*)tensor_data_ptr(w);
         if (w_data) xavier_init(w_data, (size_t)embed_dim * embed_dim, embed_dim, embed_dim);
 
         if (module_add_parameter((Module*)mha, w, params[i].w_name, true) != 0) {
-            tensor_free(w);
-            module_free((Module*)mha);
-            return NULL;
+            tensor_free(w); module_free((Module*)mha); return NULL;
         }
         *params[i].w_ptr = module_get_parameter((Module*)mha, params[i].w_name);
 
-        // Bias
         Tensor* b = tensor_zeros(bias_shape, 1, &config);
-        if (!b) {
-            module_free((Module*)mha);
-            return NULL;
-        }
+        if (!b) { module_free((Module*)mha); return NULL; }
 
         if (module_add_parameter((Module*)mha, b, params[i].b_name, true) != 0) {
-            tensor_free(b);
-            module_free((Module*)mha);
-            return NULL;
+            tensor_free(b); module_free((Module*)mha); return NULL;
         }
         *params[i].b_ptr = module_get_parameter((Module*)mha, params[i].b_name);
     }
@@ -171,302 +126,104 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
         LOG_ERROR("MultiHeadAttention forward: NULL input");
         return NULL;
     }
-
-    // Ensure inputs are executed
-    tensor_ensure_executed(query);
-    tensor_ensure_executed(key);
-    tensor_ensure_executed(value);
-
     if (query->ndim != 3 || key->ndim != 3 || value->ndim != 3) {
         LOG_ERROR("MultiHeadAttention forward: expected 3D inputs [batch, seq, embed_dim]");
         return NULL;
     }
 
-    int batch = query->shape[0];
-    int seq_q = query->shape[1];
-    int seq_k = key->shape[1];
+    int batch     = query->shape[0];
+    int seq_q     = query->shape[1];
+    int seq_k     = key->shape[1];
     int embed_dim = mha->embed_dim;
     int num_heads = mha->num_heads;
-    int head_dim = mha->head_dim;
-    int total_q = batch * seq_q;
-    int total_k = batch * seq_k;
+    int head_dim  = mha->head_dim;
 
-    float* wq_data = (float*)tensor_data_ptr(mha->W_q->tensor);
-    float* wk_data = (float*)tensor_data_ptr(mha->W_k->tensor);
-    float* wv_data = (float*)tensor_data_ptr(mha->W_v->tensor);
-    float* wo_data = (float*)tensor_data_ptr(mha->W_o->tensor);
-    float* bq_data = (float*)tensor_data_ptr(mha->b_q->tensor);
-    float* bk_data = (float*)tensor_data_ptr(mha->b_k->tensor);
-    float* bv_data = (float*)tensor_data_ptr(mha->b_v->tensor);
-    float* bo_data = (float*)tensor_data_ptr(mha->b_o->tensor);
-    float* q_in = (float*)tensor_data_ptr(query);
-    float* k_in = (float*)tensor_data_ptr(key);
-    float* v_in = (float*)tensor_data_ptr(value);
+    /* Linear projections: [B, S, E] */
+    Tensor* Q = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
+    Tensor* K = uop_linear(key,   mha->W_k->tensor, mha->b_k->tensor);
+    Tensor* V = uop_linear(value, mha->W_v->tensor, mha->b_v->tensor);
+    if (!Q || !K || !V) return NULL;
 
-    if (!wq_data || !wk_data || !wv_data || !wo_data || !q_in || !k_in || !v_in) {
-        LOG_ERROR("MultiHeadAttention forward: failed to get data pointers");
-        return NULL;
-    }
+    /* Reshape [B, S, E] -> [B, S, H, D] -> permute -> [B, H, S, D] */
+    int q_shape4[] = {batch, seq_q, num_heads, head_dim};
+    ReshapeParams qrp = {.new_shape = q_shape4, .new_ndim = 4};
+    int k_shape4[] = {batch, seq_k, num_heads, head_dim};
+    ReshapeParams krp = {.new_shape = k_shape4, .new_ndim = 4};
+    int v_shape4[] = {batch, seq_k, num_heads, head_dim};
+    ReshapeParams vrp = {.new_shape = v_shape4, .new_ndim = 4};
 
-    float* Q = malloc((size_t)total_q * embed_dim * sizeof(float));
-    float* K = malloc((size_t)total_k * embed_dim * sizeof(float));
-    float* V = malloc((size_t)total_k * embed_dim * sizeof(float));
-    if (!Q || !K || !V) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(Q); free(K); free(V);
-        return NULL;
-    }
+    Tensor* Q_r = uop_reshape(Q, &qrp);
+    Tensor* K_r = uop_reshape(K, &krp);
+    Tensor* V_r = uop_reshape(V, &vrp);
+    if (!Q_r || !K_r || !V_r) return NULL;
 
-    linear_project(Q, q_in, wq_data, bq_data, total_q, embed_dim, embed_dim);
-    linear_project(K, k_in, wk_data, bk_data, total_k, embed_dim, embed_dim);
-    linear_project(V, v_in, wv_data, bv_data, total_k, embed_dim, embed_dim);
+    int perm4[] = {0, 2, 1, 3};
+    PermuteParams pp4 = {.perm = perm4, .num_dims = 4};
+    Tensor* Q_h = uop_permute(Q_r, &pp4);
+    Tensor* K_h = uop_permute(K_r, &pp4);
+    Tensor* V_h = uop_permute(V_r, &pp4);
+    if (!Q_h || !K_h || !V_h) return NULL;
 
-    // [B, S, H, D] -> [B, H, S, D]
-    float* Q_mh = malloc((size_t)batch * num_heads * seq_q * head_dim * sizeof(float));
-    float* K_mh = malloc((size_t)batch * num_heads * seq_k * head_dim * sizeof(float));
-    float* V_mh = malloc((size_t)batch * num_heads * seq_k * head_dim * sizeof(float));
-    if (!Q_mh || !K_mh || !V_mh) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(Q); free(K); free(V); free(Q_mh); free(K_mh); free(V_mh);
-        return NULL;
-    }
+    /* Scaled dot-product attention: [B, H, S_q, D] */
+    Tensor* attn_out = uop_scaled_dot_product_attention(Q_h, K_h, V_h, mask);
+    if (!attn_out) return NULL;
 
-    for (int b = 0; b < batch; b++) {
-        for (int s = 0; s < seq_q; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
-                    Q_mh[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d] =
-                        Q[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d];
-                }
-            }
-        }
-        for (int s = 0; s < seq_k; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
-                    K_mh[b*num_heads*seq_k*head_dim + h*seq_k*head_dim + s*head_dim + d] =
-                        K[b*seq_k*embed_dim + s*embed_dim + h*head_dim + d];
-                    V_mh[b*num_heads*seq_k*head_dim + h*seq_k*head_dim + s*head_dim + d] =
-                        V[b*seq_k*embed_dim + s*embed_dim + h*head_dim + d];
-                }
-            }
-        }
-    }
+    /* [B, H, S_q, D] -> [B, S_q, H, D] -> [B, S_q, E] */
+    Tensor* attn_t = uop_permute(attn_out, &pp4); /* {0,2,1,3} is its own inverse */
+    if (!attn_t) return NULL;
 
-    free(Q); free(K); free(V);
+    int out_shape3[] = {batch, seq_q, embed_dim};
+    ReshapeParams orp = {.new_shape = out_shape3, .new_ndim = 3};
+    Tensor* concat = uop_reshape(attn_t, &orp);
+    if (!concat) return NULL;
 
-    // Transpose K: [B*H, seq_k, head_dim] -> [B*H, head_dim, seq_k]
-    int BH = batch * num_heads;
-    float* K_t = malloc((size_t)BH * head_dim * seq_k * sizeof(float));
-    if (!K_t) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(Q_mh); free(K_mh); free(V_mh);
-        return NULL;
-    }
-
-    for (int bh = 0; bh < BH; bh++) {
-        for (int s = 0; s < seq_k; s++) {
-            for (int d = 0; d < head_dim; d++) {
-                K_t[bh*head_dim*seq_k + d*seq_k + s] =
-                    K_mh[bh*seq_k*head_dim + s*head_dim + d];
-            }
-        }
-    }
-
-    float* scores = malloc((size_t)BH * seq_q * seq_k * sizeof(float));
-    if (!scores) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(Q_mh); free(K_mh); free(V_mh); free(K_t);
-        return NULL;
-    }
-
-    batch_matmul(scores, Q_mh, K_t, BH, seq_q, head_dim, seq_k);
-    free(K_t);
-    free(Q_mh);
-    free(K_mh);
-
-    float scale = 1.0f / sqrtf((float)head_dim);
-    size_t scores_size = (size_t)BH * seq_q * seq_k;
-    for (size_t i = 0; i < scores_size; i++) {
-        scores[i] *= scale;
-    }
-
-    if (mask) {
-        tensor_ensure_executed(mask);
-        float* mask_data = (float*)tensor_data_ptr(mask);
-        if (mask_data) {
-            // Broadcast mask across batch*heads
-            for (int bh = 0; bh < BH; bh++) {
-                for (int sq = 0; sq < seq_q; sq++) {
-                    for (int sk = 0; sk < seq_k; sk++) {
-                        size_t mask_idx;
-                        if (mask->ndim == 2) {
-                            mask_idx = (size_t)sq * seq_k + sk;
-                        } else {
-                            int b_idx = bh / num_heads;
-                            mask_idx = (size_t)b_idx * seq_q * seq_k + sq * seq_k + sk;
-                        }
-                        if (mask_data[mask_idx] == 0.0f) {
-                            scores[bh*seq_q*seq_k + sq*seq_k + sk] = -1e9f;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    softmax_inplace(scores, BH * seq_q, seq_k);
-
-    // scores @ V -> [B*H, seq_q, head_dim]
-    float* attn_out = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
-    if (!attn_out) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(scores); free(V_mh);
-        return NULL;
-    }
-
-    batch_matmul(attn_out, scores, V_mh, BH, seq_q, seq_k, head_dim);
-    free(scores);
-    free(V_mh);
-
-    // [B, H, seq_q, head_dim] -> [B, seq_q, embed_dim]
-    float* concat = malloc((size_t)batch * seq_q * embed_dim * sizeof(float));
-    if (!concat) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(attn_out);
-        return NULL;
-    }
-
-    for (int b = 0; b < batch; b++) {
-        for (int s = 0; s < seq_q; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
-                    concat[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d] =
-                        attn_out[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d];
-                }
-            }
-        }
-    }
-    free(attn_out);
-
-    float* output_data = malloc((size_t)total_q * embed_dim * sizeof(float));
-    if (!output_data) {
-        LOG_ERROR("MultiHeadAttention forward: allocation failed");
-        free(concat);
-        return NULL;
-    }
-
-    linear_project(output_data, concat, wo_data, bo_data, total_q, embed_dim, embed_dim);
-    free(concat);
-    int out_shape[] = {batch, seq_q, embed_dim};
-    TensorConfig out_config = {.dtype = query->dtype, .device = query->device,
-                                .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(output_data, out_shape, 3, &out_config);
-    free(output_data);
-
-    if (!output) {
-        LOG_ERROR("MultiHeadAttention forward: failed to create output tensor");
-        return NULL;
-    }
-
-    return output;
+    return uop_linear(concat, mha->W_o->tensor, mha->b_o->tensor);
 }
 
 static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
     TransformerEncoderLayer* layer = (TransformerEncoderLayer*)module;
-
     if (!layer || !input) return NULL;
-
-    tensor_ensure_executed(input);
-
     if (input->ndim != 3) {
         LOG_ERROR("TransformerEncoderLayer forward: expected 3D input [batch, seq, d_model]");
         return NULL;
     }
 
-    int batch = input->shape[0];
-    int seq_len = input->shape[1];
-    int d_model = layer->d_model;
-    int dim_ff = layer->dim_feedforward;
-    int total = batch * seq_len;
+    /* Self-attention + residual + LN1 */
+    Tensor* attn = multihead_attention_forward(layer->self_attn, input, input, input, NULL);
+    if (!attn) return NULL;
+    Tensor* x1 = uop_add(input, attn);
+    if (!x1) return NULL;
+    Tensor* x1_ln = apply_layernorm(x1,
+                                    layer->norm1_weight->tensor,
+                                    layer->norm1_bias->tensor,
+                                    layer->norm_eps);
+    if (!x1_ln) return NULL;
 
-    float* x_data = (float*)tensor_data_ptr(input);
-    if (!x_data) return NULL;
+    /* FFN: Linear1 -> ReLU -> Linear2 */
+    Tensor* ff1 = uop_linear(x1_ln,
+                             layer->linear1_weight->tensor,
+                             layer->linear1_bias->tensor);
+    if (!ff1) return NULL;
+    Tensor* ff1_act = uop_relu(ff1);
+    if (!ff1_act) return NULL;
+    Tensor* ff2 = uop_linear(ff1_act,
+                             layer->linear2_weight->tensor,
+                             layer->linear2_bias->tensor);
+    if (!ff2) return NULL;
 
-    // Working buffer: copy input
-    size_t buf_size = (size_t)total * d_model;
-    float* x = malloc(buf_size * sizeof(float));
-    if (!x) return NULL;
-    memcpy(x, x_data, buf_size * sizeof(float));
-
-    Tensor* attn_out = multihead_attention_forward(layer->self_attn, input, input, input, NULL);
-    if (!attn_out) {
-        free(x);
-        return NULL;
-    }
-    tensor_ensure_executed(attn_out);
-    float* attn_data = (float*)tensor_data_ptr(attn_out);
-
-    for (size_t i = 0; i < buf_size; i++) {
-        x[i] += attn_data[i];
-    }
-    tensor_free(attn_out);
-
-    float* norm1_w = (float*)tensor_data_ptr(layer->norm1_weight->tensor);
-    float* norm1_b = (float*)tensor_data_ptr(layer->norm1_bias->tensor);
-    layer_norm_inplace(x, total, d_model, norm1_w, norm1_b, layer->norm_eps);
-
-    // ff_hidden = relu(x @ W1^T + b1), ff_out = ff_hidden @ W2^T + b2
-    float* l1_w = (float*)tensor_data_ptr(layer->linear1_weight->tensor);
-    float* l1_b = (float*)tensor_data_ptr(layer->linear1_bias->tensor);
-    float* l2_w = (float*)tensor_data_ptr(layer->linear2_weight->tensor);
-    float* l2_b = (float*)tensor_data_ptr(layer->linear2_bias->tensor);
-
-    float* ff_hidden = malloc((size_t)total * dim_ff * sizeof(float));
-    if (!ff_hidden) {
-        free(x);
-        return NULL;
-    }
-
-    linear_project(ff_hidden, x, l1_w, l1_b, total, d_model, dim_ff);
-
-    for (size_t i = 0; i < (size_t)total * dim_ff; i++) {
-        if (ff_hidden[i] < 0.0f) ff_hidden[i] = 0.0f;
-    }
-
-    float* ff_out = malloc(buf_size * sizeof(float));
-    if (!ff_out) {
-        free(x); free(ff_hidden);
-        return NULL;
-    }
-
-    linear_project(ff_out, ff_hidden, l2_w, l2_b, total, dim_ff, d_model);
-    free(ff_hidden);
-
-    for (size_t i = 0; i < buf_size; i++) {
-        x[i] += ff_out[i];
-    }
-    free(ff_out);
-
-    float* norm2_w = (float*)tensor_data_ptr(layer->norm2_weight->tensor);
-    float* norm2_b = (float*)tensor_data_ptr(layer->norm2_bias->tensor);
-    layer_norm_inplace(x, total, d_model, norm2_w, norm2_b, layer->norm_eps);
-    int out_shape[] = {batch, seq_len, d_model};
-    TensorConfig out_config = {.dtype = input->dtype, .device = input->device,
-                                .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(x, out_shape, 3, &out_config);
-    free(x);
-
-    return output;
+    /* Residual + LN2 */
+    Tensor* x2 = uop_add(x1_ln, ff2);
+    if (!x2) return NULL;
+    return apply_layernorm(x2,
+                           layer->norm2_weight->tensor,
+                           layer->norm2_bias->tensor,
+                           layer->norm_eps);
 }
 
 static void encoder_layer_free(Module* module) {
     TransformerEncoderLayer* layer = (TransformerEncoderLayer*)module;
     if (!layer) return;
-
-    if (layer->self_attn) {
-        module_free((Module*)layer->self_attn);
-    }
-
+    if (layer->self_attn) module_free((Module*)layer->self_attn);
     free(layer);
 }
 
@@ -490,21 +247,16 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     layer->norm_eps = 1e-5f;
 
     layer->self_attn = nn_multihead_attention(d_model, nhead, dropout, dtype, device);
-    if (!layer->self_attn) {
-        module_free((Module*)layer);
-        return NULL;
-    }
+    if (!layer->self_attn) { module_free((Module*)layer); return NULL; }
 
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
-    // Feedforward weights
     int l1_w_shape[] = {dim_feedforward, d_model};
     int l1_b_shape[] = {dim_feedforward};
     int l2_w_shape[] = {d_model, dim_feedforward};
     int l2_b_shape[] = {d_model};
     int norm_shape[] = {d_model};
 
-    // Linear1 weight [dim_feedforward, d_model]
     Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
     if (!l1w) { module_free((Module*)layer); return NULL; }
     float* l1w_data = (float*)tensor_data_ptr(l1w);
@@ -514,7 +266,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     }
     layer->linear1_weight = module_get_parameter((Module*)layer, "linear1_weight");
 
-    // Linear1 bias [dim_feedforward]
     Tensor* l1b = tensor_zeros(l1_b_shape, 1, &config);
     if (!l1b) { module_free((Module*)layer); return NULL; }
     if (module_add_parameter((Module*)layer, l1b, "linear1_bias", true) != 0) {
@@ -522,7 +273,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     }
     layer->linear1_bias = module_get_parameter((Module*)layer, "linear1_bias");
 
-    // Linear2 weight [d_model, dim_feedforward]
     Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
     if (!l2w) { module_free((Module*)layer); return NULL; }
     float* l2w_data = (float*)tensor_data_ptr(l2w);
@@ -532,7 +282,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     }
     layer->linear2_weight = module_get_parameter((Module*)layer, "linear2_weight");
 
-    // Linear2 bias [d_model]
     Tensor* l2b = tensor_zeros(l2_b_shape, 1, &config);
     if (!l2b) { module_free((Module*)layer); return NULL; }
     if (module_add_parameter((Module*)layer, l2b, "linear2_bias", true) != 0) {
@@ -540,7 +289,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     }
     layer->linear2_bias = module_get_parameter((Module*)layer, "linear2_bias");
 
-    // Norm1 weight and bias [d_model]
     Tensor* n1w = tensor_ones(norm_shape, 1, &config);
     if (!n1w) { module_free((Module*)layer); return NULL; }
     if (module_add_parameter((Module*)layer, n1w, "norm1_weight", true) != 0) {
@@ -555,7 +303,6 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     }
     layer->norm1_bias = module_get_parameter((Module*)layer, "norm1_bias");
 
-    // Norm2 weight and bias [d_model]
     Tensor* n2w = tensor_ones(norm_shape, 1, &config);
     if (!n2w) { module_free((Module*)layer); return NULL; }
     if (module_add_parameter((Module*)layer, n2w, "norm2_weight", true) != 0) {
@@ -588,38 +335,12 @@ static Tensor* transformer_encoder_forward(Module* module, Tensor* input) {
         owns_x = true;
     }
 
-    // Final layer norm
-    tensor_ensure_executed(x);
-    float* x_data = (float*)tensor_data_ptr(x);
-    if (!x_data) { if (owns_x) tensor_free(x); return NULL; }
-
-    int total = 1;
-    for (int i = 0; i < x->ndim - 1; i++) total *= x->shape[i];
-    int d_model = enc->d_model;
-
-    float* norm_w = (float*)tensor_data_ptr(enc->norm_weight->tensor);
-    float* norm_b = (float*)tensor_data_ptr(enc->norm_bias->tensor);
-
-    // Clone data for in-place normalization
-    size_t buf_size = (size_t)total * d_model;
-    float* buf = malloc(buf_size * sizeof(float));
-    if (!buf) { if (owns_x) tensor_free(x); return NULL; }
-    memcpy(buf, x_data, buf_size * sizeof(float));
-
-    layer_norm_inplace(buf, total, d_model, norm_w, norm_b, enc->norm_eps);
-
-    int* out_shape = malloc(x->ndim * sizeof(int));
-    if (!out_shape) { free(buf); if (owns_x) tensor_free(x); return NULL; }
-    memcpy(out_shape, x->shape, x->ndim * sizeof(int));
-    int out_ndim = x->ndim;
-
-    TensorConfig cfg = {.dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* out = apply_layernorm(x,
+                                  enc->norm_weight->tensor,
+                                  enc->norm_bias->tensor,
+                                  enc->norm_eps);
     if (owns_x) tensor_free(x);
-
-    Tensor* output = tensor_from_data(buf, out_shape, out_ndim, &cfg);
-    free(buf);
-    free(out_shape);
-    return output;
+    return out;
 }
 
 static void transformer_encoder_free(Module* module) {
@@ -681,7 +402,6 @@ TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedf
 }
 
 static Tensor* decoder_layer_forward_wrapper(Module* module, Tensor* input) {
-    // Module forward wraps with tgt=input, memory=NULL (self-attention only mode)
     TransformerDecoderLayer* layer = (TransformerDecoderLayer*)module;
     return transformer_decoder_layer_forward(layer, input, NULL, NULL, NULL);
 }
@@ -689,88 +409,45 @@ static Tensor* decoder_layer_forward_wrapper(Module* module, Tensor* input) {
 Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor* tgt,
                                            Tensor* memory, Tensor* tgt_mask, Tensor* memory_mask) {
     if (!layer || !tgt) return NULL;
-
-    tensor_ensure_executed(tgt);
     if (tgt->ndim != 3) return NULL;
 
-    int batch = tgt->shape[0];
-    int seq_len = tgt->shape[1];
-    int d_model = layer->d_model;
-    int dim_ff = layer->dim_feedforward;
-    int total = batch * seq_len;
-
-    float* x_data = (float*)tensor_data_ptr(tgt);
-    if (!x_data) return NULL;
-
-    size_t buf_size = (size_t)total * d_model;
-    float* x = malloc(buf_size * sizeof(float));
+    /* Self-attention + residual + LN1 */
+    Tensor* self_attn = multihead_attention_forward(layer->self_attn, tgt, tgt, tgt, tgt_mask);
+    if (!self_attn) return NULL;
+    Tensor* x1 = uop_add(tgt, self_attn);
+    if (!x1) return NULL;
+    Tensor* x = apply_layernorm(x1,
+                                layer->norm1_weight->tensor,
+                                layer->norm1_bias->tensor,
+                                layer->norm_eps);
     if (!x) return NULL;
-    memcpy(x, x_data, buf_size * sizeof(float));
 
-    Tensor* self_attn_out = multihead_attention_forward(layer->self_attn, tgt, tgt, tgt, tgt_mask);
-    if (!self_attn_out) { free(x); return NULL; }
-    tensor_ensure_executed(self_attn_out);
-    float* attn_data = (float*)tensor_data_ptr(self_attn_out);
-
-    // Residual + LayerNorm1
-    for (size_t i = 0; i < buf_size; i++) x[i] += attn_data[i];
-    tensor_free(self_attn_out);
-
-    float* n1w = (float*)tensor_data_ptr(layer->norm1_weight->tensor);
-    float* n1b = (float*)tensor_data_ptr(layer->norm1_bias->tensor);
-    layer_norm_inplace(x, total, d_model, n1w, n1b, layer->norm_eps);
-
-    // Cross-attention (if memory provided)
+    /* Cross-attention + residual + LN2 (when memory provided) */
     if (memory) {
-        tensor_ensure_executed(memory);
-        int x_shape[] = {batch, seq_len, d_model};
-        TensorConfig cfg = {.dtype = tgt->dtype, .device = tgt->device, .has_dtype = true, .has_device = true};
-        Tensor* x_tensor = tensor_from_data(x, x_shape, 3, &cfg);
-        if (!x_tensor) { free(x); return NULL; }
-
-        Tensor* cross_out = multihead_attention_forward(layer->cross_attn, x_tensor, memory, memory, memory_mask);
-        tensor_free(x_tensor);
-        if (!cross_out) { free(x); return NULL; }
-        tensor_ensure_executed(cross_out);
-        float* cross_data = (float*)tensor_data_ptr(cross_out);
-
-        for (size_t i = 0; i < buf_size; i++) x[i] += cross_data[i];
-        tensor_free(cross_out);
-
-        float* n2w = (float*)tensor_data_ptr(layer->norm2_weight->tensor);
-        float* n2b = (float*)tensor_data_ptr(layer->norm2_bias->tensor);
-        layer_norm_inplace(x, total, d_model, n2w, n2b, layer->norm_eps);
+        Tensor* cross_attn = multihead_attention_forward(layer->cross_attn, x, memory, memory, memory_mask);
+        if (!cross_attn) return NULL;
+        Tensor* x2 = uop_add(x, cross_attn);
+        if (!x2) return NULL;
+        x = apply_layernorm(x2,
+                            layer->norm2_weight->tensor,
+                            layer->norm2_bias->tensor,
+                            layer->norm_eps);
+        if (!x) return NULL;
     }
 
-    float* l1w = (float*)tensor_data_ptr(layer->linear1_weight->tensor);
-    float* l1b = (float*)tensor_data_ptr(layer->linear1_bias->tensor);
-    float* l2w = (float*)tensor_data_ptr(layer->linear2_weight->tensor);
-    float* l2b = (float*)tensor_data_ptr(layer->linear2_bias->tensor);
-
-    float* ff_hidden = malloc((size_t)total * dim_ff * sizeof(float));
-    if (!ff_hidden) { free(x); return NULL; }
-    linear_project(ff_hidden, x, l1w, l1b, total, d_model, dim_ff);
-    for (size_t i = 0; i < (size_t)total * dim_ff; i++)
-        if (ff_hidden[i] < 0.0f) ff_hidden[i] = 0.0f;
-
-    float* ff_out = malloc(buf_size * sizeof(float));
-    if (!ff_out) { free(x); free(ff_hidden); return NULL; }
-    linear_project(ff_out, ff_hidden, l2w, l2b, total, dim_ff, d_model);
-    free(ff_hidden);
-
-    for (size_t i = 0; i < buf_size; i++) x[i] += ff_out[i];
-    free(ff_out);
-
-    float* n3w = (float*)tensor_data_ptr(layer->norm3_weight->tensor);
-    float* n3b = (float*)tensor_data_ptr(layer->norm3_bias->tensor);
-    layer_norm_inplace(x, total, d_model, n3w, n3b, layer->norm_eps);
-
-    // Output
-    int out_shape[] = {batch, seq_len, d_model};
-    TensorConfig out_cfg = {.dtype = tgt->dtype, .device = tgt->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(x, out_shape, 3, &out_cfg);
-    free(x);
-    return output;
+    /* FFN: Linear1 -> ReLU -> Linear2 + residual + LN3 */
+    Tensor* ff1     = uop_linear(x, layer->linear1_weight->tensor, layer->linear1_bias->tensor);
+    if (!ff1) return NULL;
+    Tensor* ff1_act = uop_relu(ff1);
+    if (!ff1_act) return NULL;
+    Tensor* ff2     = uop_linear(ff1_act, layer->linear2_weight->tensor, layer->linear2_bias->tensor);
+    if (!ff2) return NULL;
+    Tensor* x3      = uop_add(x, ff2);
+    if (!x3) return NULL;
+    return apply_layernorm(x3,
+                           layer->norm3_weight->tensor,
+                           layer->norm3_bias->tensor,
+                           layer->norm_eps);
 }
 
 static void decoder_layer_free(Module* module) {
@@ -810,7 +487,6 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
     int l2_b_shape[] = {d_model};
     int norm_shape[] = {d_model};
 
-    // Linear1
     Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
     if (!l1w) { module_free((Module*)layer); return NULL; }
     float* l1w_data = (float*)tensor_data_ptr(l1w);
@@ -827,7 +503,6 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
     }
     layer->linear1_bias = module_get_parameter((Module*)layer, "linear1_bias");
 
-    // Linear2
     Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
     if (!l2w) { module_free((Module*)layer); return NULL; }
     float* l2w_data = (float*)tensor_data_ptr(l2w);
@@ -844,7 +519,6 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
     }
     layer->linear2_bias = module_get_parameter((Module*)layer, "linear2_bias");
 
-    // 3 layer norms
     struct { const char* wn; const char* bn; Parameter** wp; Parameter** bp; } norms[] = {
         {"norm1_weight", "norm1_bias", &layer->norm1_weight, &layer->norm1_bias},
         {"norm2_weight", "norm2_bias", &layer->norm2_weight, &layer->norm2_bias},
@@ -870,7 +544,6 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
 }
 
 static Tensor* transformer_decoder_forward(Module* module, Tensor* input) {
-    // When called via module_forward, only self-attention (no cross-attention)
     TransformerDecoder* dec = (TransformerDecoder*)module;
     if (!dec || !input) return NULL;
 
@@ -885,37 +558,12 @@ static Tensor* transformer_decoder_forward(Module* module, Tensor* input) {
         owns_x = true;
     }
 
-    // Final layer norm
-    tensor_ensure_executed(x);
-    float* x_data = (float*)tensor_data_ptr(x);
-    if (!x_data) { if (owns_x) tensor_free(x); return NULL; }
-
-    int total = 1;
-    for (int i = 0; i < x->ndim - 1; i++) total *= x->shape[i];
-    int d_model = dec->d_model;
-
-    float* norm_w = (float*)tensor_data_ptr(dec->norm_weight->tensor);
-    float* norm_b = (float*)tensor_data_ptr(dec->norm_bias->tensor);
-
-    size_t buf_size = (size_t)total * d_model;
-    float* buf = malloc(buf_size * sizeof(float));
-    if (!buf) { if (owns_x) tensor_free(x); return NULL; }
-    memcpy(buf, x_data, buf_size * sizeof(float));
-
-    layer_norm_inplace(buf, total, d_model, norm_w, norm_b, dec->norm_eps);
-
-    int* out_shape = malloc(x->ndim * sizeof(int));
-    if (!out_shape) { free(buf); if (owns_x) tensor_free(x); return NULL; }
-    memcpy(out_shape, x->shape, x->ndim * sizeof(int));
-    int out_ndim = x->ndim;
-
-    TensorConfig cfg = {.dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* out = apply_layernorm(x,
+                                  dec->norm_weight->tensor,
+                                  dec->norm_bias->tensor,
+                                  dec->norm_eps);
     if (owns_x) tensor_free(x);
-
-    Tensor* output = tensor_from_data(buf, out_shape, out_ndim, &cfg);
-    free(buf);
-    free(out_shape);
-    return output;
+    return out;
 }
 
 static void transformer_decoder_free(Module* module) {
@@ -979,16 +627,12 @@ TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedf
 KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim,
                           DType dtype, DeviceType device) {
     if (batch <= 0 || num_heads <= 0 || max_seq_len <= 0 || head_dim <= 0) {
-        LOG_ERROR("kv_cache_create: invalid dimensions (batch=%d, num_heads=%d, max_seq_len=%d, head_dim=%d)",
-                  batch, num_heads, max_seq_len, head_dim);
+        LOG_ERROR("kv_cache_create: invalid dimensions");
         return NULL;
     }
 
     KVCache* cache = calloc(1, sizeof(KVCache));
-    if (!cache) {
-        LOG_ERROR("kv_cache_create: failed to allocate KVCache");
-        return NULL;
-    }
+    if (!cache) return NULL;
 
     cache->max_seq_len = max_seq_len;
     cache->current_len = 0;
@@ -997,15 +641,10 @@ KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim
     int shape[] = {batch, num_heads, max_seq_len, head_dim};
 
     cache->key_cache = tensor_zeros(shape, 4, &config);
-    if (!cache->key_cache) {
-        LOG_ERROR("kv_cache_create: failed to allocate key_cache");
-        free(cache);
-        return NULL;
-    }
+    if (!cache->key_cache) { free(cache); return NULL; }
 
     cache->value_cache = tensor_zeros(shape, 4, &config);
     if (!cache->value_cache) {
-        LOG_ERROR("kv_cache_create: failed to allocate value_cache");
         tensor_free(cache->key_cache);
         free(cache);
         return NULL;
@@ -1016,600 +655,151 @@ KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim
 
 void kv_cache_free(KVCache* cache) {
     if (!cache) return;
-    if (cache->key_cache) tensor_free(cache->key_cache);
+    if (cache->key_cache)   tensor_free(cache->key_cache);
     if (cache->value_cache) tensor_free(cache->value_cache);
     free(cache);
 }
 
 void kv_cache_reset(KVCache* cache) {
     if (!cache) return;
-
     cache->current_len = 0;
-
-    // Zero out the cache tensors
+    /* Realize and zero the cache tensors (mutable state cannot be lazy). */
     if (cache->key_cache) {
         tensor_ensure_executed(cache->key_cache);
-        float* k_data = (float*)tensor_data_ptr(cache->key_cache);
-        if (k_data) {
-            size_t numel = 1;
-            for (int i = 0; i < cache->key_cache->ndim; i++)
-                numel *= (size_t)cache->key_cache->shape[i];
-            memset(k_data, 0, numel * sizeof(float));
-        }
+        float* k = (float*)tensor_data_ptr(cache->key_cache);
+        if (k) memset(k, 0, cache->key_cache->numel * sizeof(float));
     }
     if (cache->value_cache) {
         tensor_ensure_executed(cache->value_cache);
-        float* v_data = (float*)tensor_data_ptr(cache->value_cache);
-        if (v_data) {
-            size_t numel = 1;
-            for (int i = 0; i < cache->value_cache->ndim; i++)
-                numel *= (size_t)cache->value_cache->shape[i];
-            memset(v_data, 0, numel * sizeof(float));
-        }
+        float* v = (float*)tensor_data_ptr(cache->value_cache);
+        if (v) memset(v, 0, cache->value_cache->numel * sizeof(float));
     }
-
-    LOG_DEBUG("KVCache reset: current_len set to 0");
 }
 
 Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                  Tensor* value, Tensor* mask, FlashAttentionConfig* config) {
-    if (!mha || !query || !key || !value) {
-        LOG_ERROR("flash_attention_forward: NULL input");
-        return NULL;
-    }
-
-    if (!config || !config->enabled) {
-        LOG_DEBUG("flash_attention_forward: flash disabled, falling back to standard attention");
-        return multihead_attention_forward(mha, query, key, value, mask);
-    }
-
-    tensor_ensure_executed(query);
-    tensor_ensure_executed(key);
-    tensor_ensure_executed(value);
-
-    if (query->ndim != 3 || key->ndim != 3 || value->ndim != 3) {
-        LOG_ERROR("flash_attention_forward: expected 3D inputs [batch, seq, embed_dim]");
-        return NULL;
-    }
-
-    int batch = query->shape[0];
-    int seq_q = query->shape[1];
-    int seq_k = key->shape[1];
-    int embed_dim = mha->embed_dim;
-    int num_heads = mha->num_heads;
-    int head_dim = mha->head_dim;
-    int total_q = batch * seq_q;
-    int total_k = batch * seq_k;
-
-    int block_q = config->block_size_q;
-    int block_kv = config->block_size_kv;
-
-    // Fall back to standard attention if block sizes are invalid
-    if (block_q <= 0 || block_kv <= 0 || block_q >= seq_q || block_kv >= seq_k) {
-        LOG_DEBUG("flash_attention_forward: block sizes invalid or >= seq_len, falling back to standard attention");
-        return multihead_attention_forward(mha, query, key, value, mask);
-    }
-
-    float* wq_data = (float*)tensor_data_ptr(mha->W_q->tensor);
-    float* wk_data = (float*)tensor_data_ptr(mha->W_k->tensor);
-    float* wv_data = (float*)tensor_data_ptr(mha->W_v->tensor);
-    float* wo_data = (float*)tensor_data_ptr(mha->W_o->tensor);
-    float* bq_data = (float*)tensor_data_ptr(mha->b_q->tensor);
-    float* bk_data = (float*)tensor_data_ptr(mha->b_k->tensor);
-    float* bv_data = (float*)tensor_data_ptr(mha->b_v->tensor);
-    float* bo_data = (float*)tensor_data_ptr(mha->b_o->tensor);
-    float* q_in = (float*)tensor_data_ptr(query);
-    float* k_in = (float*)tensor_data_ptr(key);
-    float* v_in = (float*)tensor_data_ptr(value);
-
-    if (!wq_data || !wk_data || !wv_data || !wo_data || !q_in || !k_in || !v_in) {
-        LOG_ERROR("flash_attention_forward: failed to get data pointers");
-        return NULL;
-    }
-
-    float* Q = malloc((size_t)total_q * embed_dim * sizeof(float));
-    float* K = malloc((size_t)total_k * embed_dim * sizeof(float));
-    float* V = malloc((size_t)total_k * embed_dim * sizeof(float));
-    if (!Q || !K || !V) {
-        LOG_ERROR("flash_attention_forward: allocation failed");
-        free(Q); free(K); free(V);
-        return NULL;
-    }
-
-    linear_project(Q, q_in, wq_data, bq_data, total_q, embed_dim, embed_dim);
-    linear_project(K, k_in, wk_data, bk_data, total_k, embed_dim, embed_dim);
-    linear_project(V, v_in, wv_data, bv_data, total_k, embed_dim, embed_dim);
-
-    // [B, S, H, D] -> [B, H, S, D]
-    int BH = batch * num_heads;
-    float* Q_mh = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
-    float* K_mh = malloc((size_t)BH * seq_k * head_dim * sizeof(float));
-    float* V_mh = malloc((size_t)BH * seq_k * head_dim * sizeof(float));
-    if (!Q_mh || !K_mh || !V_mh) {
-        LOG_ERROR("flash_attention_forward: allocation failed");
-        free(Q); free(K); free(V); free(Q_mh); free(K_mh); free(V_mh);
-        return NULL;
-    }
-
-    for (int b = 0; b < batch; b++) {
-        for (int s = 0; s < seq_q; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
-                    Q_mh[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d] =
-                        Q[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d];
-                }
-            }
-        }
-        for (int s = 0; s < seq_k; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
-                    K_mh[b*num_heads*seq_k*head_dim + h*seq_k*head_dim + s*head_dim + d] =
-                        K[b*seq_k*embed_dim + s*embed_dim + h*head_dim + d];
-                    V_mh[b*num_heads*seq_k*head_dim + h*seq_k*head_dim + s*head_dim + d] =
-                        V[b*seq_k*embed_dim + s*embed_dim + h*head_dim + d];
-                }
-            }
-        }
-    }
-
-    free(Q); free(K); free(V);
-
-    float scale = 1.0f / sqrtf((float)head_dim);
-
-    // Tiled attention with online softmax (FlashAttention-2 on CPU)
-    float* O = calloc((size_t)BH * seq_q * head_dim, sizeof(float));
-    float* row_max = malloc((size_t)BH * seq_q * sizeof(float));
-    float* row_sum = calloc((size_t)BH * seq_q, sizeof(float));
-    if (!O || !row_max || !row_sum) {
-        LOG_ERROR("flash_attention_forward: allocation failed");
-        free(Q_mh); free(K_mh); free(V_mh);
-        free(O); free(row_max); free(row_sum);
-        return NULL;
-    }
-
-    for (size_t i = 0; i < (size_t)BH * seq_q; i++) {
-        row_max[i] = -1e30f;
-    }
-
-    float* S_tile = malloc((size_t)block_q * block_kv * sizeof(float));
-    if (!S_tile) {
-        LOG_ERROR("flash_attention_forward: allocation failed");
-        free(Q_mh); free(K_mh); free(V_mh);
-        free(O); free(row_max); free(row_sum); free(S_tile);
-        return NULL;
-    }
-
-    float* mask_data = NULL;
-    if (mask) {
-        tensor_ensure_executed(mask);
-        mask_data = (float*)tensor_data_ptr(mask);
-    }
-
-    for (int bh = 0; bh < BH; bh++) {
-        float* Q_bh = Q_mh + (size_t)bh * seq_q * head_dim;
-        float* K_bh = K_mh + (size_t)bh * seq_k * head_dim;
-        float* V_bh = V_mh + (size_t)bh * seq_k * head_dim;
-        float* O_bh = O + (size_t)bh * seq_q * head_dim;
-        float* rmax_bh = row_max + (size_t)bh * seq_q;
-        float* rsum_bh = row_sum + (size_t)bh * seq_q;
-
-        for (int qi = 0; qi < seq_q; qi += block_q) {
-            int q_end = qi + block_q;
-            if (q_end > seq_q) q_end = seq_q;
-            int q_len = q_end - qi;
-
-            for (int ki = 0; ki < seq_k; ki += block_kv) {
-                int k_end = ki + block_kv;
-                if (k_end > seq_k) k_end = seq_k;
-                int k_len = k_end - ki;
-
-                for (int qr = 0; qr < q_len; qr++) {
-                    for (int kr = 0; kr < k_len; kr++) {
-                        float dot = 0.0f;
-                        for (int d = 0; d < head_dim; d++) {
-                            dot += Q_bh[(qi + qr) * head_dim + d] *
-                                   K_bh[(ki + kr) * head_dim + d];
-                        }
-                        S_tile[qr * k_len + kr] = dot * scale;
-                    }
-                }
-
-                if (config->causal) {
-                    for (int qr = 0; qr < q_len; qr++) {
-                        for (int kr = 0; kr < k_len; kr++) {
-                            if ((ki + kr) > (qi + qr)) {
-                                S_tile[qr * k_len + kr] = -1e30f;
-                            }
-                        }
-                    }
-                }
-
-                if (mask_data) {
-                    int b_idx = bh / num_heads;
-                    for (int qr = 0; qr < q_len; qr++) {
-                        for (int kr = 0; kr < k_len; kr++) {
-                            size_t mask_idx;
-                            if (mask->ndim == 2) {
-                                mask_idx = (size_t)(qi + qr) * seq_k + (ki + kr);
-                            } else {
-                                mask_idx = (size_t)b_idx * seq_q * seq_k +
-                                           (qi + qr) * seq_k + (ki + kr);
-                            }
-                            if (mask_data[mask_idx] == 0.0f) {
-                                S_tile[qr * k_len + kr] = -1e30f;
-                            }
-                        }
-                    }
-                }
-
-                for (int qr = 0; qr < q_len; qr++) {
-                    int row_idx = qi + qr;
-
-                    float tile_max = S_tile[qr * k_len];
-                    for (int kr = 1; kr < k_len; kr++) {
-                        if (S_tile[qr * k_len + kr] > tile_max)
-                            tile_max = S_tile[qr * k_len + kr];
-                    }
-
-                    float old_max = rmax_bh[row_idx];
-                    float new_max = old_max > tile_max ? old_max : tile_max;
-
-                    float rescale_old = expf(old_max - new_max);
-                    float rescale_new = expf(tile_max - new_max);
-
-                    rsum_bh[row_idx] *= rescale_old;
-                    for (int d = 0; d < head_dim; d++) {
-                        O_bh[row_idx * head_dim + d] *= rescale_old;
-                    }
-
-                    float tile_sum = 0.0f;
-                    for (int kr = 0; kr < k_len; kr++) {
-                        float p = expf(S_tile[qr * k_len + kr] - tile_max) * rescale_new;
-                        tile_sum += p;
-                        for (int d = 0; d < head_dim; d++) {
-                            O_bh[row_idx * head_dim + d] +=
-                                p * V_bh[(ki + kr) * head_dim + d];
-                        }
-                    }
-
-                    rsum_bh[row_idx] += tile_sum;
-                    rmax_bh[row_idx] = new_max;
-                }
-            }
-        }
-
-        for (int qr = 0; qr < seq_q; qr++) {
-            float inv_sum = (rsum_bh[qr] > 0.0f) ? (1.0f / rsum_bh[qr]) : 0.0f;
-            for (int d = 0; d < head_dim; d++) {
-                O_bh[qr * head_dim + d] *= inv_sum;
-            }
-        }
-    }
-
-    free(S_tile);
-    free(row_max);
-    free(row_sum);
-    free(Q_mh);
-    free(K_mh);
-    free(V_mh);
-
-    // [B, H, seq_q, head_dim] -> [B, seq_q, embed_dim]
-    float* concat = malloc((size_t)batch * seq_q * embed_dim * sizeof(float));
-    if (!concat) {
-        LOG_ERROR("flash_attention_forward: allocation failed");
-        free(O);
-        return NULL;
-    }
-
-    for (int b = 0; b < batch; b++) {
-        for (int s = 0; s < seq_q; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
-                    concat[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d] =
-                        O[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d];
-                }
-            }
-        }
-    }
-    free(O);
-
-    float* output_data = malloc((size_t)total_q * embed_dim * sizeof(float));
-    if (!output_data) {
-        LOG_ERROR("flash_attention_forward: allocation failed");
-        free(concat);
-        return NULL;
-    }
-
-    linear_project(output_data, concat, wo_data, bo_data, total_q, embed_dim, embed_dim);
-    free(concat);
-    int out_shape[] = {batch, seq_q, embed_dim};
-    TensorConfig out_config = {.dtype = query->dtype, .device = query->device,
-                                .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(output_data, out_shape, 3, &out_config);
-    free(output_data);
-
-    if (!output) {
-        LOG_ERROR("flash_attention_forward: failed to create output tensor");
-        return NULL;
-    }
-
-    LOG_DEBUG("flash_attention_forward: batch=%d, seq_q=%d, seq_k=%d, block_q=%d, block_kv=%d, causal=%d",
-              batch, seq_q, seq_k, block_q, block_kv, config->causal);
-
-    return output;
+    (void)config;
+    /* Route to the lazy SDPA-based implementation; FlashAttention is a memory
+     * optimization that is not needed when execution is deferred. */
+    return multihead_attention_forward(mha, query, key, value, mask);
 }
 
 Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query,
                                             Tensor* key, Tensor* value,
                                             Tensor* mask, KVCache* cache) {
-    if (!mha || !query || !key || !value) {
-        LOG_ERROR("multihead_attention_forward_cached: NULL input");
-        return NULL;
-    }
+    if (!mha || !query || !key || !value) return NULL;
+    if (!cache) return multihead_attention_forward(mha, query, key, value, mask);
 
-    if (!cache) {
-        LOG_DEBUG("multihead_attention_forward_cached: no cache, falling back to standard attention");
-        return multihead_attention_forward(mha, query, key, value, mask);
-    }
-
+    /* KV cache involves mutable state so we materialize inputs first. */
     tensor_ensure_executed(query);
     tensor_ensure_executed(key);
     tensor_ensure_executed(value);
     tensor_ensure_executed(cache->key_cache);
     tensor_ensure_executed(cache->value_cache);
 
-    if (query->ndim != 3 || key->ndim != 3 || value->ndim != 3) {
-        LOG_ERROR("multihead_attention_forward_cached: expected 3D inputs [batch, seq, embed_dim]");
-        return NULL;
-    }
+    if (query->ndim != 3 || key->ndim != 3 || value->ndim != 3) return NULL;
 
-    int batch = query->shape[0];
-    int seq_q = query->shape[1];
-    int seq_k = key->shape[1];
+    int batch     = query->shape[0];
+    int seq_q     = query->shape[1];
+    int seq_k     = key->shape[1];
     int embed_dim = mha->embed_dim;
     int num_heads = mha->num_heads;
-    int head_dim = mha->head_dim;
-    int total_q = batch * seq_q;
-    int total_k = batch * seq_k;
+    int head_dim  = mha->head_dim;
+    int total_q   = batch * seq_q;
+    int total_k   = batch * seq_k;
 
     if (cache->current_len + seq_k > cache->max_seq_len) {
-        LOG_ERROR("multihead_attention_forward_cached: cache overflow (current_len=%d + seq_k=%d > max_seq_len=%d)",
-                  cache->current_len, seq_k, cache->max_seq_len);
+        LOG_ERROR("multihead_attention_forward_cached: cache overflow");
         return NULL;
     }
 
-    float* wq_data = (float*)tensor_data_ptr(mha->W_q->tensor);
-    float* wk_data = (float*)tensor_data_ptr(mha->W_k->tensor);
-    float* wv_data = (float*)tensor_data_ptr(mha->W_v->tensor);
-    float* wo_data = (float*)tensor_data_ptr(mha->W_o->tensor);
-    float* bq_data = (float*)tensor_data_ptr(mha->b_q->tensor);
-    float* bk_data = (float*)tensor_data_ptr(mha->b_k->tensor);
-    float* bv_data = (float*)tensor_data_ptr(mha->b_v->tensor);
-    float* bo_data = (float*)tensor_data_ptr(mha->b_o->tensor);
-    float* q_in = (float*)tensor_data_ptr(query);
-    float* k_in = (float*)tensor_data_ptr(key);
-    float* v_in = (float*)tensor_data_ptr(value);
+    /* Project Q, K, V eagerly so we can write K/V into the cache. */
+    Tensor* Q_t = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
+    Tensor* K_t = uop_linear(key,   mha->W_k->tensor, mha->b_k->tensor);
+    Tensor* V_t = uop_linear(value, mha->W_v->tensor, mha->b_v->tensor);
+    if (!Q_t || !K_t || !V_t) return NULL;
 
-    if (!wq_data || !wk_data || !wv_data || !wo_data || !q_in || !k_in || !v_in) {
-        LOG_ERROR("multihead_attention_forward_cached: failed to get data pointers");
-        return NULL;
-    }
+    tensor_ensure_executed(Q_t);
+    tensor_ensure_executed(K_t);
+    tensor_ensure_executed(V_t);
 
-    float* Q_proj = malloc((size_t)total_q * embed_dim * sizeof(float));
-    float* K_proj = malloc((size_t)total_k * embed_dim * sizeof(float));
-    float* V_proj = malloc((size_t)total_k * embed_dim * sizeof(float));
-    if (!Q_proj || !K_proj || !V_proj) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(Q_proj); free(K_proj); free(V_proj);
-        return NULL;
-    }
-
-    linear_project(Q_proj, q_in, wq_data, bq_data, total_q, embed_dim, embed_dim);
-    linear_project(K_proj, k_in, wk_data, bk_data, total_k, embed_dim, embed_dim);
-    linear_project(V_proj, v_in, wv_data, bv_data, total_k, embed_dim, embed_dim);
-
-    // Reshape new K, V to [B, H, seq_k, D] and append to cache
+    float* Q_data  = (float*)tensor_data_ptr(Q_t);
+    float* K_data  = (float*)tensor_data_ptr(K_t);
+    float* V_data  = (float*)tensor_data_ptr(V_t);
     float* kc_data = (float*)tensor_data_ptr(cache->key_cache);
     float* vc_data = (float*)tensor_data_ptr(cache->value_cache);
-    if (!kc_data || !vc_data) {
-        LOG_ERROR("multihead_attention_forward_cached: failed to get cache data pointers");
-        free(Q_proj); free(K_proj); free(V_proj);
-        return NULL;
-    }
+    if (!Q_data || !K_data || !V_data || !kc_data || !vc_data) return NULL;
 
-    int max_sl = cache->max_seq_len;
+    int max_sl  = cache->max_seq_len;
     int cur_pos = cache->current_len;
 
-    // Copy new K, V into cache at [b, h, cur_pos..cur_pos+seq_k, d]
     for (int b = 0; b < batch; b++) {
         for (int s = 0; s < seq_k; s++) {
             for (int h = 0; h < num_heads; h++) {
                 for (int d = 0; d < head_dim; d++) {
-                    size_t cache_idx = (size_t)b * num_heads * max_sl * head_dim +
-                                       h * max_sl * head_dim +
-                                       (cur_pos + s) * head_dim + d;
-                    size_t proj_idx = (size_t)b * seq_k * embed_dim +
-                                      s * embed_dim + h * head_dim + d;
-                    kc_data[cache_idx] = K_proj[proj_idx];
-                    vc_data[cache_idx] = V_proj[proj_idx];
+                    size_t ci = (size_t)b * num_heads * max_sl * head_dim +
+                                h * max_sl * head_dim + (cur_pos + s) * head_dim + d;
+                    size_t pi = (size_t)b * seq_k * embed_dim + s * embed_dim + h * head_dim + d;
+                    kc_data[ci] = K_data[pi];
+                    vc_data[ci] = V_data[pi];
                 }
             }
         }
     }
-
-    free(K_proj);
-    free(V_proj);
-
     cache->current_len = cur_pos + seq_k;
     int cached_len = cache->current_len;
 
-    // [B, seq_q, H, D] -> [B, H, seq_q, D]
-    int BH = batch * num_heads;
-    float* Q_mh = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
-    if (!Q_mh) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(Q_proj);
-        return NULL;
-    }
-
-    for (int b = 0; b < batch; b++) {
-        for (int s = 0; s < seq_q; s++) {
-            for (int h = 0; h < num_heads; h++) {
-                for (int d = 0; d < head_dim; d++) {
+    /* Build contiguous Q/K/V tensors for the lazy attention path. */
+    int q4_shape[] = {batch, num_heads, seq_q, head_dim};
+    float* Q_mh = malloc((size_t)batch * num_heads * seq_q * head_dim * sizeof(float));
+    if (!Q_mh) return NULL;
+    for (int b = 0; b < batch; b++)
+        for (int s = 0; s < seq_q; s++)
+            for (int h = 0; h < num_heads; h++)
+                for (int d = 0; d < head_dim; d++)
                     Q_mh[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d] =
-                        Q_proj[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d];
-                }
-            }
-        }
-    }
-    free(Q_proj);
+                        Q_data[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d];
 
-    // Transpose cached K for matmul: [B, H, cached_len, D] -> [BH, D, cached_len]
-    float* K_t = malloc((size_t)BH * head_dim * cached_len * sizeof(float));
-    if (!K_t) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(Q_mh);
-        return NULL;
-    }
+    float* K_cached = malloc((size_t)batch * num_heads * cached_len * head_dim * sizeof(float));
+    float* V_cached = malloc((size_t)batch * num_heads * cached_len * head_dim * sizeof(float));
+    if (!K_cached || !V_cached) { free(Q_mh); free(K_cached); free(V_cached); return NULL; }
 
-    for (int bh = 0; bh < BH; bh++) {
-        int b = bh / num_heads;
-        int h = bh % num_heads;
-        for (int s = 0; s < cached_len; s++) {
-            for (int d = 0; d < head_dim; d++) {
-                size_t cache_idx = (size_t)b * num_heads * max_sl * head_dim +
-                                   h * max_sl * head_dim + s * head_dim + d;
-                K_t[bh * head_dim * cached_len + d * cached_len + s] = kc_data[cache_idx];
-            }
-        }
-    }
-
-    float* scores = malloc((size_t)BH * seq_q * cached_len * sizeof(float));
-    if (!scores) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(Q_mh); free(K_t);
-        return NULL;
-    }
-
-    batch_matmul(scores, Q_mh, K_t, BH, seq_q, head_dim, cached_len);
-    free(K_t);
-    free(Q_mh);
-
-    float scale = 1.0f / sqrtf((float)head_dim);
-    size_t scores_size = (size_t)BH * seq_q * cached_len;
-    for (size_t i = 0; i < scores_size; i++) {
-        scores[i] *= scale;
-    }
-
-    if (mask) {
-        tensor_ensure_executed(mask);
-        float* mask_data = (float*)tensor_data_ptr(mask);
-        if (mask_data) {
-            for (int bh = 0; bh < BH; bh++) {
-                int b_idx = bh / num_heads;
-                for (int sq = 0; sq < seq_q; sq++) {
-                    for (int sk = 0; sk < cached_len; sk++) {
-                        size_t mask_idx;
-                        if (mask->ndim == 2) {
-                            mask_idx = (size_t)sq * cached_len + sk;
-                        } else {
-                            mask_idx = (size_t)b_idx * seq_q * cached_len + sq * cached_len + sk;
-                        }
-                        if (mask_data[mask_idx] == 0.0f) {
-                            scores[bh * seq_q * cached_len + sq * cached_len + sk] = -1e9f;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    softmax_inplace(scores, BH * seq_q, cached_len);
-
-    // Extract cached V into contiguous [BH, cached_len, head_dim] for matmul
-    float* V_cached = malloc((size_t)BH * cached_len * head_dim * sizeof(float));
-    if (!V_cached) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(scores);
-        return NULL;
-    }
-
-    for (int bh = 0; bh < BH; bh++) {
-        int b = bh / num_heads;
-        int h = bh % num_heads;
-        for (int s = 0; s < cached_len; s++) {
-            for (int d = 0; d < head_dim; d++) {
-                size_t cache_idx = (size_t)b * num_heads * max_sl * head_dim +
-                                   h * max_sl * head_dim + s * head_dim + d;
-                V_cached[bh * cached_len * head_dim + s * head_dim + d] = vc_data[cache_idx];
-            }
-        }
-    }
-
-    float* attn_out = malloc((size_t)BH * seq_q * head_dim * sizeof(float));
-    if (!attn_out) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(scores); free(V_cached);
-        return NULL;
-    }
-
-    batch_matmul(attn_out, scores, V_cached, BH, seq_q, cached_len, head_dim);
-    free(scores);
-    free(V_cached);
-
-    // [B, H, seq_q, D] -> [B, seq_q, embed_dim]
-    float* concat = malloc((size_t)batch * seq_q * embed_dim * sizeof(float));
-    if (!concat) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(attn_out);
-        return NULL;
-    }
-
-    for (int b = 0; b < batch; b++) {
-        for (int s = 0; s < seq_q; s++) {
-            for (int h = 0; h < num_heads; h++) {
+    for (int b = 0; b < batch; b++)
+        for (int h = 0; h < num_heads; h++)
+            for (int s = 0; s < cached_len; s++)
                 for (int d = 0; d < head_dim; d++) {
-                    concat[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d] =
-                        attn_out[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d];
+                    size_t ci = (size_t)b * num_heads * max_sl * head_dim +
+                                h * max_sl * head_dim + s * head_dim + d;
+                    K_cached[b*num_heads*cached_len*head_dim + h*cached_len*head_dim + s*head_dim + d] = kc_data[ci];
+                    V_cached[b*num_heads*cached_len*head_dim + h*cached_len*head_dim + s*head_dim + d] = vc_data[ci];
                 }
-            }
-        }
-    }
-    free(attn_out);
 
-    float* output_data = malloc((size_t)total_q * embed_dim * sizeof(float));
-    if (!output_data) {
-        LOG_ERROR("multihead_attention_forward_cached: allocation failed");
-        free(concat);
-        return NULL;
-    }
+    TensorConfig cfg = {.dtype = query->dtype, .device = query->device,
+                        .has_dtype = true, .has_device = true};
+    Tensor* Q_lazy = tensor_from_data(Q_mh, q4_shape, 4, &cfg); free(Q_mh);
+    int k4_shape[] = {batch, num_heads, cached_len, head_dim};
+    Tensor* K_lazy = tensor_from_data(K_cached, k4_shape, 4, &cfg); free(K_cached);
+    Tensor* V_lazy = tensor_from_data(V_cached, k4_shape, 4, &cfg); free(V_cached);
+    if (!Q_lazy || !K_lazy || !V_lazy) return NULL;
 
-    linear_project(output_data, concat, wo_data, bo_data, total_q, embed_dim, embed_dim);
-    free(concat);
-    int out_shape[] = {batch, seq_q, embed_dim};
-    TensorConfig out_config = {.dtype = query->dtype, .device = query->device,
-                                .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(output_data, out_shape, 3, &out_config);
-    free(output_data);
+    Tensor* attn_out = uop_scaled_dot_product_attention(Q_lazy, K_lazy, V_lazy, mask);
+    if (!attn_out) return NULL;
 
-    if (!output) {
-        LOG_ERROR("multihead_attention_forward_cached: failed to create output tensor");
-        return NULL;
-    }
+    int inv_perm[] = {0, 2, 1, 3};
+    PermuteParams ipp = {.perm = inv_perm, .num_dims = 4};
+    Tensor* attn_t = uop_permute(attn_out, &ipp);
+    if (!attn_t) return NULL;
 
-    LOG_DEBUG("multihead_attention_forward_cached: batch=%d, seq_q=%d, cached_len=%d",
-              batch, seq_q, cached_len);
+    int out3[] = {batch, seq_q, embed_dim};
+    ReshapeParams orp = {.new_shape = out3, .new_ndim = 3};
+    Tensor* concat = uop_reshape(attn_t, &orp);
+    if (!concat) return NULL;
 
-    return output;
+    (void)total_q; (void)total_k;
+    return uop_linear(concat, mha->W_o->tensor, mha->b_o->tensor);
 }
 
 void multihead_attention_set_flash(MultiHeadAttention* mha, bool enabled, bool causal) {
-    if (!mha) {
-        LOG_ERROR("multihead_attention_set_flash: NULL mha");
-        return;
-    }
-
-    LOG_DEBUG("multihead_attention_set_flash: enabled=%d, causal=%d "
-              "(config is passed per-call via FlashAttentionConfig, this is informational only)",
-              enabled, causal);
+    if (!mha) return;
+    (void)enabled; (void)causal;
 }

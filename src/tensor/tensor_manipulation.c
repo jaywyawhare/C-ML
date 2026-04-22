@@ -2,154 +2,18 @@
 #include "tensor/tensor_views.h"
 #include "tensor/tensor_manipulation.h"
 #include "autograd/forward_ops.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
 Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
-    if (!tensors || num_tensors <= 0) {
-        LOG_ERROR("tensor_concat: invalid input");
-        return NULL;
-    }
-
-    if (num_tensors == 1) {
-        return tensor_clone(tensors[0]);
-    }
-
-    int normalized_dim = dim;
-    if (normalized_dim < 0) {
-        normalized_dim = tensors[0]->ndim + normalized_dim;
-    }
-    if (normalized_dim < 0 || normalized_dim >= tensors[0]->ndim) {
-        LOG_ERROR("tensor_concat: dimension %d out of range", dim);
-        return NULL;
-    }
-
-    for (int i = 1; i < num_tensors; i++) {
-        if (!tensors[i] || tensors[i]->ndim != tensors[0]->ndim) {
-            LOG_ERROR("tensor_concat: all tensors must have same number of dimensions");
-            return NULL;
-        }
-        for (int d = 0; d < tensors[0]->ndim; d++) {
-            if (d != normalized_dim && tensors[i]->shape[d] != tensors[0]->shape[d]) {
-                LOG_ERROR(
-                    "tensor_concat: all tensors must have same shape except in concat dimension");
-                return NULL;
-            }
-        }
-    }
-
-    int* out_shape = tensor_shape_copy(tensors[0]->shape, tensors[0]->ndim);
-    if (!out_shape)
-        return NULL;
-
-    int total_size = 0;
-    for (int i = 0; i < num_tensors; i++) {
-        total_size += tensors[i]->shape[normalized_dim];
-    }
-    out_shape[normalized_dim] = total_size;
-
-    TensorConfig config = (TensorConfig){.dtype      = tensors[0]->dtype,
-                                         .device     = tensors[0]->device,
-                                         .has_dtype  = true,
-                                         .has_device = true};
-    Tensor* output      = tensor_empty(out_shape, tensors[0]->ndim, &config);
-    free(out_shape);
-    if (!output)
-        return NULL;
-
-    float* out_data = (float*)tensor_data_ptr(output);
-    int offset      = 0;
-
-    for (int t = 0; t < num_tensors; t++) {
-        Tensor* tensor = tensors[t];
-        float* in_data = (float*)tensor_data_ptr(tensor);
-
-        size_t slice_size = 1;
-        for (int d = normalized_dim + 1; d < tensor->ndim; d++) {
-            slice_size *= (size_t)tensor->shape[d];
-        }
-
-        size_t num_slices = 1;
-        for (int d = 0; d < normalized_dim; d++) {
-            num_slices *= (size_t)tensor->shape[d];
-        }
-
-        size_t slice_elements = slice_size * (size_t)tensor->shape[normalized_dim];
-
-        for (size_t s = 0; s < num_slices; s++) {
-            size_t src_offset = s * slice_elements;
-            size_t dst_offset = s * (slice_size * (size_t)total_size) + (size_t)offset * slice_size;
-            memcpy(out_data + dst_offset, in_data + src_offset, slice_elements * sizeof(float));
-        }
-
-        offset += tensor->shape[normalized_dim];
-    }
-
-    return output;
+    return uop_cat(tensors, num_tensors, dim);
 }
 
 Tensor* tensor_stack(Tensor** tensors, int num_tensors, int dim) {
-    if (!tensors || num_tensors <= 0) {
-        LOG_ERROR("tensor_stack: invalid input");
-        return NULL;
-    }
-
-    int normalized_dim = dim;
-    if (normalized_dim < 0) {
-        normalized_dim = tensors[0]->ndim + 1 + normalized_dim;
-    }
-    if (normalized_dim < 0 || normalized_dim > tensors[0]->ndim) {
-        LOG_ERROR("tensor_stack: dimension %d out of range", dim);
-        return NULL;
-    }
-
-    for (int i = 1; i < num_tensors; i++) {
-        if (!tensors[i] || tensors[i]->ndim != tensors[0]->ndim) {
-            LOG_ERROR("tensor_stack: all tensors must have same number of dimensions");
-            return NULL;
-        }
-        for (int d = 0; d < tensors[0]->ndim; d++) {
-            if (tensors[i]->shape[d] != tensors[0]->shape[d]) {
-                LOG_ERROR("tensor_stack: all tensors must have same shape");
-                return NULL;
-            }
-        }
-    }
-
-    int out_ndim   = tensors[0]->ndim + 1;
-    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
-    if (!out_shape)
-        return NULL;
-
-    for (int d = 0; d < normalized_dim; d++) {
-        out_shape[d] = tensors[0]->shape[d];
-    }
-    out_shape[normalized_dim] = num_tensors;
-    for (int d = normalized_dim; d < tensors[0]->ndim; d++) {
-        out_shape[d + 1] = tensors[0]->shape[d];
-    }
-
-    TensorConfig config = (TensorConfig){.dtype      = tensors[0]->dtype,
-                                         .device     = tensors[0]->device,
-                                         .has_dtype  = true,
-                                         .has_device = true};
-    Tensor* output      = tensor_empty(out_shape, out_ndim, &config);
-    free(out_shape);
-    if (!output)
-        return NULL;
-
-    float* out_data    = (float*)tensor_data_ptr(output);
-    size_t tensor_size = tensors[0]->numel;
-
-    for (int t = 0; t < num_tensors; t++) {
-        float* in_data = (float*)tensor_data_ptr(tensors[t]);
-        size_t offset  = (size_t)t * tensor_size;
-        memcpy(out_data + offset, in_data, tensor_size * sizeof(float));
-    }
-
-    return output;
+    return uop_stack(tensors, num_tensors, dim);
 }
 
 Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes) {
@@ -159,9 +23,8 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
     }
 
     int normalized_dim = dim;
-    if (normalized_dim < 0) {
+    if (normalized_dim < 0)
         normalized_dim = tensor->ndim + normalized_dim;
-    }
     if (normalized_dim < 0 || normalized_dim >= tensor->ndim) {
         LOG_ERROR("tensor_split: dimension %d out of range", dim);
         return NULL;
@@ -169,82 +32,62 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
 
     int dim_size = tensor->shape[normalized_dim];
 
-    Tensor** results = malloc((size_t)num_splits * sizeof(Tensor*));
-    if (!results)
-        return NULL;
-
     int* sizes = NULL;
+    int need_free = 0;
     if (split_sizes) {
         sizes = split_sizes;
     } else {
         int base_size = dim_size / num_splits;
         int remainder = dim_size % num_splits;
-        sizes         = malloc((size_t)num_splits * sizeof(int));
-        if (!sizes) {
-            free(results);
-            return NULL;
-        }
-        for (int i = 0; i < num_splits; i++) {
+        sizes = malloc((size_t)num_splits * sizeof(int));
+        if (!sizes) return NULL;
+        need_free = 1;
+        for (int i = 0; i < num_splits; i++)
             sizes[i] = base_size + (i < remainder ? 1 : 0);
-        }
+    }
+
+    Tensor** results = malloc((size_t)num_splits * sizeof(Tensor*));
+    if (!results) {
+        if (need_free) free(sizes);
+        return NULL;
     }
 
     int offset = 0;
     for (int i = 0; i < num_splits; i++) {
-        int* out_shape = tensor_shape_copy(tensor->shape, tensor->ndim);
-        if (!out_shape) {
-            for (int j = 0; j < i; j++)
-                tensor_free(results[j]);
+        int* starts = calloc((size_t)tensor->ndim, sizeof(int));
+        int* ends   = malloc((size_t)tensor->ndim * sizeof(int));
+        int* steps  = malloc((size_t)tensor->ndim * sizeof(int));
+        if (!starts || !ends || !steps) {
+            free(starts); free(ends); free(steps);
+            for (int j = 0; j < i; j++) tensor_free(results[j]);
             free(results);
-            if (!split_sizes)
-                free(sizes);
+            if (need_free) free(sizes);
             return NULL;
         }
-        out_shape[normalized_dim] = sizes[i];
+        for (int d = 0; d < tensor->ndim; d++) {
+            starts[d] = (d == normalized_dim) ? offset : 0;
+            ends[d]   = (d == normalized_dim) ? offset + sizes[i] : tensor->shape[d];
+            steps[d]  = 1;
+        }
 
-        TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
-                                             .device     = tensor->device,
-                                             .has_dtype  = true,
-                                             .has_device = true};
-        Tensor* split       = tensor_empty(out_shape, tensor->ndim, &config);
-        free(out_shape);
-        if (!split) {
-            for (int j = 0; j < i; j++)
-                tensor_free(results[j]);
+        SliceParams* sp = malloc(sizeof(SliceParams));
+        if (!sp) {
+            free(starts); free(ends); free(steps);
+            for (int j = 0; j < i; j++) tensor_free(results[j]);
             free(results);
-            if (!split_sizes)
-                free(sizes);
+            if (need_free) free(sizes);
             return NULL;
         }
+        sp->start    = starts;
+        sp->end      = ends;
+        sp->step     = steps;
+        sp->num_dims = tensor->ndim;
 
-        float* split_data  = (float*)tensor_data_ptr(split);
-        float* tensor_data = (float*)tensor_data_ptr(tensor);
-
-        size_t slice_size = 1;
-        for (int d = normalized_dim + 1; d < tensor->ndim; d++) {
-            slice_size *= (size_t)tensor->shape[d];
-        }
-
-        size_t num_slices = 1;
-        for (int d = 0; d < normalized_dim; d++) {
-            num_slices *= (size_t)tensor->shape[d];
-        }
-
-        size_t slice_elements = slice_size * (size_t)sizes[i];
-        size_t src_offset     = (size_t)offset * slice_size;
-
-        for (size_t s = 0; s < num_slices; s++) {
-            memcpy(split_data + s * slice_elements,
-                   tensor_data + s * (slice_size * (size_t)dim_size) + src_offset,
-                   slice_elements * sizeof(float));
-        }
-
-        results[i] = split;
+        results[i] = uop_slice(tensor, sp);
         offset += sizes[i];
     }
 
-    if (!split_sizes)
-        free(sizes);
+    if (need_free) free(sizes);
     return results;
 }
 
@@ -255,23 +98,25 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     }
 
     int normalized_dim = dim;
-    if (normalized_dim < 0) {
+    if (normalized_dim < 0)
         normalized_dim = input->ndim + normalized_dim;
-    }
     if (normalized_dim < 0 || normalized_dim >= input->ndim) {
         LOG_ERROR("tensor_gather: dimension %d out of range", dim);
         return NULL;
+    }
+
+    /* uop_gather requires 1D indices; for multi-dim indices use eager fallback */
+    if (indices->ndim == 1) {
+        return uop_gather(input, indices, normalized_dim);
     }
 
     if (indices->ndim != input->ndim) {
         LOG_ERROR("tensor_gather: indices must have same number of dimensions as input");
         return NULL;
     }
-
     for (int d = 0; d < input->ndim; d++) {
         if (d != normalized_dim && indices->shape[d] != input->shape[d]) {
-            LOG_ERROR(
-                "tensor_gather: indices shape must match input shape except in gather dimension");
+            LOG_ERROR("tensor_gather: indices shape must match input shape except in gather dimension");
             return NULL;
         }
     }
@@ -279,8 +124,7 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* output = tensor_empty(indices->shape, indices->ndim, &config);
-    if (!output)
-        return NULL;
+    if (!output) return NULL;
 
     float* in_data  = (float*)tensor_data_ptr(input);
     float* out_data = (float*)tensor_data_ptr(output);
@@ -290,10 +134,8 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     size_t* output_strides = compute_contiguous_strides(output->shape, output->ndim);
     if (!input_strides || !output_strides) {
         tensor_free(output);
-        if (input_strides)
-            free(input_strides);
-        if (output_strides)
-            free(output_strides);
+        free(input_strides);
+        free(output_strides);
         return NULL;
     }
 
@@ -306,9 +148,8 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
         }
 
         size_t idx_offset = 0;
-        for (int d = 0; d < output->ndim; d++) {
+        for (int d = 0; d < output->ndim; d++)
             idx_offset += (size_t)out_indices[d] * output_strides[d];
-        }
         int gather_idx = idx_data[idx_offset];
 
         if (gather_idx < 0 || gather_idx >= input->shape[normalized_dim]) {
@@ -322,14 +163,12 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
         }
 
         int* in_indices = malloc((size_t)input->ndim * sizeof(int));
-        for (int d = 0; d < input->ndim; d++) {
+        for (int d = 0; d < input->ndim; d++)
             in_indices[d] = (d == normalized_dim) ? gather_idx : out_indices[d];
-        }
 
         size_t in_offset = 0;
-        for (int d = 0; d < input->ndim; d++) {
+        for (int d = 0; d < input->ndim; d++)
             in_offset += (size_t)in_indices[d] * input_strides[d];
-        }
 
         out_data[i] = in_data[in_offset];
 
@@ -343,93 +182,5 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
 }
 
 Tensor* tensor_scatter(Tensor* input, int dim, Tensor* index, Tensor* src) {
-    if (!input || !index || !src) {
-        LOG_ERROR("tensor_scatter: invalid input");
-        return NULL;
-    }
-
-    int normalized_dim = dim;
-    if (normalized_dim < 0) {
-        normalized_dim = input->ndim + normalized_dim;
-    }
-    if (normalized_dim < 0 || normalized_dim >= input->ndim) {
-        LOG_ERROR("tensor_scatter: dimension %d out of range", dim);
-        return NULL;
-    }
-
-    if (index->ndim != src->ndim || index->ndim != input->ndim) {
-        LOG_ERROR("tensor_scatter: index, src, and input must have same number of dimensions");
-        return NULL;
-    }
-
-    for (int d = 0; d < input->ndim; d++) {
-        if (d != normalized_dim &&
-            (index->shape[d] != input->shape[d] || src->shape[d] != input->shape[d])) {
-            LOG_ERROR("tensor_scatter: shapes must match except in scatter dimension");
-            return NULL;
-        }
-    }
-
-    Tensor* output = tensor_clone(input);
-    if (!output)
-        return NULL;
-
-    float* out_data = (float*)tensor_data_ptr(output);
-    float* src_data = (float*)tensor_data_ptr(src);
-    int* idx_data   = (int*)tensor_data_ptr(index);
-
-    size_t* output_strides = compute_contiguous_strides(output->shape, output->ndim);
-    size_t* src_strides    = compute_contiguous_strides(src->shape, src->ndim);
-    if (!output_strides || !src_strides) {
-        tensor_free(output);
-        if (output_strides)
-            free(output_strides);
-        if (src_strides)
-            free(src_strides);
-        return NULL;
-    }
-
-    for (size_t i = 0; i < src->numel; i++) {
-        int* src_indices = malloc((size_t)src->ndim * sizeof(int));
-        size_t idx       = i;
-        for (int d = src->ndim - 1; d >= 0; d--) {
-            src_indices[d] = (int)(idx % (size_t)src->shape[d]);
-            idx /= (size_t)src->shape[d];
-        }
-
-        size_t idx_offset = 0;
-        for (int d = 0; d < src->ndim; d++) {
-            idx_offset += (size_t)src_indices[d] * src_strides[d];
-        }
-        int scatter_idx = idx_data[idx_offset];
-
-        if (scatter_idx < 0 || scatter_idx >= output->shape[normalized_dim]) {
-            free(src_indices);
-            free(output_strides);
-            free(src_strides);
-            tensor_free(output);
-            LOG_ERROR("tensor_scatter: index %d out of range [0, %d)", scatter_idx,
-                      output->shape[normalized_dim]);
-            return NULL;
-        }
-
-        int* out_indices = malloc((size_t)output->ndim * sizeof(int));
-        for (int d = 0; d < output->ndim; d++) {
-            out_indices[d] = (d == normalized_dim) ? scatter_idx : src_indices[d];
-        }
-
-        size_t out_offset = 0;
-        for (int d = 0; d < output->ndim; d++) {
-            out_offset += (size_t)out_indices[d] * output_strides[d];
-        }
-
-        out_data[out_offset] = src_data[i];
-
-        free(src_indices);
-        free(out_indices);
-    }
-
-    free(output_strides);
-    free(src_strides);
-    return output;
+    return uop_scatter(input, dim, index, src);
 }

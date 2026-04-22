@@ -416,12 +416,19 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     if (cml_ir_add_uop(ir, UOP_MATMUL, inputs, 2, NULL) != 0)
         return NULL;
     struct IRNode* node = cml_ir_get_tail(ir);
-    int M                 = a->shape[a->ndim - 2];
-    int N                 = b->shape[b->ndim - 1];
-    node->output_shape    = malloc(2 * sizeof(int));
-    node->output_shape[0] = M;
-    node->output_shape[1] = N;
-    node->output_ndim     = 2;
+    int batch_dims = (a->ndim > 2) ? a->ndim - 2 : 0;
+    int out_ndim = batch_dims + 2;
+    node->output_shape = malloc((size_t)out_ndim * sizeof(int));
+    if (!node->output_shape) {
+        LOG_ERROR("Failed to allocate output shape for matmul");
+        return NULL;
+    }
+    for (int i = 0; i < batch_dims; i++) {
+        node->output_shape[i] = a->shape[i];
+    }
+    node->output_shape[out_ndim - 2] = a->shape[a->ndim - 2];
+    node->output_shape[out_ndim - 1] = b->shape[b->ndim - 1];
+    node->output_ndim = out_ndim;
     if (a->requires_grad || b->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = a->requires_grad;
@@ -513,178 +520,23 @@ Tensor* tensor_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
 Tensor* tensor_argmax(Tensor* a, int dim) {
     if (!a)
         return NULL;
-
-    tensor_ensure_executed(a);
-    float* data = (float*)tensor_data_ptr(a);
-    if (!data)
-        return NULL;
-
-    TensorConfig config = {
-        .dtype = DTYPE_INT32, .has_dtype = true, .device = a->device, .has_device = true};
-
-    if (dim < 0) {
-        float max_val = -FLT_MAX;
-        int max_idx   = 0;
-        for (size_t i = 0; i < a->numel; i++) {
-            if (data[i] > max_val) {
-                max_val = data[i];
-                max_idx = (int)i;
-            }
-        }
-
-        int shape[]    = {1};
-        Tensor* result = tensor_empty(shape, 1, &config);
-        if (!result)
-            return NULL;
-        tensor_ensure_executed(result);
-        int* result_data = (int*)tensor_data_ptr(result);
-        result_data[0]   = max_idx;
-        return result;
+    ReduceParams params = {0};
+    if (dim >= 0) {
+        params.dims = &dim;
+        params.num_dims = 1;
     }
-    if (dim >= a->ndim) {
-        LOG_ERROR("tensor_argmax: dimension %d out of range for %dD tensor", dim, a->ndim);
-        return NULL;
-    }
-    int out_ndim = a->ndim - 1;
-    if (out_ndim == 0)
-        out_ndim = 1;
-
-    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
-    if (!out_shape)
-        return NULL;
-
-    if (a->ndim == 1) {
-        out_shape[0] = 1;
-    } else {
-        int j = 0;
-        for (int i = 0; i < a->ndim; i++) {
-            if (i != dim)
-                out_shape[j++] = a->shape[i];
-        }
-    }
-
-    Tensor* result = tensor_empty(out_shape, out_ndim, &config);
-    if (!result) {
-        free(out_shape);
-        return NULL;
-    }
-    tensor_ensure_executed(result);
-    int* result_data = (int*)tensor_data_ptr(result);
-    size_t outer_size = 1;
-    for (int i = 0; i < dim; i++)
-        outer_size *= (size_t)a->shape[i];
-
-    size_t dim_size = (size_t)a->shape[dim];
-
-    size_t inner_size = 1;
-    for (int i = dim + 1; i < a->ndim; i++)
-        inner_size *= (size_t)a->shape[i];
-    for (size_t o = 0; o < outer_size; o++) {
-        for (size_t in = 0; in < inner_size; in++) {
-            float max_val = -FLT_MAX;
-            int max_idx   = 0;
-            for (size_t d = 0; d < dim_size; d++) {
-                size_t idx = o * dim_size * inner_size + d * inner_size + in;
-                if (data[idx] > max_val) {
-                    max_val = data[idx];
-                    max_idx = (int)d;
-                }
-            }
-            result_data[o * inner_size + in] = max_idx;
-        }
-    }
-
-    free(out_shape);
-    return result;
+    return uop_argmax(a, dim >= 0 ? &params : NULL);
 }
 
 Tensor* tensor_argmin(Tensor* a, int dim) {
     if (!a)
         return NULL;
-
-    // Eager execution: we need actual data
-    tensor_ensure_executed(a);
-    float* data = (float*)tensor_data_ptr(a);
-    if (!data)
-        return NULL;
-
-    TensorConfig config = {
-        .dtype = DTYPE_INT32, .has_dtype = true, .device = a->device, .has_device = true};
-
-    if (dim < 0) {
-        float min_val = FLT_MAX;
-        int min_idx   = 0;
-        for (size_t i = 0; i < a->numel; i++) {
-            if (data[i] < min_val) {
-                min_val = data[i];
-                min_idx = (int)i;
-            }
-        }
-
-        int shape[]    = {1};
-        Tensor* result = tensor_empty(shape, 1, &config);
-        if (!result)
-            return NULL;
-        tensor_ensure_executed(result);
-        int* result_data = (int*)tensor_data_ptr(result);
-        result_data[0]   = min_idx;
-        return result;
+    ReduceParams params = {0};
+    if (dim >= 0) {
+        params.dims = &dim;
+        params.num_dims = 1;
     }
-    if (dim >= a->ndim) {
-        LOG_ERROR("tensor_argmin: dimension %d out of range for %dD tensor", dim, a->ndim);
-        return NULL;
-    }
-    int out_ndim = a->ndim - 1;
-    if (out_ndim == 0)
-        out_ndim = 1;
-
-    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
-    if (!out_shape)
-        return NULL;
-
-    if (a->ndim == 1) {
-        out_shape[0] = 1;
-    } else {
-        int j = 0;
-        for (int i = 0; i < a->ndim; i++) {
-            if (i != dim)
-                out_shape[j++] = a->shape[i];
-        }
-    }
-
-    Tensor* result = tensor_empty(out_shape, out_ndim, &config);
-    if (!result) {
-        free(out_shape);
-        return NULL;
-    }
-    tensor_ensure_executed(result);
-    int* result_data = (int*)tensor_data_ptr(result);
-    size_t outer_size = 1;
-    for (int i = 0; i < dim; i++)
-        outer_size *= (size_t)a->shape[i];
-
-    size_t dim_size = (size_t)a->shape[dim];
-
-    size_t inner_size = 1;
-    for (int i = dim + 1; i < a->ndim; i++)
-        inner_size *= (size_t)a->shape[i];
-    for (size_t o = 0; o < outer_size; o++) {
-        for (size_t in = 0; in < inner_size; in++) {
-            float min_val = FLT_MAX;
-            int min_idx   = 0;
-            for (size_t d = 0; d < dim_size; d++) {
-                size_t idx = o * dim_size * inner_size + d * inner_size + in;
-                if (data[idx] < min_val) {
-                    min_val = data[idx];
-                    min_idx = (int)d;
-                }
-            }
-            result_data[o * inner_size + in] = min_idx;
-        }
-    }
-
-    free(out_shape);
-    return result;
+    return uop_argmin(a, dim >= 0 ? &params : NULL);
 }
 
 bool tensor_has_grad(Tensor* a) { return a && a->grad != NULL; }

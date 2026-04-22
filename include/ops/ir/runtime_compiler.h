@@ -65,7 +65,7 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
                                   Tensor** inputs, int num_inputs,
                                   Tensor** outputs, int num_outputs);
 
-/* schedule_v2 -> linearize groups -> fused codegen -> execute */
+/* fusion schedule -> linearize groups -> fused codegen -> execute */
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir);
 
 void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc,

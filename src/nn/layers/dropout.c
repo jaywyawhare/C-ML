@@ -14,31 +14,55 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
     if (module_is_training(module)) {
         TensorConfig config = (TensorConfig){
             .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-        Tensor* mask = tensor_empty(input->shape, input->ndim, &config);
+
+        if (dropout->p <= 0.0f) {
+            Tensor* ones = tensor_ones(input->shape, input->ndim, &config);
+            if (!ones) return NULL;
+            Tensor* out = uop_mul(input, ones);
+            tensor_free(ones);
+            return out;
+        }
+        if (dropout->p >= 1.0f) {
+            return tensor_zeros(input->shape, input->ndim, &config);
+        }
+
+        Tensor* rand = tensor_rand(input->shape, input->ndim, &config);
+        Tensor* threshold = tensor_full(input->shape, input->ndim, &config, dropout->p);
+        Tensor* scale = tensor_full(input->shape, input->ndim, &config, 1.0f / (1.0f - dropout->p));
+        if (!rand || !threshold || !scale) {
+            tensor_free(rand);
+            tensor_free(threshold);
+            tensor_free(scale);
+            return NULL;
+        }
+
+        Tensor* keep = uop_cmpgt(rand, threshold);
+        tensor_free(rand);
+        tensor_free(threshold);
+        if (!keep) {
+            tensor_free(scale);
+            return NULL;
+        }
+
+        Tensor* mask = uop_mul(keep, scale);
+        tensor_free(keep);
+        tensor_free(scale);
         if (!mask)
             return NULL;
 
-        float* mask_data  = (float*)tensor_data_ptr(mask);
-        float* input_data = (float*)tensor_data_ptr(input);
-
-        if (!mask_data || !input_data) {
-            tensor_free(mask);
-            return NULL;
-        }
-
-        for (size_t i = 0; i < mask->numel; i++) {
-            mask_data[i] = ((float)rand() / (float)(float)RAND_MAX) > dropout->p
-                               ? 1.0f / (1.0f - dropout->p)
-                               : 0.0f;
-        }
-
         Tensor* output = uop_mul(input, mask);
         tensor_free(mask);
-
         return output;
-    } else {
-        return tensor_clone(input);
     }
+
+    TensorConfig config = (TensorConfig){
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    Tensor* ones = tensor_ones(input->shape, input->ndim, &config);
+    if (!ones)
+        return NULL;
+    Tensor* out = uop_mul(input, ones);
+    tensor_free(ones);
+    return out;
 }
 
 static void dropout_free(Module* module) { free(module); }

@@ -1,6 +1,8 @@
 #include "nn/layers/batchnorm3d.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "autograd/forward_ops.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -23,107 +25,207 @@ static Tensor* batchnorm3d_forward(Module* module, Tensor* input) {
     int width    = input->shape[4];
 
     if (channels != bn->num_features) {
-        LOG_ERROR("BatchNorm3d: input channels (%d) doesn't match num_features (%d)",
-                  channels, bn->num_features);
+        LOG_ERROR("BatchNorm3d: input channels (%d) doesn't match num_features (%d)", channels,
+                  bn->num_features);
         return NULL;
     }
 
-    tensor_ensure_executed(input);
-    float* input_data = (float*)tensor_data_ptr(input);
-    if (!input_data)
-        return NULL;
+    int spatial            = depth * height * width;
+    int flat_spatial_batch = batch * spatial;
 
     bool training = module_is_training(module);
-    int spatial = depth * height * width;
-    int total_per_channel = batch * spatial;
-    float* channel_mean = calloc((size_t)channels, sizeof(float));
-    float* channel_var  = calloc((size_t)channels, sizeof(float));
-    if (!channel_mean || !channel_var) {
-        free(channel_mean);
-        free(channel_var);
+
+    Tensor* mean_tensor = NULL;
+    Tensor* var_tensor  = NULL;
+    if (training) {
+        if (!bn->current_mean) {
+            int stat_shape[]    = {channels};
+            TensorConfig config = (TensorConfig){.dtype      = input->dtype,
+                                                 .device     = input->device,
+                                                 .has_dtype  = true,
+                                                 .has_device = true};
+            bn->current_mean    = tensor_zeros(stat_shape, 1, &config);
+            bn->current_var     = tensor_zeros(stat_shape, 1, &config);
+            if (!bn->current_mean || !bn->current_var) {
+                return NULL;
+            }
+        }
+        ReshapeParams reshape_params;
+        int reshaped_shape[]     = {channels, flat_spatial_batch};
+        reshape_params.new_shape = reshaped_shape;
+        reshape_params.new_ndim  = 2;
+
+        Tensor* input_reshaped = uop_reshape(input, &reshape_params);
+        if (!input_reshaped) {
+            return NULL;
+        }
+        ReduceParams mean_params;
+        int mean_dims[]      = {1};
+        mean_params.dims     = mean_dims;
+        mean_params.num_dims = 1;
+        mean_params.keepdim  = false;
+
+        Tensor* mean_reduced = uop_mean(input_reshaped, &mean_params);
+        if (!mean_reduced)
+            return NULL;
+
+        float* mean_reduced_data = (float*)tensor_data_ptr(mean_reduced);
+        float* current_mean_data = (float*)tensor_data_ptr(bn->current_mean);
+        if (mean_reduced_data && current_mean_data)
+            memcpy(current_mean_data, mean_reduced_data, (size_t)channels * sizeof(float));
+
+        ReshapeParams reshape_mean_2d;
+        int mean_2d_shape[]        = {channels, 1};
+        reshape_mean_2d.new_shape  = mean_2d_shape;
+        reshape_mean_2d.new_ndim   = 2;
+
+        Tensor* mean_2d = uop_reshape(bn->current_mean, &reshape_mean_2d);
+        if (!mean_2d)
+            return NULL;
+
+        ExpandParams expand_params;
+        int reshaped_shape_expand[] = {channels, flat_spatial_batch};
+        expand_params.new_shape     = reshaped_shape_expand;
+        expand_params.new_ndim      = 2;
+
+        Tensor* mean_broadcast = uop_expand(mean_2d, &expand_params);
+        if (!mean_broadcast)
+            return NULL;
+
+        Tensor* diff = uop_sub(input_reshaped, mean_broadcast);
+        if (!diff)
+            return NULL;
+
+        Tensor* diff_sq = uop_mul(diff, diff);
+        if (!diff_sq)
+            return NULL;
+
+        ReduceParams var_params;
+        int var_dims[]      = {1};
+        var_params.dims     = var_dims;
+        var_params.num_dims = 1;
+        var_params.keepdim  = false;
+
+        Tensor* var_reduced = uop_mean(diff_sq, &var_params);
+        if (!var_reduced)
+            return NULL;
+
+        float* var_reduced_data = (float*)tensor_data_ptr(var_reduced);
+        float* current_var_data = (float*)tensor_data_ptr(bn->current_var);
+        if (var_reduced_data && current_var_data)
+            memcpy(current_var_data, var_reduced_data, (size_t)channels * sizeof(float));
+        if (bn->track_running_stats && bn->running_mean && bn->running_var) {
+            float* running_mean = (float*)tensor_data_ptr(bn->running_mean);
+            float* running_var  = (float*)tensor_data_ptr(bn->running_var);
+
+            if (running_mean && running_var && current_mean_data && current_var_data) {
+                for (int c = 0; c < channels; c++) {
+                    running_mean[c] = bn->momentum * running_mean[c] +
+                                      (1.0f - bn->momentum) * current_mean_data[c];
+                    running_var[c] =
+                        bn->momentum * running_var[c] + (1.0f - bn->momentum) * current_var_data[c];
+                }
+            }
+        }
+
+        mean_tensor = bn->current_mean;
+        var_tensor  = bn->current_var;
+    } else {
+        mean_tensor = bn->running_mean;
+        var_tensor  = bn->running_var;
+    }
+
+    if (!mean_tensor || !var_tensor) {
+        LOG_ERROR("BatchNorm3d: missing mean or variance tensor");
         return NULL;
     }
 
-    if (training) {
-        for (int b = 0; b < batch; b++) {
-            for (int c = 0; c < channels; c++) {
-                int offset = (b * channels + c) * spatial;
-                for (int s = 0; s < spatial; s++) {
-                    channel_mean[c] += input_data[offset + s];
-                }
-            }
-        }
-        for (int c = 0; c < channels; c++)
-            channel_mean[c] /= (float)total_per_channel;
-        for (int b = 0; b < batch; b++) {
-            for (int c = 0; c < channels; c++) {
-                int offset = (b * channels + c) * spatial;
-                for (int s = 0; s < spatial; s++) {
-                    float diff = input_data[offset + s] - channel_mean[c];
-                    channel_var[c] += diff * diff;
-                }
-            }
-        }
-        for (int c = 0; c < channels; c++)
-            channel_var[c] /= (float)total_per_channel;
-        if (bn->track_running_stats && bn->running_mean && bn->running_var) {
-            float* rm = (float*)tensor_data_ptr(bn->running_mean);
-            float* rv = (float*)tensor_data_ptr(bn->running_var);
-            if (rm && rv) {
-                for (int c = 0; c < channels; c++) {
-                    rm[c] = bn->momentum * rm[c] + (1.0f - bn->momentum) * channel_mean[c];
-                    rv[c] = bn->momentum * rv[c] + (1.0f - bn->momentum) * channel_var[c];
-                }
-            }
-        }
-    } else {
-        if (bn->running_mean && bn->running_var) {
-            float* rm = (float*)tensor_data_ptr(bn->running_mean);
-            float* rv = (float*)tensor_data_ptr(bn->running_var);
-            if (rm && rv) {
-                memcpy(channel_mean, rm, (size_t)channels * sizeof(float));
-                memcpy(channel_var, rv, (size_t)channels * sizeof(float));
-            }
-        }
-    }
+    ReshapeParams reshape_1d_to_5d;
+    int stat_5d_shape[]      = {1, channels, 1, 1, 1};
+    reshape_1d_to_5d.new_shape = stat_5d_shape;
+    reshape_1d_to_5d.new_ndim  = 5;
+
+    Tensor* mean_5d = uop_reshape(mean_tensor, &reshape_1d_to_5d);
+    if (!mean_5d)
+        return NULL;
+
+    ExpandParams expand_mean;
+    int input_shape[]     = {batch, channels, depth, height, width};
+    expand_mean.new_shape = input_shape;
+    expand_mean.new_ndim  = 5;
+
+    Tensor* mean_broadcast = uop_expand(mean_5d, &expand_mean);
+    if (!mean_broadcast)
+        return NULL;
+
+    Tensor* centered = uop_sub(input, mean_broadcast);
+    if (!centered)
+        return NULL;
+
+    int var_shape[]     = {channels};
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(input->shape, input->ndim, &config);
-    if (!output) {
-        free(channel_mean);
-        free(channel_var);
+    Tensor* eps_tensor = tensor_full(var_shape, 1, &config, bn->eps);
+    if (!eps_tensor)
         return NULL;
-    }
-    tensor_ensure_executed(output);
-    float* out_data = (float*)tensor_data_ptr(output);
 
-    float* weight_data = NULL;
-    float* bias_data   = NULL;
-    if (bn->affine && bn->weight && bn->weight->tensor) {
-        tensor_ensure_executed(bn->weight->tensor);
-        weight_data = (float*)tensor_data_ptr(bn->weight->tensor);
-    }
-    if (bn->affine && bn->bias && bn->bias->tensor) {
-        tensor_ensure_executed(bn->bias->tensor);
-        bias_data = (float*)tensor_data_ptr(bn->bias->tensor);
-    }
+    Tensor* var_eps = uop_add(var_tensor, eps_tensor);
+    tensor_free(eps_tensor);
+    if (!var_eps)
+        return NULL;
 
-    for (int b = 0; b < batch; b++) {
-        for (int c = 0; c < channels; c++) {
-            float inv_std = 1.0f / sqrtf(channel_var[c] + bn->eps);
-            float w = weight_data ? weight_data[c] : 1.0f;
-            float bi = bias_data ? bias_data[c] : 0.0f;
-            int offset = (b * channels + c) * spatial;
+    Tensor* std_tensor = uop_sqrt(var_eps);
+    if (!std_tensor)
+        return NULL;
 
-            for (int s = 0; s < spatial; s++) {
-                out_data[offset + s] =
-                    (input_data[offset + s] - channel_mean[c]) * inv_std * w + bi;
-            }
-        }
+    Tensor* std_5d = uop_reshape(std_tensor, &reshape_1d_to_5d);
+    if (!std_5d)
+        return NULL;
+
+    ExpandParams expand_std;
+    expand_std.new_shape  = input_shape;
+    expand_std.new_ndim   = 5;
+    Tensor* std_broadcast = uop_expand(std_5d, &expand_std);
+    if (!std_broadcast)
+        return NULL;
+
+    Tensor* normalized = uop_div(centered, std_broadcast);
+    if (!normalized)
+        return NULL;
+
+    Tensor* output = normalized;
+
+    if (bn->affine && bn->weight && bn->bias) {
+        Tensor* weight_5d = uop_reshape(bn->weight->tensor, &reshape_1d_to_5d);
+        if (!weight_5d)
+            return NULL;
+
+        ExpandParams expand_weight;
+        expand_weight.new_shape = input_shape;
+        expand_weight.new_ndim  = 5;
+        Tensor* weight_broadcast = uop_expand(weight_5d, &expand_weight);
+        if (!weight_broadcast)
+            return NULL;
+
+        Tensor* scaled = uop_mul(weight_broadcast, output);
+        if (!scaled)
+            return NULL;
+
+        Tensor* bias_5d = uop_reshape(bn->bias->tensor, &reshape_1d_to_5d);
+        if (!bias_5d)
+            return NULL;
+
+        ExpandParams expand_bias;
+        expand_bias.new_shape = input_shape;
+        expand_bias.new_ndim  = 5;
+        Tensor* bias_broadcast = uop_expand(bias_5d, &expand_bias);
+        if (!bias_broadcast)
+            return NULL;
+
+        output = uop_add(scaled, bias_broadcast);
+        if (!output)
+            return NULL;
     }
-
-    free(channel_mean);
-    free(channel_var);
 
     return output;
 }
@@ -137,12 +239,16 @@ static void batchnorm3d_free(Module* module) {
         tensor_free(bn->running_mean);
     if (bn->running_var)
         tensor_free(bn->running_var);
+    if (bn->current_mean)
+        tensor_free(bn->current_mean);
+    if (bn->current_var)
+        tensor_free(bn->current_var);
 
     free(bn);
 }
 
 BatchNorm3d* nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
-                             bool track_running_stats, DType dtype, DeviceType device) {
+                            bool track_running_stats, DType dtype, DeviceType device) {
     BatchNorm3d* bn = malloc(sizeof(BatchNorm3d));
     if (!bn)
         return NULL;
@@ -200,6 +306,9 @@ BatchNorm3d* nn_batchnorm3d(int num_features, float eps, float momentum, bool af
         bn->running_mean = NULL;
         bn->running_var  = NULL;
     }
+
+    bn->current_mean = NULL;
+    bn->current_var  = NULL;
 
     return bn;
 }

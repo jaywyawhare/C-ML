@@ -9,10 +9,14 @@ extern "C" {
 #endif
 
 int cml_ir_execute(CMLGraph_t ir);
+int cml_ir_execute_cpu(CMLGraph_t ir);
 
 /* Simple scalar interpreter used as a fallback when other backends
    are not available or fail. */
 int cpu_execute_ir(CMLGraph_t ir);
+
+/** Clear cpu_execute_ir fast-path state; call when the IR graph is reset. */
+void cml_cpu_execute_cache_reset(void);
 
 /* Executes up to and including the target node (for lazy evaluation). */
 int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node);
@@ -34,7 +38,8 @@ void cml_cleanup_buffer_cache(void);
    On subsequent calls with same graph structure: replays without re-scheduling. */
 int cml_ir_execute_traced(CMLGraph_t ir);
 
-int cml_ir_execute_v2(CMLGraph_t ir);
+/* Fused CPU scheduler entrypoint. */
+int cml_ir_execute_fusion(CMLGraph_t ir);
 
 #ifdef __cplusplus
 }

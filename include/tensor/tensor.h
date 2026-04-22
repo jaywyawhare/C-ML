@@ -49,6 +49,11 @@ typedef struct Tensor {
     struct IRNode* ir_node; // Points to IR node in graph
     CMLGraph_t ir_context;  // Which IR graph this belongs to
 
+    /* Saved IR linkage for tensor_unrealize (gradient checkpointing).
+     * Populated by tensor_realize before it detaches the live ir_node. */
+    struct IRNode* saved_ir_node;
+    CMLGraph_t saved_ir_context;
+
     // Execution state (lazy)
     bool is_executed; // Has this been executed?
     void* data;       // NULL until executed (lazy!)
@@ -88,6 +93,15 @@ typedef struct TensorConfig {
 } TensorConfig;
 
 Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config);
+
+/**
+ * @brief Allocate a contiguous eager tensor with uninitialized storage (no IR graph).
+ *
+ * Used when callers need an immediate backing buffer (e.g. arena or external init).
+ */
+Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape,
+                      bool requires_grad);
+
 Tensor* tensor_zeros(int* shape, int ndim, const TensorConfig* config);
 Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config);
 Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float value);

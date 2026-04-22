@@ -1,6 +1,7 @@
 #include "ops/ir/graph_cache.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/execution.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 #include "ops/simd_utils.h"
@@ -34,21 +35,23 @@ uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
 
     uint64_t hash = FNV_OFFSET;
 
-    struct IRNode* node = ir->head;
-    while (node) {
-        hash = hash_combine(hash, (uint64_t)node->type);
+    /* Compute signature from TAIL node only (the output of the graph).
+     * This allows caching even when new nodes are added to the IR between forward passes.
+     * The actual computation being benchmarked is always rooted at ir->tail. */
+    struct IRNode* node = ir->tail;
+    if (!node)
+        return 0;
 
-        if (node->output) {
-            hash = hash_combine(hash, (uint64_t)node->output->ndim);
-            for (int i = 0; i < node->output->ndim; i++) {
-                hash = hash_combine(hash, (uint64_t)node->output->shape[i]);
-            }
+    hash = hash_combine(hash, (uint64_t)node->type);
+
+    if (node->output) {
+        hash = hash_combine(hash, (uint64_t)node->output->ndim);
+        for (int i = 0; i < node->output->ndim; i++) {
+            hash = hash_combine(hash, (uint64_t)node->output->shape[i]);
         }
-
-        hash = hash_combine(hash, (uint64_t)node->num_inputs);
-
-        node = node->next;
     }
+
+    hash = hash_combine(hash, (uint64_t)node->num_inputs);
 
     return hash;
 }
@@ -74,6 +77,8 @@ CMLGraphCache* cml_graph_cache_create(size_t max_entries) {
     return cache;
 }
 
+static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_buffers);
+
 void cml_graph_cache_destroy(CMLGraphCache* cache) {
     if (!cache)
         return;
@@ -82,7 +87,7 @@ void cml_graph_cache_destroy(CMLGraphCache* cache) {
         CMLGraphCacheEntry* entry = cache->buckets[i];
         while (entry) {
             CMLGraphCacheEntry* next = entry->next;
-            cml_free_execution_plan(entry->plan);
+            free_execution_plan_impl(entry->plan, false);
             free(entry);
             entry = next;
         }
@@ -142,9 +147,10 @@ static void evict_lru_entry(CMLGraphCache* cache) {
         } else {
             cache->buckets[oldest_bucket] = oldest_entry->next;
         }
-        cml_free_execution_plan(oldest_entry->plan);
+        free_execution_plan_impl(oldest_entry->plan, true);
         free(oldest_entry);
         cache->count--;
+        cml_cpu_execute_cache_reset();
     }
 }
 
@@ -196,11 +202,12 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
         return NULL;
     }
 
-    plan->nodes        = calloc(plan->num_nodes, sizeof(struct IRNode*));
-    plan->buffers      = calloc(plan->num_nodes, sizeof(float*));
-    plan->buffer_sizes = calloc(plan->num_nodes, sizeof(size_t));
+    plan->nodes           = calloc(plan->num_nodes, sizeof(struct IRNode*));
+    plan->buffers         = calloc(plan->num_nodes, sizeof(float*));
+    plan->buffer_sizes    = calloc(plan->num_nodes, sizeof(size_t));
+    plan->output_tensors  = calloc(plan->num_nodes, sizeof(Tensor*));
 
-    if (!plan->nodes || !plan->buffers || !plan->buffer_sizes) {
+    if (!plan->nodes || !plan->buffers || !plan->buffer_sizes || !plan->output_tensors) {
         cml_free_execution_plan(plan);
         return NULL;
     }
@@ -210,9 +217,12 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     while (node && idx < plan->num_nodes) {
         plan->nodes[idx] = node;
 
-        if (node->output && node->output->numel > 0) {
-            plan->buffer_sizes[idx] = node->output->numel;
-            size_t nbytes           = (size_t)node->output->numel * sizeof(float);
+        if (node->output && node->output->numel > 0 &&
+            (int)node->output->dtype >= 0 && (int)node->output->dtype < 32 &&
+            node->output->numel < ((size_t)1 << 40)) {
+            plan->buffer_sizes[idx]   = node->output->numel;
+            plan->output_tensors[idx] = node->output;
+            size_t nbytes             = (size_t)node->output->numel * sizeof(float);
             plan->buffers[idx] =
                 aligned_alloc(32, cml_alloc_size_aligned(nbytes, 32));
             if (!plan->buffers[idx]) {
@@ -231,22 +241,34 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     return plan;
 }
 
-void cml_free_execution_plan(CMLExecutionPlan* plan) {
+static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_buffers) {
     if (!plan)
         return;
 
     if (plan->buffers) {
         for (size_t i = 0; i < plan->num_nodes; i++) {
             if (plan->buffers[i]) {
+                if (detach_tensor_buffers) {
+                    Tensor* t = plan->output_tensors ? plan->output_tensors[i] : NULL;
+                    if (t && t->data == plan->buffers[i]) {
+                        t->data        = NULL;
+                        t->is_executed = false;
+                    }
+                }
                 free(plan->buffers[i]);
             }
         }
         free(plan->buffers);
     }
 
+    free(plan->output_tensors);
     free(plan->nodes);
     free(plan->buffer_sizes);
     free(plan);
+}
+
+void cml_free_execution_plan(CMLExecutionPlan* plan) {
+    free_execution_plan_impl(plan, true);
 }
 
 int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
@@ -583,5 +605,44 @@ void cml_graph_cache_print_stats(CMLGraphCache* cache) {
     printf("  Misses: %zu\n", cache->misses);
     if (cache->hits + cache->misses > 0) {
         printf("  Hit rate: %.1f%%\n", 100.0 * cache->hits / (cache->hits + cache->misses));
+    }
+}
+
+void cml_graph_cache_reset_global(void) {
+    /* Clear all cached entries whose tensor pointers would become dangling
+     * after the IR graph is freed.  Keep the cache struct and hit/miss
+     * counters alive so that callers holding a CMLGraphCache* remain valid. */
+    if (!g_graph_cache)
+        return;
+
+    for (size_t i = 0; i < g_graph_cache->num_buckets; i++) {
+        CMLGraphCacheEntry* entry = g_graph_cache->buckets[i];
+        while (entry) {
+            CMLGraphCacheEntry* next = entry->next;
+            free_execution_plan_impl(entry->plan, false);
+            free(entry);
+            entry = next;
+        }
+        g_graph_cache->buckets[i] = NULL;
+    }
+    g_graph_cache->count = 0;
+}
+
+void cml_graph_cache_forget_tensor(Tensor* t) {
+    if (!g_graph_cache || !t)
+        return;
+
+    for (size_t b = 0; b < g_graph_cache->num_buckets; b++) {
+        CMLGraphCacheEntry* entry = g_graph_cache->buckets[b];
+        while (entry) {
+            CMLExecutionPlan* plan = entry->plan;
+            if (plan && plan->output_tensors) {
+                for (size_t i = 0; i < plan->num_nodes; i++) {
+                    if (plan->output_tensors[i] == t)
+                        plan->output_tensors[i] = NULL;
+                }
+            }
+            entry = entry->next;
+        }
     }
 }

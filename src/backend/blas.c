@@ -34,34 +34,21 @@
 
 static pthread_mutex_t g_blas_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static inline void blas_lock(void) {
-    pthread_mutex_lock(&g_blas_lock);
-}
-static inline void blas_unlock(void) {
-    pthread_mutex_unlock(&g_blas_lock);
-}
+static inline void blas_lock(void) { pthread_mutex_lock(&g_blas_lock); }
+static inline void blas_unlock(void) { pthread_mutex_unlock(&g_blas_lock); }
 
 static CMLBlasContext* g_blas_ctx = NULL;
 
 static const char* blas_library_paths[] = {
 #ifdef __linux__
     /* MKL (fastest on Intel, competitive on AMD) */
-    "libmkl_rt.so",
-    "libmkl_rt.so.2",
-    "libmkl_rt.so.1",
+    "libmkl_rt.so", "libmkl_rt.so.2", "libmkl_rt.so.1",
     /* BLIS (often beats OpenBLAS, especially on AMD) */
-    "libblis.so",
-    "libblis.so.4",
-    "libblis.so.3",
-    /* OpenBLAS (widely available, good performance) */
-    "libopenblas.so.0",
-    "libopenblas.so",
+    "libblis.so", "libblis.so.4", "libblis.so.3",
+    /* OpenBLAS / scipy-openblas64 (set LD_LIBRARY_PATH or CML_BLAS_LIB to use) */
+    "libopenblas.so.0", "libopenblas.so",
     /* ATLAS, reference BLAS */
-    "libatlas.so",
-    "libcblas.so.3",
-    "libcblas.so",
-    "libblas.so.3",
-    "libblas.so",
+    "libatlas.so", "libcblas.so.3", "libcblas.so", "libblas.so.3", "libblas.so",
 #elif defined(__APPLE__)
     "/System/Library/Frameworks/Accelerate.framework/Accelerate",
     "libopenblas.dylib",
@@ -70,10 +57,7 @@ static const char* blas_library_paths[] = {
     "libblis.dylib",
     "libblas.dylib",
 #elif defined(_WIN32)
-    "mkl_rt.dll", "mkl_rt.2.dll",
-    "libblis.dll",
-    "openblas.dll", "libopenblas.dll",
-    "blas.dll",
+    "mkl_rt.dll", "mkl_rt.2.dll", "libblis.dll", "openblas.dll", "libopenblas.dll", "blas.dll",
 #endif
     NULL};
 
@@ -108,6 +92,28 @@ static void load_cblas_functions(CMLBlasContext* ctx) {
     if (!ctx->cblas_sgemm) {
         ctx->sgemm_ = LIB_SYM(ctx->lib_handle, "sgemm_");
     }
+
+    if (!ctx->cblas_sgemm && !ctx->sgemm_) {
+        ctx->cblas_sgemm = LIB_SYM(ctx->lib_handle, "scipy_cblas_sgemm64_");
+    }
+    if (!ctx->cblas_sgemv) {
+        ctx->cblas_sgemv = LIB_SYM(ctx->lib_handle, "scipy_cblas_sgemv64_");
+    }
+    if (!ctx->cblas_saxpy) {
+        ctx->cblas_saxpy = LIB_SYM(ctx->lib_handle, "scipy_cblas_saxpy64_");
+    }
+    if (!ctx->cblas_sscal) {
+        ctx->cblas_sscal = LIB_SYM(ctx->lib_handle, "scipy_cblas_sscal64_");
+    }
+    if (!ctx->cblas_sdot) {
+        ctx->cblas_sdot = LIB_SYM(ctx->lib_handle, "scipy_cblas_sdot64_");
+    }
+    if (!ctx->cblas_snrm2) {
+        ctx->cblas_snrm2 = LIB_SYM(ctx->lib_handle, "scipy_cblas_snrm2_64_");
+    }
+    if (!ctx->cblas_dgemm) {
+        ctx->cblas_dgemm = LIB_SYM(ctx->lib_handle, "scipy_cblas_dgemm64_");
+    }
 }
 
 static void tune_blas_threading(CMLBlasContext* ctx) {
@@ -125,7 +131,8 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
             int ncores = 1;
 #ifdef __linux__
             ncores = sysconf(_SC_NPROCESSORS_ONLN);
-            if (ncores < 1) ncores = 1;
+            if (ncores < 1)
+                ncores = 1;
 #endif
             mkl_set_num_threads(ncores);
             LOG_INFO("MKL threads set to %d", ncores);
@@ -143,7 +150,8 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
             int ncores = 1;
 #ifdef __linux__
             ncores = sysconf(_SC_NPROCESSORS_ONLN);
-            if (ncores < 1) ncores = 1;
+            if (ncores < 1)
+                ncores = 1;
 #endif
             openblas_set(ncores);
             char ncores_str[16];
@@ -163,7 +171,8 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
             int ncores = 1;
 #ifdef __linux__
             ncores = sysconf(_SC_NPROCESSORS_ONLN);
-            if (ncores < 1) ncores = 1;
+            if (ncores < 1)
+                ncores = 1;
 #endif
             blis_set(ncores);
             LOG_INFO("BLIS threads set to %d", ncores);
@@ -180,8 +189,10 @@ CMLBlasContext* cml_blas_init(void) {
     }
 
     const char* env_blas = getenv("CML_BLAS_LIB");
+    fprintf(stderr, "DEBUG: CML_BLAS_LIB = %s\n", env_blas ? env_blas : "(null)");
     if (env_blas && env_blas[0] != '\0') {
         ctx->lib_handle = LIB_LOAD(env_blas);
+        fprintf(stderr, "DEBUG: Loaded lib handle = %p\n", ctx->lib_handle);
         if (ctx->lib_handle) {
             load_cblas_functions(ctx);
             if (ctx->cblas_sgemm || ctx->sgemm_) {
@@ -239,8 +250,8 @@ void cml_blas_free(CMLBlasContext* ctx) {
 
 CMLBlasContext* cml_blas_get_context(void) {
     /* Fast path: context already initialized — no lock needed */
-    CMLBlasContext* ctx = atomic_load_explicit(
-        (_Atomic(CMLBlasContext*)*)&g_blas_ctx, memory_order_acquire);
+    CMLBlasContext* ctx =
+        atomic_load_explicit((_Atomic(CMLBlasContext*)*)&g_blas_ctx, memory_order_acquire);
     if (ctx)
         return ctx;
 
@@ -259,15 +270,15 @@ CMLBlasContext* cml_blas_get_context(void) {
 #include <immintrin.h>
 
 /* Small-matrix GEMM: avoids BLAS thread pool overhead for M,N,K < 64 */
-static void sgemm_avx_small(const float* A, const float* B, float* C,
-                             int M, int N, int K, float alpha, float beta) {
+static void sgemm_avx_small(const float* A, const float* B, float* C, int M, int N, int K,
+                            float alpha, float beta) {
     /* Apply beta to C */
     if (beta == 0.0f) {
         memset(C, 0, (size_t)M * N * sizeof(float));
     } else if (beta != 1.0f) {
         size_t total = (size_t)M * N;
         __m256 vbeta = _mm256_set1_ps(beta);
-        size_t i = 0;
+        size_t i     = 0;
         for (; i + 8 <= total; i += 8)
             _mm256_storeu_ps(C + i, _mm256_mul_ps(_mm256_loadu_ps(C + i), vbeta));
         for (; i < total; i++)
@@ -278,7 +289,7 @@ static void sgemm_avx_small(const float* A, const float* B, float* C,
     for (int m = 0; m < M; m++) {
         for (int k = 0; k < K; k++) {
             __m256 a_mk = _mm256_set1_ps(alpha * A[m * K + k]);
-            int n = 0;
+            int n       = 0;
             for (; n + 16 <= N; n += 16) {
                 /* Process 16 elements (2x unrolled) */
                 __m256 c0 = _mm256_loadu_ps(C + m * N + n);
@@ -367,17 +378,16 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
     /* Leading dimensions in row-major:
      * If no trans: A is (rows x cols), lda = cols
      * If trans:    A is stored as (cols x rows), lda = rows (the actual storage cols) */
-    int lda = transA ? M : K;  /* A storage: transA ? [K,M] : [M,K] */
-    int ldb = transB ? K : N;  /* B storage: transB ? [N,K] : [K,N] */
+    int lda = transA ? M : K; /* A storage: transA ? [K,M] : [M,K] */
+    int ldb = transB ? K : N; /* B storage: transB ? [N,K] : [K,N] */
 
     if (ctx->cblas_sgemm) {
-        ctx->cblas_sgemm(CML_BLAS_ROW_MAJOR, ta, tb, M, N, K, alpha,
-                         A, lda, B, ldb, beta, C, N);
+        ctx->cblas_sgemm(CML_BLAS_ROW_MAJOR, ta, tb, M, N, K, alpha, A, lda, B, ldb, beta, C, N);
         return 0;
     } else if (ctx->sgemm_) {
         /* Fortran column-major: to compute row-major C = op(A) @ op(B),
          * we compute C^T = op(B)^T @ op(A)^T in column-major */
-        char fta = transB ? 'T' : 'N';  /* swapped */
+        char fta = transB ? 'T' : 'N'; /* swapped */
         char ftb = transA ? 'T' : 'N';
         int flda = transB ? K : N;
         int fldb = transA ? M : K;

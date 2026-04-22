@@ -71,12 +71,21 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
         if (mean_reduced_data && current_mean_data)
             memcpy(current_mean_data, mean_reduced_data, (size_t)channels * sizeof(float));
 
+        ReshapeParams reshape_mean_2d;
+        int mean_2d_shape[]        = {channels, 1};
+        reshape_mean_2d.new_shape  = mean_2d_shape;
+        reshape_mean_2d.new_ndim   = 2;
+
+        Tensor* mean_2d = uop_reshape(bn->current_mean, &reshape_mean_2d);
+        if (!mean_2d)
+            return NULL;
+
         ExpandParams expand_params;
         int reshaped_shape_expand[] = {channels, batch * height * width};
         expand_params.new_shape     = reshaped_shape_expand;
         expand_params.new_ndim      = 2;
 
-        Tensor* mean_broadcast = uop_expand(bn->current_mean, &expand_params);
+        Tensor* mean_broadcast = uop_expand(mean_2d, &expand_params);
         if (!mean_broadcast)
             return NULL;
 
@@ -153,17 +162,12 @@ static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
     int var_shape[]     = {channels};
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* eps_tensor = tensor_zeros(var_shape, 1, &config);
+    Tensor* eps_tensor = tensor_full(var_shape, 1, &config, bn->eps);
     if (!eps_tensor)
         return NULL;
 
-    float* eps_data = (float*)tensor_data_ptr(eps_tensor);
-    if (eps_data) {
-        for (int c = 0; c < channels; c++)
-            eps_data[c] = bn->eps;
-    }
-
     Tensor* var_eps = uop_add(var_tensor, eps_tensor);
+    tensor_free(eps_tensor);
     if (!var_eps)
         return NULL;
 

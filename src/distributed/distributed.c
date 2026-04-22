@@ -184,9 +184,12 @@ DistWork* cml_dist_allreduce_async(Tensor* tensor, DistReduceOp op) {
         return NULL;
     if (!g_default_group->ops->allreduce_async) {
         /* Fall back to sync allreduce */
-        cml_dist_allreduce(tensor, op);
+        int rc = cml_dist_allreduce(tensor, op);
         DistWork* work = calloc(1, sizeof(DistWork));
-        if (work) work->completed = true;
+        if (work) {
+            work->completed = true;
+            work->error_code = rc;
+        }
         return work;
     }
 
@@ -197,7 +200,7 @@ int cml_dist_wait(DistWork* work) {
     if (!work)
         return -1;
     if (work->completed)
-        return 0;
+        return work->error_code;
 
     if (g_default_group && g_default_group->ops->wait)
         return g_default_group->ops->wait(work);
