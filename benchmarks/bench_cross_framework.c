@@ -139,16 +139,17 @@ static double bench_mlp_forward(void) {
 
     Sequential* model = cml_nn_sequential();
     cml_nn_sequential_add(model,
-                          (Module*)cml_nn_linear(in_f, hid, DTYPE_FLOAT32, DEVICE_CPU, true));
+                          (Module*)cml_nn_linear(in_f, hid, DTYPE_FLOAT32, g_device, true));
     cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(model,
-                          (Module*)cml_nn_linear(hid, out_f, DTYPE_FLOAT32, DEVICE_CPU, true));
+                          (Module*)cml_nn_linear(hid, out_f, DTYPE_FLOAT32, g_device, true));
     module_set_training((Module*)model, false);
 
+    /* Warmup: populate the global graph cache (buffer pool) */
     for (int i = 0; i < 5; i++) {
         Tensor* out = cml_nn_sequential_forward(model, X);
         (void)tensor_data_ptr(out);
-        cml_reset_ir_context();
+        cml_reset_ir_graph_only();
     }
 
     int iters = 100;
@@ -158,10 +159,11 @@ static double bench_mlp_forward(void) {
         for (int i = 0; i < iters; i++) {
             Tensor* out = cml_nn_sequential_forward(model, X);
             (void)tensor_data_ptr(out);
-            cml_reset_ir_context();
+            cml_reset_ir_graph_only();
         }
         times[r] = (now() - t0) / iters * 1e3;
     }
+    cml_reset_ir_context();
 
     free(x_data);
     module_free((Module*)model);
@@ -185,10 +187,10 @@ static double bench_mlp_train(void) {
 
     Sequential* model = cml_nn_sequential();
     cml_nn_sequential_add(model,
-                          (Module*)cml_nn_linear(in_f, hid, DTYPE_FLOAT32, DEVICE_CPU, true));
+                          (Module*)cml_nn_linear(in_f, hid, DTYPE_FLOAT32, g_device, true));
     cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
     cml_nn_sequential_add(model,
-                          (Module*)cml_nn_linear(hid, out_f, DTYPE_FLOAT32, DEVICE_CPU, true));
+                          (Module*)cml_nn_linear(hid, out_f, DTYPE_FLOAT32, g_device, true));
     module_set_training((Module*)model, true);
 
     Optimizer* opt = cml_optim_sgd_for_model((Module*)model, 0.01f, 0.0f, 0.0f);
@@ -212,9 +214,10 @@ static double bench_mlp_train(void) {
             cml_optim_zero_grad(opt);
             cml_backward(loss, NULL, false, false);
             cml_optim_step(opt);
-            cml_reset_ir_context();
+            cml_reset_ir_graph_only();
         }
         times[r] = (now() - t0) / iters * 1e3;
+        cml_reset_ir_context();
     }
 
     free(x_data);
@@ -235,14 +238,15 @@ static double bench_conv2d(void) {
     fill_random(x_data, numel);
     Tensor* X = cml_tensor(x_data, x_shape, 4, &cfg);
 
-    Conv2d* conv_layer = cml_nn_conv2d(ic, oc, ksize, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
+    Conv2d* conv_layer = cml_nn_conv2d(ic, oc, ksize, 1, 0, 1, true, DTYPE_FLOAT32, g_device);
     Module* conv       = (Module*)conv_layer;
     module_set_training(conv, false);
 
+    /* Warmup: populate the global graph cache (buffer pool) */
     for (int i = 0; i < 5; i++) {
         Tensor* out = module_forward(conv, X);
         (void)tensor_data_ptr(out);
-        cml_reset_ir_context();
+        cml_reset_ir_graph_only();
     }
 
     int iters = 100;
@@ -252,10 +256,11 @@ static double bench_conv2d(void) {
         for (int i = 0; i < iters; i++) {
             Tensor* out = module_forward(conv, X);
             (void)tensor_data_ptr(out);
-            cml_reset_ir_context();
+            cml_reset_ir_graph_only();
         }
         times[r] = (now() - t0) / iters * 1e3;
     }
+    cml_reset_ir_context();
 
     free(x_data);
     module_free(conv);

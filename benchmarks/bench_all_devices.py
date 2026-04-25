@@ -205,17 +205,30 @@ def bench_tinygrad(device):
     except Exception:
         return None
 
+    # Pool sizes: pre-allocate small/medium sizes, but create on-the-fly for 2048
+    # to avoid ~2GB peak memory when running CPU and CL back-to-back.
     RUNS = 5
     ITERS = 5
     POOL = RUNS * ITERS
 
+    def _iters_for(N):
+        return ITERS if N <= 1024 else 2
+
+    def _pool_size(N):
+        ni = _iters_for(N)
+        return RUNS * ni + 3  # 3 warmup + runs*iters
+
     for N in [512, 1024, 2048]:
+        n_pool = _pool_size(N)
+        n_iters = _iters_for(N)
+        n_runs = RUNS
+
         pool = [
             (
                 TgTensor(np.random.randn(N, N).astype(np.float32)),
                 TgTensor(np.random.randn(N, N).astype(np.float32)),
             )
-            for _ in range(POOL + 3)
+            for _ in range(n_pool + 3)
         ]
         for a, b in pool:
             a.realize()
@@ -229,24 +242,29 @@ def bench_tinygrad(device):
         for a, b in [next(it) for _ in range(3)]:
             gemm_jit(a, b)
 
-        def run(it=it):
-            pairs = [next(it) for _ in range(ITERS)]
+        def run(it=it, ni=n_iters):
+            pairs = [next(it) for _ in range(ni)]
             t0 = now()
             for a, b in pairs:
                 out = gemm_jit(a, b)
             out.numpy()
-            return (now() - t0) / ITERS * 1e3
+            return (now() - t0) / ni * 1e3
 
-        results[f"gemm_{N}"] = median_of(run, runs=RUNS)
+        results[f"gemm_{N}"] = median_of(run, runs=n_runs)
+        del pool
 
     for N in [512, 1024, 2048]:
+        n_pool = _pool_size(N)
+        n_iters = _iters_for(N)
+        n_runs = RUNS
+
         pool = [
             (
                 TgTensor(np.random.randn(N, N).astype(np.float32)),
                 TgTensor(np.random.randn(N, N).astype(np.float32)),
                 TgTensor(np.random.randn(1, N).astype(np.float32)),
             )
-            for _ in range(POOL + 3)
+            for _ in range(n_pool + 3)
         ]
         for a, b, bias in pool:
             a.realize()
@@ -261,15 +279,16 @@ def bench_tinygrad(device):
         for a, b, bias in [next(it) for _ in range(3)]:
             fused_jit(a, b, bias)
 
-        def run(it=it):
-            pairs = [next(it) for _ in range(ITERS)]
+        def run(it=it, ni=n_iters):
+            pairs = [next(it) for _ in range(ni)]
             t0 = now()
             for a, b, bias in pairs:
                 out = fused_jit(a, b, bias)
             out.numpy()
-            return (now() - t0) / ITERS * 1e3
+            return (now() - t0) / ni * 1e3
 
-        results[f"fused_{N}"] = median_of(run, runs=RUNS)
+        results[f"fused_{N}"] = median_of(run, runs=n_runs)
+        del pool
 
     class TgMLP:
         def __init__(self):
@@ -309,7 +328,42 @@ def bench_tinygrad(device):
         return (now() - t0) / MLP_ITERS * 1e3
 
     results["mlp_forward"] = median_of(run, runs=RUNS)
-    results["mlp_train_step"] = None
+
+    # MLP train step with SGD — create tensors fresh each step to avoid gradient accumulation OOM
+    from tinygrad.nn import optim as tg_optim
+
+    train_model = TgMLP()
+    optimizer = tg_optim.SGD(tg_nn.state.get_parameters(train_model), lr=0.01)
+
+    import gc
+    TgTensor.training = True
+
+    def tg_train_step_once():
+        x_t = TgTensor(np.random.randn(64, 784).astype(np.float32))
+        tgt_t = TgTensor(np.random.randn(64, 10).astype(np.float32))
+        optimizer.zero_grad()
+        out = train_model(x_t)
+        loss = ((out - tgt_t) * (out - tgt_t)).mean()
+        loss.backward()
+        optimizer.step()
+        loss.numpy()
+        del x_t, tgt_t, out, loss
+
+    for _ in range(3):
+        tg_train_step_once()
+        gc.collect()
+
+    TRAIN_ITERS = 10
+
+    def run():
+        t0 = now()
+        for _ in range(TRAIN_ITERS):
+            tg_train_step_once()
+        gc.collect()
+        return (now() - t0) / TRAIN_ITERS * 1e3
+
+    results["mlp_train_step"] = median_of(run, runs=3)
+    gc.collect()
 
     CONV_ITERS = 100
     CONV_POOL = RUNS * CONV_ITERS
@@ -403,9 +457,83 @@ def bench_numpy():
         ms = median_of(run, runs=5)
         results[f"fused_{N}"] = ms
 
-    results["mlp_forward"] = None
-    results["mlp_train_step"] = None
-    results["conv2d_forward"] = None
+    # MLP forward: 784->128->ReLU->10, batch=64
+    W1 = np.random.randn(128, 784).astype(np.float32)
+    b1 = np.random.randn(128).astype(np.float32)
+    W2 = np.random.randn(10, 128).astype(np.float32)
+    b2 = np.random.randn(10).astype(np.float32)
+    x_mlp = np.random.randn(64, 784).astype(np.float32)
+    for _ in range(5):
+        np.maximum(x_mlp @ W1.T + b1, 0) @ W2.T + b2
+
+    def run():
+        t0 = now()
+        for _ in range(100):
+            h = np.maximum(x_mlp @ W1.T + b1, 0)
+            np.dot(h, W2.T) + b2
+        return (now() - t0) / 100 * 1e3
+
+    results["mlp_forward"] = median_of(run, runs=5)
+
+    # MLP train step (manual SGD, no autograd)
+    W1t = np.random.randn(128, 784).astype(np.float32) * 0.01
+    b1t = np.zeros(128, dtype=np.float32)
+    W2t = np.random.randn(10, 128).astype(np.float32) * 0.01
+    b2t = np.zeros(10, dtype=np.float32)
+    lr = 0.01
+
+    def numpy_train_step():
+        x = np.random.randn(64, 784).astype(np.float32)
+        tgt = np.random.randn(64, 10).astype(np.float32)
+        h_pre = x @ W1t.T + b1t
+        h = np.maximum(h_pre, 0)
+        out = h @ W2t.T + b2t
+        d_out = 2.0 * (out - tgt) / tgt.size
+        W2t[:] -= lr * (d_out.T @ h)
+        b2t[:] -= lr * d_out.sum(0)
+        d_h = d_out @ W2t
+        d_h_pre = d_h * (h_pre > 0)
+        W1t[:] -= lr * (d_h_pre.T @ x)
+        b1t[:] -= lr * d_h_pre.sum(0)
+
+    for _ in range(5):
+        numpy_train_step()
+
+    def run():
+        t0 = now()
+        for _ in range(50):
+            numpy_train_step()
+        return (now() - t0) / 50 * 1e3
+
+    results["mlp_train_step"] = median_of(run, runs=5)
+
+    # Conv2d forward: (8,3,32,32) -> 16 filters of 3x3 (no padding)
+    weight_c = np.random.randn(16, 3, 3, 3).astype(np.float32)
+    x_conv = np.random.randn(8, 3, 32, 32).astype(np.float32)
+
+    def numpy_conv2d(x, w):
+        N, C, H, W_in = x.shape
+        F, C, KH, KW = w.shape
+        OH, OW = H - KH + 1, W_in - KW + 1
+        # im2col via stride tricks
+        cols = np.lib.stride_tricks.as_strided(
+            x,
+            shape=(N, C, KH, KW, OH, OW),
+            strides=x.strides[:2] + x.strides[2:] + x.strides[2:],
+        ).reshape(N, C * KH * KW, OH * OW)
+        w_col = w.reshape(F, -1)
+        return np.einsum("fi,nio->nfo", w_col, cols).reshape(N, F, OH, OW)
+
+    for _ in range(5):
+        numpy_conv2d(x_conv, weight_c)
+
+    def run():
+        t0 = now()
+        for _ in range(100):
+            numpy_conv2d(x_conv, weight_c)
+        return (now() - t0) / 100 * 1e3
+
+    results["conv2d_forward"] = median_of(run, runs=5)
 
     return results
 
@@ -481,14 +609,14 @@ def main():
     except Exception as e:
         print(f"TinyGrad CPU failed: {e}")
 
-    # TinyGrad GPU (OpenCL)
+    # TinyGrad OpenCL
     try:
-        print(f"\nRunning TinyGrad (GPU)...")
-        tg_gpu = bench_tinygrad("GPU")
+        print(f"\nRunning TinyGrad (OpenCL)...")
+        tg_gpu = bench_tinygrad("CL")
         if tg_gpu:
-            all_results["TinyGrad(GPU)"] = tg_gpu
+            all_results["TinyGrad(OpenCL)"] = tg_gpu
     except Exception as e:
-        print(f"TinyGrad GPU failed: {e}")
+        print(f"TinyGrad OpenCL failed: {e}")
 
     # Print results
     frameworks = list(all_results.keys())

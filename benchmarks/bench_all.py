@@ -350,7 +350,10 @@ def bench_numpy():
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(script_dir)
-    cml_binary = os.path.join(project_dir, "build", "bin", "bench_cross_framework")
+    cml_binary = os.environ.get(
+        "CML_BENCH_BINARY",
+        os.path.join(project_dir, "build_release", "bin", "bench_cross_framework")
+    )
 
     print(f"Cross-Framework Benchmark  (float32, {os.environ.get('OMP_NUM_THREADS', '?')} threads)")
     print(f"Python {sys.version.split()[0]}")
