@@ -425,6 +425,39 @@ int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
         break;
     }
 
+    case UOP_LINEAR: {
+        if (!in1 || !in2)
+            return -1;
+        Tensor* input_t  = node->inputs[0];
+        Tensor* weight_t = node->inputs[1];
+        if (!input_t || !weight_t || input_t->ndim < 2 || weight_t->ndim != 2)
+            return -1;
+        int K             = input_t->shape[input_t->ndim - 1];
+        int N             = weight_t->shape[0];
+        size_t total_rows = input_t->numel / (size_t)K;
+        CMLBlasContext* blas = cml_blas_get_context();
+        if (blas && blas->initialized) {
+            cml_blas_sgemm_ex(blas, in1, in2, out_buf, (int)total_rows, N, K, 1.0f, 0.0f,
+                              false, true);
+        } else {
+            memset(out_buf, 0, out_n * sizeof(float));
+            for (size_t m = 0; m < total_rows; m++)
+                for (int n = 0; n < N; n++) {
+                    float s = 0.0f;
+                    for (int k = 0; k < K; k++)
+                        s += in1[m * (size_t)K + k] * in2[n * K + k];
+                    out_buf[m * (size_t)N + n] = s;
+                }
+        }
+        if (node->num_inputs >= 3 && node->inputs[2] && node->inputs[2]->data) {
+            float* bias = (float*)node->inputs[2]->data;
+            for (size_t m = 0; m < total_rows; m++)
+                for (int n = 0; n < N; n++)
+                    out_buf[m * (size_t)N + n] += bias[n];
+        }
+        break;
+    }
+
     case UOP_SUM: {
         if (!in1)
             return -1;

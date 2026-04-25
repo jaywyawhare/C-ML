@@ -166,6 +166,19 @@ void cml_ir_reset_global_context(void) {
     cml_cleanup_buffer_cache();
 }
 
+void cml_ir_reset_graph_only(void) {
+    if (g_global_ir_context) {
+        if (atomic_load(&g_auto_capture_ir) == g_global_ir_context) {
+            cml_ir_disable_auto_capture();
+        }
+        cml_ir_free(g_global_ir_context);
+        g_global_ir_context = NULL;
+    }
+    /* Intentionally does NOT call cml_graph_cache_reset_global(),
+     * cml_cpu_execute_cache_reset(), or cml_cleanup_buffer_cache().
+     * Those caches stay warm so the next forward pass hits them. */
+}
+
 void cml_ir_ensure_gradients_executed(CMLGraph_t ir) {
     if (!ir || !ir->tensor_refs)
         return;

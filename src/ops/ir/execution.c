@@ -3173,8 +3173,9 @@ int cpu_execute_node(struct IRNode* node) {
         CMLBlasContext* conv_blas = get_blas_context();
 
         /* Winograd F(2,3) for 3x3, stride 1, dilation 1 convolutions.
-         * Only beneficial when in_channels >= 16 (BLAS GEMM needs K >= 8).
-         * For shallow channels (e.g., 3 RGB), im2col+GEMM is faster. */
+         * Only beneficial when in_channels >= 16: for shallow inputs (e.g. 3-ch RGB)
+         * the 16 mini-GEMMs each have K=in_ch which is too small to amortise the
+         * input/output transform overhead, making im2col+GEMM faster. */
         if (p && p->use_winograd && conv_blas && conv_blas->initialized && ch_per_group_in >= 16 &&
             kernel_h == 3 && kernel_w == 3 && stride_h == 1 && stride_w == 1 && dilation_h == 1 &&
             dilation_w == 1) {

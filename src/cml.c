@@ -884,6 +884,7 @@ void cml_set_requires_grad(Tensor* t, bool requires_grad) {
 }
 bool cml_is_leaf(Tensor* t) { return tensor_is_leaf(t); }
 void cml_reset_ir_context(void) { cml_ir_reset_global_context(); }
+void cml_reset_ir_graph_only(void) { cml_ir_reset_graph_only(); }
 
 struct CMLKernelCache;
 struct CMLKernelCache* cml_kernel_cache_get_default(void);
