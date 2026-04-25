@@ -48,13 +48,16 @@ typedef struct CachedModelGraph {
     bool buffers_populated;        // Have plan buffers been filled at least once?
 } CachedModelGraph;
 
+struct SequentialFastPath;
+
 typedef struct Sequential {
     Module base;
     Module** modules;
     int num_modules;
     int capacity;
-    CachedModelGraph* cached_graph; // Optional cached execution graph
-    bool enable_graph_cache;        // Whether to use graph caching
+    CachedModelGraph* cached_graph;      // Optional cached execution graph
+    bool enable_graph_cache;             // Whether to use graph caching
+    struct SequentialFastPath* fast_path; // Zero-IR inference fast path
 } Sequential;
 
 Sequential* nn_sequential(void);
