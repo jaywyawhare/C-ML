@@ -370,6 +370,12 @@ bool cml_is_leaf(Tensor* t);
  */
 void cml_reset_ir_context(void);
 
+/**
+ * Soft reset: free IR nodes but keep the execution plan cache and buffer cache alive.
+ * Use this between inference iterations so repeated calls hit the plan cache.
+ */
+void cml_reset_ir_graph_only(void);
+
 void cml_kernel_cache_clear(void);
 void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory);
 double cml_kernel_cache_hit_rate(void);

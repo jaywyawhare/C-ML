@@ -34,6 +34,10 @@ void cml_ir_clear_global_if_current(CMLGraph_t ir);
    Useful for clearing the graph after a training step. */
 void cml_ir_reset_global_context(void);
 
+/* Soft reset: frees only the IR graph, leaving execution plan cache and
+   buffer cache intact so the next forward pass hits the plan cache. */
+void cml_ir_reset_graph_only(void);
+
 /* Ensure lazy gradient tensors have their data computed before
    resetting the IR context. */
 void cml_ir_ensure_gradients_executed(CMLGraph_t ir);
