@@ -4,6 +4,7 @@
 #include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 CMLUNetConfig cml_zoo_unet_config_default(void) {
     return (CMLUNetConfig){
@@ -84,7 +85,7 @@ static void unet_free(Module* module) {
     }
     if (unet->bottleneck) module_free((Module*)unet->bottleneck);
     if (unet->final_conv) module_free((Module*)unet->final_conv);
-    free(unet);
+    cml_free(unet);
 }
 
 Module* cml_zoo_unet_create(CMLUNetConfig* config, DType dtype, DeviceType device) {
@@ -95,12 +96,12 @@ Module* cml_zoo_unet_create(CMLUNetConfig* config, DType dtype, DeviceType devic
     if (depth > UNET_MAX_DEPTH)
         depth = UNET_MAX_DEPTH;
 
-    UNetModel* unet = malloc(sizeof(UNetModel));
+    UNetModel* unet = cml_malloc(sizeof(UNetModel));
     if (!unet)
         return NULL;
 
     if (module_init((Module*)unet, "UNet", unet_forward, unet_free) != 0) {
-        free(unet);
+        cml_free(unet);
         return NULL;
     }
 

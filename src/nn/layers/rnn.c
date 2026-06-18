@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 
 static Tensor* rnn_cell_module_forward(Module* module, Tensor* input) {
@@ -25,19 +26,19 @@ static void rnn_cell_free(Module* module) {
             if (!p)
                 continue;
             if (p->name)
-                free(p->name);
+                cml_free(p->name);
             if (p->tensor)
                 tensor_free(p->tensor);
-            free(p);
+            cml_free(p);
         }
-        free(module->parameters);
+        cml_free(module->parameters);
         module->parameters = NULL;
     }
     if (module->name) {
-        free(module->name);
+        cml_free(module->name);
         module->name = NULL;
     }
-    free(module);
+    cml_free(module);
 }
 
 Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
@@ -74,12 +75,12 @@ Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
 
 RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
                      DType dtype, DeviceType device) {
-    RNNCell* cell = malloc(sizeof(RNNCell));
+    RNNCell* cell = cml_malloc(sizeof(RNNCell));
     if (!cell) return NULL;
 
     if (module_init((Module*)cell, "RNNCell",
                     rnn_cell_module_forward, rnn_cell_free) != 0) {
-        free(cell);
+        cml_free(cell);
         return NULL;
     }
 
@@ -143,19 +144,19 @@ static void lstm_cell_free(Module* module) {
             if (!p)
                 continue;
             if (p->name)
-                free(p->name);
+                cml_free(p->name);
             if (p->tensor)
                 tensor_free(p->tensor);
-            free(p);
+            cml_free(p);
         }
-        free(module->parameters);
+        cml_free(module->parameters);
         module->parameters = NULL;
     }
     if (module->name) {
-        free(module->name);
+        cml_free(module->name);
         module->name = NULL;
     }
-    free(module);
+    cml_free(module);
 }
 
 void lstm_cell_forward(LSTMCell* cell, Tensor* input,
@@ -227,12 +228,12 @@ void lstm_cell_forward(LSTMCell* cell, Tensor* input,
 
 LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
                        DType dtype, DeviceType device) {
-    LSTMCell* cell = malloc(sizeof(LSTMCell));
+    LSTMCell* cell = cml_malloc(sizeof(LSTMCell));
     if (!cell) return NULL;
 
     if (module_init((Module*)cell, "LSTMCell",
                     lstm_cell_module_forward, lstm_cell_free) != 0) {
-        free(cell);
+        cml_free(cell);
         return NULL;
     }
 
@@ -297,19 +298,19 @@ static void gru_cell_free(Module* module) {
             if (!p)
                 continue;
             if (p->name)
-                free(p->name);
+                cml_free(p->name);
             if (p->tensor)
                 tensor_free(p->tensor);
-            free(p);
+            cml_free(p);
         }
-        free(module->parameters);
+        cml_free(module->parameters);
         module->parameters = NULL;
     }
     if (module->name) {
-        free(module->name);
+        cml_free(module->name);
         module->name = NULL;
     }
-    free(module);
+    cml_free(module);
 }
 
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
@@ -368,12 +369,12 @@ Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
 
 GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
                      DType dtype, DeviceType device) {
-    GRUCell* cell = malloc(sizeof(GRUCell));
+    GRUCell* cell = cml_malloc(sizeof(GRUCell));
     if (!cell) return NULL;
 
     if (module_init((Module*)cell, "GRUCell",
                     gru_cell_module_forward, gru_cell_free) != 0) {
-        free(cell);
+        cml_free(cell);
         return NULL;
     }
 
@@ -443,7 +444,7 @@ static void register_cell_params(Module* parent, Module* cell,
                     pt->ref_count--;
             }
         }
-        if (params) free(params);
+        if (params) cml_free(params);
     }
 }
 
@@ -489,19 +490,19 @@ static void rnn_free(Module* module) {
                 rnn_cell_free((Module*)rnn->cells[i]);
             }
         }
-        free(rnn->cells);
+        cml_free(rnn->cells);
     }
-    free(rnn);
+    cml_free(rnn);
 }
 
 RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
             bool batch_first, float dropout, bool use_bias,
             DType dtype, DeviceType device) {
-    RNN* rnn = malloc(sizeof(RNN));
+    RNN* rnn = cml_malloc(sizeof(RNN));
     if (!rnn) return NULL;
 
     if (module_init((Module*)rnn, "RNN", rnn_module_forward, rnn_free) != 0) {
-        free(rnn);
+        cml_free(rnn);
         return NULL;
     }
 
@@ -517,8 +518,8 @@ RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
     rnn->num_directions = bidirectional ? 2 : 1;
 
     int total = num_layers * rnn->num_directions;
-    rnn->cells = calloc((size_t)total, sizeof(RNNCell*));
-    if (!rnn->cells) { free(rnn); return NULL; }
+    rnn->cells = cml_calloc((size_t)total, sizeof(RNNCell*));
+    if (!rnn->cells) { cml_free(rnn); return NULL; }
 
     for (int l = 0; l < num_layers; l++) {
         int cell_input = (l == 0) ? input_size
@@ -548,14 +549,14 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
     int seq_len = x->shape[0];
     int total_dirs = rnn->num_layers * nd;
 
-    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
+    Tensor** final_h = cml_calloc((size_t)total_dirs, sizeof(Tensor*));
     Tensor* layer_input = x;
 
     for (int l = 0; l < rnn->num_layers; l++) {
         RNNCell* fwd_cell = rnn->cells[l * nd + 0];
 
         Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
-        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+        Tensor** fwd_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
 
         for (int t = 0; t < seq_len; t++) {
             Tensor* xt = slice_timestep(layer_input, t);
@@ -565,13 +566,13 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
         final_h[l * nd + 0] = h_fwd;
 
         Tensor* fwd_out = uop_stack(fwd_steps, seq_len, 0);
-        free(fwd_steps);
+        cml_free(fwd_steps);
 
         Tensor* layer_output;
         if (nd == 2) {
             RNNCell* rev_cell = rnn->cells[l * nd + 1];
             Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
-            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+            Tensor** rev_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
 
             for (int t = seq_len - 1; t >= 0; t--) {
                 Tensor* xt = slice_timestep(layer_input, t);
@@ -581,7 +582,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
             final_h[l * nd + 1] = h_rev;
 
             Tensor* rev_out = uop_stack(rev_steps, seq_len, 0);
-            free(rev_steps);
+            cml_free(rev_steps);
 
             layer_output = concat_features(fwd_out, rev_out);
         } else {
@@ -592,7 +593,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
     }
 
     Tensor* hn = uop_stack(final_h, total_dirs, 0);
-    free(final_h);
+    cml_free(final_h);
 
     if (rnn->batch_first)
         layer_input = transpose_01(layer_input);
@@ -615,19 +616,19 @@ static void lstm_free(Module* module) {
                 lstm_cell_free((Module*)lstm->cells[i]);
             }
         }
-        free(lstm->cells);
+        cml_free(lstm->cells);
     }
-    free(lstm);
+    cml_free(lstm);
 }
 
 LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectional,
               bool batch_first, float dropout, bool use_bias,
               DType dtype, DeviceType device) {
-    LSTM* lstm = malloc(sizeof(LSTM));
+    LSTM* lstm = cml_malloc(sizeof(LSTM));
     if (!lstm) return NULL;
 
     if (module_init((Module*)lstm, "LSTM", lstm_module_forward, lstm_free) != 0) {
-        free(lstm);
+        cml_free(lstm);
         return NULL;
     }
 
@@ -643,8 +644,8 @@ LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectiona
     lstm->num_directions = bidirectional ? 2 : 1;
 
     int total = num_layers * lstm->num_directions;
-    lstm->cells = calloc((size_t)total, sizeof(LSTMCell*));
-    if (!lstm->cells) { free(lstm); return NULL; }
+    lstm->cells = cml_calloc((size_t)total, sizeof(LSTMCell*));
+    if (!lstm->cells) { cml_free(lstm); return NULL; }
 
     for (int l = 0; l < num_layers; l++) {
         int cell_input = (l == 0) ? input_size
@@ -674,8 +675,8 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
 
     int seq_len = x->shape[0];
 
-    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
-    Tensor** final_c = calloc((size_t)total_dirs, sizeof(Tensor*));
+    Tensor** final_h = cml_calloc((size_t)total_dirs, sizeof(Tensor*));
+    Tensor** final_c = cml_calloc((size_t)total_dirs, sizeof(Tensor*));
     Tensor* layer_input = x;
 
     for (int l = 0; l < lstm->num_layers; l++) {
@@ -683,7 +684,7 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
 
         Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
         Tensor* c_fwd = c_0 ? slice_timestep(c_0, l * nd + 0) : NULL;
-        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+        Tensor** fwd_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
 
         for (int t = 0; t < seq_len; t++) {
             Tensor* xt = slice_timestep(layer_input, t);
@@ -698,14 +699,14 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
         final_c[l * nd + 0] = c_fwd;
 
         Tensor* fwd_out = uop_stack(fwd_steps, seq_len, 0);
-        free(fwd_steps);
+        cml_free(fwd_steps);
 
         Tensor* layer_output;
         if (nd == 2) {
             LSTMCell* rev_cell = lstm->cells[l * nd + 1];
             Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
             Tensor* c_rev = c_0 ? slice_timestep(c_0, l * nd + 1) : NULL;
-            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+            Tensor** rev_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
 
             for (int t = seq_len - 1; t >= 0; t--) {
                 Tensor* xt = slice_timestep(layer_input, t);
@@ -720,7 +721,7 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
             final_c[l * nd + 1] = c_rev;
 
             Tensor* rev_out = uop_stack(rev_steps, seq_len, 0);
-            free(rev_steps);
+            cml_free(rev_steps);
 
             layer_output = concat_features(fwd_out, rev_out);
         } else {
@@ -732,8 +733,8 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
 
     Tensor* hn = uop_stack(final_h, total_dirs, 0);
     Tensor* cn = uop_stack(final_c, total_dirs, 0);
-    free(final_h);
-    free(final_c);
+    cml_free(final_h);
+    cml_free(final_c);
 
     if (lstm->batch_first)
         layer_input = transpose_01(layer_input);
@@ -757,19 +758,19 @@ static void gru_free(Module* module) {
                 gru_cell_free((Module*)gru->cells[i]);
             }
         }
-        free(gru->cells);
+        cml_free(gru->cells);
     }
-    free(gru);
+    cml_free(gru);
 }
 
 GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
             bool batch_first, float dropout, bool use_bias,
             DType dtype, DeviceType device) {
-    GRU* gru = malloc(sizeof(GRU));
+    GRU* gru = cml_malloc(sizeof(GRU));
     if (!gru) return NULL;
 
     if (module_init((Module*)gru, "GRU", gru_module_forward, gru_free) != 0) {
-        free(gru);
+        cml_free(gru);
         return NULL;
     }
 
@@ -785,8 +786,8 @@ GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
     gru->num_directions = bidirectional ? 2 : 1;
 
     int total = num_layers * gru->num_directions;
-    gru->cells = calloc((size_t)total, sizeof(GRUCell*));
-    if (!gru->cells) { free(gru); return NULL; }
+    gru->cells = cml_calloc((size_t)total, sizeof(GRUCell*));
+    if (!gru->cells) { cml_free(gru); return NULL; }
 
     for (int l = 0; l < num_layers; l++) {
         int cell_input = (l == 0) ? input_size
@@ -816,14 +817,14 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
 
     int seq_len = x->shape[0];
 
-    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
+    Tensor** final_h = cml_calloc((size_t)total_dirs, sizeof(Tensor*));
     Tensor* layer_input = x;
 
     for (int l = 0; l < gru->num_layers; l++) {
         GRUCell* fwd_cell = gru->cells[l * nd + 0];
 
         Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
-        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+        Tensor** fwd_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
 
         for (int t = 0; t < seq_len; t++) {
             Tensor* xt = slice_timestep(layer_input, t);
@@ -833,13 +834,13 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
         final_h[l * nd + 0] = h_fwd;
 
         Tensor* fwd_out = uop_stack(fwd_steps, seq_len, 0);
-        free(fwd_steps);
+        cml_free(fwd_steps);
 
         Tensor* layer_output;
         if (nd == 2) {
             GRUCell* rev_cell = gru->cells[l * nd + 1];
             Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
-            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+            Tensor** rev_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
 
             for (int t = seq_len - 1; t >= 0; t--) {
                 Tensor* xt = slice_timestep(layer_input, t);
@@ -849,7 +850,7 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
             final_h[l * nd + 1] = h_rev;
 
             Tensor* rev_out = uop_stack(rev_steps, seq_len, 0);
-            free(rev_steps);
+            cml_free(rev_steps);
 
             layer_output = concat_features(fwd_out, rev_out);
         } else {
@@ -860,7 +861,7 @@ void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
     }
 
     Tensor* hn = uop_stack(final_h, total_dirs, 0);
-    free(final_h);
+    cml_free(final_h);
 
     if (gru->batch_first)
         layer_input = transpose_01(layer_input);

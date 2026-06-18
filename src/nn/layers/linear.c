@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 Tensor* linear_forward(Module* module, Tensor* input) {
     Linear* linear = (Linear*)module;
@@ -45,7 +46,7 @@ static void linear_free_fn(Module* module) {
     if (!linear)
         return;
 
-    free(linear);
+    cml_free(linear);
 }
 
 static void xavier_init(Tensor* tensor, int in_features, int out_features) {
@@ -89,7 +90,7 @@ Linear* nn_linear(int in_features, int out_features, DType dtype, DeviceType dev
 Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, DeviceType device,
                             bool use_bias, void (*weight_init)(Tensor*, int, int),
                             void (*bias_init)(Tensor*, int)) {
-    Linear* linear = malloc(sizeof(Linear));
+    Linear* linear = cml_malloc(sizeof(Linear));
     if (!linear) {
         LOG_ERROR("Failed to allocate memory for Linear layer");
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Linear layer",
@@ -99,7 +100,7 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     if (module_init((Module*)linear, "Linear", linear_forward, linear_free_fn) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Linear module", __FILE__,
                          __LINE__, __func__);
-        free(linear);
+        cml_free(linear);
         return NULL;
     }
 

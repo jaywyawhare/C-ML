@@ -15,6 +15,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <dirent.h>
+#include "alloc/cml_allocator.h"
 
 #define MOCK_FD_KFD  200
 #define MOCK_FD_DRM  201
@@ -52,7 +53,7 @@ void cml_am_mock_init(CMLAMMockGPU* config) {
     g_mock.next_queue_id = 1;
 
     g_mock.alloc_capacity = MOCK_ALLOC_INIT_CAP;
-    g_mock.alloc_table = (void**)calloc((size_t)g_mock.alloc_capacity, sizeof(void*));
+    g_mock.alloc_table = (void**)cml_calloc((size_t)g_mock.alloc_capacity, sizeof(void*));
     g_mock.num_allocs = 0;
 
     mock_create_topology();
@@ -63,9 +64,9 @@ void cml_am_mock_shutdown(void) {
     if (!g_mock_active) return;
 
     for (int i = 0; i < g_mock.num_allocs; i++) {
-        free(g_mock.alloc_table[i]);
+        cml_free(g_mock.alloc_table[i]);
     }
-    free(g_mock.alloc_table);
+    cml_free(g_mock.alloc_table);
     g_mock.alloc_table = NULL;
     g_mock.num_allocs = 0;
     g_mock.alloc_capacity = 0;
@@ -84,7 +85,7 @@ static void mock_track_alloc(void* ptr) {
 
     if (g_mock.num_allocs >= g_mock.alloc_capacity) {
         int new_cap = g_mock.alloc_capacity * 2;
-        void** tmp = (void**)realloc(g_mock.alloc_table,
+        void** tmp = (void**)cml_realloc(g_mock.alloc_table,
                                      (size_t)new_cap * sizeof(void*));
         if (!tmp) return;
         g_mock.alloc_table = tmp;
@@ -383,7 +384,7 @@ int cml_am_mock_munmap(void* addr, size_t length) {
     if (!g_mock_active) return munmap(addr, length);
 
     if (mock_untrack_alloc(addr)) {
-        free(addr);
+        cml_free(addr);
         return 0;
     }
 

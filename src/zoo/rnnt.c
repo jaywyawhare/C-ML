@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
     return (CMLRNNTConfig){
@@ -36,22 +37,22 @@ static void rnnt_free(Module* module) {
         if (net->encoder_lstms[i]) module_free(net->encoder_lstms[i]);
         if (net->encoder_lnorms[i]) module_free(net->encoder_lnorms[i]);
     }
-    free(net->encoder_lstms);
-    free(net->encoder_lnorms);
+    cml_free(net->encoder_lstms);
+    cml_free(net->encoder_lnorms);
 
     if (net->pred_embedding) module_free(net->pred_embedding);
     for (int i = 0; i < net->num_pred_layers; i++) {
         if (net->pred_lstms[i]) module_free(net->pred_lstms[i]);
         if (net->pred_lnorms[i]) module_free(net->pred_lnorms[i]);
     }
-    free(net->pred_lstms);
-    free(net->pred_lnorms);
+    cml_free(net->pred_lstms);
+    cml_free(net->pred_lnorms);
 
     if (net->joint_linear1) module_free(net->joint_linear1);
     if (net->joint_relu) module_free(net->joint_relu);
     if (net->joint_linear2) module_free(net->joint_linear2);
 
-    free(net);
+    cml_free(net);
 }
 
 Tensor* cml_rnnt_encode(Module* module, Tensor* audio_features) {
@@ -114,11 +115,11 @@ Tensor* cml_rnnt_joint(Module* module, Tensor* enc_out, Tensor* pred_out) {
 Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType device) {
     if (!config) return NULL;
 
-    CMLRNNT* net = calloc(1, sizeof(CMLRNNT));
+    CMLRNNT* net = cml_calloc(1, sizeof(CMLRNNT));
     if (!net) return NULL;
 
     if (module_init((Module*)net, "RNN-T", rnnt_forward, rnnt_free) != 0) {
-        free(net);
+        cml_free(net);
         return NULL;
     }
 
@@ -133,8 +134,8 @@ Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType
         pad, 1, true, dtype, device);
 
     net->num_enc_layers = config->encoder_layers;
-    net->encoder_lstms = calloc(config->encoder_layers, sizeof(Module*));
-    net->encoder_lnorms = calloc(config->encoder_layers, sizeof(Module*));
+    net->encoder_lstms = cml_calloc(config->encoder_layers, sizeof(Module*));
+    net->encoder_lnorms = cml_calloc(config->encoder_layers, sizeof(Module*));
 
     for (int i = 0; i < config->encoder_layers; i++) {
         int in_sz = config->encoder_dim;
@@ -149,8 +150,8 @@ Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType
         config->vocab_size, config->pred_dim, -1, dtype, device);
 
     net->num_pred_layers = config->pred_layers;
-    net->pred_lstms = calloc(config->pred_layers, sizeof(Module*));
-    net->pred_lnorms = calloc(config->pred_layers, sizeof(Module*));
+    net->pred_lstms = cml_calloc(config->pred_layers, sizeof(Module*));
+    net->pred_lnorms = cml_calloc(config->pred_layers, sizeof(Module*));
 
     for (int i = 0; i < config->pred_layers; i++) {
         int in_sz = config->pred_dim;

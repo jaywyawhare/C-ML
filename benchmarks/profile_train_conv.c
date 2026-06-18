@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double now(void) {
     struct timespec ts;
@@ -34,8 +35,8 @@ int main(void) {
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
 
-        float* x_data = malloc(sizeof(float) * batch * in_f);
-        float* y_data = malloc(sizeof(float) * batch * out_f);
+        float* x_data = cml_malloc(sizeof(float) * batch * in_f);
+        float* y_data = cml_malloc(sizeof(float) * batch * out_f);
         fill_random(x_data, batch * in_f);
         fill_random(y_data, batch * out_f);
 
@@ -105,7 +106,7 @@ int main(void) {
         printf("  ─────────────────────────────\n");
         printf("  Total:           %8.3f ms\n\n", t_total / iters * 1e3);
 
-        free(x_data); free(y_data);
+        cml_free(x_data); cml_free(y_data);
         optimizer_free(opt);
         module_free((Module*)model);
     }
@@ -120,11 +121,11 @@ int main(void) {
         CMLBlasContext* blas = cml_blas_get_context();
         int col_h = ic * kh * kw;
         int col_w = oh * ow;
-        float* input  = malloc(sizeof(float) * cb * ic * ih * iw);
-        float* weight = malloc(sizeof(float) * oc * col_h);
-        float* col    = malloc(sizeof(float) * col_h * col_w);
-        float* output = malloc(sizeof(float) * cb * oc * oh * ow);
-        float* bias   = malloc(sizeof(float) * oc);
+        float* input  = cml_malloc(sizeof(float) * cb * ic * ih * iw);
+        float* weight = cml_malloc(sizeof(float) * oc * col_h);
+        float* col    = cml_malloc(sizeof(float) * col_h * col_w);
+        float* output = cml_malloc(sizeof(float) * cb * oc * oh * ow);
+        float* bias   = cml_malloc(sizeof(float) * oc);
         fill_random(input, cb * ic * ih * iw);
         fill_random(weight, oc * col_h);
         fill_random(bias, oc);
@@ -179,7 +180,7 @@ int main(void) {
         int x_shape[] = {cb, ic, ih, iw};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* x_data = malloc(sizeof(float) * cb * ic * ih * iw);
+        float* x_data = cml_malloc(sizeof(float) * cb * ic * ih * iw);
         memcpy(x_data, input, sizeof(float) * cb * ic * ih * iw);
         Tensor* X = cml_tensor(x_data, x_shape, 4, &cfg);
         Conv2d* conv = cml_nn_conv2d(ic, oc, kh, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
@@ -213,7 +214,7 @@ int main(void) {
         printf("  Execution only:         %8.3f ms\n", cml_total - ir_create);
         printf("  Overhead:               %8.3f ms\n\n", cml_total - raw_full);
 
-        free(input); free(weight); free(col); free(output); free(bias); free(x_data);
+        cml_free(input); cml_free(weight); cml_free(col); cml_free(output); cml_free(bias); cml_free(x_data);
         module_free((Module*)conv);
     }
 

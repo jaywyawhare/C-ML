@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #define CACHE_NUM_BUCKETS 64
 #define FNV_OFFSET 0xcbf29ce484222325ULL
@@ -57,14 +58,14 @@ uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
 }
 
 CMLGraphCache* cml_graph_cache_create(size_t max_entries) {
-    CMLGraphCache* cache = calloc(1, sizeof(CMLGraphCache));
+    CMLGraphCache* cache = cml_calloc(1, sizeof(CMLGraphCache));
     if (!cache)
         return NULL;
 
     cache->num_buckets = CACHE_NUM_BUCKETS;
-    cache->buckets     = calloc(cache->num_buckets, sizeof(CMLGraphCacheEntry*));
+    cache->buckets     = cml_calloc(cache->num_buckets, sizeof(CMLGraphCacheEntry*));
     if (!cache->buckets) {
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
 
@@ -88,13 +89,13 @@ void cml_graph_cache_destroy(CMLGraphCache* cache) {
         while (entry) {
             CMLGraphCacheEntry* next = entry->next;
             free_execution_plan_impl(entry->plan, false);
-            free(entry);
+            cml_free(entry);
             entry = next;
         }
     }
 
-    free(cache->buckets);
-    free(cache);
+    cml_free(cache->buckets);
+    cml_free(cache);
 }
 
 CMLExecutionPlan* cml_graph_cache_lookup(CMLGraphCache* cache, uint64_t signature) {
@@ -148,7 +149,7 @@ static void evict_lru_entry(CMLGraphCache* cache) {
             cache->buckets[oldest_bucket] = oldest_entry->next;
         }
         free_execution_plan_impl(oldest_entry->plan, true);
-        free(oldest_entry);
+        cml_free(oldest_entry);
         cache->count--;
         cml_cpu_execute_cache_reset();
     }
@@ -164,7 +165,7 @@ int cml_graph_cache_insert(CMLGraphCache* cache, uint64_t signature, CMLExecutio
 
     size_t bucket = signature % cache->num_buckets;
 
-    CMLGraphCacheEntry* entry = calloc(1, sizeof(CMLGraphCacheEntry));
+    CMLGraphCacheEntry* entry = cml_calloc(1, sizeof(CMLGraphCacheEntry));
     if (!entry)
         return -1;
 
@@ -192,20 +193,20 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     if (!ir)
         return NULL;
 
-    CMLExecutionPlan* plan = calloc(1, sizeof(CMLExecutionPlan));
+    CMLExecutionPlan* plan = cml_calloc(1, sizeof(CMLExecutionPlan));
     if (!plan)
         return NULL;
 
     plan->num_nodes = count_nodes(ir);
     if (plan->num_nodes == 0) {
-        free(plan);
+        cml_free(plan);
         return NULL;
     }
 
-    plan->nodes           = calloc(plan->num_nodes, sizeof(struct IRNode*));
-    plan->buffers         = calloc(plan->num_nodes, sizeof(float*));
-    plan->buffer_sizes    = calloc(plan->num_nodes, sizeof(size_t));
-    plan->output_tensors  = calloc(plan->num_nodes, sizeof(Tensor*));
+    plan->nodes           = cml_calloc(plan->num_nodes, sizeof(struct IRNode*));
+    plan->buffers         = cml_calloc(plan->num_nodes, sizeof(float*));
+    plan->buffer_sizes    = cml_calloc(plan->num_nodes, sizeof(size_t));
+    plan->output_tensors  = cml_calloc(plan->num_nodes, sizeof(Tensor*));
 
     if (!plan->nodes || !plan->buffers || !plan->buffer_sizes || !plan->output_tensors) {
         cml_free_execution_plan(plan);
@@ -255,16 +256,16 @@ static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_
                         t->is_executed = false;
                     }
                 }
-                free(plan->buffers[i]);
+                cml_free(plan->buffers[i]);
             }
         }
-        free(plan->buffers);
+        cml_free(plan->buffers);
     }
 
-    free(plan->output_tensors);
-    free(plan->nodes);
-    free(plan->buffer_sizes);
-    free(plan);
+    cml_free(plan->output_tensors);
+    cml_free(plan->nodes);
+    cml_free(plan->buffer_sizes);
+    cml_free(plan);
 }
 
 void cml_free_execution_plan(CMLExecutionPlan* plan) {
@@ -653,7 +654,7 @@ void cml_graph_cache_reset_global(void) {
         while (entry) {
             CMLGraphCacheEntry* next = entry->next;
             free_execution_plan_impl(entry->plan, false);
-            free(entry);
+            cml_free(entry);
             entry = next;
         }
         g_graph_cache->buckets[i] = NULL;

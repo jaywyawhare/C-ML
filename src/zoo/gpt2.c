@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 GPT2Config cml_zoo_gpt2_config_small(void) {
     return (GPT2Config){
@@ -95,16 +96,16 @@ static void gpt2_block_free(Module* module) {
         module_free((Module*)block->ln_mlp);
     if (block->mlp)
         module_free((Module*)block->mlp);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtype, DeviceType device) {
-    GPT2Block* block = malloc(sizeof(GPT2Block));
+    GPT2Block* block = cml_malloc(sizeof(GPT2Block));
     if (!block)
         return NULL;
 
     if (module_init((Module*)block, "GPT2Block", gpt2_block_forward, gpt2_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -221,19 +222,19 @@ static void gpt2_free(Module* module) {
         module_free((Module*)gpt2->ln_f);
     if (gpt2->lm_head)
         module_free((Module*)gpt2->lm_head);
-    free(gpt2);
+    cml_free(gpt2);
 }
 
 Module* cml_zoo_gpt2_create(GPT2Config* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;
 
-    GPT2Model* gpt2 = malloc(sizeof(GPT2Model));
+    GPT2Model* gpt2 = cml_malloc(sizeof(GPT2Model));
     if (!gpt2)
         return NULL;
 
     if (module_init((Module*)gpt2, "GPT2", gpt2_forward, gpt2_free) != 0) {
-        free(gpt2);
+        cml_free(gpt2);
         return NULL;
     }
 

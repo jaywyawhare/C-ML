@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include "alloc/cml_allocator.h"
 
 struct CMLBackendBufferType {
     const char* name;
@@ -29,15 +30,15 @@ struct CMLBackendBuffer {
 
 static CMLBackendBuffer_t cpu_buffer_alloc(struct CMLBackendBufferType* buft, size_t size) {
     (void)buft; // Unused
-    void* ptr = malloc(size);
+    void* ptr = cml_malloc(size);
     if (!ptr) {
         LOG_ERROR("Failed to allocate CPU buffer of size %zu", size);
         return NULL;
     }
 
-    CMLBackendBuffer_t buffer = malloc(sizeof(struct CMLBackendBuffer));
+    CMLBackendBuffer_t buffer = cml_malloc(sizeof(struct CMLBackendBuffer));
     if (!buffer) {
-        free(ptr);
+        cml_free(ptr);
         return NULL;
     }
 
@@ -65,7 +66,7 @@ static CMLBackendBuffer_t cuda_buffer_alloc(struct CMLBackendBufferType* buft, s
         return NULL;
     }
 
-    CMLBackendBuffer_t buffer = malloc(sizeof(struct CMLBackendBuffer));
+    CMLBackendBuffer_t buffer = cml_malloc(sizeof(struct CMLBackendBuffer));
     if (!buffer) {
         device_free(ptr, DEVICE_CUDA);
         return NULL;
@@ -97,7 +98,7 @@ static CMLBackendBuffer_t metal_buffer_alloc(struct CMLBackendBufferType* buft, 
         return NULL;
     }
 
-    CMLBackendBuffer_t buffer = malloc(sizeof(struct CMLBackendBuffer));
+    CMLBackendBuffer_t buffer = cml_malloc(sizeof(struct CMLBackendBuffer));
     if (!buffer) {
         device_free(ptr, DEVICE_METAL);
         return NULL;
@@ -127,7 +128,7 @@ static CMLBackendBuffer_t rocm_buffer_alloc(struct CMLBackendBufferType* buft, s
         return NULL;
     }
 
-    CMLBackendBuffer_t buffer = malloc(sizeof(struct CMLBackendBuffer));
+    CMLBackendBuffer_t buffer = cml_malloc(sizeof(struct CMLBackendBuffer));
     if (!buffer) {
         device_free(ptr, DEVICE_ROCM);
         return NULL;
@@ -251,7 +252,7 @@ void cml_backend_buffer_free(CMLBackendBuffer_t buffer) {
         device_free(buffer->base, buffer->device);
     }
 
-    free(buffer);
+    cml_free(buffer);
 }
 
 void* cml_backend_buffer_get_base(CMLBackendBuffer_t buffer) {

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #define DEFAULT_NUM_BUCKETS 256
 #define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
@@ -45,17 +46,17 @@ CMLKernelCache* cml_kernel_cache_create(size_t max_entries) {
 }
 
 CMLKernelCache* cml_kernel_cache_create_with_limits(size_t max_entries, size_t max_memory) {
-    CMLKernelCache* cache = (CMLKernelCache*)calloc(1, sizeof(CMLKernelCache));
+    CMLKernelCache* cache = (CMLKernelCache*)cml_calloc(1, sizeof(CMLKernelCache));
     if (!cache) {
         LOG_ERROR("Failed to allocate kernel cache");
         return NULL;
     }
 
     cache->num_buckets = DEFAULT_NUM_BUCKETS;
-    cache->buckets     = (CMLKernelEntry**)calloc(cache->num_buckets, sizeof(CMLKernelEntry*));
+    cache->buckets     = (CMLKernelEntry**)cml_calloc(cache->num_buckets, sizeof(CMLKernelEntry*));
     if (!cache->buckets) {
         LOG_ERROR("Failed to allocate kernel cache buckets");
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
 
@@ -70,8 +71,8 @@ CMLKernelCache* cml_kernel_cache_create_with_limits(size_t max_entries, size_t m
 
     if (pthread_mutex_init(&cache->lock, NULL) != 0) {
         LOG_ERROR("Failed to initialize kernel cache mutex");
-        free(cache->buckets);
-        free(cache);
+        cml_free(cache->buckets);
+        cml_free(cache);
         return NULL;
     }
     cache->lock_initialized = true;
@@ -87,7 +88,7 @@ static void free_entry(CMLKernelEntry* entry) {
         g_kernel_free_fns[entry->backend](entry->compiled);
     }
 
-    free(entry);
+    cml_free(entry);
 }
 
 void cml_kernel_cache_free(CMLKernelCache* cache) {
@@ -100,8 +101,8 @@ void cml_kernel_cache_free(CMLKernelCache* cache) {
         pthread_mutex_destroy(&cache->lock);
     }
 
-    free(cache->buckets);
-    free(cache);
+    cml_free(cache->buckets);
+    cml_free(cache);
 }
 
 void kernel_cache_clear(CMLKernelCache* cache) {
@@ -221,7 +222,7 @@ int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash, CMLKernelBacke
         pthread_mutex_lock(&cache->lock);
     }
 
-    CMLKernelEntry* entry = (CMLKernelEntry*)calloc(1, sizeof(CMLKernelEntry));
+    CMLKernelEntry* entry = (CMLKernelEntry*)cml_calloc(1, sizeof(CMLKernelEntry));
     if (!entry) {
         pthread_mutex_unlock(&cache->lock);
         LOG_ERROR("Failed to allocate kernel cache entry");

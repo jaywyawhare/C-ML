@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 int cml_image_dtype_channels(CMLImageFormat format) {
     switch (format) {
@@ -107,7 +108,7 @@ CMLImageTensor* cml_image_tensor_create(Tensor* tensor, CMLImageFormat format) {
     if (!cml_image_dtype_compatible(tensor->shape, tensor->ndim, format))
         return NULL;
 
-    CMLImageTensor* img = (CMLImageTensor*)calloc(1, sizeof(CMLImageTensor));
+    CMLImageTensor* img = (CMLImageTensor*)cml_calloc(1, sizeof(CMLImageTensor));
     if (!img) return NULL;
 
     img->tensor = tensor;
@@ -135,7 +136,7 @@ Tensor* cml_image_tensor_to_regular(CMLImageTensor* img) {
 void cml_image_tensor_free(CMLImageTensor* img) {
     if (!img) return;
     /* Note: does NOT free the underlying tensor */
-    free(img);
+    cml_free(img);
 }
 
 size_t cml_image_tensor_memory(const CMLImageTensor* img) {

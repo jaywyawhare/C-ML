@@ -4,17 +4,18 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include "alloc/cml_allocator.h"
 
 static int64_t* dup_i64(const int64_t* src, int n) {
     if (!src) return NULL;
-    int64_t* dst = malloc((size_t)n * sizeof(int64_t));
+    int64_t* dst = cml_malloc((size_t)n * sizeof(int64_t));
     if (dst) memcpy(dst, src, (size_t)n * sizeof(int64_t));
     return dst;
 }
 
 static int* dup_int(const int* src, int n) {
     if (!src) return NULL;
-    int* dst = malloc((size_t)n * sizeof(int));
+    int* dst = cml_malloc((size_t)n * sizeof(int));
     if (dst) memcpy(dst, src, (size_t)n * sizeof(int));
     return dst;
 }
@@ -22,7 +23,7 @@ static int* dup_int(const int* src, int n) {
 STView* st_view_create(const int* shape, const int64_t* strides, int64_t offset,
                        const int64_t* mask_begin, const int64_t* mask_end, int ndim) {
     if (!shape || ndim <= 0) return NULL;
-    STView* v = calloc(1, sizeof(STView));
+    STView* v = cml_calloc(1, sizeof(STView));
     if (!v) return NULL;
     v->ndim   = ndim;
     v->offset = offset;
@@ -49,16 +50,16 @@ STView* st_view_copy(const STView* v) {
 
 void st_view_free(STView* v) {
     if (!v) return;
-    free(v->shape);
-    free(v->strides);
-    free(v->mask_begin);
-    free(v->mask_end);
-    free(v);
+    cml_free(v->shape);
+    cml_free(v->strides);
+    cml_free(v->mask_begin);
+    cml_free(v->mask_end);
+    cml_free(v);
 }
 
 STView* st_view_from_shape(const int* shape, int ndim) {
     if (!shape || ndim <= 0) return NULL;
-    int64_t* strides = malloc((size_t)ndim * sizeof(int64_t));
+    int64_t* strides = cml_malloc((size_t)ndim * sizeof(int64_t));
     if (!strides) return NULL;
     
     int64_t stride = 1;
@@ -67,7 +68,7 @@ STView* st_view_from_shape(const int* shape, int ndim) {
         stride *= shape[i];
     }
     STView* v = st_view_create(shape, strides, 0, NULL, NULL, ndim);
-    free(strides);
+    cml_free(strides);
     return v;
 }
 
@@ -85,14 +86,14 @@ bool st_view_is_contiguous(const STView* v) {
 
 ShapeTracker* shape_tracker_create(const int* shape, int ndim) {
     if (!shape || ndim <= 0) return NULL;
-    ShapeTracker* st = calloc(1, sizeof(ShapeTracker));
+    ShapeTracker* st = cml_calloc(1, sizeof(ShapeTracker));
     if (!st) return NULL;
-    st->views = malloc(ST_INIT_CAPACITY * sizeof(STView*));
-    if (!st->views) { free(st); return NULL; }
+    st->views = cml_malloc(ST_INIT_CAPACITY * sizeof(STView*));
+    if (!st->views) { cml_free(st); return NULL; }
     st->views_capacity = ST_INIT_CAPACITY;
     st->num_views = 0;
     STView* v = st_view_from_shape(shape, ndim);
-    if (!v) { free(st->views); free(st); return NULL; }
+    if (!v) { cml_free(st->views); cml_free(st); return NULL; }
     st->views[0] = v;
     st->num_views = 1;
     return st;
@@ -100,16 +101,16 @@ ShapeTracker* shape_tracker_create(const int* shape, int ndim) {
 
 ShapeTracker* shape_tracker_copy(const ShapeTracker* src) {
     if (!src) return NULL;
-    ShapeTracker* dst = calloc(1, sizeof(ShapeTracker));
+    ShapeTracker* dst = cml_calloc(1, sizeof(ShapeTracker));
     if (!dst) return NULL;
-    dst->views = malloc((size_t)src->num_views * sizeof(STView*));
-    if (!dst->views) { free(dst); return NULL; }
+    dst->views = cml_malloc((size_t)src->num_views * sizeof(STView*));
+    if (!dst->views) { cml_free(dst); return NULL; }
     dst->views_capacity = src->num_views;
     for (int i = 0; i < src->num_views; ++i) {
         dst->views[i] = st_view_copy(src->views[i]);
         if (!dst->views[i]) {
             for (int j = 0; j < i; ++j) st_view_free(dst->views[j]);
-            free(dst->views); free(dst); return NULL;
+            cml_free(dst->views); cml_free(dst); return NULL;
         }
     }
     dst->num_views = src->num_views;
@@ -120,8 +121,8 @@ void shape_tracker_free(ShapeTracker* st) {
     if (!st) return;
     for (int i = 0; i < st->num_views; ++i)
         st_view_free(st->views[i]);
-    free(st->views);
-    free(st);
+    cml_free(st->views);
+    cml_free(st);
 }
 
 static STView* st_top(const ShapeTracker* st) {
@@ -131,7 +132,7 @@ static STView* st_top(const ShapeTracker* st) {
 static int st_push(ShapeTracker* st, STView* v) {
     if (st->num_views >= st->views_capacity) {
         int new_cap = st->views_capacity * 2;
-        STView** tmp = realloc(st->views, (size_t)new_cap * sizeof(STView*));
+        STView** tmp = cml_realloc(st->views, (size_t)new_cap * sizeof(STView*));
         if (!tmp) return -1;
         st->views = tmp;
         st->views_capacity = new_cap;
@@ -171,10 +172,10 @@ int shape_tracker_reshape(ShapeTracker* st, const int* new_shape, int new_ndim) 
 
     
     if (st_view_is_contiguous(top)) {
-        free(top->shape);
-        free(top->strides);
+        cml_free(top->shape);
+        cml_free(top->strides);
         top->shape   = dup_int(new_shape, new_ndim);
-        top->strides = malloc((size_t)new_ndim * sizeof(int64_t));
+        top->strides = cml_malloc((size_t)new_ndim * sizeof(int64_t));
         if (!top->shape || !top->strides) return -1;
         int64_t stride = 1;
         for (int i = new_ndim - 1; i >= 0; --i) {
@@ -197,13 +198,13 @@ int shape_tracker_permute(ShapeTracker* st, const int* perm) {
     if (!top) return -1;
     int ndim = top->ndim;
 
-    int* new_shape     = malloc((size_t)ndim * sizeof(int));
-    int64_t* new_strides = malloc((size_t)ndim * sizeof(int64_t));
-    if (!new_shape || !new_strides) { free(new_shape); free(new_strides); return -1; }
+    int* new_shape     = cml_malloc((size_t)ndim * sizeof(int));
+    int64_t* new_strides = cml_malloc((size_t)ndim * sizeof(int64_t));
+    if (!new_shape || !new_strides) { cml_free(new_shape); cml_free(new_strides); return -1; }
 
     for (int i = 0; i < ndim; ++i) {
         int p = perm[i];
-        if (p < 0 || p >= ndim) { free(new_shape); free(new_strides); return -1; }
+        if (p < 0 || p >= ndim) { cml_free(new_shape); cml_free(new_strides); return -1; }
         new_shape[i]   = top->shape[p];
         new_strides[i] = top->strides[p];
     }
@@ -211,20 +212,20 @@ int shape_tracker_permute(ShapeTracker* st, const int* perm) {
     
     memcpy(top->shape,   new_shape,   (size_t)ndim * sizeof(int));
     memcpy(top->strides, new_strides, (size_t)ndim * sizeof(int64_t));
-    free(new_shape);
-    free(new_strides);
+    cml_free(new_shape);
+    cml_free(new_strides);
 
     if (top->has_mask) {
-        int64_t* nb = malloc((size_t)ndim * sizeof(int64_t));
-        int64_t* ne = malloc((size_t)ndim * sizeof(int64_t));
-        if (!nb || !ne) { free(nb); free(ne); return -1; }
+        int64_t* nb = cml_malloc((size_t)ndim * sizeof(int64_t));
+        int64_t* ne = cml_malloc((size_t)ndim * sizeof(int64_t));
+        if (!nb || !ne) { cml_free(nb); cml_free(ne); return -1; }
         for (int i = 0; i < ndim; ++i) {
             nb[i] = top->mask_begin[perm[i]];
             ne[i] = top->mask_end[perm[i]];
         }
         memcpy(top->mask_begin, nb, (size_t)ndim * sizeof(int64_t));
         memcpy(top->mask_end,   ne, (size_t)ndim * sizeof(int64_t));
-        free(nb); free(ne);
+        cml_free(nb); cml_free(ne);
     }
     return 0;
 }
@@ -235,9 +236,9 @@ int shape_tracker_expand(ShapeTracker* st, const int* new_shape, int new_ndim) {
     if (!top) return -1;
     if (new_ndim < top->ndim) return -1;
 
-    int* ns     = malloc((size_t)new_ndim * sizeof(int));
-    int64_t* ss = malloc((size_t)new_ndim * sizeof(int64_t));
-    if (!ns || !ss) { free(ns); free(ss); return -1; }
+    int* ns     = cml_malloc((size_t)new_ndim * sizeof(int));
+    int64_t* ss = cml_malloc((size_t)new_ndim * sizeof(int64_t));
+    if (!ns || !ss) { cml_free(ns); cml_free(ss); return -1; }
 
     
     int offset = new_ndim - top->ndim;
@@ -251,8 +252,8 @@ int shape_tracker_expand(ShapeTracker* st, const int* new_shape, int new_ndim) {
             ss[i] = (top->shape[old_i] == 1 && new_shape[i] != 1) ? 0 : top->strides[old_i];
         }
     }
-    free(top->shape);   top->shape   = ns;
-    free(top->strides); top->strides = ss;
+    cml_free(top->shape);   top->shape   = ns;
+    cml_free(top->strides); top->strides = ss;
     top->ndim = new_ndim;
     return 0;
 }
@@ -280,8 +281,8 @@ int shape_tracker_pad(ShapeTracker* st, const int64_t* before, const int64_t* af
     int ndim = top->ndim;
 
     if (!top->has_mask) {
-        top->mask_begin = malloc((size_t)ndim * sizeof(int64_t));
-        top->mask_end   = malloc((size_t)ndim * sizeof(int64_t));
+        top->mask_begin = cml_malloc((size_t)ndim * sizeof(int64_t));
+        top->mask_end   = cml_malloc((size_t)ndim * sizeof(int64_t));
         if (!top->mask_begin || !top->mask_end) return -1;
         for (int i = 0; i < ndim; ++i) {
             top->mask_begin[i] = 0;

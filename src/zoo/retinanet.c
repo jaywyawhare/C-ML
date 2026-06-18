@@ -5,6 +5,7 @@
 #include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 RetinaNetConfig cml_zoo_retinanet_default_config(void) {
     RetinaNetConfig cfg = {
@@ -44,7 +45,7 @@ static void backbone_free(Module* module) {
     if (bb->layer2) module_free((Module*)bb->layer2);
     if (bb->layer3) module_free((Module*)bb->layer3);
     if (bb->layer4) module_free((Module*)bb->layer4);
-    free(bb);
+    cml_free(bb);
 }
 
 typedef struct {
@@ -75,15 +76,15 @@ static void fpn_free(Module* module) {
     if (fpn->smooth5) module_free(fpn->smooth5);
     if (fpn->extra_p6) module_free(fpn->extra_p6);
     if (fpn->extra_p7) module_free(fpn->extra_p7);
-    free(fpn);
+    cml_free(fpn);
 }
 
 static Module* create_fpn(int fpn_ch, DType dtype, DeviceType device) {
-    FPN* fpn = malloc(sizeof(FPN));
+    FPN* fpn = cml_malloc(sizeof(FPN));
     if (!fpn) return NULL;
 
     if (module_init((Module*)fpn, "FPN", fpn_forward, fpn_free) != 0) {
-        free(fpn);
+        cml_free(fpn);
         return NULL;
     }
 
@@ -147,7 +148,7 @@ static void retinanet_free(Module* module) {
     if (net->fpn) module_free(net->fpn);
     if (net->cls_subnet) module_free(net->cls_subnet);
     if (net->box_subnet) module_free(net->box_subnet);
-    free(net);
+    cml_free(net);
 }
 
 Module* cml_zoo_retinanet_create(const RetinaNetConfig* cfg, DType dtype, DeviceType device) {
@@ -156,21 +157,21 @@ Module* cml_zoo_retinanet_create(const RetinaNetConfig* cfg, DType dtype, Device
     if (c.num_anchors <= 0) c.num_anchors = 9;
     if (c.fpn_channels <= 0) c.fpn_channels = 256;
 
-    RetinaNet* net = malloc(sizeof(RetinaNet));
+    RetinaNet* net = cml_malloc(sizeof(RetinaNet));
     if (!net) return NULL;
 
     if (module_init((Module*)net, "RetinaNet", retinanet_forward, retinanet_free) != 0) {
-        free(net);
+        cml_free(net);
         return NULL;
     }
 
     net->num_classes = c.num_classes;
     net->num_anchors = c.num_anchors;
 
-    ResNet50Backbone* bb = malloc(sizeof(ResNet50Backbone));
-    if (!bb) { free(net); return NULL; }
+    ResNet50Backbone* bb = cml_malloc(sizeof(ResNet50Backbone));
+    if (!bb) { cml_free(net); return NULL; }
     if (module_init((Module*)bb, "ResNet50Backbone", backbone_forward, backbone_free) != 0) {
-        free(bb); free(net); return NULL;
+        cml_free(bb); cml_free(net); return NULL;
     }
 
     bb->backbone_stem = nn_sequential();

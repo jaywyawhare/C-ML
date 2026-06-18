@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdatomic.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 const char* uop_type_to_string(UOpType type) {
     switch (type) {
@@ -266,7 +267,7 @@ const char* uop_type_to_string(UOpType type) {
 }
 
 CMLGraph_t cml_ir_new(IRTarget target) {
-    CMLGraph_t ir = malloc(sizeof(struct CMLGraph));
+    CMLGraph_t ir = cml_malloc(sizeof(struct CMLGraph));
     if (!ir)
         return NULL;
 
@@ -335,7 +336,7 @@ void cml_ir_free_node_params(struct IRNode* node) {
         break;
     case UOP_CLAMP: {
         ClampParams* p = (ClampParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_PROD:
@@ -346,27 +347,27 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_MEAN: {
         ReduceParams* p = (ReduceParams*)node->params;
         if (p) {
-            if (p->dims) free(p->dims);
-            free(p);
+            if (p->dims) cml_free(p->dims);
+            cml_free(p);
         }
         break;
     }
     case UOP_CUMSUM: {
         CumsumParams* p = (CumsumParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_TRIU:
     case UOP_TRIL: {
         TriParams* p = (TriParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_PAD: {
         PadParams* p = (PadParams*)node->params;
         if (p) {
-            if (p->pad_widths) free(p->pad_widths);
-            free(p);
+            if (p->pad_widths) cml_free(p->pad_widths);
+            cml_free(p);
         }
         break;
     }
@@ -374,15 +375,15 @@ void cml_ir_free_node_params(struct IRNode* node) {
         FillParams* p = (FillParams*)node->params;
         if (p) {
             if (p->shape)
-                free(p->shape);
-            free(p);
+                cml_free(p->shape);
+            cml_free(p);
         }
         break;
     }
     case UOP_GATHER: {
         GatherParams* p = (GatherParams*)node->params;
         if (p) {
-            free(p);
+            cml_free(p);
         }
         break;
     }
@@ -390,8 +391,8 @@ void cml_ir_free_node_params(struct IRNode* node) {
         ReshapeParams* p = (ReshapeParams*)node->params;
         if (p) {
             if (p->new_shape)
-                free(p->new_shape);
-            free(p);
+                cml_free(p->new_shape);
+            cml_free(p);
         }
         break;
     }
@@ -399,8 +400,8 @@ void cml_ir_free_node_params(struct IRNode* node) {
         PermuteParams* p = (PermuteParams*)node->params;
         if (p) {
             if (p->perm)
-                free(p->perm);
-            free(p);
+                cml_free(p->perm);
+            cml_free(p);
         }
         break;
     }
@@ -408,8 +409,8 @@ void cml_ir_free_node_params(struct IRNode* node) {
         ExpandParams* p = (ExpandParams*)node->params;
         if (p) {
             if (p->new_shape)
-                free(p->new_shape);
-            free(p);
+                cml_free(p->new_shape);
+            cml_free(p);
         }
         break;
     }
@@ -417,8 +418,8 @@ void cml_ir_free_node_params(struct IRNode* node) {
         StrideParams* p = (StrideParams*)node->params;
         if (p) {
             if (p->new_strides)
-                free(p->new_strides);
-            free(p);
+                cml_free(p->new_strides);
+            cml_free(p);
         }
         break;
     }
@@ -426,12 +427,12 @@ void cml_ir_free_node_params(struct IRNode* node) {
         SliceParams* p = (SliceParams*)node->params;
         if (p) {
             if (p->start)
-                free(p->start);
+                cml_free(p->start);
             if (p->end)
-                free(p->end);
+                cml_free(p->end);
             if (p->step)
-                free(p->step);
-            free(p);
+                cml_free(p->step);
+            cml_free(p);
         }
         break;
     }
@@ -439,38 +440,38 @@ void cml_ir_free_node_params(struct IRNode* node) {
         Conv2DParams* p = (Conv2DParams*)node->params;
         if (p) {
             if (p->kernel_size)
-                free(p->kernel_size);
+                cml_free(p->kernel_size);
             if (p->stride)
-                free(p->stride);
+                cml_free(p->stride);
             if (p->padding)
-                free(p->padding);
+                cml_free(p->padding);
             if (p->dilation)
-                free(p->dilation);
-            free(p);
+                cml_free(p->dilation);
+            cml_free(p);
         }
         break;
     }
     case UOP_SORT:
     case UOP_ARGSORT: {
         SortParams* p = (SortParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_TOPK: {
         TopkParams* p = (TopkParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_CUMPROD:
     case UOP_CUMMAX:
     case UOP_CUMMIN: {
         CumsumParams* p = (CumsumParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_MASKED_FILL: {
         MaskedFillParams* p = (MaskedFillParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_MIN_REDUCE:
@@ -481,110 +482,110 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_LOGSUMEXP: {
         ReduceParams* p = (ReduceParams*)node->params;
         if (p) {
-            if (p->dims) free(p->dims);
-            free(p);
+            if (p->dims) cml_free(p->dims);
+            cml_free(p);
         }
         break;
     }
     case UOP_CAT: {
         CatParams* p = (CatParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_STACK: {
         StackParams* p = (StackParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_SCATTER: {
         ScatterParams* p = (ScatterParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_ROLL: {
         RollParams* p = (RollParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_FLATTEN: {
         FlattenParams* p = (FlattenParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_UNFLATTEN: {
         UnflattenParams* p = (UnflattenParams*)node->params;
         if (p) {
-            if (p->sizes) free(p->sizes);
-            free(p);
+            if (p->sizes) cml_free(p->sizes);
+            cml_free(p);
         }
         break;
     }
     case UOP_DIAG: {
         DiagParams* p = (DiagParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_ONE_HOT: {
         OneHotParams* p = (OneHotParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_TILE: {
         TileParams* p = (TileParams*)node->params;
         if (p) {
-            if (p->repeats) free(p->repeats);
-            free(p);
+            if (p->repeats) cml_free(p->repeats);
+            cml_free(p);
         }
         break;
     }
     case UOP_REPEAT_INTERLEAVE: {
         RepeatInterleaveParams* p = (RepeatInterleaveParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_SHRINK: {
         ShrinkParams* p = (ShrinkParams*)node->params;
         if (p) {
-            if (p->starts) free(p->starts);
-            if (p->ends) free(p->ends);
-            free(p);
+            if (p->starts) cml_free(p->starts);
+            if (p->ends) cml_free(p->ends);
+            cml_free(p);
         }
         break;
     }
     case UOP_UNFOLD: {
         UnfoldParams* p = (UnfoldParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_MAXPOOL2D:
     case UOP_AVGPOOL2D: {
         Pool2DParams* p = (Pool2DParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_CONV3D: {
         Conv3DParams* p = (Conv3DParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_CONV_TRANSPOSE2D: {
         ConvTranspose2DParams* p = (ConvTranspose2DParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_CONV_TRANSPOSE3D: {
         ConvTranspose3DParams* p = (ConvTranspose3DParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_LOGCUMSUMEXP: {
         CumsumParams* p = (CumsumParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_CELU: {
         ClampParams* p = (ClampParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_ERFC:
@@ -633,41 +634,41 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_CONST: {
         ConstParams* p = (ConstParams*)node->params;
         if (p) {
-            if (p->data)  free(p->data);
-            if (p->shape) free(p->shape);
-            free(p);
+            if (p->data)  cml_free(p->data);
+            if (p->shape) cml_free(p->shape);
+            cml_free(p);
         }
         break;
     }
     case UOP_RAND_UNIFORM:
     case UOP_RAND_NORMAL: {
         RandParams* p = (RandParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_ARANGE_OP: {
         ArangeParams* p = (ArangeParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_EYE_OP: {
         EyeParams* p = (EyeParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_RAND_INT: {
         RandIntParams* p = (RandIntParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_SGD_STEP: {
         SgdStepParams* p = (SgdStepParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     case UOP_ADAM_STEP: {
         AdamStepParams* p = (AdamStepParams*)node->params;
-        if (p) free(p);
+        if (p) cml_free(p);
         break;
     }
     default:
@@ -693,58 +694,58 @@ static void free_ir_node(struct IRNode* node) {
     if (node->input_names && node->num_inputs >= 0 && node->num_inputs <= 1000) {
         for (int i = 0; i < node->num_inputs; i++) {
             if (node->input_names[i]) {
-                free(node->input_names[i]);
+                cml_free(node->input_names[i]);
                 node->input_names[i] = NULL;
             }
         }
-        free(node->input_names);
+        cml_free(node->input_names);
         node->input_names = NULL;
     } else if (node->input_names) {
-        free(node->input_names);
+        cml_free(node->input_names);
         node->input_names = NULL;
     }
 
     if (node->output_name) {
-        free(node->output_name);
+        cml_free(node->output_name);
         node->output_name = NULL;
     }
 
     if (node->users) {
-        free(node->users);
+        cml_free(node->users);
         node->users = NULL;
     }
 
     if (node->inputs) {
-        free(node->inputs);
+        cml_free(node->inputs);
         node->inputs = NULL;
     }
 
     if (node->input_shapes) {
-        free(node->input_shapes);
+        cml_free(node->input_shapes);
         node->input_shapes = NULL;
     }
     if (node->input_ndims) {
-        free(node->input_ndims);
+        cml_free(node->input_ndims);
         node->input_ndims = NULL;
     }
     if (node->output_shape) {
-        free(node->output_shape);
+        cml_free(node->output_shape);
         node->output_shape = NULL;
     }
 
     if (node->broadcast) {
         if (node->broadcast->broadcast_dims) {
-            free(node->broadcast->broadcast_dims);
+            cml_free(node->broadcast->broadcast_dims);
         }
         if (node->broadcast->broadcast_strides) {
-            free(node->broadcast->broadcast_strides);
+            cml_free(node->broadcast->broadcast_strides);
         }
-        free(node->broadcast);
+        cml_free(node->broadcast);
         node->broadcast = NULL;
     }
 
     if (node->saved_for_backward) {
-        free(node->saved_for_backward);
+        cml_free(node->saved_for_backward);
         node->saved_for_backward = NULL;
     }
 
@@ -755,7 +756,7 @@ static void free_ir_node(struct IRNode* node) {
     cml_ir_free_node_params(node);
 
     /* execution_result is owned by the tensor -- do not free here */
-    free(node);
+    cml_free(node);
 }
 
 void cml_ir_free(CMLGraph_t ir) {
@@ -816,7 +817,7 @@ void cml_ir_free(CMLGraph_t ir) {
                 ir->tensor_refs[i] = NULL;
             }
         }
-        free(ir->tensor_refs);
+        cml_free(ir->tensor_refs);
         ir->tensor_refs       = NULL;
         ir->tensor_refs_count = 0;
     }
@@ -861,22 +862,22 @@ void cml_ir_free(CMLGraph_t ir) {
     if (ir->tensor_names) {
         for (int i = 0; i < ir->tensor_count; i++) {
             if (ir->tensor_names[i]) {
-                free(ir->tensor_names[i]);
+                cml_free(ir->tensor_names[i]);
                 ir->tensor_names[i] = NULL;
             }
         }
-        free(ir->tensor_names);
+        cml_free(ir->tensor_names);
         ir->tensor_names = NULL;
         ir->tensor_count = 0;
     }
 
     if (ir->execution_results) {
-        free(ir->execution_results);
+        cml_free(ir->execution_results);
         ir->execution_results       = NULL;
         ir->execution_results_count = 0;
     }
 
-    free(ir);
+    cml_free(ir);
 }
 
 /** Undo refcount bumps on inputs wired as lazy tensors in this IR graph. */
@@ -927,7 +928,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         }
     }
 
-    struct IRNode* node = malloc(sizeof(struct IRNode));
+    struct IRNode* node = cml_malloc(sizeof(struct IRNode));
     if (!node)
         return -1;
 
@@ -937,9 +938,9 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     if (num_inputs == 0) {
         node->input_names = NULL;
     } else {
-        node->input_names = malloc((size_t)num_inputs * sizeof(char*));
+        node->input_names = cml_malloc((size_t)num_inputs * sizeof(char*));
         if (!node->input_names) {
-            free(node);
+            cml_free(node);
             return -1;
         }
     }
@@ -950,16 +951,16 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
             new_capacity *= 2;
         }
 
-        Tensor** new_refs = realloc(ir->tensor_refs, (size_t)new_capacity * sizeof(Tensor*));
-        char** new_names  = realloc(ir->tensor_names, (size_t)new_capacity * sizeof(char*));
+        Tensor** new_refs = cml_realloc(ir->tensor_refs, (size_t)new_capacity * sizeof(Tensor*));
+        char** new_names  = cml_realloc(ir->tensor_names, (size_t)new_capacity * sizeof(char*));
 
         if (!new_refs || !new_names) {
             if (new_refs)
-                free(new_refs);
+                cml_free(new_refs);
             if (new_names)
-                free(new_names);
-            free(node->input_names);
-            free(node);
+                cml_free(new_names);
+            cml_free(node->input_names);
+            cml_free(node);
             return -1;
         }
 
@@ -975,48 +976,48 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
 
         if (t) {
             if (t->ir_node && t->ir_context == ir && t->ir_node->output_name) {
-                name = strdup(t->ir_node->output_name);
+                name = cml_strdup(t->ir_node->output_name);
                 if (!name) {
                     cml_ir_release_same_graph_input_refs(ir, inputs, i);
                     for (int j = 0; j < i; j++)
-                        free(node->input_names[j]);
-                    free(node->input_names);
-                    free(node);
+                        cml_free(node->input_names[j]);
+                    cml_free(node->input_names);
+                    cml_free(node);
                     return -1;
                 }
                 t->ref_count++;
             } else {
                 for (int j = 0; j < ir->tensor_count; j++) {
                     if (ir->tensor_refs[j] == t) {
-                        name = strdup(ir->tensor_names[j]);
+                        name = cml_strdup(ir->tensor_names[j]);
                         break;
                     }
                 }
 
                 if (!name) {
-                    char* new_name = malloc(32);
+                    char* new_name = cml_malloc(32);
                     if (!new_name) {
                         cml_ir_release_same_graph_input_refs(ir, inputs, i);
                         for (int j = 0; j < i; j++)
-                            free(node->input_names[j]);
-                        free(node->input_names);
-                        free(node);
+                            cml_free(node->input_names[j]);
+                        cml_free(node->input_names);
+                        cml_free(node);
                         return -1;
                     }
                     snprintf(new_name, 32, "t%d", ir->tensor_count + ir->node_count);
                     ir->tensor_refs[ir->tensor_count] = t;
                     t->ref_count++;
                     ir->tensor_names[ir->tensor_count] = new_name;
-                    name                               = strdup(new_name);
+                    name                               = cml_strdup(new_name);
                     if (!name) {
-                        free(new_name);
+                        cml_free(new_name);
                         ir->tensor_refs[ir->tensor_count] = NULL;
                         t->ref_count--;
                         cml_ir_release_same_graph_input_refs(ir, inputs, i);
                         for (int j = 0; j < i; j++)
-                            free(node->input_names[j]);
-                        free(node->input_names);
-                        free(node);
+                            cml_free(node->input_names[j]);
+                        cml_free(node->input_names);
+                        cml_free(node);
                         return -1;
                     }
                     ir->tensor_count++;
@@ -1024,27 +1025,27 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
                 }
             }
         } else {
-            name = strdup("null");
+            name = cml_strdup("null");
         }
 
         if (!name) {
             cml_ir_release_same_graph_input_refs(ir, inputs, i);
             for (int j = 0; j < i; j++)
-                free(node->input_names[j]);
-            free(node->input_names);
-            free(node);
+                cml_free(node->input_names[j]);
+            cml_free(node->input_names);
+            cml_free(node);
             return -1;
         }
         node->input_names[i] = name;
     }
 
-    char* output_name = malloc(32);
+    char* output_name = cml_malloc(32);
     if (!output_name) {
         cml_ir_release_same_graph_input_refs(ir, inputs, num_inputs);
         for (int i = 0; i < num_inputs; i++)
-            free(node->input_names[i]);
-        free(node->input_names);
-        free(node);
+            cml_free(node->input_names[i]);
+        cml_free(node->input_names);
+        cml_free(node);
         return -1;
     }
     snprintf(output_name, 32, "t%d", ir->tensor_count + ir->node_count);
@@ -1054,14 +1055,14 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     node->next   = NULL;
 
     if (num_inputs > 0) {
-        node->inputs = malloc((size_t)num_inputs * sizeof(Tensor*));
+        node->inputs = cml_malloc((size_t)num_inputs * sizeof(Tensor*));
         if (!node->inputs) {
             cml_ir_release_same_graph_input_refs(ir, inputs, num_inputs);
             for (int i = 0; i < num_inputs; i++) {
-                free(node->input_names[i]);
+                cml_free(node->input_names[i]);
             }
-            free(node->input_names);
-            free(node);
+            cml_free(node->input_names);
+            cml_free(node);
             return -1;
         }
         memcpy(node->inputs, inputs, (size_t)num_inputs * sizeof(Tensor*));
@@ -1153,7 +1154,7 @@ char* cml_ir_to_string(CMLGraph_t ir) {
         return NULL;
 
     size_t buffer_size = 2048;
-    char* str          = malloc(buffer_size);
+    char* str          = cml_malloc(buffer_size);
     if (!str)
         return NULL;
 
@@ -1185,20 +1186,20 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     if (!node || node->num_inputs < 2)
         return -1;
 
-    int** input_shapes = malloc((size_t)node->num_inputs * sizeof(int*));
+    int** input_shapes = cml_malloc((size_t)node->num_inputs * sizeof(int*));
     if (!input_shapes)
         return -1;
 
-    int* input_ndims = malloc((size_t)node->num_inputs * sizeof(int));
+    int* input_ndims = cml_malloc((size_t)node->num_inputs * sizeof(int));
     if (!input_ndims) {
-        free(input_shapes);
+        cml_free(input_shapes);
         return -1;
     }
 
     for (int i = 0; i < node->num_inputs; i++) {
         if (!node->inputs[i]) {
-            free(input_shapes);
-            free(input_ndims);
+            cml_free(input_shapes);
+            cml_free(input_ndims);
             return -1;
         }
         input_shapes[i] = node->inputs[i]->shape;
@@ -1211,10 +1212,10 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
             max_ndim = input_ndims[i];
     }
 
-    int* output_shape = malloc((size_t)max_ndim * sizeof(int));
+    int* output_shape = cml_malloc((size_t)max_ndim * sizeof(int));
     if (!output_shape) {
-        free(input_shapes);
-        free(input_ndims);
+        cml_free(input_shapes);
+        cml_free(input_ndims);
         return -1;
     }
 
@@ -1225,9 +1226,9 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
             if (dim_idx >= 0) {
                 int dim = input_shapes[i][dim_idx];
                 if (dim != 1 && max_dim != 1 && dim != max_dim) {
-                    free(output_shape);
-                    free(input_shapes);
-                    free(input_ndims);
+                    cml_free(output_shape);
+                    cml_free(input_shapes);
+                    cml_free(input_ndims);
                     return -1;
                 }
                 if (dim > max_dim)

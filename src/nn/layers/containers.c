@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* module_list_forward(Module* module, Tensor* input) {
     (void)module;
@@ -21,14 +22,14 @@ static void module_list_free(Module* module) {
                 module_free(list->modules[i]);
             }
         }
-        free(list->modules);
+        cml_free(list->modules);
     }
 
-    free(list);
+    cml_free(list);
 }
 
 ModuleList* nn_module_list(void) {
-    ModuleList* list = malloc(sizeof(ModuleList));
+    ModuleList* list = cml_malloc(sizeof(ModuleList));
     if (!list) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
                          "Failed to allocate memory for ModuleList", __FILE__, __LINE__,
@@ -39,7 +40,7 @@ ModuleList* nn_module_list(void) {
     if (module_init((Module*)list, "ModuleList", module_list_forward, module_list_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize ModuleList module", __FILE__,
                          __LINE__, __func__);
-        free(list);
+        cml_free(list);
         return NULL;
     }
 
@@ -57,7 +58,7 @@ int module_list_append(ModuleList* list, Module* module) {
 
     if (list->num_modules >= list->capacity) {
         int new_cap = list->capacity == 0 ? 8 : list->capacity * 2;
-        Module** new_mods = realloc(list->modules, (size_t)new_cap * sizeof(Module*));
+        Module** new_mods = cml_realloc(list->modules, (size_t)new_cap * sizeof(Module*));
         if (!new_mods) return -1;
         list->modules  = new_mods;
         list->capacity = new_cap;
@@ -85,7 +86,7 @@ int module_list_append(ModuleList* list, Module* module) {
                     pt->ref_count--;
             }
         }
-        if (params) free(params);
+        if (params) cml_free(params);
     }
 
     return 0;
@@ -97,7 +98,7 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
     /* Ensure capacity */
     if (list->num_modules >= list->capacity) {
         int new_cap = list->capacity == 0 ? 8 : list->capacity * 2;
-        Module** new_mods = realloc(list->modules, (size_t)new_cap * sizeof(Module*));
+        Module** new_mods = cml_realloc(list->modules, (size_t)new_cap * sizeof(Module*));
         if (!new_mods) return -1;
         list->modules  = new_mods;
         list->capacity = new_cap;
@@ -128,7 +129,7 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
                     pt->ref_count--;
             }
         }
-        if (params) free(params);
+        if (params) cml_free(params);
     }
 
     return 0;
@@ -165,19 +166,19 @@ static void module_dict_free(Module* module) {
 
     if (dict->entries) {
         for (int i = 0; i < dict->num_entries; i++) {
-            free(dict->entries[i].key);
+            cml_free(dict->entries[i].key);
             if (dict->entries[i].module) {
                 module_free(dict->entries[i].module);
             }
         }
-        free(dict->entries);
+        cml_free(dict->entries);
     }
 
-    free(dict);
+    cml_free(dict);
 }
 
 ModuleDict* nn_module_dict(void) {
-    ModuleDict* dict = malloc(sizeof(ModuleDict));
+    ModuleDict* dict = cml_malloc(sizeof(ModuleDict));
     if (!dict) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
                          "Failed to allocate memory for ModuleDict", __FILE__, __LINE__,
@@ -188,7 +189,7 @@ ModuleDict* nn_module_dict(void) {
     if (module_init((Module*)dict, "ModuleDict", module_dict_forward, module_dict_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize ModuleDict module", __FILE__,
                          __LINE__, __func__);
-        free(dict);
+        cml_free(dict);
         return NULL;
     }
 
@@ -217,14 +218,14 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     }
     if (dict->num_entries >= dict->capacity) {
         int new_cap = dict->capacity == 0 ? 8 : dict->capacity * 2;
-        ModuleDictEntry* new_entries = realloc(dict->entries,
+        ModuleDictEntry* new_entries = cml_realloc(dict->entries,
                                                (size_t)new_cap * sizeof(ModuleDictEntry));
         if (!new_entries) return -1;
         dict->entries  = new_entries;
         dict->capacity = new_cap;
     }
 
-    dict->entries[dict->num_entries].key    = strdup(key);
+    dict->entries[dict->num_entries].key    = cml_strdup(key);
     dict->entries[dict->num_entries].module = module;
     if (!dict->entries[dict->num_entries].key) return -1;
     dict->num_entries++;
@@ -243,7 +244,7 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
                     pt->ref_count--;
             }
         }
-        if (params) free(params);
+        if (params) cml_free(params);
     }
 
     return 0;
@@ -264,7 +265,7 @@ int module_dict_remove(ModuleDict* dict, const char* key) {
 
     for (int i = 0; i < dict->num_entries; i++) {
         if (strcmp(dict->entries[i].key, key) == 0) {
-            free(dict->entries[i].key);
+            cml_free(dict->entries[i].key);
             /* Don't free module - caller's responsibility */
             for (int j = i; j < dict->num_entries - 1; j++) {
                 dict->entries[j] = dict->entries[j + 1];
@@ -285,7 +286,7 @@ const char** module_dict_keys(ModuleDict* dict, int* num_keys) {
     *num_keys = dict->num_entries;
     if (dict->num_entries == 0) return NULL;
 
-    const char** keys = malloc((size_t)dict->num_entries * sizeof(const char*));
+    const char** keys = cml_malloc((size_t)dict->num_entries * sizeof(const char*));
     if (!keys) return NULL;
 
     for (int i = 0; i < dict->num_entries; i++) {

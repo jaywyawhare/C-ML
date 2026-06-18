@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 void nn_tensor_param_alias(Tensor* t) {
     if (t)
@@ -20,7 +21,7 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
     if (!module || !name)
         return -1;
 
-    module->name                = strdup(name);
+    module->name                = cml_strdup(name);
     module->forward             = forward;
     module->free                = free;
     module->parameters          = NULL;
@@ -36,12 +37,12 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
 }
 
 Module* module_create(const char* name, ForwardFn forward, FreeFn free) {
-    Module* module = malloc(sizeof(Module));
+    Module* module = cml_malloc(sizeof(Module));
     if (!module)
         return NULL;
 
     if (module_init(module, name, forward, free) != 0) {
-        free(module);
+        cml_free(module);
         return NULL;
     }
 
@@ -63,7 +64,7 @@ void module_free(Module* module) {
     module->free = NULL;
 
     if (module->name) {
-        free(module->name);
+        cml_free(module->name);
         module->name = NULL;
     }
 
@@ -73,18 +74,18 @@ void module_free(Module* module) {
             if (module->parameters[i]) {
                 Parameter* p = module->parameters[i];
                 if (p->name) {
-                    free(p->name);
+                    cml_free(p->name);
                     p->name = NULL;
                 }
                 if (p->tensor) {
                     tensor_free(p->tensor);
                     p->tensor = NULL;
                 }
-                free(p);
+                cml_free(p);
                 module->parameters[i] = NULL;
             }
         }
-        free(module->parameters);
+        cml_free(module->parameters);
         module->parameters = NULL;
     }
 
@@ -96,7 +97,7 @@ void module_free(Module* module) {
         specialized_free(module);
     } else {
         
-        free(module);
+        cml_free(module);
     }
 }
 
@@ -123,7 +124,7 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
     if (module->num_parameters >= module->parameters_capacity) {
         int new_capacity = module->parameters_capacity == 0 ? 8 : module->parameters_capacity * 2;
         Parameter** new_params =
-            realloc(module->parameters, (size_t)new_capacity * sizeof(Parameter*));
+            cml_realloc(module->parameters, (size_t)new_capacity * sizeof(Parameter*));
         if (!new_params) {
             LOG_ERROR("Failed to allocate memory for parameters");
             return -1;
@@ -132,7 +133,7 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
         module->parameters_capacity = new_capacity;
     }
 
-    Parameter* param = malloc(sizeof(Parameter));
+    Parameter* param = cml_malloc(sizeof(Parameter));
     if (!param) {
         LOG_ERROR("Failed to allocate memory for parameter");
         return -1;
@@ -140,11 +141,11 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
 
     param->tensor        = tensor;
     param->requires_grad = requires_grad;
-    param->name          = strdup(name);
+    param->name          = cml_strdup(name);
 
     if (!param->name) {
         LOG_ERROR("Failed to duplicate parameter name");
-        free(param);
+        cml_free(param);
         return -1;
     }
 
@@ -314,7 +315,7 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
         return 0;
     }
 
-    Parameter** params = malloc((size_t)total_params * sizeof(Parameter*));
+    Parameter** params = cml_malloc((size_t)total_params * sizeof(Parameter*));
     if (!params) {
         LOG_ERROR("Failed to allocate memory for parameter collection");
         return -1;
@@ -368,12 +369,12 @@ int module_to_device(Module* module, DeviceType device) {
     for (int i = 0; i < num_params; i++) {
         if (params[i] && params[i]->tensor) {
             if (device_move_tensor(params[i]->tensor, device) != 0) {
-                free(params);
+                cml_free(params);
                 return -1;
             }
         }
     }
 
-    free(params);
+    cml_free(params);
     return 0;
 }

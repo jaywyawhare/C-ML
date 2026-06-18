@@ -10,6 +10,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static TrainingMetrics* g_global_metrics = NULL;
 static size_t g_current_epoch            = 0;
@@ -40,23 +41,23 @@ static int training_metrics_ensure_capacity(TrainingMetrics* metrics, size_t num
     size_t old_capacity = metrics->num_epochs;
     size_t new_capacity = num_epochs;
     metrics->epoch_training_losses =
-        realloc(metrics->epoch_training_losses, (size_t)new_capacity * sizeof(float));
+        cml_realloc(metrics->epoch_training_losses, (size_t)new_capacity * sizeof(float));
     metrics->epoch_training_accuracies =
-        realloc(metrics->epoch_training_accuracies, (size_t)new_capacity * sizeof(float));
-    metrics->epoch_times = realloc(metrics->epoch_times, (size_t)new_capacity * sizeof(float));
+        cml_realloc(metrics->epoch_training_accuracies, (size_t)new_capacity * sizeof(float));
+    metrics->epoch_times = cml_realloc(metrics->epoch_times, (size_t)new_capacity * sizeof(float));
     metrics->epoch_learning_rates =
-        realloc(metrics->epoch_learning_rates, (size_t)new_capacity * sizeof(float));
+        cml_realloc(metrics->epoch_learning_rates, (size_t)new_capacity * sizeof(float));
     if (metrics->epoch_validation_losses) {
         metrics->epoch_validation_losses =
-            realloc(metrics->epoch_validation_losses, (size_t)new_capacity * sizeof(float));
+            cml_realloc(metrics->epoch_validation_losses, (size_t)new_capacity * sizeof(float));
         metrics->epoch_validation_accuracies =
-            realloc(metrics->epoch_validation_accuracies, (size_t)new_capacity * sizeof(float));
+            cml_realloc(metrics->epoch_validation_accuracies, (size_t)new_capacity * sizeof(float));
     }
     if (metrics->epoch_testing_losses) {
         metrics->epoch_testing_losses =
-            realloc(metrics->epoch_testing_losses, (size_t)new_capacity * sizeof(float));
+            cml_realloc(metrics->epoch_testing_losses, (size_t)new_capacity * sizeof(float));
         metrics->epoch_testing_accuracies =
-            realloc(metrics->epoch_testing_accuracies, (size_t)new_capacity * sizeof(float));
+            cml_realloc(metrics->epoch_testing_accuracies, (size_t)new_capacity * sizeof(float));
     }
 
     if (!metrics->epoch_training_losses || !metrics->epoch_training_accuracies ||
@@ -86,22 +87,22 @@ static int training_metrics_ensure_capacity(TrainingMetrics* metrics, size_t num
 }
 
 TrainingMetrics* training_metrics_create(size_t num_epochs) {
-    TrainingMetrics* metrics = malloc(sizeof(TrainingMetrics));
+    TrainingMetrics* metrics = cml_malloc(sizeof(TrainingMetrics));
     if (!metrics)
         return NULL;
 
     metrics->num_epochs = num_epochs;
-    metrics->epoch_training_losses     = malloc(num_epochs * sizeof(float));
-    metrics->epoch_training_accuracies = malloc(num_epochs * sizeof(float));
+    metrics->epoch_training_losses     = cml_malloc(num_epochs * sizeof(float));
+    metrics->epoch_training_accuracies = cml_malloc(num_epochs * sizeof(float));
     metrics->epoch_testing_losses     = NULL;
     metrics->epoch_testing_accuracies = NULL;
     metrics->epoch_validation_losses     = NULL;
     metrics->epoch_validation_accuracies = NULL;
 
-    metrics->epoch_times      = malloc(num_epochs * sizeof(float));
+    metrics->epoch_times      = cml_malloc(num_epochs * sizeof(float));
     metrics->total_time       = 0.0f;
     metrics->epoch_start_time = 0;
-    metrics->epoch_learning_rates = malloc(num_epochs * sizeof(float));
+    metrics->epoch_learning_rates = cml_malloc(num_epochs * sizeof(float));
 
     metrics->best_loss        = 0.0f;
     metrics->best_accuracy    = 0.0f;
@@ -121,14 +122,14 @@ TrainingMetrics* training_metrics_create(size_t num_epochs) {
     if (!metrics->epoch_training_losses || !metrics->epoch_training_accuracies ||
         !metrics->epoch_times || !metrics->epoch_learning_rates) {
         if (metrics->epoch_training_losses)
-            free(metrics->epoch_training_losses);
+            cml_free(metrics->epoch_training_losses);
         if (metrics->epoch_training_accuracies)
-            free(metrics->epoch_training_accuracies);
+            cml_free(metrics->epoch_training_accuracies);
         if (metrics->epoch_times)
-            free(metrics->epoch_times);
+            cml_free(metrics->epoch_times);
         if (metrics->epoch_learning_rates)
-            free(metrics->epoch_learning_rates);
-        free(metrics);
+            cml_free(metrics->epoch_learning_rates);
+        cml_free(metrics);
         return NULL;
     }
 
@@ -181,8 +182,8 @@ void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, 
     if (!isinf(test_loss) && !isinf(test_accuracy) && !isnan(test_loss) && !isnan(test_accuracy) &&
         test_loss >= 0.0f && test_accuracy >= 0.0f) {
         if (!metrics->epoch_testing_losses) {
-            metrics->epoch_testing_losses     = malloc(metrics->num_epochs * sizeof(float));
-            metrics->epoch_testing_accuracies = malloc(metrics->num_epochs * sizeof(float));
+            metrics->epoch_testing_losses     = cml_malloc(metrics->num_epochs * sizeof(float));
+            metrics->epoch_testing_accuracies = cml_malloc(metrics->num_epochs * sizeof(float));
             if (metrics->epoch_testing_losses && metrics->epoch_testing_accuracies) {
                 for (size_t i = 0; i < metrics->num_epochs; i++) {
                     metrics->epoch_testing_losses[i]     = INFINITY;
@@ -199,8 +200,8 @@ void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, 
     if (!isinf(val_loss) && !isinf(val_accuracy) && !isnan(val_loss) && !isnan(val_accuracy) &&
         val_loss >= 0.0f && val_accuracy >= 0.0f) {
         if (!metrics->epoch_validation_losses) {
-            metrics->epoch_validation_losses     = malloc(metrics->num_epochs * sizeof(float));
-            metrics->epoch_validation_accuracies = malloc(metrics->num_epochs * sizeof(float));
+            metrics->epoch_validation_losses     = cml_malloc(metrics->num_epochs * sizeof(float));
+            metrics->epoch_validation_accuracies = cml_malloc(metrics->num_epochs * sizeof(float));
             if (metrics->epoch_validation_losses && metrics->epoch_validation_accuracies) {
                 for (size_t i = 0; i < metrics->num_epochs; i++) {
                     metrics->epoch_validation_losses[i]     = INFINITY;
@@ -226,12 +227,12 @@ void training_metrics_set_summary(TrainingMetrics* metrics, const char* summary)
         return;
 
     if (metrics->model_summary) {
-        free(metrics->model_summary);
+        cml_free(metrics->model_summary);
     }
 
     if (summary) {
         size_t len             = strlen(summary);
-        metrics->model_summary = malloc(len + 1);
+        metrics->model_summary = cml_malloc(len + 1);
         if (metrics->model_summary) {
             memcpy(metrics->model_summary, summary, len);
             metrics->model_summary[len] = '\0';
@@ -262,12 +263,12 @@ void training_metrics_set_learning_rate(TrainingMetrics* metrics, float lr, cons
     metrics->learning_rate = lr;
 
     if (metrics->lr_schedule) {
-        free(metrics->lr_schedule);
+        cml_free(metrics->lr_schedule);
     }
 
     if (scheduler) {
         size_t len           = strlen(scheduler);
-        metrics->lr_schedule = malloc(len + 1);
+        metrics->lr_schedule = cml_malloc(len + 1);
         if (metrics->lr_schedule) {
             memcpy(metrics->lr_schedule, scheduler, len);
             metrics->lr_schedule[len] = '\0';
@@ -282,12 +283,12 @@ void training_metrics_set_lr_schedule_params(TrainingMetrics* metrics, const cha
         return;
 
     if (metrics->lr_schedule_params) {
-        free(metrics->lr_schedule_params);
+        cml_free(metrics->lr_schedule_params);
     }
 
     if (params) {
         size_t len                  = strlen(params);
-        metrics->lr_schedule_params = malloc(len + 1);
+        metrics->lr_schedule_params = cml_malloc(len + 1);
         if (metrics->lr_schedule_params) {
             memcpy(metrics->lr_schedule_params, params, len);
             metrics->lr_schedule_params[len] = '\0';
@@ -761,28 +762,28 @@ void training_metrics_free(TrainingMetrics* metrics) {
         return;
 
     if (metrics->epoch_training_losses)
-        free(metrics->epoch_training_losses);
+        cml_free(metrics->epoch_training_losses);
     if (metrics->epoch_training_accuracies)
-        free(metrics->epoch_training_accuracies);
+        cml_free(metrics->epoch_training_accuracies);
     if (metrics->epoch_testing_losses)
-        free(metrics->epoch_testing_losses);
+        cml_free(metrics->epoch_testing_losses);
     if (metrics->epoch_testing_accuracies)
-        free(metrics->epoch_testing_accuracies);
+        cml_free(metrics->epoch_testing_accuracies);
     if (metrics->epoch_validation_losses)
-        free(metrics->epoch_validation_losses);
+        cml_free(metrics->epoch_validation_losses);
     if (metrics->epoch_validation_accuracies)
-        free(metrics->epoch_validation_accuracies);
+        cml_free(metrics->epoch_validation_accuracies);
     if (metrics->epoch_times)
-        free(metrics->epoch_times);
+        cml_free(metrics->epoch_times);
     if (metrics->epoch_learning_rates)
-        free(metrics->epoch_learning_rates);
+        cml_free(metrics->epoch_learning_rates);
     if (metrics->model_summary)
-        free(metrics->model_summary);
+        cml_free(metrics->model_summary);
     if (metrics->lr_schedule)
-        free(metrics->lr_schedule);
+        cml_free(metrics->lr_schedule);
     if (metrics->lr_schedule_params)
-        free(metrics->lr_schedule_params);
-    free(metrics);
+        cml_free(metrics->lr_schedule_params);
+    cml_free(metrics);
 }
 
 int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn)(Tensor*, Tensor*),
@@ -837,7 +838,7 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
         if (module_collect_parameters(model, &params, &num_params, true) == 0 && params) {
             grad_norm =
                 training_metrics_calculate_gradient_norm(metrics, (void**)params, num_params);
-            free(params);
+            cml_free(params);
         }
     }
     optimizer_step(optimizer);
@@ -954,13 +955,13 @@ void training_metrics_auto_export_architecture(Module* model) {
                 fseek(f, 0, SEEK_SET);
 
                 if (size > 0 && size < 1024 * 1024) { // Limit to 1MB
-                    char* json_str = malloc((size_t)size + 1);
+                    char* json_str = cml_malloc((size_t)size + 1);
                     if (json_str) {
                         size_t read    = fread(json_str, 1, (size_t)size, f);
                         json_str[read] = '\0';
                         training_metrics_set_summary(g_global_metrics, json_str);
 
-                        free(json_str);
+                        cml_free(json_str);
                     }
                 }
                 fclose(f);
@@ -1067,9 +1068,9 @@ void training_metrics_auto_capture_validation(float val_loss, float val_accuracy
         return;
     if (!g_global_metrics->epoch_validation_losses) {
         g_global_metrics->epoch_validation_losses =
-            malloc(g_global_metrics->num_epochs * sizeof(float));
+            cml_malloc(g_global_metrics->num_epochs * sizeof(float));
         g_global_metrics->epoch_validation_accuracies =
-            malloc(g_global_metrics->num_epochs * sizeof(float));
+            cml_malloc(g_global_metrics->num_epochs * sizeof(float));
         if (!g_global_metrics->epoch_validation_losses ||
             !g_global_metrics->epoch_validation_accuracies) {
             return;
@@ -1093,9 +1094,9 @@ void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
         return;
     if (!g_global_metrics->epoch_testing_losses) {
         g_global_metrics->epoch_testing_losses =
-            malloc(g_global_metrics->num_epochs * sizeof(float));
+            cml_malloc(g_global_metrics->num_epochs * sizeof(float));
         g_global_metrics->epoch_testing_accuracies =
-            malloc(g_global_metrics->num_epochs * sizeof(float));
+            cml_malloc(g_global_metrics->num_epochs * sizeof(float));
         if (!g_global_metrics->epoch_testing_losses ||
             !g_global_metrics->epoch_testing_accuracies) {
             return;

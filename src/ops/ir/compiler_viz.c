@@ -5,6 +5,7 @@
 
 #ifdef _POSIX_C_SOURCE
 #include <time.h>
+#include "alloc/cml_allocator.h"
 static double viz_get_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -15,7 +16,7 @@ static double viz_get_time_ms(void) { return 0.0; }
 #endif
 
 CMLCompilerViz* cml_compiler_viz_create(const char* output_path) {
-    CMLCompilerViz* viz = (CMLCompilerViz*)calloc(1, sizeof(CMLCompilerViz));
+    CMLCompilerViz* viz = (CMLCompilerViz*)cml_calloc(1, sizeof(CMLCompilerViz));
     if (!viz) return NULL;
 
     viz->enabled = true;
@@ -30,11 +31,11 @@ void cml_compiler_viz_free(CMLCompilerViz* viz) {
     CMLVizEvent* e = viz->events;
     while (e) {
         CMLVizEvent* next = e->next;
-        free(e->ir_snapshot);
-        free(e);
+        cml_free(e->ir_snapshot);
+        cml_free(e);
         e = next;
     }
-    free(viz);
+    cml_free(viz);
 }
 
 void cml_compiler_viz_enable(CMLCompilerViz* viz, bool enable) {
@@ -45,7 +46,7 @@ int cml_compiler_viz_record(CMLCompilerViz* viz, CMLVizEventType type,
                              const char* description, CMLGraph_t ir) {
     if (!viz || !viz->enabled) return 0;
 
-    CMLVizEvent* event = (CMLVizEvent*)calloc(1, sizeof(CMLVizEvent));
+    CMLVizEvent* event = (CMLVizEvent*)cml_calloc(1, sizeof(CMLVizEvent));
     if (!event) return -1;
 
     event->type = type;
@@ -115,8 +116,8 @@ void cml_compiler_viz_clear(CMLCompilerViz* viz) {
     CMLVizEvent* e = viz->events;
     while (e) {
         CMLVizEvent* next = e->next;
-        free(e->ir_snapshot);
-        free(e);
+        cml_free(e->ir_snapshot);
+        cml_free(e);
         e = next;
     }
     viz->events = NULL;

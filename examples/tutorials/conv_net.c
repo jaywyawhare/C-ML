@@ -1,6 +1,7 @@
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 int main(void) {
     cml_init();
@@ -33,8 +34,8 @@ int main(void) {
     int n_test = n - n_train;
     printf("Train: %d, Test: %d\n\n", n_train, n_test);
 
-    float* train_labels = malloc(sizeof(float) * n_train);
-    float* test_labels = malloc(sizeof(float) * n_test);
+    float* train_labels = cml_malloc(sizeof(float) * n_train);
+    float* test_labels = cml_malloc(sizeof(float) * n_test);
     for (int i = 0; i < n_train; i++)
         train_labels[i] = (y_all[i] < 5.0f) ? 0.0f : 1.0f;
     for (int i = 0; i < n_test; i++)
@@ -82,8 +83,8 @@ int main(void) {
     printf("\nTest accuracy (low vs high digits): %d/%d (%.1f%%)\n",
            correct, n_test, correct / (float)n_test * 100);
 
-    free(train_labels);
-    free(test_labels);
+    cml_free(train_labels);
+    cml_free(test_labels);
     cml_cleanup();
     return 0;
 }

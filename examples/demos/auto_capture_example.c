@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 int main(void) {
     cml_init();
@@ -66,7 +67,7 @@ int main(void) {
     char* cuda_code = cml_ir_compile(ir, NULL);
     if (cuda_code) {
         printf("\nGenerated CUDA code (after optimization/fusion):\n%s\n", cuda_code);
-        free(cuda_code);
+        cml_free(cuda_code);
     }
 
     if (e)

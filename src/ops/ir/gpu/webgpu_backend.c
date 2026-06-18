@@ -15,6 +15,7 @@
 #define WGPU_LIB_NAME "libwgpu_native.dylib"
 #elif defined(_WIN32)
 #include <windows.h>
+#include "alloc/cml_allocator.h"
 #define WGPU_LIB_NAME "wgpu_native.dll"
 #endif
 
@@ -161,7 +162,7 @@ bool cml_webgpu_available(void) {
 
 
 CMLWebGPUBackend* cml_webgpu_backend_create(void) {
-    CMLWebGPUBackend* backend = (CMLWebGPUBackend*)calloc(1, sizeof(CMLWebGPUBackend));
+    CMLWebGPUBackend* backend = (CMLWebGPUBackend*)cml_calloc(1, sizeof(CMLWebGPUBackend));
     if (!backend) {
         LOG_ERROR("Failed to allocate WebGPU backend");
         return NULL;
@@ -169,13 +170,13 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void) {
 
 #ifndef WGPU_LIB_NAME
     LOG_ERROR("WebGPU not supported on this platform");
-    free(backend);
+    cml_free(backend);
     return NULL;
 #else
     backend->lib_handle = wgpu_load_library(WGPU_LIB_NAME);
     if (!backend->lib_handle) {
         LOG_ERROR("Failed to load wgpu-native library: %s", WGPU_LIB_NAME);
-        free(backend);
+        cml_free(backend);
         return NULL;
     }
 
@@ -331,7 +332,7 @@ void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
         backend->lib_handle = NULL;
     }
 
-    free(backend);
+    cml_free(backend);
 }
 
 
@@ -441,7 +442,7 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
         return NULL;
     }
 
-    CMLWebGPUKernel* kernel = (CMLWebGPUKernel*)calloc(1, sizeof(CMLWebGPUKernel));
+    CMLWebGPUKernel* kernel = (CMLWebGPUKernel*)cml_calloc(1, sizeof(CMLWebGPUKernel));
     if (!kernel) {
         LOG_ERROR("Failed to allocate CMLWebGPUKernel");
         return NULL;
@@ -464,7 +465,7 @@ void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
      * wgpu-native; dropping our handle is sufficient.  We do not call
      * explicit release here to avoid double-free in case the caller
      * still holds references through bind groups.  */
-    free(kernel);
+    cml_free(kernel);
 }
 
 
@@ -531,7 +532,7 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
                 void* textureView;
             };
 
-            struct BindGroupEntry* entries = (struct BindGroupEntry*)calloc(
+            struct BindGroupEntry* entries = (struct BindGroupEntry*)cml_calloc(
                 (size_t)num_buffers, sizeof(struct BindGroupEntry));
 
             if (entries) {
@@ -559,7 +560,7 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
                 bg_desc.entries = entries;
 
                 bind_group = createBG(backend->device, &bg_desc);
-                free(entries);
+                cml_free(entries);
             }
         }
     }

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double now(void) {
     struct timespec ts;
@@ -32,9 +33,9 @@ int main(void) {
     /* --- 1. Raw BLAS matmul (zero overhead baseline) --- */
     {
         CMLBlasContext* blas = cml_blas_get_context();
-        float* A = malloc(sizeof(float) * N * N);
-        float* B = malloc(sizeof(float) * N * N);
-        float* C = malloc(sizeof(float) * N * N);
+        float* A = cml_malloc(sizeof(float) * N * N);
+        float* B = cml_malloc(sizeof(float) * N * N);
+        float* C = cml_malloc(sizeof(float) * N * N);
         fill_random(A, N * N);
         fill_random(B, N * N);
 
@@ -48,7 +49,7 @@ int main(void) {
         } else {
             printf("1. Raw BLAS: NOT AVAILABLE\n");
         }
-        free(A); free(B); free(C);
+        cml_free(A); cml_free(B); cml_free(C);
     }
 
     /* --- 2. cml_matmul through IR (includes graph overhead) --- */
@@ -56,8 +57,8 @@ int main(void) {
         int shape[] = {N, N};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* a_data = malloc(sizeof(float) * N * N);
-        float* b_data = malloc(sizeof(float) * N * N);
+        float* a_data = cml_malloc(sizeof(float) * N * N);
+        float* b_data = cml_malloc(sizeof(float) * N * N);
         fill_random(a_data, N * N);
         fill_random(b_data, N * N);
         Tensor* A = cml_tensor(a_data, shape, 2, &cfg);
@@ -78,7 +79,7 @@ int main(void) {
         printf("2. cml_matmul (IR path):        %8.3f ms\n", ms);
 
         tensor_free(A); tensor_free(B);
-        free(a_data); free(b_data);
+        cml_free(a_data); cml_free(b_data);
     }
 
     /* --- 3. Fused: cml_matmul + cml_add + cml_relu --- */
@@ -87,9 +88,9 @@ int main(void) {
         int bias_shape[] = {1, N};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* a_data = malloc(sizeof(float) * N * N);
-        float* b_data = malloc(sizeof(float) * N * N);
-        float* bias_data = malloc(sizeof(float) * N);
+        float* a_data = cml_malloc(sizeof(float) * N * N);
+        float* b_data = cml_malloc(sizeof(float) * N * N);
+        float* bias_data = cml_malloc(sizeof(float) * N);
         fill_random(a_data, N * N);
         fill_random(b_data, N * N);
         fill_random(bias_data, N);
@@ -110,7 +111,7 @@ int main(void) {
         printf("3. cml fused (mm+add+relu):     %8.3f ms\n", ms);
 
         tensor_free(A); tensor_free(B); tensor_free(bias);
-        free(a_data); free(b_data); free(bias_data);
+        cml_free(a_data); cml_free(b_data); cml_free(bias_data);
     }
 
     /* --- 4. IR graph creation only (no computation) --- */
@@ -118,8 +119,8 @@ int main(void) {
         int shape[] = {N, N};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* a_data = malloc(sizeof(float) * N * N);
-        float* b_data = malloc(sizeof(float) * N * N);
+        float* a_data = cml_malloc(sizeof(float) * N * N);
+        float* b_data = cml_malloc(sizeof(float) * N * N);
         fill_random(a_data, N * N);
         fill_random(b_data, N * N);
         Tensor* A = cml_tensor(a_data, shape, 2, &cfg);
@@ -134,7 +135,7 @@ int main(void) {
         printf("4. IR graph creation only (mm): %8.3f ms  (x%d iters)\n", ms, iters * 100);
 
         tensor_free(A); tensor_free(B);
-        free(a_data); free(b_data);
+        cml_free(a_data); cml_free(b_data);
     }
 
     /* --- 5. cml_reset_ir_context cost --- */
@@ -143,8 +144,8 @@ int main(void) {
         int shape2[] = {784, 128};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* a_data = malloc(sizeof(float) * 64 * 784);
-        float* b_data = malloc(sizeof(float) * 784 * 128);
+        float* a_data = cml_malloc(sizeof(float) * 64 * 784);
+        float* b_data = cml_malloc(sizeof(float) * 784 * 128);
         fill_random(a_data, 64 * 784);
         fill_random(b_data, 784 * 128);
 
@@ -162,7 +163,7 @@ int main(void) {
         }
         double ms = total_reset / (iters * 10) * 1e3;
         printf("5. cml_reset_ir_context cost:   %8.3f ms  (per reset, %d resets)\n", ms, iters * 10);
-        free(a_data); free(b_data);
+        cml_free(a_data); cml_free(b_data);
     }
 
     /* --- 6. MLP forward: breakdown --- */
@@ -171,7 +172,7 @@ int main(void) {
         int x_shape[] = {batch, in_f};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* x_data = malloc(sizeof(float) * batch * in_f);
+        float* x_data = cml_malloc(sizeof(float) * batch * in_f);
         fill_random(x_data, batch * in_f);
         Tensor* X = cml_tensor(x_data, x_shape, 2, &cfg);
 
@@ -198,7 +199,7 @@ int main(void) {
 
         /* Forward + backward */
         int y_shape[] = {batch, out_f};
-        float* y_data = malloc(sizeof(float) * batch * out_f);
+        float* y_data = cml_malloc(sizeof(float) * batch * out_f);
         fill_random(y_data, batch * out_f);
         Tensor* Y = cml_tensor(y_data, y_shape, 2, &cfg);
         Optimizer* opt = cml_optim_sgd_for_model((Module*)model, 0.01f, 0.0f, 0.0f);
@@ -228,7 +229,7 @@ int main(void) {
         printf("   Full train step:             %8.3f ms\n", train_ms);
         printf("   Backward+optim overhead:     %8.3f ms\n", train_ms - fwd_ms);
 
-        free(x_data); free(y_data);
+        cml_free(x_data); cml_free(y_data);
         optimizer_free(opt);
         module_free((Module*)model);
     }
@@ -239,7 +240,7 @@ int main(void) {
         int x_shape[] = {batch, ic, h, w};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* x_data = malloc(sizeof(float) * batch * ic * h * w);
+        float* x_data = cml_malloc(sizeof(float) * batch * ic * h * w);
         fill_random(x_data, batch * ic * h * w);
         Tensor* X = cml_tensor(x_data, x_shape, 4, &cfg);
 
@@ -260,7 +261,7 @@ int main(void) {
         double ms = (now() - t0) / (iters * 5) * 1e3;
         printf("\n7. Conv2d forward (8x3x32x32): %8.3f ms\n", ms);
 
-        free(x_data);
+        cml_free(x_data);
         module_free((Module*)conv);
     }
 

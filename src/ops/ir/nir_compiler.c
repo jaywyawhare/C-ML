@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -95,7 +96,7 @@ CMLNIRCompiler* cml_nir_compiler_create(CMLNIRTarget target) {
         return NULL;
     }
 
-    CMLNIRCompiler* c = (CMLNIRCompiler*)calloc(1, sizeof(CMLNIRCompiler));
+    CMLNIRCompiler* c = (CMLNIRCompiler*)cml_calloc(1, sizeof(CMLNIRCompiler));
     if (!c) return NULL;
 
     c->target = target;
@@ -125,7 +126,7 @@ void cml_nir_compiler_free(CMLNIRCompiler* compiler) {
     if (!compiler) return;
 
     if (compiler->spirv_output) {
-        free(compiler->spirv_output);
+        cml_free(compiler->spirv_output);
         compiler->spirv_output = NULL;
     }
 
@@ -138,7 +139,7 @@ void cml_nir_compiler_free(CMLNIRCompiler* compiler) {
         compiler->mesa_lib = NULL;
     }
 
-    free(compiler);
+    cml_free(compiler);
 }
 
 int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
@@ -215,7 +216,7 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
 
     /* Free any previous SPIR-V output */
     if (compiler->spirv_output) {
-        free(compiler->spirv_output);
+        cml_free(compiler->spirv_output);
         compiler->spirv_output = NULL;
         compiler->spirv_size = 0;
     }

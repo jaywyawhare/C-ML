@@ -5,6 +5,7 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 typedef int (*remote_handle_open_fn)(const char* name, uint32_t* handle);
 typedef int (*remote_handle_invoke_fn)(uint32_t handle, uint32_t method_id, void* args, int nargs);
@@ -39,7 +40,7 @@ bool cml_hexagon_available(void) {
 }
 
 CMLHexagonBackend* cml_hexagon_backend_create(void) {
-    CMLHexagonBackend* b = (CMLHexagonBackend*)calloc(1, sizeof(CMLHexagonBackend));
+    CMLHexagonBackend* b = (CMLHexagonBackend*)cml_calloc(1, sizeof(CMLHexagonBackend));
     if (!b) {
         LOG_ERROR("Failed to allocate CMLHexagonBackend");
     }
@@ -121,7 +122,7 @@ void cml_hexagon_backend_free(CMLHexagonBackend* backend) {
     }
 
     backend->initialized = false;
-    free(backend);
+    cml_free(backend);
 }
 
 int cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir) {

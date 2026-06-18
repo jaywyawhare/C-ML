@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include "alloc/cml_allocator.h"
 
 /** Counter for generating unique output names for replacement nodes. */
 static atomic_int g_rewrite_counter = 0;
@@ -15,7 +16,7 @@ static atomic_int g_rewrite_counter = 0;
 /** Generate a unique name prefixed with "_rw" for rewrite-emitted nodes. */
 static char* rewrite_unique_name(void) {
     int id = atomic_fetch_add(&g_rewrite_counter, 1);
-    char* name = malloc(32);
+    char* name = cml_malloc(32);
     if (name) {
         snprintf(name, 32, "_rw%d", id);
     }
@@ -135,8 +136,8 @@ static void replace_output_references(CMLGraph_t ir,
     while (n) {
         for (int i = 0; i < n->num_inputs; i++) {
             if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
-                free(n->input_names[i]);
-                n->input_names[i] = strdup(new_name);
+                cml_free(n->input_names[i]);
+                n->input_names[i] = cml_strdup(new_name);
             }
         }
         n = n->next;
@@ -224,12 +225,12 @@ static void free_unlinked_node(struct IRNode* node) {
 
     if (node->input_names) {
         for (int i = 0; i < node->num_inputs; i++) {
-            free(node->input_names[i]);
+            cml_free(node->input_names[i]);
         }
-        free(node->input_names);
+        cml_free(node->input_names);
     }
-    free(node->output_name);
-    free(node->users);
+    cml_free(node->output_name);
+    cml_free(node->users);
 
     /* Clear tensor's back-pointer to avoid dangling refs. */
     if (node->output) {
@@ -237,13 +238,13 @@ static void free_unlinked_node(struct IRNode* node) {
         node->output->ir_context = NULL;
     }
 
-    free(node);
+    cml_free(node);
 }
 
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_inputs) {
     if (num_inputs < 0 || num_inputs > CML_PATTERN_MAX_INPUTS) return NULL;
 
-    CMLPatternNode* p = calloc(1, sizeof(CMLPatternNode));
+    CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
     if (!p) return NULL;
 
     p->kind = CML_PAT_OP;
@@ -259,7 +260,7 @@ CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_in
 CMLPatternNode* cml_pattern_capture(const char* name) {
     if (!name) return NULL;
 
-    CMLPatternNode* p = calloc(1, sizeof(CMLPatternNode));
+    CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
     if (!p) return NULL;
 
     p->kind = CML_PAT_CAPTURE;
@@ -270,7 +271,7 @@ CMLPatternNode* cml_pattern_capture(const char* name) {
 }
 
 CMLPatternNode* cml_pattern_any(void) {
-    CMLPatternNode* p = calloc(1, sizeof(CMLPatternNode));
+    CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
     if (!p) return NULL;
 
     p->kind = CML_PAT_ANY;
@@ -284,11 +285,11 @@ void cml_pattern_free(CMLPatternNode* node) {
     for (int i = 0; i < node->num_inputs; i++) {
         cml_pattern_free(node->inputs[i]);
     }
-    free(node);
+    cml_free(node);
 }
 
 CMLRewriteRegistry* cml_rewrite_registry_create(void) {
-    CMLRewriteRegistry* reg = calloc(1, sizeof(CMLRewriteRegistry));
+    CMLRewriteRegistry* reg = cml_calloc(1, sizeof(CMLRewriteRegistry));
     return reg; /* num_rules is 0 thanks to calloc */
 }
 
@@ -299,7 +300,7 @@ void cml_rewrite_registry_free(CMLRewriteRegistry* reg) {
         cml_pattern_free(reg->rules[i].pattern);
         /* emit function pointer and name string literal are not owned */
     }
-    free(reg);
+    cml_free(reg);
 }
 
 int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern,
@@ -447,7 +448,7 @@ static bool is_fill_const(struct IRNode* node, float value) {
 static struct IRNode* make_fill_node(CMLGraph_t ir, float value,
                                      struct IRNode* shape_donor) {
     (void)ir;
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     if (!node) return NULL;
 
     node->type = UOP_FILL;
@@ -456,20 +457,20 @@ static struct IRNode* make_fill_node(CMLGraph_t ir, float value,
     node->output_name = rewrite_unique_name();
     node->next = NULL;
 
-    FillParams* fp = malloc(sizeof(FillParams));
-    if (!fp) { free(node->output_name); free(node); return NULL; }
+    FillParams* fp = cml_malloc(sizeof(FillParams));
+    if (!fp) { cml_free(node->output_name); cml_free(node); return NULL; }
 
     fp->value = value;
 
     /* Copy shape from the shape_donor if available. */
     if (shape_donor && shape_donor->output_shape && shape_donor->output_ndim > 0) {
         fp->ndim = shape_donor->output_ndim;
-        fp->shape = malloc((size_t)fp->ndim * sizeof(int));
+        fp->shape = cml_malloc((size_t)fp->ndim * sizeof(int));
         if (fp->shape) {
             memcpy(fp->shape, shape_donor->output_shape,
                    (size_t)fp->ndim * sizeof(int));
         }
-        node->output_shape = malloc((size_t)fp->ndim * sizeof(int));
+        node->output_shape = cml_malloc((size_t)fp->ndim * sizeof(int));
         if (node->output_shape) {
             memcpy(node->output_shape, shape_donor->output_shape,
                    (size_t)fp->ndim * sizeof(int));
@@ -478,10 +479,10 @@ static struct IRNode* make_fill_node(CMLGraph_t ir, float value,
     } else {
         /* Scalar: shape = {1} */
         fp->ndim = 1;
-        fp->shape = malloc(sizeof(int));
+        fp->shape = cml_malloc(sizeof(int));
         if (fp->shape) fp->shape[0] = 1;
         node->output_ndim = 1;
-        node->output_shape = malloc(sizeof(int));
+        node->output_shape = cml_malloc(sizeof(int));
         if (node->output_shape) node->output_shape[0] = 1;
     }
 
@@ -641,18 +642,18 @@ static struct IRNode* emit_mul_two(CMLGraph_t ir, const CMLMatchResult* m) {
     if (!x_name) return NULL;
 
     /* Create ADD(x, x) */
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     if (!node) return NULL;
     node->type = UOP_ADD;
     node->num_inputs = 2;
-    node->input_names = malloc(2 * sizeof(char*));
-    if (!node->input_names) { free(node); return NULL; }
-    node->input_names[0] = strdup(x_name);
-    node->input_names[1] = strdup(x_name);
+    node->input_names = cml_malloc(2 * sizeof(char*));
+    if (!node->input_names) { cml_free(node); return NULL; }
+    node->input_names[0] = cml_strdup(x_name);
+    node->input_names[1] = cml_strdup(x_name);
     node->output_name = rewrite_unique_name();
     node->output_ndim = root->output_ndim;
     if (root->output_shape && root->output_ndim > 0) {
-        node->output_shape = malloc((size_t)root->output_ndim * sizeof(int));
+        node->output_shape = cml_malloc((size_t)root->output_ndim * sizeof(int));
         if (node->output_shape)
             memcpy(node->output_shape, root->output_shape,
                    (size_t)root->output_ndim * sizeof(int));
@@ -686,18 +687,18 @@ static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
     /* Create MUL(x, recip) node */
     insert_node_before(ir, recip_node, root);
 
-    struct IRNode* mul_node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* mul_node = cml_calloc(1, sizeof(struct IRNode));
     if (!mul_node) return NULL;
     mul_node->type = UOP_MUL;
     mul_node->num_inputs = 2;
-    mul_node->input_names = malloc(2 * sizeof(char*));
-    if (!mul_node->input_names) { free(mul_node); return NULL; }
-    mul_node->input_names[0] = strdup(root->input_names[0]);
-    mul_node->input_names[1] = strdup(recip_node->output_name);
+    mul_node->input_names = cml_malloc(2 * sizeof(char*));
+    if (!mul_node->input_names) { cml_free(mul_node); return NULL; }
+    mul_node->input_names[0] = cml_strdup(root->input_names[0]);
+    mul_node->input_names[1] = cml_strdup(recip_node->output_name);
     mul_node->output_name = rewrite_unique_name();
     mul_node->output_ndim = root->output_ndim;
     if (root->output_shape && root->output_ndim > 0) {
-        mul_node->output_shape = malloc((size_t)root->output_ndim * sizeof(int));
+        mul_node->output_shape = cml_malloc((size_t)root->output_ndim * sizeof(int));
         if (mul_node->output_shape)
             memcpy(mul_node->output_shape, root->output_shape,
                    (size_t)root->output_ndim * sizeof(int));
@@ -871,9 +872,9 @@ int cml_rewrite_dce(CMLGraph_t ir) {
     if (count == 0) return 0;
 
     /* Build node array for indexed access + visited flags */
-    struct IRNode** nodes = malloc((size_t)count * sizeof(struct IRNode*));
-    bool* marked = calloc((size_t)count, sizeof(bool));
-    if (!nodes || !marked) { free(nodes); free(marked); return -1; }
+    struct IRNode** nodes = cml_malloc((size_t)count * sizeof(struct IRNode*));
+    bool* marked = cml_calloc((size_t)count, sizeof(bool));
+    if (!nodes || !marked) { cml_free(nodes); cml_free(marked); return -1; }
 
     int idx = 0;
     n = ir->head;
@@ -881,9 +882,9 @@ int cml_rewrite_dce(CMLGraph_t ir) {
 
     /* Mark phase: start from tail + any node with a live tensor reference */
     /* Use a simple worklist approach */
-    int* worklist = malloc((size_t)count * sizeof(int));
+    int* worklist = cml_malloc((size_t)count * sizeof(int));
     int wl_head = 0, wl_tail = 0;
-    if (!worklist) { free(nodes); free(marked); return -1; }
+    if (!worklist) { cml_free(nodes); cml_free(marked); return -1; }
 
     for (int i = 0; i < count; i++) {
         /* Mark output nodes and nodes with live tensor references */
@@ -925,9 +926,9 @@ int cml_rewrite_dce(CMLGraph_t ir) {
         }
     }
 
-    free(worklist);
-    free(nodes);
-    free(marked);
+    cml_free(worklist);
+    cml_free(nodes);
+    cml_free(marked);
 
     if (removed > 0) {
     }

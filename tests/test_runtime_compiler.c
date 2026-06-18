@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -19,11 +20,11 @@ static int tests_failed = 0;
 
 /* Helper: create a minimal LinearProgram */
 static CMLLinearProgram* make_test_program(int variant) {
-    CMLLinearProgram* prog = calloc(1, sizeof(CMLLinearProgram));
+    CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
     if (!prog) return NULL;
     prog->capacity = 16;
-    prog->ops = calloc(16, sizeof(CMLLinearOp));
-    if (!prog->ops) { free(prog); return NULL; }
+    prog->ops = cml_calloc(16, sizeof(CMLLinearOp));
+    if (!prog->ops) { cml_free(prog); return NULL; }
 
     /* LOAD v0, LOAD v1 */
     prog->ops[prog->num_ops++] = (CMLLinearOp){.kind = LINOP_LOAD, .dest_reg = 0};

@@ -6,6 +6,7 @@
 
 #include "cml.h"
 #include "nn/llm_ops.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -574,14 +575,14 @@ static int test_tokenizer_encode_simple(void) {
     if (!ids) { cml_tokenizer_free(tok); return 0; }
 
     /* "hello" -> 5 character tokens: h=0, e=1, l=2, l=2, o=3 */
-    if (num_tokens != 5) { free(ids); cml_tokenizer_free(tok); return 0; }
-    if (ids[0] != 0) { free(ids); cml_tokenizer_free(tok); return 0; }  /* h */
-    if (ids[1] != 1) { free(ids); cml_tokenizer_free(tok); return 0; }  /* e */
-    if (ids[2] != 2) { free(ids); cml_tokenizer_free(tok); return 0; }  /* l */
-    if (ids[3] != 2) { free(ids); cml_tokenizer_free(tok); return 0; }  /* l */
-    if (ids[4] != 3) { free(ids); cml_tokenizer_free(tok); return 0; }  /* o */
+    if (num_tokens != 5) { cml_free(ids); cml_tokenizer_free(tok); return 0; }
+    if (ids[0] != 0) { cml_free(ids); cml_tokenizer_free(tok); return 0; }  /* h */
+    if (ids[1] != 1) { cml_free(ids); cml_tokenizer_free(tok); return 0; }  /* e */
+    if (ids[2] != 2) { cml_free(ids); cml_tokenizer_free(tok); return 0; }  /* l */
+    if (ids[3] != 2) { cml_free(ids); cml_tokenizer_free(tok); return 0; }  /* l */
+    if (ids[4] != 3) { cml_free(ids); cml_tokenizer_free(tok); return 0; }  /* o */
 
-    free(ids);
+    cml_free(ids);
     cml_tokenizer_free(tok);
     return 1;
 }
@@ -596,9 +597,9 @@ static int test_tokenizer_decode_simple(void) {
     int tokens[] = {0, 1, 2, 2, 3}; /* h, e, l, l, o */
     char* text = cml_tokenizer_decode(tok, tokens, 5);
     if (!text) { cml_tokenizer_free(tok); return 0; }
-    if (strcmp(text, "hello") != 0) { free(text); cml_tokenizer_free(tok); return 0; }
+    if (strcmp(text, "hello") != 0) { cml_free(text); cml_tokenizer_free(tok); return 0; }
 
-    free(text);
+    cml_free(text);
     cml_tokenizer_free(tok);
     return 1;
 }
@@ -619,19 +620,19 @@ static int test_tokenizer_encode_decode_roundtrip(void) {
     if (!ids) { cml_tokenizer_free(tok); return 0; }
 
     /* "abc" -> "ab" + "c" after BPE merge => 2 tokens */
-    if (num_tokens != 2) { free(ids); cml_tokenizer_free(tok); return 0; }
+    if (num_tokens != 2) { cml_free(ids); cml_tokenizer_free(tok); return 0; }
 
     char* decoded = cml_tokenizer_decode(tok, ids, num_tokens);
-    free(ids);
+    cml_free(ids);
 
     if (!decoded) { cml_tokenizer_free(tok); return 0; }
     if (strcmp(decoded, original) != 0) {
-        free(decoded);
+        cml_free(decoded);
         cml_tokenizer_free(tok);
         return 0;
     }
 
-    free(decoded);
+    cml_free(decoded);
     cml_tokenizer_free(tok);
     return 1;
 }
@@ -682,13 +683,13 @@ static int test_tokenizer_unknown_token(void) {
     int num_tokens = 0;
     int* ids = cml_tokenizer_encode(tok, "ax", &num_tokens);
     if (!ids) { cml_tokenizer_free(tok); return 0; }
-    if (num_tokens != 2) { free(ids); cml_tokenizer_free(tok); return 0; }
+    if (num_tokens != 2) { cml_free(ids); cml_tokenizer_free(tok); return 0; }
 
     /* 'a' -> 0, 'x' not in vocab -> unk_token_id = 1 */
-    if (ids[0] != 0) { free(ids); cml_tokenizer_free(tok); return 0; }
-    if (ids[1] != 1) { free(ids); cml_tokenizer_free(tok); return 0; }
+    if (ids[0] != 0) { cml_free(ids); cml_tokenizer_free(tok); return 0; }
+    if (ids[1] != 1) { cml_free(ids); cml_tokenizer_free(tok); return 0; }
 
-    free(ids);
+    cml_free(ids);
     cml_tokenizer_free(tok);
     return 1;
 }
@@ -708,10 +709,10 @@ static int test_tokenizer_bpe_merge(void) {
     if (!ids) { cml_tokenizer_free(tok); return 0; }
 
     /* "abc" -> first merge "ab" gives ["ab", "c"], then merge "abc" gives ["abc"] => 1 token */
-    if (num_tokens != 1) { free(ids); cml_tokenizer_free(tok); return 0; }
-    if (ids[0] != 4) { free(ids); cml_tokenizer_free(tok); return 0; } /* "abc" = ID 4 */
+    if (num_tokens != 1) { cml_free(ids); cml_tokenizer_free(tok); return 0; }
+    if (ids[0] != 4) { cml_free(ids); cml_tokenizer_free(tok); return 0; } /* "abc" = ID 4 */
 
-    free(ids);
+    cml_free(ids);
     cml_tokenizer_free(tok);
     return 1;
 }

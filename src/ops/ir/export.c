@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static void append_json_string(char** buffer, size_t* offset, size_t* capacity, const char* str) {
     if (!str)
@@ -14,7 +15,7 @@ static void append_json_string(char** buffer, size_t* offset, size_t* capacity, 
     size_t needed = strlen(str) * 6 + 10;
     while (*offset + needed >= *capacity) {
         *capacity *= 2;
-        char* new_buffer = realloc(*buffer, *capacity);
+        char* new_buffer = cml_realloc(*buffer, *capacity);
         if (!new_buffer)
             return;
         *buffer = new_buffer;
@@ -76,7 +77,7 @@ static void append_format(char** buffer, size_t* offset, size_t* capacity, const
     // Ensure capacity
     while (*offset + (size_t)needed + 1 >= *capacity) {
         *capacity *= 2;
-        char* new_buffer = realloc(*buffer, *capacity);
+        char* new_buffer = cml_realloc(*buffer, *capacity);
         if (!new_buffer) {
             va_end(args);
             return;
@@ -98,7 +99,7 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
         return NULL;
 
     size_t buffer_size = 1024;
-    char* code         = malloc(buffer_size);
+    char* code         = cml_malloc(buffer_size);
     if (!code)
         return NULL;
 
@@ -309,7 +310,7 @@ static char* generate_fused_kernel_code(FusedKernel* kernel) {
         return NULL;
 
     size_t buffer_size = 2048;
-    char* code         = malloc(buffer_size);
+    char* code         = cml_malloc(buffer_size);
     if (!code)
         return NULL;
 
@@ -402,7 +403,7 @@ static void analyze_usage(CMLGraph_t ir) {
     if (count == 0)
         return;
 
-    struct IRNode** nodes = malloc(count * sizeof(struct IRNode*));
+    struct IRNode** nodes = cml_malloc(count * sizeof(struct IRNode*));
     if (!nodes)
         return;
 
@@ -431,7 +432,7 @@ static void analyze_usage(CMLGraph_t ir) {
         }
     }
 
-    free(nodes);
+    cml_free(nodes);
 }
 
 char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
@@ -441,7 +442,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     analyze_usage(ir);
 
     size_t capacity = 8192;
-    char* buffer    = malloc(capacity);
+    char* buffer    = cml_malloc(capacity);
     if (!buffer)
         return NULL;
 
@@ -517,7 +518,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         }
         append_json_string(&buffer, &offset, &capacity, code ? code : "// Code generation failed");
         if (code)
-            free(code);
+            cml_free(code);
         append_format(&buffer, &offset, &capacity, ",");
 
         append_format(&buffer, &offset, &capacity, "\"inputs\":[");
@@ -651,7 +652,7 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
     if (!ir)
         return NULL;
 
-    char* buffer = malloc(1024 * 1024); // 1MB buffer
+    char* buffer = cml_malloc(1024 * 1024); // 1MB buffer
     if (!buffer)
         return NULL;
 
@@ -679,9 +680,9 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
         temp = temp->next;
     }
 
-    struct IRNode** nodes = malloc(node_count * sizeof(struct IRNode*));
+    struct IRNode** nodes = cml_malloc(node_count * sizeof(struct IRNode*));
     if (!nodes) {
-        free(buffer);
+        cml_free(buffer);
         return NULL;
     }
 
@@ -749,6 +750,6 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
 
     append_format(&buffer, &offset, &capacity, "}");
 
-    free(nodes);
+    cml_free(nodes);
     return buffer;
 }

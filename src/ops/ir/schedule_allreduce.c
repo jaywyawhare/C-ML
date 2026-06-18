@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static AllReduceAlgo choose_algo(size_t bytes, int ndevices) {
     
@@ -24,7 +25,7 @@ static int build_ring_steps(ScheduleAllReduce* ar) {
 
     
     int num_steps = 2 * (n - 1);
-    ar->steps = calloc((size_t)num_steps, sizeof(AllReduceStep));
+    ar->steps = cml_calloc((size_t)num_steps, sizeof(AllReduceStep));
     if (!ar->steps) return -1;
 
     int s = 0;
@@ -63,7 +64,7 @@ static int build_ring_steps(ScheduleAllReduce* ar) {
 static int build_flat_steps(ScheduleAllReduce* ar) {
     int n = ar->num_devices;
     int ns = 2 * (n - 1);
-    ar->steps = calloc((size_t)ns, sizeof(AllReduceStep));
+    ar->steps = cml_calloc((size_t)ns, sizeof(AllReduceStep));
     if (!ar->steps) return -1;
     int s = 0;
     for (int rank = 1; rank < n; ++rank) {
@@ -98,7 +99,7 @@ static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
     while (tmp > 1) { rounds++; tmp >>= 1; }
 
     int ns = rounds * (n / 2) * 2;
-    ar->steps = calloc((size_t)(ns + 1), sizeof(AllReduceStep));
+    ar->steps = cml_calloc((size_t)(ns + 1), sizeof(AllReduceStep));
     if (!ar->steps) return -1;
 
     int s = 0;
@@ -142,7 +143,7 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
                                              int num_devices) {
     if (!t || !device_ids || num_devices <= 0) return NULL;
 
-    ScheduleAllReduce* ar = calloc(1, sizeof(ScheduleAllReduce));
+    ScheduleAllReduce* ar = cml_calloc(1, sizeof(ScheduleAllReduce));
     if (!ar) return NULL;
 
     ar->input       = t;
@@ -151,7 +152,7 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
     ar->num_devices = num_devices;
     ar->buffer_bytes = t->numel * cml_dtype_size(t->dtype);
 
-    ar->device_ids  = malloc((size_t)num_devices * sizeof(int));
+    ar->device_ids  = cml_malloc((size_t)num_devices * sizeof(int));
     if (!ar->device_ids) { schedule_allreduce_free(ar); return NULL; }
     memcpy(ar->device_ids, device_ids, (size_t)num_devices * sizeof(int));
 
@@ -173,10 +174,10 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
 
 void schedule_allreduce_free(ScheduleAllReduce* ar) {
     if (!ar) return;
-    free(ar->device_ids);
-    free(ar->steps);
-    free(ar->overlap_kernels);
-    free(ar);
+    cml_free(ar->device_ids);
+    cml_free(ar->steps);
+    cml_free(ar->overlap_kernels);
+    cml_free(ar);
 }
 
 int schedule_allreduce_run(ScheduleAllReduce* ar) {

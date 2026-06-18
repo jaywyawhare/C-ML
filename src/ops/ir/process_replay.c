@@ -10,6 +10,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 #define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
@@ -121,7 +122,7 @@ static int read_kernel_file(const char* path, char** out_source, size_t* out_len
         return -1;
     }
 
-    char* buf = malloc((size_t)total + 1);
+    char* buf = cml_malloc((size_t)total + 1);
     if (!buf) {
         fclose(f);
         return -1;
@@ -133,23 +134,23 @@ static int read_kernel_file(const char* path, char** out_source, size_t* out_len
 
     char* sep = strstr(buf, "---\n");
     if (!sep) {
-        free(buf);
+        cml_free(buf);
         return -1;
     }
 
     char* body = sep + 4;
     size_t body_len = read - (size_t)(body - buf);
 
-    *out_source = malloc(body_len + 1);
+    *out_source = cml_malloc(body_len + 1);
     if (!*out_source) {
-        free(buf);
+        cml_free(buf);
         return -1;
     }
     memcpy(*out_source, body, body_len);
     (*out_source)[body_len] = '\0';
     *out_len = body_len;
 
-    free(buf);
+    cml_free(buf);
     return 0;
 }
 
@@ -189,7 +190,7 @@ int cml_process_replay_compare(const char* output_dir, const char* baseline_dir)
 
         if (read_kernel_file(output_path, &output_src, &output_len) != 0) {
             LOG_ERROR("Process replay: missing output for %s", ent->d_name);
-            free(baseline_src);
+            cml_free(baseline_src);
             mismatches++;
             continue;
         }
@@ -201,8 +202,8 @@ int cml_process_replay_compare(const char* output_dir, const char* baseline_dir)
             mismatches++;
         }
 
-        free(baseline_src);
-        free(output_src);
+        cml_free(baseline_src);
+        cml_free(output_src);
     }
 
     closedir(dir);

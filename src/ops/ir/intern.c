@@ -44,6 +44,7 @@ uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs,
 }
 
 #include "tensor/tensor.h"
+#include "alloc/cml_allocator.h"
 
 uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
                                  Tensor** raw_inputs, int num_inputs,
@@ -122,14 +123,14 @@ static int entries_match_ex(struct IRNode* node, uint64_t hash, int op_type, int
 }
 
 CMLInternTable* cml_intern_table_create(void) {
-    CMLInternTable* table = calloc(1, sizeof(CMLInternTable));
+    CMLInternTable* table = cml_calloc(1, sizeof(CMLInternTable));
     if (!table)
         return NULL;
 
     table->capacity = INTERN_INITIAL_CAPACITY;
-    table->entries  = calloc(table->capacity, sizeof(CMLInternEntry));
+    table->entries  = cml_calloc(table->capacity, sizeof(CMLInternEntry));
     if (!table->entries) {
-        free(table);
+        cml_free(table);
         return NULL;
     }
     table->count = 0;
@@ -139,8 +140,8 @@ CMLInternTable* cml_intern_table_create(void) {
 void cml_intern_table_free(CMLInternTable* table) {
     if (!table)
         return;
-    free(table->entries);
-    free(table);
+    cml_free(table->entries);
+    cml_free(table);
 }
 
 static size_t probe_index(uint64_t hash, size_t capacity) {
@@ -149,7 +150,7 @@ static size_t probe_index(uint64_t hash, size_t capacity) {
 
 static int intern_resize(CMLInternTable* table) {
     size_t new_cap = table->capacity * 2;
-    CMLInternEntry* new_entries = calloc(new_cap, sizeof(CMLInternEntry));
+    CMLInternEntry* new_entries = cml_calloc(new_cap, sizeof(CMLInternEntry));
     if (!new_entries)
         return -1;
 
@@ -162,7 +163,7 @@ static int intern_resize(CMLInternTable* table) {
         new_entries[idx] = table->entries[i];
     }
 
-    free(table->entries);
+    cml_free(table->entries);
     table->entries  = new_entries;
     table->capacity = new_cap;
     return 0;

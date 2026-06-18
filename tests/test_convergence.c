@@ -6,6 +6,7 @@
 
 #include "cml.h"
 #include "tensor/realize.h"
+#include "alloc/cml_allocator.h"
 
 static float get_scalar(Tensor* t) {
     float* p = (float*)tensor_data_ptr(t);
@@ -28,7 +29,7 @@ static int test_xor_mlp(void) {
     Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
         printf("    ERROR: failed to create optimizer\n");
-        free(params);
+        cml_free(params);
         module_free((Module*)model);
         return 0;
     }
@@ -69,7 +70,7 @@ static int test_xor_mlp(void) {
     tensor_free(X);
     tensor_free(Y);
     optimizer_free(optimizer);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
 
     return pass;
@@ -88,7 +89,7 @@ static int test_linear_regression(void) {
     Optimizer* optimizer = optim_sgd(params, num_params, 0.01f, 0.0f, 0.0f);
     if (!optimizer) {
         printf("    ERROR: failed to create optimizer\n");
-        free(params);
+        cml_free(params);
         module_free(model);
         return 0;
     }
@@ -158,7 +159,7 @@ static int test_linear_regression(void) {
     tensor_free(X);
     tensor_free(Y);
     optimizer_free(optimizer);
-    free(params);
+    cml_free(params);
     module_free(model);
 
     return pass;
@@ -177,7 +178,7 @@ static int test_conv2d_pattern(void) {
     Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
         printf("    ERROR: failed to create optimizer\n");
-        free(params);
+        cml_free(params);
         module_free((Module*)model);
         return 0;
     }
@@ -261,7 +262,7 @@ static int test_conv2d_pattern(void) {
     tensor_free(X);
     tensor_free(Y);
     optimizer_free(optimizer);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
 
     return pass;

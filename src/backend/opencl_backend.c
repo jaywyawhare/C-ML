@@ -14,6 +14,7 @@
 #define CL_TARGET_OPENCL_VERSION 300
 #endif
 #include <CL/cl.h>
+#include "alloc/cml_allocator.h"
 #endif
 
 static pthread_mutex_t g_opencl_lock;
@@ -307,10 +308,10 @@ int opencl_backend_init(void) {
         return -1;
     }
 
-    cl_platform_id* platforms = malloc(num_platforms * sizeof(cl_platform_id));
+    cl_platform_id* platforms = cml_malloc(num_platforms * sizeof(cl_platform_id));
     clGetPlatformIDs(num_platforms, platforms, NULL);
     g_platform = platforms[0];
-    free(platforms);
+    cml_free(platforms);
 
     err = clGetDeviceIDs(g_platform, CL_DEVICE_TYPE_GPU, 1, &g_device, NULL);
     if (err != CL_SUCCESS) {

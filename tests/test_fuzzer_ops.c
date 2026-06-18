@@ -7,6 +7,7 @@
 #include "cml.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
+#include "alloc/cml_allocator.h"
 
 static uint64_t rng_state;
 
@@ -74,34 +75,34 @@ static int make_shape(int* shape, int* ndim_out, int max_numel) {
 static Tensor* make_positive_tensor(int* shape, int ndim, float range) {
     int n = 1;
     for (int i = 0; i < ndim; i++) n *= shape[i];
-    float* data = malloc(n * sizeof(float));
+    float* data = cml_malloc(n * sizeof(float));
     for (int i = 0; i < n; i++)
         data[i] = rng_float(0.01f, range);
     Tensor* t = tensor_from_data(data, shape, ndim, &cpu_f32);
-    free(data);
+    cml_free(data);
     return t;
 }
 
 static Tensor* make_signed_tensor(int* shape, int ndim, float range) {
     int n = 1;
     for (int i = 0; i < ndim; i++) n *= shape[i];
-    float* data = malloc(n * sizeof(float));
+    float* data = cml_malloc(n * sizeof(float));
     for (int i = 0; i < n; i++)
         data[i] = rng_float(-range, range);
     Tensor* t = tensor_from_data(data, shape, ndim, &cpu_f32);
-    free(data);
+    cml_free(data);
     return t;
 }
 
 static Tensor* make_asin_safe_tensor(int* shape, int ndim) {
     int n = 1;
     for (int i = 0; i < ndim; i++) n *= shape[i];
-    float* data = malloc(n * sizeof(float));
+    float* data = cml_malloc(n * sizeof(float));
     for (int i = 0; i < n; i++) {
         data[i] = (float)sin((double)rng_int(0, 1000) / 100.0);
     }
     Tensor* t = tensor_from_data(data, shape, ndim, &cpu_f32);
-    free(data);
+    cml_free(data);
     return t;
 }
 typedef Tensor* (*UnaryOp)(Tensor*);
@@ -398,12 +399,12 @@ static int fuzz_where(void) {
         int n = rng_int(2, 64);
         int shape[] = {n};
         
-        float* cd = malloc(n * sizeof(float));
+        float* cd = cml_malloc(n * sizeof(float));
         for (int i = 0; i < n; i++) cd[i] = (float)(rng_int(0, 2));
         Tensor* cond = tensor_from_data(cd, shape, 1, &cpu_f32);
         Tensor* a = make_signed_tensor(shape, 1, 3.0f);
         Tensor* b = make_signed_tensor(shape, 1, 3.0f);
-        free(cd);
+        cml_free(cd);
         if (!cond || !a || !b) {
             if (cond) tensor_free(cond);
             if (a)    tensor_free(a);

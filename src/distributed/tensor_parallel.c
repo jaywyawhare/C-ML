@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 /* output[i][j] = sum_k input[i][k] * weight[j][k]  (weight stored as [N,K]) */
 static void matmul_weight_transposed(const float* input, int M, int K,
@@ -67,7 +68,7 @@ Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
         int shard_rows = rows / tp_size;
         int shard_shape[2] = {shard_rows, cols};
         size_t shard_elems = (size_t)shard_rows * cols;
-        float* shard_data = (float*)malloc(shard_elems * sizeof(float));
+        float* shard_data = (float*)cml_malloc(shard_elems * sizeof(float));
         if (!shard_data) {
             LOG_ERROR("cml_tp_shard_weight: allocation failed");
             return NULL;
@@ -76,14 +77,14 @@ Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
         memcpy(shard_data, src + offset, shard_elems * sizeof(float));
 
         Tensor* shard = tensor_from_data(shard_data, shard_shape, 2, &cfg);
-        free(shard_data);
+        cml_free(shard_data);
         return shard;
     } else {
         /* Column sharding: each rank gets shard_cols consecutive columns */
         int shard_cols = cols / tp_size;
         int shard_shape[2] = {rows, shard_cols};
         size_t shard_elems = (size_t)rows * shard_cols;
-        float* shard_data = (float*)malloc(shard_elems * sizeof(float));
+        float* shard_data = (float*)cml_malloc(shard_elems * sizeof(float));
         if (!shard_data) {
             LOG_ERROR("cml_tp_shard_weight: allocation failed");
             return NULL;
@@ -96,7 +97,7 @@ Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
         }
 
         Tensor* shard = tensor_from_data(shard_data, shard_shape, 2, &cfg);
-        free(shard_data);
+        cml_free(shard_data);
         return shard;
     }
 }
@@ -130,7 +131,7 @@ CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
         return NULL;
     }
 
-    CMLColumnParallelLinear* cp = (CMLColumnParallelLinear*)calloc(1, sizeof(*cp));
+    CMLColumnParallelLinear* cp = (CMLColumnParallelLinear*)cml_calloc(1, sizeof(*cp));
     if (!cp) {
         LOG_ERROR("cml_column_parallel_create: allocation failed");
         return NULL;
@@ -145,7 +146,7 @@ CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
     cp->weight = cml_tp_shard_weight(full_weight, 0, tp_size, tp_rank);
     if (!cp->weight) {
         LOG_ERROR("cml_column_parallel_create: failed to shard weight");
-        free(cp);
+        cml_free(cp);
         return NULL;
     }
 
@@ -156,17 +157,17 @@ CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
         if (!bias_src) {
             LOG_ERROR("cml_column_parallel_create: failed to get bias data");
             tensor_free(cp->weight);
-            free(cp);
+            cml_free(cp);
             return NULL;
         }
 
         int shard_out = out_features / tp_size;
         int bias_shape[1] = {shard_out};
-        float* bias_data = (float*)malloc((size_t)shard_out * sizeof(float));
+        float* bias_data = (float*)cml_malloc((size_t)shard_out * sizeof(float));
         if (!bias_data) {
             LOG_ERROR("cml_column_parallel_create: bias allocation failed");
             tensor_free(cp->weight);
-            free(cp);
+            cml_free(cp);
             return NULL;
         }
         memcpy(bias_data, bias_src + tp_rank * shard_out, (size_t)shard_out * sizeof(float));
@@ -174,11 +175,11 @@ CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
         cp->bias = tensor_from_data(bias_data, bias_shape, 1, &cfg);
-        free(bias_data);
+        cml_free(bias_data);
         if (!cp->bias) {
             LOG_ERROR("cml_column_parallel_create: failed to create bias tensor");
             tensor_free(cp->weight);
-            free(cp);
+            cml_free(cp);
             return NULL;
         }
     } else {
@@ -196,7 +197,7 @@ void cml_column_parallel_free(CMLColumnParallelLinear* cp)
     if (!cp) return;
     if (cp->weight) tensor_free(cp->weight);
     if (cp->bias)   tensor_free(cp->bias);
-    free(cp);
+    cml_free(cp);
 }
 
 Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
@@ -231,7 +232,7 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
     }
 
     size_t out_elems = (size_t)batch * local_out;
-    float* out_data = (float*)malloc(out_elems * sizeof(float));
+    float* out_data = (float*)cml_malloc(out_elems * sizeof(float));
     if (!out_data) {
         LOG_ERROR("cml_column_parallel_forward: allocation failed");
         return NULL;
@@ -258,7 +259,7 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
     Tensor* output = tensor_from_data(out_data, out_shape, 2, &cfg);
-    free(out_data);
+    cml_free(out_data);
     return output;
 }
 
@@ -291,7 +292,7 @@ CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
         return NULL;
     }
 
-    CMLRowParallelLinear* rp = (CMLRowParallelLinear*)calloc(1, sizeof(*rp));
+    CMLRowParallelLinear* rp = (CMLRowParallelLinear*)cml_calloc(1, sizeof(*rp));
     if (!rp) {
         LOG_ERROR("cml_row_parallel_create: allocation failed");
         return NULL;
@@ -306,7 +307,7 @@ CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
     rp->weight = cml_tp_shard_weight(full_weight, 1, tp_size, tp_rank);
     if (!rp->weight) {
         LOG_ERROR("cml_row_parallel_create: failed to shard weight");
-        free(rp);
+        cml_free(rp);
         return NULL;
     }
 
@@ -317,16 +318,16 @@ CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
         if (!bias_src) {
             LOG_ERROR("cml_row_parallel_create: failed to get bias data");
             tensor_free(rp->weight);
-            free(rp);
+            cml_free(rp);
             return NULL;
         }
 
         int bias_shape[1] = {out_features};
-        float* bias_data = (float*)malloc((size_t)out_features * sizeof(float));
+        float* bias_data = (float*)cml_malloc((size_t)out_features * sizeof(float));
         if (!bias_data) {
             LOG_ERROR("cml_row_parallel_create: bias allocation failed");
             tensor_free(rp->weight);
-            free(rp);
+            cml_free(rp);
             return NULL;
         }
         memcpy(bias_data, bias_src, (size_t)out_features * sizeof(float));
@@ -334,11 +335,11 @@ CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
         rp->bias = tensor_from_data(bias_data, bias_shape, 1, &cfg);
-        free(bias_data);
+        cml_free(bias_data);
         if (!rp->bias) {
             LOG_ERROR("cml_row_parallel_create: failed to create bias tensor");
             tensor_free(rp->weight);
-            free(rp);
+            cml_free(rp);
             return NULL;
         }
     } else {
@@ -356,7 +357,7 @@ void cml_row_parallel_free(CMLRowParallelLinear* rp)
     if (!rp) return;
     if (rp->weight) tensor_free(rp->weight);
     if (rp->bias)   tensor_free(rp->bias);
-    free(rp);
+    cml_free(rp);
 }
 
 Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
@@ -392,7 +393,7 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
     }
 
     size_t out_elems = (size_t)batch * out_features;
-    float* out_data = (float*)malloc(out_elems * sizeof(float));
+    float* out_data = (float*)cml_malloc(out_elems * sizeof(float));
     if (!out_data) {
         LOG_ERROR("cml_row_parallel_forward: allocation failed");
         return NULL;
@@ -422,7 +423,7 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
     Tensor* output = tensor_from_data(out_data, out_shape, 2, &cfg);
-    free(out_data);
+    cml_free(out_data);
     return output;
 }
 
@@ -459,7 +460,7 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
     }
 
     /* Allocate output and sum all partials */
-    float* sum_data = (float*)calloc(numel, sizeof(float));
+    float* sum_data = (float*)cml_calloc(numel, sizeof(float));
     if (!sum_data) {
         LOG_ERROR("cml_tp_all_reduce_sum: allocation failed");
         return NULL;
@@ -470,7 +471,7 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
         const float* pdata = (const float*)tensor_data_ptr(partials[p]);
         if (!pdata) {
             LOG_ERROR("cml_tp_all_reduce_sum: failed to get data for partials[%d]", p);
-            free(sum_data);
+            cml_free(sum_data);
             return NULL;
         }
         for (size_t i = 0; i < numel; i++) {
@@ -479,10 +480,10 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
     }
 
     /* Copy shape from partials[0] */
-    int* out_shape = (int*)malloc((size_t)ndim * sizeof(int));
+    int* out_shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
     if (!out_shape) {
         LOG_ERROR("cml_tp_all_reduce_sum: shape allocation failed");
-        free(sum_data);
+        cml_free(sum_data);
         return NULL;
     }
     memcpy(out_shape, partials[0]->shape, (size_t)ndim * sizeof(int));
@@ -490,7 +491,7 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(sum_data, out_shape, ndim, &cfg);
-    free(sum_data);
-    free(out_shape);
+    cml_free(sum_data);
+    cml_free(out_shape);
     return result;
 }

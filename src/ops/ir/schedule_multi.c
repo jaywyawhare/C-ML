@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 static bool tensor_on_device(const Tensor* t, int device_id) __attribute__((unused));
 static bool tensor_on_device(const Tensor* t, int device_id) {
@@ -20,7 +21,7 @@ static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
 static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t) __attribute__((unused));
 static CrossDeviceOp* xfer_create(XferDirection dir,
                                   int src, int dst, Tensor* t) {
-    CrossDeviceOp* op = calloc(1, sizeof(CrossDeviceOp));
+    CrossDeviceOp* op = cml_calloc(1, sizeof(CrossDeviceOp));
     if (!op) return NULL;
     op->direction    = dir;
     op->src_device_id = src;
@@ -42,30 +43,30 @@ MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched,
                                           int num_devices) {
     if (!sched || !device_ids || num_devices <= 0) return NULL;
 
-    MultiDeviceSchedule* ms = calloc(1, sizeof(MultiDeviceSchedule));
+    MultiDeviceSchedule* ms = cml_calloc(1, sizeof(MultiDeviceSchedule));
     if (!ms) return NULL;
 
     ms->num_devices    = num_devices;
-    ms->device_ids     = malloc((size_t)num_devices * sizeof(int));
-    ms->device_schedules = calloc((size_t)num_devices, sizeof(CMLSchedule*));
+    ms->device_ids     = cml_malloc((size_t)num_devices * sizeof(int));
+    ms->device_schedules = cml_calloc((size_t)num_devices, sizeof(CMLSchedule*));
     if (!ms->device_ids || !ms->device_schedules) goto fail;
     memcpy(ms->device_ids, device_ids, (size_t)num_devices * sizeof(int));
 
     for (int d = 0; d < num_devices; ++d) {
-        ms->device_schedules[d] = calloc(1, sizeof(CMLSchedule));
+        ms->device_schedules[d] = cml_calloc(1, sizeof(CMLSchedule));
         if (!ms->device_schedules[d]) goto fail;
-        ms->device_schedules[d]->items = malloc(
+        ms->device_schedules[d]->items = cml_malloc(
             (size_t)sched->num_items * sizeof(CMLScheduleItem*));
         if (!ms->device_schedules[d]->items) goto fail;
         ms->device_schedules[d]->item_capacity = sched->num_items;
     }
 
     int max_xfer = sched->num_items * 2;
-    ms->xfer_ops = calloc((size_t)max_xfer, sizeof(CrossDeviceOp));
+    ms->xfer_ops = cml_calloc((size_t)max_xfer, sizeof(CrossDeviceOp));
     if (!ms->xfer_ops) goto fail;
 
     int max_steps = sched->num_items * 3;
-    ms->steps = malloc((size_t)max_steps * sizeof(ms->steps[0]));
+    ms->steps = cml_malloc((size_t)max_steps * sizeof(ms->steps[0]));
     if (!ms->steps) goto fail;
 
     for (int i = 0; i < sched->num_items; ++i) {
@@ -121,16 +122,16 @@ void multi_schedule_free(MultiDeviceSchedule* ms) {
     if (ms->device_schedules) {
         for (int d = 0; d < ms->num_devices; ++d) {
             if (ms->device_schedules[d]) {
-                free(ms->device_schedules[d]->items);
-                free(ms->device_schedules[d]);
+                cml_free(ms->device_schedules[d]->items);
+                cml_free(ms->device_schedules[d]);
             }
         }
-        free(ms->device_schedules);
+        cml_free(ms->device_schedules);
     }
-    free(ms->device_ids);
-    free(ms->xfer_ops);
-    free(ms->steps);
-    free(ms);
+    cml_free(ms->device_ids);
+    cml_free(ms->xfer_ops);
+    cml_free(ms->steps);
+    cml_free(ms);
 }
 
 int multi_schedule_run(MultiDeviceSchedule* ms) {

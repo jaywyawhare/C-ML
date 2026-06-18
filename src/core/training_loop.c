@@ -15,13 +15,14 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include "alloc/cml_allocator.h"
 
 LRScheduler* lr_scheduler_step(Optimizer* optimizer, int step_size, float gamma) {
     if (!optimizer) {
         return NULL;
     }
 
-    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -41,7 +42,7 @@ LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, 
         return NULL;
     }
 
-    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -61,7 +62,7 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma) {
         return NULL;
     }
 
-    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -79,7 +80,7 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
         return NULL;
     }
 
-    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -105,7 +106,7 @@ LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, floa
         return NULL;
     }
 
-    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -130,7 +131,7 @@ LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float war
         return NULL;
     }
 
-    LRScheduler* scheduler = calloc(1, sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_calloc(1, sizeof(LRScheduler));
     if (!scheduler) {
         return NULL;
     }
@@ -307,12 +308,12 @@ void lr_scheduler_free(LRScheduler* scheduler) {
         return;
     }
     if (scheduler->milestones) {
-        free(scheduler->milestones);
+        cml_free(scheduler->milestones);
     }
     if (scheduler->inner_scheduler) {
         lr_scheduler_free(scheduler->inner_scheduler);
     }
-    free(scheduler);
+    cml_free(scheduler);
 }
 
 void training_callbacks_create(TrainingCallbacks* callbacks) {
@@ -516,7 +517,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
                         }
                     }
 
-                    free(params);
+                    cml_free(params);
                 }
             }
             optimizer->step(optimizer);
@@ -721,7 +722,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
                         }
                     }
 
-                    free(params);
+                    cml_free(params);
                 }
             }
             optimizer->step(optimizer);

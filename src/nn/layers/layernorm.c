@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* layernorm_forward(Module* module, Tensor* input) {
     LayerNorm* ln = (LayerNorm*)module;
@@ -129,11 +130,11 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
         return NULL;
     }
 
-    LayerNorm* ln = malloc(sizeof(LayerNorm));
+    LayerNorm* ln = cml_malloc(sizeof(LayerNorm));
     if (!ln)
         return NULL;
     if (module_init((Module*)ln, "LayerNorm", layernorm_forward, layernorm_free) != 0) {
-        free(ln);
+        cml_free(ln);
         return NULL;
     }
     ln->normalized_shape = normalized_shape;

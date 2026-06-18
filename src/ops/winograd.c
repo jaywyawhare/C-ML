@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 /* Static transform matrices for F(2x2, 3x3)
  * tile_size = 4, output_tile = 2, kernel = 3 */
@@ -240,7 +241,7 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
     int out_channels_per_group = out_channels / groups;
 
     size_t U_size = (size_t)out_channels * in_channels_per_group * ts * ts;
-    float *U = (float *)malloc(U_size * sizeof(float));
+    float *U = (float *)cml_malloc(U_size * sizeof(float));
     if (!U) return -1;
 
     {
@@ -304,19 +305,19 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
     size_t ts2  = (size_t)ts * ts;
     size_t ot2  = (size_t)out_tile * out_tile;
 
-    float *tile_buf = (float *)malloc(ts2 * sizeof(float));
-    float *V_buf    = (float *)malloc(ts2 * sizeof(float));
-    float *Y_buf    = (float *)malloc(ot2 * sizeof(float));
-    float *tmp1     = (float *)malloc(ts2 * sizeof(float));
-    float *acc_buf  = (float *)malloc(ts2 * sizeof(float));
+    float *tile_buf = (float *)cml_malloc(ts2 * sizeof(float));
+    float *V_buf    = (float *)cml_malloc(ts2 * sizeof(float));
+    float *Y_buf    = (float *)cml_malloc(ot2 * sizeof(float));
+    float *tmp1     = (float *)cml_malloc(ts2 * sizeof(float));
+    float *acc_buf  = (float *)cml_malloc(ts2 * sizeof(float));
 
     if (!tile_buf || !V_buf || !Y_buf || !tmp1 || !acc_buf) {
-        free(U);
-        free(tile_buf);
-        free(V_buf);
-        free(Y_buf);
-        free(tmp1);
-        free(acc_buf);
+        cml_free(U);
+        cml_free(tile_buf);
+        cml_free(V_buf);
+        cml_free(Y_buf);
+        cml_free(tmp1);
+        cml_free(acc_buf);
         return -1;
     }
 
@@ -386,12 +387,12 @@ int winograd_conv2d(const float *input, const float *weight, const float *bias,
         }
     }
 
-    free(U);
-    free(tile_buf);
-    free(V_buf);
-    free(Y_buf);
-    free(tmp1);
-    free(acc_buf);
+    cml_free(U);
+    cml_free(tile_buf);
+    cml_free(V_buf);
+    cml_free(Y_buf);
+    cml_free(tmp1);
+    cml_free(acc_buf);
 
     return 0;
 }

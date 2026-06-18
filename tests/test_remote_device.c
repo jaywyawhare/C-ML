@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "alloc/cml_allocator.h"
 
 #define TEST_PORT 19876
 
@@ -91,8 +92,8 @@ static void test_upload_download(void) {
     uint64_t h = cml_remote_alloc(dev, n);
     assert(h != 0);
 
-    float* send_buf = (float*)malloc(n);
-    float* recv_buf = (float*)malloc(n);
+    float* send_buf = (float*)cml_malloc(n);
+    float* recv_buf = (float*)cml_malloc(n);
     for (int i = 0; i < 256; i++) send_buf[i] = (float)i * 1.5f;
 
     assert(cml_remote_upload(dev, h, send_buf, n) == 0);
@@ -102,8 +103,8 @@ static void test_upload_download(void) {
         assert(recv_buf[i] == send_buf[i]);
     }
 
-    free(send_buf);
-    free(recv_buf);
+    cml_free(send_buf);
+    cml_free(recv_buf);
     cml_remote_free(dev, h);
     cml_remote_disconnect(dev);
     cml_remote_server_stop(srv);

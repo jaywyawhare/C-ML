@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include "alloc/cml_allocator.h"
 
 #define GLOO_DEFAULT_PORT_BASE 29500
 #define GLOO_DEFAULT_MASTER_ADDR "127.0.0.1"
@@ -165,7 +166,7 @@ static int gloo_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
 
 /* Synchronous fallback; wraps result in a completed DistWork handle */
 static DistWork* gloo_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
-    DistWork* work = calloc(1, sizeof(DistWork));
+    DistWork* work = cml_calloc(1, sizeof(DistWork));
     if (!work)
         return NULL;
 
@@ -300,7 +301,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     }
 
     /* Allocate peer fd array */
-    gctx->peer_fds = calloc((size_t)world_size, sizeof(int));
+    gctx->peer_fds = cml_calloc((size_t)world_size, sizeof(int));
     if (!gctx->peer_fds)
         return -1;
     for (int i = 0; i < world_size; i++)
@@ -318,7 +319,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     gctx->listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (gctx->listen_fd < 0) {
         LOG_ERROR("Gloo init: failed to create listen socket: %s", strerror(errno));
-        free(gctx->peer_fds);
+        cml_free(gctx->peer_fds);
         gctx->peer_fds = NULL;
         return -1;
     }
@@ -337,7 +338,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
                   gctx->port_base + rank, strerror(errno));
         close(gctx->listen_fd);
         gctx->listen_fd = -1;
-        free(gctx->peer_fds);
+        cml_free(gctx->peer_fds);
         gctx->peer_fds = NULL;
         return -1;
     }
@@ -346,7 +347,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         LOG_ERROR("Gloo init: failed to listen: %s", strerror(errno));
         close(gctx->listen_fd);
         gctx->listen_fd = -1;
-        free(gctx->peer_fds);
+        cml_free(gctx->peer_fds);
         gctx->peer_fds = NULL;
         return -1;
     }
@@ -450,7 +451,7 @@ cleanup_error:
         close(gctx->listen_fd);
         gctx->listen_fd = -1;
     }
-    free(gctx->peer_fds);
+    cml_free(gctx->peer_fds);
     gctx->peer_fds = NULL;
     return -1;
 }
@@ -468,7 +469,7 @@ static void gloo_destroy(void* ctx) {
             if (gctx->peer_fds[i] >= 0)
                 close(gctx->peer_fds[i]);
         }
-        free(gctx->peer_fds);
+        cml_free(gctx->peer_fds);
         gctx->peer_fds = NULL;
     }
 
@@ -477,19 +478,19 @@ static void gloo_destroy(void* ctx) {
         gctx->listen_fd = -1;
     }
 
-    free(gctx);
+    cml_free(gctx);
     g_gloo_ctx = NULL;
     LOG_INFO("Gloo backend destroyed");
 }
 
 DistCommOps* cml_dist_create_gloo_backend(void) {
-    DistCommOps* ops = calloc(1, sizeof(DistCommOps));
+    DistCommOps* ops = cml_calloc(1, sizeof(DistCommOps));
     if (!ops)
         return NULL;
 
-    GlooContext* gctx = calloc(1, sizeof(GlooContext));
+    GlooContext* gctx = cml_calloc(1, sizeof(GlooContext));
     if (!gctx) {
-        free(ops);
+        cml_free(ops);
         return NULL;
     }
     gctx->listen_fd = -1;

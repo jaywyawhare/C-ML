@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
 #define FNV_PRIME        0x100000001b3ULL
@@ -61,7 +62,7 @@ static bool shape_matches(const CMLJitEntry *entry, const int *sig, int sig_len)
 
 CMLTinyJit *cml_tinyjit_create(void)
 {
-    CMLTinyJit *jit = (CMLTinyJit *)calloc(1, sizeof(CMLTinyJit));
+    CMLTinyJit *jit = (CMLTinyJit *)cml_calloc(1, sizeof(CMLTinyJit));
     return jit;
 }
 
@@ -73,7 +74,7 @@ void cml_tinyjit_free(CMLTinyJit *jit)
             cml_trace_free(jit->entries[i].trace);
         }
     }
-    free(jit);
+    cml_free(jit);
 }
 
 int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)

@@ -2,6 +2,7 @@
 #include "distributed/distributed.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 void cml_dist_free_backend(DistCommOps* ops) {
     if (!ops)
@@ -10,7 +11,7 @@ void cml_dist_free_backend(DistCommOps* ops) {
     if (ops->destroy)
         ops->destroy(NULL);
 
-    free(ops);
+    cml_free(ops);
 }
 
 DistCommOps* cml_dist_auto_select_backend(void) {

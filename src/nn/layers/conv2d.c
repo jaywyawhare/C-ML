@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* conv2d_forward(Module* module, Tensor* input) {
     Conv2d* conv2d = (Conv2d*)module;
@@ -75,7 +76,7 @@ static void conv2d_free(Module* module) {
     if (!conv2d)
         return;
 
-    free(conv2d);
+    cml_free(conv2d);
 }
 
 static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int kernel_size) {
@@ -96,12 +97,12 @@ static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int 
 
 Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
                   int dilation, bool use_bias, DType dtype, DeviceType device) {
-    Conv2d* conv2d = malloc(sizeof(Conv2d));
+    Conv2d* conv2d = cml_malloc(sizeof(Conv2d));
     if (!conv2d)
         return NULL;
 
     if (module_init((Module*)conv2d, "Conv2d", conv2d_forward, conv2d_free) != 0) {
-        free(conv2d);
+        cml_free(conv2d);
         return NULL;
     }
 

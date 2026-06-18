@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <inttypes.h>
+#include "alloc/cml_allocator.h"
 
 #define PROFILE_INITIAL_CAPACITY 64
 #define SQTT_BUFFER_SIZE         (4 * 1024 * 1024)
@@ -47,14 +48,14 @@ static int profile_ensure_capacity(CMLAMDProfile* prof) {
     int new_cap = prof->capacity * 2;
     if (new_cap < PROFILE_INITIAL_CAPACITY) new_cap = PROFILE_INITIAL_CAPACITY;
 
-    uint64_t* ts = realloc(prof->timestamps, (size_t)new_cap * sizeof(uint64_t));
-    uint32_t* wc = realloc(prof->wave_counts, (size_t)new_cap * sizeof(uint32_t));
-    uint64_t* bc = realloc(prof->busy_cycles, (size_t)new_cap * sizeof(uint64_t));
-    uint64_t* mr = realloc(prof->mem_reads, (size_t)new_cap * sizeof(uint64_t));
-    uint64_t* mw = realloc(prof->mem_writes, (size_t)new_cap * sizeof(uint64_t));
+    uint64_t* ts = cml_realloc(prof->timestamps, (size_t)new_cap * sizeof(uint64_t));
+    uint32_t* wc = cml_realloc(prof->wave_counts, (size_t)new_cap * sizeof(uint32_t));
+    uint64_t* bc = cml_realloc(prof->busy_cycles, (size_t)new_cap * sizeof(uint64_t));
+    uint64_t* mr = cml_realloc(prof->mem_reads, (size_t)new_cap * sizeof(uint64_t));
+    uint64_t* mw = cml_realloc(prof->mem_writes, (size_t)new_cap * sizeof(uint64_t));
 
     if (!ts || !wc || !bc || !mr || !mw) {
-        free(ts); free(wc); free(bc); free(mr); free(mw);
+        cml_free(ts); cml_free(wc); cml_free(bc); cml_free(mr); cml_free(mw);
         return -1;
     }
 
@@ -68,15 +69,15 @@ static int profile_ensure_capacity(CMLAMDProfile* prof) {
 }
 
 CMLAMDProfile* cml_amd_profile_create(void) {
-    CMLAMDProfile* prof = calloc(1, sizeof(CMLAMDProfile));
+    CMLAMDProfile* prof = cml_calloc(1, sizeof(CMLAMDProfile));
     if (!prof) return NULL;
 
     prof->capacity = PROFILE_INITIAL_CAPACITY;
-    prof->timestamps  = calloc((size_t)prof->capacity, sizeof(uint64_t));
-    prof->wave_counts = calloc((size_t)prof->capacity, sizeof(uint32_t));
-    prof->busy_cycles = calloc((size_t)prof->capacity, sizeof(uint64_t));
-    prof->mem_reads   = calloc((size_t)prof->capacity, sizeof(uint64_t));
-    prof->mem_writes  = calloc((size_t)prof->capacity, sizeof(uint64_t));
+    prof->timestamps  = cml_calloc((size_t)prof->capacity, sizeof(uint64_t));
+    prof->wave_counts = cml_calloc((size_t)prof->capacity, sizeof(uint32_t));
+    prof->busy_cycles = cml_calloc((size_t)prof->capacity, sizeof(uint64_t));
+    prof->mem_reads   = cml_calloc((size_t)prof->capacity, sizeof(uint64_t));
+    prof->mem_writes  = cml_calloc((size_t)prof->capacity, sizeof(uint64_t));
 
     if (!prof->timestamps || !prof->wave_counts || !prof->busy_cycles ||
         !prof->mem_reads || !prof->mem_writes) {
@@ -138,12 +139,12 @@ int cml_amd_profile_stop(CMLAMDProfile* prof, CMLAMDriver* drv) {
 
 void cml_amd_profile_free(CMLAMDProfile* prof) {
     if (!prof) return;
-    free(prof->timestamps);
-    free(prof->wave_counts);
-    free(prof->busy_cycles);
-    free(prof->mem_reads);
-    free(prof->mem_writes);
-    free(prof);
+    cml_free(prof->timestamps);
+    cml_free(prof->wave_counts);
+    cml_free(prof->busy_cycles);
+    cml_free(prof->mem_reads);
+    cml_free(prof->mem_writes);
+    cml_free(prof);
 }
 
 int cml_amd_pmc_read(CMLAMDriver* drv, uint32_t counter_id, uint64_t* value) {
@@ -193,12 +194,12 @@ int cml_amd_pmc_read(CMLAMDriver* drv, uint32_t counter_id, uint64_t* value) {
 CMLAMDSQTTTrace* cml_amd_sqtt_capture(CMLAMDriver* drv, int num_dispatches) {
     if (!drv || !drv->initialized || num_dispatches <= 0) return NULL;
 
-    CMLAMDSQTTTrace* trace = calloc(1, sizeof(CMLAMDSQTTTrace));
+    CMLAMDSQTTTrace* trace = cml_calloc(1, sizeof(CMLAMDSQTTTrace));
     if (!trace) return NULL;
 
-    trace->data = calloc(1, SQTT_BUFFER_SIZE);
+    trace->data = cml_calloc(1, SQTT_BUFFER_SIZE);
     if (!trace->data) {
-        free(trace);
+        cml_free(trace);
         return NULL;
     }
     trace->size = SQTT_BUFFER_SIZE;
@@ -254,8 +255,8 @@ CMLAMDSQTTTrace* cml_amd_sqtt_capture(CMLAMDriver* drv, int num_dispatches) {
 
 void cml_amd_sqtt_free(CMLAMDSQTTTrace* trace) {
     if (!trace) return;
-    free(trace->data);
-    free(trace);
+    cml_free(trace->data);
+    cml_free(trace);
 }
 
 void cml_amd_profile_print(const CMLAMDProfile* prof) {

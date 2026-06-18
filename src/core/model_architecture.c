@@ -9,9 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 ModelArchitecture* model_architecture_create(void) {
-    ModelArchitecture* arch = malloc(sizeof(ModelArchitecture));
+    ModelArchitecture* arch = cml_malloc(sizeof(ModelArchitecture));
     if (!arch)
         return NULL;
 
@@ -82,7 +83,7 @@ static int extract_from_sequential(Sequential* seq, ModelArchitecture* arch) {
         while (new_capacity < (size_t)arch->num_layers + (size_t)num_modules) {
             new_capacity *= 2;
         }
-        LayerInfo* new_layers = realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
+        LayerInfo* new_layers = cml_realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
         if (!new_layers) {
             LOG_ERROR("Failed to allocate memory for layers");
             return -1;
@@ -117,7 +118,7 @@ int model_architecture_extract(Module* module, ModelArchitecture* arch) {
     } else {
         if (arch->num_layers >= arch->capacity) {
             size_t new_capacity   = arch->capacity == 0 ? 8 : arch->capacity * 2;
-            LayerInfo* new_layers = realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
+            LayerInfo* new_layers = cml_realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
             if (!new_layers)
                 return -1;
             arch->layers   = new_layers;
@@ -144,7 +145,7 @@ int model_architecture_extract(Module* module, ModelArchitecture* arch) {
             }
         }
         if (params)
-            free(params);
+            cml_free(params);
     }
 
     return 0;
@@ -213,11 +214,11 @@ void model_architecture_free(ModelArchitecture* arch) {
     if (arch->layers) {
         for (size_t i = 0; i < arch->num_layers; i++) {
             if (arch->layers[i].details) {
-                free(arch->layers[i].details);
+                cml_free(arch->layers[i].details);
             }
         }
-        free(arch->layers);
+        cml_free(arch->layers);
     }
 
-    free(arch);
+    cml_free(arch);
 }

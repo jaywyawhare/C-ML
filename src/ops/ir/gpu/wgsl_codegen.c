@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include "alloc/cml_allocator.h"
 
 #define WGSL_BUF_INIT_SIZE 4096
 
@@ -23,7 +24,7 @@ static void wgsl_appendf(char** buf, size_t* cap, size_t* len,
 
     while (*len + (size_t)needed + 1 > *cap) {
         *cap *= 2;
-        char* tmp = (char*)realloc(*buf, *cap);
+        char* tmp = (char*)cml_realloc(*buf, *cap);
         if (!tmp) {
             LOG_ERROR("wgsl_codegen: realloc failed");
             return;
@@ -41,7 +42,7 @@ static void wgsl_appendf(char** buf, size_t* cap, size_t* len,
 static char* wgsl_buf_new(size_t* cap, size_t* len) {
     *cap = WGSL_BUF_INIT_SIZE;
     *len = 0;
-    char* buf = (char*)malloc(*cap);
+    char* buf = (char*)cml_malloc(*cap);
     if (buf) buf[0] = '\0';
     return buf;
 }
@@ -825,7 +826,7 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
 
         CMLWebGPUKernel* kernel =
             cml_webgpu_compile_wgsl(backend, wgsl_src, "main");
-        free(wgsl_src);
+        cml_free(wgsl_src);
         if (!kernel) {
             LOG_ERROR("webgpu_execute_graph: compile failed for UOp %d",
                       (int)node->type);
@@ -846,11 +847,11 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
             out_size *= sizeof(float);
         }
 
-        gpu_buffers  = (void**)calloc((size_t)total_buffers, sizeof(void*));
-        buffer_sizes = (size_t*)calloc((size_t)total_buffers, sizeof(size_t));
+        gpu_buffers  = (void**)cml_calloc((size_t)total_buffers, sizeof(void*));
+        buffer_sizes = (size_t*)cml_calloc((size_t)total_buffers, sizeof(size_t));
         if (!gpu_buffers || !buffer_sizes) {
-            free(gpu_buffers);
-            free(buffer_sizes);
+            cml_free(gpu_buffers);
+            cml_free(buffer_sizes);
             cml_webgpu_kernel_free(kernel);
             LOG_ERROR("webgpu_execute_graph: alloc failed");
             return -1;
@@ -898,8 +899,8 @@ int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
                 cml_webgpu_free(backend, gpu_buffers[i]);
             }
         }
-        free(gpu_buffers);
-        free(buffer_sizes);
+        cml_free(gpu_buffers);
+        cml_free(buffer_sizes);
         cml_webgpu_kernel_free(kernel);
 
         if (ok != 0) {

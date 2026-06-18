@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include "alloc/cml_allocator.h"
 
 #define MOCK_FD_CTL  100
 #define MOCK_FD_DEV  101
@@ -71,7 +72,7 @@ static bool g_mock_active = false;
 static void mock_track_alloc(void *ptr) {
     if (g_mock.num_allocs >= g_mock.alloc_capacity) {
         int new_cap = g_mock.alloc_capacity * 2;
-        void **new_table = (void **)realloc(g_mock.alloc_table, (size_t)new_cap * sizeof(void *));
+        void **new_table = (void **)cml_realloc(g_mock.alloc_table, (size_t)new_cap * sizeof(void *));
         if (!new_table) return;
         g_mock.alloc_table = new_table;
         g_mock.alloc_capacity = new_cap;
@@ -114,7 +115,7 @@ void cml_nv_mock_init(CMLNVMockGPU *config) {
 
     g_mock.next_handle = 1;
     g_mock.alloc_capacity = MOCK_INITIAL_ALLOC_CAP;
-    g_mock.alloc_table = (void **)calloc((size_t)g_mock.alloc_capacity, sizeof(void *));
+    g_mock.alloc_table = (void **)cml_calloc((size_t)g_mock.alloc_capacity, sizeof(void *));
     g_mock.num_allocs = 0;
     g_mock.last_semaphore = NULL;
     g_mock.last_semaphore_value = 0;
@@ -126,9 +127,9 @@ void cml_nv_mock_shutdown(void) {
     if (!g_mock_active) return;
 
     for (int i = 0; i < g_mock.num_allocs; i++)
-        free(g_mock.alloc_table[i]);
+        cml_free(g_mock.alloc_table[i]);
 
-    free(g_mock.alloc_table);
+    cml_free(g_mock.alloc_table);
     memset(&g_mock, 0, sizeof(g_mock));
     g_mock_active = false;
 }
@@ -276,7 +277,7 @@ int cml_nv_mock_munmap(void *addr, size_t length) {
         return munmap(addr, length);
 
     if (mock_untrack_alloc(addr)) {
-        free(addr);
+        cml_free(addr);
         return 0;
     }
 

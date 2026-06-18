@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 BERTConfig cml_zoo_bert_config_tiny(void) {
     return (BERTConfig){
@@ -108,17 +109,17 @@ static void bert_block_free(Module* module) {
         module_free((Module*)block->mlp);
     if (block->mlp_norm)
         module_free((Module*)block->mlp_norm);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_bert_block(int hidden_size, int n_head, int intermediate_size,
                                   int n_layer, DType dtype, DeviceType device) {
-    BERTEncoderBlock* block = malloc(sizeof(BERTEncoderBlock));
+    BERTEncoderBlock* block = cml_malloc(sizeof(BERTEncoderBlock));
     if (!block)
         return NULL;
 
     if (module_init((Module*)block, "BERTEncoderBlock", bert_block_forward, bert_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -212,19 +213,19 @@ static void bert_free(Module* module) {
         module_free((Module*)bert->layers);
     if (bert->pooler)
         module_free((Module*)bert->pooler);
-    free(bert);
+    cml_free(bert);
 }
 
 Module* cml_zoo_bert_create(BERTConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;
 
-    BERTModel* bert = malloc(sizeof(BERTModel));
+    BERTModel* bert = cml_malloc(sizeof(BERTModel));
     if (!bert)
         return NULL;
 
     if (module_init((Module*)bert, "BERT", bert_forward, bert_free) != 0) {
-        free(bert);
+        cml_free(bert);
         return NULL;
     }
 

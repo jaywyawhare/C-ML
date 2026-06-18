@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #define MAX_WORKGROUP_EXTENT 256
 
@@ -9,7 +10,7 @@ static int ensure_capacity(LinearProgram* prog, int needed) {
     if (prog->num_ops + needed <= prog->capacity) return 0;
     int nc = prog->capacity;
     while (nc < prog->num_ops + needed) nc *= 2;
-    LinearOp* tmp = realloc(prog->ops, (size_t)nc * sizeof(LinearOp));
+    LinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(LinearOp));
     if (!tmp) return -1;
     prog->ops = tmp;
     prog->capacity = nc;
@@ -158,7 +159,7 @@ int cml_expand_groups(struct LinearProgram* prog) {
             int body_len = endloop_idx - i - 1;
             LinearOp* body = NULL;
             if (body_len > 0) {
-                body = malloc((size_t)body_len * sizeof(LinearOp));
+                body = cml_malloc((size_t)body_len * sizeof(LinearOp));
                 if (!body) return -1;
                 memcpy(body, &prog->ops[i + 1], (size_t)body_len * sizeof(LinearOp));
             }
@@ -168,7 +169,7 @@ int cml_expand_groups(struct LinearProgram* prog) {
             int delta = total_new - old_block;
 
             if (delta > 0) {
-                if (ensure_capacity(prog, delta) != 0) { free(body); return -1; }
+                if (ensure_capacity(prog, delta) != 0) { cml_free(body); return -1; }
                 memmove(&prog->ops[i + total_new],
                         &prog->ops[endloop_idx + 1],
                         (size_t)(prog->num_ops - endloop_idx - 1) * sizeof(LinearOp));
@@ -201,7 +202,7 @@ int cml_expand_groups(struct LinearProgram* prog) {
                 prog->ops[pos++] = endloop;
             }
 
-            free(body);
+            cml_free(body);
             i = pos;
         } else {
             i++;

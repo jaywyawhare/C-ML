@@ -8,6 +8,7 @@
 
 #ifdef __linux__
 #include <dlfcn.h>
+#include "alloc/cml_allocator.h"
 #define HIP_LIB_NAME "libamdhip64.so"
 #define HIPRTC_LIB_NAME "libhiprtc.so"
 #else
@@ -60,7 +61,7 @@ bool cml_rocm_available(void) {
 }
 
 CMLROCmBackend* cml_rocm_backend_create(void) {
-    CMLROCmBackend* backend = calloc(1, sizeof(CMLROCmBackend));
+    CMLROCmBackend* backend = cml_calloc(1, sizeof(CMLROCmBackend));
     if (!backend)
         LOG_ERROR("Failed to allocate ROCm backend");
     return backend;
@@ -146,7 +147,7 @@ void cml_rocm_backend_free(CMLROCmBackend* backend) {
 
     unload_library(backend->hiprtc_lib);
     unload_library(backend->hip_lib);
-    free(backend);
+    cml_free(backend);
 }
 
 CMLROCmKernel* cml_rocm_compile_hsaco(CMLROCmBackend* backend, const char* hsaco_code,
@@ -154,24 +155,24 @@ CMLROCmKernel* cml_rocm_compile_hsaco(CMLROCmBackend* backend, const char* hsaco
     if (!backend || !backend->initialized || !hsaco_code || !kernel_name)
         return NULL;
 
-    CMLROCmKernel* kernel = calloc(1, sizeof(CMLROCmKernel));
+    CMLROCmKernel* kernel = cml_calloc(1, sizeof(CMLROCmKernel));
     if (!kernel)
         return NULL;
 
     hipError_t err = backend->hipModuleLoadData(&kernel->module, hsaco_code);
     if (err != HIP_SUCCESS) {
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
     err = backend->hipModuleGetFunction(&kernel->function, kernel->module, kernel_name);
     if (err != HIP_SUCCESS) {
         backend->hipModuleUnload(kernel->module);
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
-    kernel->kernel_name = strdup(kernel_name);
+    kernel->kernel_name = cml_strdup(kernel_name);
     kernel->grid_dim[0] = kernel->grid_dim[1] = kernel->grid_dim[2] = 1;
     kernel->block_dim[0]                                            = 256;
     kernel->block_dim[1] = kernel->block_dim[2] = 1;
@@ -184,8 +185,8 @@ void cml_rocm_kernel_free(CMLROCmBackend* backend, CMLROCmKernel* kernel) {
         return;
     if (kernel->module)
         backend->hipModuleUnload(kernel->module);
-    free(kernel->kernel_name);
-    free(kernel);
+    cml_free(kernel->kernel_name);
+    cml_free(kernel);
 }
 
 int cml_rocm_launch_kernel(CMLROCmBackend* backend, CMLROCmKernel* kernel, void** args,
@@ -256,7 +257,7 @@ int cml_rocm_download_tensor(CMLROCmBackend* backend, Tensor* tensor) {
         return -1;
     size_t size = tensor->numel * cml_dtype_size(tensor->dtype);
     if (!tensor->data) {
-        tensor->data = malloc(size);
+        tensor->data = cml_malloc(size);
         if (!tensor->data)
             return -1;
         tensor->owns_data = true;

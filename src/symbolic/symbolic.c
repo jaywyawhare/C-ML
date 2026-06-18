@@ -3,12 +3,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include "alloc/cml_allocator.h"
 
 static int g_var_id_counter = 0;
 
 
 static SymExpr* sym_alloc(SymExprType type) {
-    SymExpr* e = (SymExpr*)calloc(1, sizeof(SymExpr));
+    SymExpr* e = (SymExpr*)cml_calloc(1, sizeof(SymExpr));
     if (!e) return NULL;
     e->type = type;
     e->ref_count = 1;
@@ -316,7 +317,7 @@ void sym_expr_release(SymExpr* e) {
         sym_expr_release(e->binop.left);
         sym_expr_release(e->binop.right);
     }
-    free(e);
+    cml_free(e);
 }
 
 
@@ -378,10 +379,10 @@ void sym_dim_release(SymDim* dim) {
 SymShape* sym_shape_from_concrete(const int* dims, int ndim) {
     if (!dims || ndim <= 0) return NULL;
 
-    SymShape* s = (SymShape*)calloc(1, sizeof(SymShape));
+    SymShape* s = (SymShape*)cml_calloc(1, sizeof(SymShape));
     if (!s) return NULL;
-    s->dims = (SymDim*)calloc((size_t)ndim, sizeof(SymDim));
-    if (!s->dims) { free(s); return NULL; }
+    s->dims = (SymDim*)cml_calloc((size_t)ndim, sizeof(SymDim));
+    if (!s->dims) { cml_free(s); return NULL; }
 
     s->ndim = ndim;
     s->ref_count = 1;
@@ -395,10 +396,10 @@ SymShape* sym_shape_broadcast(const SymShape* a, const SymShape* b) {
     if (!a || !b) return NULL;
 
     int max_ndim = a->ndim > b->ndim ? a->ndim : b->ndim;
-    SymShape* out = (SymShape*)calloc(1, sizeof(SymShape));
+    SymShape* out = (SymShape*)cml_calloc(1, sizeof(SymShape));
     if (!out) return NULL;
-    out->dims = (SymDim*)calloc((size_t)max_ndim, sizeof(SymDim));
-    if (!out->dims) { free(out); return NULL; }
+    out->dims = (SymDim*)cml_calloc((size_t)max_ndim, sizeof(SymDim));
+    if (!out->dims) { cml_free(out); return NULL; }
     out->ndim = max_ndim;
     out->ref_count = 1;
 
@@ -518,6 +519,6 @@ void sym_shape_release(SymShape* shape) {
     for (int i = 0; i < shape->ndim; i++) {
         sym_dim_release(&shape->dims[i]);
     }
-    free(shape->dims);
-    free(shape);
+    cml_free(shape->dims);
+    cml_free(shape);
 }

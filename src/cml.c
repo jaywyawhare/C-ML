@@ -72,7 +72,7 @@ void cml_track_module(Module* module) {
 
     if (g_num_modules >= g_modules_capacity) {
         size_t new_capacity  = g_modules_capacity == 0 ? 16 : g_modules_capacity * 2;
-        Module** new_modules = realloc(g_tracked_modules, (size_t)new_capacity * sizeof(Module*));
+        Module** new_modules = cml_realloc(g_tracked_modules, (size_t)new_capacity * sizeof(Module*));
         if (!new_modules)
             return;
         g_tracked_modules  = new_modules;
@@ -100,7 +100,7 @@ void cml_track_optimizer(Optimizer* optimizer) {
     if (g_num_optimizers >= g_optimizers_capacity) {
         size_t new_capacity = g_optimizers_capacity == 0 ? 16 : g_optimizers_capacity * 2;
         Optimizer** new_optimizers =
-            realloc(g_tracked_optimizers, (size_t)new_capacity * sizeof(Optimizer*));
+            cml_realloc(g_tracked_optimizers, (size_t)new_capacity * sizeof(Optimizer*));
         if (!new_optimizers)
             return;
         g_tracked_optimizers  = new_optimizers;
@@ -128,7 +128,7 @@ void cml_track_dataset(Dataset* dataset) {
     if (g_num_datasets >= g_datasets_capacity) {
         size_t new_capacity = g_datasets_capacity == 0 ? 16 : g_datasets_capacity * 2;
         Dataset** new_datasets =
-            realloc(g_tracked_datasets, (size_t)new_capacity * sizeof(Dataset*));
+            cml_realloc(g_tracked_datasets, (size_t)new_capacity * sizeof(Dataset*));
         if (!new_datasets)
             return;
         g_tracked_datasets  = new_datasets;
@@ -152,7 +152,7 @@ static void cml_auto_cleanup(void) {
                 cleanup_context_free(g_cleanup_contexts[i]);
             }
         }
-        free(g_cleanup_contexts);
+        cml_free(g_cleanup_contexts);
         g_cleanup_contexts          = NULL;
         g_num_cleanup_contexts      = 0;
         g_cleanup_contexts_capacity = 0;
@@ -164,7 +164,7 @@ static void cml_auto_cleanup(void) {
                 dataset_free(g_tracked_datasets[i]);
             }
         }
-        free(g_tracked_datasets);
+        cml_free(g_tracked_datasets);
         g_tracked_datasets  = NULL;
         g_num_datasets      = 0;
         g_datasets_capacity = 0;
@@ -176,7 +176,7 @@ static void cml_auto_cleanup(void) {
                 optimizer_free(g_tracked_optimizers[i]);
             }
         }
-        free(g_tracked_optimizers);
+        cml_free(g_tracked_optimizers);
         g_tracked_optimizers  = NULL;
         g_num_optimizers      = 0;
         g_optimizers_capacity = 0;
@@ -188,7 +188,7 @@ static void cml_auto_cleanup(void) {
                 module_free(g_tracked_modules[i]);
             }
         }
-        free(g_tracked_modules);
+        cml_free(g_tracked_modules);
         g_tracked_modules  = NULL;
         g_num_modules      = 0;
         g_modules_capacity = 0;
@@ -226,7 +226,7 @@ void cml_register_cleanup_context(CleanupContext* ctx) {
         size_t new_capacity =
             g_cleanup_contexts_capacity == 0 ? 16 : g_cleanup_contexts_capacity * 2;
         CleanupContext** new_contexts =
-            realloc(g_cleanup_contexts, (size_t)new_capacity * sizeof(CleanupContext*));
+            cml_realloc(g_cleanup_contexts, (size_t)new_capacity * sizeof(CleanupContext*));
         if (!new_contexts)
             return;
         g_cleanup_contexts          = new_contexts;
@@ -447,7 +447,7 @@ int cml_cleanup(void) {
                 g_tracked_datasets[i] = NULL;
             }
         }
-        free(g_tracked_datasets);
+        cml_free(g_tracked_datasets);
         g_tracked_datasets  = NULL;
         g_num_datasets      = 0;
         g_datasets_capacity = 0;
@@ -460,7 +460,7 @@ int cml_cleanup(void) {
                 g_tracked_optimizers[i] = NULL;
             }
         }
-        free(g_tracked_optimizers);
+        cml_free(g_tracked_optimizers);
         g_tracked_optimizers  = NULL;
         g_num_optimizers      = 0;
         g_optimizers_capacity = 0;
@@ -473,7 +473,7 @@ int cml_cleanup(void) {
                 g_tracked_modules[i] = NULL;
             }
         }
-        free(g_tracked_modules);
+        cml_free(g_tracked_modules);
         g_tracked_modules  = NULL;
         g_num_modules      = 0;
         g_modules_capacity = 0;
@@ -608,7 +608,7 @@ void cml_summary(Module* module) {
             }
         }
         if (params)
-            free(params);
+            cml_free(params);
     }
 
     printf("%-5s %-35s %15s\n", "Layer", "Type", "Parameters");

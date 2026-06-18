@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static void xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
     float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
@@ -59,7 +60,7 @@ static Tensor* mha_module_forward(Module* module, Tensor* input) {
 static void mha_free(Module* module) {
     MultiHeadAttention* mha = (MultiHeadAttention*)module;
     if (!mha) return;
-    free(mha);
+    cml_free(mha);
 }
 
 MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float dropout,
@@ -69,14 +70,14 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
         return NULL;
     }
 
-    MultiHeadAttention* mha = malloc(sizeof(MultiHeadAttention));
+    MultiHeadAttention* mha = cml_malloc(sizeof(MultiHeadAttention));
     if (!mha) {
         LOG_ERROR("Failed to allocate MultiHeadAttention");
         return NULL;
     }
 
     if (module_init((Module*)mha, "MultiHeadAttention", mha_module_forward, mha_free) != 0) {
-        free(mha);
+        cml_free(mha);
         return NULL;
     }
 
@@ -224,19 +225,19 @@ static void encoder_layer_free(Module* module) {
     TransformerEncoderLayer* layer = (TransformerEncoderLayer*)module;
     if (!layer) return;
     if (layer->self_attn) module_free((Module*)layer->self_attn);
-    free(layer);
+    cml_free(layer);
 }
 
 TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, int dim_feedforward,
                                                        float dropout, DType dtype, DeviceType device) {
-    TransformerEncoderLayer* layer = malloc(sizeof(TransformerEncoderLayer));
+    TransformerEncoderLayer* layer = cml_malloc(sizeof(TransformerEncoderLayer));
     if (!layer) {
         LOG_ERROR("Failed to allocate TransformerEncoderLayer");
         return NULL;
     }
 
     if (module_init((Module*)layer, "TransformerEncoderLayer", encoder_layer_forward, encoder_layer_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 
@@ -350,26 +351,26 @@ static void transformer_encoder_free(Module* module) {
         for (int i = 0; i < enc->num_layers; i++) {
             if (enc->layers[i]) module_free((Module*)enc->layers[i]);
         }
-        free(enc->layers);
+        cml_free(enc->layers);
     }
-    free(enc);
+    cml_free(enc);
 }
 
 TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
                                             float dropout, int num_layers,
                                             DType dtype, DeviceType device) {
-    TransformerEncoder* enc = malloc(sizeof(TransformerEncoder));
+    TransformerEncoder* enc = cml_malloc(sizeof(TransformerEncoder));
     if (!enc) return NULL;
 
     if (module_init((Module*)enc, "TransformerEncoder", transformer_encoder_forward, transformer_encoder_free) != 0) {
-        free(enc); return NULL;
+        cml_free(enc); return NULL;
     }
 
     enc->d_model = d_model;
     enc->num_layers = num_layers;
     enc->norm_eps = 1e-5f;
 
-    enc->layers = malloc(num_layers * sizeof(TransformerEncoderLayer*));
+    enc->layers = cml_malloc(num_layers * sizeof(TransformerEncoderLayer*));
     if (!enc->layers) { module_free((Module*)enc); return NULL; }
 
     for (int i = 0; i < num_layers; i++) {
@@ -455,16 +456,16 @@ static void decoder_layer_free(Module* module) {
     if (!layer) return;
     if (layer->self_attn) module_free((Module*)layer->self_attn);
     if (layer->cross_attn) module_free((Module*)layer->cross_attn);
-    free(layer);
+    cml_free(layer);
 }
 
 TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
                                                        float dropout, DType dtype, DeviceType device) {
-    TransformerDecoderLayer* layer = malloc(sizeof(TransformerDecoderLayer));
+    TransformerDecoderLayer* layer = cml_malloc(sizeof(TransformerDecoderLayer));
     if (!layer) return NULL;
 
     if (module_init((Module*)layer, "TransformerDecoderLayer", decoder_layer_forward_wrapper, decoder_layer_free) != 0) {
-        free(layer); return NULL;
+        cml_free(layer); return NULL;
     }
 
     layer->d_model = d_model;
@@ -573,26 +574,26 @@ static void transformer_decoder_free(Module* module) {
         for (int i = 0; i < dec->num_layers; i++) {
             if (dec->layers[i]) module_free((Module*)dec->layers[i]);
         }
-        free(dec->layers);
+        cml_free(dec->layers);
     }
-    free(dec);
+    cml_free(dec);
 }
 
 TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
                                             float dropout, int num_layers,
                                             DType dtype, DeviceType device) {
-    TransformerDecoder* dec = malloc(sizeof(TransformerDecoder));
+    TransformerDecoder* dec = cml_malloc(sizeof(TransformerDecoder));
     if (!dec) return NULL;
 
     if (module_init((Module*)dec, "TransformerDecoder", transformer_decoder_forward, transformer_decoder_free) != 0) {
-        free(dec); return NULL;
+        cml_free(dec); return NULL;
     }
 
     dec->d_model = d_model;
     dec->num_layers = num_layers;
     dec->norm_eps = 1e-5f;
 
-    dec->layers = malloc(num_layers * sizeof(TransformerDecoderLayer*));
+    dec->layers = cml_malloc(num_layers * sizeof(TransformerDecoderLayer*));
     if (!dec->layers) { module_free((Module*)dec); return NULL; }
 
     for (int i = 0; i < num_layers; i++) {
@@ -631,7 +632,7 @@ KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim
         return NULL;
     }
 
-    KVCache* cache = calloc(1, sizeof(KVCache));
+    KVCache* cache = cml_calloc(1, sizeof(KVCache));
     if (!cache) return NULL;
 
     cache->max_seq_len = max_seq_len;
@@ -641,12 +642,12 @@ KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim
     int shape[] = {batch, num_heads, max_seq_len, head_dim};
 
     cache->key_cache = tensor_zeros(shape, 4, &config);
-    if (!cache->key_cache) { free(cache); return NULL; }
+    if (!cache->key_cache) { cml_free(cache); return NULL; }
 
     cache->value_cache = tensor_zeros(shape, 4, &config);
     if (!cache->value_cache) {
         tensor_free(cache->key_cache);
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
 
@@ -657,7 +658,7 @@ void kv_cache_free(KVCache* cache) {
     if (!cache) return;
     if (cache->key_cache)   tensor_free(cache->key_cache);
     if (cache->value_cache) tensor_free(cache->value_cache);
-    free(cache);
+    cml_free(cache);
 }
 
 void kv_cache_reset(KVCache* cache) {
@@ -751,7 +752,7 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
 
     /* Build contiguous Q/K/V tensors for the lazy attention path. */
     int q4_shape[] = {batch, num_heads, seq_q, head_dim};
-    float* Q_mh = malloc((size_t)batch * num_heads * seq_q * head_dim * sizeof(float));
+    float* Q_mh = cml_malloc((size_t)batch * num_heads * seq_q * head_dim * sizeof(float));
     if (!Q_mh) return NULL;
     for (int b = 0; b < batch; b++)
         for (int s = 0; s < seq_q; s++)
@@ -760,9 +761,9 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
                     Q_mh[b*num_heads*seq_q*head_dim + h*seq_q*head_dim + s*head_dim + d] =
                         Q_data[b*seq_q*embed_dim + s*embed_dim + h*head_dim + d];
 
-    float* K_cached = malloc((size_t)batch * num_heads * cached_len * head_dim * sizeof(float));
-    float* V_cached = malloc((size_t)batch * num_heads * cached_len * head_dim * sizeof(float));
-    if (!K_cached || !V_cached) { free(Q_mh); free(K_cached); free(V_cached); return NULL; }
+    float* K_cached = cml_malloc((size_t)batch * num_heads * cached_len * head_dim * sizeof(float));
+    float* V_cached = cml_malloc((size_t)batch * num_heads * cached_len * head_dim * sizeof(float));
+    if (!K_cached || !V_cached) { cml_free(Q_mh); cml_free(K_cached); cml_free(V_cached); return NULL; }
 
     for (int b = 0; b < batch; b++)
         for (int h = 0; h < num_heads; h++)
@@ -776,10 +777,10 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
 
     TensorConfig cfg = {.dtype = query->dtype, .device = query->device,
                         .has_dtype = true, .has_device = true};
-    Tensor* Q_lazy = tensor_from_data(Q_mh, q4_shape, 4, &cfg); free(Q_mh);
+    Tensor* Q_lazy = tensor_from_data(Q_mh, q4_shape, 4, &cfg); cml_free(Q_mh);
     int k4_shape[] = {batch, num_heads, cached_len, head_dim};
-    Tensor* K_lazy = tensor_from_data(K_cached, k4_shape, 4, &cfg); free(K_cached);
-    Tensor* V_lazy = tensor_from_data(V_cached, k4_shape, 4, &cfg); free(V_cached);
+    Tensor* K_lazy = tensor_from_data(K_cached, k4_shape, 4, &cfg); cml_free(K_cached);
+    Tensor* V_lazy = tensor_from_data(V_cached, k4_shape, 4, &cfg); cml_free(V_cached);
     if (!Q_lazy || !K_lazy || !V_lazy) return NULL;
 
     Tensor* attn_out = uop_scaled_dot_product_attention(Q_lazy, K_lazy, V_lazy, mask);

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct {
     int index;
@@ -31,15 +32,15 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
     if (num_buffers <= 0 || !sizes || !first_use || !last_use)
         return NULL;
 
-    CMLMemoryPlan* plan = calloc(1, sizeof(CMLMemoryPlan));
+    CMLMemoryPlan* plan = cml_calloc(1, sizeof(CMLMemoryPlan));
     if (!plan) return NULL;
 
     plan->num_buffers    = num_buffers;
-    plan->buffer_sizes   = malloc((size_t)num_buffers * sizeof(size_t));
-    plan->buffer_offsets = calloc((size_t)num_buffers, sizeof(size_t));
-    plan->buffer_reuse_map = malloc((size_t)num_buffers * sizeof(int));
-    plan->buffer_first_use = malloc((size_t)num_buffers * sizeof(int));
-    plan->buffer_last_use  = malloc((size_t)num_buffers * sizeof(int));
+    plan->buffer_sizes   = cml_malloc((size_t)num_buffers * sizeof(size_t));
+    plan->buffer_offsets = cml_calloc((size_t)num_buffers, sizeof(size_t));
+    plan->buffer_reuse_map = cml_malloc((size_t)num_buffers * sizeof(int));
+    plan->buffer_first_use = cml_malloc((size_t)num_buffers * sizeof(int));
+    plan->buffer_last_use  = cml_malloc((size_t)num_buffers * sizeof(int));
 
     if (!plan->buffer_sizes || !plan->buffer_offsets || !plan->buffer_reuse_map ||
         !plan->buffer_first_use || !plan->buffer_last_use) {
@@ -59,7 +60,7 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
         naive_total += sizes[i];
 
     /* Sort buffers by decreasing size for greedy coloring */
-    BufferEntry* sorted = malloc((size_t)num_buffers * sizeof(BufferEntry));
+    BufferEntry* sorted = cml_malloc((size_t)num_buffers * sizeof(BufferEntry));
     if (!sorted) {
         cml_memory_plan_free(plan);
         return NULL;
@@ -77,18 +78,18 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
      * We cap at num_buffers slots (worst case: no reuse).
      */
     int num_slots = 0;
-    size_t* slot_sizes = calloc((size_t)num_buffers, sizeof(size_t));
-    int* slot_owner    = malloc((size_t)num_buffers * sizeof(int));
+    size_t* slot_sizes = cml_calloc((size_t)num_buffers, sizeof(size_t));
+    int* slot_owner    = cml_malloc((size_t)num_buffers * sizeof(int));
     /* For each slot, track the merged lifetime [earliest first_use, latest last_use] */
-    int* slot_first = malloc((size_t)num_buffers * sizeof(int));
-    int* slot_last  = malloc((size_t)num_buffers * sizeof(int));
+    int* slot_first = cml_malloc((size_t)num_buffers * sizeof(int));
+    int* slot_last  = cml_malloc((size_t)num_buffers * sizeof(int));
     /* Per-buffer slot assignment */
-    int* buf_slot = malloc((size_t)num_buffers * sizeof(int));
+    int* buf_slot = cml_malloc((size_t)num_buffers * sizeof(int));
 
     if (!slot_sizes || !slot_owner || !slot_first || !slot_last || !buf_slot) {
-        free(sorted);
-        free(slot_sizes); free(slot_owner);
-        free(slot_first); free(slot_last); free(buf_slot);
+        cml_free(sorted);
+        cml_free(slot_sizes); cml_free(slot_owner);
+        cml_free(slot_first); cml_free(slot_last); cml_free(buf_slot);
         cml_memory_plan_free(plan);
         return NULL;
     }
@@ -99,14 +100,14 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
      * are overly conservative when a slot hosts multiple non-overlapping
      * buffers with a gap between them.
      */
-    int** slot_bufs   = calloc((size_t)num_buffers, sizeof(int*));
-    int*  slot_nbuf   = calloc((size_t)num_buffers, sizeof(int));
-    int*  slot_bufcap = calloc((size_t)num_buffers, sizeof(int));
+    int** slot_bufs   = cml_calloc((size_t)num_buffers, sizeof(int*));
+    int*  slot_nbuf   = cml_calloc((size_t)num_buffers, sizeof(int));
+    int*  slot_bufcap = cml_calloc((size_t)num_buffers, sizeof(int));
 
     if (!slot_bufs || !slot_nbuf || !slot_bufcap) {
-        free(sorted); free(slot_sizes); free(slot_owner);
-        free(slot_first); free(slot_last); free(buf_slot);
-        free(slot_bufs); free(slot_nbuf); free(slot_bufcap);
+        cml_free(sorted); cml_free(slot_sizes); cml_free(slot_owner);
+        cml_free(slot_first); cml_free(slot_last); cml_free(buf_slot);
+        cml_free(slot_bufs); cml_free(slot_nbuf); cml_free(slot_bufcap);
         cml_memory_plan_free(plan);
         return NULL;
     }
@@ -154,7 +155,7 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
             /* Append to slot's buffer list */
             if (slot_nbuf[best_slot] >= slot_bufcap[best_slot]) {
                 int nc = slot_bufcap[best_slot] ? slot_bufcap[best_slot] * 2 : 4;
-                int* tmp = realloc(slot_bufs[best_slot], (size_t)nc * sizeof(int));
+                int* tmp = cml_realloc(slot_bufs[best_slot], (size_t)nc * sizeof(int));
                 if (tmp) {
                     slot_bufs[best_slot]   = tmp;
                     slot_bufcap[best_slot] = nc;
@@ -170,7 +171,7 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
             buf_slot[idx] = s;
 
             slot_bufcap[s] = 4;
-            slot_bufs[s]   = malloc(4 * sizeof(int));
+            slot_bufs[s]   = cml_malloc(4 * sizeof(int));
             slot_nbuf[s]   = 1;
             if (slot_bufs[s])
                 slot_bufs[s][0] = idx;
@@ -209,28 +210,28 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
     plan->peak_memory = peak;
 
     for (int s = 0; s < num_slots; s++)
-        free(slot_bufs[s]);
-    free(slot_bufs);
-    free(slot_nbuf);
-    free(slot_bufcap);
-    free(sorted);
-    free(slot_sizes);
-    free(slot_owner);
-    free(slot_first);
-    free(slot_last);
-    free(buf_slot);
+        cml_free(slot_bufs[s]);
+    cml_free(slot_bufs);
+    cml_free(slot_nbuf);
+    cml_free(slot_bufcap);
+    cml_free(sorted);
+    cml_free(slot_sizes);
+    cml_free(slot_owner);
+    cml_free(slot_first);
+    cml_free(slot_last);
+    cml_free(buf_slot);
 
     return plan;
 }
 
 void cml_memory_plan_free(CMLMemoryPlan* plan) {
     if (!plan) return;
-    free(plan->buffer_sizes);
-    free(plan->buffer_offsets);
-    free(plan->buffer_reuse_map);
-    free(plan->buffer_first_use);
-    free(plan->buffer_last_use);
-    free(plan);
+    cml_free(plan->buffer_sizes);
+    cml_free(plan->buffer_offsets);
+    cml_free(plan->buffer_reuse_map);
+    cml_free(plan->buffer_first_use);
+    cml_free(plan->buffer_last_use);
+    cml_free(plan);
 }
 
 void cml_memory_plan_print(const CMLMemoryPlan* plan) {

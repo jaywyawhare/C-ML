@@ -217,6 +217,7 @@ set(ALLOC_SOURCES
     src/alloc/memory_pools.c
     src/alloc/graph_allocator.c
     src/alloc/tlsf_alloc.c
+    src/alloc/cml_allocator.c
 )
 
 set(BACKEND_SOURCES

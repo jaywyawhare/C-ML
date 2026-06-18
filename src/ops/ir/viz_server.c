@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #ifdef _WIN32
 #  include <winsock2.h>
@@ -148,7 +149,7 @@ char* viz_graph_to_json(CMLGraph_t ir) {
     if (!ir) return NULL;
 
     int n = ir->node_count;
-    struct IRNode** nodes = malloc((size_t)(n + 1) * sizeof(struct IRNode*));
+    struct IRNode** nodes = cml_malloc((size_t)(n + 1) * sizeof(struct IRNode*));
     if (!nodes) return NULL;
     int cnt = 0;
     for (struct IRNode* cur = ir->head; cur && cnt < n; cur = cur->next)
@@ -156,8 +157,8 @@ char* viz_graph_to_json(CMLGraph_t ir) {
     n = cnt;
 
     size_t cap = (size_t)(n * 256) + 2048;
-    char* buf = malloc(cap);
-    if (!buf) { free(nodes); return NULL; }
+    char* buf = cml_malloc(cap);
+    if (!buf) { cml_free(nodes); return NULL; }
     size_t pos = 0;
 
 #define A(...) do { int _r = snprintf(buf+pos, cap-pos, __VA_ARGS__); \
@@ -203,7 +204,7 @@ char* viz_graph_to_json(CMLGraph_t ir) {
     }
     A("]}");
 #undef A
-    free(nodes);
+    cml_free(nodes);
     return buf;
 }
 
@@ -212,12 +213,12 @@ int viz_export_html(CMLGraph_t ir, const char* path) {
     char* json = viz_graph_to_json(ir);
     if (!json) return -1;
     FILE* f = fopen(path, "w");
-    if (!f) { free(json); return -1; }
+    if (!f) { cml_free(json); return -1; }
     fputs(VIZ_HTML_PRE, f);
     fputs(json, f);
     fputs(VIZ_HTML_POST, f);
     fclose(f);
-    free(json);
+    cml_free(json);
     LOG_INFO("Exported IR graph to %s", path);
     return 0;
 }
@@ -265,7 +266,7 @@ VizServer* viz_server_start(CMLGraph_t ir, int port) {
         port = ntohs(b.sin_port);
     }
 
-    VizServer* srv = calloc(1, sizeof(VizServer));
+    VizServer* srv = cml_calloc(1, sizeof(VizServer));
     if (!srv) { sock_close(fd); return NULL; }
     srv->listen_fd  = fd;
     srv->port       = port;
@@ -278,7 +279,7 @@ VizServer* viz_server_start(CMLGraph_t ir, int port) {
 void viz_server_update(VizServer* srv, CMLGraph_t ir) {
     if (!srv) return;
     srv->ir = ir;
-    free(srv->json_cache);
+    cml_free(srv->json_cache);
     srv->json_cache = ir ? viz_graph_to_json(ir) : NULL;
 }
 
@@ -317,8 +318,8 @@ int viz_server_poll(VizServer* srv) {
 void viz_server_stop(VizServer* srv) {
     if (!srv) return;
     sock_close(srv->listen_fd);
-    free(srv->json_cache);
-    free(srv);
+    cml_free(srv->json_cache);
+    cml_free(srv);
 #ifdef _WIN32
     WSACleanup();
 #endif

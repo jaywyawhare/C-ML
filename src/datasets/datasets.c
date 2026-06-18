@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 void cml_dataset_compute_stats(Dataset* ds) {
     if (!ds || !ds->X || ds->num_samples == 0 || ds->input_size == 0) return;
@@ -17,10 +18,10 @@ void cml_dataset_compute_stats(Dataset* ds) {
     float* X = (float*)tensor_data_ptr(ds->X);
     if (!X) return;
 
-    ds->feature_means = calloc(nf, sizeof(float));
-    ds->feature_stds  = calloc(nf, sizeof(float));
-    ds->feature_mins  = malloc(sizeof(float) * nf);
-    ds->feature_maxs  = malloc(sizeof(float) * nf);
+    ds->feature_means = cml_calloc(nf, sizeof(float));
+    ds->feature_stds  = cml_calloc(nf, sizeof(float));
+    ds->feature_mins  = cml_malloc(sizeof(float) * nf);
+    ds->feature_maxs  = cml_malloc(sizeof(float) * nf);
     if (!ds->feature_means || !ds->feature_stds || !ds->feature_mins || !ds->feature_maxs)
         return;
 
@@ -162,7 +163,7 @@ static Dataset* load_iris(void) {
         ds->num_classes = nc;
         ds->class_names = class_names;
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 
@@ -182,7 +183,7 @@ static Dataset* load_wine(void) {
         ds->name = "wine";
         ds->num_classes = nc;
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 
@@ -205,9 +206,9 @@ static Dataset* load_breast_cancer(void) {
     }
     rewind(f);
 
-    float* X = malloc(sizeof(float) * n * 30);
-    float* y = malloc(sizeof(float) * n);
-    if (!X || !y) { free(X); free(y); fclose(f); return NULL; }
+    float* X = cml_malloc(sizeof(float) * n * 30);
+    float* y = cml_malloc(sizeof(float) * n);
+    if (!X || !y) { cml_free(X); cml_free(y); fclose(f); return NULL; }
 
     int idx = 0;
     while (fgets(line, sizeof(line), f) && idx < n) {
@@ -238,7 +239,7 @@ static Dataset* load_breast_cancer(void) {
         ds->name = "breast_cancer";
         ds->num_classes = 2;
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 
@@ -258,7 +259,7 @@ static Dataset* load_boston(void) {
         ds->name = "boston";
         ds->num_classes = 0; /* regression */
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 
@@ -319,7 +320,7 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
     float* train_lbl = cml_idx_load_labels(p_tl, &n_train_lbl);
 
     if (!train_img || !train_lbl) {
-        free(train_img); free(train_lbl);
+        cml_free(train_img); cml_free(train_lbl);
         return NULL;
     }
 
@@ -337,14 +338,14 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
 
         if (test_img && test_lbl) {
             total_n = n_train + n_test;
-            all_X = malloc(sizeof(float) * total_n * feat);
-            all_y = malloc(sizeof(float) * total_n);
+            all_X = cml_malloc(sizeof(float) * total_n * feat);
+            all_y = cml_malloc(sizeof(float) * total_n);
             memcpy(all_X, train_img, sizeof(float) * n_train * feat);
             memcpy(all_X + n_train * feat, test_img, sizeof(float) * n_test * feat);
             memcpy(all_y, train_lbl, sizeof(float) * n_train);
             memcpy(all_y + n_train, test_lbl, sizeof(float) * n_test);
         }
-        free(test_img); free(test_lbl);
+        cml_free(test_img); cml_free(test_lbl);
     }
 
     if (!all_X) {
@@ -361,8 +362,8 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
         ds->num_classes = 10;
     }
 
-    if (all_X != train_img) { free(all_X); free(all_y); }
-    free(train_img); free(train_lbl);
+    if (all_X != train_img) { cml_free(all_X); cml_free(all_y); }
+    cml_free(train_img); cml_free(train_lbl);
     return ds;
 }
 
@@ -390,9 +391,9 @@ static Dataset* load_cifar10(void) {
     /* Read 5 training batches + 1 test batch */
     int total = 60000;
     int feat = 3072;
-    float* X = malloc(sizeof(float) * total * feat);
-    float* y = malloc(sizeof(float) * total);
-    if (!X || !y) { free(X); free(y); return NULL; }
+    float* X = cml_malloc(sizeof(float) * total * feat);
+    float* y = cml_malloc(sizeof(float) * total);
+    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
 
     int offset = 0;
     const char* batch_files[] = {
@@ -434,7 +435,7 @@ static Dataset* load_cifar10(void) {
         ds->name = "cifar10";
         ds->num_classes = 10;
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 
@@ -442,9 +443,9 @@ static Dataset* load_airline(void) {
     int n;
     const float* data = cml_builtin_airline_data(&n);
 
-    float* X = malloc(sizeof(float) * n);
-    float* y = malloc(sizeof(float) * n);
-    if (!X || !y) { free(X); free(y); return NULL; }
+    float* X = cml_malloc(sizeof(float) * n);
+    float* y = cml_malloc(sizeof(float) * n);
+    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
 
     memcpy(X, data, sizeof(float) * n);
     /* For time series: y is same as X (predict value) */
@@ -455,7 +456,7 @@ static Dataset* load_airline(void) {
         ds->name = "airline";
         ds->num_classes = 0;
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 
@@ -466,9 +467,9 @@ static Dataset* load_digits(void) {
     const float* labels = cml_builtin_digits_labels(&nl);
 
     /* Copy to mutable buffers for dataset_from_arrays */
-    float* X = malloc(sizeof(float) * n * feat);
-    float* y = malloc(sizeof(float) * n);
-    if (!X || !y) { free(X); free(y); return NULL; }
+    float* X = cml_malloc(sizeof(float) * n * feat);
+    float* y = cml_malloc(sizeof(float) * n);
+    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
 
     memcpy(X, data, sizeof(float) * n * feat);
     memcpy(y, labels, sizeof(float) * n);
@@ -478,7 +479,7 @@ static Dataset* load_digits(void) {
         ds->name = "digits";
         ds->num_classes = 10;
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }
 

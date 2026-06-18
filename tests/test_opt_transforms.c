@@ -5,6 +5,7 @@
 
 #include "ops/ir/opt_transforms.h"
 #include "ops/ir/linearize.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -30,7 +31,7 @@ static LinearProgram* make_test_prog(int num_axes, const int* extents) {
     for (int i = 0; i < num_axes; i++) {
         if (prog->num_axes >= prog->axes_capacity) {
             int nc = prog->axes_capacity * 2;
-            int* tmp = realloc(prog->loop_axes, (size_t)nc * sizeof(int));
+            int* tmp = cml_realloc(prog->loop_axes, (size_t)nc * sizeof(int));
             if (!tmp) { linear_program_free(prog); return NULL; }
             prog->loop_axes = tmp;
             prog->axes_capacity = nc;
@@ -438,7 +439,7 @@ static int test_enumerate_basic(void) {
     if (count < 2) {
         printf("(too few combinations: %d) ", count);
         for (int i = 0; i < count; i++) cml_opt_list_free(lists[i]);
-        free(lists);
+        cml_free(lists);
         linear_program_free(prog);
         return 0;
     }
@@ -447,13 +448,13 @@ static int test_enumerate_basic(void) {
     if (lists[0]->num_opts != 0) {
         printf("(first list not empty) ");
         for (int i = 0; i < count; i++) cml_opt_list_free(lists[i]);
-        free(lists);
+        cml_free(lists);
         linear_program_free(prog);
         return 0;
     }
 
     for (int i = 0; i < count; i++) cml_opt_list_free(lists[i]);
-    free(lists);
+    cml_free(lists);
     linear_program_free(prog);
     return 1;
 }
@@ -472,13 +473,13 @@ static int test_enumerate_respects_max(void) {
     if (count > 10) {
         printf("(count %d exceeds max 10) ", count);
         for (int i = 0; i < count; i++) cml_opt_list_free(lists[i]);
-        free(lists);
+        cml_free(lists);
         linear_program_free(prog);
         return 0;
     }
 
     for (int i = 0; i < count; i++) cml_opt_list_free(lists[i]);
-    free(lists);
+    cml_free(lists);
     linear_program_free(prog);
     return 1;
 }
@@ -509,7 +510,7 @@ static int test_enumerate_all_valid(void) {
     }
 
     for (int i = 0; i < count; i++) cml_opt_list_free(lists[i]);
-    free(lists);
+    cml_free(lists);
     linear_program_free(prog);
 
     /* At least the baseline should always be valid. */

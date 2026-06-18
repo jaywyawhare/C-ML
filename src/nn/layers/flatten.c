@@ -3,6 +3,7 @@
 #include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* flatten_forward(Module* module, Tensor* input) {
     Flatten* fl = (Flatten*)module;
@@ -40,15 +41,15 @@ static Tensor* flatten_forward(Module* module, Tensor* input) {
 }
 
 static void flatten_free(Module* module) {
-    free(module);
+    cml_free(module);
 }
 
 Flatten* nn_flatten(int start_dim, int end_dim) {
-    Flatten* fl = malloc(sizeof(Flatten));
+    Flatten* fl = cml_malloc(sizeof(Flatten));
     if (!fl) return NULL;
 
     if (module_init((Module*)fl, "Flatten", flatten_forward, flatten_free) != 0) {
-        free(fl);
+        cml_free(fl);
         return NULL;
     }
 

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 #define PTX_BUF_SIZE 8192
 #define CUDA_SRC_BUF_SIZE 16384
@@ -157,7 +158,7 @@ static bool ptx_is_reduction(UOpType t) {
 }
 
 CMLPTXCodegen* cml_ptx_codegen_create(int sm_version, struct CMLCUDABackend* cuda) {
-    CMLPTXCodegen* cg = (CMLPTXCodegen*)calloc(1, sizeof(CMLPTXCodegen));
+    CMLPTXCodegen* cg = (CMLPTXCodegen*)cml_calloc(1, sizeof(CMLPTXCodegen));
     if (!cg) return NULL;
     cg->sm_version = sm_version > 0 ? sm_version : 50;
     cg->kernel_count = 0;
@@ -167,13 +168,13 @@ CMLPTXCodegen* cml_ptx_codegen_create(int sm_version, struct CMLCUDABackend* cud
 }
 
 void cml_ptx_codegen_destroy(CMLPTXCodegen* cg) {
-    free(cg);
+    cml_free(cg);
 }
 
 char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) {
     if (!cg || !kernel_name) return NULL;
 
-    char* ptx = (char*)malloc(PTX_BUF_SIZE);
+    char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
 
     int pos = 0;
@@ -316,7 +317,7 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
             "    selp.f32 %%f1, %%f0, %%f1, %%p1;\n\n");    // x > 3 ? x : result
         break;
     default:
-        free(ptx);
+        cml_free(ptx);
         return NULL;
     }
 
@@ -328,7 +329,7 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
 char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) {
     if (!cg || !kernel_name) return NULL;
 
-    char* ptx = (char*)malloc(PTX_BUF_SIZE);
+    char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
 
     int pos = 0;
@@ -386,7 +387,7 @@ char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name)
             "    cvt.rmi.f32.f32 %%f2, %%f2;\n\n");      // floor(a / b)
         break;
     default:
-        free(ptx);
+        cml_free(ptx);
         return NULL;
     }
 
@@ -401,7 +402,7 @@ char* cml_ptx_gen_fill(CMLPTXCodegen* cg, float value, const char* kernel_name) 
     char hex[16];
     float_to_ptx_hex(value, hex, sizeof(hex));
 
-    char* ptx = (char*)malloc(PTX_BUF_SIZE);
+    char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
 
     int pos = 0;
@@ -441,7 +442,7 @@ char* cml_ptx_gen_fill(CMLPTXCodegen* cg, float value, const char* kernel_name) 
 char* cml_ptx_gen_where(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name) return NULL;
 
-    char* ptx = (char*)malloc(PTX_BUF_SIZE);
+    char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
 
     int pos = 0;
@@ -500,7 +501,7 @@ char* cml_ptx_gen_reduction(CMLPTXCodegen* cg, UOpType op, const char* kernel_na
         return NULL;
     }
 
-    char* ptx = (char*)malloc(PTX_BUF_SIZE);
+    char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
 
     int pos = 0;
@@ -611,7 +612,7 @@ char* cml_ptx_gen_reduction(CMLPTXCodegen* cg, UOpType op, const char* kernel_na
 char* cml_ptx_gen_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name) return NULL;
 
-    char* ptx = (char*)malloc(PTX_BUF_SIZE);
+    char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
 
     int pos = 0;
@@ -694,7 +695,7 @@ char* cml_ptx_gen_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
 char* cml_ptx_gen_tiled_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name) return NULL;
 
-    char* src = (char*)malloc(CUDA_SRC_BUF_SIZE);
+    char* src = (char*)cml_malloc(CUDA_SRC_BUF_SIZE);
     if (!src) return NULL;
 
     // Generate CUDA C source for 16x16 tiled matmul using shared memory.
@@ -757,7 +758,7 @@ char* cml_ptx_gen_tiled_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
 char* cml_ptx_gen_conv2d(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name) return NULL;
 
-    char* src = (char*)malloc(CUDA_SRC_BUF_SIZE);
+    char* src = (char*)cml_malloc(CUDA_SRC_BUF_SIZE);
     if (!src) return NULL;
 
     // Generate CUDA C source for direct conv2d kernel.
@@ -856,7 +857,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         if (!ptx_code) return -1;
 
         CMLCUDAKernel* kernel = cml_cuda_compile_ptx(cuda, ptx_code, fn_name);
-        free(ptx_code);
+        cml_free(ptx_code);
         if (!kernel) return -1;
 
         size_t in_bytes = node->inputs[0]->numel * sizeof(float);
@@ -894,7 +895,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         if (!ptx_code) return -1;
 
         CMLCUDAKernel* kernel = cml_cuda_compile_ptx(cuda, ptx_code, fn_name);
-        free(ptx_code);
+        cml_free(ptx_code);
         if (!kernel) return -1;
 
         size_t a_bytes = node->inputs[0]->numel * sizeof(float);
@@ -935,7 +936,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         if (!ptx_code) return -1;
 
         CMLCUDAKernel* kernel = cml_cuda_compile_ptx(cuda, ptx_code, fn_name);
-        free(ptx_code);
+        cml_free(ptx_code);
         if (!kernel) return -1;
 
         size_t in_bytes = node->inputs[0]->numel * sizeof(float);
@@ -987,7 +988,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         if (!ptx_code) return -1;
 
         CMLCUDAKernel* kernel = cml_cuda_compile_ptx(cuda, ptx_code, fn_name);
-        free(ptx_code);
+        cml_free(ptx_code);
         if (!kernel) return -1;
 
         size_t out_bytes = out->numel * sizeof(float);
@@ -1021,7 +1022,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         if (!ptx_code) return -1;
 
         CMLCUDAKernel* kernel = cml_cuda_compile_ptx(cuda, ptx_code, fn_name);
-        free(ptx_code);
+        cml_free(ptx_code);
         if (!kernel) return -1;
 
         size_t c_bytes = node->inputs[0]->numel * sizeof(float);
@@ -1070,7 +1071,7 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
         if (!ptx_code) return -1;
 
         CMLCUDAKernel* kernel = cml_cuda_compile_ptx(cuda, ptx_code, fn_name);
-        free(ptx_code);
+        cml_free(ptx_code);
         if (!kernel) return -1;
 
         size_t a_bytes = a->numel * sizeof(float);

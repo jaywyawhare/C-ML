@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static void copy_pb_string(char *dst, size_t dst_size, const PBField *field)
 {
@@ -24,7 +25,7 @@ static char *dup_pb_string(const PBField *field)
     const char *src = pb_field_string(field, &len);
     if (!src || len == 0) return NULL;
 
-    char *s = (char *)malloc(len + 1);
+    char *s = (char *)cml_malloc(len + 1);
     if (!s) return NULL;
     memcpy(s, src, len);
     s[len] = '\0';
@@ -98,7 +99,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
         case 6: /* floats (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
                 int count = (int)(f.value.bytes.length / sizeof(float));
-                attr->value.floats.data = (float *)malloc(sizeof(float) * (size_t)count);
+                attr->value.floats.data = (float *)cml_malloc(sizeof(float) * (size_t)count);
                 if (attr->value.floats.data) {
                     PBReader sub = pb_reader_sub(&f);
                     for (int i = 0; i < count; i++) {
@@ -121,7 +122,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
                     pb_read_varint(&counter);
                     count++;
                 }
-                attr->value.ints.data = (int64_t *)malloc(sizeof(int64_t) * (size_t)count);
+                attr->value.ints.data = (int64_t *)cml_malloc(sizeof(int64_t) * (size_t)count);
                 if (attr->value.ints.data) {
                     for (int i = 0; i < count; i++) {
                         attr->value.ints.data[i] = (int64_t)pb_read_varint(&sub);
@@ -132,7 +133,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
             } else if (f.wire_type == PB_WIRE_VARINT) {
                 /* Non-packed single int in repeated field -- append */
                 int cur = attr->value.ints.count;
-                int64_t *tmp = (int64_t *)realloc(attr->value.ints.data,
+                int64_t *tmp = (int64_t *)cml_realloc(attr->value.ints.data,
                                                    sizeof(int64_t) * (size_t)(cur + 1));
                 if (tmp) {
                     tmp[cur] = (int64_t)f.value.varint;
@@ -254,7 +255,7 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
         case 5: /* float_data (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
                 float_count = (int)(f.value.bytes.length / sizeof(float));
-                float_data = (float *)malloc(sizeof(float) * (size_t)float_count);
+                float_data = (float *)cml_malloc(sizeof(float) * (size_t)float_count);
                 if (float_data) {
                     PBReader sub = pb_reader_sub(&f);
                     for (int i = 0; i < float_count; i++) {
@@ -292,7 +293,7 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
         init->tensor = tensor_zeros(dims, ndim, &cfg);
     }
 
-    free(float_data);
+    cml_free(float_data);
 }
 
 /*
@@ -408,10 +409,10 @@ static int parse_graph(PBReader *rd, CMLONNXGraph *graph)
 {
     memset(graph, 0, sizeof(*graph));
 
-    graph->nodes        = (CMLONNXNode *)calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXNode));
-    graph->inputs       = (CMLONNXTensorInfo *)calloc(CML_ONNX_MAX_INPUTS, sizeof(CMLONNXTensorInfo));
-    graph->outputs      = (CMLONNXTensorInfo *)calloc(CML_ONNX_MAX_OUTPUTS, sizeof(CMLONNXTensorInfo));
-    graph->initializers = (CMLONNXInitializer *)calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXInitializer));
+    graph->nodes        = (CMLONNXNode *)cml_calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXNode));
+    graph->inputs       = (CMLONNXTensorInfo *)cml_calloc(CML_ONNX_MAX_INPUTS, sizeof(CMLONNXTensorInfo));
+    graph->outputs      = (CMLONNXTensorInfo *)cml_calloc(CML_ONNX_MAX_OUTPUTS, sizeof(CMLONNXTensorInfo));
+    graph->initializers = (CMLONNXInitializer *)cml_calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXInitializer));
 
     if (!graph->nodes || !graph->inputs || !graph->outputs || !graph->initializers) {
         return -1;
@@ -501,7 +502,7 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
         return NULL;
     }
 
-    CMLONNXModel *model = (CMLONNXModel *)calloc(1, sizeof(CMLONNXModel));
+    CMLONNXModel *model = (CMLONNXModel *)cml_calloc(1, sizeof(CMLONNXModel));
     if (!model) return NULL;
 
     PBReader reader;
@@ -578,7 +579,7 @@ CMLONNXModel *cml_onnx_load(const char *filepath)
         return NULL;
     }
 
-    uint8_t *buf = (uint8_t *)malloc((size_t)fsize);
+    uint8_t *buf = (uint8_t *)cml_malloc((size_t)fsize);
     if (!buf) {
         fclose(fp);
         return NULL;
@@ -589,12 +590,12 @@ CMLONNXModel *cml_onnx_load(const char *filepath)
 
     if ((long)n != fsize) {
         LOG_ERROR("onnx: short read on '%s'", filepath);
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
 
     CMLONNXModel *model = cml_onnx_load_buffer(buf, (size_t)fsize);
-    free(buf);
+    cml_free(buf);
     return model;
 }
 
@@ -608,23 +609,23 @@ void cml_onnx_free(CMLONNXModel *model)
         for (int i = 0; i < g->num_nodes; i++) {
             CMLONNXNode *nd = &g->nodes[i];
             for (int j = 0; j < nd->num_inputs; j++) {
-                free(nd->inputs[j]);
+                cml_free(nd->inputs[j]);
             }
             for (int j = 0; j < nd->num_outputs; j++) {
-                free(nd->outputs[j]);
+                cml_free(nd->outputs[j]);
             }
             for (int j = 0; j < nd->num_attrs; j++) {
                 CMLONNXAttribute *a = &nd->attrs[j];
                 if (a->type == CML_ONNX_ATTR_INTS) {
-                    free(a->value.ints.data);
+                    cml_free(a->value.ints.data);
                 } else if (a->type == CML_ONNX_ATTR_FLOATS) {
-                    free(a->value.floats.data);
+                    cml_free(a->value.floats.data);
                 } else if (a->type == CML_ONNX_ATTR_TENSOR && a->value.tensor) {
                     tensor_free(a->value.tensor);
                 }
             }
         }
-        free(g->nodes);
+        cml_free(g->nodes);
     }
 
     if (g->initializers) {
@@ -633,11 +634,11 @@ void cml_onnx_free(CMLONNXModel *model)
                 tensor_free(g->initializers[i].tensor);
             }
         }
-        free(g->initializers);
+        cml_free(g->initializers);
     }
 
-    free(g->inputs);
-    free(g->outputs);
+    cml_free(g->inputs);
+    cml_free(g->outputs);
 
-    free(model);
+    cml_free(model);
 }

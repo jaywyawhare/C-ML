@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 static uint32_t read_u32_be(FILE* f) {
     uint8_t b[4];
@@ -30,23 +31,23 @@ float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols) {
     *cols = (int)read_u32_be(f);
 
     int px = (*rows) * (*cols);
-    float* data = malloc(sizeof(float) * (*n) * px);
+    float* data = cml_malloc(sizeof(float) * (*n) * px);
     if (!data) { fclose(f); return NULL; }
 
-    uint8_t* buf = malloc(px);
-    if (!buf) { free(data); fclose(f); return NULL; }
+    uint8_t* buf = cml_malloc(px);
+    if (!buf) { cml_free(data); fclose(f); return NULL; }
 
     for (int i = 0; i < *n; i++) {
         if ((int)fread(buf, 1, px, f) != px) {
             LOG_ERROR("[idx] Truncated at image %d", i);
-            free(data); free(buf); fclose(f);
+            cml_free(data); cml_free(buf); fclose(f);
             return NULL;
         }
         for (int j = 0; j < px; j++)
             data[i * px + j] = buf[j] / 255.0f;
     }
 
-    free(buf);
+    cml_free(buf);
     fclose(f);
     LOG_INFO("[idx] Loaded %d images (%dx%d) from %s", *n, *rows, *cols, path);
     return data;
@@ -68,14 +69,14 @@ float* cml_idx_load_labels(const char* path, int* n) {
 
     *n = (int)read_u32_be(f);
 
-    float* data = malloc(sizeof(float) * (*n));
+    float* data = cml_malloc(sizeof(float) * (*n));
     if (!data) { fclose(f); return NULL; }
 
     for (int i = 0; i < *n; i++) {
         uint8_t label;
         if (fread(&label, 1, 1, f) != 1) {
             LOG_ERROR("[idx] Truncated at label %d", i);
-            free(data); fclose(f);
+            cml_free(data); fclose(f);
             return NULL;
         }
         data[i] = (float)label;

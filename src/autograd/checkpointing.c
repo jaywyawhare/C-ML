@@ -9,6 +9,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static bool checkpointing_enabled = false;
 
@@ -38,7 +39,7 @@ int autograd_checkpoint(Tensor* tensor) {
     if (num_checkpointed >= checkpointed_capacity) {
         int new_capacity = checkpointed_capacity == 0 ? 16 : checkpointed_capacity * 2;
         CheckpointedTensor** new_array =
-            realloc(checkpointed_tensors, (size_t)new_capacity * sizeof(CheckpointedTensor*));
+            cml_realloc(checkpointed_tensors, (size_t)new_capacity * sizeof(CheckpointedTensor*));
         if (!new_array)
             return -1;
 
@@ -46,7 +47,7 @@ int autograd_checkpoint(Tensor* tensor) {
         checkpointed_capacity = new_capacity;
     }
 
-    CheckpointedTensor* checkpoint = malloc(sizeof(CheckpointedTensor));
+    CheckpointedTensor* checkpoint = cml_malloc(sizeof(CheckpointedTensor));
     if (!checkpoint)
         return -1;
 
@@ -56,9 +57,9 @@ int autograd_checkpoint(Tensor* tensor) {
 
     if (tensor->ir_node && tensor->ir_node->inputs) {
         checkpoint->num_inputs   = tensor->ir_node->num_inputs;
-        checkpoint->saved_inputs = malloc((size_t)checkpoint->num_inputs * sizeof(Tensor*));
+        checkpoint->saved_inputs = cml_malloc((size_t)checkpoint->num_inputs * sizeof(Tensor*));
         if (!checkpoint->saved_inputs) {
-            free(checkpoint);
+            cml_free(checkpoint);
             return -1;
         }
         for (int i = 0; i < checkpoint->num_inputs; i++) {
@@ -332,12 +333,12 @@ void autograd_checkpointing_cleanup(void) {
         for (int i = 0; i < num_checkpointed; i++) {
             if (checkpointed_tensors[i]) {
                 if (checkpointed_tensors[i]->saved_inputs) {
-                    free(checkpointed_tensors[i]->saved_inputs);
+                    cml_free(checkpointed_tensors[i]->saved_inputs);
                 }
-                free(checkpointed_tensors[i]);
+                cml_free(checkpointed_tensors[i]);
             }
         }
-        free(checkpointed_tensors);
+        cml_free(checkpointed_tensors);
         checkpointed_tensors  = NULL;
         num_checkpointed      = 0;
         checkpointed_capacity = 0;

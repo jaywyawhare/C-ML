@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 CMLHCQQueue* cml_hcq_cuda_queue_create(void) {
     CMLCUDABackend* cuda = cml_dispatch_get_cuda_backend();
@@ -15,7 +16,7 @@ CMLHCQQueue* cml_hcq_cuda_queue_create(void) {
         return NULL;
     }
 
-    CMLHCQQueue* queue = (CMLHCQQueue*)calloc(1, sizeof(CMLHCQQueue));
+    CMLHCQQueue* queue = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
     if (!queue) {
         LOG_ERROR("CUDA HCQ: failed to allocate queue");
         return NULL;
@@ -27,7 +28,7 @@ CMLHCQQueue* cml_hcq_cuda_queue_create(void) {
     CUresult err = cuda->cuStreamCreate(&stream, 0);
     if (err != 0) {
         LOG_ERROR("CUDA HCQ: cuStreamCreate failed (CUresult=%d)", err);
-        free(queue);
+        cml_free(queue);
         return NULL;
     }
 
@@ -47,7 +48,7 @@ void cml_hcq_cuda_queue_destroy(CMLHCQQueue* queue) {
         }
     }
 
-    free(queue);
+    cml_free(queue);
 }
 
 int cml_hcq_cuda_submit_kernel(CMLHCQQueue* queue,
@@ -139,7 +140,7 @@ CMLHCQSignal* cml_hcq_cuda_signal_create(void) {
         return NULL;
     }
 
-    CMLHCQSignal* signal = (CMLHCQSignal*)calloc(1, sizeof(CMLHCQSignal));
+    CMLHCQSignal* signal = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
     if (!signal) {
         LOG_ERROR("CUDA HCQ: failed to allocate signal");
         return NULL;
@@ -151,7 +152,7 @@ CMLHCQSignal* cml_hcq_cuda_signal_create(void) {
     CUresult err = cuda->cuEventCreate(&event, 0);
     if (err != 0) {
         LOG_ERROR("CUDA HCQ: cuEventCreate failed (CUresult=%d)", err);
-        free(signal);
+        cml_free(signal);
         return NULL;
     }
 
@@ -171,7 +172,7 @@ void cml_hcq_cuda_signal_destroy(CMLHCQSignal* signal) {
         }
     }
 
-    free(signal);
+    cml_free(signal);
 }
 
 int cml_hcq_cuda_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {

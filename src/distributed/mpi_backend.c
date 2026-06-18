@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 /* MPI constants */
 #define CML_MPI_COMM_WORLD ((void*)0x44000000)
@@ -57,7 +58,7 @@ static int mpi_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     int mpi_op = mpi_op_to_const(op);
 
     float* sendbuf = (float*)tensor->data;
-    float* recvbuf = (float*)malloc(tensor->numel * sizeof(float));
+    float* recvbuf = (float*)cml_malloc(tensor->numel * sizeof(float));
     if (!recvbuf)
         return -1;
 
@@ -67,7 +68,7 @@ static int mpi_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     if (result == 0)
         memcpy(tensor->data, recvbuf, tensor->numel * sizeof(float));
 
-    free(recvbuf);
+    cml_free(recvbuf);
 
     if (op == DIST_REDUCE_AVG && result == 0) {
         float scale = 1.0f / (float)cml_dist_get_world_size();
@@ -104,7 +105,7 @@ static int mpi_allgather(Tensor** output, Tensor* input, void* ctx) {
     int world_size = cml_dist_get_world_size();
     int sendcount = (int)input->numel;
 
-    float* recvbuf = (float*)malloc((size_t)world_size * sendcount * sizeof(float));
+    float* recvbuf = (float*)cml_malloc((size_t)world_size * sendcount * sizeof(float));
     if (!recvbuf)
         return -1;
 
@@ -121,7 +122,7 @@ static int mpi_allgather(Tensor** output, Tensor* input, void* ctx) {
         }
     }
 
-    free(recvbuf);
+    cml_free(recvbuf);
     return result;
 }
 
@@ -135,7 +136,7 @@ static int mpi_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, vo
     int chunk_size = (int)(input->numel / (size_t)world_size);
     int mpi_op = mpi_op_to_const(op);
 
-    int* recvcounts = (int*)malloc((size_t)world_size * sizeof(int));
+    int* recvcounts = (int*)cml_malloc((size_t)world_size * sizeof(int));
     if (!recvcounts)
         return -1;
 
@@ -146,7 +147,7 @@ static int mpi_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, vo
                                           recvcounts, CML_MPI_FLOAT,
                                           mpi_op, CML_MPI_COMM_WORLD);
 
-    free(recvcounts);
+    cml_free(recvcounts);
 
     if (op == DIST_REDUCE_AVG && result == 0) {
         float scale = 1.0f / (float)world_size;
@@ -181,24 +182,24 @@ static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx)
     if (!mpi || !tensor || !tensor->data)
         return NULL;
 
-    DistWork* work = calloc(1, sizeof(DistWork));
+    DistWork* work = cml_calloc(1, sizeof(DistWork));
     if (!work)
         return NULL;
 
     int mpi_op = mpi_op_to_const(op);
 
     if (mpi->MPI_Iallreduce) {
-        float* recvbuf = (float*)malloc(tensor->numel * sizeof(float));
+        float* recvbuf = (float*)cml_malloc(tensor->numel * sizeof(float));
         if (!recvbuf) {
-            free(work);
+            cml_free(work);
             return NULL;
         }
 
         /* Allocate MPI_Request handle (opaque, typically pointer-sized) */
-        void* request = calloc(1, 128);
+        void* request = cml_calloc(1, 128);
         if (!request) {
-            free(recvbuf);
-            free(work);
+            cml_free(recvbuf);
+            cml_free(work);
             return NULL;
         }
 
@@ -207,9 +208,9 @@ static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx)
                                            mpi_op, CML_MPI_COMM_WORLD, request);
 
         if (result != 0) {
-            free(request);
-            free(recvbuf);
-            free(work);
+            cml_free(request);
+            cml_free(recvbuf);
+            cml_free(work);
             return NULL;
         }
 
@@ -267,7 +268,7 @@ static int mpi_wait(DistWork* work) {
         if (recvbuf && tensor && tensor->data && numel > 0)
             memcpy(tensor->data, recvbuf, numel * sizeof(float));
 
-        free(recvbuf);
+        cml_free(recvbuf);
     }
 
     work->completed = true;
@@ -307,7 +308,7 @@ static void mpi_destroy(void* ctx) {
     if (g_mpi_ctx == mpi)
         g_mpi_ctx = NULL;
 
-    free(mpi);
+    cml_free(mpi);
 }
 
 DistCommOps* cml_dist_create_mpi_backend(void) {
@@ -323,7 +324,7 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
         return NULL;
     }
 
-    MPIContext* mpi = calloc(1, sizeof(MPIContext));
+    MPIContext* mpi = cml_calloc(1, sizeof(MPIContext));
     if (!mpi) {
         dlclose(handle);
         return NULL;
@@ -348,17 +349,17 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
     if (!mpi->MPI_Allreduce) {
         LOG_WARNING("MPI loaded but missing MPI_Allreduce");
         dlclose(handle);
-        free(mpi);
+        cml_free(mpi);
         return NULL;
     }
 
     g_mpi_ctx = mpi;
 
-    DistCommOps* ops = calloc(1, sizeof(DistCommOps));
+    DistCommOps* ops = cml_calloc(1, sizeof(DistCommOps));
     if (!ops) {
         g_mpi_ctx = NULL;
         dlclose(handle);
-        free(mpi);
+        cml_free(mpi);
         return NULL;
     }
 

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     if (!float_tensor) {
@@ -23,7 +24,7 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
         return NULL;
     }
 
-    CMLNF4Tensor* nf4 = (CMLNF4Tensor*)calloc(1, sizeof(CMLNF4Tensor));
+    CMLNF4Tensor* nf4 = (CMLNF4Tensor*)cml_calloc(1, sizeof(CMLNF4Tensor));
     if (!nf4) {
         LOG_ERROR("cml_nf4_tensor_create: failed to allocate CMLNF4Tensor");
         return NULL;
@@ -34,10 +35,10 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     nf4->original_ndim = float_tensor->ndim;
 
     /* Copy original shape */
-    nf4->original_shape = (int*)malloc((size_t)float_tensor->ndim * sizeof(int));
+    nf4->original_shape = (int*)cml_malloc((size_t)float_tensor->ndim * sizeof(int));
     if (!nf4->original_shape) {
         LOG_ERROR("cml_nf4_tensor_create: failed to allocate shape copy");
-        free(nf4);
+        cml_free(nf4);
         return NULL;
     }
     memcpy(nf4->original_shape, float_tensor->shape,
@@ -49,8 +50,8 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     Tensor* packed = cml_quantize_nf4(float_tensor, block_size, &scales, &num_scales);
     if (!packed) {
         LOG_ERROR("cml_nf4_tensor_create: NF4 quantization failed");
-        free(nf4->original_shape);
-        free(nf4);
+        cml_free(nf4->original_shape);
+        cml_free(nf4);
         return NULL;
     }
 
@@ -69,14 +70,14 @@ void cml_nf4_tensor_free(CMLNF4Tensor* nf4) {
         nf4->packed_data = NULL;
     }
     if (nf4->scales) {
-        free(nf4->scales);
+        cml_free(nf4->scales);
         nf4->scales = NULL;
     }
     if (nf4->original_shape) {
-        free(nf4->original_shape);
+        cml_free(nf4->original_shape);
         nf4->original_shape = NULL;
     }
-    free(nf4);
+    cml_free(nf4);
 }
 
 Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
@@ -107,7 +108,7 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
             return NULL;
         }
 
-        int* shape_copy = (int*)malloc((size_t)nf4->original_ndim * sizeof(int));
+        int* shape_copy = (int*)cml_malloc((size_t)nf4->original_ndim * sizeof(int));
         if (!shape_copy) {
             tensor_free(flat);
             return NULL;
@@ -118,7 +119,7 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
         TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                                .has_dtype = true, .has_device = true};
         Tensor* reshaped = tensor_from_data(fdata, shape_copy, nf4->original_ndim, &config);
-        free(shape_copy);
+        cml_free(shape_copy);
         tensor_free(flat);
 
         if (!reshaped) {
@@ -154,7 +155,7 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
     int out_features = base_weight->shape[0];
     int in_features = base_weight->shape[1];
 
-    CMLQLoRALinear* qlora = (CMLQLoRALinear*)calloc(1, sizeof(CMLQLoRALinear));
+    CMLQLoRALinear* qlora = (CMLQLoRALinear*)cml_calloc(1, sizeof(CMLQLoRALinear));
     if (!qlora) {
         LOG_ERROR("cml_qlora_linear_create: failed to allocate CMLQLoRALinear");
         return NULL;
@@ -171,7 +172,7 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
     qlora->base_weight_nf4 = cml_nf4_tensor_create(base_weight, block_size);
     if (!qlora->base_weight_nf4) {
         LOG_ERROR("cml_qlora_linear_create: failed to quantize base weight to NF4");
-        free(qlora);
+        cml_free(qlora);
         return NULL;
     }
 
@@ -190,7 +191,7 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
     if (!qlora->lora_A) {
         LOG_ERROR("cml_qlora_linear_create: failed to allocate lora_A");
         cml_nf4_tensor_free(qlora->base_weight_nf4);
-        free(qlora);
+        cml_free(qlora);
         return NULL;
     }
     tensor_ensure_executed(qlora->lora_A);
@@ -212,7 +213,7 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
         LOG_ERROR("cml_qlora_linear_create: failed to allocate lora_B");
         tensor_free(qlora->lora_A);
         cml_nf4_tensor_free(qlora->base_weight_nf4);
-        free(qlora);
+        cml_free(qlora);
         return NULL;
     }
 
@@ -234,7 +235,7 @@ void cml_qlora_linear_free(CMLQLoRALinear* qlora) {
         tensor_free(qlora->lora_B);
         qlora->lora_B = NULL;
     }
-    free(qlora);
+    cml_free(qlora);
 }
 
 Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
@@ -326,7 +327,7 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
      * input: [batch, in_f], A: [rank, in_f] => tmp: [batch, rank]
      * tmp[b][r] = sum_i( input[b][i] * A[r][i] )
      */
-    float* tmp = (float*)calloc((size_t)batch * (size_t)r, sizeof(float));
+    float* tmp = (float*)cml_calloc((size_t)batch * (size_t)r, sizeof(float));
     if (!tmp) {
         LOG_ERROR("cml_qlora_linear_forward: failed to allocate temporary buffer");
         tensor_free(output);
@@ -360,7 +361,7 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
         }
     }
 
-    free(tmp);
+    cml_free(tmp);
     return output;
 }
 

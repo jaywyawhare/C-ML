@@ -6,6 +6,7 @@
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/gpu/wmma.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -23,37 +24,37 @@ static int tests_passed = 0;
 } while(0)
 
 static struct CMLGraph* make_empty_graph(void) {
-    struct CMLGraph* g = calloc(1, sizeof(struct CMLGraph));
+    struct CMLGraph* g = cml_calloc(1, sizeof(struct CMLGraph));
     if (!g) return NULL;
     g->target = IR_TARGET_CUDA;
     return g;
 }
 
 static struct IRNode* make_matmul_node(const char* name, int m, int n, int k) {
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     if (!node) return NULL;
 
     node->type = UOP_MATMUL;
     node->num_inputs = 2;
-    node->input_names = malloc(2 * sizeof(char*));
-    node->input_names[0] = strdup("input_a");
-    node->input_names[1] = strdup("input_b");
-    node->output_name = strdup(name);
+    node->input_names = cml_malloc(2 * sizeof(char*));
+    node->input_names[0] = cml_strdup("input_a");
+    node->input_names[1] = cml_strdup("input_b");
+    node->output_name = cml_strdup(name);
 
-    node->input_ndims = malloc(2 * sizeof(int));
+    node->input_ndims = cml_malloc(2 * sizeof(int));
     node->input_ndims[0] = 2;
     node->input_ndims[1] = 2;
 
-    node->input_shapes = malloc(2 * sizeof(int*));
-    node->input_shapes[0] = malloc(2 * sizeof(int));
+    node->input_shapes = cml_malloc(2 * sizeof(int*));
+    node->input_shapes[0] = cml_malloc(2 * sizeof(int));
     node->input_shapes[0][0] = m;
     node->input_shapes[0][1] = k;
-    node->input_shapes[1] = malloc(2 * sizeof(int));
+    node->input_shapes[1] = cml_malloc(2 * sizeof(int));
     node->input_shapes[1][0] = k;
     node->input_shapes[1][1] = n;
 
     node->output_ndim = 2;
-    node->output_shape = malloc(2 * sizeof(int));
+    node->output_shape = cml_malloc(2 * sizeof(int));
     node->output_shape[0] = m;
     node->output_shape[1] = n;
 
@@ -62,17 +63,17 @@ static struct IRNode* make_matmul_node(const char* name, int m, int n, int k) {
 
 static struct IRNode* make_simple_node(const char* name, UOpType type,
                                        int num_inputs, const char** input_names) {
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     if (!node) return NULL;
 
     node->type = type;
     node->num_inputs = num_inputs;
     if (num_inputs > 0) {
-        node->input_names = malloc((size_t)num_inputs * sizeof(char*));
+        node->input_names = cml_malloc((size_t)num_inputs * sizeof(char*));
         for (int i = 0; i < num_inputs; i++)
-            node->input_names[i] = strdup(input_names[i]);
+            node->input_names[i] = cml_strdup(input_names[i]);
     }
-    node->output_name = strdup(name);
+    node->output_name = cml_strdup(name);
     return node;
 }
 
@@ -94,23 +95,23 @@ static void free_graph(struct CMLGraph* g) {
         struct IRNode* next = n->next;
         if (n->input_names) {
             for (int i = 0; i < n->num_inputs; i++)
-                free(n->input_names[i]);
-            free(n->input_names);
+                cml_free(n->input_names[i]);
+            cml_free(n->input_names);
         }
         if (n->input_shapes) {
             for (int i = 0; i < n->num_inputs; i++)
-                free(n->input_shapes[i]);
-            free(n->input_shapes);
+                cml_free(n->input_shapes[i]);
+            cml_free(n->input_shapes);
         }
-        free(n->input_ndims);
-        free(n->output_name);
-        free(n->output_shape);
-        free(n->params);
-        free(n->users);
-        free(n);
+        cml_free(n->input_ndims);
+        cml_free(n->output_name);
+        cml_free(n->output_shape);
+        cml_free(n->params);
+        cml_free(n->users);
+        cml_free(n);
         n = next;
     }
-    free(g);
+    cml_free(g);
 }
 
 static int test_config_defaults(void) {
@@ -159,7 +160,7 @@ static int test_optimize_empty_graph(void) {
     struct CMLGraph* g = make_empty_graph();
     if (!g) return 0;
     int ret = cml_tc_optimize(g);
-    free(g);
+    cml_free(g);
     return ret == 0;
 }
 

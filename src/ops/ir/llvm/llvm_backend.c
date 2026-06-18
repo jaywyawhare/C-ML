@@ -21,6 +21,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
+#include "alloc/cml_allocator.h"
 
 struct CMLLLVMBackend {
     LLVMOrcLLJITRef jit;
@@ -39,7 +40,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
         g_llvm_targets_initialized = true;
     }
 
-    CMLLLVMBackend* b = calloc(1, sizeof(CMLLLVMBackend));
+    CMLLLVMBackend* b = cml_calloc(1, sizeof(CMLLLVMBackend));
     if (!b) return NULL;
 
     char* triple = LLVMGetDefaultTargetTriple();
@@ -49,7 +50,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
         LOG_ERROR("LLVM: Failed to get target: %s", err ? err : "unknown");
         LLVMDisposeMessage(err);
         LLVMDisposeMessage(triple);
-        free(b);
+        cml_free(b);
         return NULL;
     }
 
@@ -60,7 +61,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
 
     if (!b->tm) {
         LOG_ERROR("LLVM: Failed to create target machine");
-        free(b);
+        cml_free(b);
         return NULL;
     }
 
@@ -78,7 +79,7 @@ void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
     if (backend->tm) {
         LLVMDisposeTargetMachine(backend->tm);
     }
-    free(backend);
+    cml_free(backend);
 }
 
 // Emit a simple loop: for (i64 i = 0; i < n; i++) { body }

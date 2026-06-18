@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "alloc/cml_allocator.h"
 
 #define IBV_QPT_RC          2
 #define IBV_QPS_INIT        1
@@ -255,7 +256,7 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
         return NULL;
     }
 
-    CMLIBTransport* ib = calloc(1, sizeof(CMLIBTransport));
+    CMLIBTransport* ib = cml_calloc(1, sizeof(CMLIBTransport));
     if (!ib) {
         ib_api.destroy_cq(cq);
         ib_api.dealloc_pd(pd);
@@ -273,13 +274,13 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
     ib->num_peers = world_size - 1;
     ib->connected = false;
 
-    ib->qps = calloc((size_t)world_size, sizeof(void*));
+    ib->qps = cml_calloc((size_t)world_size, sizeof(void*));
     if (!ib->qps) {
         cml_ib_free(ib);
         return NULL;
     }
 
-    ib->qp_nums = calloc((size_t)world_size, sizeof(uint32_t));
+    ib->qp_nums = cml_calloc((size_t)world_size, sizeof(uint32_t));
     if (!ib->qp_nums) {
         cml_ib_free(ib);
         return NULL;
@@ -501,17 +502,17 @@ void cml_ib_free(CMLIBTransport* ib) {
         for (int i = 0; i < ib->world_size; i++) {
             if (ib->qps[i]) ib_api.destroy_qp(ib->qps[i]);
         }
-        free(ib->qps);
+        cml_free(ib->qps);
     }
 
-    free(ib->qp_nums);
+    cml_free(ib->qp_nums);
 
     if (ib->cq) ib_api.destroy_cq(ib->cq);
     if (ib->pd) ib_api.dealloc_pd(ib->pd);
     if (ib->ib_ctx) ib_api.close_device(ib->ib_ctx);
     if (ib->ib_lib) dlclose(ib->ib_lib);
 
-    free(ib);
+    cml_free(ib);
 }
 
 static int poll_completion(CMLIBTransport* ib, int timeout_ms) {
@@ -627,7 +628,7 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
     int left  = (rank - 1 + ws) % ws;
     int right = (rank + 1) % ws;
 
-    float* recv_buf = malloc(chunk_bytes);
+    float* recv_buf = cml_malloc(chunk_bytes);
     if (!recv_buf) return -1;
 
     float* data = (float*)buf;
@@ -673,7 +674,7 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
             cml_ib_recv(ib, left, data + recv_off, rc * (size_t)elem_size);
     }
 
-    free(recv_buf);
+    cml_free(recv_buf);
     return 0;
 }
 
@@ -701,7 +702,7 @@ CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size)
         return NULL;
     }
 
-    CMLIBMemReg* reg = calloc(1, sizeof(CMLIBMemReg));
+    CMLIBMemReg* reg = cml_calloc(1, sizeof(CMLIBMemReg));
     if (!reg) {
         ib_api.dereg_mr(mr);
         return NULL;
@@ -720,5 +721,5 @@ void cml_ib_deregister_memory(CMLIBTransport* ib, CMLIBMemReg* reg) {
     (void)ib;
     if (!reg) return;
     if (reg->mr) ib_api.dereg_mr(reg->mr);
-    free(reg);
+    cml_free(reg);
 }

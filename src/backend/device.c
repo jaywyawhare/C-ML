@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#include "alloc/cml_allocator.h"
+
 #ifdef __linux__
 #include <dlfcn.h>
 #define CML_DLOPEN(path, mode) dlopen(path, mode)
@@ -465,7 +467,7 @@ void* device_alloc(size_t size, DeviceType device) {
 
     switch (device) {
     case DEVICE_CPU:
-        ptr = malloc(size);
+        ptr = cml_malloc(size);
         if (!ptr) {
             LOG_ERROR("Failed to allocate %zu bytes on CPU", size);
         }
@@ -480,7 +482,7 @@ void* device_alloc(size_t size, DeviceType device) {
             }
         } else {
             LOG_WARNING("CUDA not available, falling back to CPU");
-            ptr = malloc(size);
+            ptr = cml_malloc(size);
         }
         break;
 
@@ -501,11 +503,11 @@ void* device_alloc(size_t size, DeviceType device) {
             }
         } else {
             LOG_WARNING("Metal not available, falling back to CPU");
-            ptr = malloc(size);
+            ptr = cml_malloc(size);
         }
 #else
         LOG_WARNING("Metal not available on this platform, falling back to CPU");
-        ptr = malloc(size);
+        ptr = cml_malloc(size);
 #endif
         break;
 
@@ -523,7 +525,7 @@ void* device_alloc(size_t size, DeviceType device) {
             } else {
                 LOG_WARNING("ROCm library not loaded, falling back to CPU");
             }
-            ptr = malloc(size);
+            ptr = cml_malloc(size);
         }
         break;
 
@@ -535,7 +537,7 @@ void* device_alloc(size_t size, DeviceType device) {
                           g_sim_gpu_current, size, dev->allocated, dev->total_memory);
                 return NULL;
             }
-            ptr = malloc(size);
+            ptr = cml_malloc(size);
             if (ptr) {
                 dev->allocated += size;
                 LOG_DEBUG("SimGPU[%d]: allocated %zu bytes (%zu/%zu used)",
@@ -543,7 +545,7 @@ void* device_alloc(size_t size, DeviceType device) {
             }
         } else {
             LOG_WARNING("SimGPU not available, falling back to CPU");
-            ptr = malloc(size);
+            ptr = cml_malloc(size);
         }
         break;
 
@@ -552,7 +554,7 @@ void* device_alloc(size_t size, DeviceType device) {
 
     default:
         LOG_ERROR("Unknown device type: %d", device);
-        ptr = malloc(size);
+        ptr = cml_malloc(size);
         break;
     }
 
@@ -566,7 +568,7 @@ void device_free(void* ptr, DeviceType device) {
 
     switch (device) {
     case DEVICE_CPU:
-        free(ptr);
+        cml_free(ptr);
         break;
 
     case DEVICE_CUDA:
@@ -576,17 +578,17 @@ void device_free(void* ptr, DeviceType device) {
                 LOG_ERROR("Failed to free CUDA memory");
             }
         } else {
-            free(ptr);
+            cml_free(ptr);
         }
         break;
 
     case DEVICE_METAL:
 #ifdef __APPLE__
         if (ptr) {
-            free(ptr);
+            cml_free(ptr);
                 }
 #else
-        free(ptr);
+        cml_free(ptr);
 #endif
         break;
 
@@ -598,12 +600,12 @@ void device_free(void* ptr, DeviceType device) {
             } else {
             }
         } else {
-            free(ptr);
+            cml_free(ptr);
         }
         break;
 
     case DEVICE_SIM_GPU:
-        free(ptr);
+        cml_free(ptr);
         break;
 
     case DEVICE_AUTO:
@@ -611,7 +613,7 @@ void device_free(void* ptr, DeviceType device) {
         break;
 
     default:
-        free(ptr);
+        cml_free(ptr);
         break;
     }
 }
@@ -700,7 +702,7 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
         memcpy(dst, src, size);
         return 0;
     } else {
-        void* staging = malloc(size);
+        void* staging = cml_malloc(size);
         if (!staging) {
             LOG_ERROR("Failed to allocate staging buffer for device copy");
             return -1;
@@ -708,12 +710,12 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
 
         int result1 = device_copy(staging, src, size, DEVICE_CPU, src_device);
         if (result1 != 0) {
-            free(staging);
+            cml_free(staging);
             return -1;
         }
 
         int result2 = device_copy(dst, staging, size, dst_device, DEVICE_CPU);
-        free(staging);
+        cml_free(staging);
 
         return (result2 == 0) ? 0 : -1;
     }

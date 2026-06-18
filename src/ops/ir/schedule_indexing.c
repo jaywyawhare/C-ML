@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 IndexMap* index_map_create(SymExpr* flat_index, SymExpr* valid, int num_vars) {
     if (!flat_index) return NULL;
-    IndexMap* im = calloc(1, sizeof(IndexMap));
+    IndexMap* im = cml_calloc(1, sizeof(IndexMap));
     if (!im) return NULL;
     sym_expr_retain(flat_index);
     im->flat_index = flat_index;
@@ -22,7 +23,7 @@ void index_map_free(IndexMap* im) {
     if (!im) return;
     sym_expr_release(im->flat_index);
     if (im->valid) sym_expr_release(im->valid);
-    free(im);
+    cml_free(im);
 }
 
 IndexMap* index_map_copy(const IndexMap* im) {
@@ -32,7 +33,7 @@ IndexMap* index_map_copy(const IndexMap* im) {
 
 LoopVar* loop_vars_create(const int* shape, int n) {
     if (!shape || n <= 0) return NULL;
-    LoopVar* vars = malloc((size_t)n * sizeof(LoopVar));
+    LoopVar* vars = cml_malloc((size_t)n * sizeof(LoopVar));
     if (!vars) return NULL;
     for (int i = 0; i < n; ++i) {
         char name[16];
@@ -42,7 +43,7 @@ LoopVar* loop_vars_create(const int* shape, int n) {
         vars[i].end   = shape[i];
         if (!vars[i].expr) {
             for (int j = 0; j < i; ++j) sym_expr_release(vars[j].expr);
-            free(vars);
+            cml_free(vars);
             return NULL;
         }
     }
@@ -53,7 +54,7 @@ void loop_vars_free(LoopVar* vars, int n) {
     if (!vars) return;
     for (int i = 0; i < n; ++i)
         sym_expr_release(vars[i].expr);
-    free(vars);
+    cml_free(vars);
 }
 
 static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars) {

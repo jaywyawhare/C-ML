@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
     ConvTranspose2d* layer = (ConvTranspose2d*)module;
@@ -47,7 +48,7 @@ static void conv_transpose2d_free(Module* module) {
     ConvTranspose2d* layer = (ConvTranspose2d*)module;
     if (!layer)
         return;
-    free(layer);
+    cml_free(layer);
 }
 
 static void kaiming_init_transpose(Tensor* tensor, int in_channels, int kernel_size) {
@@ -69,13 +70,13 @@ static void kaiming_init_transpose(Tensor* tensor, int in_channels, int kernel_s
 ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
                                       int stride, int padding, int output_padding,
                                       bool use_bias, DType dtype, DeviceType device) {
-    ConvTranspose2d* layer = malloc(sizeof(ConvTranspose2d));
+    ConvTranspose2d* layer = cml_malloc(sizeof(ConvTranspose2d));
     if (!layer)
         return NULL;
 
     if (module_init((Module*)layer, "ConvTranspose2d", conv_transpose2d_forward,
                     conv_transpose2d_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 

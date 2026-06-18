@@ -3,6 +3,7 @@
 #include "tensor/tensor.h"
 #include "ops/uops.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* prelu_forward(Module* module, Tensor* input) {
     PReLU* prelu = (PReLU*)module;
@@ -25,18 +26,18 @@ static Tensor* prelu_forward(Module* module, Tensor* input) {
 }
 
 static void prelu_free(Module* module) {
-    free(module);
+    cml_free(module);
 }
 
 PReLU* nn_prelu(int num_parameters, float init, DType dtype, DeviceType device) {
     if (num_parameters <= 0) num_parameters = 1;
     if (init == 0.0f) init = 0.25f;
 
-    PReLU* prelu = malloc(sizeof(PReLU));
+    PReLU* prelu = cml_malloc(sizeof(PReLU));
     if (!prelu) return NULL;
 
     if (module_init((Module*)prelu, "PReLU", prelu_forward, prelu_free) != 0) {
-        free(prelu);
+        cml_free(prelu);
         return NULL;
     }
 

@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "cml.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -79,8 +80,8 @@ static int test_model_save_load(void) {
 
     printf("(params_match=%s) ", ok ? "yes" : "no");
 
-    if (orig_params) free(orig_params);
-    if (loaded_params) free(loaded_params);
+    if (orig_params) cml_free(orig_params);
+    if (loaded_params) cml_free(loaded_params);
     module_free((Module*)model);
     module_free((Module*)loaded);
     unlink(filepath);
@@ -98,7 +99,7 @@ static int test_checkpoint_save_load(void) {
     module_collect_parameters((Module*)model, &params, &num_params, true);
 
     Optimizer* opt = cml_optim_sgd(params, num_params, 0.01f, 0.0f, 0.0f);
-    if (!opt) { free(params); module_free((Module*)model); return 0; }
+    if (!opt) { cml_free(params); module_free((Module*)model); return 0; }
 
     int save_epoch = 5;
     float save_loss = 0.123f;
@@ -106,7 +107,7 @@ static int test_checkpoint_save_load(void) {
     int ret = model_save_checkpoint((Module*)model, opt, save_epoch, save_loss, filepath);
     if (ret != 0) {
         printf("(checkpoint save failed) ");
-        optimizer_free(opt); free(params); module_free((Module*)model);
+        optimizer_free(opt); cml_free(params); module_free((Module*)model);
         return 0;
     }
 
@@ -127,7 +128,7 @@ static int test_checkpoint_save_load(void) {
     if (ret != 0) {
         printf("(checkpoint load failed) ");
         optimizer_free(opt); optimizer_free(loaded_opt);
-        free(params); free(loaded_params);
+        cml_free(params); cml_free(loaded_params);
         module_free((Module*)model); module_free((Module*)loaded);
         unlink(filepath);
         return 0;
@@ -137,7 +138,7 @@ static int test_checkpoint_save_load(void) {
     int ok = (load_epoch == save_epoch) && APPROX_EQ(load_loss, save_loss);
 
     optimizer_free(opt); optimizer_free(loaded_opt);
-    free(params); free(loaded_params);
+    cml_free(params); cml_free(loaded_params);
     module_free((Module*)model); module_free((Module*)loaded);
     unlink(filepath);
     return ok;

@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+#include "alloc/cml_allocator.h"
 
 #define HTTP_BUF_SIZE  (256 * 1024)
 #define MAX_MESSAGES   64
@@ -238,7 +239,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
         int* prompt_tokens = cml_tokenizer_encode(tokenizer, prompt, &num_prompt_tokens);
         if (!prompt_tokens || num_prompt_tokens == 0) {
             send_sse_chunk(fd, "[DONE]");
-            free(prompt_tokens);
+            cml_free(prompt_tokens);
             return;
         }
 
@@ -284,7 +285,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
                      escaped);
 
             send_sse_chunk(fd, chunk_json);
-            free(token_text);
+            cml_free(token_text);
             total_generated++;
         }
 
@@ -299,7 +300,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
         send_sse_chunk(fd, done_json);
         send_sse_chunk(fd, "[DONE]");
 
-        free(prompt_tokens);
+        cml_free(prompt_tokens);
     } else {
         CMLGenerationResult* result = cml_llama_generate(model, prompt, &gen_config);
         if (!result || !result->text) {
@@ -325,7 +326,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
 
         int prompt_tokens_count = 0;
         int* pt = cml_tokenizer_encode(tokenizer, prompt, &prompt_tokens_count);
-        free(pt);
+        cml_free(pt);
 
         char resp[65536];
         snprintf(resp, sizeof(resp),
@@ -385,7 +386,7 @@ static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
 CMLOpenAIServer* cml_openai_server_create(int port) {
     if (port <= 0) return NULL;
 
-    CMLOpenAIServer* srv = (CMLOpenAIServer*)calloc(1, sizeof(CMLOpenAIServer));
+    CMLOpenAIServer* srv = (CMLOpenAIServer*)cml_calloc(1, sizeof(CMLOpenAIServer));
     if (!srv) return NULL;
 
     srv->port = port;
@@ -462,7 +463,7 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
     LOG_INFO("  GET  /v1/models");
     LOG_INFO("  GET  /health");
 
-    char* buf = (char*)malloc(HTTP_BUF_SIZE);
+    char* buf = (char*)cml_malloc(HTTP_BUF_SIZE);
     if (!buf) {
         LOG_ERROR("openai_api: buffer allocation failed");
         return -1;
@@ -490,7 +491,7 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
         close(client_fd);
     }
 
-    free(buf);
+    cml_free(buf);
     return 0;
 }
 
@@ -511,5 +512,5 @@ void cml_openai_server_free(CMLOpenAIServer* srv) {
     if (srv->model) {
         cml_llama_free((CMLLLaMAModel*)srv->model);
     }
-    free(srv);
+    cml_free(srv);
 }

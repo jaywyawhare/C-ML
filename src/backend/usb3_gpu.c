@@ -11,6 +11,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <linux/usbdevice_fs.h>
+#include "alloc/cml_allocator.h"
 
 #define ASM2464PD_VENDOR     0x174c
 #define ASM2464PD_PRODUCT    0x2362
@@ -145,7 +146,7 @@ CMLUSB3GPU* cml_usb3_gpu_open(void) {
         return NULL;
     }
 
-    CMLUSB3GPU* dev = (CMLUSB3GPU*)calloc(1, sizeof(CMLUSB3GPU));
+    CMLUSB3GPU* dev = (CMLUSB3GPU*)cml_calloc(1, sizeof(CMLUSB3GPU));
     if (!dev) {
         usb3_release_interface(fd, 0);
         close(fd);
@@ -164,11 +165,11 @@ CMLUSB3GPU* cml_usb3_gpu_open(void) {
     dev->ep_out = DEFAULT_EP_OUT;
 
     dev->bulk_buf_size = USB3_BULK_BUF_SIZE;
-    dev->bulk_buf = (uint8_t*)malloc(dev->bulk_buf_size);
+    dev->bulk_buf = (uint8_t*)cml_malloc(dev->bulk_buf_size);
     if (!dev->bulk_buf) {
         usb3_release_interface(fd, 0);
         close(fd);
-        free(dev);
+        cml_free(dev);
         return NULL;
     }
 
@@ -189,8 +190,8 @@ void cml_usb3_gpu_close(CMLUSB3GPU* dev) {
         close(dev->fd);
     }
 
-    free(dev->bulk_buf);
-    free(dev);
+    cml_free(dev->bulk_buf);
+    cml_free(dev);
 }
 
 int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len,

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGradFn zero_grad) {
     if (!optimizer || !name || !step || !zero_grad)
@@ -36,7 +37,7 @@ int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGrad
 }
 
 Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad) {
-    Optimizer* optimizer = malloc(sizeof(Optimizer));
+    Optimizer* optimizer = cml_malloc(sizeof(Optimizer));
     if (!optimizer) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Optimizer",
                          __FILE__, __LINE__, __func__);
@@ -46,7 +47,7 @@ Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad)
     if (optimizer_init(optimizer, name, step, zero_grad) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Optimizer", __FILE__, __LINE__,
                          __func__);
-        free(optimizer);
+        cml_free(optimizer);
         return NULL;
     }
 
@@ -92,13 +93,13 @@ typedef struct MuonState {
 typedef void (*StateInitFn)(void* state, Tensor* tensor, TensorConfig* config);
 
 static void* optimizer_alloc_state(ParameterGroup* group, size_t state_size, StateInitFn init_fn) {
-    void** states = malloc((size_t)group->num_parameters * sizeof(void*));
+    void** states = cml_malloc((size_t)group->num_parameters * sizeof(void*));
     if (!states) return NULL;
     memset(states, 0, (size_t)group->num_parameters * sizeof(void*));
     for (int i = 0; i < group->num_parameters; i++) {
         Parameter* param = group->parameters[i];
         if (!param || !param->tensor) continue;
-        void* state = calloc(1, state_size);
+        void* state = cml_calloc(1, state_size);
         if (!state) continue;
         TensorConfig config = {.dtype = param->tensor->dtype, .device = param->tensor->device,
                                .has_dtype = true, .has_device = true};
@@ -173,7 +174,7 @@ void optimizer_free(Optimizer* optimizer) {
         for (int i = 0; i < optimizer->num_param_groups; i++) {
             ParameterGroup* group = &optimizer->param_groups[i];
             if (group->parameters) {
-                free(group->parameters);
+                cml_free(group->parameters);
             }
             if (group->state) {
                 if (strcmp(optimizer->name, "SGD") == 0) {
@@ -183,10 +184,10 @@ void optimizer_free(Optimizer* optimizer) {
                             if (states[j]->momentum_buffer) {
                                 tensor_free(states[j]->momentum_buffer);
                             }
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "Adam") == 0) {
                     AdamState** states = (AdamState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
@@ -197,30 +198,30 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->exp_avg_sq);
                             if (states[j]->max_exp_avg_sq)
                                 tensor_free(states[j]->max_exp_avg_sq);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "RMSprop") == 0) {
                     RMSpropState** states = (RMSpropState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
                             if (states[j]->square_avg)
                                 tensor_free(states[j]->square_avg);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "Adagrad") == 0) {
                     AdagradState** states = (AdagradState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
                             if (states[j]->sum_sq_grad)
                                 tensor_free(states[j]->sum_sq_grad);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "AdamW") == 0) {
                     AdamState** states = (AdamState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
@@ -231,10 +232,10 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->exp_avg_sq);
                             if (states[j]->max_exp_avg_sq)
                                 tensor_free(states[j]->max_exp_avg_sq);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "AdaDelta") == 0) {
                     AdaDeltaState** states = (AdaDeltaState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
@@ -243,10 +244,10 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->acc_grad);
                             if (states[j]->acc_update)
                                 tensor_free(states[j]->acc_update);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "LAMB") == 0) {
                     LAMBState** states = (LAMBState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
@@ -255,30 +256,30 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->exp_avg);
                             if (states[j]->exp_avg_sq)
                                 tensor_free(states[j]->exp_avg_sq);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "Muon") == 0) {
                     MuonState** states = (MuonState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
                             if (states[j]->momentum_buffer)
                                 tensor_free(states[j]->momentum_buffer);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "LARS") == 0) {
                     LARSState** states = (LARSState**)group->state;
                     for (int j = 0; j < group->num_parameters; j++) {
                         if (states[j]) {
                             if (states[j]->momentum_buffer)
                                 tensor_free(states[j]->momentum_buffer);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else if (strcmp(optimizer->name, "Nadam") == 0 ||
                            strcmp(optimizer->name, "AdaMax") == 0) {
                     AdamState** states = (AdamState**)group->state;
@@ -290,20 +291,20 @@ void optimizer_free(Optimizer* optimizer) {
                                 tensor_free(states[j]->exp_avg_sq);
                             if (states[j]->max_exp_avg_sq)
                                 tensor_free(states[j]->max_exp_avg_sq);
-                            free(states[j]);
+                            cml_free(states[j]);
                         }
                     }
-                    free(states);
+                    cml_free(states);
                 } else {
                     // Generic state cleanup
-                    free(group->state);
+                    cml_free(group->state);
                 }
             }
         }
-        free(optimizer->param_groups);
+        cml_free(optimizer->param_groups);
     }
 
-    free(optimizer);
+    cml_free(optimizer);
 }
 
 int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int num_parameters,
@@ -317,7 +318,7 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
         int new_capacity =
             optimizer->param_groups_capacity == 0 ? 4 : optimizer->param_groups_capacity * 2;
         ParameterGroup* new_groups =
-            realloc(optimizer->param_groups, (size_t)new_capacity * sizeof(ParameterGroup));
+            cml_realloc(optimizer->param_groups, (size_t)new_capacity * sizeof(ParameterGroup));
         if (!new_groups) {
             LOG_ERROR("Failed to allocate memory for parameter groups");
             return -1;
@@ -328,7 +329,7 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
 
     ParameterGroup* group = &optimizer->param_groups[optimizer->num_param_groups];
 
-    group->parameters = malloc((size_t)num_parameters * sizeof(Parameter*));
+    group->parameters = cml_malloc((size_t)num_parameters * sizeof(Parameter*));
     if (!group->parameters) {
         LOG_ERROR("Failed to allocate memory for parameter group parameters");
         return -1;
@@ -1114,7 +1115,7 @@ Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, flo
     }
 
     Optimizer* optimizer = optim_adam(params, num_params, lr, weight_decay, beta1, beta2, eps);
-    free(params);
+    cml_free(params);
 
     if (optimizer) {
         extern void cml_track_optimizer(Optimizer*);
@@ -1400,7 +1401,7 @@ static void muon_step(Optimizer* optimizer) {
             for (size_t j = 0; j < numel; j++)
                 momentum_data[j] = momentum_val * momentum_data[j] + grad_data[j];
 
-            float* update = malloc(numel * sizeof(float));
+            float* update = cml_malloc(numel * sizeof(float));
             if (!update) continue;
 
             if (nesterov) {
@@ -1415,7 +1416,7 @@ static void muon_step(Optimizer* optimizer) {
             for (size_t j = 0; j < numel; j++)
                 param_data[j] -= lr * update[j];
 
-            free(update);
+            cml_free(update);
         }
 
         group->step_count++;
@@ -1592,7 +1593,7 @@ Optimizer* optim_sgd_for_model(Module* model, float lr, float momentum, float we
     }
 
     Optimizer* optimizer = optim_sgd(params, num_params, lr, momentum, weight_decay);
-    free(params);
+    cml_free(params);
 
     return optimizer;
 }

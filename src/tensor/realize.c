@@ -5,6 +5,7 @@
 #include "tensor/tensor.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 bool tensor_is_realized(const Tensor* t) {
     return t != NULL && t->data != NULL;
@@ -27,7 +28,7 @@ int tensor_realize(Tensor* t) {
      * by cml_graph_cache_reset_global() / cml_ir_reset_global_context(). */
     if (t->data && !t->owns_data) {
         size_t nbytes = t->numel * cml_dtype_size(t->dtype);
-        void* owned = malloc(nbytes);
+        void* owned = cml_malloc(nbytes);
         if (owned) {
             memcpy(owned, t->data, nbytes);
             t->data      = owned;
@@ -62,7 +63,7 @@ int tensor_realize_all(Tensor** tensors, int num_tensors) {
 
 void tensor_unrealize(Tensor* t) {
     if (!t || !t->data) return;
-    if (t->owns_data) free(t->data);
+    if (t->owns_data) cml_free(t->data);
     t->data        = NULL;
     t->is_executed = false;
     t->owns_data   = false;

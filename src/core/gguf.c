@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define GGUF_VERSION 3
 #define MAX_TENSORS 4096
@@ -59,9 +60,9 @@ static char* read_gguf_string(FILE* f) {
     uint64_t len;
     if (fread(&len, 8, 1, f) != 1) return NULL;
     if (len > 65536) return NULL;
-    char* str = malloc(len + 1);
+    char* str = cml_malloc(len + 1);
     if (!str) return NULL;
-    if (fread(str, 1, len, f) != len) { free(str); return NULL; }
+    if (fread(str, 1, len, f) != len) { cml_free(str); return NULL; }
     str[len] = '\0';
     return str;
 }
@@ -87,7 +88,7 @@ static void skip_gguf_value(FILE* f, uint32_t type) {
         case GGUF_TYPE_FLOAT64: fseek(f, 8, SEEK_CUR); break;
         case GGUF_TYPE_STRING: {
             char* s = read_gguf_string(f);
-            free(s);
+            cml_free(s);
             break;
         }
         case GGUF_TYPE_ARRAY: {
@@ -123,23 +124,23 @@ GGUFContext* gguf_open_read(const char* filepath) {
     if (fread(&num_tensors, 8, 1, f) != 1) { fclose(f); return NULL; }
     if (fread(&num_metadata, 8, 1, f) != 1) { fclose(f); return NULL; }
 
-    GGUFContext* ctx = calloc(1, sizeof(GGUFContext));
+    GGUFContext* ctx = cml_calloc(1, sizeof(GGUFContext));
     if (!ctx) { fclose(f); return NULL; }
     ctx->file = f;
-    ctx->filepath = strdup(filepath);
+    ctx->filepath = cml_strdup(filepath);
     ctx->is_write = false;
     ctx->num_tensors = (int)num_tensors;
     ctx->num_metadata = (int)num_metadata;
 
     for (uint64_t i = 0; i < num_metadata; i++) {
         char* key = read_gguf_string(f);
-        free(key);
+        cml_free(key);
         uint32_t val_type;
         if (fread(&val_type, 4, 1, f) != 1) break;
         skip_gguf_value(f, val_type);
     }
 
-    ctx->tensors = calloc(num_tensors, sizeof(GGUFTensorInfo));
+    ctx->tensors = cml_calloc(num_tensors, sizeof(GGUFTensorInfo));
     if (!ctx->tensors) { gguf_close(ctx); return NULL; }
 
     for (uint64_t i = 0; i < num_tensors; i++) {
@@ -179,13 +180,13 @@ GGUFContext* gguf_open_read(const char* filepath) {
 }
 
 GGUFContext* gguf_open_write(const char* filepath) {
-    GGUFContext* ctx = calloc(1, sizeof(GGUFContext));
+    GGUFContext* ctx = cml_calloc(1, sizeof(GGUFContext));
     if (!ctx) return NULL;
-    ctx->filepath = strdup(filepath);
+    ctx->filepath = cml_strdup(filepath);
     ctx->is_write = true;
-    ctx->tensors = calloc(MAX_TENSORS, sizeof(GGUFTensorInfo));
+    ctx->tensors = cml_calloc(MAX_TENSORS, sizeof(GGUFTensorInfo));
     ctx->write_data_cap = 4096;
-    ctx->write_data = malloc(ctx->write_data_cap);
+    ctx->write_data = cml_malloc(ctx->write_data_cap);
     if (!ctx->tensors || !ctx->write_data) { gguf_close(ctx); return NULL; }
     return ctx;
 }
@@ -231,13 +232,13 @@ void gguf_close(GGUFContext* ctx) {
     if (ctx->file) fclose(ctx->file);
     if (ctx->tensors) {
         for (int i = 0; i < ctx->num_tensors || i < ctx->write_count; i++) {
-            free(ctx->tensors[i].name);
+            cml_free(ctx->tensors[i].name);
         }
-        free(ctx->tensors);
+        cml_free(ctx->tensors);
     }
-    free(ctx->filepath);
-    free(ctx->write_data);
-    free(ctx);
+    cml_free(ctx->filepath);
+    cml_free(ctx->write_data);
+    cml_free(ctx);
 }
 
 int gguf_get_num_tensors(GGUFContext* ctx) {
@@ -270,27 +271,27 @@ Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
 
     if (gguf_type_is_quantized(info->type)) {
         /* Quantized: read raw block data, dequantize to float32 */
-        void* raw = malloc(info->data_size);
+        void* raw = cml_malloc(info->data_size);
         if (!raw) return NULL;
 
         fseek(ctx->file, (long)(ctx->data_offset + info->offset), SEEK_SET);
         if (fread(raw, 1, info->data_size, ctx->file) != info->data_size) {
-            free(raw);
+            cml_free(raw);
             return NULL;
         }
 
         TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                                .has_dtype = true, .has_device = true};
         Tensor* t = tensor_empty(shape, info->ndim, &config);
-        if (!t) { free(raw); return NULL; }
+        if (!t) { cml_free(raw); return NULL; }
         tensor_ensure_executed(t);
 
         if (gguf_dequantize(info->type, raw, (float*)t->data, numel) != 0) {
-            free(raw);
+            cml_free(raw);
             tensor_free(t);
             return NULL;
         }
-        free(raw);
+        cml_free(raw);
         return t;
     }
 
@@ -320,12 +321,12 @@ int gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor) {
 
     while (ctx->write_data_size + data_size > ctx->write_data_cap) {
         ctx->write_data_cap *= 2;
-        ctx->write_data = realloc(ctx->write_data, ctx->write_data_cap);
+        ctx->write_data = cml_realloc(ctx->write_data, ctx->write_data_cap);
         if (!ctx->write_data) return -1;
     }
 
     GGUFTensorInfo* info = &ctx->tensors[ctx->write_count];
-    info->name = strdup(name);
+    info->name = cml_strdup(name);
     info->ndim = tensor->ndim;
     for (int d = 0; d < tensor->ndim; d++) info->shape[d] = tensor->shape[d];
     info->type = dtype_to_gguf_type(tensor->dtype);

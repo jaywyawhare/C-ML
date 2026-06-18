@@ -225,6 +225,7 @@ static BackendOps scalar_ops = {.matmul     = scalar_matmul,
 #ifdef __SSE__
 #include <immintrin.h>
 #include <emmintrin.h>
+#include "alloc/cml_allocator.h"
 
 static void simd_add(const void* a, const void* b, void* out, size_t n, DType dtype) {
     if (!a || !b || !out || n == 0) {
@@ -551,13 +552,13 @@ int backend_init(BackendType type) {
 
     if (g_current_backend) {
         if (g_current_backend->context) {
-            free(g_current_backend->context);
+            cml_free(g_current_backend->context);
         }
-        free(g_current_backend);
+        cml_free(g_current_backend);
         g_current_backend = NULL;
     }
 
-    g_current_backend = malloc(sizeof(Backend));
+    g_current_backend = cml_malloc(sizeof(Backend));
     if (!g_current_backend) {
         backend_unlock();
         LOG_ERROR("Failed to allocate backend");
@@ -685,9 +686,9 @@ void backend_cleanup(void) {
     backend_lock();
     if (g_current_backend) {
         if (g_current_backend->context) {
-            free(g_current_backend->context);
+            cml_free(g_current_backend->context);
         }
-        free(g_current_backend);
+        cml_free(g_current_backend);
         g_current_backend = NULL;
     }
     backend_unlock();

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double get_time_sec(void) {
 #if defined(__linux__) || defined(__APPLE__)
@@ -28,7 +29,7 @@ static void naive_sgemm(const float* A, const float* B, float* C, int N) {
 }
 
 static float* alloc_random(int n) {
-    float* p = malloc((size_t)n * sizeof(float));
+    float* p = cml_malloc((size_t)n * sizeof(float));
     for (int i = 0; i < n; i++)
         p[i] = (float)rand() / (float)RAND_MAX - 0.5f;
     return p;
@@ -51,7 +52,7 @@ static BenchResult bench_naive(int N, int iters) {
     int n2   = N * N;
     float* A = alloc_random(n2);
     float* B = alloc_random(n2);
-    float* C = calloc((size_t)n2, sizeof(float));
+    float* C = cml_calloc((size_t)n2, sizeof(float));
 
     naive_sgemm(A, B, C, N);
 
@@ -60,9 +61,9 @@ static BenchResult bench_naive(int N, int iters) {
         naive_sgemm(A, B, C, N);
     double elapsed = get_time_sec() - start;
 
-    free(A);
-    free(B);
-    free(C);
+    cml_free(A);
+    cml_free(B);
+    cml_free(C);
     double flop = gemm_flops(N) * iters;
     return (BenchResult){.gflops = flop / elapsed / 1e9, .time_ms = elapsed / iters * 1e3};
 }
@@ -71,7 +72,7 @@ static BenchResult bench_blas(CMLBlasContext* blas, int N, int iters) {
     int n2   = N * N;
     float* A = alloc_random(n2);
     float* B = alloc_random(n2);
-    float* C = calloc((size_t)n2, sizeof(float));
+    float* C = cml_calloc((size_t)n2, sizeof(float));
 
     cml_blas_sgemm(blas, A, B, C, N, N, N, 1.0f, 0.0f);
 
@@ -80,9 +81,9 @@ static BenchResult bench_blas(CMLBlasContext* blas, int N, int iters) {
         cml_blas_sgemm(blas, A, B, C, N, N, N, 1.0f, 0.0f);
     double elapsed = get_time_sec() - start;
 
-    free(A);
-    free(B);
-    free(C);
+    cml_free(A);
+    cml_free(B);
+    cml_free(C);
     double flop = gemm_flops(N) * iters;
     return (BenchResult){.gflops = flop / elapsed / 1e9, .time_ms = elapsed / iters * 1e3};
 }
@@ -121,7 +122,7 @@ static BenchResult bench_blas_unfused(CMLBlasContext* blas, int N, int iters) {
     int n2      = N * N;
     float* A    = alloc_random(n2);
     float* B    = alloc_random(n2);
-    float* C    = calloc((size_t)n2, sizeof(float));
+    float* C    = cml_calloc((size_t)n2, sizeof(float));
     float* bias = alloc_random(N);
 
     cml_blas_sgemm(blas, A, B, C, N, N, N, 1.0f, 0.0f);
@@ -137,10 +138,10 @@ static BenchResult bench_blas_unfused(CMLBlasContext* blas, int N, int iters) {
     }
     double elapsed = get_time_sec() - start;
 
-    free(A);
-    free(B);
-    free(C);
-    free(bias);
+    cml_free(A);
+    cml_free(B);
+    cml_free(C);
+    cml_free(bias);
     double flop = fused_flops(N) * iters;
     return (BenchResult){.gflops = flop / elapsed / 1e9, .time_ms = elapsed / iters * 1e3};
 }

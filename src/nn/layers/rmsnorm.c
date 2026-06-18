@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
     RMSNorm* rn = (RMSNorm*)module;
@@ -94,12 +95,12 @@ RMSNorm* nn_rmsnorm(int normalized_shape, float eps, DType dtype, DeviceType dev
         return NULL;
     }
 
-    RMSNorm* rn = malloc(sizeof(RMSNorm));
+    RMSNorm* rn = cml_malloc(sizeof(RMSNorm));
     if (!rn)
         return NULL;
 
     if (module_init((Module*)rn, "RMSNorm", rmsnorm_forward, rmsnorm_free) != 0) {
-        free(rn);
+        cml_free(rn);
         return NULL;
     }
 

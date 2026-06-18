@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* relu_forward(Module* module, Tensor* input) {
     (void)module;
@@ -18,10 +19,10 @@ static Tensor* relu_forward(Module* module, Tensor* input) {
     return uop_relu(input);
 }
 
-static void relu_free(Module* module) { free(module); }
+static void relu_free(Module* module) { cml_free(module); }
 
 ReLU* nn_relu(bool inplace) {
-    ReLU* relu = malloc(sizeof(ReLU));
+    ReLU* relu = cml_malloc(sizeof(ReLU));
     if (!relu) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for ReLU layer",
                          __FILE__, __LINE__, __func__);
@@ -31,7 +32,7 @@ ReLU* nn_relu(bool inplace) {
     if (module_init((Module*)relu, "ReLU", relu_forward, relu_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize ReLU module", __FILE__,
                          __LINE__, __func__);
-        free(relu);
+        cml_free(relu);
         return NULL;
     }
 
@@ -45,15 +46,15 @@ static Tensor* leaky_relu_forward(Module* module, Tensor* input) {
     return uop_leaky_relu(input, leaky_relu->negative_slope);
 }
 
-static void leaky_relu_free(Module* module) { free(module); }
+static void leaky_relu_free(Module* module) { cml_free(module); }
 
 LeakyReLU* nn_leaky_relu(float negative_slope, bool inplace) {
-    LeakyReLU* leaky_relu = malloc(sizeof(LeakyReLU));
+    LeakyReLU* leaky_relu = cml_malloc(sizeof(LeakyReLU));
     if (!leaky_relu)
         return NULL;
 
     if (module_init((Module*)leaky_relu, "LeakyReLU", leaky_relu_forward, leaky_relu_free) != 0) {
-        free(leaky_relu);
+        cml_free(leaky_relu);
         return NULL;
     }
 
@@ -69,10 +70,10 @@ static Tensor* sigmoid_forward(Module* module, Tensor* input) {
     return uop_sigmoid(input);
 }
 
-static void sigmoid_free(Module* module) { free(module); }
+static void sigmoid_free(Module* module) { cml_free(module); }
 
 Sigmoid* nn_sigmoid(void) {
-    Sigmoid* sigmoid = malloc(sizeof(Sigmoid));
+    Sigmoid* sigmoid = cml_malloc(sizeof(Sigmoid));
     if (!sigmoid) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Sigmoid layer",
                          __FILE__, __LINE__, __func__);
@@ -82,7 +83,7 @@ Sigmoid* nn_sigmoid(void) {
     if (module_init((Module*)sigmoid, "Sigmoid", sigmoid_forward, sigmoid_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Sigmoid module", __FILE__,
                          __LINE__, __func__);
-        free(sigmoid);
+        cml_free(sigmoid);
         return NULL;
     }
 
@@ -96,10 +97,10 @@ static Tensor* tanh_forward(Module* module, Tensor* input) {
     return uop_tanh(input);
 }
 
-static void tanh_free(Module* module) { free(module); }
+static void tanh_free(Module* module) { cml_free(module); }
 
 Tanh* nn_tanh(void) {
-    Tanh* tanh = malloc(sizeof(Tanh));
+    Tanh* tanh = cml_malloc(sizeof(Tanh));
     if (!tanh) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Tanh layer",
                          __FILE__, __LINE__, __func__);
@@ -109,7 +110,7 @@ Tanh* nn_tanh(void) {
     if (module_init((Module*)tanh, "Tanh", tanh_forward, tanh_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Tanh module", __FILE__,
                          __LINE__, __func__);
-        free(tanh);
+        cml_free(tanh);
         return NULL;
     }
 
@@ -197,15 +198,15 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void gelu_free(Module* module) { free(module); }
+static void gelu_free(Module* module) { cml_free(module); }
 
 GELU* nn_gelu(bool approximate) {
-    GELU* gelu = malloc(sizeof(GELU));
+    GELU* gelu = cml_malloc(sizeof(GELU));
     if (!gelu)
         return NULL;
 
     if (module_init((Module*)gelu, "GELU", gelu_forward, gelu_free) != 0) {
-        free(gelu);
+        cml_free(gelu);
         return NULL;
     }
 
@@ -222,15 +223,15 @@ static Tensor* softmax_forward(Module* module, Tensor* input) {
     return tensor_softmax(input, softmax->dim);
 }
 
-static void softmax_free(Module* module) { free(module); }
+static void softmax_free(Module* module) { cml_free(module); }
 
 Softmax* nn_softmax(int dim) {
-    Softmax* softmax = malloc(sizeof(Softmax));
+    Softmax* softmax = cml_malloc(sizeof(Softmax));
     if (!softmax)
         return NULL;
 
     if (module_init((Module*)softmax, "Softmax", softmax_forward, softmax_free) != 0) {
-        free(softmax);
+        cml_free(softmax);
         return NULL;
     }
 
@@ -254,16 +255,16 @@ static Tensor* log_softmax_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void log_softmax_free(Module* module) { free(module); }
+static void log_softmax_free(Module* module) { cml_free(module); }
 
 LogSoftmax* nn_log_softmax(int dim) {
-    LogSoftmax* log_softmax = malloc(sizeof(LogSoftmax));
+    LogSoftmax* log_softmax = cml_malloc(sizeof(LogSoftmax));
     if (!log_softmax)
         return NULL;
 
     if (module_init((Module*)log_softmax, "LogSoftmax", log_softmax_forward, log_softmax_free) !=
         0) {
-        free(log_softmax);
+        cml_free(log_softmax);
         return NULL;
     }
 
@@ -349,10 +350,10 @@ static Tensor* elu_forward(Module* module, Tensor* input) {
     return uop_where(&wp);
 }
 
-static void elu_free(Module* module) { free(module); }
+static void elu_free(Module* module) { cml_free(module); }
 
 ELU* nn_elu(float alpha, bool inplace) {
-    ELU* elu = malloc(sizeof(ELU));
+    ELU* elu = cml_malloc(sizeof(ELU));
     if (!elu) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for ELU layer",
                          __FILE__, __LINE__, __func__);
@@ -362,7 +363,7 @@ ELU* nn_elu(float alpha, bool inplace) {
     if (module_init((Module*)elu, "ELU", elu_forward, elu_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize ELU module", __FILE__, __LINE__,
                          __func__);
-        free(elu);
+        cml_free(elu);
         return NULL;
     }
 
@@ -403,10 +404,10 @@ static Tensor* selu_forward(Module* module, Tensor* input) {
     return uop_mul(lambda_tensor, elu_result);
 }
 
-static void selu_free(Module* module) { free(module); }
+static void selu_free(Module* module) { cml_free(module); }
 
 SELU* nn_selu(void) {
-    SELU* selu = malloc(sizeof(SELU));
+    SELU* selu = cml_malloc(sizeof(SELU));
     if (!selu) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for SELU layer",
                          __FILE__, __LINE__, __func__);
@@ -416,7 +417,7 @@ SELU* nn_selu(void) {
     if (module_init((Module*)selu, "SELU", selu_forward, selu_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize SELU module", __FILE__,
                          __LINE__, __func__);
-        free(selu);
+        cml_free(selu);
         return NULL;
     }
 
@@ -430,10 +431,10 @@ static Tensor* silu_forward(Module* module, Tensor* input) {
     return uop_mul(input, uop_sigmoid(input));
 }
 
-static void silu_free(Module* module) { free(module); }
+static void silu_free(Module* module) { cml_free(module); }
 
 SiLU* nn_silu(void) {
-    SiLU* silu = malloc(sizeof(SiLU));
+    SiLU* silu = cml_malloc(sizeof(SiLU));
     if (!silu) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for SiLU layer",
                          __FILE__, __LINE__, __func__);
@@ -443,7 +444,7 @@ SiLU* nn_silu(void) {
     if (module_init((Module*)silu, "SiLU", silu_forward, silu_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize SiLU module", __FILE__,
                          __LINE__, __func__);
-        free(silu);
+        cml_free(silu);
         return NULL;
     }
 
@@ -466,10 +467,10 @@ static Tensor* mish_forward(Module* module, Tensor* input) {
     return uop_mul(input, tanh_sp);
 }
 
-static void mish_free(Module* module) { free(module); }
+static void mish_free(Module* module) { cml_free(module); }
 
 Mish* nn_mish(void) {
-    Mish* mish = malloc(sizeof(Mish));
+    Mish* mish = cml_malloc(sizeof(Mish));
     if (!mish) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Mish layer",
                          __FILE__, __LINE__, __func__);
@@ -479,7 +480,7 @@ Mish* nn_mish(void) {
     if (module_init((Module*)mish, "Mish", mish_forward, mish_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Mish module", __FILE__,
                          __LINE__, __func__);
-        free(mish);
+        cml_free(mish);
         return NULL;
     }
 
@@ -509,10 +510,10 @@ static Tensor* hardswish_forward(Module* module, Tensor* input) {
     return uop_mul(input, scaled);
 }
 
-static void hardswish_free(Module* module) { free(module); }
+static void hardswish_free(Module* module) { cml_free(module); }
 
 HardSwish* nn_hardswish(void) {
-    HardSwish* hardswish = malloc(sizeof(HardSwish));
+    HardSwish* hardswish = cml_malloc(sizeof(HardSwish));
     if (!hardswish) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
                          "Failed to allocate memory for HardSwish layer", __FILE__, __LINE__,
@@ -523,7 +524,7 @@ HardSwish* nn_hardswish(void) {
     if (module_init((Module*)hardswish, "HardSwish", hardswish_forward, hardswish_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize HardSwish module", __FILE__,
                          __LINE__, __func__);
-        free(hardswish);
+        cml_free(hardswish);
         return NULL;
     }
 

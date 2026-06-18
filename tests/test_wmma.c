@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include "ops/ir/gpu/wmma.h"
+#include "alloc/cml_allocator.h"
 
 static void test_select_config_basic(void) {
     printf("  test_select_config_basic...");
@@ -98,7 +99,7 @@ static void test_generate_kernel(void) {
     assert(strstr(kernel_src, "wmma") != NULL);
 
     printf(" (generated %zu bytes) ", strlen(kernel_src));
-    free(kernel_src);
+    cml_free(kernel_src);
     printf("PASS\n");
 }
 
@@ -127,7 +128,7 @@ static void test_generate_kernel_various_sizes(void) {
         char* src = cml_wmma_generate_kernel(&config, M, N, K);
         assert(src != NULL);
         assert(strstr(src, "wmma") != NULL);
-        free(src);
+        cml_free(src);
     }
 
     printf(" PASS\n");
@@ -163,9 +164,9 @@ static void test_wmma_matmul_if_available(void) {
     size_t fp32_size = M * N * 4;  /* 4 bytes per fp32 */
 
     /* Allocate host buffers (simplified: using calloc for zero-init) */
-    void* A = calloc(1, fp16_size);
-    void* B = calloc(1, fp16_size);
-    void* C = calloc(1, fp32_size);
+    void* A = cml_calloc(1, fp16_size);
+    void* B = cml_calloc(1, fp16_size);
+    void* C = cml_calloc(1, fp32_size);
     assert(A != NULL && B != NULL && C != NULL);
 
     int ret = cml_wmma_matmul(A, B, C, M, N, K);
@@ -177,9 +178,9 @@ static void test_wmma_matmul_if_available(void) {
         assert(C_fp32[i] == 0.0f);
     }
 
-    free(A);
-    free(B);
-    free(C);
+    cml_free(A);
+    cml_free(B);
+    cml_free(C);
     printf(" PASS\n");
 }
 

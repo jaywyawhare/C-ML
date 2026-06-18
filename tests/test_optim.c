@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "cml.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -56,7 +57,7 @@ static int test_sgd(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -72,7 +73,7 @@ static int test_adam(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -88,7 +89,7 @@ static int test_adamw(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -104,7 +105,7 @@ static int test_rmsprop(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -120,7 +121,7 @@ static int test_adagrad(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -136,7 +137,7 @@ static int test_adadelta(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -146,13 +147,13 @@ static int test_lamb(void) {
     create_test_model(&model, &params, &num_params);
 
     Optimizer* opt = optim_lamb(params, num_params, 0.001f, 0.01f, 0.9f, 0.999f, 1e-6f);
-    if (!opt) { free(params); module_free((Module*)model); return 0; }
+    if (!opt) { cml_free(params); module_free((Module*)model); return 0; }
 
     optimizer_step(opt);
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -162,13 +163,13 @@ static int test_lars(void) {
     create_test_model(&model, &params, &num_params);
 
     Optimizer* opt = optim_lars(params, num_params, 0.01f, 0.9f, 0.0f, 0.02f);
-    if (!opt) { free(params); module_free((Module*)model); return 0; }
+    if (!opt) { cml_free(params); module_free((Module*)model); return 0; }
 
     optimizer_step(opt);
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -184,7 +185,7 @@ static int test_zero_grad(void) {
     printf("(ok) ");
 
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return 1;
 }
@@ -197,7 +198,7 @@ static int test_lr_scheduler_step(void) {
     if (!opt) return 0;
 
     LRScheduler* sched = lr_scheduler_step(opt, 10, 0.1f);
-    if (!sched) { optimizer_free(opt); free(params); module_free((Module*)model); return 0; }
+    if (!sched) { optimizer_free(opt); cml_free(params); module_free((Module*)model); return 0; }
 
     float lr_before = lr_scheduler_get_lr(sched);
     for (int i = 0; i < 10; i++)
@@ -209,7 +210,7 @@ static int test_lr_scheduler_step(void) {
 
     lr_scheduler_free(sched);
     optimizer_free(opt);
-    free(params);
+    cml_free(params);
     module_free((Module*)model);
     return ok;
 }

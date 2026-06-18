@@ -7,13 +7,14 @@
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 static double timespec_to_ms(struct timespec* ts) {
     return (double)ts->tv_sec * 1000.0 + (double)ts->tv_nsec / 1000000.0;
 }
 
 Timer* profiler_timer_create(const char* name) {
-    Timer* timer = malloc(sizeof(Timer));
+    Timer* timer = cml_malloc(sizeof(Timer));
     if (!timer)
         return NULL;
 
@@ -25,7 +26,7 @@ Timer* profiler_timer_create(const char* name) {
     timer->is_running         = false;
     if (name) {
         size_t len  = strlen(name) + 1;
-        timer->name = malloc(len);
+        timer->name = cml_malloc(len);
         if (timer->name) {
             memcpy(timer->name, name, len);
         }
@@ -41,9 +42,9 @@ void profiler_timer_free(Timer* timer) {
         return;
 
     if (timer->name) {
-        free(timer->name);
+        cml_free(timer->name);
     }
-    free(timer);
+    cml_free(timer);
 }
 
 int profiler_timer_start(Timer* timer) {
@@ -108,7 +109,7 @@ void profiler_timer_reset(Timer* timer) {
 }
 
 Profiler* profiler_create(void) {
-    Profiler* profiler = malloc(sizeof(Profiler));
+    Profiler* profiler = cml_malloc(sizeof(Profiler));
     if (!profiler)
         return NULL;
 
@@ -130,10 +131,10 @@ void profiler_free(Profiler* profiler) {
                 profiler_timer_free(profiler->timers[i]);
             }
         }
-        free(profiler->timers);
+        cml_free(profiler->timers);
     }
 
-    free(profiler);
+    cml_free(profiler);
 }
 
 void profiler_set_enabled(Profiler* profiler, bool enabled) {
@@ -149,7 +150,7 @@ int profiler_start(Profiler* profiler, const char* name) {
     // Resize array if needed
     if (profiler->num_timers >= profiler->capacity) {
         int new_capacity   = profiler->capacity == 0 ? 8 : profiler->capacity * 2;
-        Timer** new_timers = realloc(profiler->timers, (size_t)new_capacity * sizeof(Timer*));
+        Timer** new_timers = cml_realloc(profiler->timers, (size_t)new_capacity * sizeof(Timer*));
         if (!new_timers)
             return -1;
 

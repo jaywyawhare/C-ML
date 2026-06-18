@@ -13,6 +13,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/execution.h"
 #include "ops/ir/graph_cache.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_total  = 0;
@@ -29,8 +30,8 @@ static void test_cache_population(void) {
     size_t h0 = cache->hits, m0 = cache->misses;
     TensorConfig cfg = {0};
     int sa[] = {32, 64}, sb[] = {64, 32};
-    float* a = malloc(32*64*sizeof(float));
-    float* b = malloc(64*32*sizeof(float));
+    float* a = cml_malloc(32*64*sizeof(float));
+    float* b = cml_malloc(64*32*sizeof(float));
     for (int i = 0; i < 32*64; i++) a[i] = (float)(i%7)*0.1f;
     for (int i = 0; i < 64*32; i++) b[i] = (float)(i%5)*0.1f;
 
@@ -57,7 +58,7 @@ static void test_cache_population(void) {
 
     CHECK("results consistent across reset", v1 == v2);
 
-    free(a); free(b);
+    cml_free(a); cml_free(b);
 }
 
 static void test_multi_node_cache(void) {
@@ -65,9 +66,9 @@ static void test_multi_node_cache(void) {
     CMLGraphCache* cache = cml_get_graph_cache();
     TensorConfig cfg = {0};
     int sa[] = {16, 32}, sb[] = {32, 16}, sbi[] = {16};
-    float* a = malloc(16*32*sizeof(float));
-    float* b = malloc(32*16*sizeof(float));
-    float* bias = malloc(16*sizeof(float));
+    float* a = cml_malloc(16*32*sizeof(float));
+    float* b = cml_malloc(32*16*sizeof(float));
+    float* bias = cml_malloc(16*sizeof(float));
     for (int i = 0; i < 16*32; i++) a[i] = (float)(i%9)*0.05f;
     for (int i = 0; i < 32*16; i++) b[i] = (float)(i%7)*0.05f;
     for (int i = 0; i < 16; i++) bias[i] = 0.1f;
@@ -90,7 +91,7 @@ static void test_multi_node_cache(void) {
     CHECK("multi-node: iter 0==1", results[0] == results[1]);
     CHECK("multi-node: iter 1==2", results[1] == results[2]);
 
-    free(a); free(b); free(bias);
+    cml_free(a); cml_free(b); cml_free(bias);
 }
 
 static void test_cache_stats(void) {

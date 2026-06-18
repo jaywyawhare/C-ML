@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #ifdef CML_HAS_Z3
 
@@ -162,7 +163,7 @@ bool cml_z3_available(void) {
 }
 
 CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
-    CMLZ3Verifier* v = calloc(1, sizeof(CMLZ3Verifier));
+    CMLZ3Verifier* v = cml_calloc(1, sizeof(CMLZ3Verifier));
     if (!v) return NULL;
     v->timeout_ms = timeout_ms;
 
@@ -198,7 +199,7 @@ void cml_z3_verifier_free(CMLZ3Verifier* v) {
             z3.del_context(v->z3_context);
         }
     }
-    free(v);
+    cml_free(v);
 }
 
 static Z3_ast z3_build_node_expr(Z3_context ctx, struct IRNode* node,
@@ -433,12 +434,12 @@ void cml_z3_verifier_stats(const CMLZ3Verifier* v,
 bool cml_z3_available(void) { return false; }
 
 CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
-    CMLZ3Verifier* v = calloc(1, sizeof(CMLZ3Verifier));
+    CMLZ3Verifier* v = cml_calloc(1, sizeof(CMLZ3Verifier));
     if (v) v->timeout_ms = timeout_ms;
     return v;
 }
 
-void cml_z3_verifier_free(CMLZ3Verifier* v) { free(v); }
+void cml_z3_verifier_free(CMLZ3Verifier* v) { cml_free(v); }
 
 CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v,
                                            CMLGraph_t original,

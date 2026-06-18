@@ -4,6 +4,7 @@
 #include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 static Module* conv_bn_relu(int in_ch, int out_ch, int kernel, int stride, int padding,
                              DType dtype, DeviceType device) {
@@ -29,20 +30,20 @@ static Tensor* concat_forward(Module* module, Tensor* input) {
     if (!blk || !input)
         return NULL;
 
-    Tensor** outputs = malloc(sizeof(Tensor*) * blk->num_branches);
+    Tensor** outputs = cml_malloc(sizeof(Tensor*) * blk->num_branches);
     if (!outputs)
         return NULL;
 
     for (int i = 0; i < blk->num_branches; i++) {
         outputs[i] = module_forward(blk->branches[i], input);
         if (!outputs[i]) {
-            free(outputs);
+            cml_free(outputs);
             return NULL;
         }
     }
 
     Tensor* result = tensor_concat(outputs, blk->num_branches, 1);
-    free(outputs);
+    cml_free(outputs);
     return result;
 }
 
@@ -52,23 +53,23 @@ static void concat_free(Module* module) {
         return;
     for (int i = 0; i < blk->num_branches; i++)
         module_free(blk->branches[i]);
-    free(blk->branches);
-    free(blk);
+    cml_free(blk->branches);
+    cml_free(blk);
 }
 
 static ConcatBlock* create_concat_block(const char* name, int num_branches) {
-    ConcatBlock* blk = malloc(sizeof(ConcatBlock));
+    ConcatBlock* blk = cml_malloc(sizeof(ConcatBlock));
     if (!blk)
         return NULL;
 
     if (module_init((Module*)blk, name, concat_forward, concat_free) != 0) {
-        free(blk);
+        cml_free(blk);
         return NULL;
     }
 
-    blk->branches = calloc(num_branches, sizeof(Module*));
+    blk->branches = cml_calloc(num_branches, sizeof(Module*));
     if (!blk->branches) {
-        free(blk);
+        cml_free(blk);
         return NULL;
     }
     blk->num_branches = num_branches;

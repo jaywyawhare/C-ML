@@ -18,6 +18,7 @@ static int load_graph_symbols(CMLCUDAGraphBackend* gb) {
 #define GET_SYM(name) dlsym(lib, #name)
 #elif defined(_WIN32)
 #include <windows.h>
+#include "alloc/cml_allocator.h"
 #define GET_SYM(name) (void*)GetProcAddress((HMODULE)lib, #name)
 #else
 #define GET_SYM(name) NULL
@@ -46,7 +47,7 @@ static int load_graph_symbols(CMLCUDAGraphBackend* gb) {
 CMLCUDAGraphBackend* cml_cuda_graph_backend_create(CMLCUDABackend* backend) {
     if (!backend || !backend->initialized) return NULL;
 
-    CMLCUDAGraphBackend* gb = calloc(1, sizeof(CMLCUDAGraphBackend));
+    CMLCUDAGraphBackend* gb = cml_calloc(1, sizeof(CMLCUDAGraphBackend));
     if (!gb) return NULL;
 
     gb->backend = backend;
@@ -60,7 +61,7 @@ CMLCUDAGraphBackend* cml_cuda_graph_backend_create(CMLCUDABackend* backend) {
 
 void cml_cuda_graph_backend_free(CMLCUDAGraphBackend* gb) {
     if (!gb) return;
-    free(gb);
+    cml_free(gb);
 }
 
 int cml_cuda_graph_begin_capture(CMLCUDAGraphBackend* gb) {
@@ -170,5 +171,5 @@ void cml_cuda_graph_capture_free(void* ctx) {
     CUDAGraphCaptureCtx* c = ctx;
     if (!c) return;
     if (c->target) cml_cuda_graph_free(c->target);
-    free(c);
+    cml_free(c);
 }

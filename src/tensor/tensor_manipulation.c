@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
     return uop_cat(tensors, num_tensors, dim);
@@ -39,29 +40,29 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
     } else {
         int base_size = dim_size / num_splits;
         int remainder = dim_size % num_splits;
-        sizes = malloc((size_t)num_splits * sizeof(int));
+        sizes = cml_malloc((size_t)num_splits * sizeof(int));
         if (!sizes) return NULL;
         need_free = 1;
         for (int i = 0; i < num_splits; i++)
             sizes[i] = base_size + (i < remainder ? 1 : 0);
     }
 
-    Tensor** results = malloc((size_t)num_splits * sizeof(Tensor*));
+    Tensor** results = cml_malloc((size_t)num_splits * sizeof(Tensor*));
     if (!results) {
-        if (need_free) free(sizes);
+        if (need_free) cml_free(sizes);
         return NULL;
     }
 
     int offset = 0;
     for (int i = 0; i < num_splits; i++) {
-        int* starts = calloc((size_t)tensor->ndim, sizeof(int));
-        int* ends   = malloc((size_t)tensor->ndim * sizeof(int));
-        int* steps  = malloc((size_t)tensor->ndim * sizeof(int));
+        int* starts = cml_calloc((size_t)tensor->ndim, sizeof(int));
+        int* ends   = cml_malloc((size_t)tensor->ndim * sizeof(int));
+        int* steps  = cml_malloc((size_t)tensor->ndim * sizeof(int));
         if (!starts || !ends || !steps) {
-            free(starts); free(ends); free(steps);
+            cml_free(starts); cml_free(ends); cml_free(steps);
             for (int j = 0; j < i; j++) tensor_free(results[j]);
-            free(results);
-            if (need_free) free(sizes);
+            cml_free(results);
+            if (need_free) cml_free(sizes);
             return NULL;
         }
         for (int d = 0; d < tensor->ndim; d++) {
@@ -70,12 +71,12 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
             steps[d]  = 1;
         }
 
-        SliceParams* sp = malloc(sizeof(SliceParams));
+        SliceParams* sp = cml_malloc(sizeof(SliceParams));
         if (!sp) {
-            free(starts); free(ends); free(steps);
+            cml_free(starts); cml_free(ends); cml_free(steps);
             for (int j = 0; j < i; j++) tensor_free(results[j]);
-            free(results);
-            if (need_free) free(sizes);
+            cml_free(results);
+            if (need_free) cml_free(sizes);
             return NULL;
         }
         sp->start    = starts;
@@ -87,7 +88,7 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
         offset += sizes[i];
     }
 
-    if (need_free) free(sizes);
+    if (need_free) cml_free(sizes);
     return results;
 }
 
@@ -134,13 +135,13 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     size_t* output_strides = compute_contiguous_strides(output->shape, output->ndim);
     if (!input_strides || !output_strides) {
         tensor_free(output);
-        free(input_strides);
-        free(output_strides);
+        cml_free(input_strides);
+        cml_free(output_strides);
         return NULL;
     }
 
     for (size_t i = 0; i < output->numel; i++) {
-        int* out_indices = malloc((size_t)output->ndim * sizeof(int));
+        int* out_indices = cml_malloc((size_t)output->ndim * sizeof(int));
         size_t idx       = i;
         for (int d = output->ndim - 1; d >= 0; d--) {
             out_indices[d] = (int)(idx % (size_t)output->shape[d]);
@@ -153,16 +154,16 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
         int gather_idx = idx_data[idx_offset];
 
         if (gather_idx < 0 || gather_idx >= input->shape[normalized_dim]) {
-            free(out_indices);
-            free(input_strides);
-            free(output_strides);
+            cml_free(out_indices);
+            cml_free(input_strides);
+            cml_free(output_strides);
             tensor_free(output);
             LOG_ERROR("tensor_gather: index %d out of range [0, %d)", gather_idx,
                       input->shape[normalized_dim]);
             return NULL;
         }
 
-        int* in_indices = malloc((size_t)input->ndim * sizeof(int));
+        int* in_indices = cml_malloc((size_t)input->ndim * sizeof(int));
         for (int d = 0; d < input->ndim; d++)
             in_indices[d] = (d == normalized_dim) ? gather_idx : out_indices[d];
 
@@ -172,12 +173,12 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
 
         out_data[i] = in_data[in_offset];
 
-        free(out_indices);
-        free(in_indices);
+        cml_free(out_indices);
+        cml_free(in_indices);
     }
 
-    free(input_strides);
-    free(output_strides);
+    cml_free(input_strides);
+    cml_free(output_strides);
     return output;
 }
 

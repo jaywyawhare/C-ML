@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
+#include "alloc/cml_allocator.h"
 
 /* libusb descriptor structure (partial, matches libusb_device_descriptor layout) */
 #pragma pack(push, 1)
@@ -188,7 +189,7 @@ int cml_usb_enumerate(CMLUSBDevice** devices, int* num_devices) {
         return 0;
     }
 
-    CMLUSBDevice* devs = (CMLUSBDevice*)calloc((size_t)matched, sizeof(CMLUSBDevice));
+    CMLUSBDevice* devs = (CMLUSBDevice*)cml_calloc((size_t)matched, sizeof(CMLUSBDevice));
     if (!devs) {
         LOG_ERROR("USB enumerate: allocation failed");
         fn_libusb_free_device_list(dev_list, 1);
@@ -424,5 +425,5 @@ void cml_usb_free_devices(CMLUSBDevice* devices, int num_devices) {
         }
     }
 
-    free(devices);
+    cml_free(devices);
 }

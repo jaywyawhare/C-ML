@@ -3,6 +3,7 @@
 #include "tensor/tensor.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype) {
     if (block_size == 0 || num_blocks <= 0) {
@@ -10,35 +11,35 @@ MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype) {
         return NULL;
     }
 
-    MemoryPool* pool = malloc(sizeof(MemoryPool));
+    MemoryPool* pool = cml_malloc(sizeof(MemoryPool));
     if (!pool)
         return NULL;
 
-    pool->blocks      = malloc((size_t)num_blocks * sizeof(void*));
-    pool->block_sizes = malloc((size_t)num_blocks * sizeof(size_t));
-    pool->used        = malloc((size_t)num_blocks * sizeof(size_t));
+    pool->blocks      = cml_malloc((size_t)num_blocks * sizeof(void*));
+    pool->block_sizes = cml_malloc((size_t)num_blocks * sizeof(size_t));
+    pool->used        = cml_malloc((size_t)num_blocks * sizeof(size_t));
 
     if (!pool->blocks || !pool->block_sizes || !pool->used) {
         if (pool->blocks)
-            free(pool->blocks);
+            cml_free(pool->blocks);
         if (pool->block_sizes)
-            free(pool->block_sizes);
+            cml_free(pool->block_sizes);
         if (pool->used)
-            free(pool->used);
-        free(pool);
+            cml_free(pool->used);
+        cml_free(pool);
         return NULL;
     }
 
     for (int i = 0; i < num_blocks; i++) {
-        pool->blocks[i] = malloc(block_size);
+        pool->blocks[i] = cml_malloc(block_size);
         if (!pool->blocks[i]) {
             for (int j = 0; j < i; j++) {
-                free(pool->blocks[j]);
+                cml_free(pool->blocks[j]);
             }
-            free(pool->blocks);
-            free(pool->block_sizes);
-            free(pool->used);
-            free(pool);
+            cml_free(pool->blocks);
+            cml_free(pool->block_sizes);
+            cml_free(pool->used);
+            cml_free(pool);
             return NULL;
         }
         pool->block_sizes[i] = block_size;
@@ -60,17 +61,17 @@ void memory_pool_free(MemoryPool* pool) {
     if (pool->blocks) {
         for (int i = 0; i < pool->num_blocks; i++) {
             if (pool->blocks[i]) {
-                free(pool->blocks[i]);
+                cml_free(pool->blocks[i]);
             }
         }
-        free(pool->blocks);
+        cml_free(pool->blocks);
     }
 
     if (pool->block_sizes)
-        free(pool->block_sizes);
+        cml_free(pool->block_sizes);
     if (pool->used)
-        free(pool->used);
-    free(pool);
+        cml_free(pool->used);
+    cml_free(pool);
 }
 
 void* memory_pool_alloc(MemoryPool* pool) {
@@ -109,22 +110,22 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
         return NULL;
     }
 
-    TensorPool* pool = malloc(sizeof(TensorPool));
+    TensorPool* pool = cml_malloc(sizeof(TensorPool));
     if (!pool)
         return NULL;
 
-    pool->tensors = malloc(num_tensors * sizeof(Tensor*));
-    pool->in_use  = malloc(num_tensors * sizeof(bool));
+    pool->tensors = cml_malloc(num_tensors * sizeof(Tensor*));
+    pool->in_use  = cml_malloc(num_tensors * sizeof(bool));
     pool->shape   = tensor_shape_copy(shape, ndim);
 
     if (!pool->tensors || !pool->in_use || !pool->shape) {
         if (pool->tensors)
-            free(pool->tensors);
+            cml_free(pool->tensors);
         if (pool->in_use)
-            free(pool->in_use);
+            cml_free(pool->in_use);
         if (pool->shape)
-            free(pool->shape);
-        free(pool);
+            cml_free(pool->shape);
+        cml_free(pool);
         return NULL;
     }
 
@@ -135,10 +136,10 @@ TensorPool* tensor_pool_create(int* shape, int ndim, size_t num_tensors, DType d
             for (size_t j = 0; j < i; j++) {
                 tensor_free(pool->tensors[j]);
             }
-            free(pool->tensors);
-            free(pool->in_use);
-            free(pool->shape);
-            free(pool);
+            cml_free(pool->tensors);
+            cml_free(pool->in_use);
+            cml_free(pool->shape);
+            cml_free(pool);
             return NULL;
         }
         pool->in_use[i] = false;
@@ -163,12 +164,12 @@ void tensor_pool_free(TensorPool* pool) {
                 tensor_free(pool->tensors[i]);
             }
         }
-        free(pool->tensors);
+        cml_free(pool->tensors);
     }
 
     if (pool->in_use)
-        free(pool->in_use);
+        cml_free(pool->in_use);
     if (pool->shape)
-        free(pool->shape);
-    free(pool);
+        cml_free(pool->shape);
+    cml_free(pool);
 }

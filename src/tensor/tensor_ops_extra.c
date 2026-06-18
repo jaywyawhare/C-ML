@@ -5,6 +5,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include "alloc/cml_allocator.h"
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y) {
     if (!condition || !x || !y) return NULL;
@@ -75,7 +76,7 @@ Tensor* tensor_multinomial(Tensor* probs, int num_samples, bool replacement) {
     Tensor* output = tensor_empty(out_shape, out_ndim, &config);
     if (!output) return NULL;
 
-    float* cumsum = (float*)malloc(num_categories * sizeof(float));
+    float* cumsum = (float*)cml_malloc(num_categories * sizeof(float));
     if (!cumsum) { tensor_free(output); return NULL; }
 
     int32_t* out_data = (int32_t*)tensor_data_ptr(output);
@@ -90,7 +91,7 @@ Tensor* tensor_multinomial(Tensor* probs, int num_samples, bool replacement) {
 
         if (total <= 0.0f) {
             LOG_ERROR("tensor_multinomial: probabilities sum to zero");
-            free(cumsum);
+            cml_free(cumsum);
             tensor_free(output);
             return NULL;
         }
@@ -100,8 +101,8 @@ Tensor* tensor_multinomial(Tensor* probs, int num_samples, bool replacement) {
 
         bool* used = NULL;
         if (!replacement) {
-            used = (bool*)calloc(num_categories, sizeof(bool));
-            if (!used) { free(cumsum); tensor_free(output); return NULL; }
+            used = (bool*)cml_calloc(num_categories, sizeof(bool));
+            if (!used) { cml_free(cumsum); tensor_free(output); return NULL; }
         }
 
         for (int s = 0; s < num_samples; s++) {
@@ -135,10 +136,10 @@ Tensor* tensor_multinomial(Tensor* probs, int num_samples, bool replacement) {
             out_data[out_idx] = selected;
         }
 
-        free(used);
+        cml_free(used);
     }
 
-    free(cumsum);
+    cml_free(cumsum);
     return output;
 }
 

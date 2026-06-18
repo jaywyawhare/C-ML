@@ -50,6 +50,7 @@
 #include <string.h>
 #include <strings.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 static CMLCUDABackend* g_cuda_backend = NULL;
 static bool g_cuda_init_attempted = false;
@@ -107,7 +108,7 @@ static const char* backend_descriptions[] = {
 };
 
 CMLDispatchContext* cml_dispatch_create(void) {
-    CMLDispatchContext* ctx = (CMLDispatchContext*)calloc(1, sizeof(CMLDispatchContext));
+    CMLDispatchContext* ctx = (CMLDispatchContext*)cml_calloc(1, sizeof(CMLDispatchContext));
     if (!ctx) {
         LOG_ERROR("Failed to allocate dispatch context");
         return NULL;
@@ -208,7 +209,7 @@ void cml_dispatch_free(CMLDispatchContext* ctx) {
     }
 #endif
 
-    free(ctx);
+    cml_free(ctx);
     if (ctx == g_dispatch_ctx)
         g_dispatch_ctx = NULL;
 }

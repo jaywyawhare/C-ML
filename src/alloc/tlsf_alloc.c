@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static inline int tlsf_fls(uint32_t x)
 {
@@ -329,20 +330,20 @@ CMLTLSFAllocator* cml_tlsf_create(size_t pool_size)
     /* Allocate metadata and pool separately to avoid confusion with
      * malloc's bookkeeping (the pool contains our own block headers
      * which could alias malloc metadata if placed in the same allocation). */
-    CMLTLSFAllocator* a = (CMLTLSFAllocator*)calloc(1, sizeof(CMLTLSFAllocator));
+    CMLTLSFAllocator* a = (CMLTLSFAllocator*)cml_calloc(1, sizeof(CMLTLSFAllocator));
     if (!a) return NULL;
 
-    a->pool = malloc(pool_size);
+    a->pool = cml_malloc(pool_size);
     if (!a->pool) {
-        free(a);
+        cml_free(a);
         return NULL;
     }
     a->pool_size = pool_size;
     a->owns_pool = true;
 
     if (init_pool(a) != 0) {
-        free(a->pool);
-        free(a);
+        cml_free(a->pool);
+        cml_free(a);
         return NULL;
     }
 
@@ -355,7 +356,7 @@ CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size)
         return NULL;
     }
 
-    CMLTLSFAllocator* a = (CMLTLSFAllocator*)calloc(1, sizeof(CMLTLSFAllocator));
+    CMLTLSFAllocator* a = (CMLTLSFAllocator*)cml_calloc(1, sizeof(CMLTLSFAllocator));
     if (!a) return NULL;
 
     a->pool = pool;
@@ -363,7 +364,7 @@ CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size)
     a->owns_pool = false;
 
     if (init_pool(a) != 0) {
-        free(a);
+        cml_free(a);
         return NULL;
     }
 
@@ -374,9 +375,9 @@ void cml_tlsf_destroy(CMLTLSFAllocator* a)
 {
     if (!a) return;
     if (a->owns_pool) {
-        free(a->pool);
+        cml_free(a->pool);
     }
-    free(a);
+    cml_free(a);
 }
 
 void* cml_tlsf_alloc(CMLTLSFAllocator* a, size_t size)
@@ -687,11 +688,11 @@ CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity)
 {
     if (initial_capacity <= 0) initial_capacity = 16;
 
-    CMLTimelinePlanner* p = (CMLTimelinePlanner*)calloc(1, sizeof(CMLTimelinePlanner));
+    CMLTimelinePlanner* p = (CMLTimelinePlanner*)cml_calloc(1, sizeof(CMLTimelinePlanner));
     if (!p) return NULL;
 
-    p->records = (CMLTimelineRecord*)calloc((size_t)initial_capacity, sizeof(CMLTimelineRecord));
-    if (!p->records) { free(p); return NULL; }
+    p->records = (CMLTimelineRecord*)cml_calloc((size_t)initial_capacity, sizeof(CMLTimelineRecord));
+    if (!p->records) { cml_free(p); return NULL; }
 
     p->record_capacity = initial_capacity;
     return p;
@@ -700,8 +701,8 @@ CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity)
 void cml_timeline_planner_destroy(CMLTimelinePlanner* p)
 {
     if (!p) return;
-    free(p->records);
-    free(p);
+    cml_free(p->records);
+    cml_free(p);
 }
 
 int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id,
@@ -712,7 +713,7 @@ int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id,
 
     if (p->num_records >= p->record_capacity) {
         int new_cap = p->record_capacity * 2;
-        CMLTimelineRecord* tmp = (CMLTimelineRecord*)realloc(
+        CMLTimelineRecord* tmp = (CMLTimelineRecord*)cml_realloc(
             p->records, (size_t)new_cap * sizeof(CMLTimelineRecord));
         if (!tmp) return -1;
         p->records = tmp;

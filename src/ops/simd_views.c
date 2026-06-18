@@ -1,6 +1,7 @@
 #include "ops/simd_views.h"
 #include <string.h>
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
   #define CML_X86 1
@@ -20,6 +21,7 @@
 #elif defined(__aarch64__) || defined(__arm__)
   #define CML_ARM 1
   #include <arm_neon.h>
+#include "alloc/cml_allocator.h"
   #define CML_HAS_NEON 1
 #endif
 
@@ -299,11 +301,11 @@ void simd_broadcast_copy_f32(const float* src, size_t src_n, float* dst, size_t 
 void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
                          const size_t* strides, const int* perm, int ndim, size_t numel) {
     /* Compute destination strides from permuted shape */
-    int* dst_shape = (int*)malloc(ndim * sizeof(int));
-    size_t* dst_strides = (size_t*)malloc(ndim * sizeof(size_t));
+    int* dst_shape = (int*)cml_malloc(ndim * sizeof(int));
+    size_t* dst_strides = (size_t*)cml_malloc(ndim * sizeof(size_t));
     if (!dst_shape || !dst_strides) {
-        free(dst_shape);
-        free(dst_strides);
+        cml_free(dst_shape);
+        cml_free(dst_strides);
         /* Fallback: plain copy */
         memcpy(dst, src, numel * sizeof(float));
         return;
@@ -317,10 +319,10 @@ void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
         dst_strides[i] = dst_strides[i + 1] * dst_shape[i + 1];
 
     /* Map each source element to destination via stride calculation */
-    int* coords = (int*)calloc(ndim, sizeof(int));
+    int* coords = (int*)cml_calloc(ndim, sizeof(int));
     if (!coords) {
-        free(dst_shape);
-        free(dst_strides);
+        cml_free(dst_shape);
+        cml_free(dst_strides);
         memcpy(dst, src, numel * sizeof(float));
         return;
     }
@@ -347,7 +349,7 @@ void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
         }
     }
 
-    free(coords);
-    free(dst_shape);
-    free(dst_strides);
+    cml_free(coords);
+    cml_free(dst_shape);
+    cml_free(dst_strides);
 }

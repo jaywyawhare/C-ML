@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 /** Classify a UOp into a schedule item type (mirrors schedule.c) */
 static CMLScheduleItemType classify_fusion_op(UOpType type) {
@@ -52,15 +53,15 @@ static size_t tensor_elems(const Tensor* t) {
 }
 
 static CMLFusionGroup* fusion_group_create(void) {
-    CMLFusionGroup* g = calloc(1, sizeof(CMLFusionGroup));
+    CMLFusionGroup* g = cml_calloc(1, sizeof(CMLFusionGroup));
     if (!g) return NULL;
     g->node_capacity = 8;
-    g->nodes = calloc((size_t)g->node_capacity, sizeof(struct IRNode*));
-    if (!g->nodes) { free(g); return NULL; }
+    g->nodes = cml_calloc((size_t)g->node_capacity, sizeof(struct IRNode*));
+    if (!g->nodes) { cml_free(g); return NULL; }
 
     g->elim_capacity = 4;
-    g->eliminated_buffers = calloc((size_t)g->elim_capacity, sizeof(int));
-    if (!g->eliminated_buffers) { free(g->nodes); free(g); return NULL; }
+    g->eliminated_buffers = cml_calloc((size_t)g->elim_capacity, sizeof(int));
+    if (!g->eliminated_buffers) { cml_free(g->nodes); cml_free(g); return NULL; }
 
     g->type = SCHED_MOVEMENT;  /* weakest type; promoted as nodes are added */
     return g;
@@ -70,7 +71,7 @@ static int fusion_group_add_node(CMLFusionGroup* g, struct IRNode* node) {
     if (!g || !node) return -1;
     if (g->num_nodes >= g->node_capacity) {
         int nc = g->node_capacity * 2;
-        struct IRNode** tmp = realloc(g->nodes,
+        struct IRNode** tmp = cml_realloc(g->nodes,
                                       (size_t)nc * sizeof(struct IRNode*));
         if (!tmp) return -1;
         g->nodes = tmp;
@@ -125,7 +126,7 @@ static void fusion_group_add_eliminated(CMLFusionGroup* g, int buffer_idx) {
     if (!g) return;
     if (g->num_eliminated >= g->elim_capacity) {
         int nc = g->elim_capacity * 2;
-        int* tmp = realloc(g->eliminated_buffers, (size_t)nc * sizeof(int));
+        int* tmp = cml_realloc(g->eliminated_buffers, (size_t)nc * sizeof(int));
         if (!tmp) return;
         g->eliminated_buffers = tmp;
         g->elim_capacity = nc;
@@ -135,9 +136,9 @@ static void fusion_group_add_eliminated(CMLFusionGroup* g, int buffer_idx) {
 
 static void fusion_group_free(CMLFusionGroup* g) {
     if (!g) return;
-    free(g->nodes);
-    free(g->eliminated_buffers);
-    free(g);
+    cml_free(g->nodes);
+    cml_free(g->eliminated_buffers);
+    cml_free(g);
 }
 
 CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a,
@@ -173,7 +174,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
         opts = &default_opts;
     }
 
-    CMLFusionSchedule* sched = calloc(1, sizeof(CMLFusionSchedule));
+    CMLFusionSchedule* sched = cml_calloc(1, sizeof(CMLFusionSchedule));
     if (!sched) return NULL;
 
     /* Handle NULL or empty graph */
@@ -192,8 +193,8 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
 
     /* Allocate group list */
     int cap = graph->node_count < 16 ? 16 : graph->node_count;
-    sched->groups = calloc((size_t)cap, sizeof(CMLFusionGroup*));
-    if (!sched->groups) { free(sched); return NULL; }
+    sched->groups = cml_calloc((size_t)cap, sizeof(CMLFusionGroup*));
+    if (!sched->groups) { cml_free(sched); return NULL; }
     sched->group_capacity = cap;
 
     int total_ops = 0;
@@ -287,7 +288,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
         if (cur) {
             if (sched->num_groups >= sched->group_capacity) {
                 int nc = sched->group_capacity * 2;
-                CMLFusionGroup** tmp = realloc(
+                CMLFusionGroup** tmp = cml_realloc(
                     sched->groups,
                     (size_t)nc * sizeof(CMLFusionGroup*));
                 if (tmp) {
@@ -312,7 +313,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
     if (cur) {
         if (sched->num_groups >= sched->group_capacity) {
             int nc = sched->group_capacity * 2;
-            CMLFusionGroup** tmp = realloc(
+            CMLFusionGroup** tmp = cml_realloc(
                 sched->groups,
                 (size_t)nc * sizeof(CMLFusionGroup*));
             if (tmp) {
@@ -324,17 +325,17 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
     }
 
     /* Build execution order */
-    sched->execution_order = calloc((size_t)sched->num_groups, sizeof(int));
+    sched->execution_order = cml_calloc((size_t)sched->num_groups, sizeof(int));
     if (sched->execution_order) {
         if (opts->schedule_order == CML_SCHEDULE_ORDER_BFS && sched->num_groups > 1) {
             int ng = sched->num_groups;
-            int* in_degree = calloc((size_t)ng, sizeof(int));
-            int** deps = calloc((size_t)ng, sizeof(int*));
-            int* dep_counts = calloc((size_t)ng, sizeof(int));
+            int* in_degree = cml_calloc((size_t)ng, sizeof(int));
+            int** deps = cml_calloc((size_t)ng, sizeof(int*));
+            int* dep_counts = cml_calloc((size_t)ng, sizeof(int));
 
             if (in_degree && deps && dep_counts) {
                 for (int i = 0; i < ng; i++) {
-                    deps[i] = calloc((size_t)ng, sizeof(int));
+                    deps[i] = cml_calloc((size_t)ng, sizeof(int));
                 }
 
                 for (int i = 0; i < ng; i++) {
@@ -365,7 +366,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
                     }
                 }
 
-                int* queue = calloc((size_t)ng, sizeof(int));
+                int* queue = cml_calloc((size_t)ng, sizeof(int));
                 int qhead = 0, qtail = 0;
 
                 for (int i = 0; i < ng; i++) {
@@ -394,13 +395,13 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
                 }
 
                 sched->num_ordered = ordered;
-                free(queue);
+                cml_free(queue);
             }
 
-            for (int i = 0; i < ng; i++) free(deps[i]);
-            free(deps);
-            free(dep_counts);
-            free(in_degree);
+            for (int i = 0; i < ng; i++) cml_free(deps[i]);
+            cml_free(deps);
+            cml_free(dep_counts);
+            cml_free(in_degree);
         } else {
             for (int i = 0; i < sched->num_groups; i++) {
                 sched->execution_order[i] = i;
@@ -421,9 +422,9 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
     sched->memory_plan = NULL;
     if (sched->num_groups > 0) {
         int nb = sched->num_groups;
-        size_t* buf_sizes = calloc((size_t)nb, sizeof(size_t));
-        int* buf_first    = calloc((size_t)nb, sizeof(int));
-        int* buf_last     = calloc((size_t)nb, sizeof(int));
+        size_t* buf_sizes = cml_calloc((size_t)nb, sizeof(size_t));
+        int* buf_first    = cml_calloc((size_t)nb, sizeof(int));
+        int* buf_last     = cml_calloc((size_t)nb, sizeof(int));
 
         if (buf_sizes && buf_first && buf_last) {
             for (int i = 0; i < nb; i++) {
@@ -454,9 +455,9 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
             sched->memory_plan = cml_memory_plan_create(nb, buf_sizes, buf_first, buf_last);
         }
 
-        free(buf_sizes);
-        free(buf_first);
-        free(buf_last);
+        cml_free(buf_sizes);
+        cml_free(buf_first);
+        cml_free(buf_last);
     }
 
     return sched;
@@ -468,10 +469,10 @@ void cml_fusion_schedule_free(CMLFusionSchedule* sched) {
     for (int i = 0; i < sched->num_groups; i++) {
         fusion_group_free(sched->groups[i]);
     }
-    free(sched->groups);
-    free(sched->execution_order);
+    cml_free(sched->groups);
+    cml_free(sched->execution_order);
     cml_memory_plan_free(sched->memory_plan);
-    free(sched);
+    cml_free(sched);
 }
 
 static const char* fusion_sched_type_name(CMLScheduleItemType type) {

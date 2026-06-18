@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* embedding_forward(Module* module, Tensor* input) {
     Embedding* emb = (Embedding*)module;
@@ -63,7 +64,7 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
     }
 
     int out_ndim = input->ndim + 1;
-    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape)
         return NULL;
     for (int i = 0; i < input->ndim; i++)
@@ -72,20 +73,20 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
 
     ReshapeParams rout = {.new_shape = out_shape, .new_ndim = out_ndim};
     Tensor* out        = uop_reshape(out_body, &rout);
-    free(out_shape);
+    cml_free(out_shape);
     return out;
 }
 
-static void embedding_free(Module* module) { free(module); }
+static void embedding_free(Module* module) { cml_free(module); }
 
 Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
                         DType dtype, DeviceType device) {
-    Embedding* emb = malloc(sizeof(Embedding));
+    Embedding* emb = cml_malloc(sizeof(Embedding));
     if (!emb)
         return NULL;
 
     if (module_init((Module*)emb, "Embedding", embedding_forward, embedding_free) != 0) {
-        free(emb);
+        cml_free(emb);
         return NULL;
     }
 

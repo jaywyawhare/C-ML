@@ -6,6 +6,7 @@
 
 #include "cml.h"
 #include "nn/llama.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -400,11 +401,11 @@ static int test_generation_result_free(void) {
     cml_generation_result_free(NULL);
 
     /* Create and free a result */
-    CMLGenerationResult* result = (CMLGenerationResult*)calloc(1, sizeof(CMLGenerationResult));
+    CMLGenerationResult* result = (CMLGenerationResult*)cml_calloc(1, sizeof(CMLGenerationResult));
     if (!result) return 0;
-    result->token_ids = (int*)malloc(4 * sizeof(int));
+    result->token_ids = (int*)cml_malloc(4 * sizeof(int));
     result->num_tokens = 4;
-    result->text = (char*)malloc(16);
+    result->text = (char*)cml_malloc(16);
     if (result->text) strcpy(result->text, "hello");
     cml_generation_result_free(result);
     return 1;

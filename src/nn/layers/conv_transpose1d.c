@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     ConvTranspose1d* layer = (ConvTranspose1d*)module;
@@ -106,19 +107,19 @@ static void conv_transpose1d_free(Module* module) {
     ConvTranspose1d* layer = (ConvTranspose1d*)module;
     if (!layer)
         return;
-    free(layer);
+    cml_free(layer);
 }
 
 ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
                                       int stride, int padding, int output_padding,
                                       bool use_bias, DType dtype, DeviceType device) {
-    ConvTranspose1d* layer = malloc(sizeof(ConvTranspose1d));
+    ConvTranspose1d* layer = cml_malloc(sizeof(ConvTranspose1d));
     if (!layer)
         return NULL;
 
     if (module_init((Module*)layer, "ConvTranspose1d", conv_transpose1d_forward,
                     conv_transpose1d_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 

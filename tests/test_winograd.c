@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "ops/winograd.h"
+#include "alloc/cml_allocator.h"
 
 static void test_winograd_applicable_true(void) {
     printf("  test_winograd_applicable_true...");
@@ -62,14 +63,14 @@ static void test_winograd_conv2d_basic(void) {
     int groups = 1;
 
     /* Allocate input: 1x1x8x8, all 1.0 */
-    float* input = (float*)calloc(batch * in_c * H * W, sizeof(float));
+    float* input = (float*)cml_calloc(batch * in_c * H * W, sizeof(float));
     assert(input != NULL);
     for (int i = 0; i < batch * in_c * H * W; i++) {
         input[i] = 1.0f;
     }
 
     /* Allocate weight: 1x1x3x3, all 1.0 */
-    float* weight = (float*)calloc(out_c * in_c * 3 * 3, sizeof(float));
+    float* weight = (float*)cml_calloc(out_c * in_c * 3 * 3, sizeof(float));
     assert(weight != NULL);
     for (int i = 0; i < out_c * in_c * 3 * 3; i++) {
         weight[i] = 1.0f;
@@ -78,7 +79,7 @@ static void test_winograd_conv2d_basic(void) {
     /* Output dimensions with padding=1: same as input -> 8x8 */
     int out_h = H;
     int out_w = W;
-    float* output = (float*)calloc(batch * out_c * out_h * out_w, sizeof(float));
+    float* output = (float*)cml_calloc(batch * out_c * out_h * out_w, sizeof(float));
     assert(output != NULL);
 
     WinogradConfig config;
@@ -112,9 +113,9 @@ static void test_winograd_conv2d_basic(void) {
     float edge_val = output[1];
     assert(fabsf(edge_val - 6.0f) < 1e-3f);
 
-    free(input);
-    free(weight);
-    free(output);
+    cml_free(input);
+    cml_free(weight);
+    cml_free(output);
     printf(" PASS\n");
 }
 

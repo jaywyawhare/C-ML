@@ -29,6 +29,7 @@
 
 #ifdef __AVX__
 #include <immintrin.h>
+#include "alloc/cml_allocator.h"
 #endif
 
 static CMLBlasContext* g_exec_blas_ctx = NULL;
@@ -112,7 +113,7 @@ void* cml_buffer_cache_alloc(size_t size) {
     if (bucket_idx < 0) {
         g_buffer_cache.cache_misses++;
         g_buffer_cache.bytes_allocated += size;
-        return malloc(size);
+        return cml_malloc(size);
     }
 
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
@@ -123,7 +124,7 @@ void* cml_buffer_cache_alloc(size_t size) {
         bucket->count--;
 
         void* data = cached->data;
-        free(cached);
+        cml_free(cached);
 
         g_buffer_cache.cache_hits++;
         g_buffer_cache.bytes_cached -= bucket->bucket_size;
@@ -135,7 +136,7 @@ void* cml_buffer_cache_alloc(size_t size) {
 
     g_buffer_cache.cache_misses++;
     g_buffer_cache.bytes_allocated += bucket->bucket_size;
-    return malloc(bucket->bucket_size);
+    return cml_malloc(bucket->bucket_size);
 }
 
 void cml_buffer_cache_free(void* ptr, size_t size) {
@@ -146,20 +147,20 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
 
     int bucket_idx = get_bucket_index(size);
     if (bucket_idx < 0) {
-        free(ptr);
+        cml_free(ptr);
         return;
     }
 
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
 
     if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
-        free(ptr);
+        cml_free(ptr);
         return;
     }
 
-    CachedBuffer* cached = (CachedBuffer*)malloc(sizeof(CachedBuffer));
+    CachedBuffer* cached = (CachedBuffer*)cml_malloc(sizeof(CachedBuffer));
     if (!cached) {
-        free(ptr);
+        cml_free(ptr);
         return;
     }
 
@@ -179,8 +180,8 @@ void cml_cleanup_buffer_cache(void) {
         CachedBuffer* current = bucket->free_list;
         while (current) {
             CachedBuffer* next = current->next;
-            free(current->data);
-            free(current);
+            cml_free(current->data);
+            cml_free(current);
             current = next;
         }
         bucket->free_list = NULL;
@@ -360,13 +361,13 @@ static int winograd_conv2d_blas(CMLBlasContext* blas, const float* input, const 
     size_t U_sz  = (size_t)16 * oc_pg * ic_pg;
     size_t V_sz  = (size_t)16 * ic_pg * total_tiles;
     size_t M_sz  = (size_t)16 * oc_pg * total_tiles;
-    float* U_buf = (float*)malloc(U_sz * sizeof(float));
-    float* V_buf = (float*)malloc(V_sz * sizeof(float));
-    float* M_buf = (float*)malloc(M_sz * sizeof(float));
+    float* U_buf = (float*)cml_malloc(U_sz * sizeof(float));
+    float* V_buf = (float*)cml_malloc(V_sz * sizeof(float));
+    float* M_buf = (float*)cml_malloc(M_sz * sizeof(float));
     if (!U_buf || !V_buf || !M_buf) {
-        free(U_buf);
-        free(V_buf);
-        free(M_buf);
+        cml_free(U_buf);
+        cml_free(V_buf);
+        cml_free(M_buf);
         return -1;
     }
 
@@ -480,9 +481,9 @@ static int winograd_conv2d_blas(CMLBlasContext* blas, const float* input, const 
         }
     }
 
-    free(U_buf);
-    free(V_buf);
-    free(M_buf);
+    cml_free(U_buf);
+    cml_free(V_buf);
+    cml_free(M_buf);
     return 0;
 }
 
@@ -622,7 +623,7 @@ int cpu_execute_node(struct IRNode* node) {
             /* Detached leaf tensor with no data — allocate zero-filled */
             if (inp->numel > 0) {
                 size_t sz      = inp->numel * cml_dtype_size(inp->dtype);
-                inp->data      = calloc(1, sz);
+                inp->data      = cml_calloc(1, sz);
                 inp->owns_data = true;
             }
         }
@@ -1759,7 +1760,7 @@ int cpu_execute_node(struct IRNode* node) {
 
         if (node->inputs[0]->ndim == 1) {
             int n      = node->inputs[0]->shape[0];
-            float* tmp = malloc((size_t)n * sizeof(float));
+            float* tmp = cml_malloc((size_t)n * sizeof(float));
             if (!tmp)
                 return -1;
             memcpy(tmp, in1_data, (size_t)n * sizeof(float));
@@ -1774,7 +1775,7 @@ int cpu_execute_node(struct IRNode* node) {
                 tmp[best]   = t;
                 out_data[i] = tmp[i];
             }
-            free(tmp);
+            cml_free(tmp);
         } else {
             int copy_n = k < (int)in1_numel ? k : (int)in1_numel;
             memcpy(out_data, in1_data, (size_t)copy_n * sizeof(float));
@@ -3207,8 +3208,8 @@ int cpu_execute_node(struct IRNode* node) {
 
         if (conv_blas && conv_blas->initialized) {
             if (needed > s_col_buf_size) {
-                free(s_col_buf);
-                s_col_buf      = (float*)malloc(needed);
+                cml_free(s_col_buf);
+                s_col_buf      = (float*)cml_malloc(needed);
                 s_col_buf_size = s_col_buf ? needed : 0;
             }
             col_buf = s_col_buf;
@@ -3239,8 +3240,8 @@ int cpu_execute_node(struct IRNode* node) {
             static size_t s_gemm_buf_size = 0;
             size_t gemm_sz                = (size_t)out_channels * total_col_w * sizeof(float);
             if (gemm_sz > s_gemm_buf_size) {
-                free(s_gemm_buf);
-                s_gemm_buf      = (float*)malloc(gemm_sz);
+                cml_free(s_gemm_buf);
+                s_gemm_buf      = (float*)cml_malloc(gemm_sz);
                 s_gemm_buf_size = s_gemm_buf ? gemm_sz : 0;
             }
 
