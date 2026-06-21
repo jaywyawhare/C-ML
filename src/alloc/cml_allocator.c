@@ -36,12 +36,16 @@ static inline int   system_posix_memalign(void** memptr, size_t alignment, size_
 
 _Static_assert(CML_HEADER_SIZE >= 16 && (CML_HEADER_SIZE % 16) == 0, "header must preserve alignment");
 
-/* Per-allocation header. Lives immediately before user pointer. */
+/* Per-allocation header. Lives immediately before user pointer.
+ * size is size_t so large tensors / buffers well beyond 4 GiB are representable. */
 typedef struct {
-    uint32_t size;       /* requested user bytes */
+    size_t   size;       /* requested user bytes */
     uint16_t class_idx;  /* which size class (0xffff for large/direct) */
     uint16_t magic;      /* 0xC4A1 for sanity */
 } AllocHeader;
+
+_Static_assert(sizeof(AllocHeader) <= CML_HEADER_SIZE,
+               "AllocHeader must fit in CML_HEADER_SIZE");
 
 #define ALLOC_MAGIC 0xC4A1
 
@@ -106,11 +110,18 @@ typedef struct FreeNode {
 
 typedef struct Slab {
     struct Slab*   next;
+    void*          system_base; /* original pointer from system_malloc; used for system_free */
     uint32_t       class_idx;
     uint32_t       num_blocks;
     uint32_t       used_blocks;
     char           data[];   /* flexible: the carved blocks start here */
 } Slab;
+
+/* Track live slabs so we can eventually system_free their original base.
+ * Currently slabs are process-lifetime (standard for this style of allocator),
+ * but we must not lose the system_malloc pointer after alignment. */
+static pthread_mutex_t g_slab_list_lock = PTHREAD_MUTEX_INITIALIZER;
+static Slab* g_slab_list = NULL;
 
 /* One central freelist + mutex per size class */
 typedef struct {
@@ -194,16 +205,17 @@ static Slab* carve_new_slab(int cls) {
     }
 
     size_t alloc_sz = sizeof(Slab) + num_blocks * (CML_HEADER_SIZE + bin_size);
-    /* Align the slab allocation a bit */
+    /* Align the slab allocation a bit; keep the original system pointer so we can free it. */
     void* raw = system_malloc(alloc_sz + 64);
     if (!raw) return NULL;
 
-    /* Align start of Slab data area for cleanliness */
+    /* Align start of Slab structure for cleanliness */
     uintptr_t base = (uintptr_t)raw;
     uintptr_t aligned_base = (base + 63) & ~(uintptr_t)63;
     Slab* slab = (Slab*)aligned_base;
 
     slab->next = NULL;
+    slab->system_base = raw; /* MUST retain: system_free(raw), not system_free(slab) */
     slab->class_idx = (uint32_t)cls;
     slab->num_blocks = (uint32_t)num_blocks;
     slab->used_blocks = 0;
@@ -237,6 +249,12 @@ static Slab* carve_new_slab(int cls) {
         g_central[cls].total_slabs++;
         pthread_mutex_unlock(&g_central[cls].lock);
     }
+
+    /* Register slab so its system_base is never lost (process-lifetime today). */
+    pthread_mutex_lock(&g_slab_list_lock);
+    slab->next = g_slab_list;
+    g_slab_list = slab;
+    pthread_mutex_unlock(&g_slab_list_lock);
 
     return slab;
 }
@@ -315,7 +333,7 @@ static void* alloc_from_class(int cls, size_t user_size) {
         tl_cache.heads[cls] = node->next;
         tl_cache.counts[cls]--;
         AllocHeader* hdr = (AllocHeader*)((char*)node - CML_HEADER_SIZE);
-        hdr->size = (uint32_t)user_size;
+        hdr->size = user_size;
         hdr->class_idx = (uint16_t)cls;
         hdr->magic = ALLOC_MAGIC;
 
@@ -349,7 +367,7 @@ static void* alloc_from_class(int cls, size_t user_size) {
         void* raw = system_malloc(CML_HEADER_SIZE + bin);
         if (!raw) return NULL;
         AllocHeader* hdr = (AllocHeader*)raw;
-        hdr->size = (uint32_t)user_size;
+        hdr->size = user_size;
         hdr->class_idx = (uint16_t)cls;
         hdr->magic = ALLOC_MAGIC;
         return user_from_header(hdr);
@@ -359,7 +377,7 @@ static void* alloc_from_class(int cls, size_t user_size) {
     tl_cache.counts[cls]--;
 
     AllocHeader* hdr = (AllocHeader*)((char*)node - CML_HEADER_SIZE);
-    hdr->size = (uint32_t)user_size;
+    hdr->size = user_size;
     hdr->class_idx = (uint16_t)cls;
     hdr->magic = ALLOC_MAGIC;
 
@@ -383,7 +401,7 @@ static void* alloc_large(size_t size) {
         if (!raw) return NULL;
     }
     AllocHeader* hdr = (AllocHeader*)raw;
-    hdr->size = (uint32_t)size;
+    hdr->size = size;
     hdr->class_idx = 0xffff;
     hdr->magic = ALLOC_MAGIC;
 
@@ -437,7 +455,7 @@ void* cml_realloc(void* ptr, size_t new_size) {
     size_t old_size = hdr->size;
     if (new_size <= old_size) {
         /* Shrink: keep same block, just update header */
-        hdr->size = (uint32_t)new_size;
+        hdr->size = new_size;
         /* Note: we do not give memory back to freelist for shrink here (common & fast) */
         __atomic_sub_fetch(&g_total_allocated_bytes, (old_size - new_size), __ATOMIC_RELAXED);
         return ptr;

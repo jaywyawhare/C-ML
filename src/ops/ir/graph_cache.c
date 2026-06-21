@@ -225,7 +225,7 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
             plan->output_tensors[idx] = node->output;
             size_t nbytes             = (size_t)node->output->numel * sizeof(float);
             plan->buffers[idx] =
-                aligned_alloc(32, cml_alloc_size_aligned(nbytes, 32));
+                cml_aligned_alloc(cml_alloc_size_aligned(nbytes, 32), 32);
             if (!plan->buffers[idx]) {
                 cml_free_execution_plan(plan);
                 return NULL;
@@ -256,7 +256,7 @@ static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_
                         t->is_executed = false;
                     }
                 }
-                cml_free(plan->buffers[i]);
+                cml_aligned_free(plan->buffers[i]);
             }
         }
         cml_free(plan->buffers);

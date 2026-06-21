@@ -859,7 +859,17 @@ CMLOpenImagesLoader* cml_openimages_open(const char* images_dir, const char* ann
         const char* base = strrchr(files[i], '/');
         base = base ? base + 1 : files[i];
         char* dot = strrchr(base, '.');
-        ids[i] = dot ? strndup(base, dot - base) : cml_strdup(base);
+        /* keep allocator family consistent: always use cml_* so cml_openimages_free is safe */
+        if (dot) {
+            size_t n = (size_t)(dot - base);
+            ids[i] = cml_malloc(n + 1);
+            if (ids[i]) {
+                memcpy(ids[i], base, n);
+                ids[i][n] = '\0';
+            }
+        } else {
+            ids[i] = cml_strdup(base);
+        }
         cml_free(files[i]);
     }
     cml_free(files);

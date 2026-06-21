@@ -332,12 +332,20 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
             int* in_degree = cml_calloc((size_t)ng, sizeof(int));
             int** deps = cml_calloc((size_t)ng, sizeof(int*));
             int* dep_counts = cml_calloc((size_t)ng, sizeof(int));
+            int* queue = NULL;
+            int bfs_ok = (in_degree && deps && dep_counts);
 
-            if (in_degree && deps && dep_counts) {
+            if (bfs_ok) {
                 for (int i = 0; i < ng; i++) {
                     deps[i] = cml_calloc((size_t)ng, sizeof(int));
+                    if (!deps[i]) {
+                        bfs_ok = 0;
+                        break;
+                    }
                 }
+            }
 
+            if (bfs_ok) {
                 for (int i = 0; i < ng; i++) {
                     CMLFusionGroup* consumer = sched->groups[i];
                     if (!consumer) continue;
@@ -366,7 +374,13 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
                     }
                 }
 
-                int* queue = cml_calloc((size_t)ng, sizeof(int));
+                queue = cml_calloc((size_t)ng, sizeof(int));
+                if (!queue) {
+                    bfs_ok = 0;
+                }
+            }
+
+            if (bfs_ok && queue) {
                 int qhead = 0, qtail = 0;
 
                 for (int i = 0; i < ng; i++) {
@@ -395,13 +409,23 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
                 }
 
                 sched->num_ordered = ordered;
-                cml_free(queue);
             }
 
-            for (int i = 0; i < ng; i++) cml_free(deps[i]);
+            cml_free(queue);
+            if (deps) {
+                for (int i = 0; i < ng; i++) cml_free(deps[i]);
+            }
             cml_free(deps);
             cml_free(dep_counts);
             cml_free(in_degree);
+
+            /* Fall back to sequential order if BFS temporaries could not be allocated */
+            if (!bfs_ok || sched->num_ordered == 0) {
+                for (int i = 0; i < sched->num_groups; i++) {
+                    sched->execution_order[i] = i;
+                }
+                sched->num_ordered = sched->num_groups;
+            }
         } else {
             for (int i = 0; i < sched->num_groups; i++) {
                 sched->execution_order[i] = i;

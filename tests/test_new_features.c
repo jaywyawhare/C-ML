@@ -255,7 +255,12 @@ static int test_muon_optimizer(void) {
 
     Parameter* params[] = {param};
     Optimizer* opt = optim_muon(params, 1, 0.02f, 0.95f, 0.0f, true);
-    if (!opt) { cml_free(param); tensor_free(weight); return 0; }
+    if (!opt) {
+        cml_free(param->name);
+        cml_free(param);
+        tensor_free(weight);
+        return 0;
+    }
 
     // Step should not crash
     optimizer_step(opt);

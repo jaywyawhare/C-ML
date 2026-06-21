@@ -23,9 +23,27 @@ void   cml_free(void* ptr);
 /* String helper */
 char*  cml_strdup(const char* s);
 
-/* Aligned allocation (alignment must be power of two, >= 16) */
+/* Aligned allocation (alignment must be power of two, >= 16).
+ *
+ * IMPORTANT: pointers returned by cml_aligned_alloc() MUST be freed with
+ * cml_aligned_free(), not cml_free().
+ *
+ * cml_aligned_alloc() returns an address that may not point at the normal
+ * AllocHeader layout used by cml_malloc(); it stores a small delta prefix
+ * before the returned pointer so the real backing block can be recovered.
+ * Passing that pointer directly to cml_free() will read a bogus header
+ * (magic mismatch / wrong class_idx) and either leak the block or corrupt
+ * the allocator state.
+ *
+ * Conversely, cml_malloc()/cml_calloc()/cml_realloc() pointers must be freed
+ * with cml_free() (or cml_realloc(ptr, 0)), never cml_aligned_free().
+ *
+ * Also never mix system malloc/calloc/aligned_alloc/posix_memalign pointers
+ * with cml_free() or cml_aligned_free() — those must go through the matching
+ * system free() (or cml_malloc/cml_aligned_alloc equivalents end-to-end).
+ */
 void*  cml_aligned_alloc(size_t size, size_t alignment);
-void   cml_aligned_free(void* ptr); /* safe to mix with cml_free in most cases */
+void   cml_aligned_free(void* ptr);
 
 /* Stats (approximate, racy) */
 void   cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count);

@@ -267,8 +267,8 @@ void cml_blas_free(CMLBlasContext* ctx) {
     }
     blas_unlock();
 
-    cml_free(ctx->pack_a_buf);
-    cml_free(ctx->pack_b_buf);
+    cml_aligned_free(ctx->pack_a_buf);
+    cml_aligned_free(ctx->pack_b_buf);
     cml_free(ctx);
 }
 
@@ -574,13 +574,13 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
             size_t need_b = (size_t)nc_alloc * PACKED_KC * sizeof(float);
             /* Grow context-resident buffers lazily — amortises alloc across calls */
             if (ctx->pack_a_size < need_a) {
-                cml_free(ctx->pack_a_buf);
-                ctx->pack_a_buf  = (float*)aligned_alloc(32, need_a);
+                cml_aligned_free(ctx->pack_a_buf);
+                ctx->pack_a_buf  = (float*)cml_aligned_alloc(need_a, 32);
                 ctx->pack_a_size = ctx->pack_a_buf ? need_a : 0;
             }
             if (ctx->pack_b_size < need_b) {
-                cml_free(ctx->pack_b_buf);
-                ctx->pack_b_buf  = (float*)aligned_alloc(32, need_b);
+                cml_aligned_free(ctx->pack_b_buf);
+                ctx->pack_b_buf  = (float*)cml_aligned_alloc(need_b, 32);
                 ctx->pack_b_size = ctx->pack_b_buf ? need_b : 0;
             }
             if (ctx->pack_a_buf && ctx->pack_b_buf) {

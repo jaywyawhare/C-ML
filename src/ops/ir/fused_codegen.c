@@ -82,7 +82,7 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
                 if (prog->num_ops >= prog->capacity) {
                     int nc = prog->capacity * 2;
                     CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-                    if (!tmp) break;
+                    if (!tmp) goto oom;
                     prog->ops = tmp;
                     prog->capacity = nc;
                 }
@@ -114,7 +114,7 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
         if (prog->num_ops >= prog->capacity) {
             int nc = prog->capacity * 2;
             CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-            if (!tmp) break;
+            if (!tmp) goto oom;
             prog->ops = tmp;
             prog->capacity = nc;
         }
@@ -131,7 +131,7 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
             if (prog->num_ops >= prog->capacity) {
                 int nc = prog->capacity * 2;
                 CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-                if (!tmp) break;
+                if (!tmp) goto oom;
                 prog->ops = tmp;
                 prog->capacity = nc;
             }
@@ -141,6 +141,12 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
 
     cml_free(node_vreg);
     return prog;
+
+oom:
+    cml_free(node_vreg);
+    cml_free(prog->ops);
+    cml_free(prog);
+    return NULL;
 }
 
 void cml_linear_program_free(CMLLinearProgram* prog) {

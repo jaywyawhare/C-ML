@@ -81,7 +81,7 @@ static void fast_path_free(SequentialFastPath* fp) {
             cml_free(fp->ops[i].weight_transposed);
         if (fp->ops[i].out_buf &&
             (i == 0 || fp->ops[i].out_buf != fp->ops[i - 1].out_buf)) {
-            cml_free(fp->ops[i].out_buf);
+            cml_aligned_free(fp->ops[i].out_buf);
         }
     }
     cml_free(fp->ops);
@@ -147,7 +147,7 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
             }
 
             size_t nbytes = alloc_size_aligned(op->out_numel * sizeof(float), 64);
-            op->out_buf   = aligned_alloc(64, nbytes);
+            op->out_buf   = cml_aligned_alloc(nbytes, 64);
             if (!op->out_buf) { fast_path_free(fp); return NULL; }
             prev_out       = op->out_buf;
             prev_out_numel = op->out_numel;
@@ -300,10 +300,10 @@ static void free_cached_graph(CachedModelGraph* cache) {
         cml_free(cache->input_shape);
     }
     if (cache->input_buffer) {
-        cml_free(cache->input_buffer);
+        cml_aligned_free(cache->input_buffer);
     }
     if (cache->output_buffer) {
-        cml_free(cache->output_buffer);
+        cml_aligned_free(cache->output_buffer);
     }
     cml_free(cache);
 }
@@ -339,7 +339,7 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     cache->input_numel = input->numel;
 
     cache->input_buffer =
-        aligned_alloc(32, alloc_size_aligned((size_t)input->numel * sizeof(float), 32));
+        cml_aligned_alloc(alloc_size_aligned((size_t)input->numel * sizeof(float), 32), 32);
     if (!cache->input_buffer) {
         cml_free(cache->input_shape);
         cml_free(cache);
@@ -348,9 +348,9 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
 
     cache->output_numel  = output->numel;
     cache->output_buffer =
-        aligned_alloc(32, alloc_size_aligned((size_t)output->numel * sizeof(float), 32));
+        cml_aligned_alloc(alloc_size_aligned((size_t)output->numel * sizeof(float), 32), 32);
     if (!cache->output_buffer) {
-        cml_free(cache->input_buffer);
+        cml_aligned_free(cache->input_buffer);
         cml_free(cache->input_shape);
         cml_free(cache);
         return NULL;
@@ -358,8 +358,8 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
 
     cache->plan = cml_create_execution_plan(ir);
     if (!cache->plan) {
-        cml_free(cache->output_buffer);
-        cml_free(cache->input_buffer);
+        cml_aligned_free(cache->output_buffer);
+        cml_aligned_free(cache->input_buffer);
         cml_free(cache->input_shape);
         cml_free(cache);
         return NULL;

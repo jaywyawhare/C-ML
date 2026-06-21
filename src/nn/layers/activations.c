@@ -50,10 +50,15 @@ static void leaky_relu_free(Module* module) { cml_free(module); }
 
 LeakyReLU* nn_leaky_relu(float negative_slope, bool inplace) {
     LeakyReLU* leaky_relu = cml_malloc(sizeof(LeakyReLU));
-    if (!leaky_relu)
+    if (!leaky_relu) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for LeakyReLU layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)leaky_relu, "LeakyReLU", leaky_relu_forward, leaky_relu_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize LeakyReLU module", __FILE__,
+                         __LINE__, __func__);
         cml_free(leaky_relu);
         return NULL;
     }
@@ -202,10 +207,15 @@ static void gelu_free(Module* module) { cml_free(module); }
 
 GELU* nn_gelu(bool approximate) {
     GELU* gelu = cml_malloc(sizeof(GELU));
-    if (!gelu)
+    if (!gelu) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for GELU layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)gelu, "GELU", gelu_forward, gelu_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize GELU module", __FILE__,
+                         __LINE__, __func__);
         cml_free(gelu);
         return NULL;
     }
@@ -227,10 +237,15 @@ static void softmax_free(Module* module) { cml_free(module); }
 
 Softmax* nn_softmax(int dim) {
     Softmax* softmax = cml_malloc(sizeof(Softmax));
-    if (!softmax)
+    if (!softmax) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for Softmax layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)softmax, "Softmax", softmax_forward, softmax_free) != 0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Softmax module", __FILE__,
+                         __LINE__, __func__);
         cml_free(softmax);
         return NULL;
     }
@@ -259,11 +274,16 @@ static void log_softmax_free(Module* module) { cml_free(module); }
 
 LogSoftmax* nn_log_softmax(int dim) {
     LogSoftmax* log_softmax = cml_malloc(sizeof(LogSoftmax));
-    if (!log_softmax)
+    if (!log_softmax) {
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for LogSoftmax layer",
+                         __FILE__, __LINE__, __func__);
         return NULL;
+    }
 
     if (module_init((Module*)log_softmax, "LogSoftmax", log_softmax_forward, log_softmax_free) !=
         0) {
+        error_stack_push(CM_OPERATION_FAILED, "Failed to initialize LogSoftmax module", __FILE__,
+                         __LINE__, __func__);
         cml_free(log_softmax);
         return NULL;
     }
