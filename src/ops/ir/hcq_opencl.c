@@ -1,6 +1,8 @@
 #ifdef CML_HAS_OPENCL
 
 #include "ops/ir/hcq.h"
+#include "ops/ir/dispatch.h"
+#include "ops/ir/gpu/opencl_ir_backend.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
@@ -24,6 +26,15 @@ static struct {
 
 static int ensure_ocl_init(void) {
     if (g_ocl_ctx.initialized) return 0;
+
+    CMLOpenCLIRBackend* be = cml_dispatch_get_opencl_backend();
+    if (be && be->initialized) {
+        g_ocl_ctx.platform    = be->platform;
+        g_ocl_ctx.device      = be->device;
+        g_ocl_ctx.context     = be->context;
+        g_ocl_ctx.initialized = true;
+        return 0;
+    }
 
     cl_int err;
 

@@ -45,6 +45,8 @@
 #include "ops/ir/gpu/opencl_ir_backend.h"
 #endif
 
+#include "ops/ir/hcq.h"
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -77,6 +79,37 @@ static bool g_opencl_init_attempted = false;
 #endif
 
 static CMLDispatchContext* g_dispatch_ctx = NULL;
+static CMLHCQQueue* g_hcq_queues[CML_BACKEND_COUNT] = {0};
+
+static CMLHCQBackendType dispatch_backend_to_hcq(CMLBackendType backend) {
+    switch (backend) {
+    case CML_BACKEND_CUDA:
+        return CML_HCQ_CUDA;
+    case CML_BACKEND_OPENCL:
+        return CML_HCQ_OPENCL;
+    case CML_BACKEND_VULKAN:
+        return CML_HCQ_VULKAN;
+    case CML_BACKEND_NV:
+        return CML_HCQ_NV;
+    case CML_BACKEND_AM:
+        return CML_HCQ_AM;
+    default:
+        return CML_HCQ_CPU;
+    }
+}
+
+static bool dispatch_backend_has_hcq(CMLBackendType backend) {
+    return dispatch_backend_to_hcq(backend) != CML_HCQ_CPU;
+}
+
+static void dispatch_destroy_hcq_queues(void) {
+    for (int i = 0; i < CML_BACKEND_COUNT; i++) {
+        if (g_hcq_queues[i]) {
+            cml_hcq_queue_destroy(g_hcq_queues[i]);
+            g_hcq_queues[i] = NULL;
+        }
+    }
+}
 
 static const char* backend_names[] = {
     "CPU (Interpreter)",
@@ -211,6 +244,8 @@ void cml_dispatch_free(CMLDispatchContext* ctx) {
         g_opencl_backend = NULL;
     }
 #endif
+
+    dispatch_destroy_hcq_queues();
 
     free(ctx);
     if (ctx == g_dispatch_ctx)
@@ -711,9 +746,8 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
 int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
                                Tensor** inputs, int num_inputs,
                                Tensor** outputs, int num_outputs) {
-    /* Async execution: currently dispatches synchronously.
-     * With HCQ integration, this will submit to a hardware command queue
-     * and return immediately, allowing overlapped compute/transfer. */
+    /* Graph execution is still synchronous; HCQ queues are used for memcpy,
+     * kernel submit, and cml_dispatch_synchronize on GPU backends. */
     return cml_dispatch_execute(ctx, ir, inputs, num_inputs, outputs, num_outputs);
 }
 
@@ -857,6 +891,16 @@ void cml_dispatch_synchronize(CMLDispatchContext* ctx) {
     if (ctx->backends[CML_BACKEND_VULKAN].status == CML_BACKEND_STATUS_INITIALIZED && g_vulkan_backend)
         cml_vulkan_synchronize(g_vulkan_backend);
 #endif
+
+    for (int i = 0; i < CML_BACKEND_COUNT; i++) {
+        if (ctx->backends[i].status != CML_BACKEND_STATUS_INITIALIZED)
+            continue;
+        if (!dispatch_backend_has_hcq((CMLBackendType)i))
+            continue;
+        CMLHCQQueue* q = cml_dispatch_get_hcq_queue((CMLBackendType)i);
+        if (q)
+            cml_hcq_queue_synchronize(q);
+    }
 }
 
 struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void) {
@@ -885,6 +929,26 @@ struct CMLAMDriver* cml_dispatch_get_am_driver(void) {
 #else
     return NULL;
 #endif
+}
+
+CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void) {
+#ifdef CML_HAS_OPENCL
+    return g_opencl_backend;
+#else
+    return NULL;
+#endif
+}
+
+CMLHCQQueue* cml_dispatch_get_hcq_queue(CMLBackendType backend) {
+    if (backend < 0 || backend >= CML_BACKEND_COUNT)
+        return NULL;
+    if (!dispatch_backend_has_hcq(backend))
+        return NULL;
+    if (!g_hcq_queues[backend]) {
+        CMLHCQBackendType hcq = dispatch_backend_to_hcq(backend);
+        g_hcq_queues[backend] = cml_hcq_queue_create(hcq);
+    }
+    return g_hcq_queues[backend];
 }
 
 int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,

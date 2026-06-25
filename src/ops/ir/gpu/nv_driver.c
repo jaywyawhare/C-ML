@@ -6,6 +6,7 @@
 #include "ops/ir/gpu/nv_driver.h"
 #include "ops/ir/gpu/nv_qmd.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/hcq.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
@@ -1356,6 +1357,53 @@ int cml_nv_gpu_wait_semaphore(CMLNVDriver *drv, uint64_t sem_va, uint32_t value)
 #endif
 }
 
+static CMLHCQQueue* nv_exec_hcq_queue(void) {
+    static CMLHCQQueue* queue;
+    if (!queue)
+        queue = cml_hcq_queue_create(CML_HCQ_NV);
+    return queue;
+}
+
+static int nv_exec_upload(CMLNVDriver* drv, CMLNVBuffer* buf, const void* src, size_t bytes) {
+    CMLHCQQueue* q = nv_exec_hcq_queue();
+    if (q)
+        return cml_hcq_memcpy_h2d(q, buf, src, bytes);
+    return cml_nv_buffer_upload(drv, buf, src, bytes);
+}
+
+static int nv_exec_download(CMLNVDriver* drv, CMLNVBuffer* buf, void* dst, size_t bytes) {
+    CMLHCQQueue* q = nv_exec_hcq_queue();
+    if (q)
+        return cml_hcq_memcpy_d2h(q, dst, buf, bytes);
+    return cml_nv_buffer_download(drv, buf, dst, bytes);
+}
+
+static int nv_exec_sync(CMLNVDriver* drv) {
+    CMLHCQQueue* q = nv_exec_hcq_queue();
+    if (q)
+        return cml_hcq_queue_synchronize(q);
+    return cml_nv_synchronize(drv);
+}
+
+static int nv_exec_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3],
+                          uint32_t block[3], void** kargs, int num_args) {
+    CMLHCQQueue* q = nv_exec_hcq_queue();
+    if (q) {
+        CMLHCQKernelDesc desc = {0};
+        desc.compiled_kernel = kernel;
+        desc.grid[0]         = grid[0];
+        desc.grid[1]         = grid[1];
+        desc.grid[2]         = grid[2];
+        desc.block[0]        = block[0];
+        desc.block[1]        = block[1];
+        desc.block[2]        = block[2];
+        desc.args            = kargs;
+        desc.num_args        = num_args;
+        return cml_hcq_submit_kernel(q, &desc);
+    }
+    return cml_nv_kernel_launch(drv, kernel, grid, block, kargs, num_args);
+}
+
 int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
     if (!drv || !ir) return -1;
     if (!drv->initialized) {
@@ -1401,19 +1449,19 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                     CMLNVBuffer *buf_out = cml_nv_buffer_create(drv, bytes, true);
 
                     if (buf_in && buf_out && a->data) {
-                        cml_nv_buffer_upload(drv, buf_in, a->data, bytes);
+                        nv_exec_upload(drv, buf_in, a->data, bytes);
 
                         uint32_t n32 = (uint32_t)numel;
                         void *kargs[] = { &buf_in->gpu_va, &buf_out->gpu_va, &n32 };
                         uint32_t block_dim[3] = {256, 1, 1};
                         uint32_t grid_dim[3]  = {(uint32_t)((numel + 255) / 256), 1, 1};
 
-                        if (cml_nv_kernel_launch(drv, kernel, grid_dim, block_dim, kargs, 3) == 0) {
-                            cml_nv_synchronize(drv);
+                        if (nv_exec_launch(drv, kernel, grid_dim, block_dim, kargs, 3) == 0) {
+                            nv_exec_sync(drv);
                             if (!output->data)
                                 output->data = malloc(bytes);
                             if (output->data) {
-                                cml_nv_buffer_download(drv, buf_out, output->data, bytes);
+                                nv_exec_download(drv, buf_out, output->data, bytes);
                                 gpu_ok = true;
                             }
                         }
@@ -1432,8 +1480,8 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                     CMLNVBuffer *buf_out = cml_nv_buffer_create(drv, bytes, true);
 
                     if (buf_a && buf_b && buf_out && a->data && b->data) {
-                        cml_nv_buffer_upload(drv, buf_a, a->data, bytes);
-                        cml_nv_buffer_upload(drv, buf_b, b->data, bytes);
+                        nv_exec_upload(drv, buf_a, a->data, bytes);
+                        nv_exec_upload(drv, buf_b, b->data, bytes);
 
                         uint32_t n32 = (uint32_t)numel;
                         void *kargs[] = { &buf_a->gpu_va, &buf_b->gpu_va,
@@ -1441,12 +1489,12 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                         uint32_t block_dim[3] = {256, 1, 1};
                         uint32_t grid_dim[3]  = {(uint32_t)((numel + 255) / 256), 1, 1};
 
-                        if (cml_nv_kernel_launch(drv, kernel, grid_dim, block_dim, kargs, 4) == 0) {
-                            cml_nv_synchronize(drv);
+                        if (nv_exec_launch(drv, kernel, grid_dim, block_dim, kargs, 4) == 0) {
+                            nv_exec_sync(drv);
                             if (!output->data)
                                 output->data = malloc(bytes);
                             if (output->data) {
-                                cml_nv_buffer_download(drv, buf_out, output->data, bytes);
+                                nv_exec_download(drv, buf_out, output->data, bytes);
                                 gpu_ok = true;
                             }
                         }

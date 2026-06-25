@@ -1,97 +1,9 @@
 #include "ops/ir/hcq.h"
+#include "ops/ir/hcq_backend.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef CML_HAS_CUDA
-extern CMLHCQQueue*  cml_hcq_cuda_queue_create(void);
-extern void          cml_hcq_cuda_queue_destroy(CMLHCQQueue* queue);
-extern int           cml_hcq_cuda_submit_kernel(CMLHCQQueue* queue,
-                                                const CMLHCQKernelDesc* desc);
-extern int           cml_hcq_cuda_memcpy_h2d(CMLHCQQueue* queue, void* dst,
-                                             const void* src, size_t bytes);
-extern int           cml_hcq_cuda_memcpy_d2h(CMLHCQQueue* queue, void* dst,
-                                             const void* src, size_t bytes);
-extern CMLHCQSignal* cml_hcq_cuda_signal_create(void);
-extern void          cml_hcq_cuda_signal_destroy(CMLHCQSignal* signal);
-extern int           cml_hcq_cuda_signal_record(CMLHCQQueue* queue,
-                                                CMLHCQSignal* signal);
-extern int           cml_hcq_cuda_queue_wait(CMLHCQQueue* queue,
-                                             CMLHCQSignal* signal);
-extern int           cml_hcq_cuda_signal_wait_cpu(CMLHCQSignal* signal,
-                                                  uint64_t timeout_ms);
-extern int           cml_hcq_cuda_queue_synchronize(CMLHCQQueue* queue);
-#endif
-
-#ifdef CML_HAS_OPENCL
-extern CMLHCQQueue*  cml_hcq_opencl_queue_create(void);
-extern void          cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue);
-extern int           cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue,
-                                                  const CMLHCQKernelDesc* desc);
-extern int           cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst,
-                                               const void* src, size_t bytes);
-extern int           cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst,
-                                               const void* src, size_t bytes);
-extern CMLHCQSignal* cml_hcq_opencl_signal_create(void);
-extern void          cml_hcq_opencl_signal_destroy(CMLHCQSignal* signal);
-extern int           cml_hcq_opencl_signal_record(CMLHCQQueue* queue,
-                                                  CMLHCQSignal* signal);
-extern int           cml_hcq_opencl_queue_wait(CMLHCQQueue* queue,
-                                               CMLHCQSignal* signal);
-extern int           cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal,
-                                                    uint64_t timeout_ms);
-extern int           cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue);
-#endif
-
-/* Vulkan HCQ backend (init-style API — dispatcher wraps into create/destroy) */
-extern int  cml_hcq_vulkan_queue_init(CMLHCQQueue* queue);
-extern void cml_hcq_vulkan_queue_destroy(CMLHCQQueue* queue);
-extern int  cml_hcq_vulkan_submit_kernel(CMLHCQQueue* queue,
-                                          const CMLHCQKernelDesc* desc);
-extern int  cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* queue, void* dst,
-                                       const void* src, size_t bytes);
-extern int  cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* queue, void* dst,
-                                       const void* src, size_t bytes);
-extern int  cml_hcq_vulkan_signal_create(CMLHCQSignal* signal);
-extern void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* signal);
-extern int  cml_hcq_vulkan_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
-extern int  cml_hcq_vulkan_synchronize(CMLHCQQueue* queue);
-
-/* NV userspace driver HCQ backend (create-style API) */
-extern CMLHCQQueue*  cml_hcq_nv_queue_create(void);
-extern void          cml_hcq_nv_queue_destroy(CMLHCQQueue* queue);
-extern int           cml_hcq_nv_submit_kernel(CMLHCQQueue* queue,
-                                               const CMLHCQKernelDesc* desc);
-extern int           cml_hcq_nv_memcpy_h2d(CMLHCQQueue* queue, void* dst,
-                                            const void* src, size_t bytes);
-extern int           cml_hcq_nv_memcpy_d2h(CMLHCQQueue* queue, void* dst,
-                                            const void* src, size_t bytes);
-extern CMLHCQSignal* cml_hcq_nv_signal_create(void);
-extern void          cml_hcq_nv_signal_destroy(CMLHCQSignal* signal);
-extern int           cml_hcq_nv_signal_record(CMLHCQQueue* queue,
-                                               CMLHCQSignal* signal);
-extern int           cml_hcq_nv_queue_wait(CMLHCQQueue* queue,
-                                            CMLHCQSignal* signal);
-extern int           cml_hcq_nv_signal_wait_cpu(CMLHCQSignal* signal,
-                                                 uint64_t timeout_ms);
-extern int           cml_hcq_nv_queue_synchronize(CMLHCQQueue* queue);
-
-/* AMD AM driver HCQ backend (init-style API) */
-extern int  cml_hcq_am_queue_init(CMLHCQQueue* queue);
-extern void cml_hcq_am_queue_destroy(CMLHCQQueue* queue);
-extern int  cml_hcq_am_submit_kernel(CMLHCQQueue* queue,
-                                      const CMLHCQKernelDesc* desc);
-extern int  cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst,
-                                   const void* src, size_t bytes);
-extern int  cml_hcq_am_memcpy_d2h(CMLHCQQueue* queue, void* dst,
-                                   const void* src, size_t bytes);
-extern int  cml_hcq_am_signal_create(CMLHCQSignal* signal);
-extern void cml_hcq_am_signal_destroy(CMLHCQSignal* signal);
-extern int  cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
-extern int  cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
-extern int  cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
-extern int  cml_hcq_am_synchronize(CMLHCQQueue* queue);
 
 /*
  * CPU kernel function pointer type.
@@ -102,40 +14,15 @@ extern int  cml_hcq_am_synchronize(CMLHCQQueue* queue);
 typedef void (*cml_cpu_kernel_fn)(void** args, int num_args);
 
 CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
-    /* Dispatch to backend-specific creation when available. */
-    switch (backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_queue_create();
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_queue_create();
-#endif
-    case CML_HCQ_VULKAN: {
-        CMLHCQQueue* vq = calloc(1, sizeof(CMLHCQQueue));
-        if (!vq) return NULL;
-        vq->backend = CML_HCQ_VULKAN;
-        if (cml_hcq_vulkan_queue_init(vq) != 0) { free(vq); return NULL; }
-        return vq;
-    }
-    case CML_HCQ_NV:
-        return cml_hcq_nv_queue_create();
-    case CML_HCQ_AM: {
-        CMLHCQQueue* aq = calloc(1, sizeof(CMLHCQQueue));
-        if (!aq) return NULL;
-        aq->backend = CML_HCQ_AM;
-        if (cml_hcq_am_queue_init(aq) != 0) { free(aq); return NULL; }
-        return aq;
-    }
-    case CML_HCQ_CPU:
-        break; /* handled below */
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
+    if (ops && ops->queue_create)
+        return ops->queue_create();
+
+    if (backend != CML_HCQ_CPU) {
         LOG_ERROR("Unsupported HCQ backend type: %d", (int)backend);
         return NULL;
     }
 
-    /* CPU fallback */
     CMLHCQQueue* queue = (CMLHCQQueue*)calloc(1, sizeof(CMLHCQQueue));
     if (!queue) {
         LOG_ERROR("Failed to allocate CMLHCQQueue");
@@ -149,33 +36,17 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
 }
 
 void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
-    if (!queue) return;
+    if (!queue)
+        return;
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        cml_hcq_cuda_queue_destroy(queue);
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->queue_destroy) {
+        ops->queue_destroy(queue);
+        if (queue->backend == CML_HCQ_VULKAN || queue->backend == CML_HCQ_AM)
+            free(queue);
         return;
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        cml_hcq_opencl_queue_destroy(queue);
-        return;
-#endif
-    case CML_HCQ_VULKAN:
-        cml_hcq_vulkan_queue_destroy(queue);
-        free(queue);
-        return;
-    case CML_HCQ_NV:
-        cml_hcq_nv_queue_destroy(queue);
-        return;
-    case CML_HCQ_AM:
-        cml_hcq_am_queue_destroy(queue);
-        free(queue);
-        return;
-    default:
-        break;
     }
+
     queue->active = false;
     free(queue);
 }
@@ -186,29 +57,15 @@ int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
         return -1;
     }
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_submit_kernel(queue, desc);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_submit_kernel(queue, desc);
-#endif
-    case CML_HCQ_VULKAN:
-        return cml_hcq_vulkan_submit_kernel(queue, desc);
-    case CML_HCQ_NV:
-        return cml_hcq_nv_submit_kernel(queue, desc);
-    case CML_HCQ_AM:
-        return cml_hcq_am_submit_kernel(queue, desc);
-    case CML_HCQ_CPU:
-        break;
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->submit_kernel)
+        return ops->submit_kernel(queue, desc);
+
+    if (queue->backend != CML_HCQ_CPU) {
         LOG_ERROR("Unsupported backend %d for submit_kernel", (int)queue->backend);
         return -1;
     }
 
-    /* CPU path: cast compiled_kernel to a function pointer and call it. */
     if (!desc->compiled_kernel) {
         LOG_ERROR("CPU kernel function pointer is NULL");
         return -1;
@@ -226,24 +83,11 @@ int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
         return -1;
     }
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_memcpy_h2d(queue, dst_device, src_host, bytes);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_memcpy_h2d(queue, dst_device, src_host, bytes);
-#endif
-    case CML_HCQ_VULKAN:
-        return cml_hcq_vulkan_memcpy_h2d(queue, dst_device, src_host, bytes);
-    case CML_HCQ_NV:
-        return cml_hcq_nv_memcpy_h2d(queue, dst_device, src_host, bytes);
-    case CML_HCQ_AM:
-        return cml_hcq_am_memcpy_h2d(queue, dst_device, src_host, bytes);
-    case CML_HCQ_CPU:
-        break;
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->memcpy_h2d)
+        return ops->memcpy_h2d(queue, dst_device, src_host, bytes);
+
+    if (queue->backend != CML_HCQ_CPU) {
         LOG_ERROR("Unsupported backend %d for memcpy_h2d", (int)queue->backend);
         return -1;
     }
@@ -264,24 +108,11 @@ int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
         return -1;
     }
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_memcpy_d2h(queue, dst_host, src_device, bytes);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_memcpy_d2h(queue, dst_host, src_device, bytes);
-#endif
-    case CML_HCQ_VULKAN:
-        return cml_hcq_vulkan_memcpy_d2h(queue, dst_host, src_device, bytes);
-    case CML_HCQ_NV:
-        return cml_hcq_nv_memcpy_d2h(queue, dst_host, src_device, bytes);
-    case CML_HCQ_AM:
-        return cml_hcq_am_memcpy_d2h(queue, dst_host, src_device, bytes);
-    case CML_HCQ_CPU:
-        break;
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->memcpy_d2h)
+        return ops->memcpy_d2h(queue, dst_host, src_device, bytes);
+
+    if (queue->backend != CML_HCQ_CPU) {
         LOG_ERROR("Unsupported backend %d for memcpy_d2h", (int)queue->backend);
         return -1;
     }
@@ -295,34 +126,11 @@ int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
 }
 
 CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
-    switch (backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_signal_create();
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_signal_create();
-#endif
-    case CML_HCQ_VULKAN: {
-        CMLHCQSignal* vs = calloc(1, sizeof(CMLHCQSignal));
-        if (!vs) return NULL;
-        vs->backend = CML_HCQ_VULKAN;
-        if (cml_hcq_vulkan_signal_create(vs) != 0) { free(vs); return NULL; }
-        return vs;
-    }
-    case CML_HCQ_NV:
-        return cml_hcq_nv_signal_create();
-    case CML_HCQ_AM: {
-        CMLHCQSignal* as = calloc(1, sizeof(CMLHCQSignal));
-        if (!as) return NULL;
-        as->backend = CML_HCQ_AM;
-        if (cml_hcq_am_signal_create(as) != 0) { free(as); return NULL; }
-        return as;
-    }
-    case CML_HCQ_CPU:
-        break;
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
+    if (ops && ops->signal_create)
+        return ops->signal_create();
+
+    if (backend != CML_HCQ_CPU) {
         LOG_ERROR("Unsupported HCQ backend type %d for signal", (int)backend);
         return NULL;
     }
@@ -340,33 +148,17 @@ CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
 }
 
 void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
-    if (!signal) return;
+    if (!signal)
+        return;
 
-    switch (signal->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        cml_hcq_cuda_signal_destroy(signal);
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(signal->backend);
+    if (ops && ops->signal_destroy) {
+        ops->signal_destroy(signal);
+        if (signal->backend == CML_HCQ_VULKAN || signal->backend == CML_HCQ_AM)
+            free(signal);
         return;
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        cml_hcq_opencl_signal_destroy(signal);
-        return;
-#endif
-    case CML_HCQ_VULKAN:
-        cml_hcq_vulkan_signal_destroy(signal);
-        free(signal);
-        return;
-    case CML_HCQ_NV:
-        cml_hcq_nv_signal_destroy(signal);
-        return;
-    case CML_HCQ_AM:
-        cml_hcq_am_signal_destroy(signal);
-        free(signal);
-        return;
-    default:
-        break;
     }
+
     free(signal);
 }
 
@@ -376,23 +168,11 @@ int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
         return -1;
     }
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_signal_record(queue, signal);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_signal_record(queue, signal);
-#endif
-    case CML_HCQ_NV:
-        return cml_hcq_nv_signal_record(queue, signal);
-    case CML_HCQ_AM:
-        return cml_hcq_am_signal_record(queue, signal);
-    case CML_HCQ_VULKAN: /* Vulkan has no separate signal_record; sync via synchronize */
-    case CML_HCQ_CPU:
-        break;
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->signal_record)
+        return ops->signal_record(queue, signal);
+
+    if (queue->backend != CML_HCQ_CPU && queue->backend != CML_HCQ_VULKAN) {
         LOG_ERROR("Unsupported backend %d for signal_record", (int)queue->backend);
         return -1;
     }
@@ -409,23 +189,11 @@ int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
         return -1;
     }
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_queue_wait(queue, signal);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_queue_wait(queue, signal);
-#endif
-    case CML_HCQ_NV:
-        return cml_hcq_nv_queue_wait(queue, signal);
-    case CML_HCQ_AM:
-        return cml_hcq_am_queue_wait(queue, signal);
-    case CML_HCQ_VULKAN: /* Vulkan synchronization is via cml_hcq_vulkan_synchronize */
-    case CML_HCQ_CPU:
-        break;
-    default:
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->queue_wait)
+        return ops->queue_wait(queue, signal);
+
+    if (queue->backend != CML_HCQ_CPU && queue->backend != CML_HCQ_VULKAN) {
         LOG_ERROR("Unsupported backend %d for queue_wait", (int)queue->backend);
         return -1;
     }
@@ -453,26 +221,12 @@ int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
         return -1;
     }
 
-    switch (signal->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_signal_wait_cpu(signal, timeout_ms);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_signal_wait_cpu(signal, timeout_ms);
-#endif
-    case CML_HCQ_VULKAN:
-        return cml_hcq_vulkan_signal_wait(signal, timeout_ms);
-    case CML_HCQ_NV:
-        return cml_hcq_nv_signal_wait_cpu(signal, timeout_ms);
-    case CML_HCQ_AM:
-        return cml_hcq_am_signal_wait(signal, timeout_ms);
-    case CML_HCQ_CPU:
-        break;
-    default:
-        LOG_ERROR("Unsupported backend %d for signal_wait_cpu",
-                  (int)signal->backend);
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(signal->backend);
+    if (ops && ops->signal_wait_cpu)
+        return ops->signal_wait_cpu(signal, timeout_ms);
+
+    if (signal->backend != CML_HCQ_CPU) {
+        LOG_ERROR("Unsupported backend %d for signal_wait_cpu", (int)signal->backend);
         return -1;
     }
 
@@ -495,26 +249,12 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
         return -1;
     }
 
-    switch (queue->backend) {
-#ifdef CML_HAS_CUDA
-    case CML_HCQ_CUDA:
-        return cml_hcq_cuda_queue_synchronize(queue);
-#endif
-#ifdef CML_HAS_OPENCL
-    case CML_HCQ_OPENCL:
-        return cml_hcq_opencl_queue_synchronize(queue);
-#endif
-    case CML_HCQ_VULKAN:
-        return cml_hcq_vulkan_synchronize(queue);
-    case CML_HCQ_NV:
-        return cml_hcq_nv_queue_synchronize(queue);
-    case CML_HCQ_AM:
-        return cml_hcq_am_synchronize(queue);
-    case CML_HCQ_CPU:
-        break;
-    default:
-        LOG_ERROR("Unsupported backend %d for queue_synchronize",
-                  (int)queue->backend);
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    if (ops && ops->queue_synchronize)
+        return ops->queue_synchronize(queue);
+
+    if (queue->backend != CML_HCQ_CPU) {
+        LOG_ERROR("Unsupported backend %d for queue_synchronize", (int)queue->backend);
         return -1;
     }
 
