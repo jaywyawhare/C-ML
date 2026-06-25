@@ -7,6 +7,13 @@
 extern "C" {
 #endif
 
+typedef struct FlashAttentionConfig {
+    bool enabled;
+    int block_size_q;
+    int block_size_kv;
+    bool causal;
+} FlashAttentionConfig;
+
 typedef struct MultiHeadAttention {
     Module base;
     int embed_dim;
@@ -21,6 +28,9 @@ typedef struct MultiHeadAttention {
     Parameter* b_k; // [embed_dim]
     Parameter* b_v; // [embed_dim]
     Parameter* b_o; // [embed_dim]
+    bool use_flash;
+    bool flash_causal;
+    FlashAttentionConfig flash_config;
 } MultiHeadAttention;
 
 MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float dropout,
@@ -103,14 +113,6 @@ typedef struct TransformerDecoder {
 TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
                                             float dropout, int num_layers,
                                             DType dtype, DeviceType device);
-
-/* Tiled Q/K/V with online softmax (FlashAttention-2 on CPU). */
-typedef struct FlashAttentionConfig {
-    bool enabled;
-    int block_size_q;   // Tile size for queries (default: 64)
-    int block_size_kv;  // Tile size for keys/values (default: 64)
-    bool causal;        // Whether to apply causal masking
-} FlashAttentionConfig;
 
 typedef struct KVCache {
     Tensor* key_cache;    // [batch, num_heads, max_seq_len, head_dim]

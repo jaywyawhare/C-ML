@@ -1,5 +1,6 @@
 #include "nn/layers/transformer.h"
 #include "nn/init.h"
+#include "nn/llm_ops.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
@@ -78,6 +79,10 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     mha->num_heads = num_heads;
     mha->head_dim = embed_dim / num_heads;
     mha->dropout = dropout;
+    mha->use_flash = false;
+    mha->flash_causal = false;
+    mha->flash_config = (FlashAttentionConfig){
+        .enabled = true, .block_size_q = 64, .block_size_kv = 64, .causal = false};
 
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
@@ -130,6 +135,33 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     int embed_dim = mha->embed_dim;
     int num_heads = mha->num_heads;
     int head_dim  = mha->head_dim;
+
+    if (mha->use_flash && seq_q >= 512) {
+        Tensor* Q = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
+        Tensor* K = uop_linear(key, mha->W_k->tensor, mha->b_k->tensor);
+        Tensor* V = uop_linear(value, mha->W_v->tensor, mha->b_v->tensor);
+        if (!Q || !K || !V)
+            return NULL;
+
+        CMLGQAConfig gqa_cfg = {
+            .num_heads = num_heads,
+            .num_kv_heads = num_heads,
+            .head_dim = head_dim,
+            .scale = 1.0f / sqrtf((float)head_dim),
+            .causal = mha->flash_causal,
+            .window_size = 0,
+        };
+        CMLFlashAttentionConfig flash_cfg = {
+            .tile_size_q = mha->flash_config.block_size_q,
+            .tile_size_kv = mha->flash_config.block_size_kv,
+            .enabled = true,
+        };
+
+        Tensor* attn = cml_gqa_flash_forward(Q, K, V, &gqa_cfg, &flash_cfg);
+        if (!attn)
+            return NULL;
+        return uop_linear(attn, mha->W_o->tensor, mha->b_o->tensor);
+    }
 
     /* Linear projections: [B, S, E] */
     Tensor* Q = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
@@ -667,10 +699,23 @@ void kv_cache_reset(KVCache* cache) {
 
 Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                  Tensor* value, Tensor* mask, FlashAttentionConfig* config) {
-    (void)config;
-    /* Route to the lazy SDPA-based implementation; FlashAttention is a memory
-     * optimization that is not needed when execution is deferred. */
-    return multihead_attention_forward(mha, query, key, value, mask);
+    if (!mha || !query || !key || !value)
+        return NULL;
+
+    bool prev_flash = mha->use_flash;
+    FlashAttentionConfig prev_cfg = mha->flash_config;
+
+    mha->use_flash = true;
+    if (config) {
+        mha->flash_config = *config;
+        mha->flash_causal = config->causal;
+    }
+
+    Tensor* out = multihead_attention_forward(mha, query, key, value, mask);
+
+    mha->use_flash = prev_flash;
+    mha->flash_config = prev_cfg;
+    return out;
 }
 
 Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query,
@@ -789,6 +834,10 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
 }
 
 void multihead_attention_set_flash(MultiHeadAttention* mha, bool enabled, bool causal) {
-    if (!mha) return;
-    (void)enabled; (void)causal;
+    if (!mha)
+        return;
+    mha->use_flash = enabled;
+    mha->flash_causal = causal;
+    mha->flash_config.enabled = enabled;
+    mha->flash_config.causal = causal;
 }
