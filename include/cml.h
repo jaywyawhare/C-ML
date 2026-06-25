@@ -182,6 +182,7 @@ void cml_manual_seed(uint64_t seed);
 
 const char* cml_get_last_error(void);
 int cml_get_last_error_code(void);
+void cml_clear_last_error(void);
 Tensor* cml_zeros_like(Tensor* a);
 Tensor* cml_ones_like(Tensor* a);
 Tensor* cml_rand_like(Tensor* a);

@@ -34,5 +34,4 @@ def get_error_code():
 
 
 def clear_error():
-    lib.error_stack_cleanup()
-    lib.error_stack_init()
+    lib.cml_clear_last_error()

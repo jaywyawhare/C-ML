@@ -270,9 +270,11 @@ ffi.cdef(
     // Error stack (from core/error_stack.h)
     void error_stack_init(void);
     void error_stack_cleanup(void);
+    void error_stack_clear(void);
     bool error_stack_has_errors(void);
     const char* error_stack_get_last_message(void);
     int error_stack_get_last_code(void);
+    void cml_clear_last_error(void);
 
     // Config (from core/config.h)
 

@@ -503,7 +503,16 @@ int cml_cleanup(void) {
 
 static CMLGlobalErrorHandler g_error_handler = NULL;
 
-void cml_set_error_handler(CMLGlobalErrorHandler handler) { g_error_handler = handler; }
+static void cml_error_stack_notify(int error_code, const char* error_msg, void* context) {
+    (void)context;
+    if (g_error_handler)
+        (void)g_error_handler(error_code, error_msg, NULL);
+}
+
+void cml_set_error_handler(CMLGlobalErrorHandler handler) {
+    g_error_handler = handler;
+    error_stack_set_notify(handler ? cml_error_stack_notify : NULL, NULL);
+}
 
 CMLGlobalErrorHandler cml_get_error_handler(void) { return g_error_handler; }
 
@@ -1026,6 +1035,7 @@ Tensor* cml_randint(int low, int high, int* shape, int ndim, const TensorConfig*
 void cml_manual_seed(uint64_t seed) { tensor_manual_seed(seed); }
 const char* cml_get_last_error(void) { return error_stack_get_last_message(); }
 int cml_get_last_error_code(void) { return error_stack_get_last_code(); }
+void cml_clear_last_error(void) { error_stack_clear(); }
 Tensor* cml_zeros_like(Tensor* a) { return tensor_zeros_like(a); }
 Tensor* cml_ones_like(Tensor* a) { return tensor_ones_like(a); }
 Tensor* cml_rand_like(Tensor* a) { return tensor_rand_like(a); }

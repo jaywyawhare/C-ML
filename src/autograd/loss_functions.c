@@ -6,6 +6,7 @@
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
+#include "core/error_stack.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -13,13 +14,13 @@
 
 Tensor* tensor_mse_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("MSE Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("MSE Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel && input->numel != 1 && target->numel != 1) {
         LOG_ERROR("MSE Loss: shape mismatch - input: %zu, target: %zu", input->numel,
                   target->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -35,13 +36,13 @@ Tensor* tensor_mse_loss(Tensor* input, Tensor* target) {
 
 Tensor* tensor_mae_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("MAE Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("MAE Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel && input->numel != 1 && target->numel != 1) {
         LOG_ERROR("MAE Loss: shape mismatch - input: %zu, target: %zu", input->numel,
                   target->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -57,13 +58,13 @@ Tensor* tensor_mae_loss(Tensor* input, Tensor* target) {
 
 Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("BCE Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("BCE Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel && input->numel != 1 && target->numel != 1) {
         LOG_ERROR("BCE Loss: shape mismatch - input: %zu, target: %zu", input->numel,
                   target->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -105,18 +106,15 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
 
 Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("Cross Entropy Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss: input or target is NULL");
     }
 
     if (target->ndim != 1) {
-        LOG_ERROR("Cross Entropy Loss: target must be 1D");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss: target must be 1D");
     }
 
     if (input->ndim < 2) {
-        LOG_ERROR("Cross Entropy Loss: input must be at least 2D [N, C]");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss: input must be at least 2D [N, C]");
     }
 
     size_t n_samples = target->numel;
@@ -127,6 +125,7 @@ Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (input_batch_size != n_samples) {
         LOG_ERROR("Cross Entropy Loss: batch size mismatch - input: %zu, target: %zu",
                   input_batch_size, n_samples);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -148,13 +147,11 @@ Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
 
 Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     if (!input || !target) {
-        LOG_ERROR("Huber Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Huber Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel) {
-        LOG_ERROR("Huber Loss: shape mismatch");
-        return NULL;
+        CML_ERR_NULL("Huber Loss: shape mismatch");
     }
 
     if (delta <= 0.0f) delta = 1.0f;
@@ -223,13 +220,11 @@ Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
 
 Tensor* tensor_hinge_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("Hinge Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Hinge Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel) {
-        LOG_ERROR("Hinge Loss: shape mismatch");
-        return NULL;
+        CML_ERR_NULL("Hinge Loss: shape mismatch");
     }
 
     TensorConfig config = (TensorConfig){
@@ -263,13 +258,11 @@ Tensor* tensor_hinge_loss(Tensor* input, Tensor* target) {
 
 Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamma) {
     if (!input || !target) {
-        LOG_ERROR("Focal Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Focal Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel) {
-        LOG_ERROR("Focal Loss: shape mismatch");
-        return NULL;
+        CML_ERR_NULL("Focal Loss: shape mismatch");
     }
 
     if (alpha <= 0.0f) alpha = 0.25f;
@@ -346,13 +339,11 @@ Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamm
 
 Tensor* tensor_smooth_l1_loss(Tensor* input, Tensor* target, float beta) {
     if (!input || !target) {
-        LOG_ERROR("Smooth L1 Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Smooth L1 Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel) {
-        LOG_ERROR("Smooth L1 Loss: shape mismatch");
-        return NULL;
+        CML_ERR_NULL("Smooth L1 Loss: shape mismatch");
     }
 
     if (beta <= 0.0f) beta = 1.0f;
@@ -421,13 +412,11 @@ Tensor* tensor_smooth_l1_loss(Tensor* input, Tensor* target, float beta) {
 
 Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("KL Divergence Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("KL Divergence Loss: input or target is NULL");
     }
 
     if (input->numel != target->numel) {
-        LOG_ERROR("KL Divergence Loss: shape mismatch");
-        return NULL;
+        CML_ERR_NULL("KL Divergence Loss: shape mismatch");
     }
 
     Tensor* log_target = uop_log(target);
@@ -451,18 +440,15 @@ Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
 
 Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
-        LOG_ERROR("Sparse Cross Entropy Loss: input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss: input or target is NULL");
     }
 
     if (target->ndim != 1) {
-        LOG_ERROR("Sparse Cross Entropy Loss: target must be 1D");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss: target must be 1D");
     }
 
     if (input->ndim < 2) {
-        LOG_ERROR("Sparse Cross Entropy Loss: input must be at least 2D [N, C]");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss: input must be at least 2D [N, C]");
     }
 
     size_t n_samples = target->numel;
@@ -473,6 +459,7 @@ Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (input_batch_size != n_samples) {
         LOG_ERROR("Sparse Cross Entropy Loss: batch size mismatch - input: %zu, target: %zu",
                   input_batch_size, n_samples);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -502,13 +489,11 @@ Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
 Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* negative,
                                    float margin) {
     if (!anchor || !positive || !negative) {
-        LOG_ERROR("Triplet Margin Loss: anchor, positive, or negative is NULL");
-        return NULL;
+        CML_ERR_NULL("Triplet Margin Loss: anchor, positive, or negative is NULL");
     }
 
     if (anchor->numel != positive->numel || anchor->numel != negative->numel) {
-        LOG_ERROR("Triplet Margin Loss: shape mismatch");
-        return NULL;
+        CML_ERR_NULL("Triplet Margin Loss: shape mismatch");
     }
 
     if (margin <= 0.0f) margin = 1.0f;
@@ -544,13 +529,11 @@ Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* neg
 
 Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, float margin) {
     if (!x1 || !x2 || !target) {
-        LOG_ERROR("Cosine Embedding Loss: x1, x2, or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Cosine Embedding Loss: x1, x2, or target is NULL");
     }
 
     if (x1->numel != x2->numel) {
-        LOG_ERROR("Cosine Embedding Loss: x1 and x2 shape mismatch");
-        return NULL;
+        CML_ERR_NULL("Cosine Embedding Loss: x1 and x2 shape mismatch");
     }
 
     ReduceParams reduce_all = {0};
@@ -604,26 +587,22 @@ Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, flo
 Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
                                           float label_smoothing) {
     if (!input || !target) {
-        LOG_ERROR("Cross Entropy Loss (smooth): input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss (smooth): input or target is NULL");
     }
 
     if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
-        LOG_ERROR("Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
     }
 
     if (label_smoothing == 0.0f)
         return tensor_cross_entropy_loss(input, target);
 
     if (target->ndim != 1) {
-        LOG_ERROR("Cross Entropy Loss (smooth): target must be 1D");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss (smooth): target must be 1D");
     }
 
     if (input->ndim < 2) {
-        LOG_ERROR("Cross Entropy Loss (smooth): input must be at least 2D [N, C]");
-        return NULL;
+        CML_ERR_NULL("Cross Entropy Loss (smooth): input must be at least 2D [N, C]");
     }
 
     size_t n_samples = target->numel;
@@ -634,6 +613,7 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     if (input_batch_size != n_samples) {
         LOG_ERROR("Cross Entropy Loss (smooth): batch size mismatch - input: %zu, target: %zu",
                   input_batch_size, n_samples);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -689,26 +669,22 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
 Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
                                                  float label_smoothing) {
     if (!input || !target) {
-        LOG_ERROR("Sparse Cross Entropy Loss (smooth): input or target is NULL");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss (smooth): input or target is NULL");
     }
 
     if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
-        LOG_ERROR("Sparse Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
     }
 
     if (label_smoothing == 0.0f)
         return tensor_sparse_cross_entropy_loss(input, target);
 
     if (target->ndim != 1) {
-        LOG_ERROR("Sparse Cross Entropy Loss (smooth): target must be 1D");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss (smooth): target must be 1D");
     }
 
     if (input->ndim < 2) {
-        LOG_ERROR("Sparse Cross Entropy Loss (smooth): input must be at least 2D [N, C]");
-        return NULL;
+        CML_ERR_NULL("Sparse Cross Entropy Loss (smooth): input must be at least 2D [N, C]");
     }
 
     size_t n_samples = target->numel;
@@ -719,6 +695,7 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     if (input_batch_size != n_samples) {
         LOG_ERROR("Sparse Cross Entropy Loss (smooth): batch size mismatch - input: %zu, target: %zu",
                   input_batch_size, n_samples);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -791,18 +768,15 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
 
 Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets) {
     if (!log_probs || !targets) {
-        LOG_ERROR("NLL Loss: log_probs or targets is NULL");
-        return NULL;
+        CML_ERR_NULL("NLL Loss: log_probs or targets is NULL");
     }
 
     if (targets->ndim != 1) {
-        LOG_ERROR("NLL Loss: targets must be 1D");
-        return NULL;
+        CML_ERR_NULL("NLL Loss: targets must be 1D");
     }
 
     if (log_probs->ndim < 2) {
-        LOG_ERROR("NLL Loss: log_probs must be at least 2D [N, C]");
-        return NULL;
+        CML_ERR_NULL("NLL Loss: log_probs must be at least 2D [N, C]");
     }
 
     size_t n_samples = targets->numel;
@@ -813,6 +787,7 @@ Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets) {
     if (input_batch_size != n_samples) {
         LOG_ERROR("NLL Loss: batch size mismatch - log_probs: %zu, targets: %zu",
                   input_batch_size, n_samples);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
