@@ -1,4 +1,6 @@
 #include "nn/openai_api.h"
+#include "nn/serving.h"
+#include "nn/paged_attention.h"
 #include "nn/llama.h"
 #include "nn/llm_ops.h"
 #include "core/logging.h"
@@ -421,6 +423,19 @@ int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
 
     srv->model = model;
     srv->tokenizer = model->tokenizer;
+
+    CMLServingConfig scfg = cml_serving_default_config();
+    scfg.max_batch_size = 4;
+    srv->serving = cml_serving_create(&scfg);
+    if (srv->serving) {
+        int head_dim = model->config.hidden_size / model->config.num_heads;
+        srv->kv_cache = cml_paged_kv_cache_create(512, 64, model->config.num_kv_heads, head_dim);
+        if (srv->kv_cache) {
+            cml_serving_set_kv_cache(srv->serving, srv->kv_cache);
+            LOG_INFO("OpenAI API: paged KV cache and serving scheduler initialized");
+        }
+    }
+
     LOG_INFO("OpenAI API: loaded model from %s", model_path);
     return 0;
 }
@@ -510,6 +525,15 @@ void cml_openai_server_free(CMLOpenAIServer* srv) {
     }
     if (srv->model) {
         cml_llama_free((CMLLLaMAModel*)srv->model);
+        srv->model = NULL;
+    }
+    if (srv->serving) {
+        cml_serving_free(srv->serving);
+        srv->serving = NULL;
+    }
+    if (srv->kv_cache) {
+        cml_paged_kv_cache_free(srv->kv_cache);
+        srv->kv_cache = NULL;
     }
     free(srv);
 }
