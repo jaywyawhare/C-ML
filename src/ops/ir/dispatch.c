@@ -158,6 +158,10 @@ int cml_dispatch_init(CMLDispatchContext* ctx) {
 
     cml_dispatch_set_from_env(ctx);
 
+    if (!ctx->cache) {
+        ctx->cache = (struct CMLKernelCache*)cml_kernel_cache_create(256);
+    }
+
     LOG_INFO("Dispatch initialized. Active backend: %s", backend_names[ctx->active]);
     return 0;
 }
@@ -501,6 +505,19 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
 
     if (!ctx || !ir)
         return -1;
+
+    if (ctx->cache) {
+        CMLKernelBackend kbackend = CML_KERNEL_CPU_FALLBACK;
+        switch (backend) {
+        case CML_BACKEND_CUDA: kbackend = CML_KERNEL_CUDA; break;
+        case CML_BACKEND_ROCM: kbackend = CML_KERNEL_ROCM; break;
+        case CML_BACKEND_METAL: kbackend = CML_KERNEL_METAL; break;
+        case CML_BACKEND_WEBGPU: kbackend = CML_KERNEL_WEBGPU; break;
+        case CML_BACKEND_CPU_LLVM: kbackend = CML_KERNEL_CPU_LLVM; break;
+        default: break;
+        }
+        (void)cml_kernel_cache_lookup_ir((CMLKernelCache*)ctx->cache, ir, inputs, nin, kbackend);
+    }
 
     switch (backend) {
     case CML_BACKEND_CPU_FALLBACK: {
