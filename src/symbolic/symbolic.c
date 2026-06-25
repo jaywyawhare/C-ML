@@ -3,8 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <stdatomic.h>
 
-static int g_var_id_counter = 0;
+static _Atomic int g_var_id_counter = 0;
 
 
 static SymExpr* sym_alloc(SymExprType type) {
@@ -33,7 +34,7 @@ SymExpr* sym_var(const char* name, int64_t vmin, int64_t vmax) {
     e->var.name[sizeof(e->var.name) - 1] = '\0';
     e->var.vmin = vmin;
     e->var.vmax = vmax;
-    e->var.id = g_var_id_counter++;
+    e->var.id = atomic_fetch_add(&g_var_id_counter, 1);
     return e;
 }
 
