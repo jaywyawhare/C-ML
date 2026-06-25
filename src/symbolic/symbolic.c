@@ -19,6 +19,25 @@ static SymExpr* sym_alloc(SymExprType type) {
 static int64_t i64_min(int64_t a, int64_t b) { return a < b ? a : b; }
 static int64_t i64_max(int64_t a, int64_t b) { return a > b ? a : b; }
 
+static int sym_fold_binop(SymExprType type, int64_t left, int64_t right, int64_t* out) {
+    if (!out)
+        return 0;
+    switch (type) {
+    case SYM_ADD: *out = left + right; return 1;
+    case SYM_MUL: *out = left * right; return 1;
+    case SYM_DIV:
+        if (right == 0) return 0;
+        *out = left / right;
+        return 1;
+    case SYM_MOD:
+        if (right == 0) return 0;
+        *out = left % right;
+        return 1;
+    case SYM_MIN: *out = i64_min(left, right); return 1;
+    case SYM_MAX: *out = i64_max(left, right); return 1;
+    default: return 0;
+    }
+}
 
 SymExpr* sym_const(int64_t value) {
     SymExpr* e = sym_alloc(SYM_CONST);
@@ -42,25 +61,11 @@ SymExpr* sym_var(const char* name, int64_t vmin, int64_t vmax) {
 static SymExpr* sym_binop(SymExprType type, SymExpr* a, SymExpr* b) {
     if (!a || !b) return NULL;
 
-    // Constant folding: if both children are constants, evaluate now
     if (a->type == SYM_CONST && b->type == SYM_CONST) {
         int64_t result;
-        switch (type) {
-        case SYM_ADD: result = a->const_val + b->const_val; break;
-        case SYM_MUL: result = a->const_val * b->const_val; break;
-        case SYM_DIV:
-            if (b->const_val == 0) return NULL;
-            result = a->const_val / b->const_val;
-            break;
-        case SYM_MOD:
-            if (b->const_val == 0) return NULL;
-            result = a->const_val % b->const_val;
-            break;
-        case SYM_MIN: result = i64_min(a->const_val, b->const_val); break;
-        case SYM_MAX: result = i64_max(a->const_val, b->const_val); break;
-        default: return NULL;
-        }
-        return sym_const(result);
+        if (sym_fold_binop(type, a->const_val, b->const_val, &result))
+            return sym_const(result);
+        return NULL;
     }
 
     SymExpr* e = sym_alloc(type);
@@ -160,37 +165,37 @@ int64_t sym_expr_max(const SymExpr* e) {
 }
 
 
-int64_t sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, int num_vars) {
-    if (!e) return 0;
+int sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, int num_vars,
+             int64_t* out) {
+    if (!e || !out)
+        return -1;
     switch (e->type) {
-    case SYM_CONST: return e->const_val;
+    case SYM_CONST:
+        *out = e->const_val;
+        return 0;
     case SYM_VAR:
         for (int i = 0; i < num_vars; i++) {
-            if (var_names[i] && strcmp(var_names[i], e->var.name) == 0)
-                return values[i];
+            if (var_names[i] && strcmp(var_names[i], e->var.name) == 0) {
+                *out = values[i];
+                return 0;
+            }
         }
-        // Variable not found; return midpoint as fallback
-        return (e->var.vmin + e->var.vmax) / 2;
-    case SYM_ADD: return sym_eval(e->binop.left, var_names, values, num_vars)
-                       + sym_eval(e->binop.right, var_names, values, num_vars);
-    case SYM_MUL: return sym_eval(e->binop.left, var_names, values, num_vars)
-                       * sym_eval(e->binop.right, var_names, values, num_vars);
-    case SYM_DIV: {
-        int64_t r = sym_eval(e->binop.right, var_names, values, num_vars);
-        if (r == 0) return 0;
-        return sym_eval(e->binop.left, var_names, values, num_vars) / r;
+        return -1;
+    case SYM_ADD:
+    case SYM_MUL:
+    case SYM_DIV:
+    case SYM_MOD:
+    case SYM_MIN:
+    case SYM_MAX: {
+        int64_t left, right;
+        if (sym_eval(e->binop.left, var_names, values, num_vars, &left) != 0)
+            return -1;
+        if (sym_eval(e->binop.right, var_names, values, num_vars, &right) != 0)
+            return -1;
+        return sym_fold_binop(e->type, left, right, out) ? 0 : -1;
     }
-    case SYM_MOD: {
-        int64_t r = sym_eval(e->binop.right, var_names, values, num_vars);
-        if (r == 0) return 0;
-        return sym_eval(e->binop.left, var_names, values, num_vars) % r;
     }
-    case SYM_MIN: return i64_min(sym_eval(e->binop.left, var_names, values, num_vars),
-                                  sym_eval(e->binop.right, var_names, values, num_vars));
-    case SYM_MAX: return i64_max(sym_eval(e->binop.left, var_names, values, num_vars),
-                                  sym_eval(e->binop.right, var_names, values, num_vars));
-    }
-    return 0;
+    return -1;
 }
 
 
@@ -215,20 +220,7 @@ SymExpr* sym_simplify(SymExpr* e) {
     // Constant folding (both children are now constants)
     if (left->type == SYM_CONST && right->type == SYM_CONST) {
         int64_t result;
-        bool valid = true;
-        switch (e->type) {
-        case SYM_ADD: result = left->const_val + right->const_val; break;
-        case SYM_MUL: result = left->const_val * right->const_val; break;
-        case SYM_DIV:
-            if (right->const_val == 0) { valid = false; break; }
-            result = left->const_val / right->const_val; break;
-        case SYM_MOD:
-            if (right->const_val == 0) { valid = false; break; }
-            result = left->const_val % right->const_val; break;
-        case SYM_MIN: result = i64_min(left->const_val, right->const_val); break;
-        case SYM_MAX: result = i64_max(left->const_val, right->const_val); break;
-        default: valid = false;
-        }
+        bool valid = sym_fold_binop(e->type, left->const_val, right->const_val, &result);
         sym_expr_release(left);
         sym_expr_release(right);
         if (valid) return sym_const(result);
@@ -479,7 +471,10 @@ int sym_shape_eval(const SymShape* shape, const char** var_names, const int64_t*
 
     for (int i = 0; i < shape->ndim; i++) {
         if (shape->dims[i].is_symbolic) {
-            out_dims[i] = (int)sym_eval(shape->dims[i].expr, var_names, values, num_vars);
+            int64_t val;
+            if (sym_eval(shape->dims[i].expr, var_names, values, num_vars, &val) != 0)
+                return -1;
+            out_dims[i] = (int)val;
         } else {
             out_dims[i] = shape->dims[i].concrete;
         }
