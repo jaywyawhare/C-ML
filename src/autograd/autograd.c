@@ -13,7 +13,8 @@
 
 AutogradEngine* global_autograd_engine = NULL;
 
-static pthread_once_t g_autograd_once = PTHREAD_ONCE_INIT;
+static pthread_mutex_t g_autograd_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool g_autograd_initialized = false;
 static pthread_mutex_t g_hook_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void autograd_init_once(void) {
@@ -35,14 +36,19 @@ static void autograd_init_once(void) {
 
     pthread_mutex_init(&global_autograd_engine->lock, NULL);
     global_autograd_engine->lock_initialized = true;
-
 }
 
 void autograd_init(void) {
-    pthread_once(&g_autograd_once, autograd_init_once);
+    pthread_mutex_lock(&g_autograd_init_mutex);
+    if (!g_autograd_initialized) {
+        autograd_init_once();
+        g_autograd_initialized = global_autograd_engine != NULL;
+    }
+    pthread_mutex_unlock(&g_autograd_init_mutex);
 }
 
 void autograd_shutdown(void) {
+    pthread_mutex_lock(&g_autograd_init_mutex);
     if (global_autograd_engine) {
         if (global_autograd_engine->lock_initialized) {
             pthread_mutex_destroy(&global_autograd_engine->lock);
@@ -50,13 +56,13 @@ void autograd_shutdown(void) {
         }
         free(global_autograd_engine);
         global_autograd_engine = NULL;
-        /* Reset pthread_once so re-init is possible (e.g., in tests) */
-        g_autograd_once = (pthread_once_t)PTHREAD_ONCE_INIT;
     }
+    g_autograd_initialized = false;
+    pthread_mutex_unlock(&g_autograd_init_mutex);
 }
 
 AutogradEngine* autograd_get_engine(void) {
-    pthread_once(&g_autograd_once, autograd_init_once);
+    autograd_init();
     return global_autograd_engine;
 }
 
