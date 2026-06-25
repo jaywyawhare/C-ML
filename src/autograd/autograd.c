@@ -127,7 +127,15 @@ void tensor_detach_inplace(Tensor* t) {
     if (!t)
         return;
 
+    if (t->ir_node && !t->is_executed) {
+        if (tensor_ensure_executed(t) != 0) {
+            LOG_ERROR("tensor_detach_inplace: failed to materialize lazy tensor");
+            return;
+        }
+    }
+
     t->requires_grad = false;
+    t->retains_grad  = false;
     t->ir_node       = NULL;
     t->ir_context    = NULL;
 }
@@ -136,21 +144,73 @@ void tensor_retain_grad(Tensor* t) {
     if (!t)
         return;
 
-    t->requires_grad = true;
+    t->retains_grad = true;
 }
 
-#define MAX_HOOKS 16
-
 typedef struct {
-    TensorBackwardHook hooks[MAX_HOOKS];
+    TensorBackwardHook* hooks;
     int num_hooks;
+    int capacity;
 } TensorHookList;
 
+typedef struct {
+    ModuleBackwardHook* hooks;
+    int num_hooks;
+    int capacity;
+} ModuleHookList;
+
 static TensorHookList* get_tensor_hooks(Tensor* t) {
-    if (!t->user_data) {
-        t->user_data = calloc(1, sizeof(TensorHookList));
+    if (!t->backward_hooks) {
+        t->backward_hooks = calloc(1, sizeof(TensorHookList));
+        if (!t->backward_hooks) {
+            LOG_ERROR("Failed to allocate tensor hook list");
+            return NULL;
+        }
     }
-    return (TensorHookList*)t->user_data;
+    return (TensorHookList*)t->backward_hooks;
+}
+
+static ModuleHookList* get_module_hooks(Module* module) {
+    if (!module->backward_hooks) {
+        module->backward_hooks = calloc(1, sizeof(ModuleHookList));
+        if (!module->backward_hooks) {
+            LOG_ERROR("Failed to allocate module hook list");
+            return NULL;
+        }
+    }
+    return (ModuleHookList*)module->backward_hooks;
+}
+
+static int hook_list_append_tensor(TensorHookList* list, TensorBackwardHook hook) {
+    if (list->num_hooks >= list->capacity) {
+        int new_cap = list->capacity == 0 ? 4 : list->capacity * 2;
+        TensorBackwardHook* new_hooks =
+            realloc(list->hooks, (size_t)new_cap * sizeof(TensorBackwardHook));
+        if (!new_hooks) {
+            LOG_ERROR("Failed to grow tensor hook list");
+            return -1;
+        }
+        list->hooks    = new_hooks;
+        list->capacity = new_cap;
+    }
+    list->hooks[list->num_hooks++] = hook;
+    return 0;
+}
+
+static int hook_list_append_module(ModuleHookList* list, ModuleBackwardHook hook) {
+    if (list->num_hooks >= list->capacity) {
+        int new_cap = list->capacity == 0 ? 4 : list->capacity * 2;
+        ModuleBackwardHook* new_hooks =
+            realloc(list->hooks, (size_t)new_cap * sizeof(ModuleBackwardHook));
+        if (!new_hooks) {
+            LOG_ERROR("Failed to grow module hook list");
+            return -1;
+        }
+        list->hooks    = new_hooks;
+        list->capacity = new_cap;
+    }
+    list->hooks[list->num_hooks++] = hook;
+    return 0;
 }
 
 int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
@@ -160,21 +220,17 @@ int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
     }
 
     TensorHookList* hooks = get_tensor_hooks(t);
-    if (hooks->num_hooks >= MAX_HOOKS) {
-        LOG_ERROR("Maximum number of hooks (%d) reached", MAX_HOOKS);
+    if (!hooks)
         return -1;
-    }
 
-    hooks->hooks[hooks->num_hooks++] = hook;
-    return 0;
+    return hook_list_append_tensor(hooks, hook);
 }
 
 void tensor_remove_hooks(Tensor* t) {
-    if (!t || !t->user_data) {
+    if (!t || !t->backward_hooks)
         return;
-    }
 
-    TensorHookList* hooks = (TensorHookList*)t->user_data;
+    TensorHookList* hooks = (TensorHookList*)t->backward_hooks;
     hooks->num_hooks      = 0;
 }
 
@@ -184,16 +240,31 @@ int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook
         return -1;
     }
 
-    if (!module->user_data) {
-        module->user_data = malloc(sizeof(ModuleBackwardHook));
-        if (!module->user_data) {
-            LOG_ERROR("Failed to allocate memory for module hook");
-            return -1;
-        }
-    }
+    ModuleHookList* hooks = get_module_hooks(module);
+    if (!hooks)
+        return -1;
 
-    *(ModuleBackwardHook*)module->user_data = hook;
-    return 0;
+    return hook_list_append_module(hooks, hook);
+}
+
+void autograd_free_tensor_hooks(Tensor* t) {
+    if (!t || !t->backward_hooks)
+        return;
+
+    TensorHookList* hooks = (TensorHookList*)t->backward_hooks;
+    free(hooks->hooks);
+    free(hooks);
+    t->backward_hooks = NULL;
+}
+
+void autograd_free_module_hooks(Module* module) {
+    if (!module || !module->backward_hooks)
+        return;
+
+    ModuleHookList* hooks = (ModuleHookList*)module->backward_hooks;
+    free(hooks->hooks);
+    free(hooks);
+    module->backward_hooks = NULL;
 }
 
 void tensor_zero_grad(Tensor* tensor) {
@@ -322,6 +393,23 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     if (cml_ir_execute_backward(tensor->ir_context) != 0) {
         LOG_ERROR("Failed to execute backward pass");
         return;
+    }
+
+    if (tensor->backward_hooks && tensor->grad) {
+        TensorHookList* hook_list = (TensorHookList*)tensor->backward_hooks;
+        for (int i = 0; i < hook_list->num_hooks; i++) {
+            hook_list->hooks[i](tensor->grad);
+        }
+    }
+
+    if (tensor->ir_context && tensor->ir_context->tensor_refs) {
+        for (int i = 0; i < tensor->ir_context->tensor_refs_count; i++) {
+            Tensor* t = tensor->ir_context->tensor_refs[i];
+            if (!t || !t->grad || t->retains_grad || tensor_is_leaf(t))
+                continue;
+            tensor_free(t->grad);
+            t->grad = NULL;
+        }
     }
 
     const char* viz     = getenv("CML_VIZ");

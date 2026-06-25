@@ -19,6 +19,7 @@
 #include "core/error_stack.h"
 #include "core/config.h"
 #include "core/threefry.h"
+#include "autograd/autograd.h"
 
 static inline uint16_t float_to_fp16(float f) {
     uint32_t x;
@@ -245,6 +246,8 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->is_contiguous  = true;
     t->buffer_handle     = NULL;
     t->user_data         = NULL;
+    t->backward_hooks    = NULL;
+    t->retains_grad      = false;
     t->owns_data         = true;
     t->from_buffer_cache = false;
 
@@ -687,6 +690,8 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->is_contiguous     = true;
     t->buffer_handle     = NULL;
     t->user_data         = NULL;
+    t->backward_hooks    = NULL;
+    t->retains_grad      = false;
     t->from_buffer_cache = false;
 
     node->output = t;
@@ -810,6 +815,8 @@ void tensor_free(Tensor* t) {
         free(t->user_data);
         t->user_data = NULL;
     }
+
+    autograd_free_tensor_hooks(t);
 
     free(t);
 }

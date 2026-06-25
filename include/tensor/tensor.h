@@ -61,6 +61,7 @@ typedef struct Tensor {
     bool from_buffer_cache; // Data was allocated via cml_buffer_cache_alloc
 
     bool requires_grad;
+    bool retains_grad; /* PyTorch retain_grad(): keep .grad after backward */
     struct Tensor* grad; // Gradient tensor (also lazy!)
 
     int ref_count;       // Reference counting
@@ -72,6 +73,7 @@ typedef struct Tensor {
     CMLBackendBuffer_t buffer_handle;
 
     void* user_data;
+    void* backward_hooks; /* TensorHookList*, owned by autograd */
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);

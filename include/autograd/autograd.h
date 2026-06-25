@@ -122,6 +122,8 @@ typedef void (*ModuleBackwardHook)(struct Module* module, struct Tensor* grad);
 
 int tensor_register_backward_hook(struct Tensor* t, TensorBackwardHook hook);
 void tensor_remove_hooks(struct Tensor* t);
+void autograd_free_tensor_hooks(struct Tensor* t);
+void autograd_free_module_hooks(struct Module* module);
 int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook);
 void tensor_accumulate_grad(struct Tensor* tensor, struct Tensor* new_grad);
 struct Tensor* tensor_get_grad(struct Tensor* tensor);

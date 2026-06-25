@@ -6,6 +6,7 @@
 #include "backend/device.h"
 #include "tensor/tensor.h"
 #include "tensor/realize.h"
+#include "autograd/autograd.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
     module->next                = NULL;
     module->training            = false;
     module->user_data           = NULL;
+    module->backward_hooks      = NULL;
     module->version             = "1.0.0";
     module->description         = "Module";
 
@@ -88,10 +90,8 @@ void module_free(Module* module) {
         module->parameters = NULL;
     }
 
-    
-    
-    
-    
+    autograd_free_module_hooks(module);
+
     if (specialized_free) {
         specialized_free(module);
     } else {
