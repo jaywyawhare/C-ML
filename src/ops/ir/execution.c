@@ -16,6 +16,7 @@
 #include "ops/winograd.h"
 #include "ops/ir/dispatch.h"
 #include "ops/ir/cpu_lazy_materialize.h"
+#include "core/gguf_quant.h"
 #include "alloc/tlsf_alloc.h"
 #include <pthread.h>
 #include <stdio.h>
@@ -1030,6 +1031,14 @@ int cpu_execute_node(struct IRNode* node) {
         int M = a->shape[a->ndim - 2];
         int K = a->shape[a->ndim - 1];
         int N = b->shape[b->ndim - 1];
+
+        if (b->quant_type == CML_QUANT_GGUF_Q8_0 && b->quant_data) {
+            if (gguf_q8_0_matmul(in1_data, b->quant_data, out_data, M, K, N) == 0)
+                break;
+        } else if (b->quant_type == CML_QUANT_GGUF_Q4_0 && b->quant_data) {
+            if (gguf_q4_0_matmul(in1_data, b->quant_data, out_data, M, K, N) == 0)
+                break;
+        }
 
         CMLBlasContext* blas = get_blas_context();
         if (blas && blas->initialized) {

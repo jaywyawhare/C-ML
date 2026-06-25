@@ -248,6 +248,9 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->user_data         = NULL;
     t->backward_hooks    = NULL;
     t->retains_grad      = false;
+    t->quant_type        = CML_QUANT_NONE;
+    t->quant_data        = NULL;
+    t->quant_data_bytes  = 0;
     t->owns_data         = true;
     t->from_buffer_cache = false;
 
@@ -692,6 +695,9 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->user_data         = NULL;
     t->backward_hooks    = NULL;
     t->retains_grad      = false;
+    t->quant_type        = CML_QUANT_NONE;
+    t->quant_data        = NULL;
+    t->quant_data_bytes  = 0;
     t->from_buffer_cache = false;
 
     node->output = t;
@@ -817,6 +823,13 @@ void tensor_free(Tensor* t) {
     }
 
     autograd_free_tensor_hooks(t);
+
+    if (t->quant_data) {
+        free(t->quant_data);
+        t->quant_data = NULL;
+        t->quant_data_bytes = 0;
+        t->quant_type = CML_QUANT_NONE;
+    }
 
     free(t);
 }
