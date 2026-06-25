@@ -1,6 +1,7 @@
 #include "nn/init.h"
 #include "core/threefry.h"
 #include "core/logging.h"
+#include <stdlib.h>
 #include <math.h>
 
 void nn_init_uniform(Tensor* tensor, float low, float high) {
