@@ -1,4 +1,5 @@
 #include "nn/layers/linear.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor.h"
@@ -49,19 +50,7 @@ static void linear_free_fn(Module* module) {
 }
 
 static void xavier_init(Tensor* tensor, int in_features, int out_features) {
-    if (!tensor)
-        return;
-
-    float* data = (float*)tensor_data_ptr(tensor);
-    if (!data)
-        return;
-
-    float scale  = sqrtf(2.0f / (float)(in_features + out_features));
-    size_t numel = tensor->numel;
-
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)(float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
+    nn_init_xavier(tensor, in_features, out_features);
 }
 
 static void zeros_init(Tensor* tensor, int out_features) {

@@ -1,4 +1,5 @@
 #include "nn/layers/rnn.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
@@ -94,20 +95,14 @@ RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
     /* weight_ih [hidden_size, input_size] */
     int wih_shape[] = {hidden_size, input_size};
     Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    tensor_ensure_executed(wih);
-    float* wih_data = (float*)tensor_data_ptr(wih);
-    for (size_t i = 0; i < wih->numel; i++)
-        wih_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(wih, -scale, scale);
     module_add_parameter((Module*)cell, wih, "weight_ih", true);
     cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
 
     /* weight_hh [hidden_size, hidden_size] */
     int whh_shape[] = {hidden_size, hidden_size};
     Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    tensor_ensure_executed(whh);
-    float* whh_data = (float*)tensor_data_ptr(whh);
-    for (size_t i = 0; i < whh->numel; i++)
-        whh_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(whh, -scale, scale);
     module_add_parameter((Module*)cell, whh, "weight_hh", true);
     cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
 
@@ -248,20 +243,14 @@ LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
     /* weight_ih [4*hidden_size, input_size] */
     int wih_shape[] = {gs, input_size};
     Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    tensor_ensure_executed(wih);
-    float* wih_data = (float*)tensor_data_ptr(wih);
-    for (size_t i = 0; i < wih->numel; i++)
-        wih_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(wih, -scale, scale);
     module_add_parameter((Module*)cell, wih, "weight_ih", true);
     cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
 
     /* weight_hh [4*hidden_size, hidden_size] */
     int whh_shape[] = {gs, hidden_size};
     Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    tensor_ensure_executed(whh);
-    float* whh_data = (float*)tensor_data_ptr(whh);
-    for (size_t i = 0; i < whh->numel; i++)
-        whh_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(whh, -scale, scale);
     module_add_parameter((Module*)cell, whh, "weight_hh", true);
     cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
 
@@ -389,20 +378,14 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
     /* weight_ih [3*hidden_size, input_size] */
     int wih_shape[] = {gs, input_size};
     Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    tensor_ensure_executed(wih);
-    float* wih_data = (float*)tensor_data_ptr(wih);
-    for (size_t i = 0; i < wih->numel; i++)
-        wih_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(wih, -scale, scale);
     module_add_parameter((Module*)cell, wih, "weight_ih", true);
     cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
 
     /* weight_hh [3*hidden_size, hidden_size] */
     int whh_shape[] = {gs, hidden_size};
     Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    tensor_ensure_executed(whh);
-    float* whh_data = (float*)tensor_data_ptr(whh);
-    for (size_t i = 0; i < whh->numel; i++)
-        whh_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(whh, -scale, scale);
     module_add_parameter((Module*)cell, whh, "weight_hh", true);
     cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
 

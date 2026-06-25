@@ -1,4 +1,5 @@
 #include "nn/llama.h"
+#include "core/threefry.h"
 #include "nn/llm_ops.h"
 #include "core/gguf.h"
 #include "ops/uops.h"
@@ -720,7 +721,11 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     }
 
     /* Sample from the distribution */
-    float r = (float)rand() / (float)RAND_MAX;
+    float r;
+    {
+        CMLRNGState* rng = cml_rng_get_global();
+        cml_rng_uniform(rng, &r, 1);
+    }
     float acc = 0.0f;
     int sampled_id = entries[0].index;
     for (int i = 0; i < cutoff; i++) {

@@ -1,4 +1,5 @@
 #include "nn/layers/conv_transpose3d.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
@@ -53,20 +54,10 @@ static void conv_transpose3d_free(Module* module) {
 
 static void kaiming_init_transpose3d(Tensor* tensor, int in_channels,
                                       int kd, int kh, int kw) {
-    if (!tensor)
-        return;
-
-    float* data = (float*)tensor_data_ptr(tensor);
-    if (!data)
-        return;
-
-    float fan_in = (float)(in_channels * kd * kh * kw);
-    float scale  = sqrtf(2.0f / fan_in);
-    size_t numel = tensor->numel;
-
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
+    (void)kd;
+    (void)kh;
+    (void)kw;
+    nn_init_kaiming(tensor, in_channels, kd * kh * kw);
 }
 
 ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,

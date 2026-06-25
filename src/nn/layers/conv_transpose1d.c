@@ -1,4 +1,5 @@
 #include "nn/layers/conv_transpose1d.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
@@ -138,12 +139,7 @@ ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kern
         module_free((Module*)layer);
         return NULL;
     }
-    float scale = sqrtf(2.0f / (float)(in_channels * kernel_size));
-    float* data = (float*)tensor_data_ptr(weight);
-    if (data) {
-        for (size_t i = 0; i < weight->numel; i++)
-            data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
+    nn_init_kaiming(weight, in_channels, kernel_size);
 
     if (module_add_parameter((Module*)layer, weight, "weight", true) != 0) {
         tensor_free(weight);

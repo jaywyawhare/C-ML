@@ -1,4 +1,5 @@
 #include "nn/layers/conv_transpose2d.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
@@ -51,19 +52,7 @@ static void conv_transpose2d_free(Module* module) {
 }
 
 static void kaiming_init_transpose(Tensor* tensor, int in_channels, int kernel_size) {
-    if (!tensor)
-        return;
-
-    float* data = (float*)tensor_data_ptr(tensor);
-    if (!data)
-        return;
-
-    float scale  = sqrtf(2.0f / (float)(in_channels * kernel_size * kernel_size));
-    size_t numel = tensor->numel;
-
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
+    nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size);
 }
 
 ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,

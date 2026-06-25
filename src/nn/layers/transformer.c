@@ -1,4 +1,5 @@
 #include "nn/layers/transformer.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
@@ -6,13 +7,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-
-static void xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
-    float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
-}
 
 /* Compose LayerNorm from primitives so it records into the IR (fully lazy). */
 static Tensor* apply_layernorm(Tensor* x, Tensor* weight, Tensor* bias, float eps) {
@@ -100,8 +94,7 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     for (int i = 0; i < 4; i++) {
         Tensor* w = tensor_empty(weight_shape, 2, &config);
         if (!w) { module_free((Module*)mha); return NULL; }
-        float* w_data = (float*)tensor_data_ptr(w);
-        if (w_data) xavier_init(w_data, (size_t)embed_dim * embed_dim, embed_dim, embed_dim);
+        nn_init_xavier(w, embed_dim, embed_dim);
 
         if (module_add_parameter((Module*)mha, w, params[i].w_name, true) != 0) {
             tensor_free(w); module_free((Module*)mha); return NULL;
@@ -259,8 +252,7 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
 
     Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
     if (!l1w) { module_free((Module*)layer); return NULL; }
-    float* l1w_data = (float*)tensor_data_ptr(l1w);
-    if (l1w_data) xavier_init(l1w_data, (size_t)dim_feedforward * d_model, d_model, dim_feedforward);
+    nn_init_xavier(l1w, d_model, dim_feedforward);
     if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
         tensor_free(l1w); module_free((Module*)layer); return NULL;
     }
@@ -275,8 +267,7 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
 
     Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
     if (!l2w) { module_free((Module*)layer); return NULL; }
-    float* l2w_data = (float*)tensor_data_ptr(l2w);
-    if (l2w_data) xavier_init(l2w_data, (size_t)d_model * dim_feedforward, dim_feedforward, d_model);
+    nn_init_xavier(l2w, dim_feedforward, d_model);
     if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
         tensor_free(l2w); module_free((Module*)layer); return NULL;
     }
@@ -489,8 +480,7 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
 
     Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
     if (!l1w) { module_free((Module*)layer); return NULL; }
-    float* l1w_data = (float*)tensor_data_ptr(l1w);
-    if (l1w_data) xavier_init(l1w_data, (size_t)dim_feedforward * d_model, d_model, dim_feedforward);
+    nn_init_xavier(l1w, d_model, dim_feedforward);
     if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
         tensor_free(l1w); module_free((Module*)layer); return NULL;
     }
@@ -505,8 +495,7 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
 
     Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
     if (!l2w) { module_free((Module*)layer); return NULL; }
-    float* l2w_data = (float*)tensor_data_ptr(l2w);
-    if (l2w_data) xavier_init(l2w_data, (size_t)d_model * dim_feedforward, dim_feedforward, d_model);
+    nn_init_xavier(l2w, dim_feedforward, d_model);
     if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
         tensor_free(l2w); module_free((Module*)layer); return NULL;
     }

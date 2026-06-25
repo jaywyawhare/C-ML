@@ -407,6 +407,7 @@ set(NN_SOURCES
     src/nn/qlora.c
     src/nn/paged_attention.c
     src/nn/serving.c
+    src/nn/init.c
     src/nn/speculative.c
     src/nn/openai_api.c
     src/nn/state.c
