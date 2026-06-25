@@ -11,7 +11,7 @@
 
 static _Atomic(CMLGraph_t) g_auto_capture_ir = NULL;
 
-static CMLGraph_t g_global_ir_context = NULL;
+static _Thread_local CMLGraph_t tls_ir_context = NULL;
 
 int cml_ir_enable_auto_capture(CMLGraph_t ir) {
     if (!ir) {
@@ -132,47 +132,47 @@ CMLGraph_t cml_ir_get_or_create_context(void) {
     if (auto_capture_ir)
         return auto_capture_ir;
 
-    if (!g_global_ir_context) {
-        g_global_ir_context = cml_ir_new(IR_TARGET_C);
-        if (!g_global_ir_context) {
-            LOG_ERROR("Failed to create global IR context");
+    if (!tls_ir_context) {
+        tls_ir_context = cml_ir_new(IR_TARGET_C);
+        if (!tls_ir_context) {
+            LOG_ERROR("Failed to create thread-local IR context");
             return NULL;
         }
     }
-    return g_global_ir_context;
+    return tls_ir_context;
 }
 
-void cml_ir_set_global_context(CMLGraph_t ir) { g_global_ir_context = ir; }
+void cml_ir_set_global_context(CMLGraph_t ir) { tls_ir_context = ir; }
 
 void cml_ir_clear_global_if_current(CMLGraph_t ir) {
-    if (!ir || g_global_ir_context != ir)
+    if (!ir || tls_ir_context != ir)
         return;
     if (atomic_load(&g_auto_capture_ir) == ir)
         cml_ir_disable_auto_capture();
-    g_global_ir_context = NULL;
+    tls_ir_context = NULL;
 }
 
 void cml_ir_reset_global_context(void) {
     /* Tear down execution cache before IR tensors: plans hold Tensor* for buffer detach. */
     cml_graph_cache_reset_global();
     cml_cpu_execute_cache_reset();
-    if (g_global_ir_context) {
-        if (atomic_load(&g_auto_capture_ir) == g_global_ir_context) {
+    if (tls_ir_context) {
+        if (atomic_load(&g_auto_capture_ir) == tls_ir_context) {
             cml_ir_disable_auto_capture();
         }
-        cml_ir_free(g_global_ir_context);
-        g_global_ir_context = NULL;
+        cml_ir_free(tls_ir_context);
+        tls_ir_context = NULL;
     }
     cml_cleanup_buffer_cache();
 }
 
 void cml_ir_reset_graph_only(void) {
-    if (g_global_ir_context) {
-        if (atomic_load(&g_auto_capture_ir) == g_global_ir_context) {
+    if (tls_ir_context) {
+        if (atomic_load(&g_auto_capture_ir) == tls_ir_context) {
             cml_ir_disable_auto_capture();
         }
-        cml_ir_free(g_global_ir_context);
-        g_global_ir_context = NULL;
+        cml_ir_free(tls_ir_context);
+        tls_ir_context = NULL;
     }
     /* Intentionally does NOT call cml_graph_cache_reset_global(),
      * cml_cpu_execute_cache_reset(), or cml_cleanup_buffer_cache().
