@@ -179,6 +179,9 @@ Tensor* cml_randn(int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_randint(int low, int high, int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_randperm(int n, const TensorConfig* config);
 void cml_manual_seed(uint64_t seed);
+
+const char* cml_get_last_error(void);
+int cml_get_last_error_code(void);
 Tensor* cml_zeros_like(Tensor* a);
 Tensor* cml_ones_like(Tensor* a);
 Tensor* cml_rand_like(Tensor* a);

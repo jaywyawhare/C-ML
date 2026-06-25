@@ -1024,6 +1024,8 @@ Tensor* cml_randint(int low, int high, int* shape, int ndim, const TensorConfig*
     return tensor_randint(low, high, shape, ndim, config);
 }
 void cml_manual_seed(uint64_t seed) { tensor_manual_seed(seed); }
+const char* cml_get_last_error(void) { return error_stack_get_last_message(); }
+int cml_get_last_error_code(void) { return error_stack_get_last_code(); }
 Tensor* cml_zeros_like(Tensor* a) { return tensor_zeros_like(a); }
 Tensor* cml_ones_like(Tensor* a) { return tensor_ones_like(a); }
 Tensor* cml_rand_like(Tensor* a) { return tensor_rand_like(a); }
