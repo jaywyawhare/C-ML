@@ -419,6 +419,29 @@ set(SYMBOLIC_SOURCES
 
 set(OPTIM_SOURCES src/optim.c src/optim/lr_scheduler.c)
 
+set(TORCH_SOURCES
+    src/torch/torch_c.c
+    src/torch/torch_eager.c
+    src/torch/pte.c
+    src/torch/selective_build.c
+    src/torch/memory.c
+    src/torch/delegate.c
+)
+
+option(CML_TORCH_SELECTIVE_OPS "Comma-separated UOp names for selective kernel build (empty=all)" "")
+
+function(cml_apply_torch_selective_ops target)
+    if(CML_TORCH_SELECTIVE_OPS)
+        target_compile_definitions(${target} PRIVATE
+            CML_TORCH_SELECTIVE_OPS="${CML_TORCH_SELECTIVE_OPS}")
+    endif()
+endfunction()
+
+if(CML_TORCH_SELECTIVE_OPS)
+    message(STATUS "Torch selective build ops: ${CML_TORCH_SELECTIVE_OPS}")
+endif()
+
+
 option(ENABLE_DISTRIBUTED "Enable distributed training" OFF)
 option(ENABLE_NCCL "Enable NCCL backend (requires libnccl)" ON)
 option(ENABLE_MPI "Enable MPI backend (requires libmpi)" ON)
@@ -490,6 +513,7 @@ set(LIBRARY_SOURCES
     ${AUTOGRAD_SOURCES}
     ${NN_SOURCES}
     ${OPTIM_SOURCES}
+    ${TORCH_SOURCES}
     ${SYMBOLIC_SOURCES}
     ${DISTRIBUTED_SOURCES}
     ${ZOO_SOURCES}
@@ -522,6 +546,7 @@ set_target_properties(cml PROPERTIES
     SOVERSION ${PROJECT_VERSION_MAJOR}
 )
 cml_link_all(cml)
+cml_apply_torch_selective_ops(cml)
 
 add_library(cml_static STATIC ${LIBRARY_SOURCES})
 set_target_properties(cml_static PROPERTIES
@@ -531,6 +556,7 @@ set_target_properties(cml_static PROPERTIES
 )
 target_compile_definitions(cml_static PUBLIC CML_STATIC_DEFINE)
 cml_link_all(cml_static)
+cml_apply_torch_selective_ops(cml_static)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 if(BUILD_SHARED_LIBS)
@@ -543,6 +569,7 @@ if(BUILD_SHARED_LIBS)
     )
     target_compile_definitions(cml_shared PRIVATE CML_BUILDING_DLL)
     cml_link_all(cml_shared)
+    cml_apply_torch_selective_ops(cml_shared)
 endif()
 
 option(BUILD_TESTS "Build tests" ON)
@@ -564,6 +591,7 @@ if(BUILD_TESTS)
     )
     target_compile_definitions(test_nv_mock PRIVATE CML_NV_MOCK_GPU CML_HAS_NV_DRIVER)
     cml_link_all(test_nv_mock)
+    cml_apply_torch_selective_ops(test_nv_mock)
     add_test(NAME test_nv_mock COMMAND test_nv_mock)
 
     add_executable(test_am_mock
@@ -573,6 +601,7 @@ if(BUILD_TESTS)
     )
     target_compile_definitions(test_am_mock PRIVATE CML_AM_MOCK_GPU CML_HAS_AM_DRIVER)
     cml_link_all(test_am_mock)
+    cml_apply_torch_selective_ops(test_am_mock)
     add_test(NAME test_am_mock COMMAND test_am_mock)
 
     if(ENABLE_SANITIZERS)
@@ -598,6 +627,8 @@ function(cml_add_example target_name source_file)
 endfunction()
 
 if(BUILD_EXAMPLES)
+    cml_add_example(torch_c_example examples/tutorials/torch_c_example.c)
+    cml_add_example(bench_torch_eager benchmarks/bench_torch_eager.c)
     cml_add_example(hello_cml examples/tutorials/hello_cml.c)
     cml_add_example(simple_xor examples/tutorials/simple_xor.c)
     cml_add_example(tensor_ops examples/tutorials/tensor_ops.c)
@@ -618,6 +649,7 @@ if(BUILD_EXAMPLES)
     cml_add_example(bench_forward examples/benchmarks/bench_forward.c)
     cml_add_example(bench_gemm examples/benchmarks/bench_gemm.c)
     cml_add_example(bench_cross_framework benchmarks/bench_cross_framework.c)
+    cml_add_example(bench_torch_c benchmarks/bench_torch_c.c)
     cml_add_example(profile_overhead benchmarks/profile_overhead.c)
     cml_add_example(profile_mlp_conv benchmarks/profile_mlp_conv.c)
     cml_add_example(profile_overhead_detailed benchmarks/profile_overhead_detailed.c)

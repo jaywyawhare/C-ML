@@ -271,6 +271,33 @@ void cml_blas_free(CMLBlasContext* ctx) {
     free(ctx);
 }
 
+void cml_blas_set_num_threads(int n) {
+    if (n < 1)
+        n = 1;
+    CMLBlasContext* ctx = cml_blas_get_context();
+    if (!ctx || !ctx->initialized)
+        return;
+    bool applied = false;
+    if (ctx->is_ilp64) {
+        if (ctx->ilp64_set_threads) {
+            ctx->ilp64_set_threads((int64_t)n);
+            applied = true;
+        }
+    } else if (ctx->fn_set_threads) {
+        ctx->fn_set_threads(n);
+        applied = true;
+    }
+    if (applied)
+        ctx->cur_threads = n;
+}
+
+int cml_blas_get_num_threads(void) {
+    CMLBlasContext* ctx = cml_blas_get_context();
+    if (!ctx)
+        return 1;
+    return ctx->cur_threads > 0 ? ctx->cur_threads : 1;
+}
+
 CMLBlasContext* cml_blas_get_context(void) {
     /* Fast path: context already initialized — no lock needed */
     CMLBlasContext* ctx =

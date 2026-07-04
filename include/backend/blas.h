@@ -99,6 +99,12 @@ float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n);
 
 const char* cml_blas_get_library_name(CMLBlasContext* ctx);
 
+/* Set/get the global BLAS thread count (MKL/OpenBLAS/BLIS/ILP64).
+ * The underlying library thread pool is process-global, so this affects all
+ * subsequent GEMM calls regardless of which CMLBlasContext issues them. */
+void cml_blas_set_num_threads(int n);
+int  cml_blas_get_num_threads(void);
+
 #ifdef __cplusplus
 }
 #endif

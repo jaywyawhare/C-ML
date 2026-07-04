@@ -19,6 +19,7 @@ typedef struct {
 
 void error_stack_init(void);
 void error_stack_cleanup(void);
+void error_stack_clear(void);
 void error_stack_push(int code, const char* message, const char* file, int line,
                       const char* function);
 ErrorEntry* error_stack_peek(void);

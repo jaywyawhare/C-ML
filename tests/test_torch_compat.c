@@ -4,34 +4,38 @@
 #include <stdlib.h>
 
 static float* realize(Tensor* t) {
-    return (float*)tensor_data_ptr(t);
+    float* p = torch_tensor_data_ptr_f32(t);
+    assert(p != NULL);
+    return p;
 }
 
 static void test_creation_aliases(void) {
     printf("  test_creation_aliases...");
 
-    int shape[] = {2, 3};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    TorchTensorOptions opts = torch_options();
+    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts = torch_options_device(opts, DEVICE_CPU);
 
-    Tensor* z = torch_zeros(shape, 2, &cfg);
+    int shape[] = {2, 3};
+    Tensor* z = torch_zeros(shape, 2, &opts);
     assert(z != NULL);
     float* zd = realize(z);
     for (int i = 0; i < 6; i++) assert(zd[i] == 0.0f);
-    tensor_free(z);
+    torch_tensor_free(z);
 
-    Tensor* o = torch_ones(shape, 2, &cfg);
+    Tensor* o = torch_ones(shape, 2, &opts);
     assert(o != NULL);
     float* od = realize(o);
     for (int i = 0; i < 6; i++) assert(od[i] == 1.0f);
-    tensor_free(o);
+    torch_tensor_free(o);
 
-    Tensor* r = torch_randn(shape, 2, &cfg);
+    Tensor* r = torch_randn(shape, 2, &opts);
     assert(r != NULL);
-    tensor_free(r);
+    torch_tensor_free(r);
 
-    Tensor* e = torch_eye(3, &cfg);
+    Tensor* e = torch_eye(3, &opts);
     assert(e != NULL);
-    tensor_free(e);
+    torch_tensor_free(e);
 
     printf(" PASSED\n");
 }
@@ -39,11 +43,13 @@ static void test_creation_aliases(void) {
 static void test_op_aliases(void) {
     printf("  test_op_aliases...");
 
-    int shape[] = {2, 2};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    TorchTensorOptions opts = torch_options();
+    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts = torch_options_device(opts, DEVICE_CPU);
 
-    Tensor* a = torch_ones(shape, 2, &cfg);
-    Tensor* b = torch_ones(shape, 2, &cfg);
+    int shape[] = {2, 2};
+    Tensor* a = torch_ones(shape, 2, &opts);
+    Tensor* b = torch_ones(shape, 2, &opts);
     assert(a && b);
 
     Tensor* c = torch_add(a, b);
@@ -57,11 +63,11 @@ static void test_op_aliases(void) {
     Tensor* m = torch_matmul(a, b);
     assert(m != NULL);
 
-    tensor_free(a);
-    tensor_free(b);
-    tensor_free(c);
-    tensor_free(d);
-    tensor_free(m);
+    torch_tensor_free(a);
+    torch_tensor_free(b);
+    torch_tensor_free(c);
+    torch_tensor_free(d);
+    torch_tensor_free(m);
 
     printf(" PASSED\n");
 }
@@ -69,9 +75,12 @@ static void test_op_aliases(void) {
 static void test_activation_aliases(void) {
     printf("  test_activation_aliases...");
 
+    TorchTensorOptions opts = torch_options();
+    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts = torch_options_device(opts, DEVICE_CPU);
+
     int shape[] = {4};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
-    Tensor* x = torch_ones(shape, 1, &cfg);
+    Tensor* x = torch_ones(shape, 1, &opts);
     assert(x != NULL);
     float* xd = realize(x);
     xd[0] = -1.0f;
@@ -84,28 +93,30 @@ static void test_activation_aliases(void) {
     float* rd = realize(r);
     assert(rd[0] == 0.0f);
     assert(rd[2] == 1.0f);
-    tensor_free(r);
+    torch_tensor_free(r);
 
     Tensor* s = torch_sigmoid(x);
     assert(s != NULL);
-    tensor_free(s);
+    torch_tensor_free(s);
 
     Tensor* t = torch_tanh(x);
     assert(t != NULL);
-    tensor_free(t);
+    torch_tensor_free(t);
 
-    tensor_free(x);
+    torch_tensor_free(x);
 
     printf(" PASSED\n");
 }
 
 int main(void) {
+    torch_init();
     printf("Running torch compat tests:\n");
 
     test_creation_aliases();
     test_op_aliases();
     test_activation_aliases();
 
+    torch_cleanup();
     printf("All torch compat tests passed.\n");
     return 0;
 }

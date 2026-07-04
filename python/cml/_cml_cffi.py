@@ -756,6 +756,102 @@ ffi.cdef(
     int cml_dist_barrier(void);
 
     void* tensor_data_ptr(Tensor* t);
+
+    // torch/torch_c.h — PyTorch-like C API
+    typedef struct TorchTensorOptions {
+        DType dtype;
+        DeviceType device;
+        bool requires_grad;
+        bool has_dtype;
+        bool has_device;
+        TensorConfig config;
+    } TorchTensorOptions;
+
+    typedef enum {
+        TORCH_RUNTIME_EAGER = 0,
+        TORCH_RUNTIME_AOT   = 1,
+        TORCH_RUNTIME_PTE   = 2,
+    } TorchRuntimeKind;
+
+    typedef struct TorchRuntimeModule TorchRuntimeModule;
+    typedef struct TorchMemoryManager TorchMemoryManager;
+
+    typedef struct TorchPTEExportOptions {
+        const char* method_name;
+        int backend;
+        bool include_weights;
+        bool compute_memory_plan;
+        const char* aot_output_path;
+    } TorchPTEExportOptions;
+
+    int torch_init(void);
+    int torch_cleanup(void);
+    void torch_manual_seed(uint64_t seed);
+    void torch_set_default_device(DeviceType device);
+    void torch_set_default_dtype(DType dtype);
+
+    TorchTensorOptions torch_options(void);
+    TorchTensorOptions torch_options_dtype(TorchTensorOptions opts, DType dtype);
+    TorchTensorOptions torch_options_device(TorchTensorOptions opts, DeviceType device);
+    TorchTensorOptions torch_options_requires_grad(TorchTensorOptions opts, bool requires_grad);
+
+    Tensor* torch_zeros(int* shape, int ndim, const TorchTensorOptions* opts);
+    Tensor* torch_ones(int* shape, int ndim, const TorchTensorOptions* opts);
+    Tensor* torch_randn(int* shape, int ndim, const TorchTensorOptions* opts);
+    void torch_tensor_free(Tensor* t);
+    void* torch_tensor_data_ptr(Tensor* t);
+    int torch_tensor_ndim(const Tensor* t);
+    size_t torch_tensor_numel(const Tensor* t);
+
+    Tensor* torch_add(Tensor* a, Tensor* b);
+    Tensor* torch_matmul(Tensor* a, Tensor* b);
+    Tensor* torch_relu(Tensor* a);
+    void torch_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
+    void torch_no_grad(void);
+    void torch_enable_grad(void);
+
+    Tensor* torch_module_forward(Module* module, Tensor* input);
+    void torch_module_train(Module* module);
+    void torch_module_eval(Module* module);
+    Linear* torch_nn_linear(int in_features, int out_features, bool bias);
+    Sequential* torch_nn_sequential(void);
+    void torch_nn_sequential_add(Sequential* seq, Module* layer);
+    Tensor* torch_nn_sequential_forward(Sequential* seq, Tensor* input);
+    Tensor* torch_nn_mse_loss(Tensor* input, Tensor* target);
+
+    Optimizer* torch_optim_adam(Module* model, float lr, float weight_decay,
+                                float beta1, float beta2, float eps);
+    void torch_optim_zero_grad(Optimizer* optimizer);
+    void torch_optim_step(Optimizer* optimizer);
+    void torch_optim_free(Optimizer* optimizer);
+    void torch_reset_ir(void);
+
+    TorchRuntimeModule* torch_runtime_from_module(Module* module);
+    TorchRuntimeModule* torch_runtime_load_aot(const char* path);
+    TorchRuntimeModule* torch_runtime_load_pte(const char* path);
+    int torch_runtime_export_pte(Module* module, Tensor* sample_input, const char* path,
+                                 const TorchPTEExportOptions* opts);
+    Tensor* torch_runtime_forward(TorchRuntimeModule* runtime, Tensor* input);
+    void torch_runtime_free(TorchRuntimeModule* runtime);
+
+    TorchMemoryManager* torch_memory_create(size_t size);
+    TorchMemoryManager* torch_memory_from_buffer(void* buffer, size_t size);
+    void torch_memory_free(TorchMemoryManager* mgr);
+    size_t torch_memory_used(const TorchMemoryManager* mgr);
+    size_t torch_memory_peak(const TorchMemoryManager* mgr);
+    void torch_runtime_set_memory(TorchRuntimeModule* runtime, TorchMemoryManager* memory);
+
+    bool torch_cuda_is_available(void);
+
+    // torch/torch_eager.h — zero-IR eager mode + fused linear + thread tuning
+    void torch_set_eager_mode(bool enabled);
+    bool torch_is_eager_mode(void);
+    void torch_inference_mode(bool enabled);
+    void torch_set_num_threads(int n);
+    int  torch_get_num_threads(void);
+    int  torch_realize(Tensor* t);
+    Tensor* torch_linear(Tensor* input, Tensor* weight, Tensor* bias);
+    Tensor* torch_linear_relu(Tensor* input, Tensor* weight, Tensor* bias);
 """
 )
 
@@ -764,6 +860,7 @@ ffi.set_source(
     """
     #include "cml.h"
     #include "tensor/tensor.h"
+    #include "torch/torch_c.h"
     """,
     libraries=["cml", "m", "dl", "pthread"],
     include_dirs=["../../include"],

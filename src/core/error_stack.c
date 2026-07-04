@@ -52,6 +52,13 @@ void error_stack_cleanup(void) {
 
 }
 
+void error_stack_clear(void) {
+    if (!g_error_stack_initialized) {
+        return;
+    }
+    g_error_stack_size = 0;
+}
+
 void error_stack_push(int code, const char* message, const char* file, int line,
                       const char* function) {
     if (!g_error_stack_initialized) {
