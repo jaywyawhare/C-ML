@@ -262,6 +262,22 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
     float* mask_data = NULL;
     if (mask) {
         tensor_ensure_executed(mask);
+        if (mask->ndim == 2) {
+            if (mask->shape[0] < seq_q || mask->shape[1] < kv_len) {
+                LOG_ERROR("cml_gqa_forward: 2D mask shape [%d,%d] too small for [%d,%d]",
+                          mask->shape[0], mask->shape[1], seq_q, kv_len);
+                return NULL;
+            }
+        } else if (mask->ndim == 3) {
+            if (mask->shape[0] < batch || mask->shape[1] < seq_q || mask->shape[2] < kv_len) {
+                LOG_ERROR("cml_gqa_forward: 3D mask shape [%d,%d,%d] too small for [%d,%d,%d]",
+                          mask->shape[0], mask->shape[1], mask->shape[2], batch, seq_q, kv_len);
+                return NULL;
+            }
+        } else {
+            LOG_ERROR("cml_gqa_forward: mask must be 2D or 3D, got %dD", mask->ndim);
+            return NULL;
+        }
         mask_data = (float*)tensor_data_ptr(mask);
     }
 
@@ -298,13 +314,14 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
                 }
             }
 
-            /* Apply sliding window mask */
+            /* Apply sliding window mask (symmetric: mask both past and future beyond window) */
             if (config->window_size > 0) {
                 for (int sq = 0; sq < seq_q; sq++) {
                     for (int sk = 0; sk < kv_len; sk++) {
-                        if (sq - sk > config->window_size) {
+                        int dist = sq - sk;
+                        if (dist < 0) dist = -dist;
+                        if (dist > config->window_size)
                             scores[sq * kv_len + sk] = -1e9f;
-                        }
                     }
                 }
             }
@@ -560,8 +577,12 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
                             /* Causal mask */
                             if (config->causal && sk > sq) s = -1e30f;
 
-                            /* Sliding window mask */
-                            if (window_size > 0 && sq - sk > window_size) s = -1e30f;
+                            /* Sliding window mask (symmetric) */
+                            if (window_size > 0) {
+                                int dist = sq - sk;
+                                if (dist < 0) dist = -dist;
+                                if (dist > window_size) s = -1e30f;
+                            }
 
                             tile_scores[qi * tkv_len + ki] = s;
                         }
