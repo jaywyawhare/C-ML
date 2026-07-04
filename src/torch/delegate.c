@@ -249,6 +249,10 @@ int torch_delegate_execute_plan(TorchDelegatePlan* plan, Tensor** inputs, int nu
                                     num_outputs);
     }
 
+    if (!g_registry.entries ||
+        plan->partitions[0].delegate_index < 0 ||
+        plan->partitions[0].delegate_index >= g_registry.count)
+        return -1;
     TorchDelegate* d = &g_registry.entries[plan->partitions[0].delegate_index];
     return d->execute(d, plan->partitions[0].blob, plan->partitions[0].blob_size, inputs,
                       num_inputs, outputs, num_outputs);

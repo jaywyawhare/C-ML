@@ -23,6 +23,7 @@ class MemoryManager:
             MemoryError: If the native arena cannot be created.
         """
         self._buffer = None
+        self._buffer_cdata = None
         self._mgr = lib.torch_memory_create(size)
         if self._mgr == ffi.NULL:
             raise MemoryError(f"Failed to allocate {size}-byte arena")
@@ -41,9 +42,15 @@ class MemoryManager:
         Raises:
             MemoryError: If the native wrapper cannot be created.
         """
+        mv = memoryview(buffer)
+        if mv.readonly:
+            raise ValueError("buffer must be writable")
+        if size <= 0 or mv.nbytes < size:
+            raise ValueError("size exceeds backing buffer length")
         mgr = cls.__new__(cls)
-        mgr._buffer = buffer
-        mgr._mgr = lib.torch_memory_from_buffer(buffer, size)
+        mgr._buffer = mv
+        mgr._buffer_cdata = ffi.from_buffer(mv)
+        mgr._mgr = lib.torch_memory_from_buffer(mgr._buffer_cdata, size)
         if mgr._mgr == ffi.NULL:
             raise MemoryError("Failed to wrap external buffer")
         return mgr
@@ -70,6 +77,7 @@ class MemoryManager:
         if getattr(self, "_mgr", ffi.NULL) != ffi.NULL:
             lib.torch_memory_free(self._mgr)
             self._mgr = ffi.NULL
+        self._buffer_cdata = None
         self._buffer = None
 
     def __enter__(self) -> "MemoryManager":
