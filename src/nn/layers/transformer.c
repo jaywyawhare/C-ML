@@ -1,4 +1,6 @@
 #include "nn/layers/transformer.h"
+#include "nn/init.h"
+#include "nn/llm_ops.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
@@ -7,13 +9,6 @@
 #include <math.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
-
-static void xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
-    float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
-}
 
 /* Compose LayerNorm from primitives so it records into the IR (fully lazy). */
 static Tensor* apply_layernorm(Tensor* x, Tensor* weight, Tensor* bias, float eps) {
@@ -85,6 +80,10 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     mha->num_heads = num_heads;
     mha->head_dim = embed_dim / num_heads;
     mha->dropout = dropout;
+    mha->use_flash = false;
+    mha->flash_causal = false;
+    mha->flash_config = (FlashAttentionConfig){
+        .enabled = true, .block_size_q = 64, .block_size_kv = 64, .causal = false};
 
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
@@ -101,8 +100,7 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     for (int i = 0; i < 4; i++) {
         Tensor* w = tensor_empty(weight_shape, 2, &config);
         if (!w) { module_free((Module*)mha); return NULL; }
-        float* w_data = (float*)tensor_data_ptr(w);
-        if (w_data) xavier_init(w_data, (size_t)embed_dim * embed_dim, embed_dim, embed_dim);
+        nn_init_xavier(w, embed_dim, embed_dim);
 
         if (module_add_parameter((Module*)mha, w, params[i].w_name, true) != 0) {
             tensor_free(w); module_free((Module*)mha); return NULL;
@@ -138,6 +136,33 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     int embed_dim = mha->embed_dim;
     int num_heads = mha->num_heads;
     int head_dim  = mha->head_dim;
+
+    if (mha->use_flash && seq_q >= 512) {
+        Tensor* Q = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
+        Tensor* K = uop_linear(key, mha->W_k->tensor, mha->b_k->tensor);
+        Tensor* V = uop_linear(value, mha->W_v->tensor, mha->b_v->tensor);
+        if (!Q || !K || !V)
+            return NULL;
+
+        CMLGQAConfig gqa_cfg = {
+            .num_heads = num_heads,
+            .num_kv_heads = num_heads,
+            .head_dim = head_dim,
+            .scale = 1.0f / sqrtf((float)head_dim),
+            .causal = mha->flash_causal,
+            .window_size = 0,
+        };
+        CMLFlashAttentionConfig flash_cfg = {
+            .tile_size_q = mha->flash_config.block_size_q,
+            .tile_size_kv = mha->flash_config.block_size_kv,
+            .enabled = true,
+        };
+
+        Tensor* attn = cml_gqa_flash_forward(Q, K, V, &gqa_cfg, &flash_cfg);
+        if (!attn)
+            return NULL;
+        return uop_linear(attn, mha->W_o->tensor, mha->b_o->tensor);
+    }
 
     /* Linear projections: [B, S, E] */
     Tensor* Q = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
@@ -260,8 +285,7 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
 
     Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
     if (!l1w) { module_free((Module*)layer); return NULL; }
-    float* l1w_data = (float*)tensor_data_ptr(l1w);
-    if (l1w_data) xavier_init(l1w_data, (size_t)dim_feedforward * d_model, d_model, dim_feedforward);
+    nn_init_xavier(l1w, d_model, dim_feedforward);
     if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
         tensor_free(l1w); module_free((Module*)layer); return NULL;
     }
@@ -276,8 +300,7 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
 
     Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
     if (!l2w) { module_free((Module*)layer); return NULL; }
-    float* l2w_data = (float*)tensor_data_ptr(l2w);
-    if (l2w_data) xavier_init(l2w_data, (size_t)d_model * dim_feedforward, dim_feedforward, d_model);
+    nn_init_xavier(l2w, dim_feedforward, d_model);
     if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
         tensor_free(l2w); module_free((Module*)layer); return NULL;
     }
@@ -490,8 +513,7 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
 
     Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
     if (!l1w) { module_free((Module*)layer); return NULL; }
-    float* l1w_data = (float*)tensor_data_ptr(l1w);
-    if (l1w_data) xavier_init(l1w_data, (size_t)dim_feedforward * d_model, d_model, dim_feedforward);
+    nn_init_xavier(l1w, d_model, dim_feedforward);
     if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
         tensor_free(l1w); module_free((Module*)layer); return NULL;
     }
@@ -506,8 +528,7 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
 
     Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
     if (!l2w) { module_free((Module*)layer); return NULL; }
-    float* l2w_data = (float*)tensor_data_ptr(l2w);
-    if (l2w_data) xavier_init(l2w_data, (size_t)d_model * dim_feedforward, dim_feedforward, d_model);
+    nn_init_xavier(l2w, dim_feedforward, d_model);
     if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
         tensor_free(l2w); module_free((Module*)layer); return NULL;
     }
@@ -679,10 +700,23 @@ void kv_cache_reset(KVCache* cache) {
 
 Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                  Tensor* value, Tensor* mask, FlashAttentionConfig* config) {
-    (void)config;
-    /* Route to the lazy SDPA-based implementation; FlashAttention is a memory
-     * optimization that is not needed when execution is deferred. */
-    return multihead_attention_forward(mha, query, key, value, mask);
+    if (!mha || !query || !key || !value)
+        return NULL;
+
+    bool prev_flash = mha->use_flash;
+    FlashAttentionConfig prev_cfg = mha->flash_config;
+
+    mha->use_flash = true;
+    if (config) {
+        mha->flash_config = *config;
+        mha->flash_causal = config->causal;
+    }
+
+    Tensor* out = multihead_attention_forward(mha, query, key, value, mask);
+
+    mha->use_flash = prev_flash;
+    mha->flash_config = prev_cfg;
+    return out;
 }
 
 Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query,
@@ -779,9 +813,14 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
                         .has_dtype = true, .has_device = true};
     Tensor* Q_lazy = tensor_from_data(Q_mh, q4_shape, 4, &cfg); cml_free(Q_mh);
     int k4_shape[] = {batch, num_heads, cached_len, head_dim};
-    Tensor* K_lazy = tensor_from_data(K_cached, k4_shape, 4, &cfg); cml_free(K_cached);
-    Tensor* V_lazy = tensor_from_data(V_cached, k4_shape, 4, &cfg); cml_free(V_cached);
-    if (!Q_lazy || !K_lazy || !V_lazy) return NULL;
+    Tensor* K_lazy = tensor_from_data(K_cached, k4_shape, 4, &cfg); free(K_cached);
+    Tensor* V_lazy = tensor_from_data(V_cached, k4_shape, 4, &cfg); free(V_cached);
+    if (!Q_lazy || !K_lazy || !V_lazy) {
+        tensor_free(Q_lazy);
+        tensor_free(K_lazy);
+        tensor_free(V_lazy);
+        return NULL;
+    }
 
     Tensor* attn_out = uop_scaled_dot_product_attention(Q_lazy, K_lazy, V_lazy, mask);
     if (!attn_out) return NULL;
@@ -801,6 +840,10 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
 }
 
 void multihead_attention_set_flash(MultiHeadAttention* mha, bool enabled, bool causal) {
-    if (!mha) return;
-    (void)enabled; (void)causal;
+    if (!mha)
+        return;
+    mha->use_flash = enabled;
+    mha->flash_causal = causal;
+    mha->flash_config.enabled = enabled;
+    mha->flash_config.causal = causal;
 }

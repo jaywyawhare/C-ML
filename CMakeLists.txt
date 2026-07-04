@@ -257,6 +257,7 @@ set(OPS_SOURCES
     src/ops/ir/pattern_matcher.c
     src/ops/ir/tree_automaton.c
     src/ops/ir/hcq.c
+    src/ops/ir/hcq_backend.c
     src/ops/ir/hcq_cuda.c
     src/ops/ir/hcq_opencl.c
     src/ops/ir/hcq_vulkan.c
@@ -408,6 +409,7 @@ set(NN_SOURCES
     src/nn/qlora.c
     src/nn/paged_attention.c
     src/nn/serving.c
+    src/nn/init.c
     src/nn/speculative.c
     src/nn/openai_api.c
     src/nn/state.c

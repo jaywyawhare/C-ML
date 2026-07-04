@@ -14,19 +14,17 @@
 #include "alloc/cml_allocator.h"
 
 static Tensor* uop_binary(Tensor* a, Tensor* b, UOpType type) {
-    if (!a || !b) {
-        LOG_ERROR("NULL tensor input to uop_binary");
-        return NULL;
-    }
+    if (!a || !b)
+        CML_ERR_NULL("NULL tensor input to uop_binary");
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
-        return NULL;
+        CML_ERR_NULL("Failed to get or create IR context");
     Tensor* inputs[] = {a, b};
     if (cml_ir_add_uop(ir, type, inputs, 2, NULL) != 0)
-        return NULL;
+        CML_ERR_NULL("Failed to add IR uop");
     struct IRNode* node = cml_ir_get_tail(ir);
     if (cml_ir_compute_broadcast_shape(node) != 0)
-        return NULL;
+        CML_ERR_NULL("Failed to compute broadcast shape");
     if (a->requires_grad || b->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = a->requires_grad;
@@ -42,13 +40,11 @@ Tensor* uop_div(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_DIV); }
 
 Tensor* uop_max(Tensor* a, Tensor* b) {
     if (!a || !b) {
-        LOG_ERROR("NULL tensor input to uop_max");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_max");
     }
 
     if (!tensor_can_broadcast_shapes(a->shape, a->ndim, b->shape, b->ndim)) {
-        LOG_ERROR("Shapes cannot be broadcast for uop_max");
-        return NULL;
+        CML_ERR_NULL("Shapes cannot be broadcast for uop_max");
     }
 
     int out_ndim;
@@ -83,13 +79,11 @@ Tensor* uop_max(Tensor* a, Tensor* b) {
 
 Tensor* uop_cmplt(Tensor* a, Tensor* b) {
     if (!a || !b) {
-        LOG_ERROR("NULL tensor input to uop_cmplt");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_cmplt");
     }
 
     if (!tensor_can_broadcast_shapes(a->shape, a->ndim, b->shape, b->ndim)) {
-        LOG_ERROR("Shapes cannot be broadcast for uop_cmplt");
-        return NULL;
+        CML_ERR_NULL("Shapes cannot be broadcast for uop_cmplt");
     }
 
     int out_ndim;
@@ -124,13 +118,13 @@ Tensor* uop_cmplt(Tensor* a, Tensor* b) {
 
 static Tensor* uop_unary(Tensor* a, UOpType type) {
     if (!a)
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to unary uop");
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
-        return NULL;
+        CML_ERR_NULL("Failed to get or create IR context");
     Tensor* inputs[] = {a};
     if (cml_ir_add_uop(ir, type, inputs, 1, NULL) != 0)
-        return NULL;
+        CML_ERR_NULL("Failed to add IR uop");
     struct IRNode* node = cml_ir_get_tail(ir);
     const int* a_shape = NULL;
     int a_ndim         = 0;
@@ -157,8 +151,7 @@ Tensor* uop_sqrt(Tensor* a) { return uop_unary(a, UOP_SQRT); }
 
 Tensor* uop_recip(Tensor* a) {
     if (!a) {
-        LOG_ERROR("NULL tensor input to uop_recip");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_recip");
     }
 
     Tensor* ones = uop_fill(a->shape, a->ndim, 1.0f);
@@ -255,8 +248,7 @@ Tensor* uop_mean(Tensor* a, ReduceParams* params)       { return uop_reduce(a, p
 
 Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
     if (!a || !params) {
-        LOG_ERROR("NULL input to uop_reshape");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_reshape");
     }
 
     Tensor* result = tensor_reshape(a, params->new_shape, params->new_ndim);
@@ -300,8 +292,7 @@ Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
 
 Tensor* uop_permute(Tensor* a, PermuteParams* params) {
     if (!a || !params || !params->perm) {
-        LOG_ERROR("NULL input to uop_permute");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_permute");
     }
 
     int actual_ndim = a->ndim;
@@ -311,6 +302,7 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
 
     if (params->num_dims != actual_ndim) {
         LOG_ERROR("Permute: num_dims (%d) must match tensor ndim (%d)", params->num_dims, actual_ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -322,11 +314,13 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
         if (params->perm[i] < 0 || params->perm[i] >= actual_ndim) {
             cml_free(used);
             LOG_ERROR("Permute: invalid dimension %d in permutation", params->perm[i]);
+            error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
             return NULL;
         }
         if (used[params->perm[i]]) {
             cml_free(used);
             LOG_ERROR("Permute: duplicate dimension %d in permutation", params->perm[i]);
+            error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
             return NULL;
         }
         used[params->perm[i]] = true;
@@ -384,12 +378,12 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
 
 Tensor* uop_expand(Tensor* a, ExpandParams* params) {
     if (!a || !params || !params->new_shape) {
-        LOG_ERROR("NULL input to uop_expand");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_expand");
     }
 
     if (params->new_ndim < a->ndim) {
         LOG_ERROR("Expand: new_ndim (%d) must be >= tensor ndim (%d)", params->new_ndim, a->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -412,6 +406,7 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params) {
             cml_free(broadcast_shape);
             LOG_ERROR("Expand: cannot broadcast dimension %d: %d -> %d", i, orig_dim,
                       params->new_shape[i]);
+            error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
             return NULL;
         }
     }
@@ -493,12 +488,12 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params) {
 
 Tensor* uop_stride(Tensor* a, StrideParams* params) {
     if (!a || !params || !params->new_strides) {
-        LOG_ERROR("NULL input to uop_stride");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_stride");
     }
 
     if (params->num_dims != a->ndim) {
         LOG_ERROR("Stride: num_dims (%d) must match tensor ndim (%d)", params->num_dims, a->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -544,12 +539,12 @@ Tensor* uop_stride(Tensor* a, StrideParams* params) {
 
 Tensor* uop_slice(Tensor* a, SliceParams* params) {
     if (!a || !params || !params->start || !params->end) {
-        LOG_ERROR("NULL input to uop_slice");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_slice");
     }
 
     if (params->num_dims != a->ndim) {
         LOG_ERROR("Slice: num_dims (%d) must match tensor ndim (%d)", params->num_dims, a->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -672,12 +667,10 @@ Tensor* uop_slice(Tensor* a, SliceParams* params) {
 
 Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     if (!input || !weight) {
-        LOG_ERROR("NULL tensor input to uop_linear");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_linear");
     }
     if (input->ndim < 2 || weight->ndim != 2) {
-        LOG_ERROR("uop_linear: input must be >=2D, weight must be 2D");
-        return NULL;
+        CML_ERR_NULL("uop_linear: input must be >=2D, weight must be 2D");
     }
 
     int M = input->shape[input->ndim - 2]; /* batch */
@@ -687,6 +680,7 @@ Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     if (weight->shape[1] != K) {
         LOG_ERROR("uop_linear: weight in_features (%d) != input features (%d)",
                   weight->shape[1], K);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -723,8 +717,7 @@ Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
 
 Tensor* uop_matmul(Tensor* a, Tensor* b) {
     if (!a || !b) {
-        LOG_ERROR("NULL tensor input to uop_matmul");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_matmul");
     }
 
     extern Tensor* tensor_matmul(Tensor*, Tensor*);
@@ -747,12 +740,12 @@ static void conv2d_params_free_local(Conv2DParams* p) {
 
 static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
     if (!input || !params) {
-        LOG_ERROR("NULL input to uop_pool2d");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_pool2d");
     }
     if (input->ndim != 4) {
         LOG_ERROR("Pool2D expects 4D input [batch, channels, height, width], got %dD",
                   input->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -769,8 +762,7 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
 
     if (kernel_h <= 0 || kernel_w <= 0 || stride_h <= 0 || stride_w <= 0 ||
         dilation_h <= 0 || dilation_w <= 0) {
-        LOG_ERROR("uop_pool2d: invalid kernel/stride/dilation");
-        return NULL;
+        CML_ERR_NULL("uop_pool2d: invalid kernel/stride/dilation");
     }
 
     int out_height =
@@ -787,6 +779,7 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
     }
     if (out_height <= 0 || out_width <= 0) {
         LOG_ERROR("uop_pool2d: invalid output dimensions (%d x %d)", out_height, out_width);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -829,12 +822,10 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
 static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
                                const Conv3DParams* params) {
     if (!input || !weight) {
-        LOG_ERROR("NULL tensor input to uop_conv3d");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_conv3d");
     }
     if (input->ndim != 5 || weight->ndim != 5) {
-        LOG_ERROR("Conv3D expects input [N,C,D,H,W] and weight [O,C,Kd,Kh,Kw]");
-        return NULL;
+        CML_ERR_NULL("Conv3D expects input [N,C,D,H,W] and weight [O,C,Kd,Kh,Kw]");
     }
 
     int batch = input->shape[0];
@@ -851,6 +842,7 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
     if (in_channels != weight_in_channels) {
         LOG_ERROR("Conv3D: input channels (%d) don't match weight channels (%d)",
                   in_channels, weight_in_channels);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -909,12 +901,10 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
 static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* bias,
                                          const ConvTranspose2DParams* params) {
     if (!input || !weight || !params) {
-        LOG_ERROR("NULL input to uop_conv_transpose2d");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_conv_transpose2d");
     }
     if (input->ndim != 4 || weight->ndim != 4) {
-        LOG_ERROR("ConvTranspose2D expects input [N,C,H,W] and weight [Cin,Cout,Kh,Kw]");
-        return NULL;
+        CML_ERR_NULL("ConvTranspose2D expects input [N,C,H,W] and weight [Cin,Cout,Kh,Kw]");
     }
 
     int batch = input->shape[0];
@@ -964,12 +954,10 @@ static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* 
 static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* bias,
                                          const ConvTranspose3DParams* params) {
     if (!input || !weight || !params) {
-        LOG_ERROR("NULL input to uop_conv_transpose3d");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_conv_transpose3d");
     }
     if (input->ndim != 5 || weight->ndim != 5) {
-        LOG_ERROR("ConvTranspose3D expects input [N,C,D,H,W] and weight [Cin,Cout,Kd,Kh,Kw]");
-        return NULL;
+        CML_ERR_NULL("ConvTranspose3D expects input [N,C,D,H,W] and weight [Cin,Cout,Kd,Kh,Kw]");
     }
 
     int batch = input->shape[0];
@@ -1026,6 +1014,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
         LOG_ERROR("NULL tensor input to uop_conv2d");
         error_stack_push(CM_INVALID_ARGUMENT, "uop_conv2d: NULL tensor input", __FILE__, __LINE__,
                          __func__);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1034,6 +1023,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
                   input->ndim);
         error_stack_push(CM_INVALID_ARGUMENT, "uop_conv2d: invalid input rank", __FILE__, __LINE__,
                          __func__);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1043,6 +1033,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
                   weight->ndim);
         error_stack_push(CM_INVALID_ARGUMENT, "uop_conv2d: invalid weight rank", __FILE__, __LINE__,
                          __func__);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1061,6 +1052,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
                   weight_in_channels);
         error_stack_push(CM_INVALID_ARGUMENT, "uop_conv2d: channel mismatch", __FILE__, __LINE__,
                          __func__);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1078,6 +1070,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
         LOG_ERROR("Conv2D: invalid output dimensions (%d x %d)", out_height, out_width);
         error_stack_push(CM_INVALID_ARGUMENT, "uop_conv2d: invalid output dimensions", __FILE__,
                          __LINE__, __func__);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1086,6 +1079,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
             LOG_ERROR("Conv2D bias must be 1D with shape [out_channels]");
             error_stack_push(CM_INVALID_ARGUMENT, "uop_conv2d: invalid bias shape", __FILE__,
                              __LINE__, __func__);
+            error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
             return NULL;
         }
     }
@@ -1172,8 +1166,7 @@ Tensor* uop_conv_transpose3d(Tensor* input, Tensor* weight, Tensor* bias,
 
 Tensor* uop_fill(int* shape, int ndim, float value) {
     if (!shape || ndim <= 0) {
-        LOG_ERROR("Invalid shape for uop_fill");
-        return NULL;
+        CML_ERR_NULL("Invalid shape for uop_fill");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1217,8 +1210,7 @@ Tensor* uop_fill(int* shape, int ndim, float value) {
 
 Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
-        LOG_ERROR("Invalid shape for uop_fill_ex");
-        return NULL;
+        CML_ERR_NULL("Invalid shape for uop_fill_ex");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1262,8 +1254,7 @@ Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType d
 Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim,
                   DType dtype, DeviceType device) {
     if (!data || data_size == 0 || !shape || ndim <= 0) {
-        LOG_ERROR("Invalid arguments for uop_const");
-        return NULL;
+        CML_ERR_NULL("Invalid arguments for uop_const");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1314,8 +1305,7 @@ Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim,
 
 Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
-        LOG_ERROR("Invalid shape for uop_rand_uniform");
-        return NULL;
+        CML_ERR_NULL("Invalid shape for uop_rand_uniform");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1348,8 +1338,7 @@ Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device) {
 
 Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
-        LOG_ERROR("Invalid shape for uop_rand_normal");
-        return NULL;
+        CML_ERR_NULL("Invalid shape for uop_rand_normal");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1382,13 +1371,13 @@ Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device) {
 
 Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceType device) {
     if (step == 0.0f) {
-        LOG_ERROR("uop_arange_op: step cannot be zero");
-        return NULL;
+        CML_ERR_NULL("uop_arange_op: step cannot be zero");
     }
 
     int n = (int)ceilf((end - start) / step);
     if (n <= 0) {
         LOG_ERROR("uop_arange_op: empty range (start=%g end=%g step=%g)", start, end, step);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1430,6 +1419,7 @@ Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceTyp
 Tensor* uop_eye_op(int n, DType dtype, DeviceType device) {
     if (n <= 0) {
         LOG_ERROR("uop_eye_op: n must be positive, got %d", n);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1470,11 +1460,11 @@ Tensor* uop_eye_op(int n, DType dtype, DeviceType device) {
 Tensor* uop_rand_int(int low, int high, int* shape, int ndim,
                      DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
-        LOG_ERROR("Invalid shape for uop_rand_int");
-        return NULL;
+        CML_ERR_NULL("Invalid shape for uop_rand_int");
     }
     if (low >= high) {
         LOG_ERROR("uop_rand_int: low (%d) must be less than high (%d)", low, high);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -1510,13 +1500,11 @@ Tensor* uop_rand_int(int low, int high, int* shape, int ndim,
 
 Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
     if (!input || !indices) {
-        LOG_ERROR("NULL tensor input to uop_gather");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_gather");
     }
 
     if (input->ndim < 1 || indices->ndim != 1) {
-        LOG_ERROR("uop_gather: input must have at least 1 dim, indices must be 1D");
-        return NULL;
+        CML_ERR_NULL("uop_gather: input must have at least 1 dim, indices must be 1D");
     }
 
     int gather_dim = dim;
@@ -1525,14 +1513,14 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
     }
     if (gather_dim < 0 || gather_dim >= input->ndim) {
         LOG_ERROR("uop_gather: invalid dimension %d for input with %d dims", dim, input->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
     /* Output shape: indices.shape + input.shape[gather_dim+1:] (NumPy-style gather). */
     int out_ndim = indices->ndim + input->ndim - 1;
     if (out_ndim <= 0) {
-        LOG_ERROR("uop_gather: invalid output rank");
-        return NULL;
+        CML_ERR_NULL("uop_gather: invalid output rank");
     }
     int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape)
@@ -1584,8 +1572,7 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
 
 Tensor* uop_where(WhereParams* params) {
     if (!params || !params->cond || !params->a || !params->b) {
-        LOG_ERROR("NULL input to uop_where");
-        return NULL;
+        CML_ERR_NULL("NULL input to uop_where");
     }
 
     Tensor* ones = uop_fill(params->cond->shape, params->cond->ndim, 1.0f);
@@ -1609,8 +1596,7 @@ Tensor* uop_where(WhereParams* params) {
 
 Tensor* uop_relu(Tensor* x) {
     if (!x) {
-        LOG_ERROR("NULL tensor input to uop_relu");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_relu");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1633,8 +1619,7 @@ Tensor* uop_relu(Tensor* x) {
 
 Tensor* uop_sigmoid(Tensor* x) {
     if (!x) {
-        LOG_ERROR("NULL tensor input to uop_sigmoid");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_sigmoid");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1665,8 +1650,7 @@ Tensor* uop_sigmoid(Tensor* x) {
 
 Tensor* uop_tanh(Tensor* x) {
     if (!x) {
-        LOG_ERROR("NULL tensor input to uop_tanh");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_tanh");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -1697,8 +1681,7 @@ Tensor* uop_tanh(Tensor* x) {
 
 Tensor* uop_gelu(Tensor* x) {
     if (!x) {
-        LOG_ERROR("NULL tensor input to uop_gelu");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_gelu");
     }
 
     
@@ -1756,8 +1739,7 @@ Tensor* uop_gelu(Tensor* x) {
 
 Tensor* uop_softmax(Tensor* x, int dim) {
     if (!x) {
-        LOG_ERROR("NULL tensor input to uop_softmax");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_softmax");
     }
 
     ReduceParams max_params = {0};
@@ -1791,8 +1773,7 @@ Tensor* uop_softmax(Tensor* x, int dim) {
 
 Tensor* uop_leaky_relu(Tensor* x, float negative_slope) {
     if (!x) {
-        LOG_ERROR("NULL tensor input to uop_leaky_relu");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to uop_leaky_relu");
     }
 
     Tensor* alpha_tensor = uop_fill(x->shape, x->ndim, negative_slope);
@@ -3181,6 +3162,7 @@ Tensor* uop_unfold(Tensor* a, int kernel_size, int stride) {
     if (num_windows <= 0) {
         LOG_ERROR("uop_unfold: invalid params (kernel_size=%d, stride=%d for dim=%d)",
                   kernel_size, params->stride, last_dim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -3601,8 +3583,7 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
     (void)params; 
 
     if (!inputs || num_inputs <= 0) {
-        LOG_ERROR("Invalid inputs for uop");
-        return NULL;
+        CML_ERR_NULL("Invalid inputs for uop");
     }
 
     switch (type) {
@@ -3921,8 +3902,9 @@ Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device) {
     memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
 
     if (cml_ir_add_uop(ir, UOP_ALLOC, NULL, 0, params) != 0) {
-        cml_free(params->shape);
-        cml_free(params);
+        free(params->shape);
+        free(params);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 

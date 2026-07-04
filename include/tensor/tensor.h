@@ -37,6 +37,12 @@ struct IRNode;
 struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
 
+typedef enum {
+    CML_QUANT_NONE = 0,
+    CML_QUANT_GGUF_Q8_0,
+    CML_QUANT_GGUF_Q4_0,
+} CMLQuantType;
+
 typedef struct Tensor {
     // Shape info (computed from IR, not execution)
     int* shape;        // Shape array
@@ -61,6 +67,7 @@ typedef struct Tensor {
     bool from_buffer_cache; // Data was allocated via cml_buffer_cache_alloc
 
     bool requires_grad;
+    bool retains_grad; /* PyTorch retain_grad(): keep .grad after backward */
     struct Tensor* grad; // Gradient tensor (also lazy!)
 
     int ref_count;       // Reference counting
@@ -72,6 +79,11 @@ typedef struct Tensor {
     CMLBackendBuffer_t buffer_handle;
 
     void* user_data;
+    void* backward_hooks; /* TensorHookList*, owned by autograd */
+
+    CMLQuantType quant_type;
+    void* quant_data;
+    size_t quant_data_bytes;
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);

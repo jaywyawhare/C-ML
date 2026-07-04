@@ -13,7 +13,8 @@
 
 AutogradEngine* global_autograd_engine = NULL;
 
-static pthread_once_t g_autograd_once = PTHREAD_ONCE_INIT;
+static pthread_mutex_t g_autograd_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool g_autograd_initialized = false;
 static pthread_mutex_t g_hook_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void autograd_init_once(void) {
@@ -35,14 +36,19 @@ static void autograd_init_once(void) {
 
     pthread_mutex_init(&global_autograd_engine->lock, NULL);
     global_autograd_engine->lock_initialized = true;
-
 }
 
 void autograd_init(void) {
-    pthread_once(&g_autograd_once, autograd_init_once);
+    pthread_mutex_lock(&g_autograd_init_mutex);
+    if (!g_autograd_initialized) {
+        autograd_init_once();
+        g_autograd_initialized = global_autograd_engine != NULL;
+    }
+    pthread_mutex_unlock(&g_autograd_init_mutex);
 }
 
 void autograd_shutdown(void) {
+    pthread_mutex_lock(&g_autograd_init_mutex);
     if (global_autograd_engine) {
         if (global_autograd_engine->lock_initialized) {
             pthread_mutex_destroy(&global_autograd_engine->lock);
@@ -50,13 +56,13 @@ void autograd_shutdown(void) {
         }
         cml_free(global_autograd_engine);
         global_autograd_engine = NULL;
-        /* Reset pthread_once so re-init is possible (e.g., in tests) */
-        g_autograd_once = (pthread_once_t)PTHREAD_ONCE_INIT;
     }
+    g_autograd_initialized = false;
+    pthread_mutex_unlock(&g_autograd_init_mutex);
 }
 
 AutogradEngine* autograd_get_engine(void) {
-    pthread_once(&g_autograd_once, autograd_init_once);
+    autograd_init();
     return global_autograd_engine;
 }
 
@@ -121,7 +127,15 @@ void tensor_detach_inplace(Tensor* t) {
     if (!t)
         return;
 
+    if (t->ir_node && !t->is_executed) {
+        if (tensor_ensure_executed(t) != 0) {
+            LOG_ERROR("tensor_detach_inplace: failed to materialize lazy tensor");
+            return;
+        }
+    }
+
     t->requires_grad = false;
+    t->retains_grad  = false;
     t->ir_node       = NULL;
     t->ir_context    = NULL;
 }
@@ -130,21 +144,73 @@ void tensor_retain_grad(Tensor* t) {
     if (!t)
         return;
 
-    t->requires_grad = true;
+    t->retains_grad = true;
 }
 
-#define MAX_HOOKS 16
-
 typedef struct {
-    TensorBackwardHook hooks[MAX_HOOKS];
+    TensorBackwardHook* hooks;
     int num_hooks;
+    int capacity;
 } TensorHookList;
 
+typedef struct {
+    ModuleBackwardHook* hooks;
+    int num_hooks;
+    int capacity;
+} ModuleHookList;
+
 static TensorHookList* get_tensor_hooks(Tensor* t) {
-    if (!t->user_data) {
-        t->user_data = cml_calloc(1, sizeof(TensorHookList));
+    if (!t->backward_hooks) {
+        t->backward_hooks = calloc(1, sizeof(TensorHookList));
+        if (!t->backward_hooks) {
+            LOG_ERROR("Failed to allocate tensor hook list");
+            return NULL;
+        }
     }
-    return (TensorHookList*)t->user_data;
+    return (TensorHookList*)t->backward_hooks;
+}
+
+static ModuleHookList* get_module_hooks(Module* module) {
+    if (!module->backward_hooks) {
+        module->backward_hooks = calloc(1, sizeof(ModuleHookList));
+        if (!module->backward_hooks) {
+            LOG_ERROR("Failed to allocate module hook list");
+            return NULL;
+        }
+    }
+    return (ModuleHookList*)module->backward_hooks;
+}
+
+static int hook_list_append_tensor(TensorHookList* list, TensorBackwardHook hook) {
+    if (list->num_hooks >= list->capacity) {
+        int new_cap = list->capacity == 0 ? 4 : list->capacity * 2;
+        TensorBackwardHook* new_hooks =
+            realloc(list->hooks, (size_t)new_cap * sizeof(TensorBackwardHook));
+        if (!new_hooks) {
+            LOG_ERROR("Failed to grow tensor hook list");
+            return -1;
+        }
+        list->hooks    = new_hooks;
+        list->capacity = new_cap;
+    }
+    list->hooks[list->num_hooks++] = hook;
+    return 0;
+}
+
+static int hook_list_append_module(ModuleHookList* list, ModuleBackwardHook hook) {
+    if (list->num_hooks >= list->capacity) {
+        int new_cap = list->capacity == 0 ? 4 : list->capacity * 2;
+        ModuleBackwardHook* new_hooks =
+            realloc(list->hooks, (size_t)new_cap * sizeof(ModuleBackwardHook));
+        if (!new_hooks) {
+            LOG_ERROR("Failed to grow module hook list");
+            return -1;
+        }
+        list->hooks    = new_hooks;
+        list->capacity = new_cap;
+    }
+    list->hooks[list->num_hooks++] = hook;
+    return 0;
 }
 
 int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
@@ -154,21 +220,17 @@ int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
     }
 
     TensorHookList* hooks = get_tensor_hooks(t);
-    if (hooks->num_hooks >= MAX_HOOKS) {
-        LOG_ERROR("Maximum number of hooks (%d) reached", MAX_HOOKS);
+    if (!hooks)
         return -1;
-    }
 
-    hooks->hooks[hooks->num_hooks++] = hook;
-    return 0;
+    return hook_list_append_tensor(hooks, hook);
 }
 
 void tensor_remove_hooks(Tensor* t) {
-    if (!t || !t->user_data) {
+    if (!t || !t->backward_hooks)
         return;
-    }
 
-    TensorHookList* hooks = (TensorHookList*)t->user_data;
+    TensorHookList* hooks = (TensorHookList*)t->backward_hooks;
     hooks->num_hooks      = 0;
 }
 
@@ -178,16 +240,31 @@ int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook
         return -1;
     }
 
-    if (!module->user_data) {
-        module->user_data = cml_malloc(sizeof(ModuleBackwardHook));
-        if (!module->user_data) {
-            LOG_ERROR("Failed to allocate memory for module hook");
-            return -1;
-        }
-    }
+    ModuleHookList* hooks = get_module_hooks(module);
+    if (!hooks)
+        return -1;
 
-    *(ModuleBackwardHook*)module->user_data = hook;
-    return 0;
+    return hook_list_append_module(hooks, hook);
+}
+
+void autograd_free_tensor_hooks(Tensor* t) {
+    if (!t || !t->backward_hooks)
+        return;
+
+    TensorHookList* hooks = (TensorHookList*)t->backward_hooks;
+    free(hooks->hooks);
+    free(hooks);
+    t->backward_hooks = NULL;
+}
+
+void autograd_free_module_hooks(Module* module) {
+    if (!module || !module->backward_hooks)
+        return;
+
+    ModuleHookList* hooks = (ModuleHookList*)module->backward_hooks;
+    free(hooks->hooks);
+    free(hooks);
+    module->backward_hooks = NULL;
 }
 
 void tensor_zero_grad(Tensor* tensor) {
@@ -316,6 +393,23 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     if (cml_ir_execute_backward(tensor->ir_context) != 0) {
         LOG_ERROR("Failed to execute backward pass");
         return;
+    }
+
+    if (tensor->backward_hooks && tensor->grad) {
+        TensorHookList* hook_list = (TensorHookList*)tensor->backward_hooks;
+        for (int i = 0; i < hook_list->num_hooks; i++) {
+            hook_list->hooks[i](tensor->grad);
+        }
+    }
+
+    if (tensor->ir_context && tensor->ir_context->tensor_refs) {
+        for (int i = 0; i < tensor->ir_context->tensor_refs_count; i++) {
+            Tensor* t = tensor->ir_context->tensor_refs[i];
+            if (!t || !t->grad || t->retains_grad || tensor_is_leaf(t))
+                continue;
+            tensor_free(t->grad);
+            t->grad = NULL;
+        }
     }
 
     const char* viz     = getenv("CML_VIZ");
@@ -611,13 +705,13 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
             return m->ids[i];
     if (m->size >= m->cap) {
         int ncap           = m->cap ? m->cap * 2 : 64;
-        const void** nkeys = cml_realloc(m->keys, (size_t)ncap * sizeof(const void*));
-        int* nids          = cml_realloc(m->ids, (size_t)ncap * sizeof(int));
-        if (!nkeys || !nids)
-            return -1;
+        const void** nkeys = realloc(m->keys, (size_t)ncap * sizeof(const void*));
+        if (!nkeys) return -1;
         m->keys = nkeys;
-        m->ids  = nids;
-        m->cap  = ncap;
+        int* nids = realloc(m->ids, (size_t)ncap * sizeof(int));
+        if (!nids) return -1;
+        m->ids = nids;
+        m->cap = ncap;
     }
     m->keys[m->size] = key;
     m->ids[m->size]  = next_id;

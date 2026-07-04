@@ -9,6 +9,8 @@
 
 #define GGUF_VERSION 3
 #define MAX_TENSORS 4096
+#define GGUF_TENSOR_TYPE_Q4_0 2
+#define GGUF_TENSOR_TYPE_Q8_0 7
 
 typedef struct GGUFTensorInfo {
     char* name;
@@ -291,7 +293,14 @@ Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
             tensor_free(t);
             return NULL;
         }
-        cml_free(raw);
+
+        if ((int)info->type == GGUF_TENSOR_TYPE_Q8_0) {
+            t->quant_type = CML_QUANT_GGUF_Q8_0;
+        } else if ((int)info->type == GGUF_TENSOR_TYPE_Q4_0) {
+            t->quant_type = CML_QUANT_GGUF_Q4_0;
+        }
+        t->quant_data = raw;
+        t->quant_data_bytes = info->data_size;
         return t;
     }
 

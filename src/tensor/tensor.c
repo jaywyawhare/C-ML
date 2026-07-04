@@ -19,7 +19,7 @@
 #include "core/error_stack.h"
 #include "core/config.h"
 #include "core/threefry.h"
-#include "alloc/cml_allocator.h"
+#include "autograd/autograd.h"
 
 static inline uint16_t float_to_fp16(float f) {
     uint32_t x;
@@ -246,6 +246,11 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->is_contiguous  = true;
     t->buffer_handle     = NULL;
     t->user_data         = NULL;
+    t->backward_hooks    = NULL;
+    t->retains_grad      = false;
+    t->quant_type        = CML_QUANT_NONE;
+    t->quant_data        = NULL;
+    t->quant_data_bytes  = 0;
     t->owns_data         = true;
     t->from_buffer_cache = false;
 
@@ -316,8 +321,7 @@ void* tensor_data_ptr(Tensor* t) {
                 size_t size = t->numel * cml_dtype_size(t->dtype);
                 t->data     = cml_calloc(1, size);
                 if (!t->data) {
-                    LOG_ERROR("Failed to allocate data after execution");
-                    return NULL;
+                    CML_ERR_NULL("Failed to allocate data after execution");
                 }
             }
         } else {
@@ -422,8 +426,7 @@ size_t* compute_contiguous_strides(int* shape, int ndim) {
 
     size_t* strides = (size_t*)cml_malloc((size_t)ndim * sizeof(size_t));
     if (!strides) {
-        LOG_ERROR("Failed to allocate memory for strides");
-        return NULL;
+        CML_ERR_NULL("Failed to allocate memory for strides");
     }
 
     strides[ndim - 1] = 1;
@@ -465,8 +468,7 @@ size_t tensor_compute_storage_size(int* shape, size_t* strides, int ndim) {
 int* tensor_shape_copy(int* shape, int ndim) {
     int* new_shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
     if (!new_shape) {
-        LOG_ERROR("Failed to allocate memory for tensor shape copy");
-        return NULL;
+        CML_ERR_NULL("Failed to allocate memory for tensor shape copy");
     }
     memcpy(new_shape, shape, (size_t)ndim * sizeof(int));
     return new_shape;
@@ -723,6 +725,11 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->is_contiguous     = true;
     t->buffer_handle     = NULL;
     t->user_data         = NULL;
+    t->backward_hooks    = NULL;
+    t->retains_grad      = false;
+    t->quant_type        = CML_QUANT_NONE;
+    t->quant_data        = NULL;
+    t->quant_data_bytes  = 0;
     t->from_buffer_cache = false;
 
     node->output = t;
@@ -847,7 +854,16 @@ void tensor_free(Tensor* t) {
         t->user_data = NULL;
     }
 
-    cml_free(t);
+    autograd_free_tensor_hooks(t);
+
+    if (t->quant_data) {
+        free(t->quant_data);
+        t->quant_data = NULL;
+        t->quant_data_bytes = 0;
+        t->quant_type = CML_QUANT_NONE;
+    }
+
+    free(t);
 }
 
 Tensor* tensor_clone(Tensor* t) {
@@ -1291,8 +1307,7 @@ Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode
 
     // Support 4D [N, C, H, W]
     if (a->ndim != 4 || num_dims != 2) {
-        LOG_ERROR("tensor_interpolate: only 4D [N,C,H,W] with 2D output_size supported");
-        return NULL;
+        CML_ERR_NULL("tensor_interpolate: only 4D [N,C,H,W] with 2D output_size supported");
     }
 
     int N = a->shape[0], C = a->shape[1];
@@ -1350,8 +1365,7 @@ Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode
 Tensor* tensor_dot(Tensor* a, Tensor* b) {
     if (!a || !b) return NULL;
     if (a->ndim != 1 || b->ndim != 1 || a->numel != b->numel) {
-        LOG_ERROR("tensor_dot: both tensors must be 1D with same size");
-        return NULL;
+        CML_ERR_NULL("tensor_dot: both tensors must be 1D with same size");
     }
     tensor_ensure_executed(a);
     tensor_ensure_executed(b);
@@ -1462,8 +1476,7 @@ Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
     size_t dst_size = cml_dtype_size(target_dtype);
 
     if (src_size == 0 || dst_size == 0) {
-        LOG_ERROR("tensor_bitcast: unsupported dtype size");
-        return NULL;
+        CML_ERR_NULL("tensor_bitcast: unsupported dtype size");
     }
 
     size_t total_bytes = a->numel * src_size;
@@ -1722,8 +1735,7 @@ Tensor* tensor_from_url(const char* url) {
     char tmppath[] = "/tmp/cml_tensor_XXXXXX";
     int fd = mkstemp(tmppath);
     if (fd < 0) {
-        LOG_ERROR("tensor_from_url: failed to create temp file");
-        return NULL;
+        CML_ERR_NULL("tensor_from_url: failed to create temp file");
     }
     close(fd);
 

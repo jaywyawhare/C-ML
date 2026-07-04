@@ -19,8 +19,8 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs);
 /* Called internally from tensor_* functions when auto-capture is enabled. */
 int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_inputs, void* params);
 
-/* Returns the global IR context used for lazy evaluation.
-   Creates a new one if it doesn't exist. */
+/* Returns the thread-local IR context used for lazy evaluation.
+   Creates a new one per thread if it doesn't exist. */
 CMLGraph_t cml_ir_get_or_create_context(void);
 void cml_ir_set_global_context(CMLGraph_t ir);
 

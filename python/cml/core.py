@@ -110,8 +110,35 @@ def _coerce_shape(shape):
     return list(shape)
 
 
-def _create(lib_fn, shape, dtype, device, *extra_args):
+def _validate_shape(shape):
     shape = _coerce_shape(shape)
+    if not shape:
+        raise ValueError("shape must be non-empty")
+    for i, dim in enumerate(shape):
+        if not isinstance(dim, int):
+            raise TypeError(f"shape[{i}] must be int, got {type(dim).__name__}")
+        if dim < 0:
+            raise ValueError(f"shape[{i}] must be non-negative, got {dim}")
+    return shape
+
+
+def _validate_dtype(dtype):
+    if dtype is None:
+        return DTYPE_FLOAT32
+    if isinstance(dtype, str):
+        name = dtype.lower()
+        rev = {v: k for k, v in DTYPE_NAMES.items()}
+        if name not in rev:
+            raise ValueError(f"unsupported dtype string: {dtype!r}")
+        return rev[name]
+    if dtype not in DTYPE_TO_NUMPY:
+        raise ValueError(f"unsupported dtype id: {dtype}")
+    return dtype
+
+
+def _create(lib_fn, shape, dtype, device, *extra_args):
+    shape = _validate_shape(shape)
+    dtype = _validate_dtype(dtype)
     shape_array = ffi.new("int[]", shape)
     config = _make_config(dtype, device)
     args = [shape_array, len(shape), config] + list(extra_args)
@@ -409,16 +436,31 @@ class Tensor:
         return arr
 
     @classmethod
-    def from_numpy(cls, arr: np.ndarray, requires_grad: bool = False) -> "Tensor":
-        if arr.dtype != np.float32:
-            arr = arr.astype(np.float32)
+    def from_numpy(cls, arr: np.ndarray, requires_grad: bool = False,
+                   dtype: Optional[int] = None) -> "Tensor":
+        if not isinstance(arr, np.ndarray):
+            raise TypeError(f"from_numpy expects numpy.ndarray, got {type(arr).__name__}")
+
+        target_dtype = _validate_dtype(dtype) if dtype is not None else DTYPE_FLOAT32
+        np_target = DTYPE_TO_NUMPY[target_dtype]
+
+        if arr.dtype != np_target:
+            arr = arr.astype(np_target)
         if not arr.flags["C_CONTIGUOUS"]:
             arr = np.ascontiguousarray(arr)
 
-        shape = arr.shape
-        if len(shape) == 0:
-            shape = (1,)
-            arr = arr.reshape(shape)
+        shape = _validate_shape(arr.shape if arr.shape else (1,))
+        if arr.size == 0:
+            raise ValueError("from_numpy: array must contain at least one element")
+
+        expected_numel = 1
+        for d in shape:
+            expected_numel *= d
+        if arr.size != expected_numel:
+            raise ValueError(
+                f"from_numpy: array size {arr.size} does not match shape {tuple(shape)} "
+                f"(expected {expected_numel} elements)"
+            )
 
         shape_array = ffi.new("int[]", shape)
         data_ptr = ffi.cast("void*", arr.ctypes.data)

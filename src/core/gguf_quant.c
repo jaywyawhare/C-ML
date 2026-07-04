@@ -33,7 +33,6 @@ static float fp16_to_fp32(uint16_t h) {
             shift++;
         }
         m &= ~0x0400u;            /* remove the now-explicit leading 1      */
-        shift++;                   /* account for the leading-1 position     */
         /* fp32 exponent: stored = 127 + (1 - 15 - shift) = 113 - shift     */
         uint32_t v = sign | ((uint32_t)(113 - shift) << 23) | (m << 13);
         float r;
@@ -387,5 +386,58 @@ int gguf_dequantize(GGUFTensorType type, const void *src, float *dst, size_t num
             return -1;
     }
 
+    return 0;
+}
+
+int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, int n) {
+    if (!x || !w_q8 || !y || m <= 0 || k <= 0 || n <= 0 || (k % QK8_0) != 0)
+        return -1;
+
+    const BlockQ8_0* blocks = (const BlockQ8_0*)w_q8;
+    const int kb = k / QK8_0;
+
+    memset(y, 0, (size_t)m * (size_t)n * sizeof(float));
+    for (int mi = 0; mi < m; mi++) {
+        for (int ni = 0; ni < n; ni++) {
+            float acc = 0.0f;
+            for (int b = 0; b < kb; b++) {
+                const BlockQ8_0* blk = &blocks[ni * kb + b];
+                const float d = fp16_to_fp32(blk->d);
+                for (int q = 0; q < QK8_0; q++) {
+                    const int kk = b * QK8_0 + q;
+                    acc += x[mi * k + kk] * d * (float)blk->qs[q];
+                }
+            }
+            y[mi * n + ni] = acc;
+        }
+    }
+    return 0;
+}
+
+int gguf_q4_0_matmul(const float* x, const void* w_q4, float* y, int m, int k, int n) {
+    if (!x || !w_q4 || !y || m <= 0 || k <= 0 || n <= 0 || (k % QK4_0) != 0)
+        return -1;
+
+    const BlockQ4_0* blocks = (const BlockQ4_0*)w_q4;
+    const int kb = k / QK4_0;
+
+    memset(y, 0, (size_t)m * (size_t)n * sizeof(float));
+    for (int mi = 0; mi < m; mi++) {
+        for (int ni = 0; ni < n; ni++) {
+            float acc = 0.0f;
+            for (int b = 0; b < kb; b++) {
+                const BlockQ4_0* blk = &blocks[ni * kb + b];
+                const float d = fp16_to_fp32(blk->d);
+                for (int q = 0; q < QK4_0; q++) {
+                    const int kk = b * QK4_0 + q;
+                    const uint8_t packed = blk->qs[q / 2];
+                    const int q4 = (q & 1) ? (packed >> 4) : (packed & 0x0F);
+                    const float wv = d * ((float)q4 - 8.0f);
+                    acc += x[mi * k + kk] * wv;
+                }
+            }
+            y[mi * n + ni] = acc;
+        }
+    }
     return 0;
 }

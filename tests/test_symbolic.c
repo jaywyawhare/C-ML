@@ -260,7 +260,9 @@ static void test_eval_var(void) {
     SymExpr* v = sym_var("N", 1, 100);
     const char* names[] = { "N" };
     int64_t vals[] = { 42 };
-    ASSERT_EQ(sym_eval(v, names, vals, 1), 42);
+    int64_t result;
+    ASSERT_EQ(sym_eval(v, names, vals, 1, &result), 0);
+    ASSERT_EQ(result, 42);
     sym_expr_release(v);
     PASS();
 }
@@ -272,15 +274,17 @@ static void test_eval_complex(void) {
     SymExpr* one = sym_const(1);
     SymExpr* two = sym_const(2);
     SymExpr* np1 = sym_add(n, one);
-    SymExpr* result = sym_mul(np1, two);
+    SymExpr* result_expr = sym_mul(np1, two);
     const char* names[] = { "N" };
     int64_t vals[] = { 10 };
-    ASSERT_EQ(sym_eval(result, names, vals, 1), 22);
+    int64_t result;
+    ASSERT_EQ(sym_eval(result_expr, names, vals, 1, &result), 0);
+    ASSERT_EQ(result, 22);
     sym_expr_release(n);
     sym_expr_release(one);
     sym_expr_release(two);
     sym_expr_release(np1);
-    sym_expr_release(result);
+    sym_expr_release(result_expr);
     PASS();
 }
 
@@ -294,12 +298,25 @@ static void test_eval_multi_var(void) {
     SymExpr* e = sym_add(a, b2);
     const char* names[] = { "A", "B" };
     int64_t vals[] = { 10, 5 };
-    ASSERT_EQ(sym_eval(e, names, vals, 2), 20);
+    int64_t result;
+    ASSERT_EQ(sym_eval(e, names, vals, 2, &result), 0);
+    ASSERT_EQ(result, 20);
     sym_expr_release(a);
     sym_expr_release(b);
     sym_expr_release(two);
     sym_expr_release(b2);
     sym_expr_release(e);
+    PASS();
+}
+
+static void test_eval_unknown_var(void) {
+    TEST(eval_unknown_var);
+    SymExpr* v = sym_var("X", 1, 100);
+    const char* names[] = { "N" };
+    int64_t vals[] = { 42 };
+    int64_t result;
+    ASSERT_EQ(sym_eval(v, names, vals, 1, &result), -1);
+    sym_expr_release(v);
     PASS();
 }
 
@@ -587,6 +604,7 @@ int main(void) {
     test_eval_var();
     test_eval_complex();
     test_eval_multi_var();
+    test_eval_unknown_var();
 
     test_simplify_add_zero();
     test_simplify_mul_one();

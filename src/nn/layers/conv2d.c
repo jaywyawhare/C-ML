@@ -1,4 +1,5 @@
 #include "nn/layers/conv2d.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
@@ -81,18 +82,7 @@ static void conv2d_free(Module* module) {
 
 static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int kernel_size) {
     (void)out_channels;
-    if (!tensor)
-        return;
-
-    float* data = (float*)tensor_data_ptr(tensor);
-    if (!data)
-        return;
-    float scale  = sqrtf(2.0f / (float)(in_channels * kernel_size * kernel_size));
-    size_t numel = tensor->numel;
-
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)(float)RAND_MAX - 0.5f) * 2.0f * scale;
-    }
+    nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size);
 }
 
 Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride, int padding,

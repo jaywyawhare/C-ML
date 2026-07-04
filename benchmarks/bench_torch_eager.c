@@ -11,6 +11,7 @@
 
 #include "torch/torch_c.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 static double now_ms(void) {

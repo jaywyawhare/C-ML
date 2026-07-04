@@ -108,6 +108,10 @@ struct CMLNVDriver;
 struct CMLNVDriver* cml_dispatch_get_nv_driver(void);
 struct CMLAMDriver;
 struct CMLAMDriver* cml_dispatch_get_am_driver(void);
+struct CMLOpenCLIRBackend;
+struct CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void);
+struct CMLHCQQueue;
+struct CMLHCQQueue* cml_dispatch_get_hcq_queue(CMLBackendType backend);
 
 int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
                              Tensor** inputs, int num_inputs,

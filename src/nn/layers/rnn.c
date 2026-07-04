@@ -1,4 +1,5 @@
 #include "nn/layers/rnn.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
@@ -95,20 +96,14 @@ RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
     /* weight_ih [hidden_size, input_size] */
     int wih_shape[] = {hidden_size, input_size};
     Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    tensor_ensure_executed(wih);
-    float* wih_data = (float*)tensor_data_ptr(wih);
-    for (size_t i = 0; i < wih->numel; i++)
-        wih_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(wih, -scale, scale);
     module_add_parameter((Module*)cell, wih, "weight_ih", true);
     cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
 
     /* weight_hh [hidden_size, hidden_size] */
     int whh_shape[] = {hidden_size, hidden_size};
     Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    tensor_ensure_executed(whh);
-    float* whh_data = (float*)tensor_data_ptr(whh);
-    for (size_t i = 0; i < whh->numel; i++)
-        whh_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(whh, -scale, scale);
     module_add_parameter((Module*)cell, whh, "weight_hh", true);
     cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
 
@@ -249,20 +244,14 @@ LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
     /* weight_ih [4*hidden_size, input_size] */
     int wih_shape[] = {gs, input_size};
     Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    tensor_ensure_executed(wih);
-    float* wih_data = (float*)tensor_data_ptr(wih);
-    for (size_t i = 0; i < wih->numel; i++)
-        wih_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(wih, -scale, scale);
     module_add_parameter((Module*)cell, wih, "weight_ih", true);
     cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
 
     /* weight_hh [4*hidden_size, hidden_size] */
     int whh_shape[] = {gs, hidden_size};
     Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    tensor_ensure_executed(whh);
-    float* whh_data = (float*)tensor_data_ptr(whh);
-    for (size_t i = 0; i < whh->numel; i++)
-        whh_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(whh, -scale, scale);
     module_add_parameter((Module*)cell, whh, "weight_hh", true);
     cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
 
@@ -390,20 +379,14 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
     /* weight_ih [3*hidden_size, input_size] */
     int wih_shape[] = {gs, input_size};
     Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    tensor_ensure_executed(wih);
-    float* wih_data = (float*)tensor_data_ptr(wih);
-    for (size_t i = 0; i < wih->numel; i++)
-        wih_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(wih, -scale, scale);
     module_add_parameter((Module*)cell, wih, "weight_ih", true);
     cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
 
     /* weight_hh [3*hidden_size, hidden_size] */
     int whh_shape[] = {gs, hidden_size};
     Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    tensor_ensure_executed(whh);
-    float* whh_data = (float*)tensor_data_ptr(whh);
-    for (size_t i = 0; i < whh->numel; i++)
-        whh_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+    nn_init_uniform(whh, -scale, scale);
     module_add_parameter((Module*)cell, whh, "weight_hh", true);
     cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
 
@@ -549,7 +532,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
     int seq_len = x->shape[0];
     int total_dirs = rnn->num_layers * nd;
 
-    Tensor** final_h = cml_calloc((size_t)total_dirs, sizeof(Tensor*));
+    Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
     if (!final_h) return;
     Tensor* layer_input = x;
 
@@ -557,11 +540,8 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
         RNNCell* fwd_cell = rnn->cells[l * nd + 0];
 
         Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
-        Tensor** fwd_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
-        if (!fwd_steps) {
-            cml_free(final_h);
-            return;
-        }
+        Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+        if (!fwd_steps) { free(final_h); return; }
 
         for (int t = 0; t < seq_len; t++) {
             Tensor* xt = slice_timestep(layer_input, t);
@@ -577,9 +557,10 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
         if (nd == 2) {
             RNNCell* rev_cell = rnn->cells[l * nd + 1];
             Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
-            Tensor** rev_steps = cml_malloc((size_t)seq_len * sizeof(Tensor*));
+            Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
             if (!rev_steps) {
-                cml_free(final_h);
+                free(fwd_steps);
+                free(final_h);
                 return;
             }
 

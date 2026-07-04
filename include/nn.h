@@ -33,6 +33,7 @@ typedef struct Module {
 
     bool training;   // Training mode flag
     void* user_data; // User-defined data
+    void* backward_hooks; /* ModuleHookList*, owned by autograd */
 
     const char* version;     // Module version
     const char* description; // Module description

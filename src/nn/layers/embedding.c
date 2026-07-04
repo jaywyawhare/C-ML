@@ -1,4 +1,5 @@
 #include "nn/layers/embedding.h"
+#include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
 #include "ops/uops.h"
@@ -103,15 +104,11 @@ Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
         return NULL;
     }
 
-    tensor_ensure_executed(weight);
-    float* data = (float*)tensor_data_ptr(weight);
-    if (data) {
-        for (size_t i = 0; i < weight->numel; i++) {
-            data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f;
-        }
-        if (padding_idx >= 0 && padding_idx < num_embeddings) {
+    nn_init_uniform(weight, -1.0f, 1.0f);
+    if (padding_idx >= 0 && padding_idx < num_embeddings) {
+        float* data = (float*)tensor_data_ptr(weight);
+        if (data)
             memset(&data[padding_idx * embedding_dim], 0, (size_t)embedding_dim * sizeof(float));
-        }
     }
 
     if (module_add_parameter((Module*)emb, weight, "weight", true) != 0) {

@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "nn/serving.h"
+#include "nn/paged_attention.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,6 +22,8 @@ typedef struct CMLOpenAIServer {
     float top_p;
     char model_name[128];
     char model_path[512];
+    CMLServingContext* serving;
+    CMLPagedKVCache* kv_cache;
 } CMLOpenAIServer;
 
 CMLOpenAIServer* cml_openai_server_create(int port);

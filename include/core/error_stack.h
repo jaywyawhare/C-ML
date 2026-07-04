@@ -10,11 +10,11 @@ extern "C" {
 #endif
 
 typedef struct {
-    int code;             // Error code
-    const char* message;  // Error message
-    const char* file;     // Source file
-    int line;             // Line number
-    const char* function; // Function name
+    int code;
+    const char* message;
+    const char* file;
+    int line;
+    const char* function;
 } ErrorEntry;
 
 void error_stack_init(void);
@@ -22,11 +22,27 @@ void error_stack_cleanup(void);
 void error_stack_clear(void);
 void error_stack_push(int code, const char* message, const char* file, int line,
                       const char* function);
+void error_stack_set_notify(void (*fn)(int code, const char* message, void* context),
+                            void* context);
 ErrorEntry* error_stack_peek(void);
 bool error_stack_has_errors(void);
 void error_stack_print_all(void);
 const char* error_stack_get_last_message(void);
 int error_stack_get_last_code(void);
+
+#define CML_ERR(code, msg)                                                                         \
+    do {                                                                                           \
+        error_stack_push((code), (msg), __FILE__, __LINE__, __func__);                             \
+    } while (0)
+
+#define CML_ERR_RET(code, msg, ret)                                                                \
+    do {                                                                                           \
+        error_stack_push((code), (msg), __FILE__, __LINE__, __func__);                             \
+        return (ret);                                                                              \
+    } while (0)
+
+#define CML_ERR_NULL(msg) CML_ERR_RET(CM_OPERATION_FAILED, (msg), NULL)
+#define CML_ERR_INT(msg) CML_ERR_RET(CM_OPERATION_FAILED, (msg), -1)
 
 #define CML_AUTO_CHECK_PTR(ptr, msg)                                                               \
     do {                                                                                           \
@@ -47,10 +63,7 @@ int error_stack_get_last_code(void);
          ? (error_stack_push(CM_OPERATION_FAILED, (msg), __FILE__, __LINE__, __func__), (ptr))     \
          : (ptr))
 
-/* CML_CHECK(tensor_empty(...), "Failed to create tensor") */
 #define CML_CHECK(expr, msg) CML_AUTO_CHECK_PTR_RET((expr), (msg))
-
-/* CML_CHECK_AUTO(tensor_empty(...)) */
 #define CML_CHECK_AUTO(expr) CML_AUTO_CHECK_PTR_RET((expr), "Operation failed: " #expr)
 
 #define CML_HAS_ERRORS() error_stack_has_errors()
@@ -61,4 +74,4 @@ int error_stack_get_last_code(void);
 }
 #endif
 
-#endif // CML_CORE_ERROR_STACK_H
+#endif /* CML_CORE_ERROR_STACK_H */

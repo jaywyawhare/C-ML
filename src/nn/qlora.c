@@ -1,4 +1,5 @@
 #include "nn/qlora.h"
+#include "core/threefry.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
 
@@ -197,13 +198,10 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
     tensor_ensure_executed(qlora->lora_A);
     float* data_A = (float*)tensor_data_ptr(qlora->lora_A);
     if (data_A) {
-        for (int i = 0; i < rank * in_features; i++) {
-            float u1 = (float)rand() / (float)RAND_MAX;
-            float u2 = (float)rand() / (float)RAND_MAX;
-            /* Box-Muller for approximate normal distribution */
-            float z = sqrtf(-2.0f * logf(u1 + 1e-10f)) * cosf(2.0f * 3.14159265f * u2);
-            data_A[i] = z * xavier_scale;
-        }
+        CMLRNGState* rng = cml_rng_get_global();
+        cml_rng_normal(rng, data_A, (size_t)(rank * in_features));
+        for (int i = 0; i < rank * in_features; i++)
+            data_A[i] *= xavier_scale;
     }
 
     /* Initialize lora_B with zeros */

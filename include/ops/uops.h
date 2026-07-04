@@ -186,6 +186,8 @@ typedef enum {
     // Additional Activation Ops
     UOP_ELU,             // x > 0 ? x : alpha*(exp(x)-1)
     UOP_SELU,            // scale*(x > 0 ? x : alpha*(exp(x)-1))
+    UOP_GELU,            // x * Phi(x) (Gaussian Error Linear Unit)
+    UOP_LEAKY_RELU,      // x > 0 ? x : alpha*x
     UOP_MISH,            // x * tanh(softplus(x))
     UOP_SILU,            // x * sigmoid(x) (swish)
     UOP_HARDSWISH,       // x > 3 ? x : x < -3 ? 0 : x*(x+3)/6

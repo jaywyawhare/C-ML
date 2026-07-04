@@ -16,6 +16,9 @@
 #include "ops/winograd.h"
 #include "ops/ir/dispatch.h"
 #include "ops/ir/cpu_lazy_materialize.h"
+#include "core/gguf_quant.h"
+#include "alloc/tlsf_alloc.h"
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +51,7 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
 #define BUFFER_CACHE_MIN_BUCKET 6  // 64 bytes (2^6)
 #define BUFFER_CACHE_MAX_BUCKET 26 // 64 MB (2^26)
 #define BUFFER_CACHE_NUM_BUCKETS (BUFFER_CACHE_MAX_BUCKET - BUFFER_CACHE_MIN_BUCKET + 1)
-#define BUFFER_CACHE_MAX_PER_BUCKET 8 // Max cached buffers per size bucket
+#define BUFFER_CACHE_MAX_PER_BUCKET 32
 
 typedef struct CachedBuffer {
     void* data;
@@ -71,6 +74,34 @@ typedef struct {
 } BufferCache;
 
 static BufferCache g_buffer_cache = {0};
+static CMLTLSFAllocator* g_exec_tlsf = NULL;
+static pthread_mutex_t g_exec_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void* exec_pool_alloc(size_t size) {
+    pthread_mutex_lock(&g_exec_alloc_lock);
+    if (!g_exec_tlsf) {
+        g_exec_tlsf = cml_tlsf_create(256u * 1024u * 1024u);
+    }
+    void* ptr = g_exec_tlsf ? cml_tlsf_alloc(g_exec_tlsf, size) : NULL;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
+    if (ptr)
+        return ptr;
+    return malloc(size);
+}
+
+static void exec_pool_free(void* ptr, size_t size) {
+    (void)size;
+    if (!ptr)
+        return;
+    pthread_mutex_lock(&g_exec_alloc_lock);
+    if (g_exec_tlsf && cml_tlsf_alloc_size(g_exec_tlsf, ptr) > 0) {
+        cml_tlsf_free(g_exec_tlsf, ptr);
+        pthread_mutex_unlock(&g_exec_alloc_lock);
+        return;
+    }
+    pthread_mutex_unlock(&g_exec_alloc_lock);
+    free(ptr);
+}
 
 static int get_bucket_index(size_t size) {
     if (size == 0)
@@ -111,11 +142,14 @@ void* cml_buffer_cache_alloc(size_t size) {
 
     int bucket_idx = get_bucket_index(size);
     if (bucket_idx < 0) {
+        pthread_mutex_lock(&g_exec_alloc_lock);
         g_buffer_cache.cache_misses++;
         g_buffer_cache.bytes_allocated += size;
-        return cml_malloc(size);
+        pthread_mutex_unlock(&g_exec_alloc_lock);
+        return exec_pool_alloc(size);
     }
 
+    pthread_mutex_lock(&g_exec_alloc_lock);
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
 
     if (bucket->free_list) {
@@ -124,19 +158,21 @@ void* cml_buffer_cache_alloc(size_t size) {
         bucket->count--;
 
         void* data = cached->data;
-        cml_free(cached);
-
         g_buffer_cache.cache_hits++;
         g_buffer_cache.bytes_cached -= bucket->bucket_size;
+        pthread_mutex_unlock(&g_exec_alloc_lock);
 
+        free(cached);
         /* Don't zero — callers that need zeroing (e.g. reduce ops) do it themselves.
          * Most ops (matmul, add, relu, conv) write every output element. */
         return data;
     }
 
     g_buffer_cache.cache_misses++;
-    g_buffer_cache.bytes_allocated += bucket->bucket_size;
-    return cml_malloc(bucket->bucket_size);
+    size_t alloc_size = bucket->bucket_size;
+    g_buffer_cache.bytes_allocated += alloc_size;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
+    return exec_pool_alloc(alloc_size);
 }
 
 void cml_buffer_cache_free(void* ptr, size_t size) {
@@ -147,20 +183,23 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
 
     int bucket_idx = get_bucket_index(size);
     if (bucket_idx < 0) {
-        cml_free(ptr);
-        return;
-    }
-
-    BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
-
-    if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
-        cml_free(ptr);
+        exec_pool_free(ptr, size);
         return;
     }
 
     CachedBuffer* cached = (CachedBuffer*)cml_malloc(sizeof(CachedBuffer));
     if (!cached) {
-        cml_free(ptr);
+        exec_pool_free(ptr, size);
+        return;
+    }
+
+    pthread_mutex_lock(&g_exec_alloc_lock);
+    BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
+
+    if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
+        pthread_mutex_unlock(&g_exec_alloc_lock);
+        free(cached);
+        exec_pool_free(ptr, bucket->bucket_size);
         return;
     }
 
@@ -169,6 +208,7 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
     bucket->free_list = cached;
     bucket->count++;
     g_buffer_cache.bytes_cached += bucket->bucket_size;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
 }
 
 void cml_cleanup_buffer_cache(void) {
@@ -190,32 +230,47 @@ void cml_cleanup_buffer_cache(void) {
 
     g_buffer_cache.bytes_cached = 0;
     g_buffer_cache.initialized  = false;
+
+    pthread_mutex_lock(&g_exec_alloc_lock);
+    if (g_exec_tlsf) {
+        cml_tlsf_destroy(g_exec_tlsf);
+        g_exec_tlsf = NULL;
+    }
+    pthread_mutex_unlock(&g_exec_alloc_lock);
 }
 
 void cml_print_buffer_cache_stats(void) {
-    printf("Buffer Cache Stats:\n");
+    pthread_mutex_lock(&g_exec_alloc_lock);
     if (!g_buffer_cache.initialized) {
-        printf("  (Not initialized)\n");
+        pthread_mutex_unlock(&g_exec_alloc_lock);
+        printf("Buffer Cache Stats:\n  (Not initialized)\n");
         return;
     }
 
-    size_t total_cached = 0;
-    int total_buffers   = 0;
+    size_t total_cached  = 0;
+    int    total_buffers = 0;
     for (int i = 0; i < BUFFER_CACHE_NUM_BUCKETS; i++) {
         if (g_buffer_cache.buckets[i].count > 0) {
             total_buffers += g_buffer_cache.buckets[i].count;
-            total_cached += g_buffer_cache.buckets[i].count * g_buffer_cache.buckets[i].bucket_size;
+            total_cached  += (size_t)g_buffer_cache.buckets[i].count *
+                             g_buffer_cache.buckets[i].bucket_size;
         }
     }
+    size_t hits   = g_buffer_cache.cache_hits;
+    size_t misses = g_buffer_cache.cache_misses;
+    size_t alloc  = g_buffer_cache.bytes_allocated;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
 
-    size_t total_requests = g_buffer_cache.cache_hits + g_buffer_cache.cache_misses;
-    float hit_rate = total_requests > 0 ? (100.0f * g_buffer_cache.cache_hits / total_requests) : 0;
+    size_t total_requests = hits + misses;
+    float  hit_rate       = total_requests > 0
+                            ? (100.0f * (float)hits / (float)total_requests) : 0.0f;
 
-    printf("  Cache hits:    %zu\n", g_buffer_cache.cache_hits);
-    printf("  Cache misses:  %zu\n", g_buffer_cache.cache_misses);
+    printf("Buffer Cache Stats:\n");
+    printf("  Cache hits:    %zu\n", hits);
+    printf("  Cache misses:  %zu\n", misses);
     printf("  Hit rate:      %.1f%%\n", hit_rate);
     printf("  Cached now:    %d buffers (%.2f KB)\n", total_buffers, total_cached / 1024.0f);
-    printf("  Total alloc:   %.2f KB\n", g_buffer_cache.bytes_allocated / 1024.0f);
+    printf("  Total alloc:   %.2f KB\n", alloc / 1024.0f);
 }
 
 CMLBlasContext* get_blas_context(void) {
@@ -885,21 +940,16 @@ int cpu_execute_node(struct IRNode* node) {
                 int rows = inp->shape[0];
                 int cols = inp->shape[1];
                 if (reduce_dim == 1) {
-                    /* Reduce along cols: output [rows] or [rows,1] */
                     for (int r = 0; r < rows; r++) {
-                        float acc = 0.0f;
-                        for (int c = 0; c < cols; c++)
-                            acc += in1_data[r * cols + c];
+                        float acc = simd_sum_float(in1_data + (size_t)r * (size_t)cols, (size_t)cols);
                         if (node->type == UOP_MEAN && cols > 0)
                             acc /= (float)cols;
                         out_data[r] = acc;
                     }
                 } else { /* reduce_dim == 0 */
-                    /* Reduce along rows: output [cols] or [1,cols] */
                     for (int c = 0; c < cols; c++) {
-                        float acc = 0.0f;
-                        for (int r = 0; r < rows; r++)
-                            acc += in1_data[r * cols + c];
+                        float acc = simd_sum_float_strided(in1_data + (size_t)c, (size_t)rows,
+                                                           (size_t)cols);
                         if (node->type == UOP_MEAN && rows > 0)
                             acc /= (float)rows;
                         out_data[c] = acc;
@@ -999,6 +1049,14 @@ int cpu_execute_node(struct IRNode* node) {
         int M = a->shape[a->ndim - 2];
         int K = a->shape[a->ndim - 1];
         int N = b->shape[b->ndim - 1];
+
+        if (b->quant_type == CML_QUANT_GGUF_Q8_0 && b->quant_data) {
+            if (gguf_q8_0_matmul(in1_data, b->quant_data, out_data, M, K, N) == 0)
+                break;
+        } else if (b->quant_type == CML_QUANT_GGUF_Q4_0 && b->quant_data) {
+            if (gguf_q4_0_matmul(in1_data, b->quant_data, out_data, M, K, N) == 0)
+                break;
+        }
 
         CMLBlasContext* blas = get_blas_context();
         if (blas && blas->initialized) {

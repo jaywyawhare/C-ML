@@ -1,4 +1,6 @@
 #include "nn/llm_ops.h"
+#include "nn/init.h"
+#include "core/threefry.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
 #include <stdlib.h>
@@ -25,13 +27,6 @@ static void llm_softmax_inplace(float* data, int rows, int cols) {
                 row[c] *= inv;
             }
         }
-    }
-}
-
-static void llm_xavier_init(float* data, size_t numel, int fan_in, int fan_out) {
-    float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
-    for (size_t i = 0; i < numel; i++) {
-        data[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * scale;
     }
 }
 
@@ -869,8 +864,7 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
         cml_free(moe);
         return NULL;
     }
-    float* gw = (float*)tensor_data_ptr(moe->gate_weight);
-    if (gw) llm_xavier_init(gw, (size_t)input_dim * num_experts, input_dim, num_experts);
+    nn_init_xavier(moe->gate_weight, input_dim, num_experts);
 
     /* Expert weights */
     moe->expert_w1 = (Tensor**)cml_calloc((size_t)num_experts, sizeof(Tensor*));
@@ -894,10 +888,8 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
             return NULL;
         }
 
-        float* w1 = (float*)tensor_data_ptr(moe->expert_w1[e]);
-        float* w2 = (float*)tensor_data_ptr(moe->expert_w2[e]);
-        if (w1) llm_xavier_init(w1, (size_t)input_dim * hidden_dim, input_dim, hidden_dim);
-        if (w2) llm_xavier_init(w2, (size_t)hidden_dim * input_dim, hidden_dim, input_dim);
+        nn_init_xavier(moe->expert_w1[e], input_dim, hidden_dim);
+        nn_init_xavier(moe->expert_w2[e], hidden_dim, input_dim);
     }
     return moe;
 }

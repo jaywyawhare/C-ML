@@ -4,6 +4,7 @@
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
+#include "core/error_stack.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -12,14 +13,12 @@
 
 Tensor* tensor_add(Tensor* a, Tensor* b) {
     if (!a || !b) {
-        LOG_ERROR("NULL tensor input to tensor_add");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to tensor_add");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {
-        LOG_ERROR("Failed to get or create IR context");
-        return NULL;
+        CML_ERR_NULL("Failed to get or create IR context");
     }
 
     Tensor* inputs[]    = {a, b};
@@ -42,8 +41,7 @@ Tensor* tensor_add(Tensor* a, Tensor* b) {
 
 Tensor* tensor_sub(Tensor* a, Tensor* b) {
     if (!a || !b) {
-        LOG_ERROR("NULL tensor input to tensor_sub");
-        return NULL;
+        CML_ERR_NULL("NULL tensor input to tensor_sub");
     }
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
@@ -241,6 +239,7 @@ Tensor* tensor_softmax(Tensor* a, int dim) {
     }
     if (normalized_dim < 0 || normalized_dim >= a->ndim) {
         LOG_ERROR("Softmax: dimension %d out of range for %dD tensor", dim, a->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -380,6 +379,7 @@ Tensor* tensor_transpose(Tensor* a, int dim0, int dim1) {
     if (dim0 >= a->ndim || dim1 >= a->ndim || dim0 < 0 || dim1 < 0) {
         LOG_ERROR("Transpose: invalid dimensions %d, %d for tensor with ndim=%d", dim0, dim1,
                   a->ndim);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -407,8 +407,7 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
     if (a->ndim < 2 || b->ndim < 2) {
-        LOG_ERROR("MatMul requires at least 2D tensors");
-        return NULL;
+        CML_ERR_NULL("MatMul requires at least 2D tensors");
     }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
@@ -421,8 +420,7 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     int out_ndim = batch_dims + 2;
     node->output_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!node->output_shape) {
-        LOG_ERROR("Failed to allocate output shape for matmul");
-        return NULL;
+        CML_ERR_NULL("Failed to allocate output shape for matmul");
     }
     for (int i = 0; i < batch_dims; i++) {
         node->output_shape[i] = a->shape[i];
