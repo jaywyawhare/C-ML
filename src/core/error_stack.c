@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #define MAX_ERROR_STACK_SIZE 256
 #define MAX_ERROR_MESSAGE_LEN 512
@@ -20,6 +21,7 @@ static __thread size_t g_message_buffer_index         = 0;
 
 static ErrorStackNotifyFn g_error_notify_fn           = NULL;
 static void* g_error_notify_context                   = NULL;
+static pthread_mutex_t g_notify_lock                  = PTHREAD_MUTEX_INITIALIZER;
 
 static void error_stack_ensure_initialized(void) {
     if (g_error_stack_initialized)
@@ -38,8 +40,10 @@ static void error_stack_ensure_initialized(void) {
 }
 
 void error_stack_set_notify(ErrorStackNotifyFn fn, void* context) {
+    pthread_mutex_lock(&g_notify_lock);
     g_error_notify_fn     = fn;
     g_error_notify_context = context;
+    pthread_mutex_unlock(&g_notify_lock);
 }
 
 void error_stack_init(void) { error_stack_ensure_initialized(); }
@@ -116,8 +120,12 @@ void error_stack_push(int code, const char* message, const char* file, int line,
     g_error_stack_size++;
     g_message_buffer_index++;
 
-    if (g_error_notify_fn && entry->message)
-        g_error_notify_fn(code, entry->message, g_error_notify_context);
+    pthread_mutex_lock(&g_notify_lock);
+    ErrorStackNotifyFn notify_fn  = g_error_notify_fn;
+    void* notify_ctx              = g_error_notify_context;
+    pthread_mutex_unlock(&g_notify_lock);
+    if (notify_fn && entry->message)
+        notify_fn(code, entry->message, notify_ctx);
 }
 
 ErrorEntry* error_stack_peek(void) {

@@ -705,12 +705,12 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     if (m->size >= m->cap) {
         int ncap           = m->cap ? m->cap * 2 : 64;
         const void** nkeys = realloc(m->keys, (size_t)ncap * sizeof(const void*));
-        int* nids          = realloc(m->ids, (size_t)ncap * sizeof(int));
-        if (!nkeys || !nids)
-            return -1;
+        if (!nkeys) return -1;
         m->keys = nkeys;
-        m->ids  = nids;
-        m->cap  = ncap;
+        int* nids = realloc(m->ids, (size_t)ncap * sizeof(int));
+        if (!nids) return -1;
+        m->ids = nids;
+        m->cap = ncap;
     }
     m->keys[m->size] = key;
     m->ids[m->size]  = next_id;

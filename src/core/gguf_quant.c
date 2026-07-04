@@ -33,7 +33,6 @@ static float fp16_to_fp32(uint16_t h) {
             shift++;
         }
         m &= ~0x0400u;            /* remove the now-explicit leading 1      */
-        shift++;                   /* account for the leading-1 position     */
         /* fp32 exponent: stored = 127 + (1 - 15 - shift) = 113 - shift     */
         uint32_t v = sign | ((uint32_t)(113 - shift) << 23) | (m << 13);
         float r;

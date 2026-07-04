@@ -141,11 +141,14 @@ void* cml_buffer_cache_alloc(size_t size) {
 
     int bucket_idx = get_bucket_index(size);
     if (bucket_idx < 0) {
+        pthread_mutex_lock(&g_exec_alloc_lock);
         g_buffer_cache.cache_misses++;
         g_buffer_cache.bytes_allocated += size;
+        pthread_mutex_unlock(&g_exec_alloc_lock);
         return exec_pool_alloc(size);
     }
 
+    pthread_mutex_lock(&g_exec_alloc_lock);
     BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
 
     if (bucket->free_list) {
@@ -154,19 +157,21 @@ void* cml_buffer_cache_alloc(size_t size) {
         bucket->count--;
 
         void* data = cached->data;
-        free(cached);
-
         g_buffer_cache.cache_hits++;
         g_buffer_cache.bytes_cached -= bucket->bucket_size;
+        pthread_mutex_unlock(&g_exec_alloc_lock);
 
+        free(cached);
         /* Don't zero — callers that need zeroing (e.g. reduce ops) do it themselves.
          * Most ops (matmul, add, relu, conv) write every output element. */
         return data;
     }
 
     g_buffer_cache.cache_misses++;
-    g_buffer_cache.bytes_allocated += bucket->bucket_size;
-    return exec_pool_alloc(bucket->bucket_size);
+    size_t alloc_size = bucket->bucket_size;
+    g_buffer_cache.bytes_allocated += alloc_size;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
+    return exec_pool_alloc(alloc_size);
 }
 
 void cml_buffer_cache_free(void* ptr, size_t size) {
@@ -181,16 +186,19 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
         return;
     }
 
-    BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
-
-    if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
-        exec_pool_free(ptr, bucket->bucket_size);
+    CachedBuffer* cached = (CachedBuffer*)malloc(sizeof(CachedBuffer));
+    if (!cached) {
+        exec_pool_free(ptr, size);
         return;
     }
 
-    CachedBuffer* cached = (CachedBuffer*)malloc(sizeof(CachedBuffer));
-    if (!cached) {
-        free(ptr);
+    pthread_mutex_lock(&g_exec_alloc_lock);
+    BufferBucket* bucket = &g_buffer_cache.buckets[bucket_idx];
+
+    if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
+        pthread_mutex_unlock(&g_exec_alloc_lock);
+        free(cached);
+        exec_pool_free(ptr, bucket->bucket_size);
         return;
     }
 
@@ -199,6 +207,7 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
     bucket->free_list = cached;
     bucket->count++;
     g_buffer_cache.bytes_cached += bucket->bucket_size;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
 }
 
 void cml_cleanup_buffer_cache(void) {

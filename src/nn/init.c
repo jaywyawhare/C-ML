@@ -40,13 +40,13 @@ void nn_init_uniform(Tensor* tensor, float low, float high) {
 void nn_init_xavier(Tensor* tensor, int fan_in, int fan_out) {
     if (fan_in <= 0 || fan_out <= 0)
         return;
-    float scale = sqrtf(2.0f / (float)(fan_in + fan_out));
+    float scale = sqrtf(6.0f / (float)(fan_in + fan_out));
     nn_init_uniform(tensor, -scale, scale);
 }
 
 void nn_init_kaiming(Tensor* tensor, int fan_in, int kernel_volume) {
     if (fan_in <= 0 || kernel_volume <= 0)
         return;
-    float scale = sqrtf(2.0f / (float)(fan_in * kernel_volume));
+    float scale = sqrtf(6.0f / (float)(fan_in * kernel_volume));
     nn_init_uniform(tensor, -scale, scale);
 }

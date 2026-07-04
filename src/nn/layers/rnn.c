@@ -532,6 +532,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
     int total_dirs = rnn->num_layers * nd;
 
     Tensor** final_h = calloc((size_t)total_dirs, sizeof(Tensor*));
+    if (!final_h) return;
     Tensor* layer_input = x;
 
     for (int l = 0; l < rnn->num_layers; l++) {
@@ -539,6 +540,7 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
 
         Tensor* h_fwd = h_0 ? slice_timestep(h_0, l * nd + 0) : NULL;
         Tensor** fwd_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+        if (!fwd_steps) { free(final_h); return; }
 
         for (int t = 0; t < seq_len; t++) {
             Tensor* xt = slice_timestep(layer_input, t);
@@ -555,6 +557,11 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
             RNNCell* rev_cell = rnn->cells[l * nd + 1];
             Tensor* h_rev = h_0 ? slice_timestep(h_0, l * nd + 1) : NULL;
             Tensor** rev_steps = malloc((size_t)seq_len * sizeof(Tensor*));
+            if (!rev_steps) {
+                free(fwd_steps);
+                free(final_h);
+                return;
+            }
 
             for (int t = seq_len - 1; t >= 0; t--) {
                 Tensor* xt = slice_timestep(layer_input, t);

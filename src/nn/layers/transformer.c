@@ -814,7 +814,12 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     int k4_shape[] = {batch, num_heads, cached_len, head_dim};
     Tensor* K_lazy = tensor_from_data(K_cached, k4_shape, 4, &cfg); free(K_cached);
     Tensor* V_lazy = tensor_from_data(V_cached, k4_shape, 4, &cfg); free(V_cached);
-    if (!Q_lazy || !K_lazy || !V_lazy) return NULL;
+    if (!Q_lazy || !K_lazy || !V_lazy) {
+        tensor_free(Q_lazy);
+        tensor_free(K_lazy);
+        tensor_free(V_lazy);
+        return NULL;
+    }
 
     Tensor* attn_out = uop_scaled_dot_product_attention(Q_lazy, K_lazy, V_lazy, mask);
     if (!attn_out) return NULL;
