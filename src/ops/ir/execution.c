@@ -239,29 +239,37 @@ void cml_cleanup_buffer_cache(void) {
 }
 
 void cml_print_buffer_cache_stats(void) {
-    printf("Buffer Cache Stats:\n");
+    pthread_mutex_lock(&g_exec_alloc_lock);
     if (!g_buffer_cache.initialized) {
-        printf("  (Not initialized)\n");
+        pthread_mutex_unlock(&g_exec_alloc_lock);
+        printf("Buffer Cache Stats:\n  (Not initialized)\n");
         return;
     }
 
-    size_t total_cached = 0;
-    int total_buffers   = 0;
+    size_t total_cached  = 0;
+    int    total_buffers = 0;
     for (int i = 0; i < BUFFER_CACHE_NUM_BUCKETS; i++) {
         if (g_buffer_cache.buckets[i].count > 0) {
             total_buffers += g_buffer_cache.buckets[i].count;
-            total_cached += g_buffer_cache.buckets[i].count * g_buffer_cache.buckets[i].bucket_size;
+            total_cached  += (size_t)g_buffer_cache.buckets[i].count *
+                             g_buffer_cache.buckets[i].bucket_size;
         }
     }
+    size_t hits   = g_buffer_cache.cache_hits;
+    size_t misses = g_buffer_cache.cache_misses;
+    size_t alloc  = g_buffer_cache.bytes_allocated;
+    pthread_mutex_unlock(&g_exec_alloc_lock);
 
-    size_t total_requests = g_buffer_cache.cache_hits + g_buffer_cache.cache_misses;
-    float hit_rate = total_requests > 0 ? (100.0f * g_buffer_cache.cache_hits / total_requests) : 0;
+    size_t total_requests = hits + misses;
+    float  hit_rate       = total_requests > 0
+                            ? (100.0f * (float)hits / (float)total_requests) : 0.0f;
 
-    printf("  Cache hits:    %zu\n", g_buffer_cache.cache_hits);
-    printf("  Cache misses:  %zu\n", g_buffer_cache.cache_misses);
+    printf("Buffer Cache Stats:\n");
+    printf("  Cache hits:    %zu\n", hits);
+    printf("  Cache misses:  %zu\n", misses);
     printf("  Hit rate:      %.1f%%\n", hit_rate);
     printf("  Cached now:    %d buffers (%.2f KB)\n", total_buffers, total_cached / 1024.0f);
-    printf("  Total alloc:   %.2f KB\n", g_buffer_cache.bytes_allocated / 1024.0f);
+    printf("  Total alloc:   %.2f KB\n", alloc / 1024.0f);
 }
 
 CMLBlasContext* get_blas_context(void) {
