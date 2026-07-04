@@ -203,15 +203,16 @@ done:
 #undef RECORD
 }
 
-void cml_validate_graph_or_die(CMLGraph_t ir) {
+bool cml_validate_graph_or_die(CMLGraph_t ir) {
     CMLValidateDiag diags[32];
     int ndiags = 0;
     CMLValidateCode rc = cml_validate_graph(ir, NULL, diags, 32, &ndiags);
     if (rc != CML_VALID_OK) {
         cml_validate_print_diags(diags, ndiags);
         LOG_ERROR("IR graph validation failed: %s", cml_validate_code_str(rc));
-        abort();
+        return false;
     }
+    return true;
 }
 
 void cml_validate_print_diags(const CMLValidateDiag* diags, int num_diags) {

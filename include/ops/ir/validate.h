@@ -50,7 +50,7 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
                                    int max_diag_count,
                                    int* num_diags_out);
 
-void cml_validate_graph_or_die(CMLGraph_t ir);
+bool cml_validate_graph_or_die(CMLGraph_t ir);
 
 void cml_validate_print_diags(const CMLValidateDiag* diags, int num_diags);
 
