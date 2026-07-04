@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include "alloc/cml_allocator.h"
 
 #define AUTOMATON_INITIAL_TABLE_CAP 256
 #define AUTOMATON_MAX_ARITY CML_PATTERN_MAX_INPUTS
@@ -102,7 +103,7 @@ static void transition_grow(CMLAutomaton* aut) {
     CMLTransition* old = aut->transitions;
 
     int new_cap = old_cap < 16 ? 16 : old_cap * 2;
-    aut->transitions = calloc((size_t)new_cap, sizeof(CMLTransition));
+    aut->transitions = cml_calloc((size_t)new_cap, sizeof(CMLTransition));
     aut->table_capacity = new_cap;
     aut->num_transitions = 0;
 
@@ -110,14 +111,14 @@ static void transition_grow(CMLAutomaton* aut) {
         if (old[i].occupied)
             transition_insert(aut, old[i].key, old[i].result_state);
     }
-    free(old);
+    cml_free(old);
 }
 
 static int automaton_add_state(CMLAutomaton* aut) {
     if (aut->num_states >= aut->states_capacity) {
         int new_cap = aut->states_capacity * 2;
         if (new_cap < 16) new_cap = 16;
-        CMLAutomatonState* ns = realloc(aut->states, (size_t)new_cap * sizeof(CMLAutomatonState));
+        CMLAutomatonState* ns = cml_realloc(aut->states, (size_t)new_cap * sizeof(CMLAutomatonState));
         if (!ns) return -1;
         aut->states = ns;
         aut->states_capacity = new_cap;
@@ -140,7 +141,7 @@ static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
             return;
     }
 
-    s->matched_rules = realloc(s->matched_rules,
+    s->matched_rules = cml_realloc(s->matched_rules,
                                 (size_t)(s->num_matched + 1) * sizeof(int));
     s->matched_rules[s->num_matched] = rule_idx;
     s->num_matched++;
@@ -257,7 +258,7 @@ static void expand_wildcard_transitions(CMLAutomaton* aut,
 CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     if (!registry || registry->num_rules == 0) return NULL;
 
-    CMLAutomaton* aut = calloc(1, sizeof(CMLAutomaton));
+    CMLAutomaton* aut = cml_calloc(1, sizeof(CMLAutomaton));
     if (!aut) return NULL;
 
     aut->registry = registry;
@@ -275,7 +276,7 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
 
     /* Allocate pending wildcard records for expansion pass */
     int pending_cap = registry->num_rules * AUTOMATON_MAX_ARITY;
-    PendingWildcard* pending = calloc((size_t)pending_cap, sizeof(PendingWildcard));
+    PendingWildcard* pending = cml_calloc((size_t)pending_cap, sizeof(PendingWildcard));
     int num_pending = 0;
 
     for (int r = 0; r < registry->num_rules; r++) {
@@ -302,7 +303,7 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     }
 
     expand_wildcard_transitions(aut, pending, num_pending);
-    free(pending);
+    cml_free(pending);
 
     return aut;
 }
@@ -310,10 +311,10 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
 void cml_automaton_free(CMLAutomaton* automaton) {
     if (!automaton) return;
     for (int i = 0; i < automaton->num_states; i++)
-        free(automaton->states[i].matched_rules);
-    free(automaton->states);
-    free(automaton->transitions);
-    free(automaton);
+        cml_free(automaton->states[i].matched_rules);
+    cml_free(automaton->states);
+    cml_free(automaton->transitions);
+    cml_free(automaton);
 }
 
 static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* name) {
@@ -366,7 +367,7 @@ static atomic_int g_rewrite_counter = 0;
 
 static char* rewrite_unique_name(void) {
     int id = atomic_fetch_add(&g_rewrite_counter, 1);
-    char* name = malloc(32);
+    char* name = cml_malloc(32);
     if (name)
         snprintf(name, 32, "_rw%d", id);
     return name;
@@ -380,8 +381,8 @@ static void replace_output_references(CMLGraph_t ir,
     while (n) {
         for (int i = 0; i < n->num_inputs; i++) {
             if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
-                free(n->input_names[i]);
-                n->input_names[i] = strdup(new_name);
+                cml_free(n->input_names[i]);
+                n->input_names[i] = cml_strdup(new_name);
             }
         }
         n = n->next;
@@ -451,18 +452,18 @@ static void free_unlinked_node(struct IRNode* node) {
 
     if (node->input_names) {
         for (int i = 0; i < node->num_inputs; i++)
-            free(node->input_names[i]);
-        free(node->input_names);
+            cml_free(node->input_names[i]);
+        cml_free(node->input_names);
     }
-    free(node->output_name);
-    free(node->users);
+    cml_free(node->output_name);
+    cml_free(node->users);
 
     if (node->output) {
         node->output->ir_node = NULL;
         node->output->ir_context = NULL;
     }
 
-    free(node);
+    cml_free(node);
 }
 
 static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern,
@@ -513,18 +514,18 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
     for (int iter = 0; iter < max_iter; iter++) {
         /* Phase 1: topological order (children before parents) */
         int cap = graph->node_count > 0 ? graph->node_count : 16;
-        struct IRNode** topo = malloc((size_t)cap * sizeof(struct IRNode*));
-        int* node_states = calloc((size_t)cap, sizeof(int));
-        if (!topo || !node_states) { free(topo); free(node_states); return -1; }
+        struct IRNode** topo = cml_malloc((size_t)cap * sizeof(struct IRNode*));
+        int* node_states = cml_calloc((size_t)cap, sizeof(int));
+        if (!topo || !node_states) { cml_free(topo); cml_free(node_states); return -1; }
 
         int topo_count = 0;
         struct IRNode* n = graph->head;
         while (n) {
             if (topo_count >= cap) {
                 cap *= 2;
-                topo = realloc(topo, (size_t)cap * sizeof(struct IRNode*));
-                node_states = realloc(node_states, (size_t)cap * sizeof(int));
-                if (!topo || !node_states) { free(topo); free(node_states); return -1; }
+                topo = cml_realloc(topo, (size_t)cap * sizeof(struct IRNode*));
+                node_states = cml_realloc(node_states, (size_t)cap * sizeof(int));
+                if (!topo || !node_states) { cml_free(topo); cml_free(node_states); return -1; }
             }
             topo[topo_count] = n;
             node_states[topo_count] = AUTOMATON_DEAD_STATE;
@@ -622,8 +623,8 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
             }
         }
 
-        free(topo);
-        free(node_states);
+        cml_free(topo);
+        cml_free(node_states);
 
         total_rewrites += rewrites_this_pass;
         if (rewrites_this_pass == 0)

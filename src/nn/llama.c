@@ -10,6 +10,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 CMLLLaMAConfig cml_llama_config_7b(void) {
     CMLLLaMAConfig config = {
@@ -155,7 +156,7 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
 }
 
 static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
-    CMLLLaMALayer* layer = (CMLLLaMALayer*)calloc(1, sizeof(CMLLLaMALayer));
+    CMLLLaMALayer* layer = (CMLLLaMALayer*)cml_calloc(1, sizeof(CMLLLaMALayer));
     if (!layer) return NULL;
 
     int head_dim = config->hidden_size / config->num_heads;
@@ -164,7 +165,7 @@ static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
     layer->kv_cache = cml_kv_cache_create(config->max_seq_len,
                                            config->num_kv_heads, head_dim);
     if (!layer->kv_cache) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 
@@ -188,7 +189,7 @@ static void llama_layer_free(CMLLLaMALayer* layer) {
     if (layer->post_attn_layernorm) tensor_free(layer->post_attn_layernorm);
     if (layer->kv_cache) cml_kv_cache_free(layer->kv_cache);
 
-    free(layer);
+    cml_free(layer);
 }
 
 CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
@@ -197,7 +198,7 @@ CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
         return NULL;
     }
 
-    CMLLLaMAModel* model = (CMLLLaMAModel*)calloc(1, sizeof(CMLLLaMAModel));
+    CMLLLaMAModel* model = (CMLLLaMAModel*)cml_calloc(1, sizeof(CMLLLaMAModel));
     if (!model) {
         LOG_ERROR("cml_llama_create: allocation failed");
         return NULL;
@@ -209,11 +210,11 @@ CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
     model->current_seq_len = 0;
 
     /* Allocate layer array */
-    model->layers = (CMLLLaMALayer**)calloc((size_t)config->num_layers,
+    model->layers = (CMLLLaMALayer**)cml_calloc((size_t)config->num_layers,
                                              sizeof(CMLLLaMALayer*));
     if (!model->layers) {
         LOG_ERROR("cml_llama_create: layer array allocation failed");
-        free(model);
+        cml_free(model);
         return NULL;
     }
 
@@ -226,8 +227,8 @@ CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
             for (int j = 0; j < i; j++) {
                 llama_layer_free(model->layers[j]);
             }
-            free(model->layers);
-            free(model);
+            cml_free(model->layers);
+            cml_free(model);
             return NULL;
         }
     }
@@ -247,7 +248,7 @@ void cml_llama_free(CMLLLaMAModel* model) {
         for (int i = 0; i < model->num_layers; i++) {
             llama_layer_free(model->layers[i]);
         }
-        free(model->layers);
+        cml_free(model->layers);
     }
 
     /* Free embeddings and output weights */
@@ -258,7 +259,7 @@ void cml_llama_free(CMLLLaMAModel* model) {
     /* Free tokenizer */
     if (model->tokenizer) cml_tokenizer_free(model->tokenizer);
 
-    free(model);
+    cml_free(model);
 }
 
 static int load_tensor_by_name(CMLLLaMAModel* model, GGUFContext* ctx, const char* name) {
@@ -660,7 +661,7 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     }
 
     /* Apply temperature */
-    float* scaled = (float*)malloc((size_t)vocab_size * sizeof(float));
+    float* scaled = (float*)cml_malloc((size_t)vocab_size * sizeof(float));
     if (!scaled) return -1;
 
     float inv_temp = 1.0f / config->temperature;
@@ -669,8 +670,8 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     }
 
     /* Build sorted entries for top-k / top-p filtering */
-    LogitEntry* entries = (LogitEntry*)malloc((size_t)vocab_size * sizeof(LogitEntry));
-    if (!entries) { free(scaled); return -1; }
+    LogitEntry* entries = (LogitEntry*)cml_malloc((size_t)vocab_size * sizeof(LogitEntry));
+    if (!entries) { cml_free(scaled); return -1; }
 
     for (int i = 0; i < vocab_size; i++) {
         entries[i].value = scaled[i];
@@ -731,8 +732,8 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
         }
     }
 
-    free(entries);
-    free(scaled);
+    cml_free(entries);
+    cml_free(scaled);
     return sampled_id;
 }
 
@@ -757,18 +758,18 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
 
     if (!prompt_tokens || num_prompt_tokens <= 0) {
         LOG_ERROR("cml_llama_generate: tokenization failed or empty prompt");
-        if (prompt_tokens) free(prompt_tokens);
+        if (prompt_tokens) cml_free(prompt_tokens);
         return NULL;
     }
 
     int max_total = num_prompt_tokens + config->max_new_tokens;
-    CMLGenerationResult* result = (CMLGenerationResult*)calloc(1, sizeof(CMLGenerationResult));
-    if (!result) { free(prompt_tokens); return NULL; }
+    CMLGenerationResult* result = (CMLGenerationResult*)cml_calloc(1, sizeof(CMLGenerationResult));
+    if (!result) { cml_free(prompt_tokens); return NULL; }
 
-    result->token_ids = (int*)malloc((size_t)max_total * sizeof(int));
+    result->token_ids = (int*)cml_malloc((size_t)max_total * sizeof(int));
     if (!result->token_ids) {
-        free(prompt_tokens);
-        free(result);
+        cml_free(prompt_tokens);
+        cml_free(result);
         return NULL;
     }
 
@@ -783,12 +784,12 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
     Tensor* logits = cml_llama_forward(model, prompt_tokens, num_prompt_tokens);
-    free(prompt_tokens);
+    cml_free(prompt_tokens);
 
     if (!logits) {
         LOG_ERROR("cml_llama_generate: prefill forward failed");
-        free(result->token_ids);
-        free(result);
+        cml_free(result->token_ids);
+        cml_free(result);
         return NULL;
     }
 
@@ -852,9 +853,9 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
 
 void cml_generation_result_free(CMLGenerationResult* result) {
     if (!result) return;
-    if (result->token_ids) free(result->token_ids);
-    if (result->text) free(result->text);
-    free(result);
+    if (result->token_ids) cml_free(result->token_ids);
+    if (result->text) cml_free(result->text);
+    cml_free(result);
 }
 
 void cml_llama_reset(CMLLLaMAModel* model) {

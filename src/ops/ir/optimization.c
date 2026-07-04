@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "alloc/cml_allocator.h"
 
 static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* output_name) {
     if (!ir || !output_name)
@@ -30,7 +31,7 @@ static int build_dependency_graph(CMLGraph_t ir) {
     while (node) {
         node->use_count = 0;
         if (node->users) {
-            free(node->users);
+            cml_free(node->users);
             node->users          = NULL;
             node->users_capacity = 0;
         }
@@ -46,7 +47,7 @@ static int build_dependency_graph(CMLGraph_t ir) {
                     int new_capacity =
                         producer->users_capacity == 0 ? 4 : producer->users_capacity * 2;
                     struct IRNode** new_users =
-                        realloc(producer->users, (size_t)new_capacity * sizeof(struct IRNode*));
+                        cml_realloc(producer->users, (size_t)new_capacity * sizeof(struct IRNode*));
                     if (!new_users)
                         return -1;
                     producer->users          = new_users;
@@ -73,7 +74,7 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
 
     int stack_capacity = 256;
     int stack_top = 0;
-    struct IRNode** stack = malloc((size_t)stack_capacity * sizeof(struct IRNode*));
+    struct IRNode** stack = cml_malloc((size_t)stack_capacity * sizeof(struct IRNode*));
     if (!stack) {
         LOG_ERROR("Failed to allocate DCE stack; marking all nodes as used");
         node = ir->head;
@@ -99,7 +100,7 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
                 if (stack_top >= stack_capacity) {
                     int new_capacity = stack_capacity * 2;
                     struct IRNode** new_stack =
-                        realloc(stack, (size_t)new_capacity * sizeof(struct IRNode*));
+                        cml_realloc(stack, (size_t)new_capacity * sizeof(struct IRNode*));
                     if (!new_stack) {
                         LOG_ERROR("Failed to grow DCE stack; node will be kept as used");
                         producer->is_used = true;
@@ -113,7 +114,7 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
         }
     }
 
-    free(stack);
+    cml_free(stack);
 }
 
 static int remove_dead_nodes(CMLGraph_t ir) {
@@ -147,42 +148,42 @@ static int remove_dead_nodes(CMLGraph_t ir) {
             if (node->input_names) {
                 for (int i = 0; i < node->num_inputs; i++) {
                     if (node->input_names[i]) {
-                        free(node->input_names[i]);
+                        cml_free(node->input_names[i]);
                     }
                 }
-                free(node->input_names);
+                cml_free(node->input_names);
             }
             if (node->output_name) {
-                free(node->output_name);
+                cml_free(node->output_name);
             }
             if (node->users) {
-                free(node->users);
+                cml_free(node->users);
             }
             if (node->inputs) {
-                free(node->inputs);
+                cml_free(node->inputs);
             }
             if (node->input_shapes) {
-                free(node->input_shapes);
+                cml_free(node->input_shapes);
             }
             if (node->input_ndims) {
-                free(node->input_ndims);
+                cml_free(node->input_ndims);
             }
             if (node->output_shape) {
-                free(node->output_shape);
+                cml_free(node->output_shape);
             }
             if (node->broadcast) {
                 if (node->broadcast->broadcast_dims) {
-                    free(node->broadcast->broadcast_dims);
+                    cml_free(node->broadcast->broadcast_dims);
                 }
                 if (node->broadcast->broadcast_strides) {
-                    free(node->broadcast->broadcast_strides);
+                    cml_free(node->broadcast->broadcast_strides);
                 }
-                free(node->broadcast);
+                cml_free(node->broadcast);
             }
             if (node->saved_for_backward) {
-                free(node->saved_for_backward);
+                cml_free(node->saved_for_backward);
             }
-            free(node);
+            cml_free(node);
 
             ir->node_count--;
             removed++;
@@ -322,13 +323,13 @@ static FusedKernel* create_fused_kernel(struct IRNode** ops, int num_ops, Fusion
     if (!ops || num_ops < 2)
         return NULL;
 
-    FusedKernel* kernel = malloc(sizeof(FusedKernel));
+    FusedKernel* kernel = cml_malloc(sizeof(FusedKernel));
     if (!kernel)
         return NULL;
 
-    kernel->ops = malloc((size_t)num_ops * sizeof(struct IRNode*));
+    kernel->ops = cml_malloc((size_t)num_ops * sizeof(struct IRNode*));
     if (!kernel->ops) {
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -352,9 +353,9 @@ void free_fused_kernel(FusedKernel* kernel) {
                 kernel->ops[i]->fused_kernel = NULL;
             }
         }
-        free(kernel->ops);
+        cml_free(kernel->ops);
     }
-    free(kernel);
+    cml_free(kernel);
 }
 
 static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) {
@@ -405,16 +406,16 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
             // Swap inputs
             if (node2->input_names[0] && node1->output_name &&
                 strcmp(node2->input_names[0], node1->output_name) == 0) {
-                free(node2->input_names[0]);
-                node2->input_names[0] = malloc(32);
+                cml_free(node2->input_names[0]);
+                node2->input_names[0] = cml_malloc(32);
                 if (node2->input_names[0]) {
                     strncpy(node2->input_names[0], other_input, 31);
                     node2->input_names[0][31] = '\0';
                 }
 
                 if (node2->num_inputs >= 2) {
-                    free(node2->input_names[1]);
-                    node2->input_names[1] = malloc(32);
+                    cml_free(node2->input_names[1]);
+                    node2->input_names[1] = cml_malloc(32);
                     if (node2->input_names[1] && node1->input_names[0]) {
                         strncpy(node2->input_names[1], node1->input_names[0], 31);
                         node2->input_names[1][31] = '\0';
@@ -630,13 +631,13 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
 
     ir->node_count = actual_count;
 
-    int* in_degree = calloc((size_t)actual_count, sizeof(int));
+    int* in_degree = cml_calloc((size_t)actual_count, sizeof(int));
     if (!in_degree)
         return -1;
 
-    struct IRNode** all_nodes = malloc((size_t)actual_count * sizeof(struct IRNode*));
+    struct IRNode** all_nodes = cml_malloc((size_t)actual_count * sizeof(struct IRNode*));
     if (!all_nodes) {
-        free(in_degree);
+        cml_free(in_degree);
         return -1;
     }
 
@@ -657,10 +658,10 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
         }
     }
 
-    struct IRNode** queue = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
+    struct IRNode** queue = cml_malloc((size_t)ir->node_count * sizeof(struct IRNode*));
     if (!queue) {
-        free(in_degree);
-        free(all_nodes);
+        cml_free(in_degree);
+        cml_free(all_nodes);
         return -1;
     }
 
@@ -673,11 +674,11 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
         }
     }
 
-    struct IRNode** sorted = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
+    struct IRNode** sorted = cml_malloc((size_t)ir->node_count * sizeof(struct IRNode*));
     if (!sorted) {
-        free(in_degree);
-        free(all_nodes);
-        free(queue);
+        cml_free(in_degree);
+        cml_free(all_nodes);
+        cml_free(queue);
         return -1;
     }
 
@@ -714,17 +715,17 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
         LOG_WARNING("Topological sort incomplete: %d/%d nodes sorted (possible cycle?)",
                     sorted_count, ir->node_count);
         // Don't reorder if sort failed
-        free(in_degree);
-        free(all_nodes);
-        free(queue);
-        free(sorted);
+        cml_free(in_degree);
+        cml_free(all_nodes);
+        cml_free(queue);
+        cml_free(sorted);
         return -1;
     }
 
-    free(in_degree);
-    free(all_nodes);
-    free(queue);
-    free(sorted);
+    cml_free(in_degree);
+    cml_free(all_nodes);
+    cml_free(queue);
+    cml_free(sorted);
 
     return 0;
 }

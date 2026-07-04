@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "alloc/cml_allocator.h"
 #define HAS_MMAP 1
 #else
 #define HAS_MMAP 0
@@ -19,7 +20,7 @@
 /* Helper: construct file path for a tensor */
 static char* make_tensor_path(const CMLDiskBackend* backend, const char* name) {
     size_t len = strlen(backend->base_path) + strlen(name) + 16;
-    char* path = (char*)malloc(len);
+    char* path = (char*)cml_malloc(len);
     if (!path) return NULL;
     snprintf(path, len, "%s/%s.cml_tensor", backend->base_path, name);
     return path;
@@ -37,11 +38,11 @@ typedef struct {
 CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mode) {
     if (!base_path) return NULL;
 
-    CMLDiskBackend* b = (CMLDiskBackend*)calloc(1, sizeof(CMLDiskBackend));
+    CMLDiskBackend* b = (CMLDiskBackend*)cml_calloc(1, sizeof(CMLDiskBackend));
     if (!b) return NULL;
 
-    b->base_path = strdup(base_path);
-    if (!b->base_path) { free(b); return NULL; }
+    b->base_path = cml_strdup(base_path);
+    if (!b->base_path) { cml_free(b); return NULL; }
 
     b->io_mode = mode;
     b->read_only = false;
@@ -52,8 +53,8 @@ CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mod
 
 void cml_disk_backend_free(CMLDiskBackend* backend) {
     if (!backend) return;
-    free(backend->base_path);
-    free(backend);
+    cml_free(backend->base_path);
+    cml_free(backend);
 }
 
 int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tensor) {
@@ -63,7 +64,7 @@ int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tens
     if (!path) return -1;
 
     FILE* f = fopen(path, "wb");
-    free(path);
+    cml_free(path);
     if (!f) return -1;
 
     /* Write header */
@@ -100,7 +101,7 @@ Tensor* cml_disk_load_tensor(CMLDiskBackend* backend, const char* name) {
     if (!path) return NULL;
 
     FILE* f = fopen(path, "rb");
-    free(path);
+    cml_free(path);
     if (!f) return NULL;
 
     /* Read header */
@@ -138,25 +139,25 @@ CMLDiskTensor* cml_disk_mmap_tensor(CMLDiskBackend* backend, const char* name) {
     char* path = make_tensor_path(backend, name);
     if (!path) return NULL;
 
-    CMLDiskTensor* dt = (CMLDiskTensor*)calloc(1, sizeof(CMLDiskTensor));
-    if (!dt) { free(path); return NULL; }
+    CMLDiskTensor* dt = (CMLDiskTensor*)cml_calloc(1, sizeof(CMLDiskTensor));
+    if (!dt) { cml_free(path); return NULL; }
     dt->file_path = path;
 
 #if HAS_MMAP
     int fd = open(path, O_RDONLY);
-    if (fd < 0) { free(dt->file_path); free(dt); return NULL; }
+    if (fd < 0) { cml_free(dt->file_path); cml_free(dt); return NULL; }
 
     /* Read header first */
     DiskTensorHeader hdr;
     if (read(fd, &hdr, sizeof(hdr)) != sizeof(hdr)) {
         close(fd);
-        free(dt->file_path); free(dt);
+        cml_free(dt->file_path); cml_free(dt);
         return NULL;
     }
 
     if (memcmp(hdr.magic, "CMLTENS", 8) != 0) {
         close(fd);
-        free(dt->file_path); free(dt);
+        cml_free(dt->file_path); cml_free(dt);
         return NULL;
     }
 
@@ -221,8 +222,8 @@ void cml_disk_tensor_unmap(CMLDiskTensor* dt) {
 void cml_disk_tensor_free(CMLDiskTensor* dt) {
     if (!dt) return;
     cml_disk_tensor_unmap(dt);
-    free(dt->file_path);
-    free(dt);
+    cml_free(dt->file_path);
+    cml_free(dt);
 }
 
 Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt) {
@@ -247,7 +248,7 @@ int cml_disk_async_read(CMLDiskBackend* backend, const char* name,
     if (!path) return -1;
 
     FILE* f = fopen(path, "rb");
-    free(path);
+    cml_free(path);
     if (!f) return -1;
 
     /* Skip header */

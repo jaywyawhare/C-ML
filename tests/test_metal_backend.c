@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include "ops/ir/gpu/metal_backend.h"
+#include "alloc/cml_allocator.h"
 
 int main(void) {
     printf("Metal Backend Tests\n");
@@ -41,7 +42,7 @@ int main(void) {
         assert(buffer != NULL);
 
         /* Upload some data */
-        float* host_data = (float*)calloc(1024, sizeof(float));
+        float* host_data = (float*)cml_calloc(1024, sizeof(float));
         assert(host_data != NULL);
         for (int i = 0; i < 1024; i++) {
             host_data[i] = (float)i;
@@ -50,7 +51,7 @@ int main(void) {
         assert(ret == 0);
 
         /* Download and verify */
-        float* host_out = (float*)calloc(1024, sizeof(float));
+        float* host_out = (float*)cml_calloc(1024, sizeof(float));
         assert(host_out != NULL);
         ret = cml_metal_download(backend, host_out, buffer, buf_size);
         assert(ret == 0);
@@ -58,8 +59,8 @@ int main(void) {
             assert(host_out[i] == (float)i);
         }
 
-        free(host_data);
-        free(host_out);
+        cml_free(host_data);
+        cml_free(host_out);
         cml_metal_free(backend, buffer);
         printf(" PASS\n");
 

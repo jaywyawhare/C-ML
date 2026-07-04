@@ -6,6 +6,7 @@
 #include "ops/ir/gpu/webgpu_backend.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
+#include "alloc/cml_allocator.h"
 
 static void test_wgsl_generate_add(void) {
     printf("  test_wgsl_generate_add...");
@@ -27,7 +28,7 @@ static void test_wgsl_generate_add(void) {
     assert(strstr(wgsl, "result") != NULL);
 
     printf(" (generated %zu bytes) ", strlen(wgsl));
-    free(wgsl);
+    cml_free(wgsl);
     printf("PASS\n");
 }
 
@@ -45,7 +46,7 @@ static void test_wgsl_generate_mul(void) {
     assert(strstr(wgsl, "@compute") != NULL);
     assert(strstr(wgsl, "@workgroup_size") != NULL);
 
-    free(wgsl);
+    cml_free(wgsl);
     printf(" PASS\n");
 }
 
@@ -63,7 +64,7 @@ static void test_wgsl_generate_exp(void) {
     assert(strstr(wgsl, "@compute") != NULL);
     assert(strstr(wgsl, "@workgroup_size") != NULL);
 
-    free(wgsl);
+    cml_free(wgsl);
     printf(" PASS\n");
 }
 

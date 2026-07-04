@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 struct CMLGraphNode {
     CMLOpType op_type;
@@ -36,7 +37,7 @@ static void graph_topo_sort(CMLComputationGraph_t graph);
 static void graph_mark_reachable(CMLGraphNode_t node);
 
 CMLComputationGraph_t cml_graph_new(void) {
-    CMLComputationGraph_t graph = malloc(sizeof(struct CMLComputationGraph));
+    CMLComputationGraph_t graph = cml_malloc(sizeof(struct CMLComputationGraph));
     if (!graph)
         return NULL;
 
@@ -59,14 +60,14 @@ void cml_graph_free(CMLComputationGraph_t graph) {
         for (size_t i = 0; i < graph->num_nodes; i++) {
             graph_node_free(graph->nodes[i]);
         }
-        free(graph->nodes);
+        cml_free(graph->nodes);
     }
 
     if (graph->leaf_nodes) {
-        free(graph->leaf_nodes);
+        cml_free(graph->leaf_nodes);
     }
 
-    free(graph);
+    cml_free(graph);
 }
 
 void cml_graph_clear(CMLComputationGraph_t graph) {
@@ -77,11 +78,11 @@ void cml_graph_clear(CMLComputationGraph_t graph) {
         for (size_t i = 0; i < graph->num_nodes; i++) {
             graph_node_free(graph->nodes[i]);
         }
-        free(graph->nodes);
+        cml_free(graph->nodes);
     }
 
     if (graph->leaf_nodes) {
-        free(graph->leaf_nodes);
+        cml_free(graph->leaf_nodes);
     }
 
     graph->nodes         = NULL;
@@ -112,7 +113,7 @@ CMLGraphNode_t cml_graph_get_node_by_index(CMLComputationGraph_t graph, size_t i
 }
 
 static CMLGraphNode_t graph_node_create(CMLOpType op_type, Tensor* tensor) {
-    CMLGraphNode_t node = malloc(sizeof(struct CMLGraphNode));
+    CMLGraphNode_t node = cml_malloc(sizeof(struct CMLGraphNode));
     if (!node)
         return NULL;
 
@@ -134,14 +135,14 @@ static void graph_node_free(CMLGraphNode_t node) {
         return;
 
     if (node->inputs) {
-        free(node->inputs);
+        cml_free(node->inputs);
     }
 
     if (node->op_params) {
-        free(node->op_params);
+        cml_free(node->op_params);
     }
 
-    free(node);
+    cml_free(node);
 }
 
 static void graph_add_node(CMLComputationGraph_t graph, CMLGraphNode_t node) {
@@ -151,7 +152,7 @@ static void graph_add_node(CMLComputationGraph_t graph, CMLGraphNode_t node) {
     if (graph->num_nodes >= graph->capacity) {
         size_t new_capacity = graph->capacity == 0 ? 16 : graph->capacity * 2;
         CMLGraphNode_t* new_nodes =
-            realloc(graph->nodes, (size_t)new_capacity * sizeof(CMLGraphNode_t));
+            cml_realloc(graph->nodes, (size_t)new_capacity * sizeof(CMLGraphNode_t));
         if (!new_nodes) {
             LOG_ERROR("Failed to expand graph node array");
             return;
@@ -177,7 +178,7 @@ CMLGraphNode_t cml_graph_node_input(CMLComputationGraph_t graph, Tensor* tensor)
     if (graph->num_leaves >= graph->leaf_capacity) {
         size_t new_capacity = graph->leaf_capacity == 0 ? 8 : graph->leaf_capacity * 2;
         CMLGraphNode_t* new_leaves =
-            realloc(graph->leaf_nodes, (size_t)new_capacity * sizeof(CMLGraphNode_t));
+            cml_realloc(graph->leaf_nodes, (size_t)new_capacity * sizeof(CMLGraphNode_t));
         if (!new_leaves) {
             graph_node_free(node);
             return NULL;
@@ -211,7 +212,7 @@ CMLGraphNode_t cml_graph_node_op(CMLComputationGraph_t graph, CMLOpType op_type,
     if (!node)
         return NULL;
 
-    node->inputs = malloc((size_t)num_inputs * sizeof(CMLGraphNode_t));
+    node->inputs = cml_malloc((size_t)num_inputs * sizeof(CMLGraphNode_t));
     if (!node->inputs) {
         graph_node_free(node);
         return NULL;
@@ -276,15 +277,15 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     if (!backward_graph)
         return NULL;
 
-    bool* visited = calloc(forward_graph->num_nodes, sizeof(bool));
+    bool* visited = cml_calloc(forward_graph->num_nodes, sizeof(bool));
     if (!visited) {
         cml_graph_free(backward_graph);
         return NULL;
     }
 
-    CMLGraphNode_t* stack = malloc(forward_graph->num_nodes * sizeof(CMLGraphNode_t));
+    CMLGraphNode_t* stack = cml_malloc(forward_graph->num_nodes * sizeof(CMLGraphNode_t));
     if (!stack) {
-        free(visited);
+        cml_free(visited);
         cml_graph_free(backward_graph);
         return NULL;
     }
@@ -292,10 +293,10 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     int stack_top      = 0;
     stack[stack_top++] = output;
 
-    CMLGraphNode_t* forward_to_backward = calloc(forward_graph->num_nodes, sizeof(CMLGraphNode_t));
+    CMLGraphNode_t* forward_to_backward = cml_calloc(forward_graph->num_nodes, sizeof(CMLGraphNode_t));
     if (!forward_to_backward) {
-        free(stack);
-        free(visited);
+        cml_free(stack);
+        cml_free(visited);
         cml_graph_free(backward_graph);
         return NULL;
     }
@@ -351,7 +352,7 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
         if (backward_node) {
             if (forward_node->num_inputs > 0) {
                 backward_node->inputs =
-                    malloc((size_t)forward_node->num_inputs * sizeof(CMLGraphNode_t));
+                    cml_malloc((size_t)forward_node->num_inputs * sizeof(CMLGraphNode_t));
                 if (backward_node->inputs) {
                     memcpy(backward_node->inputs, forward_node->inputs,
                            (size_t)forward_node->num_inputs * sizeof(CMLGraphNode_t));
@@ -395,9 +396,9 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
         }
     }
 
-    free(forward_to_backward);
-    free(stack);
-    free(visited);
+    cml_free(forward_to_backward);
+    cml_free(stack);
+    cml_free(visited);
 
     backward_graph->built = true;
     return backward_graph;
@@ -546,7 +547,7 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
         return 0;
 
     int fused_count = 0;
-    bool* fused     = calloc(graph->num_nodes, sizeof(bool));
+    bool* fused     = cml_calloc(graph->num_nodes, sizeof(bool));
     if (!fused)
         return -1;
 
@@ -606,9 +607,9 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
                     fused[consumer_idx] = true;
 
                     if (consumer->num_inputs > 0 && consumer->inputs) {
-                        free(consumer->inputs);
+                        cml_free(consumer->inputs);
                         consumer->inputs =
-                            malloc((size_t)node1->num_inputs * sizeof(CMLGraphNode_t));
+                            cml_malloc((size_t)node1->num_inputs * sizeof(CMLGraphNode_t));
                         if (consumer->inputs) {
                             memcpy(consumer->inputs, node1->inputs,
                                    (size_t)node1->num_inputs * sizeof(CMLGraphNode_t));
@@ -622,7 +623,7 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
         }
     }
 
-    free(fused);
+    cml_free(fused);
 
     return 0;
 }
@@ -667,7 +668,7 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
             write_idx++;
         } else {
             if (graph->nodes[i]) {
-                free(graph->nodes[i]);
+                cml_free(graph->nodes[i]);
             }
         }
     }

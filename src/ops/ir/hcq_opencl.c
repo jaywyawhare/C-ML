@@ -13,6 +13,7 @@
 #define CL_TARGET_OPENCL_VERSION 300
 #endif
 #include <CL/cl.h>
+#include "alloc/cml_allocator.h"
 #endif
 
 static struct {
@@ -61,7 +62,7 @@ CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
         return NULL;
     }
 
-    CMLHCQQueue* queue = (CMLHCQQueue*)calloc(1, sizeof(CMLHCQQueue));
+    CMLHCQQueue* queue = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
     if (!queue) {
         LOG_ERROR("OpenCL HCQ: failed to allocate queue");
         return NULL;
@@ -79,7 +80,7 @@ CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
 #endif
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clCreateCommandQueue failed (err=%d)", err);
-        free(queue);
+        cml_free(queue);
         return NULL;
     }
 
@@ -98,7 +99,7 @@ void cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue) {
         }
     }
 
-    free(queue);
+    cml_free(queue);
 }
 
 int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue,
@@ -174,7 +175,7 @@ int cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst,
 }
 
 CMLHCQSignal* cml_hcq_opencl_signal_create(void) {
-    CMLHCQSignal* signal = (CMLHCQSignal*)calloc(1, sizeof(CMLHCQSignal));
+    CMLHCQSignal* signal = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
     if (!signal) {
         LOG_ERROR("OpenCL HCQ: failed to allocate signal");
         return NULL;
@@ -196,7 +197,7 @@ void cml_hcq_opencl_signal_destroy(CMLHCQSignal* signal) {
         }
     }
 
-    free(signal);
+    cml_free(signal);
 }
 
 int cml_hcq_opencl_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {

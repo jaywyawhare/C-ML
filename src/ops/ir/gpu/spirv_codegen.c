@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 
 #define SPIRV_MAGIC       0x07230203
@@ -130,11 +131,11 @@
 
 
 SPIRVBuilder* spirv_builder_create(void) {
-    SPIRVBuilder* b = (SPIRVBuilder*)calloc(1, sizeof(SPIRVBuilder));
+    SPIRVBuilder* b = (SPIRVBuilder*)cml_calloc(1, sizeof(SPIRVBuilder));
     if (!b) return NULL;
     b->cap = 4096;
-    b->words = (uint32_t*)malloc(b->cap * sizeof(uint32_t));
-    if (!b->words) { free(b); return NULL; }
+    b->words = (uint32_t*)cml_malloc(b->cap * sizeof(uint32_t));
+    if (!b->words) { cml_free(b); return NULL; }
     b->len = 0;
     b->next_id = 1;
     return b;
@@ -142,14 +143,14 @@ SPIRVBuilder* spirv_builder_create(void) {
 
 void spirv_builder_destroy(SPIRVBuilder* b) {
     if (!b) return;
-    free(b->words);
-    free(b);
+    cml_free(b->words);
+    cml_free(b);
 }
 
 void spirv_builder_emit(SPIRVBuilder* b, uint32_t word) {
     if (b->len >= b->cap) {
         b->cap *= 2;
-        b->words = (uint32_t*)realloc(b->words, b->cap * sizeof(uint32_t));
+        b->words = (uint32_t*)cml_realloc(b->words, b->cap * sizeof(uint32_t));
     }
     b->words[b->len++] = word;
 }
@@ -255,7 +256,7 @@ static uint32_t __attribute__((unused)) emit_uint_constant(SPIRVBuilder* b, uint
 }
 
 uint32_t* spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size) {
-    uint32_t* result = (uint32_t*)malloc(b->len * sizeof(uint32_t));
+    uint32_t* result = (uint32_t*)cml_malloc(b->len * sizeof(uint32_t));
     if (!result) return NULL;
     memcpy(result, b->words, b->len * sizeof(uint32_t));
     *out_size = b->len * sizeof(uint32_t);
@@ -264,7 +265,7 @@ uint32_t* spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size) {
 
 
 CMLSPIRVCodegen* cml_spirv_codegen_create(void) {
-    CMLSPIRVCodegen* cg = (CMLSPIRVCodegen*)calloc(1, sizeof(CMLSPIRVCodegen));
+    CMLSPIRVCodegen* cg = (CMLSPIRVCodegen*)cml_calloc(1, sizeof(CMLSPIRVCodegen));
     if (!cg) return NULL;
     cg->local_size_x = 256;
     cg->local_size_y = 1;
@@ -274,7 +275,7 @@ CMLSPIRVCodegen* cml_spirv_codegen_create(void) {
 }
 
 void cml_spirv_codegen_destroy(CMLSPIRVCodegen* cg) {
-    free(cg);
+    cml_free(cg);
 }
 
 /*

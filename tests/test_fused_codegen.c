@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -20,11 +21,11 @@ static int tests_failed = 0;
 
 /* Helper: create a minimal LinearProgram manually */
 static CMLLinearProgram* make_test_program(void) {
-    CMLLinearProgram* prog = calloc(1, sizeof(CMLLinearProgram));
+    CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
     if (!prog) return NULL;
     prog->capacity = 16;
-    prog->ops = calloc(16, sizeof(CMLLinearOp));
-    if (!prog->ops) { free(prog); return NULL; }
+    prog->ops = cml_calloc(16, sizeof(CMLLinearOp));
+    if (!prog->ops) { cml_free(prog); return NULL; }
 
     /* LOAD v0 from buf0 */
     prog->ops[0] = (CMLLinearOp){.kind = LINOP_LOAD, .dest_reg = 0};
@@ -130,7 +131,7 @@ static void test_cuda_codegen(void) {
         fclose(f);
         printf("  CUDA source saved to /tmp/cml_matmul.cu\n");
     }
-    free(cuda_src);
+    cml_free(cuda_src);
 
     cuda_src = cml_ptx_gen_conv2d(cg, "conv2d_kernel");
     ASSERT(cuda_src != NULL, "conv2d CUDA source");
@@ -142,7 +143,7 @@ static void test_cuda_codegen(void) {
         fclose(f);
         printf("  CUDA source saved to /tmp/cml_conv2d.cu\n");
     }
-    free(cuda_src);
+    cml_free(cuda_src);
 
     cml_ptx_codegen_destroy(cg);
     tests_passed++;
@@ -184,10 +185,10 @@ static void test_linear_program_print(void) {
 static void test_mul_chain_codegen(void) {
     printf("test_mul_chain_codegen...\n");
 
-    CMLLinearProgram* prog = calloc(1, sizeof(CMLLinearProgram));
+    CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
     ASSERT(prog != NULL, "alloc");
     prog->capacity = 16;
-    prog->ops = calloc(16, sizeof(CMLLinearOp));
+    prog->ops = cml_calloc(16, sizeof(CMLLinearOp));
     ASSERT(prog->ops != NULL, "alloc ops");
 
     /* LOAD v0 */

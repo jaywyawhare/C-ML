@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct PrefetchQueue {
     Batch** batches;
@@ -37,18 +38,18 @@ typedef struct WorkerContext {
 } WorkerContext;
 
 static PrefetchQueue* prefetch_queue_create(int capacity) {
-    PrefetchQueue* queue = malloc(sizeof(PrefetchQueue));
+    PrefetchQueue* queue = cml_malloc(sizeof(PrefetchQueue));
     if (!queue)
         return NULL;
 
-    queue->batches       = calloc((size_t)capacity, sizeof(Batch*));
-    queue->batch_indices = calloc((size_t)capacity, sizeof(int));
+    queue->batches       = cml_calloc((size_t)capacity, sizeof(Batch*));
+    queue->batch_indices = cml_calloc((size_t)capacity, sizeof(int));
     if (!queue->batches || !queue->batch_indices) {
         if (queue->batches)
-            free(queue->batches);
+            cml_free(queue->batches);
         if (queue->batch_indices)
-            free(queue->batch_indices);
-        free(queue);
+            cml_free(queue->batch_indices);
+        cml_free(queue);
         return NULL;
     }
 
@@ -82,7 +83,7 @@ static void prefetch_queue_free(PrefetchQueue* queue) {
                 tensor_free(batch->X);
             if (batch->y)
                 tensor_free(batch->y);
-            free(batch);
+            cml_free(batch);
         }
         queue->front = (queue->front + 1) % queue->capacity;
         queue->size--;
@@ -93,10 +94,10 @@ static void prefetch_queue_free(PrefetchQueue* queue) {
     pthread_cond_destroy(&queue->not_full);
 
     if (queue->batches)
-        free(queue->batches);
+        cml_free(queue->batches);
     if (queue->batch_indices)
-        free(queue->batch_indices);
-    free(queue);
+        cml_free(queue->batch_indices);
+    cml_free(queue);
 }
 
 static int prefetch_queue_enqueue(PrefetchQueue* queue, Batch* batch, int batch_idx) {
@@ -169,7 +170,7 @@ static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
 
     int actual_batch_size = end_idx - start_idx;
 
-    Batch* batch = malloc(sizeof(Batch));
+    Batch* batch = cml_malloc(sizeof(Batch));
     if (!batch)
         return NULL;
     int batch_X_shape[] = {actual_batch_size, loader->dataset->input_size};
@@ -187,7 +188,7 @@ static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
             tensor_free(batch->X);
         if (batch->y)
             tensor_free(batch->y);
-        free(batch);
+        cml_free(batch);
         return NULL;
     }
 
@@ -245,7 +246,7 @@ static void* worker_prefetch_batches(void* arg) {
 }
 
 Dataset* dataset_create(void) {
-    Dataset* dataset = malloc(sizeof(Dataset));
+    Dataset* dataset = cml_malloc(sizeof(Dataset));
     if (!dataset) {
         LOG_ERROR("Failed to allocate memory for Dataset");
         return NULL;
@@ -330,7 +331,7 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
     dataset->output_size = output_size;
     dataset->is_loaded   = true;
 
-    dataset->indices = malloc((size_t)num_samples * sizeof(int));
+    dataset->indices = cml_malloc((size_t)num_samples * sizeof(int));
     if (!dataset->indices) {
         LOG_WARNING("Failed to allocate indices array, shuffling will be disabled");
     } else {
@@ -361,21 +362,21 @@ int dataset_load_file(Dataset* dataset, const char* filepath, const char* format
         }
 
         int result = dataset_load_arrays(dataset, X, y, num_samples, num_features, 1);
-        free(X);
-        free(y);
+        cml_free(X);
+        cml_free(y);
 
         if (result != 0) {
             if (class_names) {
                 for (int i = 0; i < num_classes; i++)
-                    free(class_names[i]);
-                free(class_names);
+                    cml_free(class_names[i]);
+                cml_free(class_names);
             }
             return -1;
         }
 
         dataset->num_classes = num_classes;
         dataset->class_names = class_names;
-        dataset->filepath = strdup(filepath);
+        dataset->filepath = cml_strdup(filepath);
 
         cml_dataset_compute_stats(dataset);
 
@@ -430,36 +431,36 @@ void dataset_free(Dataset* dataset) {
         tensor_free(dataset->y);
 
     if (dataset->feature_means)
-        free(dataset->feature_means);
+        cml_free(dataset->feature_means);
     if (dataset->feature_stds)
-        free(dataset->feature_stds);
+        cml_free(dataset->feature_stds);
     if (dataset->feature_mins)
-        free(dataset->feature_mins);
+        cml_free(dataset->feature_mins);
     if (dataset->feature_maxs)
-        free(dataset->feature_maxs);
+        cml_free(dataset->feature_maxs);
 
     if (dataset->feature_names) {
         for (int i = 0; i < dataset->input_size; i++) {
             if (dataset->feature_names[i])
-                free(dataset->feature_names[i]);
+                cml_free(dataset->feature_names[i]);
         }
-        free(dataset->feature_names);
+        cml_free(dataset->feature_names);
     }
 
     if (dataset->class_names) {
         for (int i = 0; i < dataset->num_classes; i++) {
             if (dataset->class_names[i])
-                free(dataset->class_names[i]);
+                cml_free(dataset->class_names[i]);
         }
-        free(dataset->class_names);
+        cml_free(dataset->class_names);
     }
 
     if (dataset->indices)
-        free(dataset->indices);
+        cml_free(dataset->indices);
     if (dataset->filepath)
-        free(dataset->filepath);
+        cml_free(dataset->filepath);
 
-    free(dataset);
+    cml_free(dataset);
 }
 
 int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
@@ -511,10 +512,10 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
     /* Copy normalization statistics if present */
     if (dataset->feature_mins && dataset->feature_maxs) {
         size_t stat_sz                 = (size_t)dataset->input_size * sizeof(float);
-        (*train_dataset)->feature_mins = malloc(stat_sz);
-        (*train_dataset)->feature_maxs = malloc(stat_sz);
-        (*val_dataset)->feature_mins   = malloc(stat_sz);
-        (*val_dataset)->feature_maxs   = malloc(stat_sz);
+        (*train_dataset)->feature_mins = cml_malloc(stat_sz);
+        (*train_dataset)->feature_maxs = cml_malloc(stat_sz);
+        (*val_dataset)->feature_mins   = cml_malloc(stat_sz);
+        (*val_dataset)->feature_maxs   = cml_malloc(stat_sz);
         if ((*train_dataset)->feature_mins && (*train_dataset)->feature_maxs) {
             memcpy((*train_dataset)->feature_mins, dataset->feature_mins, stat_sz);
             memcpy((*train_dataset)->feature_maxs, dataset->feature_maxs, stat_sz);
@@ -526,10 +527,10 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
     }
     if (dataset->feature_means && dataset->feature_stds) {
         size_t stat_sz                  = (size_t)dataset->input_size * sizeof(float);
-        (*train_dataset)->feature_means = malloc(stat_sz);
-        (*train_dataset)->feature_stds  = malloc(stat_sz);
-        (*val_dataset)->feature_means   = malloc(stat_sz);
-        (*val_dataset)->feature_stds    = malloc(stat_sz);
+        (*train_dataset)->feature_means = cml_malloc(stat_sz);
+        (*train_dataset)->feature_stds  = cml_malloc(stat_sz);
+        (*val_dataset)->feature_means   = cml_malloc(stat_sz);
+        (*val_dataset)->feature_stds    = cml_malloc(stat_sz);
         if ((*train_dataset)->feature_means && (*train_dataset)->feature_stds) {
             memcpy((*train_dataset)->feature_means, dataset->feature_means, stat_sz);
             memcpy((*train_dataset)->feature_stds, dataset->feature_stds, stat_sz);
@@ -555,15 +556,15 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
             *val_dataset   = NULL;
             return -1;
         }
-        float* train_X = malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
-        float* train_y = malloc((size_t)train_size * (size_t)dataset->output_size * sizeof(float));
+        float* train_X = cml_malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
+        float* train_y = cml_malloc((size_t)train_size * (size_t)dataset->output_size * sizeof(float));
 
         if (!train_X || !train_y) {
             LOG_ERROR("Failed to allocate training data");
             if (train_X)
-                free(train_X);
+                cml_free(train_X);
             if (train_y)
-                free(train_y);
+                cml_free(train_y);
             dataset_free(*train_dataset);
             dataset_free(*val_dataset);
             *train_dataset = NULL;
@@ -584,8 +585,8 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
                                      .has_device = true};
         (*train_dataset)->X       = tensor_from_data(train_X, train_input_shape, 2, &train_config);
         (*train_dataset)->y       = tensor_from_data(train_y, train_target_shape, 2, &train_config);
-        free(train_X);
-        free(train_y);
+        cml_free(train_X);
+        cml_free(train_y);
 
         if (!(*train_dataset)->X || !(*train_dataset)->y) {
             LOG_ERROR("Failed to create training tensors");
@@ -595,15 +596,15 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
             *val_dataset   = NULL;
             return -1;
         }
-        float* val_X = malloc((size_t)val_size * (size_t)dataset->input_size * sizeof(float));
-        float* val_y = malloc((size_t)val_size * (size_t)dataset->output_size * sizeof(float));
+        float* val_X = cml_malloc((size_t)val_size * (size_t)dataset->input_size * sizeof(float));
+        float* val_y = cml_malloc((size_t)val_size * (size_t)dataset->output_size * sizeof(float));
 
         if (!val_X || !val_y) {
             LOG_ERROR("Failed to allocate validation data");
             if (val_X)
-                free(val_X);
+                cml_free(val_X);
             if (val_y)
-                free(val_y);
+                cml_free(val_y);
             dataset_free(*train_dataset);
             dataset_free(*val_dataset);
             *train_dataset = NULL;
@@ -627,8 +628,8 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
                                    .has_device = true};
         (*val_dataset)->X       = tensor_from_data(val_X, val_input_shape, 2, &val_config);
         (*val_dataset)->y       = tensor_from_data(val_y, val_target_shape, 2, &val_config);
-        free(val_X);
-        free(val_y);
+        cml_free(val_X);
+        cml_free(val_y);
 
         if (!(*val_dataset)->X || !(*val_dataset)->y) {
             LOG_ERROR("Failed to create validation tensors");
@@ -708,8 +709,8 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
         float* train_X_data = (float*)tensor_data_ptr(dataset->X);
         float* train_y_data = (float*)tensor_data_ptr(dataset->y);
 
-        float* train_X = malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
-        float* train_y = malloc((size_t)train_size * sizeof(float));
+        float* train_X = cml_malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
+        float* train_y = cml_malloc((size_t)train_size * sizeof(float));
 
         if (!train_X || !train_y) {
             LOG_ERROR("Failed to allocate training data");
@@ -735,13 +736,13 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
                                      .has_device = true};
         (*train_dataset)->X       = tensor_from_data(train_X, train_input_shape, 2, &train_config);
         (*train_dataset)->y       = tensor_from_data(train_y, train_target_shape, 2, &train_config);
-        free(train_X);
-        free(train_y);
+        cml_free(train_X);
+        cml_free(train_y);
         int val_input_shape[]  = {val_size, dataset->input_size};
         int val_target_shape[] = {val_size, dataset->output_size};
 
-        float* val_X = malloc((size_t)val_size * (size_t)dataset->input_size * sizeof(float));
-        float* val_y = malloc((size_t)val_size * sizeof(float));
+        float* val_X = cml_malloc((size_t)val_size * (size_t)dataset->input_size * sizeof(float));
+        float* val_y = cml_malloc((size_t)val_size * sizeof(float));
 
         if (!val_X || !val_y) {
             LOG_ERROR("Failed to allocate validation data");
@@ -769,13 +770,13 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
                                    .has_device = true};
         (*val_dataset)->X       = tensor_from_data(val_X, val_input_shape, 2, &val_config);
         (*val_dataset)->y       = tensor_from_data(val_y, val_target_shape, 2, &val_config);
-        free(val_X);
-        free(val_y);
+        cml_free(val_X);
+        cml_free(val_y);
         int test_input_shape[]  = {test_size, dataset->input_size};
         int test_target_shape[] = {test_size, dataset->output_size};
 
-        float* test_X = malloc((size_t)test_size * (size_t)dataset->input_size * sizeof(float));
-        float* test_y = malloc((size_t)test_size * sizeof(float));
+        float* test_X = cml_malloc((size_t)test_size * (size_t)dataset->input_size * sizeof(float));
+        float* test_y = cml_malloc((size_t)test_size * sizeof(float));
 
         if (!test_X || !test_y) {
             LOG_ERROR("Failed to allocate test data");
@@ -803,8 +804,8 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
                                     .has_device = true};
         (*test_dataset)->X       = tensor_from_data(test_X, test_input_shape, 2, &test_config);
         (*test_dataset)->y       = tensor_from_data(test_y, test_target_shape, 2, &test_config);
-        free(test_X);
-        free(test_y);
+        cml_free(test_X);
+        cml_free(test_y);
     }
     (*train_dataset)->num_samples = train_size;
     (*train_dataset)->input_size  = dataset->input_size;
@@ -1049,7 +1050,7 @@ Dataset* dataset_copy(Dataset* dataset) {
     }
 
     if (dataset->indices) {
-        copy->indices = malloc((size_t)dataset->num_samples * sizeof(int));
+        copy->indices = cml_malloc((size_t)dataset->num_samples * sizeof(int));
         if (copy->indices) {
             memcpy(copy->indices, dataset->indices, (size_t)dataset->num_samples * sizeof(int));
         }
@@ -1065,7 +1066,7 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     }
 
 
-    DataLoader* loader = malloc(sizeof(DataLoader));
+    DataLoader* loader = cml_malloc(sizeof(DataLoader));
     if (!loader)
         return NULL;
 
@@ -1084,9 +1085,9 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     loader->on_batch_start = NULL;
     loader->on_batch_end   = NULL;
 
-    loader->shuffled_indices = malloc((size_t)dataset->num_samples * sizeof(int));
+    loader->shuffled_indices = cml_malloc((size_t)dataset->num_samples * sizeof(int));
     if (!loader->shuffled_indices) {
-        free(loader);
+        cml_free(loader);
         return NULL;
     }
 
@@ -1119,22 +1120,22 @@ void dataloader_free(DataLoader* loader) {
             for (int i = 0; i < loader->num_active_workers; i++) {
                 pthread_join(threads[i], NULL);
             }
-            free(threads);
+            cml_free(threads);
         }
 
         if (loader->worker_contexts) {
-            free(loader->worker_contexts);
+            cml_free(loader->worker_contexts);
         }
     }
 
     if (loader->shuffled_indices) {
-        free(loader->shuffled_indices);
+        cml_free(loader->shuffled_indices);
     }
     if (loader->batch_indices) {
-        free(loader->batch_indices);
+        cml_free(loader->batch_indices);
     }
 
-    free(loader);
+    cml_free(loader);
 }
 
 int dataloader_reset(DataLoader* loader) {
@@ -1222,7 +1223,7 @@ void batch_free(Batch* batch) {
     if (batch->y)
         tensor_free(batch->y);
 
-    free(batch);
+    cml_free(batch);
 }
 
 Tensor* batch_get_input(Batch* batch) {
@@ -1297,14 +1298,14 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
         }
 
         loader->prefetch_queue = queue;
-        pthread_t* threads      = calloc((size_t)num_workers, sizeof(pthread_t));
-        WorkerContext* contexts = calloc((size_t)num_workers, sizeof(WorkerContext));
+        pthread_t* threads      = cml_calloc((size_t)num_workers, sizeof(pthread_t));
+        WorkerContext* contexts = cml_calloc((size_t)num_workers, sizeof(WorkerContext));
 
         if (!threads || !contexts) {
             if (threads)
-                free(threads);
+                cml_free(threads);
             if (contexts)
-                free(contexts);
+                cml_free(contexts);
             prefetch_queue_free(queue);
             loader->num_workers    = 0;
             loader->prefetch_queue = NULL;
@@ -1344,8 +1345,8 @@ int dataloader_get_batch_tensors(DataLoader* loader, Tensor*** batch_inputs,
     if (!batch) {
         return 0;
     }
-    *batch_inputs  = malloc(sizeof(Tensor*));
-    *batch_targets = malloc(sizeof(Tensor*));
+    *batch_inputs  = cml_malloc(sizeof(Tensor*));
+    *batch_targets = cml_malloc(sizeof(Tensor*));
     if (!*batch_inputs || !*batch_targets) {
         batch_free(batch);
         return 0;
@@ -1362,8 +1363,8 @@ int dataloader_get_batch_tensors(DataLoader* loader, Tensor*** batch_inputs,
         if ((*batch_targets)[0]) {
             tensor_free((*batch_targets)[0]);
         }
-        free(*batch_inputs);
-        free(*batch_targets);
+        cml_free(*batch_inputs);
+        cml_free(*batch_targets);
         *batch_inputs = NULL;
         *batch_targets = NULL;
         batch_free(batch);
@@ -1394,8 +1395,8 @@ int dataloader_for_each(DataLoader* loader, BatchCallback callback, void* user_d
             if (batch_targets && batch_targets[0]) {
                 tensor_free(batch_targets[0]);
             }
-            free(batch_inputs);
-            free(batch_targets);
+            cml_free(batch_inputs);
+            cml_free(batch_targets);
             return -1;
         }
         if (batch_inputs && batch_inputs[0]) {
@@ -1404,8 +1405,8 @@ int dataloader_for_each(DataLoader* loader, BatchCallback callback, void* user_d
         if (batch_targets && batch_targets[0]) {
             tensor_free(batch_targets[0]);
         }
-        free(batch_inputs);
-        free(batch_targets);
+        cml_free(batch_inputs);
+        cml_free(batch_targets);
     }
 
     return 0;
@@ -1414,11 +1415,11 @@ int dataloader_for_each(DataLoader* loader, BatchCallback callback, void* user_d
 Dataset* dataset_xor(void) {
     float X[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
     float y[4]    = {0.0f, 1.0f, 1.0f, 0.0f};
-    float* X_flat = malloc(4 * 2 * sizeof(float));
-    float* y_flat = malloc(4 * sizeof(float));
+    float* X_flat = cml_malloc(4 * 2 * sizeof(float));
+    float* y_flat = cml_malloc(4 * sizeof(float));
     if (!X_flat || !y_flat) {
-        free(X_flat);
-        free(y_flat);
+        cml_free(X_flat);
+        cml_free(y_flat);
         return NULL;
     }
 
@@ -1434,8 +1435,8 @@ Dataset* dataset_xor(void) {
         dataset->name = "XOR";
     }
 
-    free(X_flat);
-    free(y_flat);
+    cml_free(X_flat);
+    cml_free(y_flat);
     return dataset;
 }
 
@@ -1445,11 +1446,11 @@ Dataset* dataset_random_classification(int num_samples, int num_features, int nu
     }
     cml_random_seed();
 
-    float* X = malloc((size_t)num_samples * (size_t)num_features * sizeof(float));
-    float* y = malloc((size_t)num_samples * sizeof(float));
+    float* X = cml_malloc((size_t)num_samples * (size_t)num_features * sizeof(float));
+    float* y = cml_malloc((size_t)num_samples * sizeof(float));
     if (!X || !y) {
-        free(X);
-        free(y);
+        cml_free(X);
+        cml_free(y);
         return NULL;
     }
     for (int i = 0; i < num_samples * num_features; i++) {
@@ -1465,8 +1466,8 @@ Dataset* dataset_random_classification(int num_samples, int num_features, int nu
         dataset->num_classes = num_classes;
     }
 
-    free(X);
-    free(y);
+    cml_free(X);
+    cml_free(y);
     return dataset;
 }
 
@@ -1495,10 +1496,10 @@ int transform_normalize(Dataset* dataset, float* mean, float* std) {
         }
     }
     if (!dataset->feature_means) {
-        dataset->feature_means = malloc((size_t)dataset->input_size * sizeof(float));
+        dataset->feature_means = cml_malloc((size_t)dataset->input_size * sizeof(float));
     }
     if (!dataset->feature_stds) {
-        dataset->feature_stds = malloc((size_t)dataset->input_size * sizeof(float));
+        dataset->feature_stds = cml_malloc((size_t)dataset->input_size * sizeof(float));
     }
 
     if (dataset->feature_means && dataset->feature_stds) {

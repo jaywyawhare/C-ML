@@ -5,6 +5,7 @@
 
 #include "core/logging.h"
 #include "alloc/memory_management.h"
+#include "alloc/cml_allocator.h"
 #include "core/error_codes.h"
 #include "core/error_stack.h"
 #include "core/dataset.h"

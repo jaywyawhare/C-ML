@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
                                   const int* dense_shape, int dense_ndim) {
@@ -39,7 +40,7 @@ SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
         return NULL;
     }
 
-    SparseCOOData* sparse = calloc(1, sizeof(SparseCOOData));
+    SparseCOOData* sparse = cml_calloc(1, sizeof(SparseCOOData));
     if (!sparse) {
         LOG_ERROR("sparse_coo_tensor: failed to allocate SparseCOOData");
         return NULL;
@@ -53,19 +54,19 @@ SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
         LOG_ERROR("sparse_coo_tensor: failed to clone indices or values");
         if (sparse->indices) tensor_free(sparse->indices);
         if (sparse->values) tensor_free(sparse->values);
-        free(sparse);
+        cml_free(sparse);
         return NULL;
     }
 
     sparse->nnz        = nnz;
     sparse->dense_ndim = dense_ndim;
 
-    sparse->dense_shape = calloc(dense_ndim, sizeof(int));
+    sparse->dense_shape = cml_calloc(dense_ndim, sizeof(int));
     if (!sparse->dense_shape) {
         LOG_ERROR("sparse_coo_tensor: failed to allocate dense_shape");
         tensor_free(sparse->indices);
         tensor_free(sparse->values);
-        free(sparse);
+        cml_free(sparse);
         return NULL;
     }
     memcpy(sparse->dense_shape, dense_shape, dense_ndim * sizeof(int));
@@ -161,7 +162,7 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
         }
     }
 
-    SparseCOOData* sparse = calloc(1, sizeof(SparseCOOData));
+    SparseCOOData* sparse = cml_calloc(1, sizeof(SparseCOOData));
     if (!sparse) {
         tensor_free(indices);
         tensor_free(values);
@@ -174,11 +175,11 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
     sparse->nnz        = nnz;
     sparse->dense_ndim = ndim;
 
-    sparse->dense_shape = calloc(ndim, sizeof(int));
+    sparse->dense_shape = cml_calloc(ndim, sizeof(int));
     if (!sparse->dense_shape) {
         tensor_free(indices);
         tensor_free(values);
-        free(sparse);
+        cml_free(sparse);
         LOG_ERROR("sparse_from_dense: failed to allocate dense_shape");
         return NULL;
     }
@@ -367,9 +368,9 @@ void sparse_free(SparseCOOData* sparse) {
     }
 
     if (sparse->dense_shape) {
-        free(sparse->dense_shape);
+        cml_free(sparse->dense_shape);
         sparse->dense_shape = NULL;
     }
 
-    free(sparse);
+    cml_free(sparse);
 }

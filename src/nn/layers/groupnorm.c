@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     GroupNorm* gn = (GroupNorm*)module;
@@ -112,13 +113,13 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
         return NULL;
     ReshapeParams rback = {.new_shape = back_shape, .new_ndim = input->ndim};
     Tensor* output      = uop_reshape(normalized2, &rback);
-    free(back_shape);
+    cml_free(back_shape);
     if (!output)
         return NULL;
 
     if (gn->affine && gn->weight && gn->bias) {
         int nd = input->ndim;
-        int* stat_shape = malloc((size_t)nd * sizeof(int));
+        int* stat_shape = cml_malloc((size_t)nd * sizeof(int));
         if (!stat_shape)
             return NULL;
         stat_shape[0] = 1;
@@ -129,7 +130,7 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
         ReshapeParams rw = {.new_shape = stat_shape, .new_ndim = nd};
         Tensor* w_r      = uop_reshape(gn->weight->tensor, &rw);
         Tensor* b_r      = uop_reshape(gn->bias->tensor, &rw);
-        free(stat_shape);
+        cml_free(stat_shape);
         if (!w_r || !b_r)
             return NULL;
 
@@ -141,7 +142,7 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
 
         Tensor* wb = uop_expand(w_r, &ex);
         Tensor* bb = uop_expand(b_r, &ex);
-        free(ex.new_shape);
+        cml_free(ex.new_shape);
         if (!wb || !bb)
             return NULL;
 
@@ -156,7 +157,7 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void groupnorm_free(Module* module) { free(module); }
+static void groupnorm_free(Module* module) { cml_free(module); }
 
 GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine,
                         DType dtype, DeviceType device) {
@@ -166,12 +167,12 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine
         return NULL;
     }
 
-    GroupNorm* gn = malloc(sizeof(GroupNorm));
+    GroupNorm* gn = cml_malloc(sizeof(GroupNorm));
     if (!gn)
         return NULL;
 
     if (module_init((Module*)gn, "GroupNorm", groupnorm_forward, groupnorm_free) != 0) {
-        free(gn);
+        cml_free(gn);
         return NULL;
     }
 

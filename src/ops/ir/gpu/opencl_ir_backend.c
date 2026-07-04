@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #ifdef CML_HAS_OPENCL
 
@@ -381,7 +382,7 @@ static int ocl_download(CMLOpenCLIRBackend* b, Tensor* t) {
     size_t bytes = t->numel * cml_dtype_size(t->dtype);
 
     if (!t->data) {
-        t->data = malloc(bytes);
+        t->data = cml_malloc(bytes);
         if (!t->data) return -1;
         t->owns_data = true;
     }
@@ -416,7 +417,7 @@ static void ocl_release_all_buffers(CMLOpenCLIRBackend* b) {
 /* ─── BEAM autotuner for GEMM kernels ─────────────────────────────────── */
 
 /* Generate OpenCL source for a parameterized GEMM kernel.
- * Returns heap-allocated string. Caller must free(). */
+ * Returns heap-allocated string. Caller must cml_free(). */
 static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
     int wg_x = p->tsn / p->reg_n;
     int wg_y = p->tsm / p->reg_m;
@@ -429,7 +430,7 @@ static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
     int slm_h_a = p->transpose_a ? p->tsk : p->tsm;
     int slm_w_b = p->tsn + p->slm_pad;
 
-    char* buf = (char*)malloc(16384);
+    char* buf = (char*)cml_malloc(16384);
     if (!buf) return NULL;
     int off = 0;
 
@@ -567,7 +568,7 @@ static void ocl_beam_compile_variants(CMLOpenCLIRBackend* b) {
 
         cl_int err;
         cl_program prog = clCreateProgramWithSource(b->context, 1, (const char**)&src, NULL, &err);
-        free(src);
+        cml_free(src);
         if (err != CL_SUCCESS) continue;
 
         err = clBuildProgram(prog, 1, &b->device, "-cl-mad-enable -cl-fast-relaxed-math", NULL, NULL);
@@ -746,7 +747,7 @@ bool cml_opencl_ir_available(void) {
 }
 
 CMLOpenCLIRBackend* cml_opencl_ir_backend_create(void) {
-    CMLOpenCLIRBackend* b = (CMLOpenCLIRBackend*)calloc(1, sizeof(CMLOpenCLIRBackend));
+    CMLOpenCLIRBackend* b = (CMLOpenCLIRBackend*)cml_calloc(1, sizeof(CMLOpenCLIRBackend));
     return b;
 }
 
@@ -916,7 +917,7 @@ void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
     if (b->queue)   clReleaseCommandQueue(b->queue);
     if (b->context) clReleaseContext(b->context);
 
-    free(b);
+    cml_free(b);
 }
 
 /* ─── Node execution helpers ───────────────────────────────────────────── */

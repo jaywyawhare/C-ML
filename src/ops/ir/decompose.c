@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdatomic.h>
+#include "alloc/cml_allocator.h"
 
 static atomic_int g_decompose_counter = 0;
 
@@ -24,7 +25,7 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
 
 static char* decompose_unique_name(void) {
     int id = atomic_fetch_add(&g_decompose_counter, 1);
-    char* name = malloc(32);
+    char* name = cml_malloc(32);
     if (name) {
         snprintf(name, 32, "_d%d", id);
     }
@@ -39,7 +40,7 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
                                             Tensor** inputs, int num_inputs,
                                             void* params, int* out_shape,
                                             int out_ndim) {
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     if (!node) return NULL;
 
     node->type = type;
@@ -47,19 +48,19 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     node->params = params;
 
     if (num_inputs > 0 && inputs) {
-        node->input_names = malloc((size_t)num_inputs * sizeof(char*));
-        node->inputs = malloc((size_t)num_inputs * sizeof(Tensor*));
+        node->input_names = cml_malloc((size_t)num_inputs * sizeof(char*));
+        node->inputs = cml_malloc((size_t)num_inputs * sizeof(Tensor*));
         if (!node->input_names || !node->inputs) {
-            free(node->input_names);
-            free(node->inputs);
-            free(node);
+            cml_free(node->input_names);
+            cml_free(node->inputs);
+            cml_free(node);
             return NULL;
         }
         for (int i = 0; i < num_inputs; i++) {
             node->inputs[i] = inputs[i];
             if (inputs[i] && inputs[i]->ir_node &&
                 ((struct IRNode*)inputs[i]->ir_node)->output_name) {
-                node->input_names[i] = strdup(((struct IRNode*)inputs[i]->ir_node)->output_name);
+                node->input_names[i] = cml_strdup(((struct IRNode*)inputs[i]->ir_node)->output_name);
             } else {
                 node->input_names[i] = decompose_unique_name();
             }
@@ -73,7 +74,7 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     node->next = NULL;
 
     if (out_shape && out_ndim > 0) {
-        node->output_shape = malloc((size_t)out_ndim * sizeof(int));
+        node->output_shape = cml_malloc((size_t)out_ndim * sizeof(int));
         if (node->output_shape) {
             memcpy(node->output_shape, out_shape, (size_t)out_ndim * sizeof(int));
         }
@@ -90,14 +91,14 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
         }
     }
 
-    Tensor* out_tensor = calloc(1, sizeof(Tensor));
+    Tensor* out_tensor = cml_calloc(1, sizeof(Tensor));
     if (!out_tensor) {
-        for (int i = 0; i < num_inputs; i++) free(node->input_names[i]);
-        free(node->input_names);
-        free(node->inputs);
-        free(node->output_name);
-        free(node->output_shape);
-        free(node);
+        for (int i = 0; i < num_inputs; i++) cml_free(node->input_names[i]);
+        cml_free(node->input_names);
+        cml_free(node->inputs);
+        cml_free(node->output_name);
+        cml_free(node->output_shape);
+        cml_free(node);
         return NULL;
     }
 
@@ -106,7 +107,7 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     node->output = out_tensor;
 
     if (out_shape && out_ndim > 0) {
-        out_tensor->shape = malloc((size_t)out_ndim * sizeof(int));
+        out_tensor->shape = cml_malloc((size_t)out_ndim * sizeof(int));
         if (out_tensor->shape) {
             memcpy(out_tensor->shape, out_shape, (size_t)out_ndim * sizeof(int));
         }
@@ -134,7 +135,7 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     out_tensor->base = NULL;
 
     if (out_ndim > 0 && out_tensor->shape) {
-        out_tensor->strides = malloc((size_t)out_ndim * sizeof(size_t));
+        out_tensor->strides = cml_malloc((size_t)out_ndim * sizeof(size_t));
         if (out_tensor->strides) {
             size_t stride = 1;
             for (int i = out_ndim - 1; i >= 0; i--) {
@@ -155,12 +156,12 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
  * Create a FILL node for a constant scalar broadcast to given shape.
  */
 static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, float value) {
-    FillParams* params = malloc(sizeof(FillParams));
+    FillParams* params = cml_malloc(sizeof(FillParams));
     if (!params) return NULL;
     params->value = value;
     params->ndim = ndim;
-    params->shape = malloc((size_t)ndim * sizeof(int));
-    if (!params->shape) { free(params); return NULL; }
+    params->shape = cml_malloc((size_t)ndim * sizeof(int));
+    if (!params->shape) { cml_free(params); return NULL; }
     memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
 
     struct IRNode* node = create_primitive_node(ir, UOP_FILL, NULL, 0, params, shape, ndim);
@@ -190,15 +191,15 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
         orig_output->ir_node = chain_tail;
 
         // Free the chain_tail's intermediate output tensor (no longer needed)
-        if (chain_output->shape) free(chain_output->shape);
-        if (chain_output->strides) free(chain_output->strides);
-        free(chain_output);
+        if (chain_output->shape) cml_free(chain_output->shape);
+        if (chain_output->strides) cml_free(chain_output->strides);
+        cml_free(chain_output);
 
         // Point chain_tail at the original output tensor
         chain_tail->output = orig_output;
 
-        if (chain_tail->output_name) free(chain_tail->output_name);
-        chain_tail->output_name = strdup(original->output_name ? original->output_name : "_decomp");
+        if (chain_tail->output_name) cml_free(chain_tail->output_name);
+        chain_tail->output_name = cml_strdup(original->output_name ? original->output_name : "_decomp");
     }
 
     // Find the node before `original` in the linked list
@@ -235,15 +236,15 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
     original->output = NULL; // Prevent double-free
     if (original->input_names) {
         for (int i = 0; i < original->num_inputs; i++) {
-            free(original->input_names[i]);
+            cml_free(original->input_names[i]);
         }
-        free(original->input_names);
+        cml_free(original->input_names);
     }
-    free(original->inputs);
-    free(original->output_name);
-    free(original->output_shape);
+    cml_free(original->inputs);
+    cml_free(original->output_name);
+    cml_free(original->output_shape);
     cml_ir_free_node_params(original);
-    free(original);
+    cml_free(original);
 }
 
 /**
@@ -1042,14 +1043,14 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
 
     // Deep copy reduce params for the new SUM node
     ReduceParams* orig_params = (ReduceParams*)node->params;
-    ReduceParams* sum_params = malloc(sizeof(ReduceParams));
+    ReduceParams* sum_params = cml_malloc(sizeof(ReduceParams));
     if (!sum_params) return -1;
     if (orig_params) {
         sum_params->keepdim = orig_params->keepdim;
         sum_params->num_dims = orig_params->num_dims;
         if (orig_params->dims && orig_params->num_dims > 0) {
-            sum_params->dims = malloc((size_t)orig_params->num_dims * sizeof(int));
-            if (!sum_params->dims) { free(sum_params); return -1; }
+            sum_params->dims = cml_malloc((size_t)orig_params->num_dims * sizeof(int));
+            if (!sum_params->dims) { cml_free(sum_params); return -1; }
             memcpy(sum_params->dims, orig_params->dims, (size_t)orig_params->num_dims * sizeof(int));
         } else {
             sum_params->dims = NULL;
@@ -1062,7 +1063,7 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
 
     // sum(x)
     struct IRNode* sum_node = create_primitive_node(ir, UOP_SUM, &x, 1, sum_params, out_shape, out_ndim);
-    if (!sum_node) { free(sum_params->dims); free(sum_params); return -1; }
+    if (!sum_node) { cml_free(sum_params->dims); cml_free(sum_params); return -1; }
     chain_append(&head, &tail, sum_node);
 
     // Compute n = number of elements being reduced
@@ -1111,14 +1112,14 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
 
     // Deep copy reduce params
     ReduceParams* orig_params = (ReduceParams*)node->params;
-    ReduceParams* max_params = malloc(sizeof(ReduceParams));
+    ReduceParams* max_params = cml_malloc(sizeof(ReduceParams));
     if (!max_params) return -1;
     if (orig_params) {
         max_params->keepdim = orig_params->keepdim;
         max_params->num_dims = orig_params->num_dims;
         if (orig_params->dims && orig_params->num_dims > 0) {
-            max_params->dims = malloc((size_t)orig_params->num_dims * sizeof(int));
-            if (!max_params->dims) { free(max_params); return -1; }
+            max_params->dims = cml_malloc((size_t)orig_params->num_dims * sizeof(int));
+            if (!max_params->dims) { cml_free(max_params); return -1; }
             memcpy(max_params->dims, orig_params->dims, (size_t)orig_params->num_dims * sizeof(int));
         } else {
             max_params->dims = NULL;
@@ -1132,7 +1133,7 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
     // max_reduce(neg(x))
     struct IRNode* max_node = create_primitive_node(ir, UOP_MAX_REDUCE, &neg_node->output, 1,
                                                      max_params, out_shape, out_ndim);
-    if (!max_node) { free(max_params->dims); free(max_params); return -1; }
+    if (!max_node) { cml_free(max_params->dims); cml_free(max_params); return -1; }
     chain_append(&head, &tail, max_node);
 
     // neg(max_reduce(neg(x)))

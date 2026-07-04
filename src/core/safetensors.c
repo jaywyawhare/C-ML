@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define MAX_TENSORS 4096
 
@@ -92,7 +93,7 @@ static char* parse_string(char* p, char** out) {
         p++;
     }
     size_t len = p - start;
-    *out = malloc(len + 1);
+    *out = cml_malloc(len + 1);
     memcpy(*out, start, len);
     (*out)[len] = '\0';
     if (*p == '"') p++;
@@ -122,19 +123,19 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
     if (fread(&header_size, 8, 1, f) != 1) { fclose(f); return NULL; }
     if (header_size > 100 * 1024 * 1024) { fclose(f); return NULL; } // Sanity check
 
-    char* header = malloc(header_size + 1);
+    char* header = cml_malloc(header_size + 1);
     if (!header) { fclose(f); return NULL; }
-    if (fread(header, 1, header_size, f) != header_size) { free(header); fclose(f); return NULL; }
+    if (fread(header, 1, header_size, f) != header_size) { cml_free(header); fclose(f); return NULL; }
     header[header_size] = '\0';
 
-    SafeTensorsContext* ctx = calloc(1, sizeof(SafeTensorsContext));
-    if (!ctx) { free(header); fclose(f); return NULL; }
+    SafeTensorsContext* ctx = cml_calloc(1, sizeof(SafeTensorsContext));
+    if (!ctx) { cml_free(header); fclose(f); return NULL; }
     ctx->file = f;
-    ctx->filepath = strdup(filepath);
+    ctx->filepath = cml_strdup(filepath);
     ctx->is_write = false;
     ctx->header_size = header_size;
-    ctx->tensors = calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
-    if (!ctx->tensors) { free(header); safetensors_close(ctx); return NULL; }
+    ctx->tensors = cml_calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
+    if (!ctx->tensors) { cml_free(header); safetensors_close(ctx); return NULL; }
 
     char* p = header;
     p = skip_ws(p);
@@ -151,7 +152,7 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
         if (!p || !name) break;
 
         if (strcmp(name, "__metadata__") == 0) {
-            free(name);
+            cml_free(name);
             p = skip_ws(p);
             if (*p == ':') p++;
             int depth = 0;
@@ -170,7 +171,7 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
         if (*p == ':') p++;
         p = skip_ws(p);
 
-        if (*p != '{') { free(name); break; }
+        if (*p != '{') { cml_free(name); break; }
         p++;
 
         while (*p && *p != '}') {
@@ -217,24 +218,24 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
                 info->data_start = (size_t)start;
                 info->data_end = (size_t)end;
             }
-            free(key);
+            cml_free(key);
         }
         if (*p == '}') p++;
         ctx->num_tensors++;
     }
 
-    free(header);
+    cml_free(header);
     return ctx;
 }
 
 SafeTensorsContext* safetensors_open_write(const char* filepath) {
-    SafeTensorsContext* ctx = calloc(1, sizeof(SafeTensorsContext));
+    SafeTensorsContext* ctx = cml_calloc(1, sizeof(SafeTensorsContext));
     if (!ctx) return NULL;
-    ctx->filepath = strdup(filepath);
+    ctx->filepath = cml_strdup(filepath);
     ctx->is_write = true;
-    ctx->tensors = calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
+    ctx->tensors = cml_calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
     ctx->write_data_cap = 4096;
-    ctx->write_data = malloc(ctx->write_data_cap);
+    ctx->write_data = cml_malloc(ctx->write_data_cap);
     if (!ctx->tensors || !ctx->write_data) { safetensors_close(ctx); return NULL; }
     return ctx;
 }
@@ -244,7 +245,7 @@ void safetensors_close(SafeTensorsContext* ctx) {
 
     if (ctx->is_write && ctx->filepath && ctx->write_count > 0) {
         size_t json_cap = 4096;
-        char* json = malloc(json_cap);
+        char* json = cml_malloc(json_cap);
         if (json) {
             size_t pos = 0;
             json[pos++] = '{';
@@ -253,7 +254,7 @@ void safetensors_close(SafeTensorsContext* ctx) {
                 SafeTensorInfo* info = &ctx->tensors[i];
                 while (pos + 512 > json_cap) {
                     json_cap *= 2;
-                    json = realloc(json, json_cap);
+                    json = cml_realloc(json, json_cap);
                 }
                 if (i > 0) json[pos++] = ',';
                 pos += snprintf(json + pos, json_cap - pos,
@@ -277,7 +278,7 @@ void safetensors_close(SafeTensorsContext* ctx) {
                 fwrite(ctx->write_data, 1, ctx->write_data_size, f);
                 fclose(f);
             }
-            free(json);
+            cml_free(json);
         }
     }
 
@@ -285,14 +286,14 @@ void safetensors_close(SafeTensorsContext* ctx) {
     if (ctx->tensors) {
         int count = ctx->is_write ? ctx->write_count : ctx->num_tensors;
         for (int i = 0; i < count; i++) {
-            free(ctx->tensors[i].name);
-            free(ctx->tensors[i].dtype_str);
+            cml_free(ctx->tensors[i].name);
+            cml_free(ctx->tensors[i].dtype_str);
         }
-        free(ctx->tensors);
+        cml_free(ctx->tensors);
     }
-    free(ctx->filepath);
-    free(ctx->write_data);
-    free(ctx);
+    cml_free(ctx->filepath);
+    cml_free(ctx->write_data);
+    cml_free(ctx);
 }
 
 int safetensors_get_num_tensors(SafeTensorsContext* ctx) {
@@ -344,13 +345,13 @@ int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* 
 
     while (ctx->write_data_size + data_size > ctx->write_data_cap) {
         ctx->write_data_cap *= 2;
-        ctx->write_data = realloc(ctx->write_data, ctx->write_data_cap);
+        ctx->write_data = cml_realloc(ctx->write_data, ctx->write_data_cap);
         if (!ctx->write_data) return -1;
     }
 
     SafeTensorInfo* info = &ctx->tensors[ctx->write_count];
-    info->name = strdup(name);
-    info->dtype_str = strdup(dtype_to_safetensor_str(tensor->dtype));
+    info->name = cml_strdup(name);
+    info->dtype_str = cml_strdup(dtype_to_safetensor_str(tensor->dtype));
     info->ndim = tensor->ndim;
     for (int d = 0; d < tensor->ndim; d++) info->shape[d] = tensor->shape[d];
     info->data_start = ctx->write_data_size;

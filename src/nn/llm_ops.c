@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static void llm_softmax_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
@@ -83,7 +84,7 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
         return NULL;
     }
 
-    CMLKVCache* cache = (CMLKVCache*)calloc(1, sizeof(CMLKVCache));
+    CMLKVCache* cache = (CMLKVCache*)cml_calloc(1, sizeof(CMLKVCache));
     if (!cache) {
         LOG_ERROR("cml_kv_cache_create: allocation failed");
         return NULL;
@@ -105,7 +106,7 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
         LOG_ERROR("cml_kv_cache_create: failed to allocate cache tensors");
         if (cache->key_cache) tensor_free(cache->key_cache);
         if (cache->value_cache) tensor_free(cache->value_cache);
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
     return cache;
@@ -115,7 +116,7 @@ void cml_kv_cache_free(CMLKVCache* cache) {
     if (!cache) return;
     if (cache->key_cache) tensor_free(cache->key_cache);
     if (cache->value_cache) tensor_free(cache->value_cache);
-    free(cache);
+    cml_free(cache);
 }
 
 int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
@@ -244,17 +245,17 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
 
     /* Allocate output: [batch, seq_q, num_heads * head_dim] */
     size_t out_size = (size_t)batch * seq_q * num_heads * head_dim;
-    float* output = (float*)calloc(out_size, sizeof(float));
+    float* output = (float*)cml_calloc(out_size, sizeof(float));
     if (!output) {
         LOG_ERROR("cml_gqa_forward: allocation failed");
         return NULL;
     }
 
     /* Allocate scratch for attention scores: [seq_q, kv_len] per head */
-    float* scores = (float*)malloc((size_t)seq_q * kv_len * sizeof(float));
+    float* scores = (float*)cml_malloc((size_t)seq_q * kv_len * sizeof(float));
     if (!scores) {
         LOG_ERROR("cml_gqa_forward: scores allocation failed");
-        free(output);
+        cml_free(output);
         return NULL;
     }
 
@@ -345,14 +346,14 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
         }
     }
 
-    free(scores);
+    cml_free(scores);
 
     /* Create output tensor */
     int out_shape[] = {batch, seq_q, num_heads * head_dim};
     TensorConfig out_cfg = {.dtype = Q->dtype, .device = Q->device,
                             .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
-    free(output);
+    cml_free(output);
 
     if (!result) {
         LOG_ERROR("cml_gqa_forward: failed to create output tensor");
@@ -501,18 +502,18 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
     }
 
     size_t out_size = (size_t)batch * seq_q * num_heads * head_dim;
-    float* output = (float*)calloc(out_size, sizeof(float));
+    float* output = (float*)cml_calloc(out_size, sizeof(float));
     if (!output) return NULL;
 
     /* Per-query-position online softmax state */
-    float* row_max = (float*)malloc((size_t)tile_q * sizeof(float));
-    float* row_sum = (float*)malloc((size_t)tile_q * sizeof(float));
-    float* tile_scores = (float*)malloc((size_t)tile_q * tile_kv * sizeof(float));
-    float* acc = (float*)malloc((size_t)tile_q * head_dim * sizeof(float));
+    float* row_max = (float*)cml_malloc((size_t)tile_q * sizeof(float));
+    float* row_sum = (float*)cml_malloc((size_t)tile_q * sizeof(float));
+    float* tile_scores = (float*)cml_malloc((size_t)tile_q * tile_kv * sizeof(float));
+    float* acc = (float*)cml_malloc((size_t)tile_q * head_dim * sizeof(float));
 
     if (!row_max || !row_sum || !tile_scores || !acc) {
-        free(output); free(row_max); free(row_sum);
-        free(tile_scores); free(acc);
+        cml_free(output); cml_free(row_max); cml_free(row_sum);
+        cml_free(tile_scores); cml_free(acc);
         return NULL;
     }
 
@@ -619,16 +620,16 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
         }
     }
 
-    free(row_max);
-    free(row_sum);
-    free(tile_scores);
-    free(acc);
+    cml_free(row_max);
+    cml_free(row_sum);
+    cml_free(tile_scores);
+    cml_free(acc);
 
     int out_shape[] = {batch, seq_q, num_heads * head_dim};
     TensorConfig out_cfg = {.dtype = Q->dtype, .device = Q->device,
                             .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
-    free(output);
+    cml_free(output);
     return result;
 }
 
@@ -823,7 +824,7 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
         return NULL;
     }
 
-    CMLMoELayer* moe = (CMLMoELayer*)calloc(1, sizeof(CMLMoELayer));
+    CMLMoELayer* moe = (CMLMoELayer*)cml_calloc(1, sizeof(CMLMoELayer));
     if (!moe) {
         LOG_ERROR("cml_moe_create: allocation failed");
         return NULL;
@@ -844,15 +845,15 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
     moe->gate_weight = tensor_empty(gate_shape, 2, &tcfg);
     if (!moe->gate_weight) {
         LOG_ERROR("cml_moe_create: failed to create gate weight");
-        free(moe);
+        cml_free(moe);
         return NULL;
     }
     float* gw = (float*)tensor_data_ptr(moe->gate_weight);
     if (gw) llm_xavier_init(gw, (size_t)input_dim * num_experts, input_dim, num_experts);
 
     /* Expert weights */
-    moe->expert_w1 = (Tensor**)calloc((size_t)num_experts, sizeof(Tensor*));
-    moe->expert_w2 = (Tensor**)calloc((size_t)num_experts, sizeof(Tensor*));
+    moe->expert_w1 = (Tensor**)cml_calloc((size_t)num_experts, sizeof(Tensor*));
+    moe->expert_w2 = (Tensor**)cml_calloc((size_t)num_experts, sizeof(Tensor*));
     if (!moe->expert_w1 || !moe->expert_w2) {
         LOG_ERROR("cml_moe_create: failed to allocate expert arrays");
         cml_moe_free(moe);
@@ -890,15 +891,15 @@ void cml_moe_free(CMLMoELayer* moe) {
         for (int e = 0; e < num_experts; e++) {
             if (moe->expert_w1[e]) tensor_free(moe->expert_w1[e]);
         }
-        free(moe->expert_w1);
+        cml_free(moe->expert_w1);
     }
     if (moe->expert_w2) {
         for (int e = 0; e < num_experts; e++) {
             if (moe->expert_w2[e]) tensor_free(moe->expert_w2[e]);
         }
-        free(moe->expert_w2);
+        cml_free(moe->expert_w2);
     }
-    free(moe);
+    cml_free(moe);
 }
 
 Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
@@ -932,7 +933,7 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     }
 
     /* Step 1: Compute gating scores [total_tokens, num_experts] */
-    float* gate_scores = (float*)calloc((size_t)total_tokens * num_experts, sizeof(float));
+    float* gate_scores = (float*)cml_calloc((size_t)total_tokens * num_experts, sizeof(float));
     if (!gate_scores) {
         LOG_ERROR("cml_moe_forward: allocation failed");
         return NULL;
@@ -953,13 +954,13 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     llm_softmax_inplace(gate_scores, total_tokens, num_experts);
 
     /* Step 3: Find top-k experts per token */
-    int* top_k_indices = (int*)malloc((size_t)total_tokens * top_k * sizeof(int));
-    float* top_k_weights = (float*)malloc((size_t)total_tokens * top_k * sizeof(float));
+    int* top_k_indices = (int*)cml_malloc((size_t)total_tokens * top_k * sizeof(int));
+    float* top_k_weights = (float*)cml_malloc((size_t)total_tokens * top_k * sizeof(float));
     if (!top_k_indices || !top_k_weights) {
         LOG_ERROR("cml_moe_forward: allocation failed");
-        free(gate_scores);
-        free(top_k_indices);
-        free(top_k_weights);
+        cml_free(gate_scores);
+        cml_free(top_k_indices);
+        cml_free(top_k_weights);
         return NULL;
     }
 
@@ -967,11 +968,11 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
         float* row = gate_scores + t * num_experts;
 
         /* Simple selection of top-k by repeated argmax */
-        bool* selected = (bool*)calloc((size_t)num_experts, sizeof(bool));
+        bool* selected = (bool*)cml_calloc((size_t)num_experts, sizeof(bool));
         if (!selected) {
-            free(gate_scores);
-            free(top_k_indices);
-            free(top_k_weights);
+            cml_free(gate_scores);
+            cml_free(top_k_indices);
+            cml_free(top_k_weights);
             return NULL;
         }
 
@@ -988,7 +989,7 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
             top_k_weights[t * top_k + ki] = best_val;
             if (best_idx >= 0) selected[best_idx] = true;
         }
-        free(selected);
+        cml_free(selected);
 
         /* Optionally re-normalize top-k weights to sum to 1 */
         if (moe->config.normalize_weights) {
@@ -1005,20 +1006,20 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
         }
     }
 
-    free(gate_scores);
+    cml_free(gate_scores);
 
     /* Step 4: Compute expert outputs and combine */
-    float* output = (float*)calloc((size_t)total_tokens * input_dim, sizeof(float));
-    float* expert_hidden = (float*)malloc((size_t)hidden_dim * sizeof(float));
-    float* expert_out = (float*)malloc((size_t)input_dim * sizeof(float));
+    float* output = (float*)cml_calloc((size_t)total_tokens * input_dim, sizeof(float));
+    float* expert_hidden = (float*)cml_malloc((size_t)hidden_dim * sizeof(float));
+    float* expert_out = (float*)cml_malloc((size_t)input_dim * sizeof(float));
 
     if (!output || !expert_hidden || !expert_out) {
         LOG_ERROR("cml_moe_forward: allocation failed");
-        free(output);
-        free(expert_hidden);
-        free(expert_out);
-        free(top_k_indices);
-        free(top_k_weights);
+        cml_free(output);
+        cml_free(expert_hidden);
+        cml_free(expert_out);
+        cml_free(top_k_indices);
+        cml_free(top_k_weights);
         return NULL;
     }
 
@@ -1062,17 +1063,17 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
         }
     }
 
-    free(expert_hidden);
-    free(expert_out);
-    free(top_k_indices);
-    free(top_k_weights);
+    cml_free(expert_hidden);
+    cml_free(expert_out);
+    cml_free(top_k_indices);
+    cml_free(top_k_weights);
 
     /* Create output tensor [batch, seq_len, input_dim] */
     int out_shape[] = {batch, seq_len, input_dim};
     TensorConfig out_cfg = {.dtype = input->dtype, .device = input->device,
                             .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
-    free(output);
+    cml_free(output);
 
     if (!result) {
         LOG_ERROR("cml_moe_forward: failed to create output tensor");
@@ -1109,7 +1110,7 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
         return NULL;
     }
 
-    float* routing = (float*)calloc((size_t)total_tokens * num_experts, sizeof(float));
+    float* routing = (float*)cml_calloc((size_t)total_tokens * num_experts, sizeof(float));
     if (!routing) {
         LOG_ERROR("cml_moe_get_routing: allocation failed");
         return NULL;
@@ -1133,7 +1134,7 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     TensorConfig out_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(routing, out_shape, 2, &out_cfg);
-    free(routing);
+    cml_free(routing);
     return result;
 }
 
@@ -1145,7 +1146,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
         return NULL;
     }
 
-    CMLTokenizer* tok = (CMLTokenizer*)calloc(1, sizeof(CMLTokenizer));
+    CMLTokenizer* tok = (CMLTokenizer*)cml_calloc(1, sizeof(CMLTokenizer));
     if (!tok) {
         LOG_ERROR("cml_tokenizer_create: allocation failed");
         return NULL;
@@ -1158,16 +1159,16 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
     tok->unk_token_id = -1;
 
     /* Copy vocab strings */
-    tok->vocab = (char**)calloc((size_t)vocab_size, sizeof(char*));
+    tok->vocab = (char**)cml_calloc((size_t)vocab_size, sizeof(char*));
     if (!tok->vocab) {
         LOG_ERROR("cml_tokenizer_create: failed to allocate vocab array");
-        free(tok);
+        cml_free(tok);
         return NULL;
     }
 
     for (int i = 0; i < vocab_size; i++) {
         if (vocab[i]) {
-            tok->vocab[i] = strdup(vocab[i]);
+            tok->vocab[i] = cml_strdup(vocab[i]);
             if (!tok->vocab[i]) {
                 LOG_ERROR("cml_tokenizer_create: strdup failed for token %d", i);
                 cml_tokenizer_free(tok);
@@ -1179,7 +1180,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
     /* Build hash table: size = 2 * vocab_size for low load factor */
     tok->hash_size = vocab_size * 2;
     if (tok->hash_size < 64) tok->hash_size = 64;
-    tok->token_to_id = (int*)malloc((size_t)tok->hash_size * sizeof(int));
+    tok->token_to_id = (int*)cml_malloc((size_t)tok->hash_size * sizeof(int));
     if (!tok->token_to_id) {
         LOG_ERROR("cml_tokenizer_create: failed to allocate hash table");
         cml_tokenizer_free(tok);
@@ -1200,7 +1201,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
     /* Copy merge rules */
     tok->num_merges = num_merges;
     if (num_merges > 0 && merge_pairs) {
-        tok->merges = (CMLBPEMerge*)calloc((size_t)num_merges, sizeof(CMLBPEMerge));
+        tok->merges = (CMLBPEMerge*)cml_calloc((size_t)num_merges, sizeof(CMLBPEMerge));
         if (!tok->merges) {
             LOG_ERROR("cml_tokenizer_create: failed to allocate merges");
             cml_tokenizer_free(tok);
@@ -1209,7 +1210,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
 
         for (int i = 0; i < num_merges; i++) {
             if (merge_pairs[i]) {
-                tok->merges[i].pair = strdup(merge_pairs[i]);
+                tok->merges[i].pair = cml_strdup(merge_pairs[i]);
                 if (!tok->merges[i].pair) {
                     LOG_ERROR("cml_tokenizer_create: strdup failed for merge %d", i);
                     cml_tokenizer_free(tok);
@@ -1232,20 +1233,20 @@ void cml_tokenizer_free(CMLTokenizer* tok) {
 
     if (tok->vocab) {
         for (int i = 0; i < tok->vocab_size; i++) {
-            free(tok->vocab[i]);
+            cml_free(tok->vocab[i]);
         }
-        free(tok->vocab);
+        cml_free(tok->vocab);
     }
 
     if (tok->merges) {
         for (int i = 0; i < tok->num_merges; i++) {
-            free(tok->merges[i].pair);
+            cml_free(tok->merges[i].pair);
         }
-        free(tok->merges);
+        cml_free(tok->merges);
     }
 
-    free(tok->token_to_id);
-    free(tok);
+    cml_free(tok->token_to_id);
+    cml_free(tok);
 }
 
 int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) {
@@ -1265,7 +1266,7 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
      * Each character becomes a separate token string. */
     int capacity = text_len + 16;
     int count = 0;
-    char** tokens = (char**)malloc((size_t)capacity * sizeof(char*));
+    char** tokens = (char**)cml_malloc((size_t)capacity * sizeof(char*));
     if (!tokens) {
         *num_tokens = 0;
         return NULL;
@@ -1273,10 +1274,10 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
 
     for (int i = 0; i < text_len; i++) {
         char buf[2] = {text[i], '\0'};
-        tokens[count] = strdup(buf);
+        tokens[count] = cml_strdup(buf);
         if (!tokens[count]) {
-            for (int j = 0; j < count; j++) free(tokens[j]);
-            free(tokens);
+            for (int j = 0; j < count; j++) cml_free(tokens[j]);
+            cml_free(tokens);
             *num_tokens = 0;
             return NULL;
         }
@@ -1302,7 +1303,7 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
                 if (len_a + len_b != merge_len) continue;
 
                 /* Build concatenated string to compare */
-                char* concat = (char*)malloc(merge_len + 1);
+                char* concat = (char*)cml_malloc(merge_len + 1);
                 if (!concat) continue;
                 memcpy(concat, tokens[i], len_a);
                 memcpy(concat + len_a, tokens[i + 1], len_b);
@@ -1310,9 +1311,9 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
 
                 if (strcmp(concat, merge_str) == 0) {
                     /* Merge: replace tokens[i] with the merged string, remove tokens[i+1] */
-                    free(tokens[i]);
+                    cml_free(tokens[i]);
                     tokens[i] = concat;
-                    free(tokens[i + 1]);
+                    cml_free(tokens[i + 1]);
                     /* Shift remaining tokens left */
                     for (int j = i + 1; j < count - 1; j++) {
                         tokens[j] = tokens[j + 1];
@@ -1321,17 +1322,17 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
                     found = true;
                     break; /* restart scan for this merge rule */
                 } else {
-                    free(concat);
+                    cml_free(concat);
                 }
             }
         }
     }
 
     /* Step 3: Convert token strings to IDs */
-    int* ids = (int*)malloc((size_t)count * sizeof(int));
+    int* ids = (int*)cml_malloc((size_t)count * sizeof(int));
     if (!ids) {
-        for (int i = 0; i < count; i++) free(tokens[i]);
-        free(tokens);
+        for (int i = 0; i < count; i++) cml_free(tokens[i]);
+        cml_free(tokens);
         *num_tokens = 0;
         return NULL;
     }
@@ -1344,9 +1345,9 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
             /* Unknown token */
             ids[i] = tok->unk_token_id >= 0 ? tok->unk_token_id : 0;
         }
-        free(tokens[i]);
+        cml_free(tokens[i]);
     }
-    free(tokens);
+    cml_free(tokens);
 
     *num_tokens = count;
     return ids;
@@ -1367,7 +1368,7 @@ char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens)
         }
     }
 
-    char* result = (char*)malloc(total_len + 1);
+    char* result = (char*)cml_malloc(total_len + 1);
     if (!result) {
         LOG_ERROR("cml_tokenizer_decode: allocation failed");
         return NULL;

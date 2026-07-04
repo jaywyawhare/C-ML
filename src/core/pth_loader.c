@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 #define ZIP_LOCAL_HEADER_SIG 0x04034b50
 #define ZIP_CENTRAL_DIR_SIG  0x02014b50
@@ -50,12 +51,12 @@ typedef struct {
 } PickleScanResult;
 
 static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
-    PickleScanResult* result = (PickleScanResult*)calloc(1, sizeof(PickleScanResult));
+    PickleScanResult* result = (PickleScanResult*)cml_calloc(1, sizeof(PickleScanResult));
     if (!result) return NULL;
 
     result->key_capacity = 64;
-    result->keys = (char**)calloc((size_t)result->key_capacity, sizeof(char*));
-    if (!result->keys) { free(result); return NULL; }
+    result->keys = (char**)cml_calloc((size_t)result->key_capacity, sizeof(char*));
+    if (!result->keys) { cml_free(result); return NULL; }
 
     size_t pos = 0;
     while (pos < size) {
@@ -66,7 +67,7 @@ static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
             uint8_t len = data[pos++];
             if (pos + len <= size && len > 0) {
                 /* Check if this looks like a parameter key (contains '.weight' or '.bias') */
-                char* str = (char*)malloc(len + 1);
+                char* str = (char*)cml_malloc(len + 1);
                 if (str) {
                     memcpy(str, &data[pos], len);
                     str[len] = '\0';
@@ -78,16 +79,16 @@ static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
                         strstr(str, "embedding")) {
                         if (result->num_keys >= result->key_capacity) {
                             result->key_capacity *= 2;
-                            char** new_keys = (char**)realloc(result->keys,
+                            char** new_keys = (char**)cml_realloc(result->keys,
                                 (size_t)result->key_capacity * sizeof(char*));
                             if (new_keys) result->keys = new_keys;
                         }
                         if (result->num_keys < result->key_capacity)
                             result->keys[result->num_keys++] = str;
                         else
-                            free(str);
+                            cml_free(str);
                     } else {
-                        free(str);
+                        cml_free(str);
                     }
                 }
                 pos += len;
@@ -98,7 +99,7 @@ static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
             uint32_t len = read_u32_le(&data[pos]);
             pos += 4;
             if (pos + len <= size && len > 0 && len < 1024) {
-                char* str = (char*)malloc(len + 1);
+                char* str = (char*)cml_malloc(len + 1);
                 if (str) {
                     memcpy(str, &data[pos], len);
                     str[len] = '\0';
@@ -106,9 +107,9 @@ static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
                         if (result->num_keys < result->key_capacity)
                             result->keys[result->num_keys++] = str;
                         else
-                            free(str);
+                            cml_free(str);
                     } else {
-                        free(str);
+                        cml_free(str);
                     }
                 }
                 pos += len;
@@ -122,11 +123,11 @@ static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
 static void free_pickle_result(PickleScanResult* result) {
     if (!result) return;
     for (int i = 0; i < result->num_keys; i++)
-        free(result->keys[i]);
-    free(result->keys);
-    free(result->storage_dtypes);
-    free(result->storage_sizes);
-    free(result);
+        cml_free(result->keys[i]);
+    cml_free(result->keys);
+    cml_free(result->storage_dtypes);
+    cml_free(result->storage_sizes);
+    cml_free(result);
 }
 
 CMLPthStateDict* cml_pth_load(const char* path) {
@@ -144,19 +145,19 @@ CMLPthStateDict* cml_pth_load(const char* path) {
         return NULL;
     }
 
-    uint8_t* file_data = (uint8_t*)malloc((size_t)file_size);
+    uint8_t* file_data = (uint8_t*)cml_malloc((size_t)file_size);
     if (!file_data) { fclose(f); return NULL; }
 
     size_t read_size = fread(file_data, 1, (size_t)file_size, f);
     fclose(f);
-    if (read_size != (size_t)file_size) { free(file_data); return NULL; }
+    if (read_size != (size_t)file_size) { cml_free(file_data); return NULL; }
 
-    CMLPthStateDict* sd = (CMLPthStateDict*)calloc(1, sizeof(CMLPthStateDict));
-    if (!sd) { free(file_data); return NULL; }
+    CMLPthStateDict* sd = (CMLPthStateDict*)cml_calloc(1, sizeof(CMLPthStateDict));
+    if (!sd) { cml_free(file_data); return NULL; }
 
     sd->entry_capacity = 64;
-    sd->entries = (CMLPthEntry*)calloc((size_t)sd->entry_capacity, sizeof(CMLPthEntry));
-    if (!sd->entries) { free(sd); free(file_data); return NULL; }
+    sd->entries = (CMLPthEntry*)cml_calloc((size_t)sd->entry_capacity, sizeof(CMLPthEntry));
+    if (!sd->entries) { cml_free(sd); cml_free(file_data); return NULL; }
 
     PickleScanResult* pickle_keys = NULL;
     int data_file_count = 0;
@@ -212,7 +213,7 @@ CMLPthStateDict* cml_pth_load(const char* path) {
 
             if (sd->num_entries >= sd->entry_capacity) {
                 sd->entry_capacity *= 2;
-                CMLPthEntry* new_entries = (CMLPthEntry*)realloc(
+                CMLPthEntry* new_entries = (CMLPthEntry*)cml_realloc(
                     sd->entries, (size_t)sd->entry_capacity * sizeof(CMLPthEntry));
                 if (!new_entries) break;
                 sd->entries = new_entries;
@@ -239,7 +240,7 @@ CMLPthStateDict* cml_pth_load(const char* path) {
         free_pickle_result(pickle_keys);
     }
 
-    free(file_data);
+    cml_free(file_data);
     return sd;
 }
 
@@ -249,9 +250,9 @@ void cml_pth_free(CMLPthStateDict* sd) {
         if (sd->entries[i].tensor)
             tensor_free(sd->entries[i].tensor);
     }
-    free(sd->entries);
-    free(sd->model_name);
-    free(sd);
+    cml_free(sd->entries);
+    cml_free(sd->model_name);
+    cml_free(sd);
 }
 
 Tensor* cml_pth_get_tensor(const CMLPthStateDict* sd, const char* key) {
@@ -279,7 +280,7 @@ bool cml_pth_has_key(const CMLPthStateDict* sd, const char* key) {
 const char** cml_pth_list_keys(const CMLPthStateDict* sd, int* count) {
     if (!sd || !count) return NULL;
     *count = sd->num_entries;
-    const char** keys = (const char**)malloc((size_t)sd->num_entries * sizeof(char*));
+    const char** keys = (const char**)cml_malloc((size_t)sd->num_entries * sizeof(char*));
     if (!keys) return NULL;
     for (int i = 0; i < sd->num_entries; i++)
         keys[i] = sd->entries[i].key;

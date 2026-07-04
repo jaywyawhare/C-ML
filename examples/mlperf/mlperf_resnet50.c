@@ -8,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct {
     const char* data_dir;
@@ -65,7 +66,7 @@ static void random_crop_flip(float* img, int h, int w, int c) {
     int off_y = rand() % (h - crop_h + 1);
     int off_x = rand() % (w - crop_w + 1);
 
-    float* tmp = malloc(sizeof(float) * crop_h * crop_w * c);
+    float* tmp = cml_malloc(sizeof(float) * crop_h * crop_w * c);
     if (!tmp) return;
 
     for (int y = 0; y < crop_h; y++)
@@ -88,7 +89,7 @@ static void random_crop_flip(float* img, int h, int w, int c) {
     }
 
     memcpy(img, tmp, sizeof(float) * crop_h * crop_w * c);
-    free(tmp);
+    cml_free(tmp);
 }
 
 static int compute_topk(Tensor* logits, int* labels, int batch_size, int num_classes, int k) {
@@ -161,13 +162,13 @@ int main(int argc, char** argv) {
 
     int input_shape[] = { cfg.batch_size, img_c, img_h, img_w };
 
-    float* batch_data = malloc(sizeof(float) * cfg.batch_size * img_c * img_h * img_w);
-    int* batch_labels = malloc(sizeof(int) * cfg.batch_size);
+    float* batch_data = cml_malloc(sizeof(float) * cfg.batch_size * img_c * img_h * img_w);
+    int* batch_labels = cml_malloc(sizeof(int) * cfg.batch_size);
 
     if (!batch_data || !batch_labels) {
         fprintf(stderr, "Failed to allocate batch buffers\n");
-        free(batch_data);
-        free(batch_labels);
+        cml_free(batch_data);
+        cml_free(batch_labels);
         optimizer_free(opt);
         module_free(model);
         return 1;
@@ -202,7 +203,7 @@ int main(int argc, char** argv) {
                 continue;
             }
 
-            float* label_floats = malloc(sizeof(float) * cfg.batch_size * num_classes);
+            float* label_floats = cml_malloc(sizeof(float) * cfg.batch_size * num_classes);
             if (!label_floats) continue;
             memset(label_floats, 0, sizeof(float) * cfg.batch_size * num_classes);
             for (int b = 0; b < cfg.batch_size; b++)
@@ -226,7 +227,7 @@ int main(int argc, char** argv) {
                        epoch + 1, step, steps_per_epoch, loss_val, throughput);
             }
 
-            free(label_floats);
+            cml_free(label_floats);
             cml_reset_ir_context();
         }
 
@@ -284,8 +285,8 @@ int main(int argc, char** argv) {
     mlperf_log_metric("total_training_time", total_time);
     mlperf_log_end("resnet50", converged ? "success" : "aborted");
 
-    free(batch_data);
-    free(batch_labels);
+    cml_free(batch_data);
+    cml_free(batch_labels);
     optimizer_free(opt);
     module_free(model);
 

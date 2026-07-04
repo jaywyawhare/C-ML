@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define MAX_ERROR_STACK_SIZE 256
 #define MAX_ERROR_MESSAGE_LEN 512
@@ -23,7 +24,7 @@ void error_stack_init(void) {
     }
 
     g_error_stack_capacity = MAX_ERROR_STACK_SIZE;
-    g_error_stack          = (ErrorEntry*)malloc(sizeof(ErrorEntry) * g_error_stack_capacity);
+    g_error_stack          = (ErrorEntry*)cml_malloc(sizeof(ErrorEntry) * g_error_stack_capacity);
     if (!g_error_stack) {
         fprintf(stderr, "FATAL: Failed to initialize error stack\n");
         return;
@@ -41,7 +42,7 @@ void error_stack_cleanup(void) {
     }
 
     if (g_error_stack) {
-        free(g_error_stack);
+        cml_free(g_error_stack);
         g_error_stack = NULL;
     }
 

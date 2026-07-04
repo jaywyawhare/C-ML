@@ -7,6 +7,7 @@
 #include "tensor/tensor.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -215,12 +216,12 @@ static int test_keccak_large_tensor(void) {
     cml_ir_set_global_context(ir);
 
     int n = 1024;
-    float* data = malloc(n * sizeof(float));
+    float* data = cml_malloc(n * sizeof(float));
     for (int i = 0; i < n; i++) data[i] = (float)i;
     int shape[] = {n};
 
     Tensor* t = tensor_from_data(data, shape, 1, NULL);
-    free(data);
+    cml_free(data);
     if (!t) { cml_ir_free(ir); return 0; }
 
     uint8_t hash[32];

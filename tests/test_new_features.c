@@ -12,6 +12,7 @@
 #include "core/gguf.h"
 #include "core/safetensors.h"
 #include "core/serialization.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_total  = 0;
@@ -246,15 +247,20 @@ static int test_muon_optimizer(void) {
     weight->requires_grad = true;
     weight->grad = tensor_ones(shape, 2, &cpu_f32);
 
-    Parameter* param = (Parameter*)malloc(sizeof(Parameter));
+    Parameter* param = (Parameter*)cml_malloc(sizeof(Parameter));
     if (!param) { tensor_free(weight); return 0; }
     param->tensor = weight;
-    param->name = strdup("test_weight");
+    param->name = cml_strdup("test_weight");
     param->requires_grad = true;
 
     Parameter* params[] = {param};
     Optimizer* opt = optim_muon(params, 1, 0.02f, 0.95f, 0.0f, true);
-    if (!opt) { free(param); tensor_free(weight); return 0; }
+    if (!opt) {
+        cml_free(param->name);
+        cml_free(param);
+        tensor_free(weight);
+        return 0;
+    }
 
     // Step should not crash
     optimizer_step(opt);
@@ -273,8 +279,8 @@ static int test_muon_optimizer(void) {
         tensor_free(g);
     }
     tensor_free(weight);
-    free(param->name);
-    free(param);
+    cml_free(param->name);
+    cml_free(param);
     return changed;
 }
 
@@ -464,15 +470,15 @@ static int test_nadam_optimizer(void) {
     weight->requires_grad = true;
     weight->grad = tensor_ones(shape, 2, &cpu_f32);
 
-    Parameter* param = (Parameter*)malloc(sizeof(Parameter));
+    Parameter* param = (Parameter*)cml_malloc(sizeof(Parameter));
     if (!param) { tensor_free(weight); return 0; }
     param->tensor = weight;
-    param->name = strdup("w");
+    param->name = cml_strdup("w");
     param->requires_grad = true;
 
     Parameter* params[] = {param};
     Optimizer* opt = optim_nadam(params, 1, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
-    if (!opt) { free(param->name); free(param); tensor_free(weight); return 0; }
+    if (!opt) { cml_free(param->name); cml_free(param); tensor_free(weight); return 0; }
 
     optimizer_step(opt);
     tensor_ensure_executed(weight);
@@ -482,8 +488,8 @@ static int test_nadam_optimizer(void) {
     optimizer_free(opt);
     if (weight->grad) { Tensor* g = weight->grad; weight->grad = NULL; tensor_free(g); }
     tensor_free(weight);
-    free(param->name);
-    free(param);
+    cml_free(param->name);
+    cml_free(param);
     return changed;
 }
 
@@ -493,15 +499,15 @@ static int test_adamax_optimizer(void) {
     weight->requires_grad = true;
     weight->grad = tensor_ones(shape, 2, &cpu_f32);
 
-    Parameter* param = (Parameter*)malloc(sizeof(Parameter));
+    Parameter* param = (Parameter*)cml_malloc(sizeof(Parameter));
     if (!param) { tensor_free(weight); return 0; }
     param->tensor = weight;
-    param->name = strdup("w");
+    param->name = cml_strdup("w");
     param->requires_grad = true;
 
     Parameter* params[] = {param};
     Optimizer* opt = optim_adamax(params, 1, 0.002f, 0.0f, 0.9f, 0.999f, 1e-8f);
-    if (!opt) { free(param->name); free(param); tensor_free(weight); return 0; }
+    if (!opt) { cml_free(param->name); cml_free(param); tensor_free(weight); return 0; }
 
     optimizer_step(opt);
     tensor_ensure_executed(weight);
@@ -511,8 +517,8 @@ static int test_adamax_optimizer(void) {
     optimizer_free(opt);
     if (weight->grad) { Tensor* g = weight->grad; weight->grad = NULL; tensor_free(g); }
     tensor_free(weight);
-    free(param->name);
-    free(param);
+    cml_free(param->name);
+    cml_free(param);
     return changed;
 }
 

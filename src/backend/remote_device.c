@@ -16,6 +16,7 @@
 
 #ifdef __linux__
 #include <dlfcn.h>
+#include "alloc/cml_allocator.h"
 #define CML_HAS_DLFCN 1
 #endif
 
@@ -107,7 +108,7 @@ static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payl
 CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     if (!host || port <= 0) return NULL;
 
-    CMLRemoteDevice* dev = (CMLRemoteDevice*)calloc(1, sizeof(CMLRemoteDevice));
+    CMLRemoteDevice* dev = (CMLRemoteDevice*)cml_calloc(1, sizeof(CMLRemoteDevice));
     if (!dev) return NULL;
 
     strncpy(dev->host, host, sizeof(dev->host) - 1);
@@ -122,7 +123,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
 
     if (getaddrinfo(host, port_str, &hints, &res) != 0 || !res) {
         LOG_ERROR("remote_connect: cannot resolve %s:%d", host, port);
-        free(dev);
+        cml_free(dev);
         return NULL;
     }
 
@@ -130,7 +131,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     if (dev->sock_fd < 0) {
         LOG_ERROR("remote_connect: socket() failed: %s", strerror(errno));
         freeaddrinfo(res);
-        free(dev);
+        cml_free(dev);
         return NULL;
     }
 
@@ -141,7 +142,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
         LOG_ERROR("remote_connect: connect to %s:%d failed: %s", host, port, strerror(errno));
         close(dev->sock_fd);
         freeaddrinfo(res);
-        free(dev);
+        cml_free(dev);
         return NULL;
     }
     freeaddrinfo(res);
@@ -149,7 +150,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     if (send_msg(dev->sock_fd, CML_REMOTE_OP_PING, NULL, 0) != 0) {
         LOG_ERROR("remote_connect: ping send failed");
         close(dev->sock_fd);
-        free(dev);
+        cml_free(dev);
         return NULL;
     }
 
@@ -159,7 +160,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     if (recv_resp(dev->sock_fd, &status, &sid, &psize) != 0 || status != CML_REMOTE_STATUS_OK) {
         LOG_ERROR("remote_connect: ping response failed");
         close(dev->sock_fd);
-        free(dev);
+        cml_free(dev);
         return NULL;
     }
 
@@ -177,7 +178,7 @@ void cml_remote_disconnect(CMLRemoteDevice* dev) {
         dev->sock_fd = -1;
     }
     dev->connected = false;
-    free(dev);
+    cml_free(dev);
 }
 
 bool cml_remote_is_connected(CMLRemoteDevice* dev) {
@@ -216,7 +217,7 @@ int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, s
 
     size_t hdr_size = sizeof(handle) + sizeof(uint64_t);
     size_t total = hdr_size + n;
-    uint8_t* payload = (uint8_t*)malloc(total);
+    uint8_t* payload = (uint8_t*)cml_malloc(total);
     if (!payload) return -1;
 
     memcpy(payload, &handle, sizeof(handle));
@@ -225,7 +226,7 @@ int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, s
     memcpy(payload + hdr_size, data, n);
 
     int ret = send_msg(dev->sock_fd, CML_REMOTE_OP_UPLOAD, payload, (uint32_t)total);
-    free(payload);
+    cml_free(payload);
     if (ret != 0) return -1;
 
     uint32_t status, psize = 0;
@@ -279,7 +280,7 @@ int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source,
 
     /* payload: [src_len(4)][source][num_buf(4)][handles...][grid(12)][block(12)] */
     size_t total = sizeof(uint32_t) + src_len + sizeof(uint32_t) + handles_size + 24;
-    uint8_t* payload = (uint8_t*)malloc(total);
+    uint8_t* payload = (uint8_t*)cml_malloc(total);
     if (!payload) return -1;
 
     size_t off = 0;
@@ -293,7 +294,7 @@ int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source,
     memcpy(payload + off, block, 12);
 
     int ret = send_msg(dev->sock_fd, CML_REMOTE_OP_EXECUTE, payload, (uint32_t)total);
-    free(payload);
+    cml_free(payload);
     if (ret != 0) return -1;
 
     uint32_t status, psize = 0;
@@ -321,7 +322,7 @@ static uint64_t server_alloc(size_t size) {
     DeviceType best = device_get_best_available();
     void* ptr = device_alloc(size, best);
     if (!ptr) {
-        ptr = malloc(size);
+        ptr = cml_malloc(size);
         if (!ptr) return 0;
     }
 
@@ -343,7 +344,7 @@ static AllocEntry* server_find(uint64_t handle) {
 static void server_free_handle(uint64_t handle) {
     for (int i = 0; i < g_num_allocs; i++) {
         if (g_allocs[i].handle == handle) {
-            free(g_allocs[i].ptr);
+            cml_free(g_allocs[i].ptr);
             g_allocs[i] = g_allocs[g_num_allocs - 1];
             g_num_allocs--;
             return;
@@ -353,7 +354,7 @@ static void server_free_handle(uint64_t handle) {
 
 static void server_free_all(void) {
     for (int i = 0; i < g_num_allocs; i++) {
-        free(g_allocs[i].ptr);
+        cml_free(g_allocs[i].ptr);
     }
     g_num_allocs = 0;
 }
@@ -370,10 +371,10 @@ static void handle_client(int client_fd) {
 
         uint8_t* payload = NULL;
         if (psize > 0) {
-            payload = (uint8_t*)malloc(psize);
+            payload = (uint8_t*)cml_malloc(psize);
             if (!payload) break;
             if (recv_all(client_fd, payload, psize) != 0) {
-                free(payload);
+                cml_free(payload);
                 break;
             }
         }
@@ -482,7 +483,7 @@ static void handle_client(int client_fd) {
             /* Resolve handles to buffer pointers */
             float** bufs = NULL;
             if (num_buf2 > 0) {
-                bufs = (float**)malloc((size_t)num_buf2 * sizeof(float*));
+                bufs = (float**)cml_malloc((size_t)num_buf2 * sizeof(float*));
                 if (!bufs) {
                     LOG_ERROR("remote_server: OOM resolving buffer handles");
                     send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
@@ -500,7 +501,7 @@ static void handle_client(int client_fd) {
                     bufs[bi] = (float*)ae->ptr;
                 }
                 if (!lookup_ok) {
-                    free(bufs);
+                    cml_free(bufs);
                     send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                     break;
                 }
@@ -514,7 +515,7 @@ static void handle_client(int client_fd) {
             int src_fd2 = mkstemps(src_path, 2); /* suffix len = 2 for ".c" */
             if (src_fd2 < 0) {
                 LOG_ERROR("remote_server: mkstemps failed: %s", strerror(errno));
-                free(bufs);
+                cml_free(bufs);
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
@@ -550,7 +551,7 @@ static void handle_client(int client_fd) {
             if (compile_ret != 0) {
                 LOG_ERROR("remote_server: kernel compilation failed (exit %d)", compile_ret);
                 unlink(so_path2);
-                free(bufs);
+                cml_free(bufs);
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
@@ -560,7 +561,7 @@ static void handle_client(int client_fd) {
             if (!dl) {
                 LOG_ERROR("remote_server: dlopen failed: %s", dlerror());
                 unlink(so_path2);
-                free(bufs);
+                cml_free(bufs);
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
@@ -571,7 +572,7 @@ static void handle_client(int client_fd) {
                 LOG_ERROR("remote_server: dlsym(cml_kernel) failed: %s", dlerror());
                 dlclose(dl);
                 unlink(so_path2);
-                free(bufs);
+                cml_free(bufs);
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
@@ -580,7 +581,7 @@ static void handle_client(int client_fd) {
 
             dlclose(dl);
             unlink(so_path2);
-            free(bufs);
+            cml_free(bufs);
 
             LOG_INFO("remote_server: kernel executed successfully (%u bufs)", num_buf2);
             send_resp(client_fd, CML_REMOTE_STATUS_OK, NULL, 0);
@@ -596,7 +597,7 @@ static void handle_client(int client_fd) {
             break;
         }
 
-        free(payload);
+        cml_free(payload);
     }
 }
 
@@ -605,14 +606,14 @@ static void handle_client(int client_fd) {
 CMLRemoteServer* cml_remote_server_create(int port) {
     if (port <= 0) return NULL;
 
-    CMLRemoteServer* srv = (CMLRemoteServer*)calloc(1, sizeof(CMLRemoteServer));
+    CMLRemoteServer* srv = (CMLRemoteServer*)cml_calloc(1, sizeof(CMLRemoteServer));
     if (!srv) return NULL;
 
     srv->port = port;
     srv->listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (srv->listen_fd < 0) {
         LOG_ERROR("remote_server: socket() failed: %s", strerror(errno));
-        free(srv);
+        cml_free(srv);
         return NULL;
     }
 
@@ -627,14 +628,14 @@ CMLRemoteServer* cml_remote_server_create(int port) {
     if (bind(srv->listen_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         LOG_ERROR("remote_server: bind() port %d failed: %s", port, strerror(errno));
         close(srv->listen_fd);
-        free(srv);
+        cml_free(srv);
         return NULL;
     }
 
     if (listen(srv->listen_fd, 8) != 0) {
         LOG_ERROR("remote_server: listen() failed: %s", strerror(errno));
         close(srv->listen_fd);
-        free(srv);
+        cml_free(srv);
         return NULL;
     }
 
@@ -691,5 +692,5 @@ void cml_remote_server_free(CMLRemoteServer* srv) {
         close(srv->listen_fd);
     }
     server_free_all();
-    free(srv);
+    cml_free(srv);
 }

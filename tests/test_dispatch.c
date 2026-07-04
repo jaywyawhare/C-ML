@@ -10,6 +10,7 @@
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -286,7 +287,7 @@ static int test_env_backend_selection(void) {
     char* original = getenv("CML_BACKEND");
     char* saved = NULL;
     if (original) {
-        saved = strdup(original);
+        saved = cml_strdup(original);
     }
 
     // Test setting via env
@@ -296,7 +297,7 @@ static int test_env_backend_selection(void) {
     // Restore original env
     if (saved) {
         setenv("CML_BACKEND", saved, 1);
-        free(saved);
+        cml_free(saved);
     } else {
         unsetenv("CML_BACKEND");
     }

@@ -13,6 +13,7 @@
 #include "autograd/forward_ops.h"
 #include "backend/blas.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"
 
 typedef struct {
     struct timespec start;
@@ -80,7 +81,7 @@ static void bench_matmul(int size, int iterations) {
     {
         CMLBlasContext* blas = cml_blas_init();
         if (blas) {
-            float* C = (float*)calloc(size * size, sizeof(float));
+            float* C = (float*)cml_calloc(size * size, sizeof(float));
 
             double total_time = 0;
             for (int i = 0; i < iterations; i++) {
@@ -93,7 +94,7 @@ static void bench_matmul(int size, int iterations) {
             printf("  BLAS (%s): %8.2f ms avg (%.2f ms total)\n",
                    cml_blas_get_library_name(blas), total_time / iterations, total_time);
 
-            free(C);
+            cml_free(C);
             cml_blas_free(blas);
         } else {
             printf("  BLAS:            Not available\n");

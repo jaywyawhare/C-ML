@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "alloc/cml_allocator.h"
 
 CMLValidateOpts cml_validate_default_opts(void) {
     CMLValidateOpts o;
@@ -33,7 +34,7 @@ static void push_diag(CMLValidateDiag* diags, int max_diags, int* count,
 static struct IRNode** collect_nodes(CMLGraph_t ir, int* out_count) {
     *out_count = 0;
     if (!ir || ir->node_count == 0) return NULL;
-    struct IRNode** arr = malloc((size_t)ir->node_count * sizeof(struct IRNode*));
+    struct IRNode** arr = cml_malloc((size_t)ir->node_count * sizeof(struct IRNode*));
     if (!arr) return NULL;
     int n = 0;
     struct IRNode* cur = ir->head;
@@ -127,7 +128,7 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
 
     if (num_nodes == 0) {
         RECORD(CML_VALID_EMPTY_GRAPH, -1, "IR graph is empty");
-        free(nodes);
+        cml_free(nodes);
         goto done;
     }
 
@@ -136,7 +137,7 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
             RECORD(CML_VALID_NULL_NODE, i, "Node slot %d is NULL", i);
         }
     }
-    if (first != CML_VALID_OK) { free(nodes); goto done; }
+    if (first != CML_VALID_OK) { cml_free(nodes); goto done; }
 
     for (int i = 0; i < num_nodes; ++i) {
         struct IRNode* n = nodes[i];
@@ -158,13 +159,13 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
     }
 
     if (opts->check_cycles) {
-        uint8_t* color = calloc((size_t)num_nodes, 1);
+        uint8_t* color = cml_calloc((size_t)num_nodes, 1);
         if (color) {
             for (int i = 0; i < num_nodes; ++i)
                 if (color[i] == 0)
                     dfs_has_cycle(nodes, num_nodes, color, i,
                                   diags, max_diag_count, &ndiags);
-            free(color);
+            cml_free(color);
         }
     }
 
@@ -194,7 +195,7 @@ CMLValidateCode cml_validate_graph(CMLGraph_t ir,
         }
     }
 
-    free(nodes);
+    cml_free(nodes);
 
 done:
     if (num_diags_out) *num_diags_out = ndiags;

@@ -4,6 +4,7 @@
 #include "tensor/tensor_views.h"
 #include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"
 
 static bool can_reshape_as_view(Tensor* t, int* new_shape, int new_ndim) {
     if (!t->is_contiguous)
@@ -36,7 +37,7 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
     }
 
     if (can_reshape_as_view(t, new_shape, new_ndim)) {
-        Tensor* view = calloc(1, sizeof(Tensor));
+        Tensor* view = cml_calloc(1, sizeof(Tensor));
         if (!view) {
             LOG_ERROR("Failed to allocate memory for tensor view");
             return NULL;
@@ -44,14 +45,14 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
 
         view->shape = tensor_shape_copy(new_shape, new_ndim);
         if (!view->shape) {
-            free(view);
+            cml_free(view);
             return NULL;
         }
 
         view->strides = compute_contiguous_strides(new_shape, new_ndim);
         if (!view->strides) {
-            free(view->shape);
-            free(view);
+            cml_free(view->shape);
+            cml_free(view);
             return NULL;
         }
 
@@ -96,7 +97,7 @@ Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size
         return NULL;
     }
 
-    Tensor* view = calloc(1, sizeof(Tensor));
+    Tensor* view = cml_calloc(1, sizeof(Tensor));
     if (!view) {
         LOG_ERROR("Failed to allocate memory for strided view");
         return NULL;
@@ -104,14 +105,14 @@ Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size
 
     view->shape = tensor_shape_copy(shape, ndim);
     if (!view->shape) {
-        free(view);
+        cml_free(view);
         return NULL;
     }
 
-    view->strides = malloc((size_t)ndim * sizeof(size_t));
+    view->strides = cml_malloc((size_t)ndim * sizeof(size_t));
     if (!view->strides) {
-        free(view->shape);
-        free(view);
+        cml_free(view->shape);
+        cml_free(view);
         return NULL;
     }
     memcpy(view->strides, strides, (size_t)ndim * sizeof(size_t));

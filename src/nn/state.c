@@ -4,14 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #define SD_INIT_CAP 32
 
 StateDict* nn_state_dict_create(void) {
-    StateDict* sd = calloc(1, sizeof(StateDict));
+    StateDict* sd = cml_calloc(1, sizeof(StateDict));
     if (!sd) return NULL;
-    sd->entries  = malloc(SD_INIT_CAP * sizeof(StateDictEntry));
-    if (!sd->entries) { free(sd); return NULL; }
+    sd->entries  = cml_malloc(SD_INIT_CAP * sizeof(StateDictEntry));
+    if (!sd->entries) { cml_free(sd); return NULL; }
     sd->capacity = SD_INIT_CAP;
     sd->count    = 0;
     return sd;
@@ -20,10 +21,10 @@ StateDict* nn_state_dict_create(void) {
 void nn_state_dict_free(StateDict* sd) {
     if (!sd) return;
     for (int i = 0; i < sd->count; ++i)
-        free(sd->entries[i].key);
+        cml_free(sd->entries[i].key);
     
-    free(sd->entries);
-    free(sd);
+    cml_free(sd->entries);
+    cml_free(sd);
 }
 
 int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value) {
@@ -36,13 +37,13 @@ int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value) {
     }
     if (sd->count >= sd->capacity) {
         int new_cap = sd->capacity * 2;
-        StateDictEntry* tmp = realloc(sd->entries,
+        StateDictEntry* tmp = cml_realloc(sd->entries,
                                        (size_t)new_cap * sizeof(StateDictEntry));
         if (!tmp) return -1;
         sd->entries  = tmp;
         sd->capacity = new_cap;
     }
-    sd->entries[sd->count].key   = strdup(key);
+    sd->entries[sd->count].key   = cml_strdup(key);
     sd->entries[sd->count].value = value;
     if (!sd->entries[sd->count].key) return -1;
     ++sd->count;
@@ -61,7 +62,7 @@ int nn_state_dict_remove(StateDict* sd, const char* key) {
     if (!sd || !key) return 0;
     for (int i = 0; i < sd->count; ++i) {
         if (strcmp(sd->entries[i].key, key) == 0) {
-            free(sd->entries[i].key);
+            cml_free(sd->entries[i].key);
             sd->entries[i] = sd->entries[sd->count - 1];
             --sd->count;
             return 1;

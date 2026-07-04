@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     if (!g) return false;
@@ -15,15 +16,15 @@ static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
 }
 
 LinearProgram* linear_program_create(void) {
-    LinearProgram* prog = calloc(1, sizeof(LinearProgram));
+    LinearProgram* prog = cml_calloc(1, sizeof(LinearProgram));
     if (!prog) return NULL;
     prog->capacity = 32;
-    prog->ops = calloc((size_t)prog->capacity, sizeof(LinearOp));
-    if (!prog->ops) { free(prog); return NULL; }
+    prog->ops = cml_calloc((size_t)prog->capacity, sizeof(LinearOp));
+    if (!prog->ops) { cml_free(prog); return NULL; }
     prog->next_vreg = 0;
     prog->axes_capacity = 8;
-    prog->loop_axes = calloc((size_t)prog->axes_capacity, sizeof(int));
-    if (!prog->loop_axes) { free(prog->ops); free(prog); return NULL; }
+    prog->loop_axes = cml_calloc((size_t)prog->axes_capacity, sizeof(int));
+    if (!prog->loop_axes) { cml_free(prog->ops); cml_free(prog); return NULL; }
     prog->group_dims[0] = 1;
     prog->group_dims[1] = 1;
     prog->group_dims[2] = 1;
@@ -32,16 +33,16 @@ LinearProgram* linear_program_create(void) {
 
 void linear_program_free(LinearProgram* prog) {
     if (!prog) return;
-    free(prog->loop_axes);
-    free(prog->ops);
-    free(prog);
+    cml_free(prog->loop_axes);
+    cml_free(prog->ops);
+    cml_free(prog);
 }
 
 int linear_program_emit(LinearProgram* prog, LinearOp op) {
     if (!prog) return -1;
     if (prog->num_ops >= prog->capacity) {
         int nc = prog->capacity * 2;
-        LinearOp* tmp = realloc(prog->ops, (size_t)nc * sizeof(LinearOp));
+        LinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(LinearOp));
         if (!tmp) return -1;
         prog->ops = tmp;
         prog->capacity = nc;
@@ -65,7 +66,7 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
     LinearProgram* prog = linear_program_create();
     if (!prog) return NULL;
 
-    int* node_vreg = calloc((size_t)g->num_nodes, sizeof(int));
+    int* node_vreg = cml_calloc((size_t)g->num_nodes, sizeof(int));
     if (!node_vreg) { linear_program_free(prog); return NULL; }
     for (int i = 0; i < g->num_nodes; i++) node_vreg[i] = -1;
 
@@ -144,7 +145,7 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
         }
     }
 
-    free(node_vreg);
+    cml_free(node_vreg);
     return prog;
 }
 

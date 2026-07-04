@@ -28,6 +28,7 @@
 
 #ifdef CML_AM_MOCK_GPU
 #include "ops/ir/gpu/am_mock.h"
+#include "alloc/cml_allocator.h"
 #define open(...)    cml_am_mock_open(__VA_ARGS__)
 #define close(...)   cml_am_mock_close(__VA_ARGS__)
 #define ioctl(...)   cml_am_mock_ioctl(__VA_ARGS__)
@@ -451,8 +452,8 @@ int cml_am_enumerate_gpus(CMLAMGPUInfo** gpus, int* count) {
 
         if (num >= cap) {
             cap = cap ? cap * 2 : 4;
-            CMLAMGPUInfo* tmp = realloc(list, (size_t)cap * sizeof(CMLAMGPUInfo));
-            if (!tmp) { free(list); closedir(dir); return -1; }
+            CMLAMGPUInfo* tmp = cml_realloc(list, (size_t)cap * sizeof(CMLAMGPUInfo));
+            if (!tmp) { cml_free(list); closedir(dir); return -1; }
             list = tmp;
         }
         list[num++] = info;
@@ -545,7 +546,7 @@ bool cml_am_driver_available(void) {
 
 
 CMLAMDriver* cml_am_driver_create(void) {
-    CMLAMDriver* drv = (CMLAMDriver*)calloc(1, sizeof(CMLAMDriver));
+    CMLAMDriver* drv = (CMLAMDriver*)cml_calloc(1, sizeof(CMLAMDriver));
     if (!drv) {
         LOG_ERROR("AM driver: failed to allocate driver context");
         return NULL;
@@ -654,7 +655,7 @@ int cml_am_driver_init(CMLAMDriver* drv) {
             snprintf(drv->device_name, sizeof(drv->device_name), "%s", gpus[0].name);
             snprintf(drv->gfx_version, sizeof(drv->gfx_version), "%s", gpus[0].gfx_version);
         }
-        free(gpus);
+        cml_free(gpus);
 
         if (drv->gpu_id == 0) {
             LOG_ERROR("AM driver: no GPU found via KFD topology");
@@ -809,7 +810,7 @@ void cml_am_driver_free(CMLAMDriver* drv) {
     if (drv->fd_kfd >= 0) close(drv->fd_kfd);
 #endif
 
-    free(drv);
+    cml_free(drv);
 }
 
 
@@ -1045,7 +1046,7 @@ CMLAMSignal* cml_am_signal_create(CMLAMDriver* drv, uint64_t initial_value) {
 #ifdef __linux__
     if (!drv || !drv->initialized) return NULL;
 
-    CMLAMSignal* sig = (CMLAMSignal*)calloc(1, sizeof(CMLAMSignal));
+    CMLAMSignal* sig = (CMLAMSignal*)cml_calloc(1, sizeof(CMLAMSignal));
     if (!sig) return NULL;
 
     uint64_t handle = 0, va = 0;
@@ -1055,7 +1056,7 @@ CMLAMSignal* cml_am_signal_create(CMLAMDriver* drv, uint64_t initial_value) {
                    | KFD_IOC_ALLOC_MEM_FLAGS_COHERENT;
 
     if (am_alloc_and_map(drv, sizeof(uint64_t) * 8, flags, &handle, &va, &addr) != 0) {
-        free(sig);
+        cml_free(sig);
         return NULL;
     }
 
@@ -1084,7 +1085,7 @@ void cml_am_signal_free(CMLAMDriver* drv, CMLAMSignal* signal) {
     }
 #endif
 
-    free(signal);
+    cml_free(signal);
 }
 
 int cml_am_signal_wait(CMLAMSignal* signal, uint64_t expected, uint64_t timeout_ns) {
@@ -1372,7 +1373,7 @@ CMLAMBuffer* cml_am_buffer_create(CMLAMDriver* drv, size_t size, bool vram) {
         return NULL;
     }
 
-    CMLAMBuffer* buf = (CMLAMBuffer*)calloc(1, sizeof(CMLAMBuffer));
+    CMLAMBuffer* buf = (CMLAMBuffer*)cml_calloc(1, sizeof(CMLAMBuffer));
     if (!buf) return NULL;
 
     uint32_t flags;
@@ -1391,7 +1392,7 @@ CMLAMBuffer* cml_am_buffer_create(CMLAMDriver* drv, size_t size, bool vram) {
     void* cpu_addr = NULL;
 
     if (am_alloc_and_map(drv, size, flags, &handle, &va, &cpu_addr) != 0) {
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
 
@@ -1418,7 +1419,7 @@ void cml_am_buffer_free(CMLAMDriver* drv, CMLAMBuffer* buf) {
     }
 #endif
 
-    free(buf);
+    cml_free(buf);
 }
 
 int cml_am_buffer_upload(CMLAMDriver* drv, CMLAMBuffer* dst,
@@ -1632,7 +1633,7 @@ CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object,
     if (!drv || !drv->initialized || !code_object || code_size == 0 || !kernel_name)
         return NULL;
 
-    CMLAMKernel* kernel = (CMLAMKernel*)calloc(1, sizeof(CMLAMKernel));
+    CMLAMKernel* kernel = (CMLAMKernel*)cml_calloc(1, sizeof(CMLAMKernel));
     if (!kernel) return NULL;
 
     uint64_t handle = 0, va = 0;
@@ -1643,7 +1644,7 @@ CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object,
                    | KFD_IOC_ALLOC_MEM_FLAGS_EXECUTABLE;
 
     if (am_alloc_and_map(drv, code_size, flags, &handle, &va, &cpu_addr) != 0) {
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -1652,17 +1653,17 @@ CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object,
         am_mb();
     } else {
         am_free_and_unmap(drv, handle, cpu_addr, code_size);
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
-    kernel->code_object = malloc(code_size);
+    kernel->code_object = cml_malloc(code_size);
     if (kernel->code_object)
         memcpy(kernel->code_object, code_object, code_size);
     kernel->code_size = code_size;
     kernel->gpu_addr  = va;
     kernel->handle    = (uint32_t)handle;
-    kernel->name      = strdup(kernel_name);
+    kernel->name      = cml_strdup(kernel_name);
 
     /* Try kernel descriptor parsing first */
     AMDGPUKernelDescriptor kd;
@@ -1796,9 +1797,9 @@ void cml_am_kernel_free(CMLAMDriver* drv, CMLAMKernel* kernel) {
     }
 #endif
 
-    free(kernel->code_object);
-    free(kernel->name);
-    free(kernel);
+    cml_free(kernel->code_object);
+    cml_free(kernel->name);
+    cml_free(kernel);
 }
 
 
@@ -2072,7 +2073,7 @@ int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
 
                 if (gpu_ok) {
                     if (!output->data)
-                        output->data = malloc(bytes);
+                        output->data = cml_malloc(bytes);
                     if (output->data)
                         cml_am_buffer_download(drv, buf_out, output->data, bytes);
                 }

@@ -2,12 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 CMLTinyFS* cml_tinyfs_create(const char* base_path, int num_shards, size_t shard_size) {
     if (!base_path || num_shards < 1 || num_shards > CML_TINYFS_MAX_SHARDS)
         return NULL;
 
-    CMLTinyFS* fs = (CMLTinyFS*)calloc(1, sizeof(CMLTinyFS));
+    CMLTinyFS* fs = (CMLTinyFS*)cml_calloc(1, sizeof(CMLTinyFS));
     if (!fs) return NULL;
 
     strncpy(fs->base_path, base_path, sizeof(fs->base_path) - 1);
@@ -27,7 +28,7 @@ CMLTinyFS* cml_tinyfs_create(const char* base_path, int num_shards, size_t shard
 }
 
 void cml_tinyfs_free(CMLTinyFS* fs) {
-    free(fs);
+    cml_free(fs);
 }
 
 int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {

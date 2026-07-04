@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 #define TENSOR_MAP_SIZE 2048
 
@@ -743,12 +744,12 @@ static Tensor *op_constant(const CMLONNXNode *n, TensorMap *m)
     const CMLONNXAttribute *vis = find_attr(n, "value_ints");
     if (vis && vis->type == CML_ONNX_ATTR_INTS && vis->value.ints.count > 0) {
         int count = vis->value.ints.count;
-        float *fdata = (float *)malloc(sizeof(float) * (size_t)count);
+        float *fdata = (float *)cml_malloc(sizeof(float) * (size_t)count);
         if (!fdata) return NULL;
         for (int i = 0; i < count; i++) fdata[i] = (float)vis->value.ints.data[i];
         int shape[1] = { count };
         Tensor *t = tensor_from_data(fdata, shape, 1, NULL);
-        free(fdata);
+        cml_free(fdata);
         return t;
     }
 
@@ -825,7 +826,7 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
 
     CMLONNXGraph *g = &model->graph;
 
-    TensorMap *map = (TensorMap *)calloc(1, sizeof(TensorMap));
+    TensorMap *map = (TensorMap *)cml_calloc(1, sizeof(TensorMap));
     if (!map) return -1;
 
     for (int i = 0; i < g->num_initializers; i++) {
@@ -851,7 +852,7 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
         if (!handler) {
             LOG_ERROR("onnx_ops: unsupported op '%s' (node '%s')",
                       node->op_type, node->name);
-            free(map);
+            cml_free(map);
             return -2;
         }
 
@@ -859,7 +860,7 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
         if (!result) {
             LOG_ERROR("onnx_ops: op '%s' (node '%s') returned NULL",
                       node->op_type, node->name);
-            free(map);
+            cml_free(map);
             return -3;
         }
 
@@ -877,7 +878,7 @@ int cml_onnx_run(CMLONNXModel *model, Tensor **inputs, int num_inputs,
         if (t) copied++;
     }
 
-    free(map);
+    cml_free(map);
 
     if (copied == 0 && num_outputs > 0) {
         LOG_ERROR("onnx_ops: no graph outputs were produced");

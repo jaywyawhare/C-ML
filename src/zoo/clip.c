@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 CMLCLIPConfig cml_zoo_clip_config_vit_b32(void) {
     return (CMLCLIPConfig){
@@ -94,16 +95,16 @@ static void clip_vision_block_free(Module* module) {
     if (block->attn) module_free((Module*)block->attn);
     if (block->norm2) module_free((Module*)block->norm2);
     if (block->mlp) module_free((Module*)block->mlp);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_vision_block(int dim, int n_head, DType dtype, DeviceType device) {
-    CLIPVisionBlock* block = malloc(sizeof(CLIPVisionBlock));
+    CLIPVisionBlock* block = cml_malloc(sizeof(CLIPVisionBlock));
     if (!block) return NULL;
 
     if (module_init((Module*)block, "CLIPVisionBlock",
                     clip_vision_block_forward, clip_vision_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -160,16 +161,16 @@ static void clip_text_block_free(Module* module) {
     if (block->attn) module_free((Module*)block->attn);
     if (block->norm2) module_free((Module*)block->norm2);
     if (block->mlp) module_free((Module*)block->mlp);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_text_block(int dim, int n_head, DType dtype, DeviceType device) {
-    CLIPTextBlock* block = malloc(sizeof(CLIPTextBlock));
+    CLIPTextBlock* block = cml_malloc(sizeof(CLIPTextBlock));
     if (!block) return NULL;
 
     if (module_init((Module*)block, "CLIPTextBlock",
                     clip_text_block_forward, clip_text_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -233,7 +234,7 @@ static void clip_free(Module* module) {
     if (clip->text_norm) module_free((Module*)clip->text_norm);
     if (clip->text_proj) module_free((Module*)clip->text_proj);
 
-    free(clip);
+    cml_free(clip);
 }
 
 Tensor* clip_encode_image(Module* module, Tensor* image) {
@@ -341,12 +342,12 @@ Module* cml_zoo_clip_create(CMLCLIPConfig* config, DType dtype, DeviceType devic
     if (!config)
         return NULL;
 
-    CLIPModel* clip = malloc(sizeof(CLIPModel));
+    CLIPModel* clip = cml_malloc(sizeof(CLIPModel));
     if (!clip)
         return NULL;
 
     if (module_init((Module*)clip, "CLIP", clip_forward, clip_free) != 0) {
-        free(clip);
+        cml_free(clip);
         return NULL;
     }
 

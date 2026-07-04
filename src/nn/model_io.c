@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define CML_MODEL_MAGIC "CML\0"
 #define CML_CKPT_MAGIC  "CKP\0"
@@ -85,7 +86,7 @@ int model_load(Module* model, const char* filepath) {
     for (int i = 0; i < num_params; i++) {
         int32_t name_len;
         fread(&name_len, sizeof(int32_t), 1, f);
-        char* name = malloc((size_t)(name_len + 1));
+        char* name = cml_malloc((size_t)(name_len + 1));
         if (!name) { fclose(f); return -1; }
         fread(name, 1, (size_t)name_len, f);
         name[name_len] = '\0';
@@ -95,7 +96,7 @@ int model_load(Module* model, const char* filepath) {
         int32_t ndim;
         fread(&ndim, sizeof(int32_t), 1, f);
 
-        int* shape = malloc((size_t)ndim * sizeof(int));
+        int* shape = cml_malloc((size_t)ndim * sizeof(int));
         for (int d = 0; d < ndim; d++) {
             int32_t dim;
             fread(&dim, sizeof(int32_t), 1, f);
@@ -120,8 +121,8 @@ int model_load(Module* model, const char* filepath) {
             LOG_WARNING("Parameter '%s' not found in model, skipping", name);
         }
 
-        free(name);
-        free(shape);
+        cml_free(name);
+        cml_free(shape);
     }
 
     fclose(f);
@@ -225,7 +226,7 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
     for (int i = 0; i < num_params; i++) {
         int32_t name_len;
         fread(&name_len, sizeof(int32_t), 1, f);
-        char* name = malloc((size_t)(name_len + 1));
+        char* name = cml_malloc((size_t)(name_len + 1));
         if (!name) { fclose(f); return -1; }
         fread(name, 1, (size_t)name_len, f);
         name[name_len] = '\0';
@@ -252,7 +253,7 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
         } else {
             fseek(f, (long)data_size, SEEK_CUR);
         }
-        free(name);
+        cml_free(name);
     }
     int32_t has_optim;
     fread(&has_optim, sizeof(int32_t), 1, f);

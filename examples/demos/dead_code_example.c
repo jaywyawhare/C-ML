@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 int main(void) {
     printf("Dead Code & IR Optimization Demo\n\n");
@@ -87,9 +88,9 @@ int main(void) {
         }
 
         if (unopt)
-            free(unopt);
+            cml_free(unopt);
         if (opt)
-            free(opt);
+            cml_free(opt);
     } else {
         printf("Warning: No IR context available\n");
     }

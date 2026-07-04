@@ -4,6 +4,7 @@
 
 #include "ops/ir/heuristic_opt.h"
 #include "ops/ir/linearize.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -28,7 +29,7 @@ static LinearProgram* make_prog(int num_axes, const int* extents,
     for (int i = 0; i < num_axes; i++) {
         if (prog->num_axes >= prog->axes_capacity) {
             int nc = prog->axes_capacity * 2;
-            int* tmp = realloc(prog->loop_axes, (size_t)nc * sizeof(int));
+            int* tmp = cml_realloc(prog->loop_axes, (size_t)nc * sizeof(int));
             if (!tmp) { linear_program_free(prog); return NULL; }
             prog->loop_axes = tmp;
             prog->axes_capacity = nc;

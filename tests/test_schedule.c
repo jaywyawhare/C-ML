@@ -6,6 +6,7 @@
 #include "ops/ir/ir.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run    = 0;
 static int tests_passed = 0;
@@ -336,7 +337,7 @@ static int test_schedule_to_string(void) {
     CMLSchedule* s = cml_schedule_create(g, NULL);
     char* str = cml_schedule_to_string(s);
     int ok = (str != NULL && strlen(str) > 0);
-    free(str);
+    cml_free(str);
 
     /* NULL schedule returns NULL */
     char* str2 = cml_schedule_to_string(NULL);
@@ -349,7 +350,7 @@ static int test_schedule_to_string(void) {
 }
 
 static int test_schedule_free_null(void) {
-    /* free(NULL) must not crash */
+    /* cml_free(NULL) must not crash */
     cml_schedule_free(NULL);
     return 1;
 }

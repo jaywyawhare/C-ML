@@ -17,6 +17,7 @@
 #include <math.h>
 #include <float.h>
 #include <stdbool.h>
+#include "alloc/cml_allocator.h"
 
 static bool g_nvptx_initialized = false;
 static bool g_amdgpu_initialized = false;
@@ -42,7 +43,7 @@ static void init_amdgpu_target(void) {
 CMLGPUCodegen* cml_gpu_codegen_create(GPUTarget target, void* backend) {
     if (!backend) return NULL;
 
-    CMLGPUCodegen* cg = calloc(1, sizeof(CMLGPUCodegen));
+    CMLGPUCodegen* cg = cml_calloc(1, sizeof(CMLGPUCodegen));
     if (!cg) return NULL;
 
     cg->target = target;
@@ -70,7 +71,7 @@ CMLGPUCodegen* cml_gpu_codegen_create(GPUTarget target, void* backend) {
 }
 
 void cml_gpu_codegen_destroy(CMLGPUCodegen* cg) {
-    free(cg);
+    cml_free(cg);
 }
 
 // NVPTX calling convention for kernels
@@ -1213,7 +1214,7 @@ static char* emit_gpu_code(CMLGPUCodegen* cg, LLVMModuleRef mod, size_t* out_siz
     size_t size = LLVMGetBufferSize(buf);
     const char* data = LLVMGetBufferStart(buf);
 
-    char* result = malloc(size + 1);
+    char* result = cml_malloc(size + 1);
     memcpy(result, data, size);
     result[size] = '\0';  // null-terminate for PTX text
 
@@ -1271,7 +1272,7 @@ static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
 
 static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
     size_t size = numel * sizeof(float);
-    float* zeros = calloc(numel, sizeof(float));
+    float* zeros = cml_calloc(numel, sizeof(float));
     if (!zeros) return NULL;
 
     void* dptr = NULL;
@@ -1288,13 +1289,13 @@ static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
             dptr = hptr;
         }
     }
-    free(zeros);
+    cml_free(zeros);
     return dptr;
 }
 
 static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
     size_t size = numel * sizeof(float);
-    float* buf = malloc(size);
+    float* buf = cml_malloc(size);
     if (!buf) return NULL;
     for (size_t i = 0; i < numel; i++) buf[i] = fill_val;
 
@@ -1312,7 +1313,7 @@ static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
             dptr = hptr;
         }
     }
-    free(buf);
+    cml_free(buf);
     return dptr;
 }
 
@@ -1384,7 +1385,7 @@ static int gpu_compile_and_launch(CMLGPUCodegen* cg, LLVMModuleRef mod,
         }
     }
 
-    free(code);
+    cml_free(code);
     return result;
 }
 

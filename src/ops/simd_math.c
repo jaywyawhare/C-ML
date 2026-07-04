@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #define CML_X86 1
@@ -646,6 +647,7 @@ static void simd_div_f32_avx512(const float* a, const float* b, float* out, size
 
 #ifdef CML_HAS_AVX_COMPILE
 
+__attribute__((target("avx2")))
 static inline __m256 exp_poly_avx(__m256 x) {
     // Clamp input to prevent overflow/underflow
     // exp(88.7) ~ 3.4e38 (max float), exp(-87.3) ~ 1e-38 (min normal float)
@@ -691,6 +693,7 @@ static inline __m256 exp_poly_avx(__m256 x) {
     return _mm256_mul_ps(result, scale);
 }
 
+__attribute__((target("avx2")))
 static inline __m256 log_poly_avx(__m256 x) {
     __m256i xi        = _mm256_castps_si256(x);
     __m256i exp_mask  = _mm256_set1_epi32(0x7F800000);
@@ -2261,6 +2264,7 @@ void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
 }
 
 #include "backend/threadpool.h"
+#include "alloc/cml_allocator.h"
 
 static size_t g_parallel_threshold = 10000; // Min elements for parallel execution
 
@@ -2388,7 +2392,7 @@ float simd_sum_f32_parallel(const float* data, size_t n) {
     if (num_threads == 0)
         num_threads = 1;
 
-    float* partial_sums = calloc(num_threads, sizeof(float));
+    float* partial_sums = cml_calloc(num_threads, sizeof(float));
     if (!partial_sums) {
         return simd_sum_float(data, n);
     }
@@ -2401,7 +2405,7 @@ float simd_sum_f32_parallel(const float* data, size_t n) {
     for (size_t i = 0; i < num_threads; i++) {
         total += partial_sums[i];
     }
-    free(partial_sums);
+    cml_free(partial_sums);
 
     return total;
 }

@@ -3,6 +3,7 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 ConvNeXtConfig cml_zoo_convnext_config_tiny(void) {
     ConvNeXtConfig cfg = {
@@ -66,16 +67,16 @@ static void convnext_block_free(Module* module) {
         return;
     if (block->path)
         module_free((Module*)block->path);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_convnext_block(int dim, DType dtype, DeviceType device) {
-    ConvNeXtBlock* block = malloc(sizeof(ConvNeXtBlock));
+    ConvNeXtBlock* block = cml_malloc(sizeof(ConvNeXtBlock));
     if (!block)
         return NULL;
 
     if (module_init((Module*)block, "ConvNeXtBlock", convnext_block_forward, convnext_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -83,7 +84,7 @@ static Module* create_convnext_block(int dim, DType dtype, DeviceType device) {
 
     block->path = nn_sequential();
     if (!block->path) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 

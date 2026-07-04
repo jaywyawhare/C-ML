@@ -3,6 +3,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static FusionMatch* match_matmul_bias_relu(struct IRNode* start, struct CMLGraph* ir) {
     (void)ir;
@@ -30,14 +31,14 @@ static FusionMatch* match_matmul_bias_relu(struct IRNode* start, struct CMLGraph
         return NULL;
     }
 
-    FusionMatch* match = calloc(1, sizeof(FusionMatch));
+    FusionMatch* match = cml_calloc(1, sizeof(FusionMatch));
     if (!match)
         return NULL;
 
     match->num_matched = 3;
-    match->matched_nodes = malloc(3 * sizeof(struct IRNode*));
+    match->matched_nodes = cml_malloc(3 * sizeof(struct IRNode*));
     if (!match->matched_nodes) {
-        free(match);
+        cml_free(match);
         return NULL;
     }
     match->matched_nodes[0] = start;
@@ -111,14 +112,14 @@ static FusionMatch* match_elementwise_chain(struct IRNode* start, struct CMLGrap
     if (chain_len < 2)
         return NULL;
 
-    FusionMatch* match = calloc(1, sizeof(FusionMatch));
+    FusionMatch* match = cml_calloc(1, sizeof(FusionMatch));
     if (!match)
         return NULL;
 
     match->num_matched = chain_len;
-    match->matched_nodes = malloc(chain_len * sizeof(struct IRNode*));
+    match->matched_nodes = cml_malloc(chain_len * sizeof(struct IRNode*));
     if (!match->matched_nodes) {
-        free(match);
+        cml_free(match);
         return NULL;
     }
     memcpy(match->matched_nodes, chain, chain_len * sizeof(struct IRNode*));
@@ -166,12 +167,12 @@ static FusionMatch* match_softmax_ce_bwd(struct IRNode* start, struct CMLGraph* 
         sub_node = mul_node->users[0];
     if (!sub_node || sub_node->type != UOP_SUB) return NULL;
 
-    FusionMatch* match = calloc(1, sizeof(FusionMatch));
+    FusionMatch* match = cml_calloc(1, sizeof(FusionMatch));
     if (!match) return NULL;
 
     match->num_matched = 5;
-    match->matched_nodes = malloc(5 * sizeof(struct IRNode*));
-    if (!match->matched_nodes) { free(match); return NULL; }
+    match->matched_nodes = cml_malloc(5 * sizeof(struct IRNode*));
+    if (!match->matched_nodes) { cml_free(match); return NULL; }
     match->matched_nodes[0] = start;
     match->matched_nodes[1] = sum_node;
     match->matched_nodes[2] = recip_node;
@@ -236,12 +237,12 @@ static FusionMatch* match_layernorm_bwd(struct IRNode* start, struct CMLGraph* i
     }
     if (!rsqrt) return NULL;
 
-    FusionMatch* match = calloc(1, sizeof(FusionMatch));
+    FusionMatch* match = cml_calloc(1, sizeof(FusionMatch));
     if (!match) return NULL;
 
     match->num_matched = 5;
-    match->matched_nodes = malloc(5 * sizeof(struct IRNode*));
-    if (!match->matched_nodes) { free(match); return NULL; }
+    match->matched_nodes = cml_malloc(5 * sizeof(struct IRNode*));
+    if (!match->matched_nodes) { cml_free(match); return NULL; }
     match->matched_nodes[0] = start;
     match->matched_nodes[1] = sub;
     match->matched_nodes[2] = sq;
@@ -270,12 +271,12 @@ static FusionMatch* match_gelu_bwd(struct IRNode* start, struct CMLGraph* ir) {
 
     if (start->type == UOP_QUICK_GELU || start->type == UOP_SILU) {
         if (start->backward_node || (start->use_count > 0 && start->users)) {
-            FusionMatch* match = calloc(1, sizeof(FusionMatch));
+            FusionMatch* match = cml_calloc(1, sizeof(FusionMatch));
             if (!match) return NULL;
 
             match->num_matched = 1;
-            match->matched_nodes = malloc(sizeof(struct IRNode*));
-            if (!match->matched_nodes) { free(match); return NULL; }
+            match->matched_nodes = cml_malloc(sizeof(struct IRNode*));
+            if (!match->matched_nodes) { cml_free(match); return NULL; }
             match->matched_nodes[0] = start;
 
             LOG_DEBUG("Fusion pattern matched: GELU/SiLU + backward");
@@ -299,7 +300,7 @@ static int emit_gelu_bwd(FusionMatch* match, struct CMLGraph* ir) {
 static FusionPatternRegistry* g_default_registry = NULL;
 
 FusionPatternRegistry* cml_fusion_registry_create(void) {
-    FusionPatternRegistry* reg = calloc(1, sizeof(FusionPatternRegistry));
+    FusionPatternRegistry* reg = cml_calloc(1, sizeof(FusionPatternRegistry));
     if (!reg)
         return NULL;
 
@@ -346,11 +347,11 @@ void cml_fusion_registry_free(FusionPatternRegistry* registry) {
         FusionPattern* p = registry->patterns[t];
         while (p) {
             FusionPattern* next = p->next;
-            free(p);
+            cml_free(p);
             p = next;
         }
     }
-    free(registry);
+    cml_free(registry);
 }
 
 FusionPatternRegistry* cml_fusion_registry_get_default(void) {
@@ -369,7 +370,7 @@ int cml_fusion_register_pattern(FusionPatternRegistry* registry,
     if (!registry || !match || !emit || target >= FUSION_TARGET_COUNT)
         return -1;
 
-    FusionPattern* pattern = calloc(1, sizeof(FusionPattern));
+    FusionPattern* pattern = cml_calloc(1, sizeof(FusionPattern));
     if (!pattern)
         return -1;
 
@@ -426,7 +427,7 @@ int cml_fusion_apply_patterns(FusionPatternRegistry* registry,
 void cml_fusion_match_free(FusionMatch* match) {
     if (!match)
         return;
-    free(match->matched_nodes);
-    free(match->match_data);
-    free(match);
+    cml_free(match->matched_nodes);
+    cml_free(match->match_data);
+    cml_free(match);
 }

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static float bicubic_kernel(float x) {
     float ax = fabsf(x);
@@ -388,19 +389,19 @@ static void upsample_free(Module* module) {
     Upsample* layer = (Upsample*)module;
     if (!layer)
         return;
-    free(layer);
+    cml_free(layer);
 }
 
 Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
                        UpsampleMode mode, bool align_corners) {
-    Upsample* layer = calloc(1, sizeof(Upsample));
+    Upsample* layer = cml_calloc(1, sizeof(Upsample));
     if (!layer) {
         LOG_ERROR("Upsample: failed to allocate memory");
         return NULL;
     }
 
     if (module_init((Module*)layer, "Upsample", upsample_forward, upsample_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 

@@ -5,6 +5,7 @@
 #include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 MaskRCNNConfig cml_zoo_mask_rcnn_default_config(void) {
     MaskRCNNConfig cfg = {
@@ -69,15 +70,15 @@ static void backbone_free(Module* module) {
     if (bb->layer2) module_free((Module*)bb->layer2);
     if (bb->layer3) module_free((Module*)bb->layer3);
     if (bb->layer4) module_free((Module*)bb->layer4);
-    free(bb);
+    cml_free(bb);
 }
 
 static Module* create_backbone(DType dtype, DeviceType device) {
-    Backbone* bb = malloc(sizeof(Backbone));
+    Backbone* bb = cml_malloc(sizeof(Backbone));
     if (!bb) return NULL;
 
     if (module_init((Module*)bb, "ResNet50+FPN_Backbone", backbone_forward, backbone_free) != 0) {
-        free(bb);
+        cml_free(bb);
         return NULL;
     }
 
@@ -130,15 +131,15 @@ static void fpn_free(Module* module) {
     if (fpn->smooth3) module_free(fpn->smooth3);
     if (fpn->smooth4) module_free(fpn->smooth4);
     if (fpn->smooth5) module_free(fpn->smooth5);
-    free(fpn);
+    cml_free(fpn);
 }
 
 static Module* create_fpn(int fpn_ch, DType dtype, DeviceType device) {
-    FPN* fpn = malloc(sizeof(FPN));
+    FPN* fpn = cml_malloc(sizeof(FPN));
     if (!fpn) return NULL;
 
     if (module_init((Module*)fpn, "FPN", fpn_forward, fpn_free) != 0) {
-        free(fpn);
+        cml_free(fpn);
         return NULL;
     }
 
@@ -177,15 +178,15 @@ static void rpn_free(Module* module) {
     if (rpn->rpn_conv) module_free(rpn->rpn_conv);
     if (rpn->rpn_cls) module_free(rpn->rpn_cls);
     if (rpn->rpn_bbox) module_free(rpn->rpn_bbox);
-    free(rpn);
+    cml_free(rpn);
 }
 
 static Module* create_rpn(int fpn_ch, int num_anchors, DType dtype, DeviceType device) {
-    RPN* rpn = malloc(sizeof(RPN));
+    RPN* rpn = cml_malloc(sizeof(RPN));
     if (!rpn) return NULL;
 
     if (module_init((Module*)rpn, "RPN", rpn_forward, rpn_free) != 0) {
-        free(rpn);
+        cml_free(rpn);
         return NULL;
     }
 
@@ -227,16 +228,16 @@ static void roi_head_free(Module* module) {
     if (head->fc2) module_free(head->fc2);
     if (head->cls_score) module_free(head->cls_score);
     if (head->bbox_pred) module_free(head->bbox_pred);
-    free(head);
+    cml_free(head);
 }
 
 static Module* create_roi_head(int fpn_ch, int roi_size, int num_classes,
                                 DType dtype, DeviceType device) {
-    ROIHead* head = malloc(sizeof(ROIHead));
+    ROIHead* head = cml_malloc(sizeof(ROIHead));
     if (!head) return NULL;
 
     if (module_init((Module*)head, "ROIHead", roi_head_forward, roi_head_free) != 0) {
-        free(head);
+        cml_free(head);
         return NULL;
     }
 
@@ -277,15 +278,15 @@ static void mask_head_free(Module* module) {
     if (head->conv_layers) module_free((Module*)head->conv_layers);
     if (head->deconv) module_free(head->deconv);
     if (head->mask_pred) module_free(head->mask_pred);
-    free(head);
+    cml_free(head);
 }
 
 static Module* create_mask_head(int fpn_ch, int num_classes, DType dtype, DeviceType device) {
-    MaskHead* head = malloc(sizeof(MaskHead));
+    MaskHead* head = cml_malloc(sizeof(MaskHead));
     if (!head) return NULL;
 
     if (module_init((Module*)head, "MaskHead", mask_head_forward, mask_head_free) != 0) {
-        free(head);
+        cml_free(head);
         return NULL;
     }
 
@@ -332,7 +333,7 @@ static void mask_rcnn_free(Module* module) {
     if (net->rpn) module_free(net->rpn);
     if (net->roi_head) module_free(net->roi_head);
     if (net->mask_head) module_free(net->mask_head);
-    free(net);
+    cml_free(net);
 }
 
 Module* cml_zoo_mask_rcnn_create(const MaskRCNNConfig* cfg, DType dtype, DeviceType device) {
@@ -343,11 +344,11 @@ Module* cml_zoo_mask_rcnn_create(const MaskRCNNConfig* cfg, DType dtype, DeviceT
     if (c.roi_output_size <= 0) c.roi_output_size = 7;
     if (c.mask_output_size <= 0) c.mask_output_size = 14;
 
-    MaskRCNN* net = malloc(sizeof(MaskRCNN));
+    MaskRCNN* net = cml_malloc(sizeof(MaskRCNN));
     if (!net) return NULL;
 
     if (module_init((Module*)net, "MaskRCNN", mask_rcnn_forward, mask_rcnn_free) != 0) {
-        free(net);
+        cml_free(net);
         return NULL;
     }
 

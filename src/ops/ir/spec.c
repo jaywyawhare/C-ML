@@ -5,14 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 static CMLSpecResult* spec_result_create(void) {
-    CMLSpecResult* r = calloc(1, sizeof(CMLSpecResult));
+    CMLSpecResult* r = cml_calloc(1, sizeof(CMLSpecResult));
     if (!r) return NULL;
     r->valid = true;
     r->capacity = 8;
-    r->errors = calloc((size_t)r->capacity, sizeof(CMLSpecError));
-    if (!r->errors) { free(r); return NULL; }
+    r->errors = cml_calloc((size_t)r->capacity, sizeof(CMLSpecError));
+    if (!r->errors) { cml_free(r); return NULL; }
     return r;
 }
 
@@ -22,7 +23,7 @@ static void spec_add_error(CMLSpecResult* r, int node_id,
     r->valid = false;
     if (r->num_errors >= r->capacity) {
         int nc = r->capacity * 2;
-        CMLSpecError* tmp = realloc(r->errors, (size_t)nc * sizeof(CMLSpecError));
+        CMLSpecError* tmp = cml_realloc(r->errors, (size_t)nc * sizeof(CMLSpecError));
         if (!tmp) return;
         r->errors = tmp;
         r->capacity = nc;
@@ -104,7 +105,7 @@ static void validate_tensor_level(CMLGraph_t graph, CMLSpecResult* result) {
     struct IRNode* node = graph->head;
     int idx = 0;
     int visited_cap = graph->node_count > 0 ? graph->node_count : 16;
-    struct IRNode** visited = calloc((size_t)visited_cap, sizeof(struct IRNode*));
+    struct IRNode** visited = cml_calloc((size_t)visited_cap, sizeof(struct IRNode*));
     int num_visited = 0;
 
     while (node) {
@@ -188,7 +189,7 @@ done_cycle:
         idx++;
     }
 
-    free(visited);
+    cml_free(visited);
 }
 
 static void validate_kernel_level(CMLGraph_t graph, CMLSpecResult* result) {
@@ -268,11 +269,11 @@ static void validate_linear_level(CMLGraph_t graph, CMLSpecResult* result) {
         LinearProgram* prog = linearize_group(grp);
         if (!prog) continue;
 
-        bool* has_store = calloc((size_t)(prog->next_vreg + 1), sizeof(bool));
-        bool* has_load_reg = calloc((size_t)(prog->next_vreg + 1), sizeof(bool));
+        bool* has_store = cml_calloc((size_t)(prog->next_vreg + 1), sizeof(bool));
+        bool* has_load_reg = cml_calloc((size_t)(prog->next_vreg + 1), sizeof(bool));
         if (!has_store || !has_load_reg) {
-            free(has_store);
-            free(has_load_reg);
+            cml_free(has_store);
+            cml_free(has_load_reg);
             linear_program_free(prog);
             continue;
         }
@@ -322,8 +323,8 @@ static void validate_linear_level(CMLGraph_t graph, CMLSpecResult* result) {
                 "mismatched LOOP/ENDLOOP nesting", CML_SPEC_LINEAR);
         }
 
-        free(has_store);
-        free(has_load_reg);
+        cml_free(has_store);
+        cml_free(has_load_reg);
         linear_program_free(prog);
     }
 
@@ -403,8 +404,8 @@ CMLSpecResult* cml_spec_validate(CMLGraph_t graph, CMLSpecLevel level) {
 
 void cml_spec_result_free(CMLSpecResult* result) {
     if (!result) return;
-    free(result->errors);
-    free(result);
+    cml_free(result->errors);
+    cml_free(result);
 }
 
 void cml_spec_result_print(const CMLSpecResult* result) {

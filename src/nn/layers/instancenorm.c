@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
     InstanceNorm2d* in = (InstanceNorm2d*)module;
@@ -142,18 +143,18 @@ static void instancenorm2d_free(Module* module) {
     InstanceNorm2d* in = (InstanceNorm2d*)module;
     if (!in)
         return;
-    free(in);
+    cml_free(in);
 }
 
 InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
                                   DeviceType device) {
-    InstanceNorm2d* in = malloc(sizeof(InstanceNorm2d));
+    InstanceNorm2d* in = cml_malloc(sizeof(InstanceNorm2d));
     if (!in)
         return NULL;
 
     if (module_init((Module*)in, "InstanceNorm2d", instancenorm2d_forward, instancenorm2d_free) !=
         0) {
-        free(in);
+        cml_free(in);
         return NULL;
     }
 

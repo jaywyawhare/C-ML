@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 #define CL_SUCCESS                  0
 #define CL_DEVICE_TYPE_GPU          (1 << 2)
@@ -122,11 +123,11 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
         return false;
     }
 
-    void** platforms = (void**)calloc(num_platforms, sizeof(void*));
+    void** platforms = (void**)cml_calloc(num_platforms, sizeof(void*));
     if (!platforms) return false;
 
     if (fn_clGetPlatformIDs(num_platforms, platforms, NULL) != CL_SUCCESS) {
-        free(platforms);
+        cml_free(platforms);
         return false;
     }
 
@@ -140,11 +141,11 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
             continue;
         }
 
-        void** devices = (void**)calloc(num_devices, sizeof(void*));
+        void** devices = (void**)cml_calloc(num_devices, sizeof(void*));
         if (!devices) continue;
 
         if (fn_clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, num_devices, devices, NULL) != CL_SUCCESS) {
-            free(devices);
+            cml_free(devices);
             continue;
         }
 
@@ -155,15 +156,15 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
             if (strstr(dev_name, "Adreno") || strstr(name, "Qualcomm") || strstr(name, "QUALCOMM")) {
                 *out_platform = platforms[i];
                 *out_device = devices[j];
-                free(devices);
-                free(platforms);
+                cml_free(devices);
+                cml_free(platforms);
                 return true;
             }
         }
-        free(devices);
+        cml_free(devices);
     }
 
-    free(platforms);
+    cml_free(platforms);
     return false;
 }
 
@@ -187,7 +188,7 @@ bool cml_adreno_available(void) {
         return false;
     }
 
-    void** platforms = (void**)calloc(num_platforms, sizeof(void*));
+    void** platforms = (void**)cml_calloc(num_platforms, sizeof(void*));
     if (!platforms) { dlclose(lib); return false; }
 
     bool found = false;
@@ -202,7 +203,7 @@ bool cml_adreno_available(void) {
                 continue;
             }
 
-            void** devices = (void**)calloc(num_devices, sizeof(void*));
+            void** devices = (void**)cml_calloc(num_devices, sizeof(void*));
             if (!devices) continue;
 
             if (get_dev(platforms[i], CL_DEVICE_TYPE_GPU, num_devices, devices, NULL) == CL_SUCCESS) {
@@ -215,17 +216,17 @@ bool cml_adreno_available(void) {
                     }
                 }
             }
-            free(devices);
+            cml_free(devices);
         }
     }
 
-    free(platforms);
+    cml_free(platforms);
     dlclose(lib);
     return found;
 }
 
 CMLAdrenoBackend* cml_adreno_backend_create(void) {
-    CMLAdrenoBackend* b = (CMLAdrenoBackend*)calloc(1, sizeof(CMLAdrenoBackend));
+    CMLAdrenoBackend* b = (CMLAdrenoBackend*)cml_calloc(1, sizeof(CMLAdrenoBackend));
     if (!b) {
         LOG_ERROR("Failed to allocate CMLAdrenoBackend");
     }
@@ -333,7 +334,7 @@ void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
     }
 
     backend->initialized = false;
-    free(backend);
+    cml_free(backend);
 }
 
 int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {

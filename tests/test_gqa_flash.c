@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -28,7 +29,7 @@ static int tests_failed = 0;
 
 static Tensor* make_rand_tensor(int b, int s, int d) {
     size_t n = (size_t)b * s * d;
-    float* buf = (float*)malloc(n * sizeof(float));
+    float* buf = (float*)cml_malloc(n * sizeof(float));
     if (!buf) return NULL;
     for (size_t i = 0; i < n; i++) {
         buf[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 0.1f;
@@ -37,7 +38,7 @@ static Tensor* make_rand_tensor(int b, int s, int d) {
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
     Tensor* t = tensor_from_data(buf, shape, 3, &cfg);
-    free(buf);
+    cml_free(buf);
     return t;
 }
 

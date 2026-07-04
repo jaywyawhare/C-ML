@@ -9,6 +9,7 @@
 
 #include "ops/ir/gpu/cuda_backend.h"
 #include "ops/ir/dispatch.h"
+#include "alloc/cml_allocator.h"
 
 static CMLCUDABackend* wmma_get_cuda_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_get_global();
@@ -94,7 +95,7 @@ static void src_appendf(char** buf, size_t* cap, size_t* len,
 
     while (*len + (size_t)needed + 1 > *cap) {
         *cap *= 2;
-        char* tmp = (char*)realloc(*buf, *cap);
+        char* tmp = (char*)cml_realloc(*buf, *cap);
         if (!tmp) {
             LOG_ERROR("wmma: realloc failed");
             return;
@@ -114,7 +115,7 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
 
     size_t cap = WMMA_SRC_MAX;
     size_t len = 0;
-    char* src = (char*)malloc(cap);
+    char* src = (char*)cml_malloc(cap);
     if (!src) return NULL;
     src[0] = '\0';
 
@@ -228,7 +229,7 @@ int cml_wmma_matmul(const void* A, const void* B, void* C,
     }
 
     CMLCUDAKernel* kernel = cml_cuda_compile_source(cuda, kernel_src, "wmma_matmul");
-    free(kernel_src);
+    cml_free(kernel_src);
 
     if (!kernel) {
         LOG_ERROR("WMMA kernel compilation failed");

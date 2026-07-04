@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static const int BLOCK_SIZES[]   = {32, 64, 128, 256, 512, 1024};
 static const int UNROLL_FACTORS[] = {1, 2, 4};
@@ -32,7 +33,7 @@ bool cml_beam_search_enabled(void) {
 
 CMLBeamSearchCtx* cml_beam_search_create(void) {
     CMLBeamSearchCtx* ctx =
-        (CMLBeamSearchCtx*)calloc(1, sizeof(CMLBeamSearchCtx));
+        (CMLBeamSearchCtx*)cml_calloc(1, sizeof(CMLBeamSearchCtx));
     if (!ctx) {
         LOG_ERROR("Failed to allocate CMLBeamSearchCtx");
         return NULL;
@@ -64,7 +65,7 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
 
 void cml_beam_search_free(CMLBeamSearchCtx* ctx) {
     if (!ctx) return;
-    free(ctx);
+    cml_free(ctx);
 }
 
 int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
@@ -565,7 +566,7 @@ int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     for (int i = 0; i < num_configs; i++)
         cml_opt_list_free(opt_lists[i]);
-    free(opt_lists);
+    cml_free(opt_lists);
 
     if (best_idx < 0) {
         LOG_WARNING("BEAM opt tune: no valid configuration found");

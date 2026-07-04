@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 T5Config cml_zoo_t5_config_small(void) {
     return (T5Config){
@@ -84,17 +85,17 @@ static void t5_enc_block_free(Module* module) {
     if (block->self_attn) module_free((Module*)block->self_attn);
     if (block->norm2) module_free((Module*)block->norm2);
     if (block->mlp) module_free((Module*)block->mlp);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_t5_enc_block(int d_model, int n_head, int d_ff, int num_buckets,
                                     int n_layer, DType dtype, DeviceType device) {
-    T5EncoderBlock* block = malloc(sizeof(T5EncoderBlock));
+    T5EncoderBlock* block = cml_malloc(sizeof(T5EncoderBlock));
     if (!block) return NULL;
 
     if (module_init((Module*)block, "T5EncoderBlock",
                     t5_enc_block_forward, t5_enc_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -216,17 +217,17 @@ static void t5_dec_block_free(Module* module) {
     if (block->cross_attn) module_free((Module*)block->cross_attn);
     if (block->norm3) module_free((Module*)block->norm3);
     if (block->mlp) module_free((Module*)block->mlp);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_t5_dec_block(int d_model, int n_head, int d_ff, int num_buckets,
                                     int n_layer, DType dtype, DeviceType device) {
-    T5DecoderBlock* block = malloc(sizeof(T5DecoderBlock));
+    T5DecoderBlock* block = cml_malloc(sizeof(T5DecoderBlock));
     if (!block) return NULL;
 
     if (module_init((Module*)block, "T5DecoderBlock",
                     t5_dec_block_forward, t5_dec_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -315,7 +316,7 @@ static void t5_free(Module* module) {
     if (t5->dec_blocks) module_free((Module*)t5->dec_blocks);
     if (t5->dec_norm) module_free((Module*)t5->dec_norm);
     if (t5->lm_head) module_free((Module*)t5->lm_head);
-    free(t5);
+    cml_free(t5);
 }
 
 Tensor* t5_encode(Module* module, Tensor* input) {
@@ -359,12 +360,12 @@ Module* cml_zoo_t5_create(T5Config* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;
 
-    T5Model* t5 = malloc(sizeof(T5Model));
+    T5Model* t5 = cml_malloc(sizeof(T5Model));
     if (!t5)
         return NULL;
 
     if (module_init((Module*)t5, "T5", t5_forward, t5_free) != 0) {
-        free(t5);
+        cml_free(t5);
         return NULL;
     }
 

@@ -5,9 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 RangeProgram* range_program_create(void) {
-    RangeProgram* prog = calloc(1, sizeof(RangeProgram));
+    RangeProgram* prog = cml_calloc(1, sizeof(RangeProgram));
     if (!prog) return NULL;
     prog->next_id = 0;
     return prog;
@@ -18,14 +19,14 @@ void range_program_free(RangeProgram* prog) {
     RangeNode* cur = prog->head;
     while (cur) {
         RangeNode* next = cur->next;
-        free(cur);
+        cml_free(cur);
         cur = next;
     }
-    free(prog);
+    cml_free(prog);
 }
 
 static RangeNode* alloc_node(RangeProgram* prog, RangeUOpType type) {
-    RangeNode* node = calloc(1, sizeof(RangeNode));
+    RangeNode* node = cml_calloc(1, sizeof(RangeNode));
     if (!node) return NULL;
     node->type = type;
     node->id = prog->next_id++;
@@ -86,7 +87,7 @@ void range_program_print(const RangeProgram* prog) {
 
 static size_t* compute_strides_for_shape(const int* shape, int ndim) {
     if (!shape || ndim <= 0) return NULL;
-    size_t* strides = malloc((size_t)ndim * sizeof(size_t));
+    size_t* strides = cml_malloc((size_t)ndim * sizeof(size_t));
     if (!strides) return NULL;
     strides[ndim - 1] = 1;
     for (int i = ndim - 2; i >= 0; i--)
@@ -155,10 +156,10 @@ static RangeProgram* rangeify_node(struct IRNode* node) {
 
         if (count > 0)
             range_program_add_index(prog, inp_range_ids, inp_effective_strides, count);
-        free(inp_strides);
+        cml_free(inp_strides);
     }
 
-    free(out_strides);
+    cml_free(out_strides);
     return prog;
 }
 

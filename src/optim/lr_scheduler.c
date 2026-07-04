@@ -2,6 +2,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 LRScheduler* lr_scheduler_cosine_annealing(Optimizer* optimizer, int T_max, float eta_min) {
     return lr_scheduler_cosine(optimizer, T_max, eta_min);
@@ -14,7 +15,7 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int 
         return NULL;
     }
 
-    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_malloc(sizeof(LRScheduler));
     if (!scheduler) return NULL;
 
     memset(scheduler, 0, sizeof(LRScheduler));
@@ -25,9 +26,9 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int 
     scheduler->num_milestones = num_milestones;
     scheduler->last_epoch     = 0;
 
-    scheduler->milestones = malloc(sizeof(int) * (size_t)num_milestones);
+    scheduler->milestones = cml_malloc(sizeof(int) * (size_t)num_milestones);
     if (!scheduler->milestones) {
-        free(scheduler);
+        cml_free(scheduler);
         return NULL;
     }
     memcpy(scheduler->milestones, milestones, sizeof(int) * (size_t)num_milestones);
@@ -57,7 +58,7 @@ LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int tota
         return NULL;
     }
 
-    LRScheduler* scheduler = malloc(sizeof(LRScheduler));
+    LRScheduler* scheduler = cml_malloc(sizeof(LRScheduler));
     if (!scheduler) return NULL;
 
     memset(scheduler, 0, sizeof(LRScheduler));

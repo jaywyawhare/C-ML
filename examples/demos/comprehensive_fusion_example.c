@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 int main(void) {
     cml_init();
@@ -190,8 +191,8 @@ int main(void) {
             printf("Exported kernel analysis to kernels.json\n");
         }
     }
-    free(raw_json);
-    free(opt_json);
+    cml_free(raw_json);
+    cml_free(opt_json);
 
     char* graph_json = cml_ir_export_graph_json(ir);
     if (graph_json) {
@@ -201,14 +202,14 @@ int main(void) {
             fclose(f);
             printf("Exported graph topology to graph.json\n");
         }
-        free(graph_json);
+        cml_free(graph_json);
     }
 
     /* Print IR summary */
     char* ir_str = cml_ir_to_string(ir);
     if (ir_str) {
         printf("\nIR Summary:\n%s\n", ir_str);
-        free(ir_str);
+        cml_free(ir_str);
     }
 
     /* Clean up */

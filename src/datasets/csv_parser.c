@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "alloc/cml_allocator.h"
 
 #define MAX_LINE 8192
 #define MAX_COLS 256
@@ -171,9 +172,9 @@ int cml_csv_parse(const char* filepath, int target_col,
     }
 
     /* Allocate */
-    float* X = malloc(sizeof(float) * line_count * nfeat);
-    float* y = malloc(sizeof(float) * line_count);
-    if (!X || !y) { free(X); free(y); fclose(f); return -1; }
+    float* X = cml_malloc(sizeof(float) * line_count * nfeat);
+    float* y = cml_malloc(sizeof(float) * line_count);
+    if (!X || !y) { cml_free(X); cml_free(y); fclose(f); return -1; }
 
     LabelMap lm = {.count = 0};
     int row = 0;
@@ -245,9 +246,9 @@ int cml_csv_parse(const char* filepath, int target_col,
     *num_classes = lm.count > 0 ? lm.count : 0;
 
     if (class_names_out && lm.count > 0) {
-        char** names = malloc(sizeof(char*) * lm.count);
+        char** names = cml_malloc(sizeof(char*) * lm.count);
         for (int i = 0; i < lm.count; i++) {
-            names[i] = strdup(lm.labels[i]);
+            names[i] = cml_strdup(lm.labels[i]);
         }
         *class_names_out = names;
     } else if (class_names_out) {
@@ -275,6 +276,6 @@ Dataset* cml_dataset_from_csv(const char* filepath, int target_col) {
         ds->class_names = class_names;
         cml_dataset_compute_stats(ds);
     }
-    free(X); free(y);
+    cml_free(X); cml_free(y);
     return ds;
 }

@@ -24,6 +24,7 @@
 
 #ifdef CML_NV_MOCK_GPU
 #include "ops/ir/gpu/nv_mock.h"
+#include "alloc/cml_allocator.h"
 #define open(...)   cml_nv_mock_open(__VA_ARGS__)
 #define close(...)  cml_nv_mock_close(__VA_ARGS__)
 #define ioctl(...)  cml_nv_mock_ioctl(__VA_ARGS__)
@@ -314,7 +315,7 @@ static int nv_setup_vaspace(CMLNVDriver *drv) {
 }
 
 static CMLNVBuffer *nv_alloc_gpu_buffer(CMLNVDriver *drv, size_t size, bool host_visible) {
-    CMLNVBuffer *buf = (CMLNVBuffer *)calloc(1, sizeof(CMLNVBuffer));
+    CMLNVBuffer *buf = (CMLNVBuffer *)cml_calloc(1, sizeof(CMLNVBuffer));
     if (!buf) return NULL;
 
     size_t aligned = NV_ALIGN(size, 4096);
@@ -358,7 +359,7 @@ static CMLNVBuffer *nv_alloc_gpu_buffer(CMLNVDriver *drv, size_t size, bool host
     buf->gpu_va = nv_va_alloc(drv, aligned, 4096);
     if (buf->gpu_va == 0) {
         nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle, buf->handle);
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
 
@@ -382,7 +383,7 @@ fallback_mmap:
     buf->handle = 0;
     buf->gpu_va = nv_va_alloc(drv, aligned, 4096);
     if (buf->gpu_va == 0) {
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
     if (host_visible) {
@@ -390,7 +391,7 @@ fallback_mmap:
                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (buf->cpu_addr == MAP_FAILED) {
             buf->cpu_addr = NULL;
-            free(buf);
+            cml_free(buf);
             return NULL;
         }
         memset(buf->cpu_addr, 0, aligned);
@@ -598,7 +599,7 @@ bool cml_nv_driver_available(void) {
 
 
 CMLNVDriver* cml_nv_driver_create(void) {
-    CMLNVDriver *drv = (CMLNVDriver *)calloc(1, sizeof(CMLNVDriver));
+    CMLNVDriver *drv = (CMLNVDriver *)cml_calloc(1, sizeof(CMLNVDriver));
     if (!drv) {
         LOG_ERROR("NV driver: failed to allocate context");
         return NULL;
@@ -758,7 +759,7 @@ void cml_nv_driver_free(CMLNVDriver *drv) {
     }
 #endif
 
-    free(drv);
+    cml_free(drv);
 }
 
 
@@ -802,7 +803,7 @@ void cml_nv_buffer_free(CMLNVDriver *drv, CMLNVBuffer *buf) {
     }
 #endif
 
-    free(buf);
+    cml_free(buf);
 }
 
 int cml_nv_buffer_upload(CMLNVDriver *drv, CMLNVBuffer *dst,
@@ -908,12 +909,12 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     if (drv && drv->compute_cap_major > 0)
         sm = drv->compute_cap_major * 10 + drv->compute_cap_minor;
 
-    CMLNVKernel *kernel = (CMLNVKernel *)calloc(1, sizeof(CMLNVKernel));
+    CMLNVKernel *kernel = (CMLNVKernel *)cml_calloc(1, sizeof(CMLNVKernel));
     if (!kernel) return NULL;
 
-    kernel->name = strdup(kernel_name);
+    kernel->name = cml_strdup(kernel_name);
     if (!kernel->name) {
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -925,8 +926,8 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     FILE *ptx_file = fopen(ptx_path, "w");
     if (!ptx_file) {
         LOG_ERROR("NV driver: failed to write PTX temp file: %s", strerror(errno));
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
     fputs(ptx_code, ptx_file);
@@ -939,8 +940,8 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     if (!proc) {
         LOG_ERROR("NV driver: failed to run ptxas: %s", strerror(errno));
         unlink(ptx_path);
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -959,16 +960,16 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     if (status != 0) {
         LOG_ERROR("NV driver: ptxas failed (status %d): %s", status, output);
         unlink(cubin_path);
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
 
     FILE *cubin_file = fopen(cubin_path, "rb");
     if (!cubin_file) {
         LOG_ERROR("NV driver: failed to read CUBIN file %s", cubin_path);
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -979,17 +980,17 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     if (cubin_len <= 0) {
         fclose(cubin_file);
         unlink(cubin_path);
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
 
-    kernel->cubin_data = malloc((size_t)cubin_len);
+    kernel->cubin_data = cml_malloc((size_t)cubin_len);
     if (!kernel->cubin_data) {
         fclose(cubin_file);
         unlink(cubin_path);
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -997,9 +998,9 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     if (fread(kernel->cubin_data, 1, kernel->cubin_size, cubin_file) != kernel->cubin_size) {
         fclose(cubin_file);
         unlink(cubin_path);
-        free(kernel->cubin_data);
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->cubin_data);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
     fclose(cubin_file);
@@ -1041,19 +1042,19 @@ CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver *drv, const void *cubin, size_
                                         const char *kernel_name) {
     if (!cubin || size == 0 || !kernel_name) return NULL;
 
-    CMLNVKernel *kernel = (CMLNVKernel *)calloc(1, sizeof(CMLNVKernel));
+    CMLNVKernel *kernel = (CMLNVKernel *)cml_calloc(1, sizeof(CMLNVKernel));
     if (!kernel) return NULL;
 
-    kernel->name = strdup(kernel_name);
+    kernel->name = cml_strdup(kernel_name);
     if (!kernel->name) {
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
-    kernel->cubin_data = malloc(size);
+    kernel->cubin_data = cml_malloc(size);
     if (!kernel->cubin_data) {
-        free(kernel->name);
-        free(kernel);
+        cml_free(kernel->name);
+        cml_free(kernel);
         return NULL;
     }
     memcpy(kernel->cubin_data, cubin, size);
@@ -1102,9 +1103,9 @@ void cml_nv_kernel_free(CMLNVDriver *drv, CMLNVKernel *kernel) {
     (void)drv;
 #endif
 
-    free(kernel->cubin_data);
-    free(kernel->name);
-    free(kernel);
+    cml_free(kernel->cubin_data);
+    cml_free(kernel->name);
+    cml_free(kernel);
 }
 
 
@@ -1238,7 +1239,7 @@ static char* nv_gen_ptx_for_node(struct IRNode *node, int sm) {
     case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
     case UOP_ABS: case UOP_SIN: case UOP_COS: case UOP_TANH:
     case UOP_SIGMOID: case UOP_RECIP: case UOP_SILU: {
-        ptx = (char *)malloc(buf_size);
+        ptx = (char *)cml_malloc(buf_size);
         if (!ptx) return NULL;
         const char *op_ptx;
         switch (node->type) {
@@ -1285,7 +1286,7 @@ static char* nv_gen_ptx_for_node(struct IRNode *node, int sm) {
     }
 
     case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: {
-        ptx = (char *)malloc(buf_size);
+        ptx = (char *)cml_malloc(buf_size);
         if (!ptx) return NULL;
         const char *op_ptx;
         switch (node->type) {
@@ -1411,7 +1412,7 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                         if (cml_nv_kernel_launch(drv, kernel, grid_dim, block_dim, kargs, 3) == 0) {
                             cml_nv_synchronize(drv);
                             if (!output->data)
-                                output->data = malloc(bytes);
+                                output->data = cml_malloc(bytes);
                             if (output->data) {
                                 cml_nv_buffer_download(drv, buf_out, output->data, bytes);
                                 gpu_ok = true;
@@ -1444,7 +1445,7 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                         if (cml_nv_kernel_launch(drv, kernel, grid_dim, block_dim, kargs, 4) == 0) {
                             cml_nv_synchronize(drv);
                             if (!output->data)
-                                output->data = malloc(bytes);
+                                output->data = cml_malloc(bytes);
                             if (output->data) {
                                 cml_nv_buffer_download(drv, buf_out, output->data, bytes);
                                 gpu_ok = true;
@@ -1459,7 +1460,7 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
 
                 cml_nv_kernel_free(drv, kernel);
             }
-            free(ptx);
+            cml_free(ptx);
         }
 
         if (!gpu_ok) {

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "alloc/cml_allocator.h"
 
 #define OPT_MAX_LOCAL_MEM    49152  /* 48 KiB typical GPU shared memory */
 #define OPT_MAX_WORKGROUP    1024
@@ -33,25 +34,25 @@ const char* cml_opt_type_name(CMLOptType type) {
 }
 
 CMLOptList* cml_opt_list_create(void) {
-    CMLOptList* list = calloc(1, sizeof(CMLOptList));
+    CMLOptList* list = cml_calloc(1, sizeof(CMLOptList));
     if (!list) return NULL;
     list->capacity = 8;
-    list->opts = calloc((size_t)list->capacity, sizeof(CMLOpt));
-    if (!list->opts) { free(list); return NULL; }
+    list->opts = cml_calloc((size_t)list->capacity, sizeof(CMLOpt));
+    if (!list->opts) { cml_free(list); return NULL; }
     return list;
 }
 
 void cml_opt_list_free(CMLOptList* list) {
     if (!list) return;
-    free(list->opts);
-    free(list);
+    cml_free(list->opts);
+    cml_free(list);
 }
 
 void cml_opt_list_add(CMLOptList* list, CMLOptType type, int axis, int amount) {
     if (!list) return;
     if (list->num_opts >= list->capacity) {
         int nc = list->capacity * 2;
-        CMLOpt* tmp = realloc(list->opts, (size_t)nc * sizeof(CMLOpt));
+        CMLOpt* tmp = cml_realloc(list->opts, (size_t)nc * sizeof(CMLOpt));
         if (!tmp) return;
         list->opts = tmp;
         list->capacity = nc;
@@ -76,7 +77,7 @@ static int prog_add_axis(LinearProgram* prog, int extent) {
     if (!prog) return -1;
     if (prog->num_axes >= prog->axes_capacity) {
         int nc = prog->axes_capacity * 2;
-        int* tmp = realloc(prog->loop_axes, (size_t)nc * sizeof(int));
+        int* tmp = cml_realloc(prog->loop_axes, (size_t)nc * sizeof(int));
         if (!tmp) return -1;
         prog->loop_axes = tmp;
         prog->axes_capacity = nc;
@@ -334,7 +335,7 @@ int cml_opt_enumerate(struct LinearProgram* prog, CMLOptList*** out_lists,
     if (!prog || !out_lists || !out_count || max_combinations <= 0) return -1;
 
     int cap = max_combinations;
-    CMLOptList** lists = calloc((size_t)cap, sizeof(CMLOptList*));
+    CMLOptList** lists = cml_calloc((size_t)cap, sizeof(CMLOptList*));
     if (!lists) return -1;
     int count = 0;
 

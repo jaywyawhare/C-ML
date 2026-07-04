@@ -9,6 +9,7 @@
 #include <dlfcn.h>
 #include <time.h>
 #include <errno.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct sqlite3 sqlite3;
 typedef struct sqlite3_stmt sqlite3_stmt;
@@ -123,7 +124,7 @@ static char* default_path(void) {
     const char* cache_dir = getenv("CML_CACHE_DIR");
     if (cache_dir) {
         size_t len = strlen(cache_dir) + 32;
-        char* buf = malloc(len);
+        char* buf = cml_malloc(len);
         if (!buf) return NULL;
         snprintf(buf, len, "%s/kernels.db", cache_dir);
         return buf;
@@ -133,7 +134,7 @@ static char* default_path(void) {
     if (!home) home = "/tmp";
 
     size_t len = strlen(home) + 32;
-    char* buf = malloc(len);
+    char* buf = cml_malloc(len);
     if (!buf) return NULL;
     snprintf(buf, len, "%s/.cache/cml/kernels.db", home);
     return buf;
@@ -157,20 +158,20 @@ CMLDiskCache* cml_disk_cache_open(const char* path) {
 
     mkdirs(path);
 
-    CMLDiskCache* cache = calloc(1, sizeof(CMLDiskCache));
+    CMLDiskCache* cache = cml_calloc(1, sizeof(CMLDiskCache));
     if (!cache) {
-        free(alloc_path);
+        cml_free(alloc_path);
         return NULL;
     }
 
     if (sql.open(path, &cache->db) != SQLITE_OK) {
         LOG_ERROR("Failed to open disk cache: %s", path);
-        free(cache);
-        free(alloc_path);
+        cml_free(cache);
+        cml_free(alloc_path);
         return NULL;
     }
 
-    free(alloc_path);
+    cml_free(alloc_path);
 
     char* err = NULL;
     sql.exec(cache->db, "PRAGMA journal_mode=WAL", NULL, NULL, &err);
@@ -189,7 +190,7 @@ CMLDiskCache* cml_disk_cache_open(const char* path) {
         LOG_ERROR("Failed to create table: %s", err);
         if (sql.free_fn) sql.free_fn(err);
         sql.close(cache->db);
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
 
@@ -219,7 +220,7 @@ void cml_disk_cache_close(CMLDiskCache* cache) {
     if (cache->stmt_count) sql.finalize(cache->stmt_count);
     if (cache->db) sql.close(cache->db);
 
-    free(cache);
+    cml_free(cache);
 }
 
 typedef int (*fn_sqlite3_reset)(sqlite3_stmt*);
@@ -285,7 +286,7 @@ int cml_disk_cache_get(CMLDiskCache* cache, uint64_t hash, void** out_data, size
         return -1;
     }
 
-    void* buf = malloc((size_t)blob_size);
+    void* buf = cml_malloc((size_t)blob_size);
     if (!buf) {
         reset_stmt(cache->stmt_get);
         return -1;

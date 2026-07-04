@@ -1,6 +1,7 @@
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 int main(void) {
     cml_init();
@@ -21,7 +22,7 @@ int main(void) {
     int nc = 3;
 
     float* train_y_raw = (float*)tensor_data_ptr(train->y);
-    float* onehot = calloc(n_train * nc, sizeof(float));
+    float* onehot = cml_calloc(n_train * nc, sizeof(float));
     for (int i = 0; i < n_train; i++) {
         int cls = (int)train_y_raw[i];
         if (cls >= 0 && cls < nc)
@@ -75,7 +76,7 @@ int main(void) {
     printf("\nTest accuracy: %d/%d (%.1f%%)\n", correct, n_test,
            correct / (float)n_test * 100);
 
-    free(onehot);
+    cml_free(onehot);
     cml_cleanup();
     return 0;
 }

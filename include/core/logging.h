@@ -2,6 +2,7 @@
 #define CML_LOGGING_H
 
 #include <stdarg.h>
+#include "alloc/cml_allocator.h"
 
 typedef enum {
     LOG_LEVEL_DEBUG   = 0,

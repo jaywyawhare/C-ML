@@ -19,6 +19,7 @@
 #include "distributed/distributed.h"
 #include "distributed/data_parallel.h"
 #include "distributed/pipeline_parallel.h"
+#include "alloc/cml_allocator.h"
 #endif
 
 /* Test counters */
@@ -809,7 +810,7 @@ static int test_ddp_training_loop(void) {
     printf("(final_loss=%.4f, decreased=%s) ", prev_loss, loss_decreased ? "yes" : "no");
 
     optimizer_free(optimizer);
-    free(params);
+    cml_free(params);
     cml_ddp_free(ddp);
     module_free((Module*)model);
     cml_dist_destroy();

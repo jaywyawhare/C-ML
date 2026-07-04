@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 extern CMLNVDriver* cml_dispatch_get_nv_driver(void);
 
@@ -27,12 +28,12 @@ CMLHCQQueue* cml_hcq_nv_queue_create(void) {
         return NULL;
     }
 
-    CMLHCQQueue *queue = (CMLHCQQueue *)calloc(1, sizeof(CMLHCQQueue));
+    CMLHCQQueue *queue = (CMLHCQQueue *)cml_calloc(1, sizeof(CMLHCQQueue));
     if (!queue) return NULL;
 
-    NVQueueData *qd = (NVQueueData *)calloc(1, sizeof(NVQueueData));
+    NVQueueData *qd = (NVQueueData *)cml_calloc(1, sizeof(NVQueueData));
     if (!qd) {
-        free(queue);
+        cml_free(queue);
         return NULL;
     }
 
@@ -44,10 +45,10 @@ CMLHCQQueue* cml_hcq_nv_queue_create(void) {
 
 void cml_hcq_nv_queue_destroy(CMLHCQQueue *queue) {
     if (!queue) return;
-    free(queue->native_handle);
+    cml_free(queue->native_handle);
     queue->native_handle = NULL;
     queue->active = false;
-    free(queue);
+    cml_free(queue);
 }
 
 int cml_hcq_nv_submit_kernel(CMLHCQQueue *queue,
@@ -115,12 +116,12 @@ CMLHCQSignal* cml_hcq_nv_signal_create(void) {
     CMLNVDriver *nv = cml_dispatch_get_nv_driver();
     if (!nv || !nv->initialized) return NULL;
 
-    CMLHCQSignal *signal = (CMLHCQSignal *)calloc(1, sizeof(CMLHCQSignal));
+    CMLHCQSignal *signal = (CMLHCQSignal *)cml_calloc(1, sizeof(CMLHCQSignal));
     if (!signal) return NULL;
 
-    NVSignalData *sd = (NVSignalData *)calloc(1, sizeof(NVSignalData));
+    NVSignalData *sd = (NVSignalData *)cml_calloc(1, sizeof(NVSignalData));
     if (!sd) {
-        free(signal);
+        cml_free(signal);
         return NULL;
     }
 
@@ -134,9 +135,9 @@ CMLHCQSignal* cml_hcq_nv_signal_create(void) {
 
 void cml_hcq_nv_signal_destroy(CMLHCQSignal *signal) {
     if (!signal) return;
-    free(signal->native_handle);
+    cml_free(signal->native_handle);
     signal->native_handle = NULL;
-    free(signal);
+    cml_free(signal);
 }
 
 int cml_hcq_nv_signal_record(CMLHCQQueue *queue, CMLHCQSignal *signal) {

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include "alloc/cml_allocator.h"
 
 static int pool2d_out_dim(int in_size, int kernel, int stride, int padding,
                           int dilation, bool ceil_mode) {
@@ -62,15 +63,15 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
     return uop_maxpool2d(input, &params);
 }
 
-static void maxpool2d_free(Module* module) { free(module); }
+static void maxpool2d_free(Module* module) { cml_free(module); }
 
 MaxPool2d* nn_maxpool2d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
-    MaxPool2d* pool = malloc(sizeof(MaxPool2d));
+    MaxPool2d* pool = cml_malloc(sizeof(MaxPool2d));
     if (!pool)
         return NULL;
 
     if (module_init((Module*)pool, "MaxPool2d", maxpool2d_forward, maxpool2d_free) != 0) {
-        free(pool);
+        cml_free(pool);
         return NULL;
     }
 
@@ -123,16 +124,16 @@ static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
     return uop_avgpool2d(input, &params);
 }
 
-static void avgpool2d_free(Module* module) { free(module); }
+static void avgpool2d_free(Module* module) { cml_free(module); }
 
 AvgPool2d* nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode,
                         bool count_include_pad) {
-    AvgPool2d* pool = malloc(sizeof(AvgPool2d));
+    AvgPool2d* pool = cml_malloc(sizeof(AvgPool2d));
     if (!pool)
         return NULL;
 
     if (module_init((Module*)pool, "AvgPool2d", avgpool2d_forward, avgpool2d_free) != 0) {
-        free(pool);
+        cml_free(pool);
         return NULL;
     }
 
@@ -205,13 +206,13 @@ static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void maxpool3d_free(Module* module) { free(module); }
+static void maxpool3d_free(Module* module) { cml_free(module); }
 
 MaxPool3d* nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
-    MaxPool3d* pool = malloc(sizeof(MaxPool3d));
+    MaxPool3d* pool = cml_malloc(sizeof(MaxPool3d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "MaxPool3d", maxpool3d_forward, maxpool3d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     for (int i = 0; i < 3; i++) {
         pool->kernel_size[i] = kernel_size;
@@ -282,13 +283,13 @@ static Tensor* avgpool3d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void avgpool3d_free(Module* module) { free(module); }
+static void avgpool3d_free(Module* module) { cml_free(module); }
 
 AvgPool3d* nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode, bool count_include_pad) {
-    AvgPool3d* pool = malloc(sizeof(AvgPool3d));
+    AvgPool3d* pool = cml_malloc(sizeof(AvgPool3d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "AvgPool3d", avgpool3d_forward, avgpool3d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     for (int i = 0; i < 3; i++) {
         pool->kernel_size[i] = kernel_size;
@@ -340,13 +341,13 @@ static Tensor* maxpool1d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void maxpool1d_free(Module* module) { free(module); }
+static void maxpool1d_free(Module* module) { cml_free(module); }
 
 MaxPool1d* nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
-    MaxPool1d* pool = malloc(sizeof(MaxPool1d));
+    MaxPool1d* pool = cml_malloc(sizeof(MaxPool1d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "MaxPool1d", maxpool1d_forward, maxpool1d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     pool->kernel_size = kernel_size;
     pool->stride = stride > 0 ? stride : kernel_size;
@@ -399,13 +400,13 @@ static Tensor* avgpool1d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void avgpool1d_free(Module* module) { free(module); }
+static void avgpool1d_free(Module* module) { cml_free(module); }
 
 AvgPool1d* nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode, bool count_include_pad) {
-    AvgPool1d* pool = malloc(sizeof(AvgPool1d));
+    AvgPool1d* pool = cml_malloc(sizeof(AvgPool1d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "AvgPool1d", avgpool1d_forward, avgpool1d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     pool->kernel_size = kernel_size;
     pool->stride = stride > 0 ? stride : kernel_size;
@@ -459,13 +460,13 @@ static Tensor* adaptive_avgpool2d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void adaptive_avgpool2d_free(Module* module) { free(module); }
+static void adaptive_avgpool2d_free(Module* module) { cml_free(module); }
 
 AdaptiveAvgPool2d* nn_adaptive_avgpool2d(int output_h, int output_w) {
-    AdaptiveAvgPool2d* pool = malloc(sizeof(AdaptiveAvgPool2d));
+    AdaptiveAvgPool2d* pool = cml_malloc(sizeof(AdaptiveAvgPool2d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "AdaptiveAvgPool2d", adaptive_avgpool2d_forward, adaptive_avgpool2d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     pool->output_size[0] = output_h;
     pool->output_size[1] = output_w;
@@ -505,13 +506,13 @@ static Tensor* adaptive_avgpool1d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void adaptive_avgpool1d_free(Module* module) { free(module); }
+static void adaptive_avgpool1d_free(Module* module) { cml_free(module); }
 
 AdaptiveAvgPool1d* nn_adaptive_avgpool1d(int output_size) {
-    AdaptiveAvgPool1d* pool = malloc(sizeof(AdaptiveAvgPool1d));
+    AdaptiveAvgPool1d* pool = cml_malloc(sizeof(AdaptiveAvgPool1d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "AdaptiveAvgPool1d", adaptive_avgpool1d_forward, adaptive_avgpool1d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     pool->output_size = output_size;
     return pool;
@@ -559,13 +560,13 @@ static Tensor* adaptive_maxpool2d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void adaptive_maxpool2d_free(Module* module) { free(module); }
+static void adaptive_maxpool2d_free(Module* module) { cml_free(module); }
 
 AdaptiveMaxPool2d* nn_adaptive_maxpool2d(int output_h, int output_w) {
-    AdaptiveMaxPool2d* pool = malloc(sizeof(AdaptiveMaxPool2d));
+    AdaptiveMaxPool2d* pool = cml_malloc(sizeof(AdaptiveMaxPool2d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "AdaptiveMaxPool2d", adaptive_maxpool2d_forward, adaptive_maxpool2d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     pool->output_size[0] = output_h;
     pool->output_size[1] = output_w;
@@ -607,13 +608,13 @@ static Tensor* adaptive_maxpool1d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-static void adaptive_maxpool1d_free(Module* module) { free(module); }
+static void adaptive_maxpool1d_free(Module* module) { cml_free(module); }
 
 AdaptiveMaxPool1d* nn_adaptive_maxpool1d(int output_size) {
-    AdaptiveMaxPool1d* pool = malloc(sizeof(AdaptiveMaxPool1d));
+    AdaptiveMaxPool1d* pool = cml_malloc(sizeof(AdaptiveMaxPool1d));
     if (!pool) return NULL;
     if (module_init((Module*)pool, "AdaptiveMaxPool1d", adaptive_maxpool1d_forward, adaptive_maxpool1d_free) != 0) {
-        free(pool); return NULL;
+        cml_free(pool); return NULL;
     }
     pool->output_size = output_size;
     return pool;

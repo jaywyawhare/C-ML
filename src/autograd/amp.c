@@ -7,6 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include "alloc/cml_allocator.h"
 
 static AutocastContext g_autocast_ctx = {
     .enabled      = false,
@@ -52,7 +53,7 @@ bool autocast_should_keep_float32(OpType op) {
 
 GradScaler* grad_scaler_create(float init_scale, float growth_factor,
                                 float backoff_factor, int growth_interval) {
-    GradScaler* scaler = calloc(1, sizeof(GradScaler));
+    GradScaler* scaler = cml_calloc(1, sizeof(GradScaler));
     if (!scaler) {
         LOG_ERROR("GradScaler: failed to allocate memory");
         return NULL;
@@ -71,7 +72,7 @@ GradScaler* grad_scaler_create(float init_scale, float growth_factor,
 void grad_scaler_free(GradScaler* scaler) {
     if (!scaler)
         return;
-    free(scaler);
+    cml_free(scaler);
 }
 
 Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {

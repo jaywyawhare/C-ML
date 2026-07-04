@@ -1,6 +1,7 @@
 #include "nn/layers/identity.h"
 #include "nn.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* identity_forward(Module* module, Tensor* input) {
     (void)module;
@@ -8,15 +9,15 @@ static Tensor* identity_forward(Module* module, Tensor* input) {
 }
 
 static void identity_free(Module* module) {
-    free(module);
+    cml_free(module);
 }
 
 Identity* nn_identity(void) {
-    Identity* id = malloc(sizeof(Identity));
+    Identity* id = cml_malloc(sizeof(Identity));
     if (!id) return NULL;
 
     if (module_init((Module*)id, "Identity", identity_forward, identity_free) != 0) {
-        free(id);
+        cml_free(id);
         return NULL;
     }
     return id;

@@ -4,6 +4,7 @@
 #include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 ViTConfig cml_zoo_vit_config_tiny(void) {
     return (ViTConfig){
@@ -101,17 +102,17 @@ static void vit_block_free(Module* module) {
         module_free((Module*)block->mlp);
     if (block->norm2)
         module_free((Module*)block->norm2);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_vit_block(int hidden_size, int n_head, int mlp_dim,
                                  DType dtype, DeviceType device) {
-    ViTBlock* block = malloc(sizeof(ViTBlock));
+    ViTBlock* block = cml_malloc(sizeof(ViTBlock));
     if (!block)
         return NULL;
 
     if (module_init((Module*)block, "ViTBlock", vit_block_forward, vit_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -196,19 +197,19 @@ static void vit_free(Module* module) {
         module_free((Module*)vit->norm);
     if (vit->head)
         module_free((Module*)vit->head);
-    free(vit);
+    cml_free(vit);
 }
 
 Module* cml_zoo_vit_create(ViTConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;
 
-    ViTModel* vit = malloc(sizeof(ViTModel));
+    ViTModel* vit = cml_malloc(sizeof(ViTModel));
     if (!vit)
         return NULL;
 
     if (module_init((Module*)vit, "ViT", vit_forward, vit_free) != 0) {
-        free(vit);
+        cml_free(vit);
         return NULL;
     }
 

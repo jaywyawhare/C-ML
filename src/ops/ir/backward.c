@@ -17,6 +17,7 @@
 #endif
 #ifdef __AVX__
 #include <immintrin.h>
+#include "alloc/cml_allocator.h"
 #endif
 
 /* Access the shared BLAS context from execution.c */
@@ -785,7 +786,7 @@ static int cpu_backward_node(struct IRNode* node) {
         CMLBlasContext* blas = get_blas_context();
 
         if (blas && blas->initialized) {
-            float* col_buf = (float*)malloc((size_t)col_h * col_w * sizeof(float));
+            float* col_buf = (float*)cml_malloc((size_t)col_h * col_w * sizeof(float));
             if (!col_buf) break;
 
             for (int g = 0; g < groups; g++) {
@@ -869,7 +870,7 @@ static int cpu_backward_node(struct IRNode* node) {
                 }
             }
 
-            free(col_buf);
+            cml_free(col_buf);
         } else {
             /* Naive fallback with groups, stride, dilation, padding */
             if (in1->requires_grad && in2->data) {
@@ -2042,8 +2043,8 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* g1d = (float*)g1->data, *x = (float*)in1->data;
                 size_t n = in1->numel;
                 // Compute prefix and suffix products to avoid division by zero
-                float* prefix = (float*)calloc(n + 1, sizeof(float));
-                float* suffix = (float*)calloc(n + 1, sizeof(float));
+                float* prefix = (float*)cml_calloc(n + 1, sizeof(float));
+                float* suffix = (float*)cml_calloc(n + 1, sizeof(float));
                 if (prefix && suffix) {
                     prefix[0] = 1.f;
                     for (size_t i = 0; i < n; i++) prefix[i+1] = prefix[i] * x[i];
@@ -2052,7 +2053,7 @@ static int cpu_backward_node(struct IRNode* node) {
                     for (size_t i = 0; i < n; i++)
                         g1d[i] += out_grad[0] * prefix[i] * suffix[i+1];
                 }
-                free(prefix); free(suffix);
+                cml_free(prefix); cml_free(suffix);
             }
         }
         break;
@@ -2930,7 +2931,7 @@ static int cpu_execute_backward(CMLGraph_t ir) {
     /* Use stack buffer for small graphs to avoid malloc/free overhead */
     struct IRNode* stack_buf[64];
     struct IRNode** nodes = (node_count <= 64) ? stack_buf
-                                               : malloc(node_count * sizeof(struct IRNode*));
+                                               : cml_malloc(node_count * sizeof(struct IRNode*));
     if (!nodes) {
         LOG_ERROR("Failed to allocate node array for backward pass");
         return -1;
@@ -2953,7 +2954,7 @@ static int cpu_execute_backward(CMLGraph_t ir) {
     }
 
     if (nodes != stack_buf)
-        free(nodes);
+        cml_free(nodes);
     return 0;
 }
 

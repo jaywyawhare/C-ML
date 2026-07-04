@@ -6,6 +6,7 @@
 
 #include "cml.h"
 #include "nn/qlora.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -56,7 +57,7 @@ static int test_nf4_roundtrip(void) {
     int expected_blocks = (numel + block_size - 1) / block_size;
     if (num_scales != expected_blocks) {
         printf("(expected %d blocks, got %d) ", expected_blocks, num_scales);
-        free(scales);
+        cml_free(scales);
         tensor_free(packed);
         tensor_free(original);
         return 0;
@@ -66,7 +67,7 @@ static int test_nf4_roundtrip(void) {
     Tensor* reconstructed = cml_dequantize_nf4(packed, scales, num_scales,
                                                 block_size, (size_t)numel);
     if (!reconstructed) {
-        free(scales);
+        cml_free(scales);
         tensor_free(packed);
         tensor_free(original);
         return 0;
@@ -98,7 +99,7 @@ static int test_nf4_roundtrip(void) {
         ok = 0;
     }
 
-    free(scales);
+    cml_free(scales);
     tensor_free(packed);
     tensor_free(reconstructed);
     tensor_free(original);

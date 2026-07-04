@@ -17,6 +17,7 @@
 #define NVRTC_LIB_NAME NULL
 #elif defined(_WIN32)
 #include <windows.h>
+#include "alloc/cml_allocator.h"
 #define CUDA_LIB_NAME "nvcuda.dll"
 #define NVRTC_LIB_NAME "nvrtc64_*.dll"
 #endif
@@ -92,7 +93,7 @@ bool cml_cuda_available(void) {
 }
 
 CMLCUDABackend* cml_cuda_backend_create(void) {
-    CMLCUDABackend* backend = calloc(1, sizeof(CMLCUDABackend));
+    CMLCUDABackend* backend = cml_calloc(1, sizeof(CMLCUDABackend));
     if (!backend) {
         LOG_ERROR("Failed to allocate CUDA backend");
         return NULL;
@@ -266,7 +267,7 @@ void cml_cuda_backend_free(CMLCUDABackend* backend) {
         unload_library(backend->cuda_lib);
     }
 
-    free(backend);
+    cml_free(backend);
 }
 
 int cml_cuda_get_device_count(CMLCUDABackend* backend) {
@@ -285,7 +286,7 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
         return NULL;
     }
 
-    CMLCUDAKernel* kernel = calloc(1, sizeof(CMLCUDAKernel));
+    CMLCUDAKernel* kernel = cml_calloc(1, sizeof(CMLCUDAKernel));
     if (!kernel) {
         LOG_ERROR("Failed to allocate CUDA kernel");
         return NULL;
@@ -294,7 +295,7 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
     CUresult err = backend->cuModuleLoadData(&kernel->module, ptx_code);
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuModuleLoadData failed with error %d", err);
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
@@ -302,11 +303,11 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
     if (err != CUDA_SUCCESS) {
         LOG_ERROR("cuModuleGetFunction failed for '%s' with error %d", kernel_name, err);
         backend->cuModuleUnload(kernel->module);
-        free(kernel);
+        cml_free(kernel);
         return NULL;
     }
 
-    kernel->kernel_name = strdup(kernel_name);
+    kernel->kernel_name = cml_strdup(kernel_name);
 
     kernel->grid_dim[0]  = 1;
     kernel->grid_dim[1]  = 1;
@@ -352,10 +353,10 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
         size_t log_size = 0;
         backend->nvrtcGetProgramLogSize(prog, &log_size);
         if (log_size > 1) {
-            char* log = malloc(log_size);
+            char* log = cml_malloc(log_size);
             backend->nvrtcGetProgramLog(prog, log);
             LOG_ERROR("NVRTC compilation failed:\n%s", log);
-            free(log);
+            cml_free(log);
         }
         backend->nvrtcDestroyProgram(&prog);
         return NULL;
@@ -363,14 +364,14 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
 
     size_t ptx_size = 0;
     backend->nvrtcGetPTXSize(prog, &ptx_size);
-    char* ptx = malloc(ptx_size);
+    char* ptx = cml_malloc(ptx_size);
     backend->nvrtcGetPTX(prog, ptx);
     backend->nvrtcDestroyProgram(&prog);
 
     cml_process_replay_record(kernel_name, ptx, ptx_size);
 
     CMLCUDAKernel* kernel = cml_cuda_compile_ptx(backend, ptx, kernel_name);
-    free(ptx);
+    cml_free(ptx);
 
     return kernel;
 }
@@ -382,8 +383,8 @@ void cml_cuda_kernel_free(CMLCUDABackend* backend, CMLCUDAKernel* kernel) {
     if (kernel->module && backend->cuModuleUnload) {
         backend->cuModuleUnload(kernel->module);
     }
-    free(kernel->kernel_name);
-    free(kernel);
+    cml_free(kernel->kernel_name);
+    cml_free(kernel);
 }
 
 void cml_cuda_kernel_set_launch_config(CMLCUDAKernel* kernel, int grid_x, int grid_y, int grid_z,
@@ -497,7 +498,7 @@ int cml_cuda_download_tensor(CMLCUDABackend* backend, Tensor* tensor) {
     size_t size = tensor->numel * cml_dtype_size(tensor->dtype);
 
     if (!tensor->data) {
-        tensor->data = malloc(size);
+        tensor->data = cml_malloc(size);
         if (!tensor->data)
             return -1;
         tensor->owns_data = true;

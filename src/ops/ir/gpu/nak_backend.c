@@ -8,6 +8,7 @@
 #include <dlfcn.h>
 #else
 #include <windows.h>
+#include "alloc/cml_allocator.h"
 #define dlopen(path, flags) ((void*)LoadLibraryA(path))
 #define dlsym(handle, sym)  ((void*)GetProcAddress((HMODULE)(handle), (sym)))
 #define dlclose(handle)     FreeLibrary((HMODULE)(handle))
@@ -84,7 +85,7 @@ bool cml_nak_available(void) {
 }
 
 CMLNAKBackend* cml_nak_create(int gpu_arch) {
-    CMLNAKBackend* nak = calloc(1, sizeof(CMLNAKBackend));
+    CMLNAKBackend* nak = cml_calloc(1, sizeof(CMLNAKBackend));
     if (!nak) return NULL;
 
     nak->gpu_arch = gpu_arch;
@@ -111,7 +112,7 @@ void cml_nak_free(CMLNAKBackend* nak) {
     if (!nak) return;
     if (nak->nak_lib)
         dlclose(nak->nak_lib);
-    free(nak);
+    cml_free(nak);
 }
 
 int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader,
@@ -137,7 +138,7 @@ int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader,
         return -1;
     }
 
-    void* result = malloc(size);
+    void* result = cml_malloc(size);
     if (!result) {
         g_nak_fns.shader_free(compiled);
         return -1;

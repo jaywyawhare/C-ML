@@ -80,7 +80,7 @@ CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch) {
         }
     }
 
-    CMLAMDLLVMCompiler* comp = calloc(1, sizeof(CMLAMDLLVMCompiler));
+    CMLAMDLLVMCompiler* comp = cml_calloc(1, sizeof(CMLAMDLLVMCompiler));
     if (!comp) return NULL;
 
     strncpy(comp->target_triple, "amdgcn-amd-amdhsa", sizeof(comp->target_triple) - 1);
@@ -95,7 +95,7 @@ CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch) {
     comp->llvm_ctx = LLVMContextCreate();
     if (!comp->llvm_ctx) {
         LOG_ERROR("AMD LLVM: failed to create context");
-        free(comp);
+        cml_free(comp);
         return NULL;
     }
 
@@ -107,7 +107,7 @@ void cml_amd_llvm_free(CMLAMDLLVMCompiler* comp) {
     if (!comp) return;
     if (comp->llvm_ctx)
         LLVMContextDispose((LLVMContextRef)comp->llvm_ctx);
-    free(comp);
+    cml_free(comp);
 }
 
 static LLVMTargetMachineRef create_target_machine(CMLAMDLLVMCompiler* comp) {
@@ -217,7 +217,7 @@ int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp,
     size_t obj_size = LLVMGetBufferSize(obj_buf);
     const char* obj_data = LLVMGetBufferStart(obj_buf);
 
-    void* result = malloc(obj_size);
+    void* result = cml_malloc(obj_size);
     if (!result) {
         LLVMDisposeMemoryBuffer(obj_buf);
         LLVMDisposeModule(mod);
@@ -324,7 +324,7 @@ int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
     size_t obj_size = LLVMGetBufferSize(obj_buf);
     const char* obj_data = LLVMGetBufferStart(obj_buf);
 
-    void* result = malloc(obj_size);
+    void* result = cml_malloc(obj_size);
     if (!result) {
         LLVMDisposeMemoryBuffer(obj_buf);
         LLVMDisposeModule(mod);
@@ -348,6 +348,7 @@ int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
 
 #include "ops/ir/gpu/amd_llvm.h"
 #include <stddef.h>
+#include "alloc/cml_allocator.h"
 
 bool cml_amd_llvm_available(void) { return false; }
 CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch) { (void)gpu_arch; return NULL; }

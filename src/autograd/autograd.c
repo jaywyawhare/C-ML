@@ -19,7 +19,7 @@ static pthread_mutex_t g_hook_lock = PTHREAD_MUTEX_INITIALIZER;
 static void autograd_init_once(void) {
     if (global_autograd_engine) return;
 
-    global_autograd_engine = malloc(sizeof(AutogradEngine));
+    global_autograd_engine = cml_malloc(sizeof(AutogradEngine));
     if (!global_autograd_engine) {
         LOG_ERROR("Failed to initialize autograd engine");
         return;
@@ -48,7 +48,7 @@ void autograd_shutdown(void) {
             pthread_mutex_destroy(&global_autograd_engine->lock);
             global_autograd_engine->lock_initialized = false;
         }
-        free(global_autograd_engine);
+        cml_free(global_autograd_engine);
         global_autograd_engine = NULL;
         /* Reset pthread_once so re-init is possible (e.g., in tests) */
         g_autograd_once = (pthread_once_t)PTHREAD_ONCE_INIT;
@@ -142,7 +142,7 @@ typedef struct {
 
 static TensorHookList* get_tensor_hooks(Tensor* t) {
     if (!t->user_data) {
-        t->user_data = calloc(1, sizeof(TensorHookList));
+        t->user_data = cml_calloc(1, sizeof(TensorHookList));
     }
     return (TensorHookList*)t->user_data;
 }
@@ -179,7 +179,7 @@ int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook
     }
 
     if (!module->user_data) {
-        module->user_data = malloc(sizeof(ModuleBackwardHook));
+        module->user_data = cml_malloc(sizeof(ModuleBackwardHook));
         if (!module->user_data) {
             LOG_ERROR("Failed to allocate memory for module hook");
             return -1;
@@ -345,10 +345,10 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                     fclose(f);
                     LOG_INFO("CML_VIZ exported kernels to kernels.json");
                 }
-                free(kernel_json_raw);
+                cml_free(kernel_json_raw);
             }
             if (kernel_json_opt) {
-                free(kernel_json_opt);
+                cml_free(kernel_json_opt);
             }
             tensor_ensure_executed(tensor);
             cml_ir_ensure_gradients_executed(tensor->ir_context);
@@ -415,7 +415,7 @@ int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_n
     }
 
     int max_ndim = ndim1 > ndim2 ? ndim1 : ndim2;
-    int* result  = malloc((size_t)max_ndim * sizeof(int));
+    int* result  = cml_malloc((size_t)max_ndim * sizeof(int));
     if (!result)
         return NULL;
 
@@ -451,10 +451,10 @@ int* broadcast_multi_shapes(int** shapes, int* ndims, int num_shapes, int* out_n
         int* new_result =
             broadcast_shapes(result, current_ndim, shapes[i], ndims[i], &current_ndim);
         if (!new_result) {
-            free(result);
+            cml_free(result);
             return NULL;
         }
-        free(result);
+        cml_free(result);
         result = new_result;
     }
 
@@ -494,14 +494,14 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
     float* grad_out_data = (float*)grad_output->data;
     float* grad_in_data  = (float*)(*grad_input)->data;
 
-    size_t* out_strides = malloc((size_t)grad_output->ndim * sizeof(size_t));
-    size_t* in_strides  = malloc((size_t)ndim * sizeof(size_t));
+    size_t* out_strides = cml_malloc((size_t)grad_output->ndim * sizeof(size_t));
+    size_t* in_strides  = cml_malloc((size_t)ndim * sizeof(size_t));
 
     if (!out_strides || !in_strides) {
         if (out_strides)
-            free(out_strides);
+            cml_free(out_strides);
         if (in_strides)
-            free(in_strides);
+            cml_free(in_strides);
         return;
     }
 
@@ -536,8 +536,8 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
         grad_in_data[in_idx] += grad_out_data[i];
     }
 
-    free(out_strides);
-    free(in_strides);
+    cml_free(out_strides);
+    cml_free(in_strides);
 
 }
 
@@ -584,6 +584,7 @@ void autograd_print_graph(Tensor* tensor) {
 }
 
 #include <inttypes.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct {
     const void** keys; // Stores const pointers for comparison only
@@ -600,9 +601,9 @@ static void map_init(PtrIdMap* m) {
 }
 static void map_free(PtrIdMap* m) {
     if (m->keys)
-        free(m->keys);
+        cml_free(m->keys);
     if (m->ids)
-        free(m->ids);
+        cml_free(m->ids);
 }
 static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     for (int i = 0; i < m->size; i++)
@@ -610,8 +611,8 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
             return m->ids[i];
     if (m->size >= m->cap) {
         int ncap           = m->cap ? m->cap * 2 : 64;
-        const void** nkeys = realloc(m->keys, (size_t)ncap * sizeof(const void*));
-        int* nids          = realloc(m->ids, (size_t)ncap * sizeof(int));
+        const void** nkeys = cml_realloc(m->keys, (size_t)ncap * sizeof(const void*));
+        int* nids          = cml_realloc(m->ids, (size_t)ncap * sizeof(int));
         if (!nkeys || !nids)
             return -1;
         m->keys = nkeys;
@@ -669,7 +670,7 @@ int autograd_export_json(Tensor* root, const char* path) {
     }
 
     int stack_cap         = 256;
-    struct IRNode** stack = malloc(stack_cap * sizeof(struct IRNode*));
+    struct IRNode** stack = cml_malloc(stack_cap * sizeof(struct IRNode*));
     int stack_size        = 0;
     if (stack) {
         stack[stack_size++] = root->ir_node;
@@ -686,7 +687,7 @@ int autograd_export_json(Tensor* root, const char* path) {
                 if (already == 1) {
                     if (stack_size >= stack_cap) {
                         stack_cap *= 2;
-                        struct IRNode** new_stack = realloc(stack, stack_cap * sizeof(struct IRNode*));
+                        struct IRNode** new_stack = cml_realloc(stack, stack_cap * sizeof(struct IRNode*));
                         if (!new_stack) {
                             stack_ok = false;
                             break;
@@ -697,7 +698,7 @@ int autograd_export_json(Tensor* root, const char* path) {
                 }
             }
         }
-        free(stack);
+        cml_free(stack);
     }
 
     fputs("{\n", f);

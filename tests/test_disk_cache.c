@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "ops/ir/disk_cache.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -59,7 +60,7 @@ static int test_put_get(void) {
     }
 
     int ok = (out_size == sizeof(data)) && (memcmp(out, data, sizeof(data)) == 0);
-    free(out);
+    cml_free(out);
     cml_disk_cache_close(cache);
     unlink(tmp_path);
     return ok;
@@ -123,7 +124,7 @@ static int test_overwrite(void) {
     cml_disk_cache_get(cache, 100, &out, &out_size);
 
     int ok = (out_size == sizeof(data2)) && (memcmp(out, data2, sizeof(data2)) == 0);
-    free(out);
+    cml_free(out);
     cml_disk_cache_close(cache);
     unlink(tmp_path);
     return ok;
@@ -145,7 +146,7 @@ static int test_persistence(void) {
     int ok = (cml_disk_cache_get(cache, 555, &out, &out_size) == 0) &&
              (out_size == sizeof(data)) &&
              (memcmp(out, data, sizeof(data)) == 0);
-    free(out);
+    cml_free(out);
     cml_disk_cache_close(cache);
     unlink(tmp_path);
     return ok;
@@ -168,7 +169,7 @@ static int test_large_blob(void) {
     if (!cache) return 1;
 
     size_t size = 1024 * 1024;
-    uint8_t* data = malloc(size);
+    uint8_t* data = cml_malloc(size);
     for (size_t i = 0; i < size; i++)
         data[i] = (uint8_t)(i & 0xFF);
 
@@ -179,8 +180,8 @@ static int test_large_blob(void) {
     cml_disk_cache_get(cache, 7777, &out, &out_size);
 
     int ok = (out_size == size) && (memcmp(out, data, size) == 0);
-    free(out);
-    free(data);
+    cml_free(out);
+    cml_free(data);
     cml_disk_cache_close(cache);
     unlink(tmp_path);
     return ok;

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include "alloc/cml_allocator.h"
 
 #define HVX_VECTOR_SIZE 128
 
@@ -93,12 +94,12 @@ static inline void mem_write32(CMLHexagonSim* sim, uint64_t addr, uint32_t val) 
 CMLHexagonSim* cml_hexagon_sim_create(size_t mem_size) {
     if (mem_size == 0) mem_size = 1024 * 1024;
 
-    CMLHexagonSim* sim = calloc(1, sizeof(CMLHexagonSim));
+    CMLHexagonSim* sim = cml_calloc(1, sizeof(CMLHexagonSim));
     if (!sim) return NULL;
 
-    sim->memory = calloc(1, mem_size);
+    sim->memory = cml_calloc(1, mem_size);
     if (!sim->memory) {
-        free(sim);
+        cml_free(sim);
         return NULL;
     }
 
@@ -110,8 +111,8 @@ CMLHexagonSim* cml_hexagon_sim_create(size_t mem_size) {
 
 void cml_hexagon_sim_free(CMLHexagonSim* sim) {
     if (!sim) return;
-    free(sim->memory);
-    free(sim);
+    cml_free(sim->memory);
+    cml_free(sim);
 }
 
 int cml_hexagon_sim_load(CMLHexagonSim* sim, const void* program, size_t size, uint64_t load_addr) {

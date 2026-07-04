@@ -6,6 +6,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double now_ms(void) {
     struct timespec ts;
@@ -59,7 +60,7 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
         return NULL;
     }
 
-    CMLSpeculativeDecoder* dec = (CMLSpeculativeDecoder*)calloc(1, sizeof(CMLSpeculativeDecoder));
+    CMLSpeculativeDecoder* dec = (CMLSpeculativeDecoder*)cml_calloc(1, sizeof(CMLSpeculativeDecoder));
     if (!dec) {
         LOG_ERROR("cml_speculative_create: allocation failed");
         return NULL;
@@ -72,7 +73,7 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
 
 void cml_speculative_free(CMLSpeculativeDecoder* decoder) {
     if (!decoder) return;
-    free(decoder);
+    cml_free(decoder);
 }
 
 void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
@@ -115,16 +116,16 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
     /* Allocate working buffer for prefix + K draft tokens. */
     int max_seq = prefix_len + K;
-    int* full_seq = (int*)malloc((size_t)max_seq * sizeof(int));
+    int* full_seq = (int*)cml_malloc((size_t)max_seq * sizeof(int));
     if (!full_seq) {
         LOG_ERROR("cml_speculative_decode_step: allocation failed");
         return NULL;
     }
     memcpy(full_seq, prefix_tokens, (size_t)prefix_len * sizeof(int));
 
-    int* draft_tokens = (int*)malloc((size_t)K * sizeof(int));
+    int* draft_tokens = (int*)cml_malloc((size_t)K * sizeof(int));
     if (!draft_tokens) {
-        free(full_seq);
+        cml_free(full_seq);
         LOG_ERROR("cml_speculative_decode_step: allocation failed");
         return NULL;
     }
@@ -165,8 +166,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
     if (!target_logits) {
         LOG_ERROR("target forward returned NULL");
-        free(full_seq);
-        free(draft_tokens);
+        cml_free(full_seq);
+        cml_free(draft_tokens);
         return NULL;
     }
 
@@ -209,18 +210,18 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     int total_output = num_accepted + ((num_accepted == K) ? 1 : 1);
     /* accepted draft tokens + either correction or bonus */
 
-    CMLSpeculativeResult* result = (CMLSpeculativeResult*)calloc(1, sizeof(CMLSpeculativeResult));
+    CMLSpeculativeResult* result = (CMLSpeculativeResult*)cml_calloc(1, sizeof(CMLSpeculativeResult));
     if (!result) {
-        free(full_seq);
-        free(draft_tokens);
+        cml_free(full_seq);
+        cml_free(draft_tokens);
         return NULL;
     }
 
-    result->accepted_tokens = (int*)malloc((size_t)total_output * sizeof(int));
+    result->accepted_tokens = (int*)cml_malloc((size_t)total_output * sizeof(int));
     if (!result->accepted_tokens) {
-        free(result);
-        free(full_seq);
-        free(draft_tokens);
+        cml_free(result);
+        cml_free(full_seq);
+        cml_free(draft_tokens);
         return NULL;
     }
 
@@ -250,8 +251,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     dec->total_accepted += (size_t)num_accepted;
     dec->total_steps++;
 
-    free(full_seq);
-    free(draft_tokens);
+    cml_free(full_seq);
+    cml_free(draft_tokens);
 
     LOG_DEBUG("speculative step: drafted=%d accepted=%d rate=%.2f",
               K, num_accepted, result->acceptance_rate);
@@ -261,8 +262,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
 void cml_speculative_result_free(CMLSpeculativeResult* result) {
     if (!result) return;
-    free(result->accepted_tokens);
-    free(result);
+    cml_free(result->accepted_tokens);
+    cml_free(result);
 }
 
 float cml_speculative_acceptance_rate(const CMLSpeculativeDecoder* dec) {

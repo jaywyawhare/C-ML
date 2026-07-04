@@ -19,6 +19,7 @@
 #include "core/error_stack.h"
 #include "core/config.h"
 #include "core/threefry.h"
+#include "alloc/cml_allocator.h"
 
 static inline uint16_t float_to_fp16(float f) {
     uint32_t x;
@@ -199,16 +200,16 @@ static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType*
 
 Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape,
                       bool requires_grad) {
-    Tensor* t = (Tensor*)malloc(sizeof(Tensor));
+    Tensor* t = (Tensor*)cml_malloc(sizeof(Tensor));
     if (!t)
         return NULL;
 
     t->dtype  = dtype;
     t->device = device;
     t->ndim   = ndim;
-    t->shape  = (int*)malloc(ndim * sizeof(int));
+    t->shape  = (int*)cml_malloc(ndim * sizeof(int));
     if (!t->shape) {
-        free(t);
+        cml_free(t);
         return NULL;
     }
     memcpy(t->shape, shape, ndim * sizeof(int));
@@ -220,10 +221,10 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
 
     total_size *= cml_dtype_size(dtype);
 
-    t->data = malloc(total_size);
+    t->data = cml_malloc(total_size);
     if (!t->data) {
-        free(t->shape);
-        free(t);
+        cml_free(t->shape);
+        cml_free(t);
         return NULL;
     }
 
@@ -236,9 +237,9 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->base           = NULL;
     t->strides        = compute_contiguous_strides(t->shape, ndim);
     if (!t->strides && ndim > 0) {
-        free(t->data);
-        free(t->shape);
-        free(t);
+        cml_free(t->data);
+        cml_free(t->shape);
+        cml_free(t);
         return NULL;
     }
     t->storage_offset = 0;
@@ -303,7 +304,7 @@ void* tensor_data_ptr(Tensor* t) {
             // After execution, update tensor metadata from IR node's output shape
             // (e.g., reshape operations may have changed dimensions)
             if (t->ir_node && t->ir_node->output_shape && t->ir_node->output_ndim > 0) {
-                if (t->shape) free(t->shape);
+                if (t->shape) cml_free(t->shape);
                 t->shape = tensor_shape_copy(t->ir_node->output_shape, t->ir_node->output_ndim);
                 t->ndim  = t->ir_node->output_ndim;
                 t->numel = tensor_numel(t->ir_node->output_shape, t->ir_node->output_ndim);
@@ -313,7 +314,7 @@ void* tensor_data_ptr(Tensor* t) {
             // allocate it (shouldn't happen, but be safe).
             if (!t->data && t->numel > 0) {
                 size_t size = t->numel * cml_dtype_size(t->dtype);
-                t->data     = calloc(1, size);
+                t->data     = cml_calloc(1, size);
                 if (!t->data) {
                     LOG_ERROR("Failed to allocate data after execution");
                     return NULL;
@@ -324,7 +325,7 @@ void* tensor_data_ptr(Tensor* t) {
             LOG_WARNING("IR execution failed, returning zero-initialized data");
             if (!t->data && t->numel > 0) {
                 size_t size = t->numel * cml_dtype_size(t->dtype);
-                t->data     = calloc(1, size);
+                t->data     = cml_calloc(1, size);
             }
             t->is_executed = true;
             return t->data;
@@ -416,10 +417,10 @@ size_t* compute_contiguous_strides(int* shape, int ndim) {
 
     if (ndim == 0) {
         // Scalar tensor has no strides, but some functions might expect a non-NULL pointer
-        return (size_t*)malloc(sizeof(size_t));
+        return (size_t*)cml_malloc(sizeof(size_t));
     }
 
-    size_t* strides = (size_t*)malloc((size_t)ndim * sizeof(size_t));
+    size_t* strides = (size_t*)cml_malloc((size_t)ndim * sizeof(size_t));
     if (!strides) {
         LOG_ERROR("Failed to allocate memory for strides");
         return NULL;
@@ -462,7 +463,7 @@ size_t tensor_compute_storage_size(int* shape, size_t* strides, int ndim) {
 }
 
 int* tensor_shape_copy(int* shape, int ndim) {
-    int* new_shape = (int*)malloc((size_t)ndim * sizeof(int));
+    int* new_shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
     if (!new_shape) {
         LOG_ERROR("Failed to allocate memory for tensor shape copy");
         return NULL;
@@ -620,7 +621,7 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         return node->output;
     }
 
-    Tensor* t = (Tensor*)malloc(sizeof(Tensor));
+    Tensor* t = (Tensor*)cml_malloc(sizeof(Tensor));
     if (!t)
         return NULL;
 
@@ -633,7 +634,7 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     if (node->output_shape) {
         t->shape = tensor_shape_copy(node->output_shape, node->output_ndim);
         if (!t->shape) {
-            free(t);
+            cml_free(t);
             return NULL;
         }
         t->ndim  = node->output_ndim;
@@ -643,13 +644,13 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         if (node->inputs && node->inputs[0]) {
             t->shape = tensor_shape_copy(node->inputs[0]->shape, node->inputs[0]->ndim);
             if (!t->shape) {
-                free(t);
+                cml_free(t);
                 return NULL;
             }
             t->ndim  = node->inputs[0]->ndim;
             t->numel = node->inputs[0]->numel;
         } else {
-            free(t);
+            cml_free(t);
             return NULL;
         }
     }
@@ -679,8 +680,8 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
 
     t->strides = compute_contiguous_strides(t->shape, t->ndim);
     if (!t->strides && t->ndim > 0) {
-        free(t->shape);
-        free(t);
+        cml_free(t->shape);
+        cml_free(t);
         return NULL;
     }
     t->storage_offset    = 0;
@@ -789,7 +790,7 @@ void tensor_free(Tensor* t) {
             if (t->from_buffer_cache && t->numel > 0) {
                 cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
             } else {
-                free(t->data);
+                cml_free(t->data);
             }
         } else {
             device_free(t->data, t->device);
@@ -797,9 +798,9 @@ void tensor_free(Tensor* t) {
     }
 
     if (t->shape)
-        free(t->shape);
+        cml_free(t->shape);
     if (t->strides)
-        free(t->strides);
+        cml_free(t->strides);
 
     if (t->grad) {
         tensor_free(t->grad);
@@ -807,11 +808,11 @@ void tensor_free(Tensor* t) {
     }
 
     if (t->user_data) {
-        free(t->user_data);
+        cml_free(t->user_data);
         t->user_data = NULL;
     }
 
-    free(t);
+    cml_free(t);
 }
 
 Tensor* tensor_clone(Tensor* t) {
@@ -888,7 +889,7 @@ int* tensor_shape(int ndim, ...) {
         return NULL;
     }
 
-    int* shape = (int*)malloc((size_t)ndim * sizeof(int));
+    int* shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
     if (!shape) {
         return NULL;
     }
@@ -927,7 +928,7 @@ Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* c
     resolve_config(config, &dtype, &device);
 
     size_t esz = cml_dtype_size(dtype);
-    void* buf  = malloc((size_t)steps * esz);
+    void* buf  = cml_malloc((size_t)steps * esz);
     if (!buf)
         return NULL;
     if (steps == 1) {
@@ -938,7 +939,7 @@ Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* c
             cml_cpu_lazy_store_float_elem(buf, (size_t)i, dtype, start + (float)i * step);
     }
     Tensor* out = uop_const(buf, (size_t)steps * esz, shape, 1, dtype, device);
-    free(buf);
+    cml_free(buf);
     return out;
 }
 
@@ -1020,7 +1021,7 @@ Tensor* tensor_squeeze(Tensor* a, int dim) {
     }
     if (new_ndim == 0) new_ndim = 1;
 
-    int* new_shape = malloc((size_t)new_ndim * sizeof(int));
+    int* new_shape = cml_malloc((size_t)new_ndim * sizeof(int));
     if (!new_shape) return NULL;
 
     int j = 0;
@@ -1035,7 +1036,7 @@ Tensor* tensor_squeeze(Tensor* a, int dim) {
     if (j == 0) new_shape[0] = 1;
 
     Tensor* result = tensor_reshape(a, new_shape, new_ndim);
-    free(new_shape);
+    cml_free(new_shape);
     return result;
 }
 
@@ -1045,7 +1046,7 @@ Tensor* tensor_unsqueeze(Tensor* a, int dim) {
     if (dim < 0 || dim > a->ndim) return NULL;
 
     int new_ndim = a->ndim + 1;
-    int* new_shape = malloc((size_t)new_ndim * sizeof(int));
+    int* new_shape = cml_malloc((size_t)new_ndim * sizeof(int));
     if (!new_shape) return NULL;
 
     int j = 0;
@@ -1058,7 +1059,7 @@ Tensor* tensor_unsqueeze(Tensor* a, int dim) {
     }
 
     Tensor* result = tensor_reshape(a, new_shape, new_ndim);
-    free(new_shape);
+    cml_free(new_shape);
     return result;
 }
 
@@ -1189,12 +1190,12 @@ Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* c
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
-    Tensor* t = (Tensor*)calloc(1, sizeof(Tensor));
+    Tensor* t = (Tensor*)cml_calloc(1, sizeof(Tensor));
     if (!t) return NULL;
 
     t->ndim = ndim;
-    t->shape = (int*)malloc((size_t)ndim * sizeof(int));
-    if (!t->shape) { free(t); return NULL; }
+    t->shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
+    if (!t->shape) { cml_free(t); return NULL; }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int));
 
     t->numel = tensor_numel(shape, ndim);
@@ -1220,7 +1221,7 @@ Tensor* tensor_randperm(int n, const TensorConfig* config) {
     resolve_config(config, &dtype, &device);
 
     size_t esz = cml_dtype_size(dtype);
-    void* buf  = malloc((size_t)n * esz);
+    void* buf  = cml_malloc((size_t)n * esz);
     if (!buf)
         return NULL;
     for (int i = 0; i < n; i++)
@@ -1233,7 +1234,7 @@ Tensor* tensor_randperm(int n, const TensorConfig* config) {
         memcpy((uint8_t*)buf + (size_t)j * esz, tmp, esz);
     }
     Tensor* out = uop_const(buf, (size_t)n * esz, shape, 1, dtype, device);
-    free(buf);
+    cml_free(buf);
     return out;
 }
 
@@ -1369,7 +1370,7 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
         }
         if (mode == SCATTER_REDUCE_MEAN) {
             // Count contributions per index
-            int* counts = calloc(self->shape[0], sizeof(int));
+            int* counts = cml_calloc(self->shape[0], sizeof(int));
             if (counts) {
                 for (int i = 0; i < self->shape[0]; i++) counts[i] = 1; // self contributes 1
                 for (size_t i = 0; i < index->numel; i++) {
@@ -1381,7 +1382,7 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
                         tensor_set_float(output, i, tensor_get_float(output, i) / counts[i]);
                     }
                 }
-                free(counts);
+                cml_free(counts);
             }
         }
     } else if (self->ndim == 2) {
@@ -1440,18 +1441,18 @@ Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
     size_t new_numel = total_bytes / dst_size;
 
     int new_ndim = a->ndim;
-    int* new_shape = malloc(new_ndim * sizeof(int));
+    int* new_shape = cml_malloc(new_ndim * sizeof(int));
     if (!new_shape) return NULL;
 
     for (int i = 0; i < new_ndim - 1; i++) new_shape[i] = a->shape[i];
     size_t leading = 1;
     for (int i = 0; i < new_ndim - 1; i++) leading *= a->shape[i];
-    if (leading == 0) { free(new_shape); return NULL; }
+    if (leading == 0) { cml_free(new_shape); return NULL; }
     new_shape[new_ndim - 1] = (int)(new_numel / leading);
 
     TensorConfig config = {.dtype = target_dtype, .device = a->device, .has_dtype = true, .has_device = true};
     Tensor* out = tensor_empty(new_shape, new_ndim, &config);
-    free(new_shape);
+    cml_free(new_shape);
     if (!out) return NULL;
     tensor_ensure_executed(out);
 
@@ -1474,18 +1475,18 @@ QRResult tensor_qr(Tensor* a) {
     int k = m < n ? m : n;
 
     // Work on a copy of A (will become R)
-    float* R = malloc((size_t)m * n * sizeof(float));
+    float* R = cml_malloc((size_t)m * n * sizeof(float));
     if (!R) return result;
     for (int i = 0; i < m * n; i++)
         R[i] = tensor_get_float(a, i);
 
     // Q starts as identity [m, m]
-    float* Q = calloc((size_t)m * m, sizeof(float));
-    if (!Q) { free(R); return result; }
+    float* Q = cml_calloc((size_t)m * m, sizeof(float));
+    if (!Q) { cml_free(R); return result; }
     for (int i = 0; i < m; i++) Q[i * m + i] = 1.0f;
 
-    float* v = malloc((size_t)m * sizeof(float));
-    if (!v) { free(R); free(Q); return result; }
+    float* v = cml_malloc((size_t)m * sizeof(float));
+    if (!v) { cml_free(R); cml_free(Q); return result; }
 
     for (int j = 0; j < k; j++) {
         // Extract column j from row j..m-1
@@ -1521,14 +1522,14 @@ QRResult tensor_qr(Tensor* a) {
             for (int i = j; i < m; i++) Q[r * m + i] -= dot * v[i];
         }
     }
-    free(v);
+    cml_free(v);
 
     // Create reduced Q [m, k] and R [k, n]
     TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
 
     int q_shape[] = {m, k};
     result.Q = tensor_empty(q_shape, 2, &config);
-    if (!result.Q) { free(R); free(Q); return result; }
+    if (!result.Q) { cml_free(R); cml_free(Q); return result; }
     tensor_ensure_executed(result.Q);
     float* q_out = (float*)result.Q->data;
     for (int i = 0; i < m; i++)
@@ -1537,15 +1538,15 @@ QRResult tensor_qr(Tensor* a) {
 
     int r_shape[] = {k, n};
     result.R = tensor_empty(r_shape, 2, &config);
-    if (!result.R) { free(R); free(Q); tensor_free(result.Q); result.Q = NULL; return result; }
+    if (!result.R) { cml_free(R); cml_free(Q); tensor_free(result.Q); result.Q = NULL; return result; }
     tensor_ensure_executed(result.R);
     float* r_out = (float*)result.R->data;
     for (int i = 0; i < k; i++)
         for (int j = 0; j < n; j++)
             r_out[i * n + j] = R[i * n + j];
 
-    free(R);
-    free(Q);
+    cml_free(R);
+    cml_free(Q);
     return result;
 }
 
@@ -1564,14 +1565,14 @@ SVDResult tensor_svd(Tensor* a) {
 
     // Work on A^T * A for right singular vectors, or use Jacobi on A directly
     // Use one-sided Jacobi: iterate on columns of A copy
-    float* W = malloc((size_t)m * n * sizeof(float));
+    float* W = cml_malloc((size_t)m * n * sizeof(float));
     if (!W) return result;
     for (int i = 0; i < m * n; i++)
         W[i] = tensor_get_float(a, i);
 
     // V starts as identity [n, n]
-    float* V = calloc((size_t)n * n, sizeof(float));
-    if (!V) { free(W); return result; }
+    float* V = cml_calloc((size_t)n * n, sizeof(float));
+    if (!V) { cml_free(W); return result; }
     for (int i = 0; i < n; i++) V[i * n + i] = 1.0f;
 
     // One-sided Jacobi rotations
@@ -1616,16 +1617,16 @@ SVDResult tensor_svd(Tensor* a) {
     }
 
     // Compute singular values (column norms of W) and U = W / sigma
-    float* sigma = malloc((size_t)k * sizeof(float));
-    float* U = malloc((size_t)m * k * sizeof(float));
-    if (!sigma || !U) { free(W); free(V); free(sigma); free(U); return result; }
+    float* sigma = cml_malloc((size_t)k * sizeof(float));
+    float* U = cml_malloc((size_t)m * k * sizeof(float));
+    if (!sigma || !U) { cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); return result; }
 
-    int* order = malloc((size_t)n * sizeof(int));
-    if (!order) { free(W); free(V); free(sigma); free(U); return result; }
+    int* order = cml_malloc((size_t)n * sizeof(int));
+    if (!order) { cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); return result; }
     for (int i = 0; i < n; i++) order[i] = i;
 
-    float* col_norms = malloc((size_t)n * sizeof(float));
-    if (!col_norms) { free(W); free(V); free(sigma); free(U); free(order); return result; }
+    float* col_norms = cml_malloc((size_t)n * sizeof(float));
+    if (!col_norms) { cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); cml_free(order); return result; }
     for (int j = 0; j < n; j++) {
         float norm = 0.0f;
         for (int i = 0; i < m; i++) norm += W[i * n + j] * W[i * n + j];
@@ -1676,7 +1677,7 @@ SVDResult tensor_svd(Tensor* a) {
         }
     }
 
-    free(W); free(V); free(sigma); free(U); free(order); free(col_norms);
+    cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); cml_free(order); cml_free(col_norms);
     return result;
 }
 
@@ -1735,7 +1736,7 @@ int tensor_assign(Tensor* t, Tensor* src) {
             cml_backend_buffer_free(t->buffer_handle);
             t->buffer_handle = NULL;
         } else if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
-            free(t->data);
+            cml_free(t->data);
         } else {
             device_free(t->data, t->device);
         }
@@ -1747,7 +1748,7 @@ int tensor_assign(Tensor* t, Tensor* src) {
         t->buffer_handle = NULL;
         t->from_buffer_cache = false;
     } else {
-        t->data = malloc(nbytes);
+        t->data = cml_malloc(nbytes);
         if (!t->data) return -1;
         memcpy(t->data, src->data, nbytes);
         t->owns_data = true;
@@ -1764,7 +1765,7 @@ int tensor_assign_data(Tensor* t, const void* data, size_t nbytes) {
     if (nbytes > expected) return -1;
 
     if (!t->data) {
-        t->data = malloc(expected);
+        t->data = cml_malloc(expected);
         if (!t->data) return -1;
         t->owns_data = true;
     }

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct TaskNode {
     Task task;
@@ -93,7 +94,7 @@ static void* worker_thread(void* arg) {
                     pool->task_queue_tail = NULL;
                 }
                 pool->queue_size--;
-                free(task_node);
+                cml_free(task_node);
                 pthread_cond_broadcast(&pool->cond);
             }
             pthread_mutex_unlock(&pool->mutex);
@@ -113,16 +114,16 @@ ThreadPool* threadpool_create(size_t num_threads) {
         }
     }
 
-    ThreadPool* pool = malloc(sizeof(ThreadPool));
+    ThreadPool* pool = cml_malloc(sizeof(ThreadPool));
     if (!pool) {
         LOG_ERROR("Failed to allocate thread pool");
         return NULL;
     }
 
     pool->num_threads = num_threads;
-    pool->workers     = calloc(num_threads, sizeof(Worker));
+    pool->workers     = cml_calloc(num_threads, sizeof(Worker));
     if (!pool->workers) {
-        free(pool);
+        cml_free(pool);
         return NULL;
     }
 
@@ -164,15 +165,15 @@ void threadpool_destroy(ThreadPool* pool) {
     TaskNode* node = pool->task_queue_head;
     while (node) {
         TaskNode* next = node->next;
-        free(node);
+        cml_free(node);
         node = next;
     }
 
     pthread_mutex_destroy(&pool->mutex);
     pthread_cond_destroy(&pool->cond);
     pthread_cond_destroy(&pool->task_cond);
-    free(pool->workers);
-    free(pool);
+    cml_free(pool->workers);
+    cml_free(pool);
 }
 
 int threadpool_submit(ThreadPool* pool, Task* task) {
@@ -180,7 +181,7 @@ int threadpool_submit(ThreadPool* pool, Task* task) {
         return -1;
     }
 
-    TaskNode* task_node = malloc(sizeof(TaskNode));
+    TaskNode* task_node = cml_malloc(sizeof(TaskNode));
     if (!task_node) {
         LOG_ERROR("Failed to allocate task node");
         return -1;

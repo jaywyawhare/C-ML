@@ -19,6 +19,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static DeviceType g_device = DEVICE_CPU;
 
@@ -53,8 +54,8 @@ static double bench_gemm(int N) {
     TensorConfig cfg = {
         .dtype = DTYPE_FLOAT32, .device = g_device, .has_dtype = true, .has_device = true};
 
-    float* a_data = malloc(sizeof(float) * N * N);
-    float* b_data = malloc(sizeof(float) * N * N);
+    float* a_data = cml_malloc(sizeof(float) * N * N);
+    float* b_data = cml_malloc(sizeof(float) * N * N);
     fill_random(a_data, N * N);
     fill_random(b_data, N * N);
 
@@ -81,8 +82,8 @@ static double bench_gemm(int N) {
         times[r] = (now() - t0) / iters * 1e3;
     }
 
-    free(a_data);
-    free(b_data);
+    cml_free(a_data);
+    cml_free(b_data);
     return median(times, rounds);
 }
 
@@ -92,9 +93,9 @@ static double bench_fused(int N) {
     TensorConfig cfg = {
         .dtype = DTYPE_FLOAT32, .device = g_device, .has_dtype = true, .has_device = true};
 
-    float* a_data    = malloc(sizeof(float) * N * N);
-    float* b_data    = malloc(sizeof(float) * N * N);
-    float* bias_data = malloc(sizeof(float) * N);
+    float* a_data    = cml_malloc(sizeof(float) * N * N);
+    float* b_data    = cml_malloc(sizeof(float) * N * N);
+    float* bias_data = cml_malloc(sizeof(float) * N);
     fill_random(a_data, N * N);
     fill_random(b_data, N * N);
     fill_random(bias_data, N);
@@ -121,9 +122,9 @@ static double bench_fused(int N) {
         cml_reset_ir_context();
     }
 
-    free(a_data);
-    free(b_data);
-    free(bias_data);
+    cml_free(a_data);
+    cml_free(b_data);
+    cml_free(bias_data);
     return median(times, rounds);
 }
 
@@ -133,7 +134,7 @@ static double bench_mlp_forward(void) {
     TensorConfig cfg = {
         .dtype = DTYPE_FLOAT32, .device = g_device, .has_dtype = true, .has_device = true};
 
-    float* x_data = malloc(sizeof(float) * batch * in_f);
+    float* x_data = cml_malloc(sizeof(float) * batch * in_f);
     fill_random(x_data, batch * in_f);
     Tensor* X = cml_tensor(x_data, x_shape, 2, &cfg);
 
@@ -165,7 +166,7 @@ static double bench_mlp_forward(void) {
     }
     cml_reset_ir_context();
 
-    free(x_data);
+    cml_free(x_data);
     module_free((Module*)model);
     return median(times, 5);
 }
@@ -177,8 +178,8 @@ static double bench_mlp_train(void) {
     TensorConfig cfg = {
         .dtype = DTYPE_FLOAT32, .device = g_device, .has_dtype = true, .has_device = true};
 
-    float* x_data = malloc(sizeof(float) * batch * in_f);
-    float* y_data = malloc(sizeof(float) * batch * out_f);
+    float* x_data = cml_malloc(sizeof(float) * batch * in_f);
+    float* y_data = cml_malloc(sizeof(float) * batch * out_f);
     fill_random(x_data, batch * in_f);
     fill_random(y_data, batch * out_f);
 
@@ -220,8 +221,8 @@ static double bench_mlp_train(void) {
         cml_reset_ir_context();
     }
 
-    free(x_data);
-    free(y_data);
+    cml_free(x_data);
+    cml_free(y_data);
     optimizer_free(opt);
     module_free((Module*)model);
     return median(times, 5);
@@ -234,7 +235,7 @@ static double bench_conv2d(void) {
         .dtype = DTYPE_FLOAT32, .device = g_device, .has_dtype = true, .has_device = true};
 
     int numel     = batch * ic * h * w;
-    float* x_data = malloc(sizeof(float) * numel);
+    float* x_data = cml_malloc(sizeof(float) * numel);
     fill_random(x_data, numel);
     Tensor* X = cml_tensor(x_data, x_shape, 4, &cfg);
 
@@ -262,7 +263,7 @@ static double bench_conv2d(void) {
     }
     cml_reset_ir_context();
 
-    free(x_data);
+    cml_free(x_data);
     module_free(conv);
     return median(times, 5);
 }

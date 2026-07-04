@@ -13,6 +13,7 @@
 
 #ifdef CML_HAS_OPENCL
 #include "ops/ir/gpu/opencl_ir_backend.h"
+#include "alloc/cml_allocator.h"
 #endif
 
 static int tests_passed = 0;
@@ -40,8 +41,8 @@ static void test_matmul(void) {
 
     /* CPU reference */
     TensorConfig cfg = {0};
-    float* a_data = malloc(M * K * sizeof(float));
-    float* b_data = malloc(K * N * sizeof(float));
+    float* a_data = cml_malloc(M * K * sizeof(float));
+    float* b_data = cml_malloc(K * N * sizeof(float));
     for (int i = 0; i < M * K; i++) a_data[i] = (float)(i % 7) * 0.1f;
     for (int i = 0; i < K * N; i++) b_data[i] = (float)(i % 5) * 0.1f;
 
@@ -52,7 +53,7 @@ static void test_matmul(void) {
     Tensor* tc_cpu = uop_matmul(ta_cpu, tb_cpu);
     float* cpu_result = (float*)tensor_data_ptr(tc_cpu);
 
-    float* cpu_copy = malloc(M * N * sizeof(float));
+    float* cpu_copy = cml_malloc(M * N * sizeof(float));
     memcpy(cpu_copy, cpu_result, M * N * sizeof(float));
 
     tensor_free(ta_cpu);
@@ -77,15 +78,15 @@ static void test_matmul(void) {
     cml_reset_ir_context();
     unsetenv("CML_BACKEND");
 
-    free(a_data);
-    free(b_data);
-    free(cpu_copy);
+    cml_free(a_data);
+    cml_free(b_data);
+    cml_free(cpu_copy);
 }
 
 static void test_elementwise(void) {
     printf("Testing elementwise ops on GPU...\n");
     int n = 1024;
-    float* data = malloc(n * sizeof(float));
+    float* data = cml_malloc(n * sizeof(float));
     for (int i = 0; i < n; i++) data[i] = (float)(i - 512) * 0.01f;
 
     int shape[] = {n};
@@ -97,7 +98,7 @@ static void test_elementwise(void) {
         Tensor* t = tensor_from_data(data, shape, 1, &cfg);
         Tensor* r = uop_relu(t);
         float* cpu_res = (float*)tensor_data_ptr(r);
-        float* cpu_copy = malloc(n * sizeof(float));
+        float* cpu_copy = cml_malloc(n * sizeof(float));
         memcpy(cpu_copy, cpu_res, n * sizeof(float));
         tensor_free(t); tensor_free(r);
         cml_reset_ir_context();
@@ -112,12 +113,12 @@ static void test_elementwise(void) {
         tensor_free(t); tensor_free(r);
         cml_reset_ir_context();
         unsetenv("CML_BACKEND");
-        free(cpu_copy);
+        cml_free(cpu_copy);
     }
 
     /* Test ADD with broadcast */
     {
-        float* data2 = malloc(sizeof(float));
+        float* data2 = cml_malloc(sizeof(float));
         data2[0] = 3.14f;
         int shape2[] = {1};
 
@@ -126,7 +127,7 @@ static void test_elementwise(void) {
         Tensor* tb = tensor_from_data(data2, shape2, 1, &cfg);
         Tensor* r = uop_add(ta, tb);
         float* cpu_res = (float*)tensor_data_ptr(r);
-        float* cpu_copy = malloc(n * sizeof(float));
+        float* cpu_copy = cml_malloc(n * sizeof(float));
         memcpy(cpu_copy, cpu_res, n * sizeof(float));
         tensor_free(ta); tensor_free(tb); tensor_free(r);
         cml_reset_ir_context();
@@ -142,18 +143,18 @@ static void test_elementwise(void) {
         tensor_free(ta); tensor_free(tb); tensor_free(r);
         cml_reset_ir_context();
         unsetenv("CML_BACKEND");
-        free(cpu_copy);
-        free(data2);
+        cml_free(cpu_copy);
+        cml_free(data2);
     }
 
-    free(data);
+    cml_free(data);
 }
 
 static void test_large_matmul_perf(void) {
     printf("Testing large MATMUL performance...\n");
     int M = 512, K = 512, N = 512;
-    float* a_data = malloc(M * K * sizeof(float));
-    float* b_data = malloc(K * N * sizeof(float));
+    float* a_data = cml_malloc(M * K * sizeof(float));
+    float* b_data = cml_malloc(K * N * sizeof(float));
     for (int i = 0; i < M * K; i++) a_data[i] = (float)(i % 11) * 0.01f;
     for (int i = 0; i < K * N; i++) b_data[i] = (float)(i % 13) * 0.01f;
 
@@ -203,8 +204,8 @@ static void test_large_matmul_perf(void) {
     printf("    GEMM 512x512: GPU %.2fms, CPU %.2fms (%.2fx)\n", gpu_ms, cpu_ms, cpu_ms / gpu_ms);
     CHECK("MATMUL 512x512 GPU runs", gpu_ms > 0);
 
-    free(a_data);
-    free(b_data);
+    cml_free(a_data);
+    cml_free(b_data);
 }
 
 int main(void) {

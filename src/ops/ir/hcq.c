@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #ifdef CML_HAS_CUDA
 extern CMLHCQQueue*  cml_hcq_cuda_queue_create(void);
@@ -113,19 +114,19 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
         return cml_hcq_opencl_queue_create();
 #endif
     case CML_HCQ_VULKAN: {
-        CMLHCQQueue* vq = calloc(1, sizeof(CMLHCQQueue));
+        CMLHCQQueue* vq = cml_calloc(1, sizeof(CMLHCQQueue));
         if (!vq) return NULL;
         vq->backend = CML_HCQ_VULKAN;
-        if (cml_hcq_vulkan_queue_init(vq) != 0) { free(vq); return NULL; }
+        if (cml_hcq_vulkan_queue_init(vq) != 0) { cml_free(vq); return NULL; }
         return vq;
     }
     case CML_HCQ_NV:
         return cml_hcq_nv_queue_create();
     case CML_HCQ_AM: {
-        CMLHCQQueue* aq = calloc(1, sizeof(CMLHCQQueue));
+        CMLHCQQueue* aq = cml_calloc(1, sizeof(CMLHCQQueue));
         if (!aq) return NULL;
         aq->backend = CML_HCQ_AM;
-        if (cml_hcq_am_queue_init(aq) != 0) { free(aq); return NULL; }
+        if (cml_hcq_am_queue_init(aq) != 0) { cml_free(aq); return NULL; }
         return aq;
     }
     case CML_HCQ_CPU:
@@ -136,7 +137,7 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     }
 
     /* CPU fallback */
-    CMLHCQQueue* queue = (CMLHCQQueue*)calloc(1, sizeof(CMLHCQQueue));
+    CMLHCQQueue* queue = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
     if (!queue) {
         LOG_ERROR("Failed to allocate CMLHCQQueue");
         return NULL;
@@ -164,20 +165,20 @@ void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
 #endif
     case CML_HCQ_VULKAN:
         cml_hcq_vulkan_queue_destroy(queue);
-        free(queue);
+        cml_free(queue);
         return;
     case CML_HCQ_NV:
         cml_hcq_nv_queue_destroy(queue);
         return;
     case CML_HCQ_AM:
         cml_hcq_am_queue_destroy(queue);
-        free(queue);
+        cml_free(queue);
         return;
     default:
         break;
     }
     queue->active = false;
-    free(queue);
+    cml_free(queue);
 }
 
 int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
@@ -305,19 +306,19 @@ CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
         return cml_hcq_opencl_signal_create();
 #endif
     case CML_HCQ_VULKAN: {
-        CMLHCQSignal* vs = calloc(1, sizeof(CMLHCQSignal));
+        CMLHCQSignal* vs = cml_calloc(1, sizeof(CMLHCQSignal));
         if (!vs) return NULL;
         vs->backend = CML_HCQ_VULKAN;
-        if (cml_hcq_vulkan_signal_create(vs) != 0) { free(vs); return NULL; }
+        if (cml_hcq_vulkan_signal_create(vs) != 0) { cml_free(vs); return NULL; }
         return vs;
     }
     case CML_HCQ_NV:
         return cml_hcq_nv_signal_create();
     case CML_HCQ_AM: {
-        CMLHCQSignal* as = calloc(1, sizeof(CMLHCQSignal));
+        CMLHCQSignal* as = cml_calloc(1, sizeof(CMLHCQSignal));
         if (!as) return NULL;
         as->backend = CML_HCQ_AM;
-        if (cml_hcq_am_signal_create(as) != 0) { free(as); return NULL; }
+        if (cml_hcq_am_signal_create(as) != 0) { cml_free(as); return NULL; }
         return as;
     }
     case CML_HCQ_CPU:
@@ -327,7 +328,7 @@ CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
         return NULL;
     }
 
-    CMLHCQSignal* signal = (CMLHCQSignal*)calloc(1, sizeof(CMLHCQSignal));
+    CMLHCQSignal* signal = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
     if (!signal) {
         LOG_ERROR("Failed to allocate CMLHCQSignal");
         return NULL;
@@ -355,19 +356,19 @@ void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
 #endif
     case CML_HCQ_VULKAN:
         cml_hcq_vulkan_signal_destroy(signal);
-        free(signal);
+        cml_free(signal);
         return;
     case CML_HCQ_NV:
         cml_hcq_nv_signal_destroy(signal);
         return;
     case CML_HCQ_AM:
         cml_hcq_am_signal_destroy(signal);
-        free(signal);
+        cml_free(signal);
         return;
     default:
         break;
     }
-    free(signal);
+    cml_free(signal);
 }
 
 int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
@@ -525,7 +526,7 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
 
 CMLHCQPipeline* cml_hcq_pipeline_create(void) {
     CMLHCQPipeline* pipeline =
-        (CMLHCQPipeline*)calloc(1, sizeof(CMLHCQPipeline));
+        (CMLHCQPipeline*)cml_calloc(1, sizeof(CMLHCQPipeline));
     if (!pipeline) {
         LOG_ERROR("Failed to allocate CMLHCQPipeline");
         return NULL;
@@ -547,7 +548,7 @@ void cml_hcq_pipeline_destroy(CMLHCQPipeline* pipeline) {
     }
 
     LOG_DEBUG("Destroying HCQ pipeline %p", (void*)pipeline);
-    free(pipeline);
+    cml_free(pipeline);
 }
 
 int cml_hcq_pipeline_add_stage(CMLHCQPipeline* pipeline, CMLHCQQueue* queue) {

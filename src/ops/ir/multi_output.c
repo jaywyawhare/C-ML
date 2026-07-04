@@ -3,6 +3,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define MAX_INPUTS_TRACKED 32
 
@@ -83,7 +84,7 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
     int ng = sched->num_groups;
     if (ng < 2) return 0;
 
-    GroupSignature* sigs = calloc((size_t)ng, sizeof(GroupSignature));
+    GroupSignature* sigs = cml_calloc((size_t)ng, sizeof(GroupSignature));
     if (!sigs) return -1;
 
     for (int i = 0; i < ng; i++) {
@@ -91,12 +92,12 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
             collect_group_inputs(sched->groups[i], &sigs[i]);
     }
 
-    int* pairs = calloc((size_t)(ng * 2), sizeof(int));
-    if (!pairs) { free(sigs); return -1; }
+    int* pairs = cml_calloc((size_t)(ng * 2), sizeof(int));
+    if (!pairs) { cml_free(sigs); return -1; }
     int count = 0;
 
-    int* merged = calloc((size_t)ng, sizeof(int));
-    if (!merged) { free(sigs); free(pairs); return -1; }
+    int* merged = cml_calloc((size_t)ng, sizeof(int));
+    if (!merged) { cml_free(sigs); cml_free(pairs); return -1; }
 
     for (int i = 0; i < ng; i++) {
         if (merged[i]) continue;
@@ -118,16 +119,16 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
         }
     }
 
-    free(merged);
-    free(sigs);
+    cml_free(merged);
+    cml_free(sigs);
 
     if (count == 0) {
-        free(pairs);
+        cml_free(pairs);
         return 0;
     }
 
-    int* tmp = realloc(pairs, (size_t)(count * 2) * sizeof(int));
-    if (!tmp) { free(pairs); *merge_groups = NULL; *num_merges = 0; return 0; }
+    int* tmp = cml_realloc(pairs, (size_t)(count * 2) * sizeof(int));
+    if (!tmp) { cml_free(pairs); *merge_groups = NULL; *num_merges = 0; return 0; }
     *merge_groups = tmp;
     *num_merges = count;
     return count;
@@ -159,7 +160,7 @@ int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_m
 
             if (primary->num_nodes >= primary->node_capacity) {
                 int nc = primary->node_capacity * 2;
-                struct IRNode** tmp = realloc(primary->nodes,
+                struct IRNode** tmp = cml_realloc(primary->nodes,
                                               (size_t)nc * sizeof(struct IRNode*));
                 if (!tmp) return -1;
                 primary->nodes = tmp;
@@ -170,9 +171,9 @@ int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_m
             primary->total_memory += secondary->total_memory / secondary->num_nodes;
         }
 
-        free(secondary->nodes);
-        free(secondary->eliminated_buffers);
-        free(secondary);
+        cml_free(secondary->nodes);
+        cml_free(secondary->eliminated_buffers);
+        cml_free(secondary);
         sched->groups[gj] = NULL;
     }
 
@@ -186,8 +187,8 @@ int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_m
     sched->total_groups_after = write;
 
     if (sched->execution_order) {
-        free(sched->execution_order);
-        sched->execution_order = calloc((size_t)write, sizeof(int));
+        cml_free(sched->execution_order);
+        sched->execution_order = cml_calloc((size_t)write, sizeof(int));
         if (sched->execution_order) {
             for (int i = 0; i < write; i++)
                 sched->execution_order[i] = i;

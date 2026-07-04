@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static void training_example(void) {
     cml_init();
@@ -181,9 +182,9 @@ static void training_example(void) {
                         }
                     }
                     if (unopt)
-                        free(unopt);
+                        cml_free(unopt);
                     if (opt)
-                        free(opt);
+                        cml_free(opt);
                 }
             }
 

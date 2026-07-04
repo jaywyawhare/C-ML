@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double now(void) {
     struct timespec ts;
@@ -35,13 +36,13 @@ int main(void) {
     {
         CMLBlasContext* blas = cml_blas_get_context();
         if (blas && blas->initialized) {
-            float* X   = malloc(sizeof(float) * batch * in_f);
-            float* W1  = malloc(sizeof(float) * hid * in_f);   /* [128,784] stored */
-            float* B1  = malloc(sizeof(float) * hid);
-            float* H   = malloc(sizeof(float) * batch * hid);
-            float* W2  = malloc(sizeof(float) * out_f * hid);  /* [10,128] stored */
-            float* B2  = malloc(sizeof(float) * out_f);
-            float* OUT = malloc(sizeof(float) * batch * out_f);
+            float* X   = cml_malloc(sizeof(float) * batch * in_f);
+            float* W1  = cml_malloc(sizeof(float) * hid * in_f);   /* [128,784] stored */
+            float* B1  = cml_malloc(sizeof(float) * hid);
+            float* H   = cml_malloc(sizeof(float) * batch * hid);
+            float* W2  = cml_malloc(sizeof(float) * out_f * hid);  /* [10,128] stored */
+            float* B2  = cml_malloc(sizeof(float) * out_f);
+            float* OUT = cml_malloc(sizeof(float) * batch * out_f);
             fill_random(X, batch * in_f);
             fill_random(W1, hid * in_f);
             fill_random(B1, hid);
@@ -80,7 +81,7 @@ int main(void) {
             double ms = (now() - t0) / iters * 1e3;
             printf("Raw BLAS MLP forward:    %8.3f ms\n", ms);
 
-            free(X); free(W1); free(B1); free(H); free(W2); free(B2); free(OUT);
+            cml_free(X); cml_free(W1); cml_free(B1); cml_free(H); cml_free(W2); cml_free(B2); cml_free(OUT);
         }
     }
 
@@ -89,7 +90,7 @@ int main(void) {
         int x_shape[] = {batch, in_f};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* x_data = malloc(sizeof(float) * batch * in_f);
+        float* x_data = cml_malloc(sizeof(float) * batch * in_f);
         fill_random(x_data, batch * in_f);
         Tensor* X = cml_tensor(x_data, x_shape, 2, &cfg);
 
@@ -139,7 +140,7 @@ int main(void) {
                t_matmul1 / iters * 1e3, t_ir_reset / iters * 1e3,
                (t_matmul1 + t_ir_reset) / iters * 1e3);
 
-        free(x_data);
+        cml_free(x_data);
         module_free((Module*)model);
     }
 
@@ -155,10 +156,10 @@ int main(void) {
             int col_h = ic * kh * kw;  /* 27 */
             int col_w = oh * ow;       /* 900 */
 
-            float* input = malloc(sizeof(float) * cb * ic * ih * iw);
-            float* weight = malloc(sizeof(float) * oc * col_h);
-            float* col = malloc(sizeof(float) * col_h * col_w);
-            float* output = malloc(sizeof(float) * cb * oc * oh * ow);
+            float* input = cml_malloc(sizeof(float) * cb * ic * ih * iw);
+            float* weight = cml_malloc(sizeof(float) * oc * col_h);
+            float* col = cml_malloc(sizeof(float) * col_h * col_w);
+            float* output = cml_malloc(sizeof(float) * cb * oc * oh * ow);
             fill_random(input, cb * ic * ih * iw);
             fill_random(weight, oc * col_h);
 
@@ -200,7 +201,7 @@ int main(void) {
             double ms = (now() - t0) / iters * 1e3;
             printf("Raw BLAS im2col+mm conv: %8.3f ms\n", ms);
 
-            free(input); free(weight); free(col); free(output);
+            cml_free(input); cml_free(weight); cml_free(col); cml_free(output);
         }
     }
 
@@ -210,7 +211,7 @@ int main(void) {
         int x_shape[] = {cb, ic, h, w};
         TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
-        float* x_data = malloc(sizeof(float) * cb * ic * h * w);
+        float* x_data = cml_malloc(sizeof(float) * cb * ic * h * w);
         fill_random(x_data, cb * ic * h * w);
         Tensor* X = cml_tensor(x_data, x_shape, 4, &cfg);
 
@@ -231,7 +232,7 @@ int main(void) {
         double ms = (now() - t0) / iters * 1e3;
         printf("CML Conv2d forward:      %8.3f ms\n", ms);
 
-        free(x_data);
+        cml_free(x_data);
         module_free((Module*)conv);
     }
 

@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #if defined(__AVX2__)
 #include <immintrin.h>
+#include "alloc/cml_allocator.h"
 #endif
 
 static size_t alloc_size_aligned(size_t size, size_t alignment);
@@ -77,15 +78,15 @@ static void fast_path_free(SequentialFastPath* fp) {
     }
     for (int i = 0; i < fp->num_ops; i++) {
         if (fp->ops[i].weight_transposed)
-            free(fp->ops[i].weight_transposed);
+            cml_free(fp->ops[i].weight_transposed);
         if (fp->ops[i].out_buf &&
             (i == 0 || fp->ops[i].out_buf != fp->ops[i - 1].out_buf)) {
-            free(fp->ops[i].out_buf);
+            cml_aligned_free(fp->ops[i].out_buf);
         }
     }
-    free(fp->ops);
-    free(fp->input_shape);
-    free(fp);
+    cml_free(fp->ops);
+    cml_free(fp->input_shape);
+    cml_free(fp);
 }
 
 /* Build a SequentialFastPath from the module list and a sample input tensor.
@@ -95,14 +96,14 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
     /* Only build when NOT in training mode (weights must be frozen). */
     if (((Module*)seq)->training) return NULL;
 
-    SequentialFastPath* fp = calloc(1, sizeof(SequentialFastPath));
+    SequentialFastPath* fp = cml_calloc(1, sizeof(SequentialFastPath));
     if (!fp) return NULL;
 
-    fp->ops = calloc((size_t)seq->num_modules, sizeof(FastOp));
-    if (!fp->ops) { free(fp); return NULL; }
+    fp->ops = cml_calloc((size_t)seq->num_modules, sizeof(FastOp));
+    if (!fp->ops) { cml_free(fp); return NULL; }
 
-    fp->input_shape = malloc(sizeof(int) * input->ndim);
-    if (!fp->input_shape) { free(fp->ops); free(fp); return NULL; }
+    fp->input_shape = cml_malloc(sizeof(int) * input->ndim);
+    if (!fp->input_shape) { cml_free(fp->ops); cml_free(fp); return NULL; }
     memcpy(fp->input_shape, input->shape, sizeof(int) * input->ndim);
     fp->input_ndim  = input->ndim;
     fp->input_numel = input->numel;
@@ -133,7 +134,7 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
 
             /* Pre-transpose weight from (out×in) → (in×out) so the BLAS call
              * is NoTrans/NoTrans — enables our AVX2 microkernel for small sizes. */
-            op->weight_transposed = malloc(
+            op->weight_transposed = cml_malloc(
                 (size_t)lin->in_features * lin->out_features * sizeof(float));
             if (!op->weight_transposed) { fast_path_free(fp); return NULL; }
             {
@@ -146,7 +147,7 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
             }
 
             size_t nbytes = alloc_size_aligned(op->out_numel * sizeof(float), 64);
-            op->out_buf   = aligned_alloc(64, nbytes);
+            op->out_buf   = cml_aligned_alloc(nbytes, 64);
             if (!op->out_buf) { fast_path_free(fp); return NULL; }
             prev_out       = op->out_buf;
             prev_out_numel = op->out_numel;
@@ -193,7 +194,7 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
     fp->output_tensor = tensor_empty(out_shape, out_ndim, NULL);
     if (!fp->output_tensor) { fast_path_free(fp); return NULL; }
     if (fp->output_tensor->owns_data && fp->output_tensor->data)
-        free(fp->output_tensor->data);
+        cml_free(fp->output_tensor->data);
     fp->output_tensor->data      = fp->result_buf;
     fp->output_tensor->owns_data = false;
     fp->output_tensor->is_executed = true;
@@ -296,15 +297,15 @@ static void free_cached_graph(CachedModelGraph* cache) {
         cml_free_execution_plan(cache->plan);
     }
     if (cache->input_shape) {
-        free(cache->input_shape);
+        cml_free(cache->input_shape);
     }
     if (cache->input_buffer) {
-        free(cache->input_buffer);
+        cml_aligned_free(cache->input_buffer);
     }
     if (cache->output_buffer) {
-        free(cache->output_buffer);
+        cml_aligned_free(cache->output_buffer);
     }
-    free(cache);
+    cml_free(cache);
 }
 
 static bool shapes_match(CachedModelGraph* cache, Tensor* input) {
@@ -324,43 +325,43 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     if (!input || !output || !ir)
         return NULL;
 
-    CachedModelGraph* cache = calloc(1, sizeof(CachedModelGraph));
+    CachedModelGraph* cache = cml_calloc(1, sizeof(CachedModelGraph));
     if (!cache)
         return NULL;
 
     cache->input_ndim  = input->ndim;
-    cache->input_shape = malloc(sizeof(int) * input->ndim);
+    cache->input_shape = cml_malloc(sizeof(int) * input->ndim);
     if (!cache->input_shape) {
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
     memcpy(cache->input_shape, input->shape, sizeof(int) * input->ndim);
     cache->input_numel = input->numel;
 
     cache->input_buffer =
-        aligned_alloc(32, alloc_size_aligned((size_t)input->numel * sizeof(float), 32));
+        cml_aligned_alloc(alloc_size_aligned((size_t)input->numel * sizeof(float), 32), 32);
     if (!cache->input_buffer) {
-        free(cache->input_shape);
-        free(cache);
+        cml_free(cache->input_shape);
+        cml_free(cache);
         return NULL;
     }
 
     cache->output_numel  = output->numel;
     cache->output_buffer =
-        aligned_alloc(32, alloc_size_aligned((size_t)output->numel * sizeof(float), 32));
+        cml_aligned_alloc(alloc_size_aligned((size_t)output->numel * sizeof(float), 32), 32);
     if (!cache->output_buffer) {
-        free(cache->input_buffer);
-        free(cache->input_shape);
-        free(cache);
+        cml_aligned_free(cache->input_buffer);
+        cml_free(cache->input_shape);
+        cml_free(cache);
         return NULL;
     }
 
     cache->plan = cml_create_execution_plan(ir);
     if (!cache->plan) {
-        free(cache->output_buffer);
-        free(cache->input_buffer);
-        free(cache->input_shape);
-        free(cache);
+        cml_aligned_free(cache->output_buffer);
+        cml_aligned_free(cache->input_buffer);
+        cml_free(cache->input_shape);
+        cml_free(cache);
         return NULL;
     }
 
@@ -540,14 +541,14 @@ static void sequential_free(Module* module) {
                 module_free(seq->modules[i]);
             }
         }
-        free(seq->modules);
+        cml_free(seq->modules);
     }
 
-    free(seq);
+    cml_free(seq);
 }
 
 Sequential* nn_sequential(void) {
-    Sequential* seq = malloc(sizeof(Sequential));
+    Sequential* seq = cml_malloc(sizeof(Sequential));
     if (!seq) {
         error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
                          "Failed to allocate memory for Sequential module", __FILE__, __LINE__,
@@ -558,7 +559,7 @@ Sequential* nn_sequential(void) {
     if (module_init((Module*)seq, "Sequential", sequential_forward, sequential_free) != 0) {
         error_stack_push(CM_OPERATION_FAILED, "Failed to initialize Sequential module", __FILE__,
                          __LINE__, __func__);
-        free(seq);
+        cml_free(seq);
         return NULL;
     }
 
@@ -581,7 +582,7 @@ int sequential_add(Sequential* seq, Module* module) {
         return -1;
     if (seq->num_modules >= seq->capacity) {
         int new_capacity     = seq->capacity == 0 ? 8 : seq->capacity * 2;
-        Module** new_modules = realloc(seq->modules, (size_t)new_capacity * sizeof(Module*));
+        Module** new_modules = cml_realloc(seq->modules, (size_t)new_capacity * sizeof(Module*));
         if (!new_modules) {
             LOG_ERROR("Failed to allocate memory for Sequential modules");
             return -1;
@@ -615,7 +616,7 @@ int sequential_add(Sequential* seq, Module* module) {
             }
         }
         if (params)
-            free(params);
+            cml_free(params);
     }
 
     LOG_DEBUG(

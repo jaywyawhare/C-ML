@@ -8,11 +8,12 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define INITIAL_CAPACITY 16
 
 CleanupContext* cleanup_context_create(void) {
-    CleanupContext* ctx = malloc(sizeof(CleanupContext));
+    CleanupContext* ctx = cml_malloc(sizeof(CleanupContext));
     if (!ctx)
         return NULL;
 
@@ -47,7 +48,7 @@ static int ensure_tensor_capacity(CleanupContext* ctx, size_t needed) {
         new_capacity *= 2;
     }
 
-    Tensor** new_tensors = realloc(ctx->tensors, (size_t)new_capacity * sizeof(Tensor*));
+    Tensor** new_tensors = cml_realloc(ctx->tensors, (size_t)new_capacity * sizeof(Tensor*));
     if (!new_tensors)
         return -1;
 
@@ -110,7 +111,7 @@ void cleanup_clear_all(CleanupContext* ctx) {
     }
 
     if (ctx->params) {
-        free(ctx->params);
+        cml_free(ctx->params);
         ctx->params = NULL;
     }
 
@@ -125,7 +126,7 @@ void cleanup_clear_all(CleanupContext* ctx) {
         }
     }
     if (ctx->tensors) {
-        free(ctx->tensors);
+        cml_free(ctx->tensors);
         ctx->tensors = NULL;
     }
     ctx->num_tensors     = 0;
@@ -137,7 +138,7 @@ void cleanup_clear_all(CleanupContext* ctx) {
         }
     }
     if (ctx->datasets) {
-        free(ctx->datasets);
+        cml_free(ctx->datasets);
         ctx->datasets = NULL;
     }
     ctx->num_datasets     = 0;
@@ -145,11 +146,11 @@ void cleanup_clear_all(CleanupContext* ctx) {
 
     for (size_t i = 0; i < ctx->num_memory_ptrs; i++) {
         if (ctx->memory_ptrs[i]) {
-            free(ctx->memory_ptrs[i]);
+            cml_free(ctx->memory_ptrs[i]);
         }
     }
     if (ctx->memory_ptrs) {
-        free(ctx->memory_ptrs);
+        cml_free(ctx->memory_ptrs);
         ctx->memory_ptrs = NULL;
     }
     ctx->num_memory_ptrs = 0;
@@ -161,5 +162,5 @@ void cleanup_context_free(CleanupContext* ctx) {
         return;
 
     cleanup_clear_all(ctx);
-    free(ctx);
+    cml_free(ctx);
 }

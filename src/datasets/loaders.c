@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <strings.h>
+#include "alloc/cml_allocator.h"
 
 static int is_image_file(const char* name) {
     const char* ext = strrchr(name, '.');
@@ -58,7 +59,7 @@ static char** list_subdirs(const char* path, int* count) {
     if (!d) { *count = 0; return NULL; }
 
     int cap = 64;
-    char** dirs = malloc(cap * sizeof(char*));
+    char** dirs = cml_malloc(cap * sizeof(char*));
     *count = 0;
 
     struct dirent* ent;
@@ -69,9 +70,9 @@ static char** list_subdirs(const char* path, int* count) {
         if (!is_directory(full)) continue;
         if (*count >= cap) {
             cap *= 2;
-            dirs = realloc(dirs, cap * sizeof(char*));
+            dirs = cml_realloc(dirs, cap * sizeof(char*));
         }
-        dirs[(*count)++] = strdup(ent->d_name);
+        dirs[(*count)++] = cml_strdup(ent->d_name);
     }
     closedir(d);
     qsort(dirs, *count, sizeof(char*), cmp_str);
@@ -83,7 +84,7 @@ static char** list_files_in_dir(const char* path, int (*filter)(const char*), in
     if (!d) { *count = 0; return NULL; }
 
     int cap = 256;
-    char** files = malloc(cap * sizeof(char*));
+    char** files = cml_malloc(cap * sizeof(char*));
     *count = 0;
 
     struct dirent* ent;
@@ -96,9 +97,9 @@ static char** list_files_in_dir(const char* path, int (*filter)(const char*), in
         if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) continue;
         if (*count >= cap) {
             cap *= 2;
-            files = realloc(files, cap * sizeof(char*));
+            files = cml_realloc(files, cap * sizeof(char*));
         }
-        files[(*count)++] = strdup(full);
+        files[(*count)++] = cml_strdup(full);
     }
     closedir(d);
     qsort(files, *count, sizeof(char*), cmp_str);
@@ -135,18 +136,18 @@ static float* load_ppm_image(const char* path, int target_size, int* out_channel
     if (w <= 0 || h <= 0 || maxval <= 0) { fclose(f); return NULL; }
 
     size_t pixel_count = (size_t)w * h * channels;
-    unsigned char* raw = malloc(pixel_count);
+    unsigned char* raw = cml_malloc(pixel_count);
     if (!raw) { fclose(f); return NULL; }
     if (fread(raw, 1, pixel_count, f) != pixel_count) {
-        free(raw);
+        cml_free(raw);
         fclose(f);
         return NULL;
     }
     fclose(f);
 
     int ts = target_size > 0 ? target_size : h;
-    float* out = malloc((size_t)ts * ts * channels * sizeof(float));
-    if (!out) { free(raw); return NULL; }
+    float* out = cml_malloc((size_t)ts * ts * channels * sizeof(float));
+    if (!out) { cml_free(raw); return NULL; }
 
     float scale_y = (float)h / ts;
     float scale_x = (float)w / ts;
@@ -164,7 +165,7 @@ static float* load_ppm_image(const char* path, int target_size, int* out_channel
         }
     }
 
-    free(raw);
+    cml_free(raw);
     return out;
 }
 
@@ -187,14 +188,14 @@ CMLImageNetLoader* cml_imagenet_open(const char* dir_path, int image_size) {
 
     if (total == 0) {
         LOG_ERROR("[loaders] No image files found in %s", dir_path);
-        for (int i = 0; i < num_classes; i++) free(class_dirs[i]);
-        free(class_dirs);
+        for (int i = 0; i < num_classes; i++) cml_free(class_dirs[i]);
+        cml_free(class_dirs);
         return NULL;
     }
 
-    CMLImageNetLoader* loader = calloc(1, sizeof(CMLImageNetLoader));
-    loader->image_paths = malloc(total * sizeof(char*));
-    loader->labels = malloc(total * sizeof(int));
+    CMLImageNetLoader* loader = cml_calloc(1, sizeof(CMLImageNetLoader));
+    loader->image_paths = cml_malloc(total * sizeof(char*));
+    loader->labels = cml_malloc(total * sizeof(int));
     loader->num_classes = num_classes;
     loader->image_size = image_size > 0 ? image_size : 224;
     loader->num_samples = 0;
@@ -210,14 +211,14 @@ CMLImageNetLoader* cml_imagenet_open(const char* dir_path, int image_size) {
             loader->image_paths[idx] = files[j];
             loader->labels[idx] = c;
         }
-        free(files);
+        cml_free(files);
     }
 
     LOG_INFO("[loaders] ImageNet: %d samples, %d classes from %s",
              loader->num_samples, num_classes, dir_path);
 
-    for (int i = 0; i < num_classes; i++) free(class_dirs[i]);
-    free(class_dirs);
+    for (int i = 0; i < num_classes; i++) cml_free(class_dirs[i]);
+    cml_free(class_dirs);
     return loader;
 }
 
@@ -232,9 +233,9 @@ Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batc
     int channels = 3;
     int feat = channels * img_size * img_size;
 
-    float* X = calloc((size_t)actual_size * feat, sizeof(float));
-    float* y = malloc((size_t)actual_size * sizeof(float));
-    if (!X || !y) { free(X); free(y); return NULL; }
+    float* X = cml_calloc((size_t)actual_size * feat, sizeof(float));
+    float* y = cml_malloc((size_t)actual_size * sizeof(float));
+    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
 
     int loaded = 0;
     for (int i = 0; i < actual_size; i++) {
@@ -245,7 +246,7 @@ Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batc
             int src_feat = ch * img_size * img_size;
             if (src_feat <= feat)
                 memcpy(X + (size_t)loaded * feat, pixels, src_feat * sizeof(float));
-            free(pixels);
+            cml_free(pixels);
         }
         y[loaded] = (float)loader->labels[idx];
         loaded++;
@@ -256,18 +257,18 @@ Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batc
         ds->name = "imagenet_batch";
         ds->num_classes = loader->num_classes;
     }
-    free(X);
-    free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
 void cml_imagenet_free(CMLImageNetLoader* loader) {
     if (!loader) return;
     for (int i = 0; i < loader->num_samples; i++)
-        free(loader->image_paths[i]);
-    free(loader->image_paths);
-    free(loader->labels);
-    free(loader);
+        cml_free(loader->image_paths[i]);
+    cml_free(loader->image_paths);
+    cml_free(loader->labels);
+    cml_free(loader);
 }
 
 static void collect_audio_recursive(const char* dir, char*** paths, char*** transcripts,
@@ -293,11 +294,11 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
 
         if (*count >= *cap) {
             *cap *= 2;
-            *paths = realloc(*paths, *cap * sizeof(char*));
-            *transcripts = realloc(*transcripts, *cap * sizeof(char*));
+            *paths = cml_realloc(*paths, *cap * sizeof(char*));
+            *transcripts = cml_realloc(*transcripts, *cap * sizeof(char*));
         }
 
-        (*paths)[*count] = strdup(full);
+        (*paths)[*count] = cml_strdup(full);
 
         char txt_path[2048];
         snprintf(txt_path, sizeof(txt_path), "%s", full);
@@ -352,7 +353,7 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
             fclose(tf);
         }
 
-        (*transcripts)[*count] = transcript ? transcript : strdup("");
+        (*transcripts)[*count] = transcript ? transcript : cml_strdup("");
         (*count)++;
     }
     closedir(d);
@@ -363,19 +364,19 @@ CMLLibriSpeechLoader* cml_librispeech_open(const char* dir_path) {
 
     int cap = 1024;
     int count = 0;
-    char** paths = malloc(cap * sizeof(char*));
-    char** transcripts = malloc(cap * sizeof(char*));
+    char** paths = cml_malloc(cap * sizeof(char*));
+    char** transcripts = cml_malloc(cap * sizeof(char*));
 
     collect_audio_recursive(dir_path, &paths, &transcripts, &count, &cap);
 
     if (count == 0) {
         LOG_ERROR("[loaders] No audio files found in %s", dir_path);
-        free(paths);
-        free(transcripts);
+        cml_free(paths);
+        cml_free(transcripts);
         return NULL;
     }
 
-    CMLLibriSpeechLoader* loader = calloc(1, sizeof(CMLLibriSpeechLoader));
+    CMLLibriSpeechLoader* loader = cml_calloc(1, sizeof(CMLLibriSpeechLoader));
     loader->audio_paths = paths;
     loader->transcripts = transcripts;
     loader->num_samples = count;
@@ -388,12 +389,12 @@ CMLLibriSpeechLoader* cml_librispeech_open(const char* dir_path) {
 void cml_librispeech_free(CMLLibriSpeechLoader* loader) {
     if (!loader) return;
     for (int i = 0; i < loader->num_samples; i++) {
-        free(loader->audio_paths[i]);
-        free(loader->transcripts[i]);
+        cml_free(loader->audio_paths[i]);
+        cml_free(loader->transcripts[i]);
     }
-    free(loader->audio_paths);
-    free(loader->transcripts);
-    free(loader);
+    cml_free(loader->audio_paths);
+    cml_free(loader->transcripts);
+    cml_free(loader);
 }
 
 static char* json_skip_ws(char* p) {
@@ -464,10 +465,10 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
     long fsize = ftell(f);
     rewind(f);
 
-    char* buf = malloc(fsize + 1);
+    char* buf = cml_malloc(fsize + 1);
     if (!buf) { fclose(f); return NULL; }
     if ((long)fread(buf, 1, fsize, f) != fsize) {
-        free(buf);
+        cml_free(buf);
         fclose(f);
         return NULL;
     }
@@ -476,10 +477,10 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
 
     int cap = 4096;
     int count = 0;
-    char** contexts = malloc(cap * sizeof(char*));
-    char** questions = malloc(cap * sizeof(char*));
-    char** answers = malloc(cap * sizeof(char*));
-    int* answer_starts = malloc(cap * sizeof(int));
+    char** contexts = cml_malloc(cap * sizeof(char*));
+    char** questions = cml_malloc(cap * sizeof(char*));
+    char** answers = cml_malloc(cap * sizeof(char*));
+    int* answer_starts = cml_malloc(cap * sizeof(int));
 
     /* Find "data" array */
     char* p = strstr(buf, "\"data\"");
@@ -588,19 +589,19 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
                     if (question) {
                         if (count >= cap) {
                             cap *= 2;
-                            contexts = realloc(contexts, cap * sizeof(char*));
-                            questions = realloc(questions, cap * sizeof(char*));
-                            answers = realloc(answers, cap * sizeof(char*));
-                            answer_starts = realloc(answer_starts, cap * sizeof(int));
+                            contexts = cml_realloc(contexts, cap * sizeof(char*));
+                            questions = cml_realloc(questions, cap * sizeof(char*));
+                            answers = cml_realloc(answers, cap * sizeof(char*));
+                            answer_starts = cml_realloc(answer_starts, cap * sizeof(int));
                         }
-                        contexts[count] = strdup(context);
+                        contexts[count] = cml_strdup(context);
                         questions[count] = question;
-                        answers[count] = answer ? answer : strdup("");
+                        answers[count] = answer ? answer : cml_strdup("");
                         answer_starts[count] = ans_start;
                         count++;
                     } else {
-                        free(question);
-                        free(answer);
+                        cml_free(question);
+                        cml_free(answer);
                     }
 
                     /* Skip to end of this qa object */
@@ -613,7 +614,7 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
                     }
                 }
             }
-            free(context);
+            cml_free(context);
 
             /* Skip to end of this paragraph object */
             int depth = 1;
@@ -635,15 +636,15 @@ CMLSQuADLoader* cml_squad_open(const char* json_path) {
     }
 
 done:
-    free(buf);
+    cml_free(buf);
 
     if (count == 0) {
         LOG_ERROR("[loaders] No QA pairs found in %s", json_path);
-        free(contexts); free(questions); free(answers); free(answer_starts);
+        cml_free(contexts); cml_free(questions); cml_free(answers); cml_free(answer_starts);
         return NULL;
     }
 
-    CMLSQuADLoader* loader = calloc(1, sizeof(CMLSQuADLoader));
+    CMLSQuADLoader* loader = cml_calloc(1, sizeof(CMLSQuADLoader));
     loader->contexts = contexts;
     loader->questions = questions;
     loader->answers = answers;
@@ -657,15 +658,15 @@ done:
 void cml_squad_free(CMLSQuADLoader* loader) {
     if (!loader) return;
     for (int i = 0; i < loader->num_samples; i++) {
-        free(loader->contexts[i]);
-        free(loader->questions[i]);
-        free(loader->answers[i]);
+        cml_free(loader->contexts[i]);
+        cml_free(loader->questions[i]);
+        cml_free(loader->answers[i]);
     }
-    free(loader->contexts);
-    free(loader->questions);
-    free(loader->answers);
-    free(loader->answer_starts);
-    free(loader);
+    cml_free(loader->contexts);
+    cml_free(loader->questions);
+    cml_free(loader->answers);
+    cml_free(loader->answer_starts);
+    cml_free(loader);
 }
 
 /* NIfTI-1 header (simplified, 348 bytes) */
@@ -712,36 +713,36 @@ static float* nifti_read_volume(const char* path, int* dims_out, int* ndim_out) 
     if (offset < 348) offset = 348;
     fseek(f, offset, SEEK_SET);
 
-    float* data = malloc(nvox * sizeof(float));
+    float* data = cml_malloc(nvox * sizeof(float));
     if (!data) { fclose(f); return NULL; }
 
     if (hdr.datatype == 16) { /* FLOAT32 */
         if (fread(data, sizeof(float), nvox, f) != nvox) {
-            free(data); fclose(f); return NULL;
+            cml_free(data); fclose(f); return NULL;
         }
     } else if (hdr.datatype == 4) { /* INT16 */
-        short* raw = malloc(nvox * sizeof(short));
+        short* raw = cml_malloc(nvox * sizeof(short));
         if (!raw || fread(raw, sizeof(short), nvox, f) != nvox) {
-            free(raw); free(data); fclose(f); return NULL;
+            cml_free(raw); cml_free(data); fclose(f); return NULL;
         }
         for (size_t i = 0; i < nvox; i++) data[i] = (float)raw[i];
-        free(raw);
+        cml_free(raw);
     } else if (hdr.datatype == 2) { /* UINT8 */
-        unsigned char* raw = malloc(nvox);
+        unsigned char* raw = cml_malloc(nvox);
         if (!raw || fread(raw, 1, nvox, f) != nvox) {
-            free(raw); free(data); fclose(f); return NULL;
+            cml_free(raw); cml_free(data); fclose(f); return NULL;
         }
         for (size_t i = 0; i < nvox; i++) data[i] = (float)raw[i];
-        free(raw);
+        cml_free(raw);
     } else if (hdr.datatype == 8) { /* INT32 */
-        int* raw = malloc(nvox * sizeof(int));
+        int* raw = cml_malloc(nvox * sizeof(int));
         if (!raw || fread(raw, sizeof(int), nvox, f) != nvox) {
-            free(raw); free(data); fclose(f); return NULL;
+            cml_free(raw); cml_free(data); fclose(f); return NULL;
         }
         for (size_t i = 0; i < nvox; i++) data[i] = (float)raw[i];
-        free(raw);
+        cml_free(raw);
     } else {
-        free(data); fclose(f); return NULL;
+        cml_free(data); fclose(f); return NULL;
     }
 
     fclose(f);
@@ -756,10 +757,10 @@ CMLKiTS19Loader* cml_kits19_open(const char* data_dir) {
     if (!data_dir) return NULL;
 
     int cap = 256, count = 0;
-    char** dirs = malloc(cap * sizeof(char*));
+    char** dirs = cml_malloc(cap * sizeof(char*));
 
     DIR* d = opendir(data_dir);
-    if (!d) { free(dirs); return NULL; }
+    if (!d) { cml_free(dirs); return NULL; }
 
     struct dirent* ent;
     while ((ent = readdir(d)) != NULL) {
@@ -769,21 +770,21 @@ CMLKiTS19Loader* cml_kits19_open(const char* data_dir) {
         if (!is_directory(full)) continue;
         if (count >= cap) {
             cap *= 2;
-            dirs = realloc(dirs, cap * sizeof(char*));
+            dirs = cml_realloc(dirs, cap * sizeof(char*));
         }
-        dirs[count++] = strdup(full);
+        dirs[count++] = cml_strdup(full);
     }
     closedir(d);
 
     if (count == 0) {
         LOG_ERROR("[loaders] No KiTS19 case directories found in %s", data_dir);
-        free(dirs);
+        cml_free(dirs);
         return NULL;
     }
 
     qsort(dirs, count, sizeof(char*), cmp_str);
 
-    CMLKiTS19Loader* loader = calloc(1, sizeof(CMLKiTS19Loader));
+    CMLKiTS19Loader* loader = cml_calloc(1, sizeof(CMLKiTS19Loader));
     loader->case_dirs = dirs;
     loader->num_cases = count;
 
@@ -794,9 +795,9 @@ CMLKiTS19Loader* cml_kits19_open(const char* data_dir) {
 void cml_kits19_free(CMLKiTS19Loader* loader) {
     if (!loader) return;
     for (int i = 0; i < loader->num_cases; i++)
-        free(loader->case_dirs[i]);
-    free(loader->case_dirs);
-    free(loader);
+        cml_free(loader->case_dirs[i]);
+    cml_free(loader->case_dirs);
+    cml_free(loader);
 }
 
 int cml_kits19_load_case(CMLKiTS19Loader* loader, int case_idx,
@@ -819,15 +820,15 @@ int cml_kits19_load_case(CMLKiTS19Loader* loader, int case_idx,
     float* seg_data = nifti_read_volume(seg_path, seg_dims, &seg_ndim);
     if (!seg_data) {
         LOG_ERROR("[loaders] Failed to load segmentation: %s", seg_path);
-        free(vol_data);
+        cml_free(vol_data);
         return -1;
     }
 
     *volume = tensor_from_data(vol_data, vol_dims, vol_ndim, NULL);
     *segmentation = tensor_from_data(seg_data, seg_dims, seg_ndim, NULL);
 
-    free(vol_data);
-    free(seg_data);
+    cml_free(vol_data);
+    cml_free(seg_data);
 
     if (!*volume || !*segmentation) return -1;
     return 0;
@@ -849,25 +850,35 @@ CMLOpenImagesLoader* cml_openimages_open(const char* images_dir, const char* ann
     char** files = list_files_in_dir(images_dir, is_image_file, &count);
     if (count == 0) {
         LOG_ERROR("[loaders] No images found in %s", images_dir);
-        free(files);
+        cml_free(files);
         return NULL;
     }
 
-    char** ids = malloc(count * sizeof(char*));
+    char** ids = cml_malloc(count * sizeof(char*));
     for (int i = 0; i < count; i++) {
         const char* base = strrchr(files[i], '/');
         base = base ? base + 1 : files[i];
         char* dot = strrchr(base, '.');
-        ids[i] = dot ? strndup(base, dot - base) : strdup(base);
-        free(files[i]);
+        /* keep allocator family consistent: always use cml_* so cml_openimages_free is safe */
+        if (dot) {
+            size_t n = (size_t)(dot - base);
+            ids[i] = cml_malloc(n + 1);
+            if (ids[i]) {
+                memcpy(ids[i], base, n);
+                ids[i][n] = '\0';
+            }
+        } else {
+            ids[i] = cml_strdup(base);
+        }
+        cml_free(files[i]);
     }
-    free(files);
+    cml_free(files);
 
-    CMLOpenImagesLoader* loader = calloc(1, sizeof(CMLOpenImagesLoader));
+    CMLOpenImagesLoader* loader = cml_calloc(1, sizeof(CMLOpenImagesLoader));
     loader->image_ids = ids;
     loader->num_images = count;
-    loader->images_dir = strdup(images_dir);
-    loader->annotations_path = strdup(annotations_csv);
+    loader->images_dir = cml_strdup(images_dir);
+    loader->annotations_path = cml_strdup(annotations_csv);
 
     LOG_INFO("[loaders] OpenImages: %d images from %s", count, images_dir);
     return loader;
@@ -876,11 +887,11 @@ CMLOpenImagesLoader* cml_openimages_open(const char* images_dir, const char* ann
 void cml_openimages_free(CMLOpenImagesLoader* loader) {
     if (!loader) return;
     for (int i = 0; i < loader->num_images; i++)
-        free(loader->image_ids[i]);
-    free(loader->image_ids);
-    free(loader->images_dir);
-    free(loader->annotations_path);
-    free(loader);
+        cml_free(loader->image_ids[i]);
+    cml_free(loader->image_ids);
+    cml_free(loader->images_dir);
+    cml_free(loader->annotations_path);
+    cml_free(loader);
 }
 
 CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir) {
@@ -890,7 +901,7 @@ CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir) {
     char** files = list_files_in_dir(dump_dir, is_text_file, &count);
     if (count == 0) {
         LOG_ERROR("[loaders] No text files found in %s", dump_dir);
-        free(files);
+        cml_free(files);
         return NULL;
     }
 
@@ -901,7 +912,7 @@ CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir) {
             total += st.st_size;
     }
 
-    CMLWikipediaLoader* loader = calloc(1, sizeof(CMLWikipediaLoader));
+    CMLWikipediaLoader* loader = cml_calloc(1, sizeof(CMLWikipediaLoader));
     loader->article_paths = files;
     loader->num_articles = count;
     loader->total_bytes = total;
@@ -914,9 +925,9 @@ CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir) {
 void cml_wikipedia_free(CMLWikipediaLoader* loader) {
     if (!loader) return;
     for (int i = 0; i < loader->num_articles; i++)
-        free(loader->article_paths[i]);
-    free(loader->article_paths);
-    free(loader);
+        cml_free(loader->article_paths[i]);
+    cml_free(loader->article_paths);
+    cml_free(loader);
 }
 
 int cml_wikipedia_read_chunk(CMLWikipediaLoader* loader, int article_idx,

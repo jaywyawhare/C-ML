@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct {
     const char* thunder_name;
@@ -63,7 +64,7 @@ static CMLBackendType parse_backend(const char* name) {
 }
 
 CMLThunderExecutor* cml_thunder_create(const char* backend) {
-    CMLThunderExecutor* exec = calloc(1, sizeof(CMLThunderExecutor));
+    CMLThunderExecutor* exec = cml_calloc(1, sizeof(CMLThunderExecutor));
     if (!exec) return NULL;
 
     if (backend)
@@ -73,7 +74,7 @@ CMLThunderExecutor* cml_thunder_create(const char* backend) {
 
     CMLDispatchContext* ctx = cml_dispatch_create();
     if (!ctx) {
-        free(exec);
+        cml_free(exec);
         return NULL;
     }
 
@@ -92,7 +93,7 @@ void cml_thunder_free(CMLThunderExecutor* exec) {
     if (!exec) return;
     if (exec->dispatch_ctx)
         cml_dispatch_free((CMLDispatchContext*)exec->dispatch_ctx);
-    free(exec);
+    cml_free(exec);
 }
 
 int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops) {

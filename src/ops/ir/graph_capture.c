@@ -8,6 +8,7 @@
 
 #ifdef _POSIX_C_SOURCE
 #include <time.h>
+#include "alloc/cml_allocator.h"
 static double get_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -18,12 +19,12 @@ static double get_time_ms(void) { return 0.0; }
 #endif
 
 CMLCapturedGraph* cml_graph_capture_create(void) {
-    CMLCapturedGraph* g = (CMLCapturedGraph*)calloc(1, sizeof(CMLCapturedGraph));
+    CMLCapturedGraph* g = (CMLCapturedGraph*)cml_calloc(1, sizeof(CMLCapturedGraph));
     if (!g) return NULL;
 
     g->node_capacity = 32;
-    g->nodes = (CMLCapturedNode*)calloc((size_t)g->node_capacity, sizeof(CMLCapturedNode));
-    if (!g->nodes) { free(g); return NULL; }
+    g->nodes = (CMLCapturedNode*)cml_calloc((size_t)g->node_capacity, sizeof(CMLCapturedNode));
+    if (!g->nodes) { cml_free(g); return NULL; }
 
     g->state = CML_CAPTURE_IDLE;
     return g;
@@ -33,12 +34,12 @@ void cml_graph_capture_free(CMLCapturedGraph* graph) {
     if (!graph) return;
 
     for (int i = 0; i < graph->num_nodes; i++) {
-        free(graph->nodes[i].kernel_args);
+        cml_free(graph->nodes[i].kernel_args);
     }
-    free(graph->nodes);
-    free(graph->input_bindings);
-    free(graph->output_bindings);
-    free(graph);
+    cml_free(graph->nodes);
+    cml_free(graph->input_bindings);
+    cml_free(graph->output_bindings);
+    cml_free(graph);
 }
 
 int cml_graph_capture_begin(CMLCapturedGraph* graph) {
@@ -46,7 +47,7 @@ int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     if (graph->state == CML_CAPTURE_RECORDING) return -1;
 
     for (int i = 0; i < graph->num_nodes; i++) {
-        free(graph->nodes[i].kernel_args);
+        cml_free(graph->nodes[i].kernel_args);
     }
     graph->num_nodes = 0;
     graph->state = CML_CAPTURE_RECORDING;
@@ -68,7 +69,7 @@ int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op,
             graph->state = CML_CAPTURE_ERROR;
             return -1;
         }
-        CMLCapturedNode* new_nodes = (CMLCapturedNode*)realloc(
+        CMLCapturedNode* new_nodes = (CMLCapturedNode*)cml_realloc(
             graph->nodes, (size_t)new_cap * sizeof(CMLCapturedNode));
         if (!new_nodes) { graph->state = CML_CAPTURE_ERROR; return -1; }
         graph->nodes = new_nodes;
@@ -85,7 +86,7 @@ int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op,
     node->num_args = num_args;
 
     if (num_args > 0 && args) {
-        node->kernel_args = (void**)malloc((size_t)num_args * sizeof(void*));
+        node->kernel_args = (void**)cml_malloc((size_t)num_args * sizeof(void*));
         if (!node->kernel_args) { graph->state = CML_CAPTURE_ERROR; return -1; }
         memcpy(node->kernel_args, args, (size_t)num_args * sizeof(void*));
     }
@@ -135,7 +136,7 @@ int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* ten
 
     if (index >= graph->num_input_bindings) {
         int new_count = index + 1;
-        Tensor** new_bindings = (Tensor**)realloc(
+        Tensor** new_bindings = (Tensor**)cml_realloc(
             graph->input_bindings, (size_t)new_count * sizeof(Tensor*));
         if (!new_bindings) return -1;
         for (int i = graph->num_input_bindings; i < new_count; i++)
@@ -152,7 +153,7 @@ int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* te
 
     if (index >= graph->num_output_bindings) {
         int new_count = index + 1;
-        Tensor** new_bindings = (Tensor**)realloc(
+        Tensor** new_bindings = (Tensor**)cml_realloc(
             graph->output_bindings, (size_t)new_count * sizeof(Tensor*));
         if (!new_bindings) return -1;
         for (int i = graph->num_output_bindings; i < new_count; i++)
@@ -168,7 +169,7 @@ int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     if (!graph) return -1;
 
     for (int i = 0; i < graph->num_nodes; i++)
-        free(graph->nodes[i].kernel_args);
+        cml_free(graph->nodes[i].kernel_args);
     graph->num_nodes = 0;
     graph->state = CML_CAPTURE_IDLE;
     graph->replay_count = 0;

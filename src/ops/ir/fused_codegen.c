@@ -10,21 +10,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 #define FUSED_BUF_SIZE 16384
 
 CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0) return NULL;
 
-    CMLLinearProgram* prog = calloc(1, sizeof(CMLLinearProgram));
+    CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
     if (!prog) return NULL;
     prog->capacity = 32;
-    prog->ops = calloc((size_t)prog->capacity, sizeof(CMLLinearOp));
-    if (!prog->ops) { free(prog); return NULL; }
+    prog->ops = cml_calloc((size_t)prog->capacity, sizeof(CMLLinearOp));
+    if (!prog->ops) { cml_free(prog); return NULL; }
 
     /* Map node index -> vreg */
-    int* node_vreg = calloc((size_t)g->num_nodes, sizeof(int));
-    if (!node_vreg) { free(prog->ops); free(prog); return NULL; }
+    int* node_vreg = cml_calloc((size_t)g->num_nodes, sizeof(int));
+    if (!node_vreg) { cml_free(prog->ops); cml_free(prog); return NULL; }
     for (int i = 0; i < g->num_nodes; i++) node_vreg[i] = -1;
 
     /* Track loaded external tensors */
@@ -80,8 +81,8 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
                 /* Emit */
                 if (prog->num_ops >= prog->capacity) {
                     int nc = prog->capacity * 2;
-                    CMLLinearOp* tmp = realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-                    if (!tmp) break;
+                    CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
+                    if (!tmp) goto oom;
                     prog->ops = tmp;
                     prog->capacity = nc;
                 }
@@ -112,8 +113,8 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
         /* Emit compute */
         if (prog->num_ops >= prog->capacity) {
             int nc = prog->capacity * 2;
-            CMLLinearOp* tmp = realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-            if (!tmp) break;
+            CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
+            if (!tmp) goto oom;
             prog->ops = tmp;
             prog->capacity = nc;
         }
@@ -129,8 +130,8 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
 
             if (prog->num_ops >= prog->capacity) {
                 int nc = prog->capacity * 2;
-                CMLLinearOp* tmp = realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-                if (!tmp) break;
+                CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
+                if (!tmp) goto oom;
                 prog->ops = tmp;
                 prog->capacity = nc;
             }
@@ -138,14 +139,20 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
         }
     }
 
-    free(node_vreg);
+    cml_free(node_vreg);
     return prog;
+
+oom:
+    cml_free(node_vreg);
+    cml_free(prog->ops);
+    cml_free(prog);
+    return NULL;
 }
 
 void cml_linear_program_free(CMLLinearProgram* prog) {
     if (!prog) return;
-    free(prog->ops);
-    free(prog);
+    cml_free(prog->ops);
+    cml_free(prog);
 }
 
 static const char* linop_kind_str(CMLLinearOpKind k) {
@@ -199,7 +206,7 @@ static bool uop_is_unary(UOpType uop) {
 }
 
 static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
-    char* buf = malloc(FUSED_BUF_SIZE);
+    char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf) return NULL;
     int pos = 0;
 
@@ -327,7 +334,7 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
 }
 
 char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
-    char* buf = malloc(FUSED_BUF_SIZE);
+    char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf) return NULL;
     int pos = 0;
 
@@ -596,7 +603,7 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
 
     /* Allocate generous buffer for SPIR-V words */
     int max_words = 1024 + prog->num_ops * 32 + num_buffers * 64;
-    uint32_t* words = calloc((size_t)max_words, sizeof(uint32_t));
+    uint32_t* words = cml_calloc((size_t)max_words, sizeof(uint32_t));
     if (!words) return NULL;
 
     uint32_t* w = words;
@@ -915,7 +922,7 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
 }
 
 static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) {
-    char* buf = malloc(FUSED_BUF_SIZE);
+    char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf) return NULL;
     int pos = 0;
 
@@ -1048,7 +1055,7 @@ CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog,
                                     size_t work_size) {
     if (!prog || prog->num_ops == 0) return NULL;
 
-    CMLFusedKernel* kernel = calloc(1, sizeof(CMLFusedKernel));
+    CMLFusedKernel* kernel = cml_calloc(1, sizeof(CMLFusedKernel));
     if (!kernel) return NULL;
 
     kernel->backend = backend;
@@ -1064,30 +1071,30 @@ CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog,
     switch (backend) {
     case CML_FUSED_BACKEND_C:
         kernel->source = fused_codegen_c(prog, work_size);
-        if (!kernel->source) { free(kernel); return NULL; }
+        if (!kernel->source) { cml_free(kernel); return NULL; }
         break;
 
     case CML_FUSED_BACKEND_PTX:
         kernel->source = cml_ptx_gen_fused_kernel(prog, work_size);
-        if (!kernel->source) { free(kernel); return NULL; }
+        if (!kernel->source) { cml_free(kernel); return NULL; }
         break;
 
     case CML_FUSED_BACKEND_SPIRV:
         kernel->spirv_words = cml_spirv_gen_fused_kernel(prog, work_size,
                                                           &kernel->spirv_num_words);
-        if (!kernel->spirv_words) { free(kernel); return NULL; }
+        if (!kernel->spirv_words) { cml_free(kernel); return NULL; }
         break;
 
     case CML_FUSED_BACKEND_WGSL:
         kernel->source = fused_codegen_wgsl(prog, work_size);
-        if (!kernel->source) { free(kernel); return NULL; }
+        if (!kernel->source) { cml_free(kernel); return NULL; }
         break;
 
     default:
         LOG_WARNING("Fused codegen: unsupported backend %d, falling back to C", backend);
         kernel->backend = CML_FUSED_BACKEND_C;
         kernel->source = fused_codegen_c(prog, work_size);
-        if (!kernel->source) { free(kernel); return NULL; }
+        if (!kernel->source) { cml_free(kernel); return NULL; }
         break;
     }
 
@@ -1118,9 +1125,9 @@ CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group,
 
 void cml_fused_kernel_free(CMLFusedKernel* kernel) {
     if (!kernel) return;
-    free(kernel->source);
-    free(kernel->spirv_words);
-    free(kernel);
+    cml_free(kernel->source);
+    cml_free(kernel->spirv_words);
+    cml_free(kernel);
 }
 
 void cml_fused_kernel_print(const CMLFusedKernel* kernel) {

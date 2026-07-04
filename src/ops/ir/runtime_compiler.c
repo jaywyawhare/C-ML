@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME  0x100000001b3ULL
@@ -42,7 +43,7 @@ static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
 }
 
 CMLRuntimeCompiler* cml_runtime_compiler_create(void) {
-    CMLRuntimeCompiler* rc = calloc(1, sizeof(CMLRuntimeCompiler));
+    CMLRuntimeCompiler* rc = cml_calloc(1, sizeof(CMLRuntimeCompiler));
     if (!rc) return NULL;
     rc->preferred_backend = CML_FUSED_BACKEND_C;
     rc->enable_caching = true;
@@ -55,12 +56,12 @@ void cml_runtime_compiler_free(CMLRuntimeCompiler* rc) {
     for (int i = 0; i < CML_COMPILED_CACHE_SIZE; i++) {
         CMLCompiledKernel* k = &rc->cache[i];
         if (k->valid) {
-            free(k->source);
-            free(k->binary);
-            free(k->ops);
+            cml_free(k->source);
+            cml_free(k->binary);
+            cml_free(k->ops);
         }
     }
-    free(rc);
+    cml_free(rc);
 }
 
 static CMLCompiledKernel* cache_lookup(CMLRuntimeCompiler* rc, uint64_t hash) {
@@ -87,9 +88,9 @@ static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
         }
     }
     CMLCompiledKernel* k = &rc->cache[hash % CML_COMPILED_CACHE_SIZE];
-    free(k->source);
-    free(k->binary);
-    free(k->ops);
+    cml_free(k->source);
+    cml_free(k->binary);
+    cml_free(k->ops);
     memset(k, 0, sizeof(*k));
     k->hash = hash;
     k->valid = true;
@@ -137,7 +138,7 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
     entry->work_size = work_size;
 
     if (prog->num_ops > 0) {
-        entry->ops = malloc((size_t)prog->num_ops * sizeof(CMLLinearOp));
+        entry->ops = cml_malloc((size_t)prog->num_ops * sizeof(CMLLinearOp));
         if (entry->ops) {
             memcpy(entry->ops, prog->ops, (size_t)prog->num_ops * sizeof(CMLLinearOp));
             entry->num_ops = prog->num_ops;
@@ -381,9 +382,9 @@ void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc) {
     for (int i = 0; i < CML_COMPILED_CACHE_SIZE; i++) {
         CMLCompiledKernel* k = &rc->cache[i];
         if (k->valid) {
-            free(k->source);
-            free(k->binary);
-            free(k->ops);
+            cml_free(k->source);
+            cml_free(k->binary);
+            cml_free(k->ops);
             memset(k, 0, sizeof(*k));
         }
     }

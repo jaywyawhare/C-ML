@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp op) {
     for (size_t i = 0; i < n; i++) {
@@ -42,7 +43,7 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         return -1;
 
     size_t chunk_size = (count + (size_t)world_size - 1) / (size_t)world_size;
-    float* recv_buf = (float*)malloc(chunk_size * sizeof(float));
+    float* recv_buf = (float*)cml_malloc(chunk_size * sizeof(float));
     if (!recv_buf) return -1;
 
     int left  = (rank - 1 + world_size) % world_size;
@@ -87,10 +88,10 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
 
         /* Send to right neighbor, recv from left neighbor */
         int ret = ops->send(&send_tensor, right, step, ctx);
-        if (ret != 0) { free(recv_buf); return -1; }
+        if (ret != 0) { cml_free(recv_buf); return -1; }
 
         ret = ops->recv(&recv_tensor, left, step, ctx);
-        if (ret != 0) { free(recv_buf); return -1; }
+        if (ret != 0) { cml_free(recv_buf); return -1; }
 
         /* Reduce received data into local chunk */
         if (recv_count > 0) {
@@ -131,10 +132,10 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         recv_tensor.dtype = DTYPE_FLOAT32;
 
         int ret = ops->send(&send_tensor, right, world_size + step, ctx);
-        if (ret != 0) { free(recv_buf); return -1; }
+        if (ret != 0) { cml_free(recv_buf); return -1; }
 
         ret = ops->recv(&recv_tensor, left, world_size + step, ctx);
-        if (ret != 0) { free(recv_buf); return -1; }
+        if (ret != 0) { cml_free(recv_buf); return -1; }
     }
 
     /* Apply averaging if requested */
@@ -144,6 +145,6 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
             data[i] *= scale;
     }
 
-    free(recv_buf);
+    cml_free(recv_buf);
     return 0;
 }

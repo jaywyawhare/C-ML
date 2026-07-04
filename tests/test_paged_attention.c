@@ -6,6 +6,7 @@
 
 #include "cml.h"
 #include "nn/paged_attention.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -144,28 +145,28 @@ static int test_append_tokens(void) {
     if (seq < 0) { cml_paged_kv_cache_free(cache); return 0; }
 
     size_t kv_floats = (size_t)num_kv_heads * head_dim;
-    float* key = (float*)malloc(kv_floats * sizeof(float));
-    float* val = (float*)malloc(kv_floats * sizeof(float));
-    if (!key || !val) { free(key); free(val); cml_paged_kv_cache_free(cache); return 0; }
+    float* key = (float*)cml_malloc(kv_floats * sizeof(float));
+    float* val = (float*)cml_malloc(kv_floats * sizeof(float));
+    if (!key || !val) { cml_free(key); cml_free(val); cml_paged_kv_cache_free(cache); return 0; }
 
     /* Append 5 tokens */
     for (int t = 0; t < 5; t++) {
         fill_float(key, kv_floats, (float)(t + 1));
         fill_float(val, kv_floats, (float)(t + 1) * 0.1f);
         if (cml_paged_cache_append(cache, seq, key, val) != 0) {
-            free(key); free(val);
+            cml_free(key); cml_free(val);
             cml_paged_kv_cache_free(cache);
             return 0;
         }
     }
 
     CMLBlockTable* bt = &cache->sequences[seq];
-    if (bt->seq_len != 5) { free(key); free(val); cml_paged_kv_cache_free(cache); return 0; }
+    if (bt->seq_len != 5) { cml_free(key); cml_free(val); cml_paged_kv_cache_free(cache); return 0; }
     /* 5 tokens < block_size (16) => 1 block */
-    if (bt->num_blocks != 1) { free(key); free(val); cml_paged_kv_cache_free(cache); return 0; }
+    if (bt->num_blocks != 1) { cml_free(key); cml_free(val); cml_paged_kv_cache_free(cache); return 0; }
 
-    free(key);
-    free(val);
+    cml_free(key);
+    cml_free(val);
     cml_paged_kv_cache_free(cache);
     return 1;
 }
@@ -338,21 +339,21 @@ static int test_paged_gqa_output_shape(void) {
 
     /* Populate sequence with 10 tokens */
     size_t kv_floats = (size_t)num_kv_heads * head_dim;
-    float* key = (float*)malloc(kv_floats * sizeof(float));
-    float* val = (float*)malloc(kv_floats * sizeof(float));
-    if (!key || !val) { free(key); free(val); cml_paged_kv_cache_free(cache); return 0; }
+    float* key = (float*)cml_malloc(kv_floats * sizeof(float));
+    float* val = (float*)cml_malloc(kv_floats * sizeof(float));
+    if (!key || !val) { cml_free(key); cml_free(val); cml_paged_kv_cache_free(cache); return 0; }
 
     for (int t = 0; t < 10; t++) {
         fill_float(key, kv_floats, 0.1f * (t + 1));
         fill_float(val, kv_floats, 0.01f * (t + 1));
         cml_paged_cache_append(cache, seq, key, val);
     }
-    free(key);
-    free(val);
+    cml_free(key);
+    cml_free(val);
 
     /* Create Q tensor: [1, 1, num_heads * head_dim] (single query token) */
     int q_dim = num_heads * head_dim;
-    float* q_data = (float*)malloc((size_t)q_dim * sizeof(float));
+    float* q_data = (float*)cml_malloc((size_t)q_dim * sizeof(float));
     if (!q_data) { cml_paged_kv_cache_free(cache); return 0; }
     fill_float(q_data, (size_t)q_dim, 0.5f);
 
@@ -360,7 +361,7 @@ static int test_paged_gqa_output_shape(void) {
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
     Tensor* Q = tensor_from_data(q_data, q_shape, 3, &cfg);
-    free(q_data);
+    cml_free(q_data);
     if (!Q) { cml_paged_kv_cache_free(cache); return 0; }
 
     CMLGQAConfig gqa_cfg = {
@@ -414,7 +415,7 @@ static int test_paged_gqa_multi_query_tokens(void) {
     int q_dim = num_heads * head_dim;
     int seq_q = 3;
     int total_q = seq_q * q_dim;
-    float* q_data = (float*)malloc((size_t)total_q * sizeof(float));
+    float* q_data = (float*)cml_malloc((size_t)total_q * sizeof(float));
     if (!q_data) { cml_paged_kv_cache_free(cache); return 0; }
     fill_float(q_data, (size_t)total_q, 0.3f);
 
@@ -422,7 +423,7 @@ static int test_paged_gqa_multi_query_tokens(void) {
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
     Tensor* Q = tensor_from_data(q_data, q_shape, 3, &cfg);
-    free(q_data);
+    cml_free(q_data);
     if (!Q) { cml_paged_kv_cache_free(cache); return 0; }
 
     CMLGQAConfig gqa_cfg = {

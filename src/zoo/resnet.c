@@ -3,6 +3,7 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 typedef struct {
     Module base;
@@ -38,23 +39,23 @@ static void bottleneck_free(Module* module) {
         module_free((Module*)block->conv);
     if (block->downsample)
         module_free((Module*)block->downsample);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_bottleneck(int in_channels, int mid_channels, int out_channels,
                                   int stride, DType dtype, DeviceType device) {
-    BottleneckBlock* block = malloc(sizeof(BottleneckBlock));
+    BottleneckBlock* block = cml_malloc(sizeof(BottleneckBlock));
     if (!block)
         return NULL;
 
     if (module_init((Module*)block, "Bottleneck", bottleneck_forward, bottleneck_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
     block->conv = nn_sequential();
     if (!block->conv) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
@@ -113,23 +114,23 @@ static void basic_block_free(Module* module) {
         module_free((Module*)block->conv);
     if (block->downsample)
         module_free((Module*)block->downsample);
-    free(block);
+    cml_free(block);
 }
 
 static Module* create_basic_block(int in_channels, int out_channels, int stride,
                                    DType dtype, DeviceType device) {
-    BasicBlock* block = malloc(sizeof(BasicBlock));
+    BasicBlock* block = cml_malloc(sizeof(BasicBlock));
     if (!block)
         return NULL;
 
     if (module_init((Module*)block, "BasicBlock", basic_block_forward, basic_block_free) != 0) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 
     block->conv = nn_sequential();
     if (!block->conv) {
-        free(block);
+        cml_free(block);
         return NULL;
     }
 

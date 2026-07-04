@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double get_time_sec(void) {
 #if defined(__linux__) || defined(__APPLE__)
@@ -45,18 +46,18 @@ static float* load_mnist_images(const char* filename, int* num_images, int* rows
     printf("Loading %d images (%dx%d)...\n", *num_images, *rows, *cols);
 
     int image_size = (*rows) * (*cols);
-    float* data    = (float*)malloc(sizeof(float) * (*num_images) * image_size);
+    float* data    = (float*)cml_malloc(sizeof(float) * (*num_images) * image_size);
     if (!data) {
         fclose(f);
         return NULL;
     }
 
-    uint8_t* buffer = (uint8_t*)malloc(image_size);
+    uint8_t* buffer = (uint8_t*)cml_malloc(image_size);
     for (int i = 0; i < *num_images; i++) {
         if (fread(buffer, 1, image_size, f) != (size_t)image_size) {
             printf("Error: Failed to read image %d\n", i);
-            free(data);
-            free(buffer);
+            cml_free(data);
+            cml_free(buffer);
             fclose(f);
             return NULL;
         }
@@ -65,7 +66,7 @@ static float* load_mnist_images(const char* filename, int* num_images, int* rows
         }
     }
 
-    free(buffer);
+    cml_free(buffer);
     fclose(f);
     return data;
 }
@@ -87,7 +88,7 @@ static float* load_mnist_labels(const char* filename, int* num_labels) {
     *num_labels = (int)read_uint32_be(f);
     printf("Loading %d labels...\n", *num_labels);
 
-    float* data = (float*)calloc((*num_labels) * 10, sizeof(float));
+    float* data = (float*)cml_calloc((*num_labels) * 10, sizeof(float));
     if (!data) {
         fclose(f);
         return NULL;
@@ -97,7 +98,7 @@ static float* load_mnist_labels(const char* filename, int* num_labels) {
         uint8_t label;
         if (fread(&label, 1, 1, f) != 1) {
             printf("Error: Failed to read label %d\n", i);
-            free(data);
+            cml_free(data);
             fclose(f);
             return NULL;
         }
@@ -171,7 +172,7 @@ int main(int argc, char** argv) {
     int num_train_labels;
     float* train_labels = load_mnist_labels(train_labels_path, &num_train_labels);
     if (!train_labels) {
-        free(train_images);
+        cml_free(train_images);
         return 1;
     }
 
@@ -296,9 +297,9 @@ int main(int argc, char** argv) {
                         }
                     }
                     if (unopt)
-                        free(unopt);
+                        cml_free(unopt);
                     if (opt)
-                        free(opt);
+                        cml_free(opt);
                 }
             }
 
@@ -349,12 +350,12 @@ int main(int argc, char** argv) {
     }
 
     printf("\nDone\n");
-    free(train_images);
-    free(train_labels);
+    cml_free(train_images);
+    cml_free(train_labels);
     if (test_images)
-        free(test_images);
+        cml_free(test_images);
     if (test_labels)
-        free(test_labels);
+        cml_free(test_labels);
 
     tensor_free(X_train);
     tensor_free(y_train);

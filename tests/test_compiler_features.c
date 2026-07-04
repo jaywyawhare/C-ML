@@ -8,6 +8,7 @@
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run    = 0;
 static int tests_passed = 0;
@@ -46,7 +47,7 @@ static int test_multi_output_analyze_no_merge(void) {
 
     int ok = (num_merges == 0);
 
-    free(merge_groups);
+    cml_free(merge_groups);
     cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
@@ -93,7 +94,7 @@ static int test_multi_output_same_inputs(void) {
         ok = (s->num_groups < groups_before);
     }
 
-    free(merge_groups);
+    cml_free(merge_groups);
     cml_fusion_schedule_free(s);
     cml_ir_free(g);
     tensor_free(a);
@@ -287,7 +288,7 @@ static int test_bfs_all_groups_visited(void) {
 
     int ok = (s != NULL && s->num_ordered == s->num_groups);
 
-    int* visited = calloc((size_t)s->num_groups, sizeof(int));
+    int* visited = cml_calloc((size_t)s->num_groups, sizeof(int));
     if (ok && visited) {
         for (int i = 0; i < s->num_ordered; i++) {
             visited[s->execution_order[i]] = 1;
@@ -296,7 +297,7 @@ static int test_bfs_all_groups_visited(void) {
             if (!visited[i]) { ok = 0; break; }
         }
     }
-    free(visited);
+    cml_free(visited);
 
     cml_fusion_schedule_free(s);
     cml_ir_free(g);

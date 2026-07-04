@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include "alloc/cml_allocator.h"
 
 static CMLTCConfig g_tc_config = {
     .min_m = CML_TC_DEFAULT_MIN_DIM,
@@ -23,7 +24,7 @@ static atomic_int g_tc_counter = 0;
 
 static char* tc_unique_name(void) {
     int id = atomic_fetch_add(&g_tc_counter, 1);
-    char* name = malloc(32);
+    char* name = cml_malloc(32);
     if (name)
         snprintf(name, 32, "_tc%d", id);
     return name;
@@ -105,17 +106,17 @@ static void extract_matmul_dims(struct IRNode* node, int* m, int* n, int* k) {
 
 static struct IRNode* create_pad_node(struct IRNode* src_node, const char* src_name,
                                       int* padded_shape, int ndim) {
-    struct IRNode* pad = calloc(1, sizeof(struct IRNode));
+    struct IRNode* pad = cml_calloc(1, sizeof(struct IRNode));
     if (!pad) return NULL;
 
     pad->type = UOP_PAD;
     pad->num_inputs = 1;
-    pad->input_names = malloc(sizeof(char*));
-    if (!pad->input_names) { free(pad); return NULL; }
-    pad->input_names[0] = strdup(src_name);
+    pad->input_names = cml_malloc(sizeof(char*));
+    if (!pad->input_names) { cml_free(pad); return NULL; }
+    pad->input_names[0] = cml_strdup(src_name);
     pad->output_name = tc_unique_name();
     pad->output_ndim = ndim;
-    pad->output_shape = malloc((size_t)ndim * sizeof(int));
+    pad->output_shape = cml_malloc((size_t)ndim * sizeof(int));
     if (pad->output_shape)
         memcpy(pad->output_shape, padded_shape, (size_t)ndim * sizeof(int));
 
@@ -126,24 +127,24 @@ static struct IRNode* create_pad_node(struct IRNode* src_node, const char* src_n
 static struct IRNode* create_wmma_node(const char* a_name, const char* b_name,
                                        int m, int n, int k,
                                        int* output_shape, int output_ndim) {
-    struct IRNode* wmma = calloc(1, sizeof(struct IRNode));
+    struct IRNode* wmma = cml_calloc(1, sizeof(struct IRNode));
     if (!wmma) return NULL;
 
     wmma->type = UOP_MATMUL;
     wmma->is_fused = true;
     wmma->fusion_type = FUSION_FMA;
     wmma->num_inputs = 2;
-    wmma->input_names = malloc(2 * sizeof(char*));
-    if (!wmma->input_names) { free(wmma); return NULL; }
-    wmma->input_names[0] = strdup(a_name);
-    wmma->input_names[1] = strdup(b_name);
+    wmma->input_names = cml_malloc(2 * sizeof(char*));
+    if (!wmma->input_names) { cml_free(wmma); return NULL; }
+    wmma->input_names[0] = cml_strdup(a_name);
+    wmma->input_names[1] = cml_strdup(b_name);
     wmma->output_name = tc_unique_name();
     wmma->output_ndim = output_ndim;
-    wmma->output_shape = malloc((size_t)output_ndim * sizeof(int));
+    wmma->output_shape = cml_malloc((size_t)output_ndim * sizeof(int));
     if (wmma->output_shape)
         memcpy(wmma->output_shape, output_shape, (size_t)output_ndim * sizeof(int));
 
-    WMMAConfig* cfg = calloc(1, sizeof(WMMAConfig));
+    WMMAConfig* cfg = cml_calloc(1, sizeof(WMMAConfig));
     if (cfg) {
         cml_wmma_select_config(m, n, k, cfg);
         wmma->params = cfg;
@@ -169,8 +170,8 @@ static void replace_refs(CMLGraph_t ir, const char* old_name, const char* new_na
     while (n) {
         for (int i = 0; i < n->num_inputs; i++) {
             if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
-                free(n->input_names[i]);
-                n->input_names[i] = strdup(new_name);
+                cml_free(n->input_names[i]);
+                n->input_names[i] = cml_strdup(new_name);
             }
         }
         n = n->next;
@@ -236,18 +237,18 @@ static void free_node(struct IRNode* node) {
     if (!node) return;
     if (node->input_names) {
         for (int i = 0; i < node->num_inputs; i++)
-            free(node->input_names[i]);
-        free(node->input_names);
+            cml_free(node->input_names[i]);
+        cml_free(node->input_names);
     }
-    free(node->output_name);
-    free(node->output_shape);
-    free(node->params);
-    free(node->users);
+    cml_free(node->output_name);
+    cml_free(node->output_shape);
+    cml_free(node->params);
+    cml_free(node->users);
     if (node->output) {
         node->output->ir_node = NULL;
         node->output->ir_context = NULL;
     }
-    free(node);
+    cml_free(node);
 }
 
 static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
@@ -277,13 +278,13 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
         int ndim_b = node->input_ndims[1];
 
         if (pm != m || pk != k) {
-            int* padded_a = malloc((size_t)ndim_a * sizeof(int));
+            int* padded_a = cml_malloc((size_t)ndim_a * sizeof(int));
             if (padded_a) {
                 memcpy(padded_a, node->input_shapes[0], (size_t)ndim_a * sizeof(int));
                 padded_a[ndim_a - 2] = pm;
                 padded_a[ndim_a - 1] = pk;
                 struct IRNode* pad_a = create_pad_node(NULL, a_name, padded_a, ndim_a);
-                free(padded_a);
+                cml_free(padded_a);
                 if (pad_a) {
                     insert_before(ir, pad_a, node);
                     final_a = pad_a->output_name;
@@ -292,13 +293,13 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
         }
 
         if (pk != k || pn != n) {
-            int* padded_b = malloc((size_t)ndim_b * sizeof(int));
+            int* padded_b = cml_malloc((size_t)ndim_b * sizeof(int));
             if (padded_b) {
                 memcpy(padded_b, node->input_shapes[1], (size_t)ndim_b * sizeof(int));
                 padded_b[ndim_b - 2] = pk;
                 padded_b[ndim_b - 1] = pn;
                 struct IRNode* pad_b = create_pad_node(NULL, b_name, padded_b, ndim_b);
-                free(padded_b);
+                cml_free(padded_b);
                 if (pad_b) {
                     insert_before(ir, pad_b, node);
                     final_b = pad_b->output_name;
@@ -308,7 +309,7 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     }
 
     int out_ndim = node->output_ndim > 0 ? node->output_ndim : 2;
-    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape) return 0;
 
     if (node->output_shape && node->output_ndim > 0) {
@@ -322,22 +323,22 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode* wmma = create_wmma_node(final_a, final_b, pm, pn, pk,
                                            out_shape, out_ndim);
-    free(out_shape);
+    cml_free(out_shape);
     if (!wmma) return 0;
 
     insert_before(ir, wmma, node);
 
     if (needs_pad && node->output_shape) {
-        int* slice_shape = malloc((size_t)out_ndim * sizeof(int));
+        int* slice_shape = cml_malloc((size_t)out_ndim * sizeof(int));
         if (slice_shape) {
             memcpy(slice_shape, node->output_shape, (size_t)out_ndim * sizeof(int));
-            struct IRNode* slice = calloc(1, sizeof(struct IRNode));
+            struct IRNode* slice = cml_calloc(1, sizeof(struct IRNode));
             if (slice) {
                 slice->type = UOP_SHRINK;
                 slice->num_inputs = 1;
-                slice->input_names = malloc(sizeof(char*));
+                slice->input_names = cml_malloc(sizeof(char*));
                 if (slice->input_names) {
-                    slice->input_names[0] = strdup(wmma->output_name);
+                    slice->input_names[0] = cml_strdup(wmma->output_name);
                     slice->output_name = tc_unique_name();
                     slice->output_ndim = out_ndim;
                     slice->output_shape = slice_shape;
@@ -350,11 +351,11 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
                         node->output->ir_context = ir;
                     }
                 } else {
-                    free(slice_shape);
-                    free(slice);
+                    cml_free(slice_shape);
+                    cml_free(slice);
                 }
             } else {
-                free(slice_shape);
+                cml_free(slice_shape);
             }
         }
     } else {
@@ -417,7 +418,7 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node,
     int pk = round_up(k, 16);
 
     int out_ndim = reduce_node->output_ndim > 0 ? reduce_node->output_ndim : 2;
-    int* out_shape = malloc((size_t)out_ndim * sizeof(int));
+    int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape) return 0;
 
     if (reduce_node->output_shape && reduce_node->output_ndim > 0)
@@ -430,7 +431,7 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node,
     struct IRNode* wmma = create_wmma_node(
         src_a->output_name, src_b->output_name,
         pm, pn, pk, out_shape, out_ndim);
-    free(out_shape);
+    cml_free(out_shape);
     if (!wmma) return 0;
 
     insert_before(ir, wmma, reduce_node);

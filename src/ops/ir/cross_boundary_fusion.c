@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 /*
  * Softmax + CrossEntropy pattern:
@@ -166,7 +167,7 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
     *count = 0;
 
     int capacity = 16;
-    CMLCrossBoundaryFusion* fusions = calloc((size_t)capacity,
+    CMLCrossBoundaryFusion* fusions = cml_calloc((size_t)capacity,
                                              sizeof(CMLCrossBoundaryFusion));
     if (!fusions) return -1;
 
@@ -207,9 +208,9 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
 
             if (found >= capacity) {
                 capacity *= 2;
-                CMLCrossBoundaryFusion* tmp = realloc(fusions,
+                CMLCrossBoundaryFusion* tmp = cml_realloc(fusions,
                     (size_t)capacity * sizeof(CMLCrossBoundaryFusion));
-                if (!tmp) { free(fusions); return -1; }
+                if (!tmp) { cml_free(fusions); return -1; }
                 fusions = tmp;
             }
 
@@ -221,7 +222,7 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
     }
 
     if (found == 0) {
-        free(fusions);
+        cml_free(fusions);
         *out = NULL;
         *count = 0;
         return 0;
@@ -307,7 +308,7 @@ int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
 }
 
 void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions) {
-    free(fusions);
+    cml_free(fusions);
 }
 
 CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions,

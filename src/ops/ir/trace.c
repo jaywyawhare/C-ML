@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 static _Thread_local CMLTrace* g_active_trace = NULL;
 
@@ -20,14 +21,14 @@ void cml_trace_set_active(CMLTrace* trace) {
 
 CMLTrace *cml_trace_create(void)
 {
-    CMLTrace *trace = (CMLTrace *)calloc(1, sizeof(CMLTrace));
+    CMLTrace *trace = (CMLTrace *)cml_calloc(1, sizeof(CMLTrace));
     return trace; /* NULL on allocation failure */
 }
 
 void cml_trace_free(CMLTrace *trace)
 {
     if (!trace) return;
-    free(trace);
+    cml_free(trace);
 }
 
 int cml_trace_begin(CMLTrace *trace, uint64_t graph_hash)
@@ -168,7 +169,7 @@ int cml_trace_replay(CMLTrace *trace, void **tensor_ptrs, int num_tensors)
 
 CMLTraceCache *cml_trace_cache_create(void)
 {
-    CMLTraceCache *cache = (CMLTraceCache *)calloc(1, sizeof(CMLTraceCache));
+    CMLTraceCache *cache = (CMLTraceCache *)cml_calloc(1, sizeof(CMLTraceCache));
     return cache;
 }
 
@@ -181,7 +182,7 @@ void cml_trace_cache_free(CMLTraceCache *cache)
             cml_trace_free(cache->entries[i].trace);
         }
     }
-    free(cache);
+    cml_free(cache);
 }
 
 CMLTrace *cml_trace_cache_lookup(CMLTraceCache *cache, uint64_t graph_hash)

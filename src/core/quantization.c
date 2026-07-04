@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include "alloc/cml_allocator.h"
 
 QuantParams cml_quantize_compute_params(Tensor* tensor, bool symmetric) {
     QuantParams params = {.scale = 1.0f, .zero_point = 0};
@@ -64,7 +65,7 @@ Tensor* cml_quantize_int8(Tensor* tensor, const QuantParams* params, QuantParams
     TensorConfig config = {.dtype = DTYPE_INT8, .device = tensor->device,
                            .has_dtype = true, .has_device = true};
     Tensor* quantized = tensor_empty(shape, tensor->ndim, &config);
-    free(shape);
+    cml_free(shape);
     if (!quantized) return NULL;
 
     int8_t* qdata = (int8_t*)quantized->data;
@@ -97,7 +98,7 @@ Tensor* cml_dequantize_int8(Tensor* tensor, const QuantParams* params) {
     TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = tensor->device,
                            .has_dtype = true, .has_device = true};
     Tensor* dequantized = tensor_empty(shape, tensor->ndim, &config);
-    free(shape);
+    cml_free(shape);
     if (!dequantized) return NULL;
 
     int8_t* qdata = (int8_t*)tensor->data;
@@ -146,7 +147,7 @@ Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParam
     TensorConfig config = {.dtype = DTYPE_UINT8, .device = tensor->device,
                            .has_dtype = true, .has_device = true};
     Tensor* quantized = tensor_empty(shape, tensor->ndim, &config);
-    free(shape);
+    cml_free(shape);
     if (!quantized) return NULL;
 
     uint8_t* qdata = (uint8_t*)quantized->data;
@@ -179,7 +180,7 @@ Tensor* cml_dequantize_uint8(Tensor* tensor, const QuantParams* params) {
     TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = tensor->device,
                            .has_dtype = true, .has_device = true};
     Tensor* dequantized = tensor_empty(shape, tensor->ndim, &config);
-    free(shape);
+    cml_free(shape);
     if (!dequantized) return NULL;
 
     uint8_t* qdata = (uint8_t*)tensor->data;
@@ -244,7 +245,7 @@ Tensor* cml_quantize_nf4(Tensor* tensor, int block_size,
     /* Compute number of blocks */
     int num_blocks = (int)((numel + (size_t)block_size - 1) / (size_t)block_size);
 
-    float* scales = (float*)calloc((size_t)num_blocks, sizeof(float));
+    float* scales = (float*)cml_calloc((size_t)num_blocks, sizeof(float));
     if (!scales) {
         LOG_ERROR("cml_quantize_nf4: failed to allocate scales");
         return NULL;
@@ -272,7 +273,7 @@ Tensor* cml_quantize_nf4(Tensor* tensor, int block_size,
                            .has_dtype = true, .has_device = true};
     Tensor* packed = tensor_empty(packed_shape, 1, &config);
     if (!packed) {
-        free(scales);
+        cml_free(scales);
         LOG_ERROR("cml_quantize_nf4: failed to allocate packed tensor");
         return NULL;
     }
@@ -281,9 +282,9 @@ Tensor* cml_quantize_nf4(Tensor* tensor, int block_size,
     memset(pdata, 0, packed_size);
 
     /* Quantize: for each element, normalize by block scale, find nearest NF4 index */
-    uint8_t* indices = (uint8_t*)calloc(padded_numel, sizeof(uint8_t));
+    uint8_t* indices = (uint8_t*)cml_calloc(padded_numel, sizeof(uint8_t));
     if (!indices) {
-        free(scales);
+        cml_free(scales);
         tensor_free(packed);
         LOG_ERROR("cml_quantize_nf4: failed to allocate index buffer");
         return NULL;
@@ -304,7 +305,7 @@ Tensor* cml_quantize_nf4(Tensor* tensor, int block_size,
         pdata[i] = (uint8_t)((indices[2 * i] << 4) | (indices[2 * i + 1] & 0x0F));
     }
 
-    free(indices);
+    cml_free(indices);
 
     *out_scales = scales;
     *out_num_scales = num_blocks;

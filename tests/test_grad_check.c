@@ -5,6 +5,7 @@
 #include <string.h>
 #include "tensor/tensor.h"
 #include "ops/uops.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_total  = 0;
@@ -32,8 +33,8 @@ typedef Tensor* (*UnaryFn)(Tensor*);
 
 static float numerical_grad(const float* base, int n, int shape[],
                              int idx, UnaryFn f_fn, float eps) {
-    float* xp = malloc(n * sizeof(float));
-    float* xm = malloc(n * sizeof(float));
+    float* xp = cml_malloc(n * sizeof(float));
+    float* xm = cml_malloc(n * sizeof(float));
     memcpy(xp, base, n * sizeof(float));
     memcpy(xm, base, n * sizeof(float));
     xp[idx] += eps;
@@ -56,7 +57,7 @@ static float numerical_grad(const float* base, int n, int shape[],
 
     tensor_free(tp); tensor_free(tm);
     tensor_free(op); tensor_free(om);
-    free(xp); free(xm);
+    cml_free(xp); cml_free(xm);
     return grad;
 }
 

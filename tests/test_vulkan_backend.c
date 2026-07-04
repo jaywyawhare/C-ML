@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -38,19 +39,19 @@ static int test_spirv_gen_unary_neg(void) {
     size_t size = 0;
     uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_NEG, "test_neg", &size);
     if (!spirv) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (size == 0) { free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (size == 0) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
 
     /* Verify SPIR-V magic number */
     if (spirv[0] != 0x07230203) {
-        free(spirv); cml_spirv_codegen_destroy(cg); return 0;
+        cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0;
     }
 
     /* Verify size is multiple of 4 bytes */
     if (size % 4 != 0) {
-        free(spirv); cml_spirv_codegen_destroy(cg); return 0;
+        cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0;
     }
 
-    free(spirv);
+    cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
     return 1;
 }
@@ -62,9 +63,9 @@ static int test_spirv_gen_unary_exp(void) {
     size_t size = 0;
     uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_EXP, "test_exp", &size);
     if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
 
-    free(spirv);
+    cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
     return 1;
 }
@@ -76,9 +77,9 @@ static int test_spirv_gen_unary_sqrt(void) {
     size_t size = 0;
     uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_SQRT, "test_sqrt", &size);
     if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
 
-    free(spirv);
+    cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
     return 1;
 }
@@ -90,9 +91,9 @@ static int test_spirv_gen_binary_add(void) {
     size_t size = 0;
     uint32_t* spirv = cml_spirv_gen_binary(cg, UOP_ADD, "test_add", &size);
     if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
 
-    free(spirv);
+    cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
     return 1;
 }
@@ -104,9 +105,9 @@ static int test_spirv_gen_binary_mul(void) {
     size_t size = 0;
     uint32_t* spirv = cml_spirv_gen_binary(cg, UOP_MUL, "test_mul", &size);
     if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
 
-    free(spirv);
+    cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
     return 1;
 }
@@ -228,7 +229,7 @@ static int test_vulkan_kernel_dispatch(void) {
 
     /* Create kernel with 3 buffers (in, out, params) */
     CMLVulkanKernel* kernel = cml_vulkan_kernel_create(backend, spirv, spirv_size, "main", 3);
-    free(spirv);
+    cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
 
     if (!kernel) {

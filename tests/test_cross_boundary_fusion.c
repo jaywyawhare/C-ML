@@ -7,6 +7,7 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/fusion_patterns.h"
 #include "tensor/tensor.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -133,7 +134,7 @@ static int test_analyze_with_schedule(void) {
     int count = 0;
     int ret = cml_cross_boundary_analyze(&sched, &out, &count);
 
-    if (out) free(out);
+    if (out) cml_free(out);
     return ret == 0 && count == 0;
 }
 

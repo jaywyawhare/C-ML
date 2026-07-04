@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include "alloc/cml_allocator.h"
 
 struct CMLGraphAllocator {
     CMLBackendBufferType_t* buffer_types;
@@ -27,29 +28,29 @@ CMLGraphAllocator_t cml_graph_allocator_new(CMLBackendBufferType_t buft) {
         return NULL;
     }
 
-    CMLGraphAllocator_t galloc = malloc(sizeof(struct CMLGraphAllocator));
+    CMLGraphAllocator_t galloc = cml_malloc(sizeof(struct CMLGraphAllocator));
     if (!galloc)
         return NULL;
 
-    galloc->buffer_types    = malloc(sizeof(CMLBackendBufferType_t));
-    galloc->buffers         = malloc(sizeof(CMLBackendBuffer_t));
-    galloc->buffer_sizes    = malloc(sizeof(size_t));
-    galloc->buffer_reserved = malloc(sizeof(bool));
-    galloc->memory_pools    = malloc(sizeof(MemoryPool*));
+    galloc->buffer_types    = cml_malloc(sizeof(CMLBackendBufferType_t));
+    galloc->buffers         = cml_malloc(sizeof(CMLBackendBuffer_t));
+    galloc->buffer_sizes    = cml_malloc(sizeof(size_t));
+    galloc->buffer_reserved = cml_malloc(sizeof(bool));
+    galloc->memory_pools    = cml_malloc(sizeof(MemoryPool*));
 
     if (!galloc->buffer_types || !galloc->buffers || !galloc->buffer_sizes ||
         !galloc->buffer_reserved || !galloc->memory_pools) {
         if (galloc->buffer_types)
-            free(galloc->buffer_types);
+            cml_free(galloc->buffer_types);
         if (galloc->buffers)
-            free(galloc->buffers);
+            cml_free(galloc->buffers);
         if (galloc->buffer_sizes)
-            free(galloc->buffer_sizes);
+            cml_free(galloc->buffer_sizes);
         if (galloc->buffer_reserved)
-            free(galloc->buffer_reserved);
+            cml_free(galloc->buffer_reserved);
         if (galloc->memory_pools)
-            free(galloc->memory_pools);
-        free(galloc);
+            cml_free(galloc->memory_pools);
+        cml_free(galloc);
         return NULL;
     }
 
@@ -70,29 +71,29 @@ CMLGraphAllocator_t cml_graph_allocator_new_n(CMLBackendBufferType_t* bufts, int
         return NULL;
     }
 
-    CMLGraphAllocator_t galloc = malloc(sizeof(struct CMLGraphAllocator));
+    CMLGraphAllocator_t galloc = cml_malloc(sizeof(struct CMLGraphAllocator));
     if (!galloc)
         return NULL;
 
-    galloc->buffer_types    = malloc((size_t)n_bufs * sizeof(CMLBackendBufferType_t));
-    galloc->buffers         = malloc((size_t)n_bufs * sizeof(CMLBackendBuffer_t));
-    galloc->buffer_sizes    = malloc((size_t)n_bufs * sizeof(size_t));
-    galloc->buffer_reserved = malloc((size_t)n_bufs * sizeof(bool));
-    galloc->memory_pools    = malloc((size_t)n_bufs * sizeof(MemoryPool*));
+    galloc->buffer_types    = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBufferType_t));
+    galloc->buffers         = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBuffer_t));
+    galloc->buffer_sizes    = cml_malloc((size_t)n_bufs * sizeof(size_t));
+    galloc->buffer_reserved = cml_malloc((size_t)n_bufs * sizeof(bool));
+    galloc->memory_pools    = cml_malloc((size_t)n_bufs * sizeof(MemoryPool*));
 
     if (!galloc->buffer_types || !galloc->buffers || !galloc->buffer_sizes ||
         !galloc->buffer_reserved || !galloc->memory_pools) {
         if (galloc->buffer_types)
-            free(galloc->buffer_types);
+            cml_free(galloc->buffer_types);
         if (galloc->buffers)
-            free(galloc->buffers);
+            cml_free(galloc->buffers);
         if (galloc->buffer_sizes)
-            free(galloc->buffer_sizes);
+            cml_free(galloc->buffer_sizes);
         if (galloc->buffer_reserved)
-            free(galloc->buffer_reserved);
+            cml_free(galloc->buffer_reserved);
         if (galloc->memory_pools)
-            free(galloc->memory_pools);
-        free(galloc);
+            cml_free(galloc->memory_pools);
+        cml_free(galloc);
         return NULL;
     }
 
@@ -120,7 +121,7 @@ void cml_graph_allocator_free(CMLGraphAllocator_t galloc) {
                 cml_backend_buffer_free(galloc->buffers[i]);
             }
         }
-        free(galloc->buffers);
+        cml_free(galloc->buffers);
     }
 
     if (galloc->memory_pools) {
@@ -129,17 +130,17 @@ void cml_graph_allocator_free(CMLGraphAllocator_t galloc) {
                 memory_pool_free(galloc->memory_pools[i]);
             }
         }
-        free(galloc->memory_pools);
+        cml_free(galloc->memory_pools);
     }
 
     if (galloc->buffer_types)
-        free(galloc->buffer_types);
+        cml_free(galloc->buffer_types);
     if (galloc->buffer_sizes)
-        free(galloc->buffer_sizes);
+        cml_free(galloc->buffer_sizes);
     if (galloc->buffer_reserved)
-        free(galloc->buffer_reserved);
+        cml_free(galloc->buffer_reserved);
 
-    free(galloc);
+    cml_free(galloc);
 }
 
 static size_t calculate_tensor_size(Tensor* tensor) {
@@ -163,20 +164,20 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     if (node_count == 0)
         return 0;
 
-    size_t* tensor_sizes = calloc(node_count, sizeof(size_t));
-    int* execution_order = calloc(node_count, sizeof(int));
-    int* use_counts      = calloc(node_count, sizeof(int));
-    bool* is_leaf        = calloc(node_count, sizeof(bool));
+    size_t* tensor_sizes = cml_calloc(node_count, sizeof(size_t));
+    int* execution_order = cml_calloc(node_count, sizeof(int));
+    int* use_counts      = cml_calloc(node_count, sizeof(int));
+    bool* is_leaf        = cml_calloc(node_count, sizeof(bool));
 
     if (!tensor_sizes || !execution_order || !use_counts || !is_leaf) {
         if (tensor_sizes)
-            free(tensor_sizes);
+            cml_free(tensor_sizes);
         if (execution_order)
-            free(execution_order);
+            cml_free(execution_order);
         if (use_counts)
-            free(use_counts);
+            cml_free(use_counts);
         if (is_leaf)
-            free(is_leaf);
+            cml_free(is_leaf);
         // Fallback to adaptive analysis if full analysis fails
         return calculate_peak_memory_simple(graph);
     }
@@ -216,12 +217,12 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     }
 
     // Use Kahn's algorithm
-    int* in_degree = calloc(node_count, sizeof(int));
+    int* in_degree = cml_calloc(node_count, sizeof(int));
     if (!in_degree) {
-        free(tensor_sizes);
-        free(execution_order);
-        free(use_counts);
-        free(is_leaf);
+        cml_free(tensor_sizes);
+        cml_free(execution_order);
+        cml_free(use_counts);
+        cml_free(is_leaf);
         return calculate_peak_memory_simple(graph);
     }
 
@@ -238,13 +239,13 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         }
     }
 
-    size_t* queue = malloc(node_count * sizeof(size_t));
+    size_t* queue = cml_malloc(node_count * sizeof(size_t));
     if (!queue) {
-        free(tensor_sizes);
-        free(execution_order);
-        free(use_counts);
-        free(is_leaf);
-        free(in_degree);
+        cml_free(tensor_sizes);
+        cml_free(execution_order);
+        cml_free(use_counts);
+        cml_free(is_leaf);
+        cml_free(in_degree);
         return calculate_peak_memory_simple(graph);
     }
 
@@ -287,17 +288,17 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         }
     }
 
-    free(in_degree);
-    free(queue);
+    cml_free(in_degree);
+    cml_free(queue);
 
     size_t peak_memory = 0;
 
-    int* alive_until = calloc(node_count, sizeof(int));
+    int* alive_until = cml_calloc(node_count, sizeof(int));
     if (!alive_until) {
-        free(tensor_sizes);
-        free(execution_order);
-        free(use_counts);
-        free(is_leaf);
+        cml_free(tensor_sizes);
+        cml_free(execution_order);
+        cml_free(use_counts);
+        cml_free(is_leaf);
         return calculate_peak_memory_simple(graph);
     }
 
@@ -348,11 +349,11 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
         }
     }
 
-    free(tensor_sizes);
-    free(execution_order);
-    free(use_counts);
-    free(is_leaf);
-    free(alive_until);
+    cml_free(tensor_sizes);
+    cml_free(execution_order);
+    cml_free(use_counts);
+    cml_free(is_leaf);
+    cml_free(alive_until);
 
     // Ensure minimum allocation (1MB) for small graphs
     if (peak_memory < 1024 * 1024) {
@@ -451,7 +452,7 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
     if (graph && node_buffer_ids && leaf_buffer_ids) {
         CMLComputationGraph_t cgraph = (CMLComputationGraph_t)graph;
 
-        size_t* buffer_memory = calloc((size_t)galloc->num_buffers, sizeof(size_t));
+        size_t* buffer_memory = cml_calloc((size_t)galloc->num_buffers, sizeof(size_t));
         if (!buffer_memory) {
             // Fallback to basic reserve
             return cml_graph_allocator_reserve(galloc, graph);
@@ -502,7 +503,7 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
             }
         }
 
-        free(buffer_memory);
+        cml_free(buffer_memory);
     } else {
         // Fallback to basic reserve
         return cml_graph_allocator_reserve(galloc, graph);
@@ -659,7 +660,7 @@ struct CMLContext {
 };
 
 CMLContext_t cml_context_new(CMLContextParams params) {
-    CMLContext_t ctx = malloc(sizeof(struct CMLContext));
+    CMLContext_t ctx = cml_malloc(sizeof(struct CMLContext));
     if (!ctx)
         return NULL;
 
@@ -673,13 +674,13 @@ CMLContext_t cml_context_new(CMLContextParams params) {
     if (params.mem_buffer) {
         CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(ctx->device);
         if (!buft) {
-            free(ctx);
+            cml_free(ctx);
             return NULL;
         }
 
         ctx->buffer = cml_backend_buffer_type_alloc_buffer(buft, params.mem_size);
         if (!ctx->buffer) {
-            free(ctx);
+            cml_free(ctx);
             return NULL;
         }
 
@@ -693,13 +694,13 @@ CMLContext_t cml_context_new(CMLContextParams params) {
     } else if (params.mem_size > 0 && !params.no_alloc) {
         CMLBackendBufferType_t buft = cml_backend_buffer_type_for_device(ctx->device);
         if (!buft) {
-            free(ctx);
+            cml_free(ctx);
             return NULL;
         }
 
         ctx->buffer = cml_backend_buffer_type_alloc_buffer(buft, params.mem_size);
         if (!ctx->buffer) {
-            free(ctx);
+            cml_free(ctx);
             return NULL;
         }
 
@@ -722,7 +723,7 @@ void cml_context_free(CMLContext_t ctx) {
         cml_backend_buffer_free(ctx->buffer);
     }
 
-    free(ctx);
+    cml_free(ctx);
 }
 
 size_t cml_context_used_mem(CMLContext_t ctx) {
@@ -765,7 +766,7 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
             tensor->buffer_handle = NULL;
         } else if (tensor->data) {
             if (tensor->device == DEVICE_CPU || tensor->device == DEVICE_AUTO) {
-                free(tensor->data);
+                cml_free(tensor->data);
             } else {
                 device_free(tensor->data, tensor->device);
             }
@@ -826,7 +827,7 @@ int cml_context_set_param(CMLContext_t ctx, Tensor* tensor) {
          * release that allocation first. */
         if (tensor->owns_data && tensor->data) {
             if (tensor->device == DEVICE_CPU || tensor->device == DEVICE_AUTO) {
-                free(tensor->data);
+                cml_free(tensor->data);
             } else {
                 device_free(tensor->data, tensor->device);
             }

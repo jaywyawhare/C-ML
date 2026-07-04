@@ -1,6 +1,7 @@
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "alloc/cml_allocator.h"
 
 #define N_EPOCHS 100
 
@@ -14,17 +15,17 @@ int main(void) {
     int n = ds->num_samples;
     int nf = ds->input_size;
 
-    float* raw_y = malloc(sizeof(float) * n);
+    float* raw_y = cml_malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
         raw_y[i] = tensor_get_float(ds->y, i);
 
-    float* reg_target = malloc(sizeof(float) * n);
+    float* reg_target = cml_malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
         reg_target[i] = tensor_get_float(ds->X, i * nf + 0);
 
     dataset_normalize(ds, "minmax");
 
-    float* cls_target = malloc(sizeof(float) * n);
+    float* cls_target = cml_malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
         cls_target[i] = (raw_y[i] == 1.0f) ? 1.0f : 0.0f;
 
@@ -112,9 +113,9 @@ int main(void) {
     printf("Classification accuracy: %d/%d (%.0f%%)\n",
            total_correct, n, total_correct / (float)n * 100);
 
-    free(raw_y);
-    free(reg_target);
-    free(cls_target);
+    cml_free(raw_y);
+    cml_free(reg_target);
+    cml_free(cls_target);
     cml_cleanup();
     return 0;
 }

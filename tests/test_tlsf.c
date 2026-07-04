@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "alloc/tlsf_alloc.h"
+#include "alloc/cml_allocator.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -268,25 +269,25 @@ static int test_create_with_pool(void)
 {
     /* User-provided pool */
     size_t pool_size = 4096;
-    void* pool = malloc(pool_size);
+    void* pool = cml_malloc(pool_size);
     if (!pool) return 0;
 
     CMLTLSFAllocator* alloc = cml_tlsf_create_with_pool(pool, pool_size);
-    if (!alloc) { free(pool); return 0; }
+    if (!alloc) { cml_free(pool); return 0; }
 
     void* ptr = cml_tlsf_alloc(alloc, 64);
-    if (!ptr) { cml_tlsf_destroy(alloc); free(pool); return 0; }
+    if (!ptr) { cml_tlsf_destroy(alloc); cml_free(pool); return 0; }
 
     /* Pointer should be within the pool */
     if ((char*)ptr < (char*)pool || (char*)ptr >= (char*)pool + pool_size) {
         cml_tlsf_destroy(alloc);
-        free(pool);
+        cml_free(pool);
         return 0;
     }
 
     cml_tlsf_free(alloc, ptr);
     cml_tlsf_destroy(alloc);
-    free(pool);
+    cml_free(pool);
     return 1;
 }
 

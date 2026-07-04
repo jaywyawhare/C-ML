@@ -13,6 +13,7 @@
 
 #ifdef CML_HAS_LLVM_BACKEND
 #include "ops/ir/llvm/llvm_backend.h"
+#include "alloc/cml_allocator.h"
 #endif
 
 /* Rejects strings containing shell metacharacters that could allow
@@ -441,7 +442,7 @@ CMLAOTModel* cml_aot_load(const char* path) {
         return NULL;
     }
 
-    CMLAOTModel* model = calloc(1, sizeof(CMLAOTModel));
+    CMLAOTModel* model = cml_calloc(1, sizeof(CMLAOTModel));
     if (!model) {
         dlclose(handle);
         return NULL;
@@ -449,7 +450,7 @@ CMLAOTModel* cml_aot_load(const char* path) {
 
     model->handle = handle;
     model->forward_fn = forward_fn;
-    model->path = strdup(path);
+    model->path = cml_strdup(path);
 
     LOG_INFO("AOT model loaded from: %s", path);
     return model;
@@ -472,7 +473,7 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
     } MemRefDesc1D;
 
     int total = num_inputs + num_outputs;
-    MemRefDesc1D* descs = malloc(total * sizeof(MemRefDesc1D));
+    MemRefDesc1D* descs = cml_malloc(total * sizeof(MemRefDesc1D));
     if (!descs)
         return -1;
 
@@ -481,11 +482,11 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
         if (!t || !t->data) {
             /* Allocate output data if needed */
             if (i >= num_inputs && t && !t->data && t->numel > 0) {
-                t->data = calloc(t->numel, sizeof(float));
+                t->data = cml_calloc(t->numel, sizeof(float));
                 t->owns_data = true;
             }
             if (!t || !t->data) {
-                free(descs);
+                cml_free(descs);
                 return -1;
             }
         }
@@ -509,17 +510,17 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
     } else {
         LOG_WARNING("AOT execute: unsupported arg count %d, using generic call", total);
         /* Generic call via function pointer array */
-        void** args = malloc(total * sizeof(void*));
+        void** args = cml_malloc(total * sizeof(void*));
         for (int i = 0; i < total; i++)
             args[i] = &descs[i];
         /* Execute as packed function */
         typedef void (*FnPacked)(void**);
         FnPacked fn = (FnPacked)model->forward_fn;
         fn(args);
-        free(args);
+        cml_free(args);
     }
 
-    free(descs);
+    cml_free(descs);
     return 0;
 }
 
@@ -532,18 +533,18 @@ void cml_aot_free(CMLAOTModel* model) {
 
     if (model->input_shapes) {
         for (int i = 0; i < model->num_inputs; i++)
-            free(model->input_shapes[i]);
-        free(model->input_shapes);
+            cml_free(model->input_shapes[i]);
+        cml_free(model->input_shapes);
     }
     if (model->output_shapes) {
         for (int i = 0; i < model->num_outputs; i++)
-            free(model->output_shapes[i]);
-        free(model->output_shapes);
+            cml_free(model->output_shapes[i]);
+        cml_free(model->output_shapes);
     }
-    free(model->input_ndims);
-    free(model->output_ndims);
-    free((char*)model->path);
-    free(model);
+    cml_free(model->input_ndims);
+    cml_free(model->output_ndims);
+    cml_free((char*)model->path);
+    cml_free(model);
 }
 
 int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* function_name) {

@@ -8,34 +8,35 @@
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
+#include "alloc/cml_allocator.h"
 
 static struct IRNode* make_node(UOpType type, const char* output,
                                 const char** inputs, int num_inputs) {
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     node->type = type;
-    node->output_name = strdup(output);
+    node->output_name = cml_strdup(output);
     node->num_inputs = num_inputs;
     if (num_inputs > 0) {
-        node->input_names = malloc((size_t)num_inputs * sizeof(char*));
+        node->input_names = cml_malloc((size_t)num_inputs * sizeof(char*));
         for (int i = 0; i < num_inputs; i++)
-            node->input_names[i] = strdup(inputs[i]);
+            node->input_names[i] = cml_strdup(inputs[i]);
     }
     return node;
 }
 
 static struct IRNode* make_fill_node(const char* output, float value) {
-    struct IRNode* node = calloc(1, sizeof(struct IRNode));
+    struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
     node->type = UOP_FILL;
-    node->output_name = strdup(output);
+    node->output_name = cml_strdup(output);
     node->num_inputs = 0;
     node->output_ndim = 1;
-    node->output_shape = malloc(sizeof(int));
+    node->output_shape = cml_malloc(sizeof(int));
     node->output_shape[0] = 1;
 
-    FillParams* fp = malloc(sizeof(FillParams));
+    FillParams* fp = cml_malloc(sizeof(FillParams));
     fp->value = value;
     fp->ndim = 1;
-    fp->shape = malloc(sizeof(int));
+    fp->shape = cml_malloc(sizeof(int));
     fp->shape[0] = 1;
     node->params = fp;
     return node;
@@ -59,20 +60,20 @@ static void free_graph_nodes(struct CMLGraph* g) {
         struct IRNode* next = n->next;
         if (n->input_names) {
             for (int i = 0; i < n->num_inputs; i++)
-                free(n->input_names[i]);
-            free(n->input_names);
+                cml_free(n->input_names[i]);
+            cml_free(n->input_names);
         }
-        free(n->output_name);
-        free(n->output_shape);
+        cml_free(n->output_name);
+        cml_free(n->output_shape);
         if (n->params) {
             if (n->type == UOP_FILL) {
                 FillParams* fp = (FillParams*)n->params;
-                free(fp->shape);
+                cml_free(fp->shape);
             }
-            free(n->params);
+            cml_free(n->params);
         }
-        free(n->users);
-        free(n);
+        cml_free(n->users);
+        cml_free(n);
         n = next;
     }
     g->head = g->tail = NULL;

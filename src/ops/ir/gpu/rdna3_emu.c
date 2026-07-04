@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 /* ── RDNA3 encoding format constants ────────────────────────────────────── */
 
@@ -179,32 +180,32 @@ static uint64_t read_sgpr_pair(CMLRDNA3Wave* w, int idx) {
 /* ── Create / Free ─────────────────────────────────────────────────────── */
 
 CMLRDNA3Emu* cml_rdna3_emu_create(size_t mem_size) {
-    CMLRDNA3Emu* emu = calloc(1, sizeof(CMLRDNA3Emu));
+    CMLRDNA3Emu* emu = cml_calloc(1, sizeof(CMLRDNA3Emu));
     if (!emu) return NULL;
 
     if (mem_size == 0) mem_size = 64 * 1024 * 1024;
 
-    emu->memory = calloc(1, mem_size);
-    if (!emu->memory) { free(emu); return NULL; }
+    emu->memory = cml_calloc(1, mem_size);
+    if (!emu->memory) { cml_free(emu); return NULL; }
     emu->mem_size = mem_size;
 
-    emu->lds = calloc(1, RDNA3_LDS_SIZE);
-    if (!emu->lds) { free(emu->memory); free(emu); return NULL; }
+    emu->lds = cml_calloc(1, RDNA3_LDS_SIZE);
+    if (!emu->lds) { cml_free(emu->memory); cml_free(emu); return NULL; }
     emu->lds_size = RDNA3_LDS_SIZE;
 
     emu->wave_capacity = 64;
-    emu->waves = calloc(emu->wave_capacity, sizeof(CMLRDNA3Wave));
-    if (!emu->waves) { free(emu->lds); free(emu->memory); free(emu); return NULL; }
+    emu->waves = cml_calloc(emu->wave_capacity, sizeof(CMLRDNA3Wave));
+    if (!emu->waves) { cml_free(emu->lds); cml_free(emu->memory); cml_free(emu); return NULL; }
 
     return emu;
 }
 
 void cml_rdna3_emu_free(CMLRDNA3Emu* emu) {
     if (!emu) return;
-    free(emu->waves);
-    free(emu->lds);
-    free(emu->memory);
-    free(emu);
+    cml_free(emu->waves);
+    cml_free(emu->lds);
+    cml_free(emu->memory);
+    cml_free(emu);
 }
 
 int cml_rdna3_emu_load(CMLRDNA3Emu* emu, const void* binary, size_t size, uint64_t addr) {
@@ -241,7 +242,7 @@ int cml_rdna3_emu_dispatch(CMLRDNA3Emu* emu, uint32_t grid[3], uint32_t block[3]
 
     if ((int)total_waves > emu->wave_capacity) {
         int new_cap = (int)total_waves + 16;
-        CMLRDNA3Wave* tmp = realloc(emu->waves, new_cap * sizeof(CMLRDNA3Wave));
+        CMLRDNA3Wave* tmp = cml_realloc(emu->waves, new_cap * sizeof(CMLRDNA3Wave));
         if (!tmp) return -1;
         emu->waves = tmp;
         emu->wave_capacity = new_cap;

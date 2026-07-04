@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include "alloc/cml_allocator.h"
 
 #define NCCL_UNIQUE_ID_BYTES 128
 #define NCCL_BOOTSTRAP_DEFAULT_ADDR "127.0.0.1"
@@ -263,7 +264,7 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
     /* Allocate flat gather buffer: world_size * input->numel elements */
     size_t chunk_size = input->numel;
     size_t total_size = chunk_size * (size_t)world_size;
-    float* gather_buf = (float*)malloc(total_size * sizeof(float));
+    float* gather_buf = (float*)cml_malloc(total_size * sizeof(float));
     if (!gather_buf)
         return -1;
 
@@ -273,7 +274,7 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
                                       nccl->stream);
 
     if (result != 0) {
-        free(gather_buf);
+        cml_free(gather_buf);
         return result;
     }
 
@@ -285,7 +286,7 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
         }
     }
 
-    free(gather_buf);
+    cml_free(gather_buf);
     return 0;
 }
 
@@ -384,7 +385,7 @@ static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
                                       0 /* ncclFloat32 */, nccl_op, nccl->comm,
                                       nccl->stream);
 
-    DistWork* work = (DistWork*)calloc(1, sizeof(DistWork));
+    DistWork* work = (DistWork*)cml_calloc(1, sizeof(DistWork));
     if (!work)
         return NULL;
 
@@ -468,7 +469,7 @@ static void nccl_destroy(void* ctx) {
     if (g_nccl_ctx == nccl)
         g_nccl_ctx = NULL;
 
-    free(nccl);
+    cml_free(nccl);
 }
 
 DistCommOps* cml_dist_create_nccl_backend(void) {
@@ -482,7 +483,7 @@ DistCommOps* cml_dist_create_nccl_backend(void) {
         return NULL;
     }
 
-    NCCLContext* nccl = calloc(1, sizeof(NCCLContext));
+    NCCLContext* nccl = cml_calloc(1, sizeof(NCCLContext));
     if (!nccl) {
         dlclose(handle);
         return NULL;
@@ -508,14 +509,14 @@ DistCommOps* cml_dist_create_nccl_backend(void) {
     if (!nccl->ncclAllReduce) {
         LOG_WARNING("NCCL loaded but missing ncclAllReduce");
         dlclose(handle);
-        free(nccl);
+        cml_free(nccl);
         return NULL;
     }
 
-    DistCommOps* ops = calloc(1, sizeof(DistCommOps));
+    DistCommOps* ops = cml_calloc(1, sizeof(DistCommOps));
     if (!ops) {
         dlclose(handle);
-        free(nccl);
+        cml_free(nccl);
         return NULL;
     }
 

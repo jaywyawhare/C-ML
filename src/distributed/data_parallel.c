@@ -3,6 +3,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define DEFAULT_BUCKET_SIZE (25 * 1024 * 1024) /* 25MB in bytes */
 
@@ -27,7 +28,7 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
         return NULL;
     }
 
-    CMLDataParallel* ddp = calloc(1, sizeof(CMLDataParallel));
+    CMLDataParallel* ddp = cml_calloc(1, sizeof(CMLDataParallel));
     if (!ddp)
         return NULL;
 
@@ -40,7 +41,7 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
                                            &ddp->num_params, true);
     if (result != 0 || ddp->num_params == 0) {
         LOG_WARNING("DDP: no parameters found in module");
-        free(ddp);
+        cml_free(ddp);
         return NULL;
     }
 
@@ -65,10 +66,10 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
     if (ddp->num_buckets < 1)
         ddp->num_buckets = 1;
 
-    ddp->buckets = calloc(ddp->num_buckets, sizeof(float*));
-    ddp->bucket_sizes = calloc(ddp->num_buckets, sizeof(size_t));
-    ddp->bucket_ready = calloc(ddp->num_buckets, sizeof(bool));
-    ddp->param_to_bucket = calloc(ddp->num_params, sizeof(int));
+    ddp->buckets = cml_calloc(ddp->num_buckets, sizeof(float*));
+    ddp->bucket_sizes = cml_calloc(ddp->num_buckets, sizeof(size_t));
+    ddp->bucket_ready = cml_calloc(ddp->num_buckets, sizeof(bool));
+    ddp->param_to_bucket = cml_calloc(ddp->num_params, sizeof(int));
 
     if (!ddp->buckets || !ddp->bucket_sizes || !ddp->bucket_ready || !ddp->param_to_bucket) {
         cml_ddp_free(ddp);
@@ -97,7 +98,7 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
     /* Allocate bucket buffers */
     for (int b = 0; b < ddp->num_buckets; b++) {
         if (ddp->bucket_sizes[b] > 0) {
-            ddp->buckets[b] = calloc(ddp->bucket_sizes[b], sizeof(float));
+            ddp->buckets[b] = cml_calloc(ddp->bucket_sizes[b], sizeof(float));
             if (!ddp->buckets[b]) {
                 LOG_ERROR("DDP: failed to allocate bucket %d", b);
             }
@@ -209,13 +210,13 @@ void cml_ddp_free(CMLDataParallel* ddp) {
 
     if (ddp->buckets) {
         for (int b = 0; b < ddp->num_buckets; b++)
-            free(ddp->buckets[b]);
-        free(ddp->buckets);
+            cml_free(ddp->buckets[b]);
+        cml_free(ddp->buckets);
     }
 
-    free(ddp->bucket_sizes);
-    free(ddp->bucket_ready);
-    free(ddp->param_to_bucket);
-    free(ddp->all_params);
-    free(ddp);
+    cml_free(ddp->bucket_sizes);
+    cml_free(ddp->bucket_ready);
+    cml_free(ddp->param_to_bucket);
+    cml_free(ddp->all_params);
+    cml_free(ddp);
 }

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha) {
     if (!base_weight) {
@@ -25,7 +26,7 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
     int out_features = base_weight->shape[0];
     int in_features = base_weight->shape[1];
 
-    CMLLoRALinear* lora = (CMLLoRALinear*)calloc(1, sizeof(CMLLoRALinear));
+    CMLLoRALinear* lora = (CMLLoRALinear*)cml_calloc(1, sizeof(CMLLoRALinear));
     if (!lora) {
         LOG_ERROR("Failed to allocate CMLLoRALinear");
         return NULL;
@@ -54,7 +55,7 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
     lora->lora_A = tensor_empty(shape_A, 2, &cfg);
     if (!lora->lora_A) {
         LOG_ERROR("Failed to allocate lora_A");
-        free(lora);
+        cml_free(lora);
         return NULL;
     }
     tensor_ensure_executed(lora->lora_A);
@@ -76,7 +77,7 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
     if (!lora->lora_B) {
         LOG_ERROR("Failed to allocate lora_B");
         tensor_free(lora->lora_A);
-        free(lora);
+        cml_free(lora);
         return NULL;
     }
 
@@ -99,7 +100,7 @@ void cml_lora_linear_free(CMLLoRALinear* lora) {
         lora->frozen_base = NULL;
     }
     /* Do NOT free base_weight - we don't own it */
-    free(lora);
+    cml_free(lora);
 }
 
 Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
@@ -183,7 +184,7 @@ Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
      * input: [batch, in_f], A: [rank, in_f] => tmp: [batch, rank]
      * tmp[b][r] = sum_i( input[b][i] * A[r][i] )
      */
-    float* tmp = (float*)calloc((size_t)batch * (size_t)r, sizeof(float));
+    float* tmp = (float*)cml_calloc((size_t)batch * (size_t)r, sizeof(float));
     if (!tmp) {
         LOG_ERROR("Failed to allocate temporary buffer for LoRA forward");
         tensor_free(output);
@@ -217,7 +218,7 @@ Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
         }
     }
 
-    free(tmp);
+    cml_free(tmp);
     return output;
 }
 
@@ -329,7 +330,7 @@ CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha)
         return NULL;
     }
 
-    CMLLoRAAdapter* adapter = (CMLLoRAAdapter*)calloc(1, sizeof(CMLLoRAAdapter));
+    CMLLoRAAdapter* adapter = (CMLLoRAAdapter*)cml_calloc(1, sizeof(CMLLoRAAdapter));
     if (!adapter) {
         LOG_ERROR("Failed to allocate CMLLoRAAdapter");
         return NULL;
@@ -354,8 +355,8 @@ void cml_lora_adapter_free(CMLLoRAAdapter* adapter) {
             cml_lora_linear_free(adapter->layers[i]);
         }
     }
-    free(adapter->layers);
-    free(adapter);
+    cml_free(adapter->layers);
+    cml_free(adapter);
 }
 
 int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer) {
@@ -365,7 +366,7 @@ int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer) {
     }
 
     int new_count = adapter->num_layers + 1;
-    CMLLoRALinear** new_layers = (CMLLoRALinear**)realloc(
+    CMLLoRALinear** new_layers = (CMLLoRALinear**)cml_realloc(
         adapter->layers, (size_t)new_count * sizeof(CMLLoRALinear*));
     if (!new_layers) {
         LOG_ERROR("Failed to reallocate adapter layers array");

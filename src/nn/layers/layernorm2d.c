@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* layernorm2d_forward(Module* module, Tensor* input) {
     LayerNorm2d* ln = (LayerNorm2d*)module;
@@ -143,17 +144,17 @@ static void layernorm2d_free(Module* module) {
     LayerNorm2d* ln = (LayerNorm2d*)module;
     if (!ln)
         return;
-    free(ln);
+    cml_free(ln);
 }
 
 LayerNorm2d* nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
                             DeviceType device) {
-    LayerNorm2d* ln = malloc(sizeof(LayerNorm2d));
+    LayerNorm2d* ln = cml_malloc(sizeof(LayerNorm2d));
     if (!ln)
         return NULL;
 
     if (module_init((Module*)ln, "LayerNorm2d", layernorm2d_forward, layernorm2d_free) != 0) {
-        free(ln);
+        cml_free(ln);
         return NULL;
     }
 

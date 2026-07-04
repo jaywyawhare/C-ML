@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 Tensor* conv_transpose3d_forward(Module* module, Tensor* input) {
     ConvTranspose3d* layer = (ConvTranspose3d*)module;
@@ -48,7 +49,7 @@ static void conv_transpose3d_free(Module* module) {
     ConvTranspose3d* layer = (ConvTranspose3d*)module;
     if (!layer)
         return;
-    free(layer);
+    cml_free(layer);
 }
 
 static void kaiming_init_transpose3d(Tensor* tensor, int in_channels,
@@ -72,7 +73,7 @@ static void kaiming_init_transpose3d(Tensor* tensor, int in_channels,
 ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
                                       int stride, int padding, int output_padding,
                                       bool use_bias, DType dtype, DeviceType device) {
-    ConvTranspose3d* layer = calloc(1, sizeof(ConvTranspose3d));
+    ConvTranspose3d* layer = cml_calloc(1, sizeof(ConvTranspose3d));
     if (!layer) {
         LOG_ERROR("ConvTranspose3d: failed to allocate memory");
         return NULL;
@@ -80,7 +81,7 @@ ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kern
 
     if (module_init((Module*)layer, "ConvTranspose3d", conv_transpose3d_forward,
                     conv_transpose3d_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 

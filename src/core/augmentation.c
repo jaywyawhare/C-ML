@@ -5,13 +5,14 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
 AugmentationConfig* augmentation_config_create(void) {
-    AugmentationConfig* config = malloc(sizeof(AugmentationConfig));
+    AugmentationConfig* config = cml_malloc(sizeof(AugmentationConfig));
     if (!config)
         return NULL;
 
@@ -47,10 +48,10 @@ void augmentation_config_free(AugmentationConfig* config) {
         return;
 
     if (config->mean)
-        free(config->mean);
+        cml_free(config->mean);
     if (config->std)
-        free(config->std);
-    free(config);
+        cml_free(config->std);
+    cml_free(config);
 }
 
 static unsigned int rng_seed = 1;

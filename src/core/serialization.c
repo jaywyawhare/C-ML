@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include "alloc/cml_allocator.h"
 
 int module_named_parameters(Module* module, NamedParameter** named_params, int* num_params) {
     if (!module || !named_params || !num_params) {
@@ -22,9 +23,9 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
         return -1;
     }
 
-    NamedParameter* np = malloc((size_t)total_params * sizeof(NamedParameter));
+    NamedParameter* np = cml_malloc((size_t)total_params * sizeof(NamedParameter));
     if (!np) {
-        free(params);
+        cml_free(params);
         return -1;
     }
 
@@ -42,11 +43,11 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
                 if (module_collect_parameters(child, &child_params, &child_num_params, true) == 0) {
                     for (int j = 0; j < child_num_params; j++) {
                         snprintf(name_buf, sizeof(name_buf), "%d.%s.%d", i, child->name, j);
-                        np[idx].name      = strdup(name_buf);
+                        np[idx].name      = cml_strdup(name_buf);
                         np[idx].parameter = child_params[j];
                         idx++;
                     }
-                    free(child_params);
+                    cml_free(child_params);
                 }
             }
         }
@@ -54,20 +55,20 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
         Linear* linear = (Linear*)module;
         if (linear->weight) {
             snprintf(name_buf, sizeof(name_buf), "weight");
-            np[idx].name      = strdup(name_buf);
+            np[idx].name      = cml_strdup(name_buf);
             np[idx].parameter = linear->weight;
             idx++;
         }
         if (linear->bias) {
             snprintf(name_buf, sizeof(name_buf), "bias");
-            np[idx].name      = strdup(name_buf);
+            np[idx].name      = cml_strdup(name_buf);
             np[idx].parameter = linear->bias;
             idx++;
         }
     } else {
         for (int i = 0; i < total_params; i++) {
             snprintf(name_buf, sizeof(name_buf), "param_%d", i);
-            np[idx].name      = strdup(name_buf);
+            np[idx].name      = cml_strdup(name_buf);
             np[idx].parameter = params[i];
             idx++;
         }
@@ -85,10 +86,10 @@ void module_named_parameters_free(NamedParameter* named_params, int num_params) 
 
     for (int i = 0; i < num_params; i++) {
         if (named_params[i].name) {
-            free((void*)named_params[i].name);
+            cml_free((void*)named_params[i].name);
         }
     }
-    free(named_params);
+    cml_free(named_params);
 }
 
 // Binary format for model serialization:
@@ -234,7 +235,7 @@ int module_load_stream(Module* module, FILE* file) {
         int name_len = (int)name_len_int;
         char* name = NULL;
         if (name_len > 0) {
-            name = malloc((size_t)name_len + 1);
+            name = cml_malloc((size_t)name_len + 1);
             if (!name) {
                 LOG_ERROR("Failed to allocate name buffer");
                 module_named_parameters_free(module_params, module_num_params);
@@ -244,7 +245,7 @@ int module_load_stream(Module* module, FILE* file) {
             size_t name_len_size = (size_t)name_len;
             if (fread(name, 1, name_len_size, file) != name_len_size) {
                 LOG_ERROR("Failed to read name for parameter %d", i);
-                free(name);
+                cml_free(name);
                 module_named_parameters_free(module_params, module_num_params);
                 return -1;
             }
@@ -254,7 +255,7 @@ int module_load_stream(Module* module, FILE* file) {
         if (!loaded_tensor) {
             LOG_ERROR("Failed to read tensor for parameter %d", i);
             if (name) {
-                free(name);
+                cml_free(name);
             }
             module_named_parameters_free(module_params, module_num_params);
             return -1;
@@ -291,7 +292,7 @@ int module_load_stream(Module* module, FILE* file) {
                     target_param->tensor->device == DEVICE_CPU) {
                     memcpy(target_param->tensor->data, loaded_tensor->data, data_size);
                 } else {
-                    void* cpu_buffer = malloc(data_size);
+                    void* cpu_buffer = cml_malloc(data_size);
                     if (cpu_buffer) {
                         if (loaded_tensor->device == DEVICE_CPU) {
                             memcpy(cpu_buffer, loaded_tensor->data, data_size);
@@ -306,7 +307,7 @@ int module_load_stream(Module* module, FILE* file) {
                             device_copy_to_device(target_param->tensor->data, cpu_buffer, data_size,
                                                   target_param->tensor->device);
                         }
-                        free(cpu_buffer);
+                        cml_free(cpu_buffer);
                     }
                 }
             } else {
@@ -316,7 +317,7 @@ int module_load_stream(Module* module, FILE* file) {
         }
 
         if (name) {
-            free(name);
+            cml_free(name);
         }
         tensor_free(loaded_tensor);
     }
@@ -407,7 +408,7 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
     size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
     void* cpu_data   = NULL;
     if (tensor->device != DEVICE_CPU) {
-        cpu_data = malloc(data_size);
+        cpu_data = cml_malloc(data_size);
         if (!cpu_data) {
             LOG_ERROR("Failed to allocate CPU buffer");
             if (contiguous_tensor != tensor) {
@@ -420,7 +421,7 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
             device_copy_from_device(cpu_data, contiguous_tensor->data, data_size, tensor->device);
         if (result != 0) {
             LOG_ERROR("Failed to copy tensor data to CPU");
-            free(cpu_data);
+            cml_free(cpu_data);
             if (contiguous_tensor != tensor) {
                 tensor_free(contiguous_tensor);
             }
@@ -432,7 +433,7 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
     if (fwrite(cpu_data, 1, data_size, file) != data_size) {
         LOG_ERROR("Failed to write tensor data");
         if (cpu_data != contiguous_tensor->data) {
-            free(cpu_data);
+            cml_free(cpu_data);
         }
         if (contiguous_tensor != tensor) {
             tensor_free(contiguous_tensor);
@@ -440,7 +441,7 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
         return -1;
     }
     if (cpu_data != contiguous_tensor->data) {
-        free(cpu_data);
+        cml_free(cpu_data);
     }
     if (contiguous_tensor != tensor) {
         tensor_free(contiguous_tensor);
@@ -518,7 +519,7 @@ Tensor* tensor_read_stream(FILE* file) {
         LOG_ERROR("Invalid ndim: %d", ndim);
         return NULL;
     }
-    int* shape = malloc((size_t)ndim * sizeof(int));
+    int* shape = cml_malloc((size_t)ndim * sizeof(int));
     if (!shape) {
         LOG_ERROR("Failed to allocate shape array");
         return NULL;
@@ -526,25 +527,25 @@ Tensor* tensor_read_stream(FILE* file) {
 
     if (fread(shape, sizeof(int), (size_t)ndim, file) != (size_t)ndim) {
         LOG_ERROR("Failed to read shape");
-        free(shape);
+        cml_free(shape);
         return NULL;
     }
     size_t numel;
     if (fread(&numel, sizeof(size_t), 1, file) != 1) {
         LOG_ERROR("Failed to read numel");
-        free(shape);
+        cml_free(shape);
         return NULL;
     }
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* tensor      = tensor_empty(shape, ndim, &config);
-    free(shape);
+    cml_free(shape);
 
     if (!tensor) {
         LOG_ERROR("Failed to create tensor");
         return NULL;
     }
     size_t data_size = numel * cml_dtype_size(dtype);
-    void* cpu_data   = malloc(data_size);
+    void* cpu_data   = cml_malloc(data_size);
     if (!cpu_data) {
         LOG_ERROR("Failed to allocate CPU buffer");
         tensor_free(tensor);
@@ -553,7 +554,7 @@ Tensor* tensor_read_stream(FILE* file) {
 
     if (fread(cpu_data, 1, data_size, file) != data_size) {
         LOG_ERROR("Failed to read tensor data");
-        free(cpu_data);
+        cml_free(cpu_data);
         tensor_free(tensor);
         return NULL;
     }
@@ -563,13 +564,13 @@ Tensor* tensor_read_stream(FILE* file) {
         int result = device_copy_to_device(tensor->data, cpu_data, data_size, device);
         if (result != 0) {
             LOG_ERROR("Failed to copy data to device");
-            free(cpu_data);
+            cml_free(cpu_data);
             tensor_free(tensor);
             return NULL;
         }
     }
 
-    free(cpu_data);
+    cml_free(cpu_data);
 
     return tensor;
 }
@@ -848,7 +849,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
     }
     int name_len = (int)name_len_int;
     if (name_len > 0) {
-        char* saved_name = malloc((size_t)name_len + 1);
+        char* saved_name = cml_malloc((size_t)name_len + 1);
         if (!saved_name) {
             LOG_ERROR("Failed to allocate name buffer");
             return -1;
@@ -856,7 +857,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
 
         if (fread(saved_name, 1, (size_t)name_len, file) != (size_t)name_len) {
             LOG_ERROR("Failed to read optimizer name");
-            free(saved_name);
+            cml_free(saved_name);
             return -1;
         }
         saved_name[name_len] = '\0';
@@ -866,7 +867,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
                         optimizer->name);
         }
 
-        free(saved_name);
+        cml_free(saved_name);
     }
     int32_t num_groups_int;
     if (fread(&num_groups_int, sizeof(int32_t), 1, file) != 1) {
@@ -931,7 +932,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
                 if (state_type == OPTIMIZER_STATE_SGD && strcmp(optimizer->name, "SGD") == 0) {
                     if (!group->state) {
                         SGDMomentumState** states =
-                            malloc((size_t)group->num_parameters * sizeof(SGDMomentumState*));
+                            cml_malloc((size_t)group->num_parameters * sizeof(SGDMomentumState*));
                         if (!states) {
                             LOG_ERROR("Failed to allocate SGD state");
                             return -1;
@@ -943,7 +944,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
 
                     SGDMomentumState** states = (SGDMomentumState**)group->state;
                     if (!states[param_idx]) {
-                        states[param_idx] = malloc(sizeof(SGDMomentumState));
+                        states[param_idx] = cml_malloc(sizeof(SGDMomentumState));
                         if (!states[param_idx]) {
                             LOG_ERROR("Failed to allocate SGD state for parameter %d", param_idx);
                             return -1;
@@ -962,7 +963,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
                            strcmp(optimizer->name, "Adam") == 0) {
                     if (!group->state) {
                         AdamState** states =
-                            malloc((size_t)group->num_parameters * sizeof(AdamState*));
+                            cml_malloc((size_t)group->num_parameters * sizeof(AdamState*));
                         if (!states) {
                             LOG_ERROR("Failed to allocate Adam state");
                             return -1;
@@ -973,7 +974,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
 
                     AdamState** states = (AdamState**)group->state;
                     if (!states[param_idx]) {
-                        states[param_idx] = malloc(sizeof(AdamState));
+                        states[param_idx] = cml_malloc(sizeof(AdamState));
                         if (!states[param_idx]) {
                             LOG_ERROR("Failed to allocate Adam state for parameter %d", param_idx);
                             return -1;
@@ -1012,7 +1013,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
                            strcmp(optimizer->name, "RMSprop") == 0) {
                     if (!group->state) {
                         RMSpropState** states =
-                            malloc((size_t)group->num_parameters * sizeof(RMSpropState*));
+                            cml_malloc((size_t)group->num_parameters * sizeof(RMSpropState*));
                         if (!states) {
                             LOG_ERROR("Failed to allocate RMSprop state");
                             return -1;
@@ -1023,7 +1024,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
 
                     RMSpropState** states = (RMSpropState**)group->state;
                     if (!states[param_idx]) {
-                        states[param_idx] = malloc(sizeof(RMSpropState));
+                        states[param_idx] = cml_malloc(sizeof(RMSpropState));
                         if (!states[param_idx]) {
                             LOG_ERROR("Failed to allocate RMSprop state for parameter %d",
                                       param_idx);
@@ -1043,7 +1044,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
                            strcmp(optimizer->name, "Adagrad") == 0) {
                     if (!group->state) {
                         AdagradState** states =
-                            malloc((size_t)group->num_parameters * sizeof(AdagradState*));
+                            cml_malloc((size_t)group->num_parameters * sizeof(AdagradState*));
                         if (!states) {
                             LOG_ERROR("Failed to allocate Adagrad state");
                             return -1;
@@ -1054,7 +1055,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
 
                     AdagradState** states = (AdagradState**)group->state;
                     if (!states[param_idx]) {
-                        states[param_idx] = malloc(sizeof(AdagradState));
+                        states[param_idx] = cml_malloc(sizeof(AdagradState));
                         if (!states[param_idx]) {
                             LOG_ERROR("Failed to allocate Adagrad state for parameter %d",
                                       param_idx);

@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* dropout_forward(Module* module, Tensor* input) {
     Dropout* dropout = (Dropout*)module;
@@ -65,15 +66,15 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
     return out;
 }
 
-static void dropout_free(Module* module) { free(module); }
+static void dropout_free(Module* module) { cml_free(module); }
 
 Dropout* nn_dropout(float p, bool inplace) {
-    Dropout* dropout = malloc(sizeof(Dropout));
+    Dropout* dropout = cml_malloc(sizeof(Dropout));
     if (!dropout)
         return NULL;
 
     if (module_init((Module*)dropout, "Dropout", dropout_forward, dropout_free) != 0) {
-        free(dropout);
+        cml_free(dropout);
         return NULL;
     }
 

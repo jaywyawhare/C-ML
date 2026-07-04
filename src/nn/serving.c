@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 static double serving_time_ms(void) {
     struct timespec ts;
@@ -34,9 +35,9 @@ static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) 
 
 static void free_request(CMLSequenceRequest* req) {
     if (!req) return;
-    free(req->prompt_tokens);
-    free(req->generated_tokens);
-    free(req);
+    cml_free(req->prompt_tokens);
+    cml_free(req->generated_tokens);
+    cml_free(req);
 }
 
 CMLServingConfig cml_serving_default_config(void) {
@@ -57,7 +58,7 @@ CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
         return NULL;
     }
 
-    CMLServingContext* ctx = (CMLServingContext*)calloc(1, sizeof(CMLServingContext));
+    CMLServingContext* ctx = (CMLServingContext*)cml_calloc(1, sizeof(CMLServingContext));
     if (!ctx) {
         LOG_ERROR("cml_serving_create: allocation failed");
         return NULL;
@@ -78,11 +79,11 @@ CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
 
     /* Allocate circular queue */
     ctx->queue_capacity = ctx->config.max_queue_size;
-    ctx->queue = (CMLSequenceRequest**)calloc((size_t)ctx->queue_capacity,
+    ctx->queue = (CMLSequenceRequest**)cml_calloc((size_t)ctx->queue_capacity,
                                               sizeof(CMLSequenceRequest*));
     if (!ctx->queue) {
         LOG_ERROR("cml_serving_create: queue allocation failed");
-        free(ctx);
+        cml_free(ctx);
         return NULL;
     }
     ctx->queue_head = 0;
@@ -90,12 +91,12 @@ CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
     ctx->queue_count = 0;
 
     /* Allocate active batch array */
-    ctx->active_batch = (CMLSequenceRequest**)calloc((size_t)ctx->config.max_batch_size,
+    ctx->active_batch = (CMLSequenceRequest**)cml_calloc((size_t)ctx->config.max_batch_size,
                                                      sizeof(CMLSequenceRequest*));
     if (!ctx->active_batch) {
         LOG_ERROR("cml_serving_create: active batch allocation failed");
-        free(ctx->queue);
-        free(ctx);
+        cml_free(ctx->queue);
+        cml_free(ctx);
         return NULL;
     }
     ctx->batch_size = 0;
@@ -118,18 +119,18 @@ void cml_serving_free(CMLServingContext* ctx) {
         free_request(ctx->queue[idx]);
         ctx->queue[idx] = NULL;
     }
-    free(ctx->queue);
+    cml_free(ctx->queue);
 
     /* Free all active requests */
     for (int i = 0; i < ctx->batch_size; i++) {
         free_request(ctx->active_batch[i]);
         ctx->active_batch[i] = NULL;
     }
-    free(ctx->active_batch);
+    cml_free(ctx->active_batch);
 
     LOG_INFO("Serving context freed (total_requests=%zu, completed=%zu)",
              ctx->stats.total_requests, ctx->stats.completed_requests);
-    free(ctx);
+    cml_free(ctx);
 }
 
 void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache) {
@@ -158,7 +159,7 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens,
     }
 
     /* Allocate request */
-    CMLSequenceRequest* req = (CMLSequenceRequest*)calloc(1, sizeof(CMLSequenceRequest));
+    CMLSequenceRequest* req = (CMLSequenceRequest*)cml_calloc(1, sizeof(CMLSequenceRequest));
     if (!req) {
         LOG_ERROR("cml_serving_submit: request allocation failed");
         return -1;
@@ -166,10 +167,10 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens,
 
     req->request_id = ctx->next_request_id++;
     req->num_prompt_tokens = num_tokens;
-    req->prompt_tokens = (int*)malloc((size_t)num_tokens * sizeof(int));
+    req->prompt_tokens = (int*)cml_malloc((size_t)num_tokens * sizeof(int));
     if (!req->prompt_tokens) {
         LOG_ERROR("cml_serving_submit: token copy allocation failed");
-        free(req);
+        cml_free(req);
         return -1;
     }
     memcpy(req->prompt_tokens, prompt_tokens, (size_t)num_tokens * sizeof(int));
@@ -185,11 +186,11 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens,
 
     /* Pre-allocate generated token buffer */
     req->gen_capacity = req->max_new_tokens;
-    req->generated_tokens = (int*)calloc((size_t)req->gen_capacity, sizeof(int));
+    req->generated_tokens = (int*)cml_calloc((size_t)req->gen_capacity, sizeof(int));
     if (!req->generated_tokens) {
         LOG_ERROR("cml_serving_submit: generated token buffer allocation failed");
-        free(req->prompt_tokens);
-        free(req);
+        cml_free(req->prompt_tokens);
+        cml_free(req);
         return -1;
     }
     req->num_generated = 0;

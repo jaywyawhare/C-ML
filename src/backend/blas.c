@@ -7,6 +7,7 @@
 #include <math.h>
 #include <stdatomic.h>
 #include <pthread.h>
+#include "alloc/cml_allocator.h"
 #ifdef __linux__
 #include <unistd.h>
 #endif
@@ -180,7 +181,7 @@ static inline void blas_set_threads_for_size(CMLBlasContext* ctx, long long flop
 }
 
 CMLBlasContext* cml_blas_init(void) {
-    CMLBlasContext* ctx = calloc(1, sizeof(CMLBlasContext));
+    CMLBlasContext* ctx = cml_calloc(1, sizeof(CMLBlasContext));
     if (!ctx) {
         LOG_ERROR("Failed to allocate BLAS context");
         return NULL;
@@ -248,7 +249,7 @@ CMLBlasContext* cml_blas_init(void) {
     }
 
     fprintf(stderr, "[CML] WARNING: No BLAS library found — using scalar fallback\n");
-    free(ctx);
+    cml_free(ctx);
     return NULL;
 }
 
@@ -266,9 +267,9 @@ void cml_blas_free(CMLBlasContext* ctx) {
     }
     blas_unlock();
 
-    free(ctx->pack_a_buf);
-    free(ctx->pack_b_buf);
-    free(ctx);
+    cml_aligned_free(ctx->pack_a_buf);
+    cml_aligned_free(ctx->pack_b_buf);
+    cml_free(ctx);
 }
 
 void cml_blas_set_num_threads(int n) {
@@ -600,13 +601,13 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
             size_t need_b = (size_t)nc_alloc * PACKED_KC * sizeof(float);
             /* Grow context-resident buffers lazily — amortises alloc across calls */
             if (ctx->pack_a_size < need_a) {
-                free(ctx->pack_a_buf);
-                ctx->pack_a_buf  = (float*)aligned_alloc(32, need_a);
+                cml_aligned_free(ctx->pack_a_buf);
+                ctx->pack_a_buf  = (float*)cml_aligned_alloc(need_a, 32);
                 ctx->pack_a_size = ctx->pack_a_buf ? need_a : 0;
             }
             if (ctx->pack_b_size < need_b) {
-                free(ctx->pack_b_buf);
-                ctx->pack_b_buf  = (float*)aligned_alloc(32, need_b);
+                cml_aligned_free(ctx->pack_b_buf);
+                ctx->pack_b_buf  = (float*)cml_aligned_alloc(need_b, 32);
                 ctx->pack_b_size = ctx->pack_b_buf ? need_b : 0;
             }
             if (ctx->pack_a_buf && ctx->pack_b_buf) {

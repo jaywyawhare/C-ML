@@ -2,6 +2,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 #define HEVC_RING_INITIAL_CAP (256 * 1024)
 #define HEVC_START_CODE_3     3
@@ -55,7 +56,7 @@ static uint32_t bs_read_ue(BitstreamReader* bs) {
 }
 
 static uint8_t* rbsp_from_nal(const uint8_t* nal, size_t nal_size, size_t* rbsp_size) {
-    uint8_t* rbsp = (uint8_t*)malloc(nal_size);
+    uint8_t* rbsp = (uint8_t*)cml_malloc(nal_size);
     if (!rbsp) return NULL;
 
     size_t j = 0;
@@ -92,12 +93,12 @@ static int find_start_code(const uint8_t* buf, size_t len, size_t start, size_t*
 }
 
 CMLHEVCParser* cml_hevc_parser_create(void) {
-    CMLHEVCParser* p = (CMLHEVCParser*)calloc(1, sizeof(CMLHEVCParser));
+    CMLHEVCParser* p = (CMLHEVCParser*)cml_calloc(1, sizeof(CMLHEVCParser));
     if (!p) return NULL;
 
-    p->ring = (uint8_t*)malloc(HEVC_RING_INITIAL_CAP);
+    p->ring = (uint8_t*)cml_malloc(HEVC_RING_INITIAL_CAP);
     if (!p->ring) {
-        free(p);
+        cml_free(p);
         return NULL;
     }
     p->ring_cap = HEVC_RING_INITIAL_CAP;
@@ -109,8 +110,8 @@ CMLHEVCParser* cml_hevc_parser_create(void) {
 
 void cml_hevc_parser_free(CMLHEVCParser* parser) {
     if (!parser) return;
-    free(parser->ring);
-    free(parser);
+    cml_free(parser->ring);
+    cml_free(parser);
 }
 
 int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size) {
@@ -120,7 +121,7 @@ int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size
     if (needed > parser->ring_cap) {
         size_t new_cap = parser->ring_cap;
         while (new_cap < needed) new_cap *= 2;
-        uint8_t* new_ring = (uint8_t*)realloc(parser->ring, new_cap);
+        uint8_t* new_ring = (uint8_t*)cml_realloc(parser->ring, new_cap);
         if (!new_ring) {
             LOG_ERROR("HEVC: ring buffer realloc failed (%zu bytes)", new_cap);
             return -1;
@@ -155,12 +156,12 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
         return NULL;
     }
 
-    CMLHEVCNalUnit* nal = (CMLHEVCNalUnit*)calloc(1, sizeof(CMLHEVCNalUnit));
+    CMLHEVCNalUnit* nal = (CMLHEVCNalUnit*)cml_calloc(1, sizeof(CMLHEVCNalUnit));
     if (!nal) return NULL;
 
-    uint8_t* nal_data = (uint8_t*)malloc(nal_size);
+    uint8_t* nal_data = (uint8_t*)cml_malloc(nal_size);
     if (!nal_data) {
-        free(nal);
+        cml_free(nal);
         return NULL;
     }
     memcpy(nal_data, parser->ring + nal_start, nal_size);
@@ -193,8 +194,8 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
 
 void cml_hevc_nal_free(CMLHEVCNalUnit* nal) {
     if (!nal) return;
-    free((void*)nal->data);
-    free(nal);
+    cml_free((void*)nal->data);
+    cml_free(nal);
 }
 
 int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int* height) {
@@ -271,7 +272,7 @@ int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int
     *width = (int)pic_width;
     *height = (int)pic_height;
 
-    free(rbsp);
+    cml_free(rbsp);
     return 0;
 }
 
@@ -295,16 +296,16 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
     int w = 64, h = 64;
     int stride = w;
 
-    CMLHEVCFrame* frame = (CMLHEVCFrame*)calloc(1, sizeof(CMLHEVCFrame));
+    CMLHEVCFrame* frame = (CMLHEVCFrame*)cml_calloc(1, sizeof(CMLHEVCFrame));
     if (!frame) {
-        free(rbsp);
+        cml_free(rbsp);
         return NULL;
     }
 
-    frame->data = (uint8_t*)calloc((size_t)(stride * h), 1);
+    frame->data = (uint8_t*)cml_calloc((size_t)(stride * h), 1);
     if (!frame->data) {
-        free(rbsp);
-        free(frame);
+        cml_free(rbsp);
+        cml_free(frame);
         return NULL;
     }
 
@@ -317,12 +318,12 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
     frame->pts = parser->frame_count++;
     frame->nal_type = nal->type;
 
-    free(rbsp);
+    cml_free(rbsp);
     return frame;
 }
 
 void cml_hevc_frame_free(CMLHEVCFrame* frame) {
     if (!frame) return;
-    free(frame->data);
-    free(frame);
+    cml_free(frame->data);
+    cml_free(frame);
 }

@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 #include <float.h>
+#include "alloc/cml_allocator.h"
 
 Tensor* tensor_add(Tensor* a, Tensor* b) {
     if (!a || !b) {
@@ -253,7 +254,7 @@ Tensor* tensor_sum(Tensor* a, int dim, bool keepdim) {
     ReduceParams params;
     int* dims = NULL;
     if (dim >= 0 && dim < a->ndim) {
-        dims = malloc(sizeof(int));
+        dims = cml_malloc(sizeof(int));
         if (!dims)
             return NULL;
         dims[0]         = dim;
@@ -268,7 +269,7 @@ Tensor* tensor_sum(Tensor* a, int dim, bool keepdim) {
     Tensor* result = uop_sum(a, &params);
 
     if (dims)
-        free(dims);
+        cml_free(dims);
     return result;
 }
 
@@ -279,7 +280,7 @@ Tensor* tensor_mean(Tensor* a, int dim, bool keepdim) {
     ReduceParams params;
     int* dims = NULL;
     if (dim >= 0 && dim < a->ndim) {
-        dims = malloc(sizeof(int));
+        dims = cml_malloc(sizeof(int));
         if (!dims)
             return NULL;
         dims[0]         = dim;
@@ -294,7 +295,7 @@ Tensor* tensor_mean(Tensor* a, int dim, bool keepdim) {
     Tensor* result = uop_mean(a, &params);
 
     if (dims)
-        free(dims);
+        cml_free(dims);
     return result;
 }
 
@@ -305,7 +306,7 @@ Tensor* tensor_max(Tensor* a, int dim, bool keepdim) {
     ReduceParams params;
     int* dims = NULL;
     if (dim >= 0 && dim < a->ndim) {
-        dims = malloc(sizeof(int));
+        dims = cml_malloc(sizeof(int));
         if (!dims)
             return NULL;
         dims[0]         = dim;
@@ -320,7 +321,7 @@ Tensor* tensor_max(Tensor* a, int dim, bool keepdim) {
     Tensor* result = uop_max_reduce(a, &params);
 
     if (dims)
-        free(dims);
+        cml_free(dims);
     return result;
 }
 
@@ -336,7 +337,7 @@ Tensor* tensor_min(Tensor* a, int dim, bool keepdim) {
     ReduceParams params;
     int* dims = NULL;
     if (dim >= 0 && dim < a->ndim) {
-        dims = malloc(sizeof(int));
+        dims = cml_malloc(sizeof(int));
         if (!dims) {
             tensor_free(neg_a);
             return NULL;
@@ -355,7 +356,7 @@ Tensor* tensor_min(Tensor* a, int dim, bool keepdim) {
 
     if (!neg_max) {
         if (dims)
-            free(dims);
+            cml_free(dims);
         return NULL;
     }
 
@@ -363,7 +364,7 @@ Tensor* tensor_min(Tensor* a, int dim, bool keepdim) {
     tensor_free(neg_max);
 
     if (dims)
-        free(dims);
+        cml_free(dims);
     return result;
 }
 
@@ -382,7 +383,7 @@ Tensor* tensor_transpose(Tensor* a, int dim0, int dim1) {
         return NULL;
     }
 
-    int* perm = malloc((size_t)a->ndim * sizeof(int));
+    int* perm = cml_malloc((size_t)a->ndim * sizeof(int));
     if (!perm)
         return NULL;
 
@@ -398,7 +399,7 @@ Tensor* tensor_transpose(Tensor* a, int dim0, int dim1) {
 
     Tensor* result = uop_permute(a, &params);
 
-    free(perm);
+    cml_free(perm);
     return result;
 }
 
@@ -418,7 +419,7 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     struct IRNode* node = cml_ir_get_tail(ir);
     int batch_dims = (a->ndim > 2) ? a->ndim - 2 : 0;
     int out_ndim = batch_dims + 2;
-    node->output_shape = malloc((size_t)out_ndim * sizeof(int));
+    node->output_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!node->output_shape) {
         LOG_ERROR("Failed to allocate output shape for matmul");
         return NULL;

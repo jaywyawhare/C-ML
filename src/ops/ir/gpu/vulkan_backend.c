@@ -15,6 +15,7 @@
 #define VULKAN_LIB_NAME "libvulkan.so.1"
 #elif defined(__APPLE__)
 #include <dlfcn.h>
+#include "alloc/cml_allocator.h"
 #define VULKAN_LIB_NAME "libvulkan.1.dylib"
 #else
 #define VULKAN_LIB_NAME NULL
@@ -425,7 +426,7 @@ bool cml_vulkan_available(void) {
 
 
 CMLVulkanBackend* cml_vulkan_backend_create(void) {
-    CMLVulkanBackend* backend = (CMLVulkanBackend*)calloc(1, sizeof(CMLVulkanBackend));
+    CMLVulkanBackend* backend = (CMLVulkanBackend*)cml_calloc(1, sizeof(CMLVulkanBackend));
     if (!backend) {
         LOG_ERROR("Failed to allocate Vulkan backend");
         return NULL;
@@ -491,10 +492,10 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
         return -1;
     }
 
-    VkPhysicalDevice* devices = (VkPhysicalDevice*)calloc(dev_count, sizeof(VkPhysicalDevice));
+    VkPhysicalDevice* devices = (VkPhysicalDevice*)cml_calloc(dev_count, sizeof(VkPhysicalDevice));
     backend->vkEnumeratePhysicalDevices(backend->instance, &dev_count, devices);
     backend->physical_device = devices[0]; /* Use first device */
-    free(devices);
+    cml_free(devices);
 
     VkPhysicalDeviceProperties_t props = {0};
     backend->vkGetPhysicalDeviceProperties(backend->physical_device, &props);
@@ -519,7 +520,7 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     uint32_t qf_count = 0;
     backend->vkGetPhysicalDeviceQueueFamilyProperties(backend->physical_device, &qf_count, NULL);
     VkQueueFamilyProperties_t* qf_props =
-        (VkQueueFamilyProperties_t*)calloc(qf_count, sizeof(VkQueueFamilyProperties_t));
+        (VkQueueFamilyProperties_t*)cml_calloc(qf_count, sizeof(VkQueueFamilyProperties_t));
     backend->vkGetPhysicalDeviceQueueFamilyProperties(backend->physical_device, &qf_count,
                                                        qf_props);
 
@@ -530,7 +531,7 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
             break;
         }
     }
-    free(qf_props);
+    cml_free(qf_props);
 
     if (backend->compute_queue_family == UINT32_MAX) {
         LOG_ERROR("No Vulkan compute queue family found");
@@ -606,7 +607,7 @@ void cml_vulkan_backend_free(CMLVulkanBackend* backend) {
     if (backend->vulkan_lib)
         vk_unload_library(backend->vulkan_lib);
 
-    free(backend);
+    cml_free(backend);
 }
 
 
@@ -614,7 +615,7 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
                                            bool device_local) {
     if (!backend || !backend->initialized || size == 0) return NULL;
 
-    CMLVulkanBuffer* buf = (CMLVulkanBuffer*)calloc(1, sizeof(CMLVulkanBuffer));
+    CMLVulkanBuffer* buf = (CMLVulkanBuffer*)cml_calloc(1, sizeof(CMLVulkanBuffer));
     if (!buf) return NULL;
 
     buf->size = size;
@@ -630,7 +631,7 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
 
     VkResult res = backend->vkCreateBuffer(backend->device, &buf_info, NULL, &buf->buffer);
     if (res != VK_SUCCESS) {
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
 
@@ -646,7 +647,7 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
     res = backend->vkAllocateMemory(backend->device, &alloc_info, NULL, &buf->memory);
     if (res != VK_SUCCESS) {
         backend->vkDestroyBuffer(backend->device, buf->buffer, NULL);
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
 
@@ -654,7 +655,7 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
     if (res != VK_SUCCESS) {
         backend->vkFreeMemory(backend->device, buf->memory, NULL);
         backend->vkDestroyBuffer(backend->device, buf->buffer, NULL);
-        free(buf);
+        cml_free(buf);
         return NULL;
     }
 
@@ -677,7 +678,7 @@ void cml_vulkan_buffer_free(CMLVulkanBackend* backend, CMLVulkanBuffer* buf) {
         backend->vkFreeMemory(backend->device, buf->memory, NULL);
     if (buf->buffer)
         backend->vkDestroyBuffer(backend->device, buf->buffer, NULL);
-    free(buf);
+    cml_free(buf);
 }
 
 int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst,
@@ -779,10 +780,10 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
     if (!backend || !backend->initialized || !spirv || spirv_size == 0) return NULL;
     if (num_buffers < 1 || num_buffers > VK_MAX_BUFFERS_PER_KERNEL) return NULL;
 
-    CMLVulkanKernel* kernel = (CMLVulkanKernel*)calloc(1, sizeof(CMLVulkanKernel));
+    CMLVulkanKernel* kernel = (CMLVulkanKernel*)cml_calloc(1, sizeof(CMLVulkanKernel));
     if (!kernel) return NULL;
     kernel->num_buffers = num_buffers;
-    kernel->name = strdup(entry_point ? entry_point : "main");
+    kernel->name = cml_strdup(entry_point ? entry_point : "main");
 
     VkShaderModuleCreateInfo_t sm_info = {0};
     sm_info.sType = 16;
@@ -794,7 +795,7 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
     if (res != VK_SUCCESS) goto fail;
 
     VkDescriptorSetLayoutBinding_t* bindings =
-        (VkDescriptorSetLayoutBinding_t*)calloc(num_buffers,
+        (VkDescriptorSetLayoutBinding_t*)cml_calloc(num_buffers,
                                                   sizeof(VkDescriptorSetLayoutBinding_t));
     for (int i = 0; i < num_buffers; i++) {
         bindings[i].binding = (uint32_t)i;
@@ -810,7 +811,7 @@ CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint3
 
     res = backend->vkCreateDescriptorSetLayout(backend->device, &dsl_info, NULL,
                                                  &kernel->desc_layout);
-    free(bindings);
+    cml_free(bindings);
     if (res != VK_SUCCESS) goto fail;
 
     VkPipelineLayoutCreateInfo_t pl_info = {0};
@@ -875,8 +876,8 @@ void cml_vulkan_kernel_free(CMLVulkanBackend* backend, CMLVulkanKernel* kernel) 
         backend->vkDestroyDescriptorSetLayout(backend->device, kernel->desc_layout, NULL);
     if (kernel->shader_module)
         backend->vkDestroyShaderModule(backend->device, kernel->shader_module, NULL);
-    free(kernel->name);
-    free(kernel);
+    cml_free(kernel->name);
+    cml_free(kernel);
 }
 
 int cml_vulkan_kernel_bind_buffer(CMLVulkanBackend* backend, CMLVulkanKernel* kernel,
@@ -970,7 +971,7 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     while (node && result == 0) {
         if (!node->output || !node->output->data) {
             if (node->output && node->output->numel > 0 && !node->output->data) {
-                node->output->data = calloc(node->output->numel, sizeof(float));
+                node->output->data = cml_calloc(node->output->numel, sizeof(float));
             }
         }
 
@@ -997,7 +998,7 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
 
         CMLVulkanKernel* kernel = cml_vulkan_kernel_create(backend, spirv, spirv_size,
                                                              "main", num_bufs);
-        free(spirv);
+        cml_free(spirv);
         if (!kernel) {
             node = node->next;
             continue;

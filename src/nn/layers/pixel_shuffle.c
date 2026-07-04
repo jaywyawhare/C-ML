@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include "alloc/cml_allocator.h"
 
 Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
     if (!input) {
@@ -169,14 +170,14 @@ static void pixel_shuffle_free(Module* module) {
     PixelShuffle* layer = (PixelShuffle*)module;
     if (!layer)
         return;
-    free(layer);
+    cml_free(layer);
 }
 
 static void pixel_unshuffle_free(Module* module) {
     PixelUnshuffle* layer = (PixelUnshuffle*)module;
     if (!layer)
         return;
-    free(layer);
+    cml_free(layer);
 }
 
 PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
@@ -185,7 +186,7 @@ PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
         return NULL;
     }
 
-    PixelShuffle* layer = calloc(1, sizeof(PixelShuffle));
+    PixelShuffle* layer = cml_calloc(1, sizeof(PixelShuffle));
     if (!layer) {
         LOG_ERROR("PixelShuffle: failed to allocate memory");
         return NULL;
@@ -193,7 +194,7 @@ PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
 
     if (module_init((Module*)layer, "PixelShuffle", pixel_shuffle_forward,
                     pixel_shuffle_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 
@@ -208,7 +209,7 @@ PixelUnshuffle* nn_pixel_unshuffle(int downscale_factor) {
         return NULL;
     }
 
-    PixelUnshuffle* layer = calloc(1, sizeof(PixelUnshuffle));
+    PixelUnshuffle* layer = cml_calloc(1, sizeof(PixelUnshuffle));
     if (!layer) {
         LOG_ERROR("PixelUnshuffle: failed to allocate memory");
         return NULL;
@@ -216,7 +217,7 @@ PixelUnshuffle* nn_pixel_unshuffle(int downscale_factor) {
 
     if (module_init((Module*)layer, "PixelUnshuffle", pixel_unshuffle_forward,
                     pixel_unshuffle_free) != 0) {
-        free(layer);
+        cml_free(layer);
         return NULL;
     }
 

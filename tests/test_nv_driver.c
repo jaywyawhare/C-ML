@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc/cml_allocator.h"
+
 
 static int tests_run    = 0;
 static int tests_passed = 0;
@@ -189,10 +191,10 @@ static int test_buffer_upload_download(void) {
         SKIP("buffer create failed");
     }
 
-    float *src = (float *)malloc(n);
-    float *dst = (float *)calloc(256, sizeof(float));
+    float *src = (float *)cml_malloc(n);
+    float *dst = (float *)cml_calloc(256, sizeof(float));
     if (!src || !dst) {
-        free(src); free(dst);
+        cml_free(src); cml_free(dst);
         cml_nv_buffer_free(drv, buf);
         cml_nv_driver_free(drv);
         return 0;
@@ -201,14 +203,14 @@ static int test_buffer_upload_download(void) {
         src[i] = (float)i * 0.5f;
 
     if (cml_nv_buffer_upload(drv, buf, src, n) != 0) {
-        free(src); free(dst);
+        cml_free(src); cml_free(dst);
         cml_nv_buffer_free(drv, buf);
         cml_nv_driver_free(drv);
         return 0;
     }
 
     if (cml_nv_buffer_download(drv, buf, dst, n) != 0) {
-        free(src); free(dst);
+        cml_free(src); cml_free(dst);
         cml_nv_buffer_free(drv, buf);
         cml_nv_driver_free(drv);
         return 0;
@@ -223,8 +225,8 @@ static int test_buffer_upload_download(void) {
         }
     }
 
-    free(src);
-    free(dst);
+    cml_free(src);
+    cml_free(dst);
     cml_nv_buffer_free(drv, buf);
     cml_nv_driver_free(drv);
     return ok;
@@ -456,6 +458,7 @@ static int test_buffer_copy_null(void) {
 
 #ifdef CML_NV_MOCK_GPU
 #include "ops/ir/gpu/nv_mock.h"
+#include "alloc/cml_allocator.h"
 
 static CMLNVDriver* mock_create_and_init(void) {
     CMLNVDriver *drv = cml_nv_driver_create();

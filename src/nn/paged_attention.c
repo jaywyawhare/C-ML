@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static void paged_softmax_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
@@ -43,7 +44,7 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
         return NULL;
     }
 
-    CMLPagedKVCache* cache = (CMLPagedKVCache*)calloc(1, sizeof(CMLPagedKVCache));
+    CMLPagedKVCache* cache = (CMLPagedKVCache*)cml_calloc(1, sizeof(CMLPagedKVCache));
     if (!cache) {
         LOG_ERROR("cml_paged_kv_cache_create: allocation failed");
         return NULL;
@@ -54,26 +55,26 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
     cache->num_kv_heads = num_kv_heads;
     cache->head_dim = head_dim;
     cache->block_size = CML_PAGE_BLOCK_SIZE;
-    cache->blocks = (CMLPageBlock*)calloc((size_t)max_blocks, sizeof(CMLPageBlock));
+    cache->blocks = (CMLPageBlock*)cml_calloc((size_t)max_blocks, sizeof(CMLPageBlock));
     if (!cache->blocks) {
         LOG_ERROR("cml_paged_kv_cache_create: block array allocation failed");
-        free(cache);
+        cml_free(cache);
         return NULL;
     }
 
     size_t buf_floats = block_buf_size(cache);
     for (int i = 0; i < max_blocks; i++) {
-        cache->blocks[i].key_data = (float*)calloc(buf_floats, sizeof(float));
-        cache->blocks[i].value_data = (float*)calloc(buf_floats, sizeof(float));
+        cache->blocks[i].key_data = (float*)cml_calloc(buf_floats, sizeof(float));
+        cache->blocks[i].value_data = (float*)cml_calloc(buf_floats, sizeof(float));
         if (!cache->blocks[i].key_data || !cache->blocks[i].value_data) {
             LOG_ERROR("cml_paged_kv_cache_create: block %d data allocation failed", i);
             /* Clean up already-allocated blocks */
             for (int j = 0; j <= i; j++) {
-                free(cache->blocks[j].key_data);
-                free(cache->blocks[j].value_data);
+                cml_free(cache->blocks[j].key_data);
+                cml_free(cache->blocks[j].value_data);
             }
-            free(cache->blocks);
-            free(cache);
+            cml_free(cache->blocks);
+            cml_free(cache);
             return NULL;
         }
         cache->blocks[i].block_id = i;
@@ -81,15 +82,15 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
         cache->blocks[i].in_use = false;
     }
     cache->num_blocks = max_blocks;
-    cache->free_list = (int*)malloc((size_t)max_blocks * sizeof(int));
+    cache->free_list = (int*)cml_malloc((size_t)max_blocks * sizeof(int));
     if (!cache->free_list) {
         LOG_ERROR("cml_paged_kv_cache_create: free list allocation failed");
         for (int i = 0; i < max_blocks; i++) {
-            free(cache->blocks[i].key_data);
-            free(cache->blocks[i].value_data);
+            cml_free(cache->blocks[i].key_data);
+            cml_free(cache->blocks[i].value_data);
         }
-        free(cache->blocks);
-        free(cache);
+        cml_free(cache->blocks);
+        cml_free(cache);
         return NULL;
     }
     /* Push all block IDs onto the free list (top of stack = last element) */
@@ -97,16 +98,16 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences,
         cache->free_list[i] = i;
     }
     cache->free_count = max_blocks;
-    cache->sequences = (CMLBlockTable*)calloc((size_t)max_sequences, sizeof(CMLBlockTable));
+    cache->sequences = (CMLBlockTable*)cml_calloc((size_t)max_sequences, sizeof(CMLBlockTable));
     if (!cache->sequences) {
         LOG_ERROR("cml_paged_kv_cache_create: sequence table allocation failed");
-        free(cache->free_list);
+        cml_free(cache->free_list);
         for (int i = 0; i < max_blocks; i++) {
-            free(cache->blocks[i].key_data);
-            free(cache->blocks[i].value_data);
+            cml_free(cache->blocks[i].key_data);
+            cml_free(cache->blocks[i].value_data);
         }
-        free(cache->blocks);
-        free(cache);
+        cml_free(cache->blocks);
+        cml_free(cache);
         return NULL;
     }
     /* Mark all sequence slots as unused (block_ids == NULL) */
@@ -128,22 +129,22 @@ void cml_paged_kv_cache_free(CMLPagedKVCache* cache) {
     /* Free all sequence block tables */
     if (cache->sequences) {
         for (int i = 0; i < cache->max_sequences; i++) {
-            free(cache->sequences[i].block_ids);
+            cml_free(cache->sequences[i].block_ids);
         }
-        free(cache->sequences);
+        cml_free(cache->sequences);
     }
 
     /* Free block data */
     if (cache->blocks) {
         for (int i = 0; i < cache->num_blocks; i++) {
-            free(cache->blocks[i].key_data);
-            free(cache->blocks[i].value_data);
+            cml_free(cache->blocks[i].key_data);
+            cml_free(cache->blocks[i].value_data);
         }
-        free(cache->blocks);
+        cml_free(cache->blocks);
     }
 
-    free(cache->free_list);
-    free(cache);
+    cml_free(cache->free_list);
+    cml_free(cache);
 }
 
 int cml_paged_cache_alloc_block(CMLPagedKVCache* cache) {
@@ -215,7 +216,7 @@ int cml_paged_cache_init_sequence(CMLPagedKVCache* cache) {
     /* Allocate an initial block table with room for a few block IDs */
     int initial_capacity = 8;
     CMLBlockTable* bt = &cache->sequences[seq_id];
-    bt->block_ids = (int*)malloc((size_t)initial_capacity * sizeof(int));
+    bt->block_ids = (int*)cml_malloc((size_t)initial_capacity * sizeof(int));
     if (!bt->block_ids) {
         LOG_ERROR("cml_paged_cache_init_sequence: allocation failed");
         return -1;
@@ -250,7 +251,7 @@ void cml_paged_cache_free_sequence(CMLPagedKVCache* cache, int seq_id) {
         cml_paged_cache_free_block(cache, bt->block_ids[i]);
     }
 
-    free(bt->block_ids);
+    cml_free(bt->block_ids);
     bt->block_ids = NULL;
     bt->num_blocks = 0;
     bt->capacity = 0;
@@ -295,7 +296,7 @@ int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id,
         /* Grow block table if needed */
         if (bt->num_blocks >= bt->capacity) {
             int new_cap = bt->capacity * 2;
-            int* new_ids = (int*)realloc(bt->block_ids, (size_t)new_cap * sizeof(int));
+            int* new_ids = (int*)cml_realloc(bt->block_ids, (size_t)new_cap * sizeof(int));
             if (!new_ids) {
                 LOG_ERROR("cml_paged_cache_append: block table realloc failed");
                 cml_paged_cache_free_block(cache, new_bid);
@@ -397,17 +398,17 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
 
     /* Allocate output: [1, seq_q, num_heads * head_dim] */
     size_t out_size = (size_t)seq_q * num_heads * head_dim;
-    float* output = (float*)calloc(out_size, sizeof(float));
+    float* output = (float*)cml_calloc(out_size, sizeof(float));
     if (!output) {
         LOG_ERROR("cml_paged_gqa_forward: output allocation failed");
         return NULL;
     }
 
     /* Allocate scratch for attention scores: [seq_q, kv_len] */
-    float* scores = (float*)malloc((size_t)seq_q * kv_len * sizeof(float));
+    float* scores = (float*)cml_malloc((size_t)seq_q * kv_len * sizeof(float));
     if (!scores) {
         LOG_ERROR("cml_paged_gqa_forward: scores allocation failed");
-        free(output);
+        cml_free(output);
         return NULL;
     }
 
@@ -478,14 +479,14 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
         }
     }
 
-    free(scores);
+    cml_free(scores);
 
     /* Wrap output into a tensor [1, seq_q, num_heads * head_dim] */
     int out_shape[] = {1, seq_q, num_heads * head_dim};
     TensorConfig out_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
-    free(output);
+    cml_free(output);
 
     if (!result) {
         LOG_ERROR("cml_paged_gqa_forward: failed to create output tensor");

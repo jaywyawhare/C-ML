@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "alloc/cml_allocator.h"
 
 static Tensor* batchnorm2d_forward(Module* module, Tensor* input) {
     BatchNorm2d* bn = (BatchNorm2d*)module;
@@ -239,17 +240,17 @@ static void batchnorm2d_free(Module* module) {
         tensor_free(bn->current_mean);
     if (bn->current_var)
         tensor_free(bn->current_var);
-    free(bn);
+    cml_free(bn);
 }
 
 BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool affine,
                             bool track_running_stats, DType dtype, DeviceType device) {
-    BatchNorm2d* bn = malloc(sizeof(BatchNorm2d));
+    BatchNorm2d* bn = cml_malloc(sizeof(BatchNorm2d));
     if (!bn)
         return NULL;
 
     if (module_init((Module*)bn, "BatchNorm2d", batchnorm2d_forward, batchnorm2d_free) != 0) {
-        free(bn);
+        cml_free(bn);
         return NULL;
     }
 

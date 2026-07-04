@@ -6,6 +6,8 @@
 #include "ops/ir/gpu/am_driver.h"
 #include "ops/ir/gpu/amdgpu_kd.h"
 
+#include "alloc/cml_allocator.h"
+
 #ifdef CML_AM_MOCK_GPU
 #include "ops/ir/gpu/am_mock.h"
 #endif
@@ -146,10 +148,10 @@ static bool test_buffer_upload_download(void) {
         return true;
     }
 
-    float* src = (float*)malloc(size);
-    float* dst = (float*)calloc(256, sizeof(float));
+    float* src = (float*)cml_malloc(size);
+    float* dst = (float*)cml_calloc(256, sizeof(float));
     if (!src || !dst) {
-        free(src); free(dst);
+        cml_free(src); cml_free(dst);
         cml_am_buffer_free(drv, buf);
         cml_am_driver_free(drv);
         return false;
@@ -160,7 +162,7 @@ static bool test_buffer_upload_download(void) {
 
     if (cml_am_buffer_upload(drv, buf, src, size) != 0) {
         printf("(upload failed) ");
-        free(src); free(dst);
+        cml_free(src); cml_free(dst);
         cml_am_buffer_free(drv, buf);
         cml_am_driver_free(drv);
         return true;
@@ -168,7 +170,7 @@ static bool test_buffer_upload_download(void) {
 
     if (cml_am_buffer_download(drv, buf, dst, size) != 0) {
         printf("(download failed) ");
-        free(src); free(dst);
+        cml_free(src); cml_free(dst);
         cml_am_buffer_free(drv, buf);
         cml_am_driver_free(drv);
         return true;
@@ -179,8 +181,8 @@ static bool test_buffer_upload_download(void) {
         if (dst[i] != src[i]) { match = false; break; }
     }
 
-    free(src);
-    free(dst);
+    cml_free(src);
+    cml_free(dst);
     cml_am_buffer_free(drv, buf);
     cml_am_driver_free(drv);
     return match;
@@ -275,7 +277,7 @@ static bool test_enumerate_gpus(void) {
     if (ret == 0) {
         printf("(found %d GPU(s)) ", count);
         if (g_hw_available && count == 0) {
-            free(gpus);
+            cml_free(gpus);
             return false;
         }
         for (int i = 0; i < count; i++) {
@@ -286,7 +288,7 @@ static bool test_enumerate_gpus(void) {
         if (count > 0) printf("\n    ");
     }
 
-    free(gpus);
+    cml_free(gpus);
     return true;
 }
 
@@ -603,7 +605,7 @@ static bool test_mock_enumerate_gpus(void) {
     int count = 0;
     int ret = cml_am_enumerate_gpus(&gpus, &count);
     if (ret != 0) return false;
-    if (count < 1) { free(gpus); return false; }
+    if (count < 1) { cml_free(gpus); return false; }
 
     CMLAMMockGPU* mock = cml_am_mock_get();
     bool ok = (gpus[0].gpu_id == mock->gpu_id);
@@ -614,7 +616,7 @@ static bool test_mock_enumerate_gpus(void) {
     printf("(found %d GPU: %s [%s] gpu_id=%u) ",
            count, gpus[0].name, gpus[0].gfx_version, gpus[0].gpu_id);
 
-    free(gpus);
+    cml_free(gpus);
     return ok;
 }
 
@@ -655,14 +657,14 @@ static bool test_mock_buffer_lifecycle(void) {
     if (buf->gpu_va == 0) { cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
     if (buf->is_vram)     { cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
 
-    float* src = (float*)malloc(size);
-    float* dst = (float*)calloc(256, sizeof(float));
-    if (!src || !dst) { free(src); free(dst); cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
+    float* src = (float*)cml_malloc(size);
+    float* dst = (float*)cml_calloc(256, sizeof(float));
+    if (!src || !dst) { cml_free(src); cml_free(dst); cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
 
     for (int i = 0; i < 256; i++) src[i] = (float)i * 2.5f;
 
-    if (cml_am_buffer_upload(drv, buf, src, size) != 0) { free(src); free(dst); cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
-    if (cml_am_buffer_download(drv, buf, dst, size) != 0) { free(src); free(dst); cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
+    if (cml_am_buffer_upload(drv, buf, src, size) != 0) { cml_free(src); cml_free(dst); cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
+    if (cml_am_buffer_download(drv, buf, dst, size) != 0) { cml_free(src); cml_free(dst); cml_am_buffer_free(drv, buf); cml_am_driver_free(drv); return false; }
 
     bool match = true;
     for (int i = 0; i < 256; i++) {
@@ -676,8 +678,8 @@ static bool test_mock_buffer_lifecycle(void) {
         cml_am_buffer_free(drv, vbuf);
     }
 
-    free(src);
-    free(dst);
+    cml_free(src);
+    cml_free(dst);
     cml_am_buffer_free(drv, buf);
     cml_am_driver_free(drv);
     return match && vram_ok;

@@ -7,6 +7,7 @@
 
 #ifdef _POSIX_C_SOURCE
 #include <time.h>
+#include "alloc/cml_allocator.h"
 static double get_time_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -27,7 +28,7 @@ CMLNullDevice* cml_null_device_create(void) {
 CMLNullDevice* cml_null_device_create_with_spec(size_t memory_bytes,
                                                   double bandwidth_gbps,
                                                   double tflops) {
-    CMLNullDevice* dev = (CMLNullDevice*)calloc(1, sizeof(CMLNullDevice));
+    CMLNullDevice* dev = (CMLNullDevice*)cml_calloc(1, sizeof(CMLNullDevice));
     if (!dev) return NULL;
 
     dev->initialized = true;
@@ -40,7 +41,7 @@ CMLNullDevice* cml_null_device_create_with_spec(size_t memory_bytes,
 }
 
 void cml_null_device_free(CMLNullDevice* dev) {
-    free(dev);
+    cml_free(dev);
 }
 
 void* cml_null_device_alloc(CMLNullDevice* dev, size_t size) {

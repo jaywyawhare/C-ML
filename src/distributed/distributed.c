@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
+#include "alloc/cml_allocator.h"
 
 static DistProcessGroup* g_default_group = NULL;
 static pthread_mutex_t g_dist_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -32,7 +33,7 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
         rank = rank_env ? atoi(rank_env) : 0;
     }
 
-    g_default_group = calloc(1, sizeof(DistProcessGroup));
+    g_default_group = cml_calloc(1, sizeof(DistProcessGroup));
     if (!g_default_group) {
         pthread_mutex_unlock(&g_dist_mutex);
         return -1;
@@ -69,7 +70,7 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
 
     if (!ops) {
         LOG_ERROR("Failed to create any communication backend");
-        free(g_default_group);
+        cml_free(g_default_group);
         g_default_group = NULL;
         pthread_mutex_unlock(&g_dist_mutex);
         return -1;
@@ -86,7 +87,7 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
         if (result != 0) {
             LOG_ERROR("Backend initialization failed");
             cml_dist_free_backend(ops);
-            free(g_default_group);
+            cml_free(g_default_group);
             g_default_group = NULL;
             pthread_mutex_unlock(&g_dist_mutex);
             return -1;
@@ -134,7 +135,7 @@ void cml_dist_destroy(void) {
         cml_dist_free_backend(g_default_group->ops);
     }
 
-    free(g_default_group);
+    cml_free(g_default_group);
     g_default_group = NULL;
 
     pthread_mutex_unlock(&g_dist_mutex);
@@ -185,7 +186,7 @@ DistWork* cml_dist_allreduce_async(Tensor* tensor, DistReduceOp op) {
     if (!g_default_group->ops->allreduce_async) {
         /* Fall back to sync allreduce */
         int rc = cml_dist_allreduce(tensor, op);
-        DistWork* work = calloc(1, sizeof(DistWork));
+        DistWork* work = cml_calloc(1, sizeof(DistWork));
         if (work) {
             work->completed = true;
             work->error_code = rc;
@@ -211,6 +212,6 @@ int cml_dist_wait(DistWork* work) {
 void cml_dist_work_free(DistWork* work) {
     if (!work)
         return;
-    free(work->internal);
-    free(work);
+    cml_free(work->internal);
+    cml_free(work);
 }
