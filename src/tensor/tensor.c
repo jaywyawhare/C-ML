@@ -611,6 +611,30 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
     }
 }
 
+static int tensor_refresh_shape_from_node(Tensor* t, struct IRNode* node) {
+    if (!t || !node || !node->output_shape || node->output_ndim <= 0)
+        return -1;
+
+    if (t->shape)
+        free(t->shape);
+    if (t->strides)
+        free(t->strides);
+
+    t->shape = tensor_shape_copy(node->output_shape, node->output_ndim);
+    if (!t->shape)
+        return -1;
+
+    t->ndim  = node->output_ndim;
+    t->numel = tensor_numel(t->shape, t->ndim);
+    t->strides = compute_contiguous_strides(t->shape, t->ndim);
+    if (!t->strides && t->ndim > 0) {
+        free(t->shape);
+        t->shape = NULL;
+        return -1;
+    }
+    return 0;
+}
+
 Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     if (!node || !ir_context)
         return NULL;
@@ -618,6 +642,10 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     /* If this node was interned and already has an output tensor, reuse it */
     if (node->output) {
         node->output->ref_count++;
+        if (node->output_shape)
+            tensor_refresh_shape_from_node(node->output, node);
+        node->output->ir_node    = node;
+        node->output->ir_context = ir_context;
         return node->output;
     }
 
@@ -640,15 +668,22 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         t->ndim  = node->output_ndim;
         t->numel = tensor_numel(node->output_shape, node->output_ndim);
     } else {
-        // Fallback: use first input's shape if available
         if (node->inputs && node->inputs[0]) {
-            t->shape = tensor_shape_copy(node->inputs[0]->shape, node->inputs[0]->ndim);
+            const int* src = node->inputs[0]->shape;
+            int ndim       = node->inputs[0]->ndim;
+            if ((!src || ndim <= 0) && node->inputs[0]->ir_node &&
+                node->inputs[0]->ir_node->output_shape &&
+                node->inputs[0]->ir_node->output_ndim > 0) {
+                src  = node->inputs[0]->ir_node->output_shape;
+                ndim = node->inputs[0]->ir_node->output_ndim;
+            }
+            t->shape = (src && ndim > 0) ? tensor_shape_copy((int*)src, ndim) : NULL;
             if (!t->shape) {
                 cml_free(t);
                 return NULL;
             }
-            t->ndim  = node->inputs[0]->ndim;
-            t->numel = node->inputs[0]->numel;
+            t->ndim  = ndim;
+            t->numel = tensor_numel(t->shape, t->ndim);
         } else {
             cml_free(t);
             return NULL;

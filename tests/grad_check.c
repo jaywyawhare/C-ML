@@ -7,8 +7,9 @@
 
 #include "cml.h"
 
-#if defined(__SANITIZE_ADDRESS__) || \
-    (defined(__clang__) && defined(__has_feature) && __has_feature(address_sanitizer))
+#if defined(__SANITIZE_ADDRESS__)
+#define CML_GRAD_CHECK_ASAN 1
+#elif defined(__clang__) && __has_feature(address_sanitizer)
 #define CML_GRAD_CHECK_ASAN 1
 #else
 #define CML_GRAD_CHECK_ASAN 0

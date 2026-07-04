@@ -132,8 +132,17 @@ static Tensor* uop_unary(Tensor* a, UOpType type) {
     if (cml_ir_add_uop(ir, type, inputs, 1, NULL) != 0)
         return NULL;
     struct IRNode* node = cml_ir_get_tail(ir);
-    node->output_shape  = tensor_shape_copy(a->shape, a->ndim);
-    node->output_ndim   = a->ndim;
+    const int* a_shape = NULL;
+    int a_ndim         = 0;
+    if (a->ir_node && a->ir_node->output_shape && a->ir_node->output_ndim > 0) {
+        a_shape = a->ir_node->output_shape;
+        a_ndim  = a->ir_node->output_ndim;
+    } else if (a->shape && a->ndim > 0) {
+        a_shape = a->shape;
+        a_ndim  = a->ndim;
+    }
+    node->output_shape = (a_shape && a_ndim > 0) ? tensor_shape_copy((int*)a_shape, a_ndim) : NULL;
+    node->output_ndim  = a_ndim;
     if (a->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = true;

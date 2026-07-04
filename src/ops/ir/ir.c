@@ -721,6 +721,8 @@ static void free_ir_node(struct IRNode* node) {
     }
 
     if (node->input_shapes) {
+        for (int i = 0; i < node->num_inputs; i++)
+            cml_free(node->input_shapes[i]);
         cml_free(node->input_shapes);
         node->input_shapes = NULL;
     }
@@ -1182,9 +1184,45 @@ char* cml_ir_to_string(CMLGraph_t ir) {
     return str;
 }
 
+#define IR_TENSOR_MAX_NDIM 16
+
+static bool ir_tensor_resolve_shape(const Tensor* t, const int** out_shape, int* out_ndim) {
+    if (!t || !out_shape || !out_ndim)
+        return false;
+
+    if (t->ir_node && t->ir_node->output_shape && t->ir_node->output_ndim > 0 &&
+        t->ir_node->output_ndim <= IR_TENSOR_MAX_NDIM) {
+        *out_shape = t->ir_node->output_shape;
+        *out_ndim  = t->ir_node->output_ndim;
+        return true;
+    }
+
+    if (t->shape && t->ndim > 0 && t->ndim <= IR_TENSOR_MAX_NDIM) {
+        *out_shape = t->shape;
+        *out_ndim  = t->ndim;
+        return true;
+    }
+
+    return false;
+}
+
 int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     if (!node || node->num_inputs < 2)
         return -1;
+
+    if (node->input_shapes) {
+        for (int i = 0; i < node->num_inputs; i++)
+            cml_free(node->input_shapes[i]);
+        cml_free(node->input_shapes);
+        node->input_shapes = NULL;
+    }
+    cml_free(node->input_ndims);
+    node->input_ndims = NULL;
+    if (node->output_shape) {
+        cml_free(node->output_shape);
+        node->output_shape = NULL;
+        node->output_ndim  = 0;
+    }
 
     int** input_shapes = cml_malloc((size_t)node->num_inputs * sizeof(int*));
     if (!input_shapes)
@@ -1198,12 +1236,28 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
 
     for (int i = 0; i < node->num_inputs; i++) {
         if (!node->inputs[i]) {
+            for (int j = 0; j < i; j++)
+                cml_free(input_shapes[j]);
             cml_free(input_shapes);
             cml_free(input_ndims);
             return -1;
         }
-        input_shapes[i] = node->inputs[i]->shape;
-        input_ndims[i]  = node->inputs[i]->ndim;
+        const int* src = NULL;
+        if (!ir_tensor_resolve_shape(node->inputs[i], &src, &input_ndims[i])) {
+            for (int j = 0; j < i; j++)
+                cml_free(input_shapes[j]);
+            cml_free(input_shapes);
+            cml_free(input_ndims);
+            return -1;
+        }
+        input_shapes[i] = tensor_shape_copy((int*)src, input_ndims[i]);
+        if (!input_shapes[i]) {
+            for (int j = 0; j < i; j++)
+                cml_free(input_shapes[j]);
+            cml_free(input_shapes);
+            cml_free(input_ndims);
+            return -1;
+        }
     }
 
     int max_ndim = 0;
@@ -1214,6 +1268,8 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
 
     int* output_shape = cml_malloc((size_t)max_ndim * sizeof(int));
     if (!output_shape) {
+        for (int j = 0; j < node->num_inputs; j++)
+            cml_free(input_shapes[j]);
         cml_free(input_shapes);
         cml_free(input_ndims);
         return -1;
@@ -1227,6 +1283,8 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
                 int dim = input_shapes[i][dim_idx];
                 if (dim != 1 && max_dim != 1 && dim != max_dim) {
                     cml_free(output_shape);
+                    for (int j = 0; j < node->num_inputs; j++)
+                        cml_free(input_shapes[j]);
                     cml_free(input_shapes);
                     cml_free(input_ndims);
                     return -1;
