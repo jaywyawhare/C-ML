@@ -46,13 +46,14 @@ static const ThunderOpMapping op_table[] = {
     {"torch.mm",        UOP_MATMUL},
     {"torch.bmm",       UOP_MATMUL},
     {"torch.relu6",     UOP_RELU6},
-    {"torch.gelu",      UOP_GELU},
+    /* torch.gelu and torch.leaky_relu decompose into other uops and have no
+     * dedicated UOpType, so they are intentionally absent from this table
+     * (thunder_lookup_op returns "unsupported" for unknown names). */
     {"torch.silu",      UOP_SILU},
     {"torch.mish",      UOP_MISH},
     {"torch.hardswish", UOP_HARDSWISH},
     {"torch.selu",      UOP_SELU},
     {"torch.elu",       UOP_ELU},
-    {"torch.leaky_relu", UOP_LEAKY_RELU},
     {"torch.log2",      UOP_LOG2},
     {"torch.exp2",      UOP_EXP2},
     {"torch.maximum",   UOP_MAX},
@@ -208,10 +209,6 @@ int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops
             if (op->num_inputs >= 1)
                 result = uop_relu6(inputs[0]);
             break;
-        case UOP_GELU:
-            if (op->num_inputs >= 1)
-                result = uop_gelu(inputs[0]);
-            break;
         case UOP_SILU:
             if (op->num_inputs >= 1)
                 result = uop_silu(inputs[0]);
@@ -231,10 +228,6 @@ int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops
         case UOP_ELU:
             if (op->num_inputs >= 1)
                 result = uop_elu(inputs[0], 1.0f);
-            break;
-        case UOP_LEAKY_RELU:
-            if (op->num_inputs >= 1)
-                result = uop_leaky_relu(inputs[0], 0.01f);
             break;
         case UOP_MAX:
             if (op->num_inputs >= 2)
