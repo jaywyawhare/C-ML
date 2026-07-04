@@ -26,7 +26,7 @@ static const ThunderOpMapping op_table[] = {
     {"torch.cos",       UOP_COS},
     {"torch.tanh",      UOP_TANH},
     {"torch.sigmoid",   UOP_SIGMOID},
-    {"torch.relu",      UOP_MAX},
+    {"torch.relu",      UOP_RELU},
     {"torch.sum",       UOP_SUM},
     {"torch.max",       UOP_MAX_REDUCE},
     {"torch.mean",      UOP_MEAN},
@@ -43,6 +43,19 @@ static const ThunderOpMapping op_table[] = {
     {"torch.erf",       UOP_ERF},
     {"torch.rsqrt",     UOP_RSQRT},
     {"torch.reciprocal", UOP_RECIP},
+    {"torch.mm",        UOP_MATMUL},
+    {"torch.bmm",       UOP_MATMUL},
+    {"torch.relu6",     UOP_RELU6},
+    {"torch.gelu",      UOP_GELU},
+    {"torch.silu",      UOP_SILU},
+    {"torch.mish",      UOP_MISH},
+    {"torch.hardswish", UOP_HARDSWISH},
+    {"torch.selu",      UOP_SELU},
+    {"torch.elu",       UOP_ELU},
+    {"torch.leaky_relu", UOP_LEAKY_RELU},
+    {"torch.log2",      UOP_LOG2},
+    {"torch.exp2",      UOP_EXP2},
+    {"torch.maximum",   UOP_MAX},
     {NULL,              0}
 };
 
@@ -186,6 +199,54 @@ int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops
         case UOP_RSQRT:
             if (op->num_inputs >= 1)
                 result = uop_rsqrt(inputs[0]);
+            break;
+        case UOP_RELU:
+            if (op->num_inputs >= 1)
+                result = uop_relu(inputs[0]);
+            break;
+        case UOP_RELU6:
+            if (op->num_inputs >= 1)
+                result = uop_relu6(inputs[0]);
+            break;
+        case UOP_GELU:
+            if (op->num_inputs >= 1)
+                result = uop_gelu(inputs[0]);
+            break;
+        case UOP_SILU:
+            if (op->num_inputs >= 1)
+                result = uop_silu(inputs[0]);
+            break;
+        case UOP_MISH:
+            if (op->num_inputs >= 1)
+                result = uop_mish(inputs[0]);
+            break;
+        case UOP_HARDSWISH:
+            if (op->num_inputs >= 1)
+                result = uop_hardswish(inputs[0]);
+            break;
+        case UOP_SELU:
+            if (op->num_inputs >= 1)
+                result = uop_selu(inputs[0]);
+            break;
+        case UOP_ELU:
+            if (op->num_inputs >= 1)
+                result = uop_elu(inputs[0], 1.0f);
+            break;
+        case UOP_LEAKY_RELU:
+            if (op->num_inputs >= 1)
+                result = uop_leaky_relu(inputs[0], 0.01f);
+            break;
+        case UOP_MAX:
+            if (op->num_inputs >= 2)
+                result = uop_max(inputs[0], inputs[1]);
+            break;
+        case UOP_LOG2:
+            if (op->num_inputs >= 1)
+                result = uop_log2(inputs[0]);
+            break;
+        case UOP_EXP2:
+            if (op->num_inputs >= 1)
+                result = uop_exp2(inputs[0]);
             break;
         default:
             LOG_ERROR("[thunder] Op dispatch not implemented: %s", op->op_name);
