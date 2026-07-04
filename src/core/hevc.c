@@ -293,6 +293,7 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
 
     /* Stub: no actual HEVC decoding — allocate a placeholder luma plane.
      * Real decode requires slice header parsing, prediction, transform, deblocking. */
+    LOG_WARNING("[hevc] decode_idr is a stub; returning blank 64x64 placeholder frame");
     int w = 64, h = 64;
     int stride = w;
 
