@@ -22,7 +22,7 @@ static void test_data_ptr_f32(void) {
     TorchTensorOptions opts = torch_options();
     opts = torch_options_dtype(opts, DTYPE_FLOAT32);
     int shape[] = {2};
-    Tensor* t = torch_ones(shape, 2, &opts);
+    Tensor* t = torch_ones(shape, 1, &opts);
     float* data = torch_tensor_data_ptr_f32(t);
     assert(data != NULL);
     assert(data[0] == 1.0f && data[1] == 1.0f);
@@ -35,7 +35,7 @@ static void test_data_ptr_f32_rejects_wrong_dtype(void) {
     TorchTensorOptions opts = torch_options();
     opts = torch_options_dtype(opts, DTYPE_INT32);
     int shape[] = {2};
-    Tensor* t = torch_zeros(shape, 2, &opts);
+    Tensor* t = torch_zeros(shape, 1, &opts);
     assert(torch_tensor_data_ptr_f32(t) == NULL);
     assert(torch_has_error());
     torch_tensor_free(t);
@@ -148,7 +148,7 @@ static void test_clear_error(void) {
     TorchTensorOptions opts = torch_options();
     opts = torch_options_dtype(opts, DTYPE_INT32);
     int shape[] = {2};
-    Tensor* t = torch_zeros(shape, 2, &opts);
+    Tensor* t = torch_zeros(shape, 1, &opts);
     assert(torch_tensor_data_ptr_f32(t) == NULL);
     assert(torch_has_error());
     torch_clear_error();

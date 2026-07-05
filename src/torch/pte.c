@@ -14,6 +14,7 @@
 #include "ops/uops.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor_views.h"
+#include "tensor/realize.h"
 #include "nn/state.h"
 #include "core/logging.h"
 #include "core/error_stack.h"
@@ -254,6 +255,12 @@ int torch_pte_export_module(Module* module, Tensor* sample_input, const char* pa
         return -1;
 
     TorchPTEExportOptions o = opts ? *opts : torch_pte_default_export_options();
+
+    /* Realize lazy tensors before resetting the IR context: the reset will
+     * force-free any live IR node outputs, so a lazy sample_input would be
+     * destroyed before module_forward can use it. */
+    if (sample_input->ir_node)
+        tensor_realize(sample_input);
 
     cml_ir_reset_global_context();
     Tensor* output = module_forward(module, sample_input);

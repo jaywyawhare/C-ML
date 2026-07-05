@@ -71,7 +71,7 @@ static TorchDelegate g_vulkan_delegate = {
 };
 
 static void delegate_registry_init(void) {
-    if (g_registry.count > 0)
+    if (g_registry.capacity > 0)
         return;
     g_registry.capacity = 8;
     g_registry.entries  = calloc((size_t)g_registry.capacity, sizeof(TorchDelegate));
@@ -79,9 +79,9 @@ static void delegate_registry_init(void) {
         g_registry.capacity = 0;
         return;
     }
-    torch_delegate_register(&g_cpu_delegate);
-    torch_delegate_register(&g_cuda_delegate);
-    torch_delegate_register(&g_vulkan_delegate);
+    g_registry.entries[g_registry.count++] = g_cpu_delegate;
+    g_registry.entries[g_registry.count++] = g_cuda_delegate;
+    g_registry.entries[g_registry.count++] = g_vulkan_delegate;
 }
 
 TorchDelegateRegistry* torch_delegate_registry(void) {
