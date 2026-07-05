@@ -933,7 +933,7 @@ struct CMLAMDriver* cml_dispatch_get_am_driver(void) {
 #endif
 }
 
-CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void) {
+struct CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void) {
 #ifdef CML_HAS_OPENCL
     return g_opencl_backend;
 #else
