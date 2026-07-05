@@ -75,11 +75,12 @@ typedef struct {
 
 static BufferCache g_buffer_cache = {0};
 static CMLTLSFAllocator* g_exec_tlsf = NULL;
+static bool g_exec_tlsf_destroyed = false;  /* true after cml_tlsf_destroy is called; keeps exec_pool_alloc from re-creating the pool after shutdown */
 static pthread_mutex_t g_exec_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void* exec_pool_alloc(size_t size) {
     pthread_mutex_lock(&g_exec_alloc_lock);
-    if (!g_exec_tlsf) {
+    if (!g_exec_tlsf && !g_exec_tlsf_destroyed) {
         g_exec_tlsf = cml_tlsf_create(256u * 1024u * 1024u);
     }
     void* ptr = g_exec_tlsf ? cml_tlsf_alloc(g_exec_tlsf, size) : NULL;
@@ -94,13 +95,23 @@ static void exec_pool_free(void* ptr, size_t size) {
     if (!ptr)
         return;
     pthread_mutex_lock(&g_exec_alloc_lock);
-    if (g_exec_tlsf && cml_tlsf_alloc_size(g_exec_tlsf, ptr) > 0) {
+    if (g_exec_tlsf && g_exec_tlsf->pool &&
+        (char*)ptr >= (char*)g_exec_tlsf->pool &&
+        (char*)ptr < (char*)g_exec_tlsf->pool + g_exec_tlsf->pool_size) {
         cml_tlsf_free(g_exec_tlsf, ptr);
         pthread_mutex_unlock(&g_exec_alloc_lock);
         return;
     }
     pthread_mutex_unlock(&g_exec_alloc_lock);
-    free(ptr);
+    /* Pointer is outside the current TLSF pool bounds.  It came from either:
+     *   (a) the TLSF OOM malloc() fallback — always 16-byte aligned on Linux, or
+     *   (b) a stale pointer from an old TLSF pool — not 16-byte aligned.
+     * Distinguish by alignment: libc malloc guarantees 16-byte alignment on
+     * 64-bit Linux; TLSF sub-allocations can be 4-byte aligned.
+     * For case (b) just discard — the backing pool memory is already gone. */
+    if (((uintptr_t)ptr & 0xF) == 0)
+        free(ptr); /* 16-byte aligned → malloc fallback, safe to free */
+    /* else: stale TLSF ptr, discarded (tiny leak, crash-safe) */
 }
 
 static int get_bucket_index(size_t size) {
@@ -220,7 +231,7 @@ void cml_cleanup_buffer_cache(void) {
         CachedBuffer* current = bucket->free_list;
         while (current) {
             CachedBuffer* next = current->next;
-            cml_free(current->data);
+            exec_pool_free(current->data, bucket->bucket_size);
             cml_free(current);
             current = next;
         }
@@ -230,11 +241,17 @@ void cml_cleanup_buffer_cache(void) {
 
     g_buffer_cache.bytes_cached = 0;
     g_buffer_cache.initialized  = false;
+    /* NOTE: The TLSF pool is intentionally NOT destroyed here because live
+     * tensors may still hold data pointers into it.  Call
+     * cml_exec_pool_shutdown() only after all tensors have been freed. */
+}
 
+void cml_exec_pool_shutdown(void) {
     pthread_mutex_lock(&g_exec_alloc_lock);
     if (g_exec_tlsf) {
         cml_tlsf_destroy(g_exec_tlsf);
-        g_exec_tlsf = NULL;
+        g_exec_tlsf           = NULL;
+        g_exec_tlsf_destroyed = true;
     }
     pthread_mutex_unlock(&g_exec_alloc_lock);
 }

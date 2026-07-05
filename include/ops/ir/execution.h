@@ -33,6 +33,9 @@ void cml_buffer_cache_free(void* ptr, size_t size);
 
 void cml_print_buffer_cache_stats(void);
 void cml_cleanup_buffer_cache(void);
+/* Destroys the underlying TLSF execution pool.  Must be called only after
+ * all tensors with buffer-cache-allocated data have been freed. */
+void cml_exec_pool_shutdown(void);
 
 /* On first call: records kernel launch sequence.
    On subsequent calls with same graph structure: replays without re-scheduling. */

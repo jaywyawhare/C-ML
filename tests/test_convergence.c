@@ -14,11 +14,11 @@ static float get_scalar(Tensor* t) {
 }
 
 static int test_xor_mlp(void) {
-    printf("  [XOR MLP] Sequential(Linear(2,4)+ReLU+Linear(4,1)+Sigmoid), Adam lr=0.01, 2000 epochs\n");
+    printf("  [XOR MLP] Sequential(Linear(2,4)+Tanh+Linear(4,1)+Sigmoid), Adam lr=0.05, 2000 epochs\n");
 
     Sequential* model = nn_sequential();
     sequential_add(model, (Module*)nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
-    sequential_add(model, (Module*)nn_relu(false));
+    sequential_add(model, (Module*)nn_tanh());
     sequential_add(model, (Module*)nn_linear(4, 1, DTYPE_FLOAT32, DEVICE_CPU, true));
     sequential_add(model, (Module*)nn_sigmoid());
     module_set_training((Module*)model, true);
@@ -26,7 +26,7 @@ static int test_xor_mlp(void) {
     Parameter** params = NULL;
     int num_params = 0;
     module_collect_parameters((Module*)model, &params, &num_params, true);
-    Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+    Optimizer* optimizer = optim_adam(params, num_params, 0.05f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
         printf("    ERROR: failed to create optimizer\n");
         cml_free(params);

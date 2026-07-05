@@ -281,7 +281,9 @@ static Tensor* fast_path_run(SequentialFastPath* fp, Tensor* input) {
         }
     }
 
-    /* Return the pre-allocated non-owning output tensor — no malloc per call */
+    /* Return with an extra ref so the caller can tensor_free() it without
+     * destroying the reusable output buffer owned by the fast path. */
+    fp->output_tensor->ref_count++;
     return fp->output_tensor;
 }
 
