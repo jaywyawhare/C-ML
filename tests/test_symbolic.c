@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "alloc/cml_allocator.h"
 
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -472,10 +471,10 @@ static void test_shape_broadcast_symbolic(void) {
     // Shape (N, 1) broadcast with (1, 5) -> (N, 5)
     SymExpr* n = sym_var("N", 1, 64);
 
-    SymShape* a = (SymShape*)cml_calloc(1, sizeof(SymShape));
+    SymShape* a = (SymShape*)calloc(1, sizeof(SymShape));
     a->ndim = 2;
     a->ref_count = 1;
-    a->dims = (SymDim*)cml_calloc(2, sizeof(SymDim));
+    a->dims = (SymDim*)calloc(2, sizeof(SymDim));
     a->dims[0] = sym_dim_symbolic(n);
     a->dims[1] = sym_dim_concrete(1);
 
@@ -500,10 +499,10 @@ static void test_shape_eval(void) {
     TEST(shape_eval);
     SymExpr* n = sym_var("N", 1, 64);
 
-    SymShape* s = (SymShape*)cml_calloc(1, sizeof(SymShape));
+    SymShape* s = (SymShape*)calloc(1, sizeof(SymShape));
     s->ndim = 2;
     s->ref_count = 1;
-    s->dims = (SymDim*)cml_calloc(2, sizeof(SymDim));
+    s->dims = (SymDim*)calloc(2, sizeof(SymDim));
     s->dims[0] = sym_dim_symbolic(n);
     s->dims[1] = sym_dim_concrete(10);
 
@@ -524,10 +523,10 @@ static void test_shape_to_string(void) {
     TEST(shape_to_string);
     SymExpr* n = sym_var("N", 1, 64);
 
-    SymShape* s = (SymShape*)cml_calloc(1, sizeof(SymShape));
+    SymShape* s = (SymShape*)calloc(1, sizeof(SymShape));
     s->ndim = 2;
     s->ref_count = 1;
-    s->dims = (SymDim*)cml_calloc(2, sizeof(SymDim));
+    s->dims = (SymDim*)calloc(2, sizeof(SymDim));
     s->dims[0] = sym_dim_symbolic(n);
     s->dims[1] = sym_dim_concrete(10);
 

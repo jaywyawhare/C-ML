@@ -58,7 +58,7 @@ static void test_eager_matmul(void) {
     torch_no_grad();
 
     float av[] = {1, 2, 3, 4, 5, 6};   /* [2,3] */
-    float bv[] = {1, 0, 0, 1, 1, 1};   /* [3,2] */
+    float bv[] = {1, 0, 0, 1, 0, 1};   /* [3,2] */
     int as[] = {2, 3};
     int bs[] = {3, 2};
     Tensor* a = make(av, as, 2);

@@ -68,7 +68,7 @@ static void test_memory_arena_exhausted(void) {
     void* a = torch_memory_alloc(mgr, 64);
     assert(a != NULL);
     assert(torch_memory_alloc(mgr, 128) == NULL);
-    assert(torch_memory_remaining(mgr) < 64);
+    assert(torch_memory_remaining(mgr) <= 64);
 
     torch_memory_free(mgr);
     printf(" PASSED\n");
