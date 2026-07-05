@@ -149,6 +149,11 @@ static size_t g_total_allocated_bytes = 0;
 static size_t g_peak_allocated_bytes  = 0;
 static size_t g_alloc_count           = 0;
 
+/* Fault injection: -1 = disabled, >=0 = fail after this many more allocs */
+static _Atomic long g_fault_countdown = -1;
+/* Monotonic allocation index (for pinpointing the failing site) */
+static _Atomic long g_alloc_index     = 0;
+
 /* Forward */
 static void*  alloc_from_class(int cls, size_t user_size);
 static void   free_to_class(int cls, void* user_ptr, size_t user_size);
@@ -417,6 +422,18 @@ static void* alloc_large(size_t size) {
 void* cml_malloc(size_t size) {
     if (size == 0) size = 1; /* classic */
 
+    /* Fault injection: if a countdown is active, decrement it and fail when it hits 0. */
+    long cd = __atomic_load_n(&g_fault_countdown, __ATOMIC_RELAXED);
+    if (cd >= 0) {
+        long prev = __atomic_fetch_sub(&g_fault_countdown, 1, __ATOMIC_RELAXED);
+        if (prev == 0) {
+            /* Reset to disabled so subsequent calls succeed, then return OOM. */
+            __atomic_store_n(&g_fault_countdown, -1, __ATOMIC_RELAXED);
+            return NULL;
+        }
+    }
+    __atomic_fetch_add(&g_alloc_index, 1, __ATOMIC_RELAXED);
+
     if (size >= CML_LARGE_THRESHOLD) {
         return alloc_large(size);
     }
@@ -591,4 +608,19 @@ void cml_allocator_flush_thread_cache(void) {
             flush_local_to_central(c, 0);
         }
     }
+}
+
+/* --- Fault injection API --- */
+
+void cml_malloc_fault_after(int n) {
+    __atomic_store_n(&g_fault_countdown, (long)n, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_alloc_index, 0, __ATOMIC_RELAXED);
+}
+
+void cml_malloc_fault_reset(void) {
+    __atomic_store_n(&g_fault_countdown, -1L, __ATOMIC_RELAXED);
+}
+
+long cml_malloc_alloc_index(void) {
+    return __atomic_load_n(&g_alloc_index, __ATOMIC_RELAXED);
 }

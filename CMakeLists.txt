@@ -744,10 +744,48 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/viz-ui/dist")
     install(DIRECTORY viz-ui/dist DESTINATION ${VIZ_INSTALL_DIR}/viz-ui)
 endif()
 
+# ── Simulation & Fuzz Testing ─────────────────────────────────────────────────
+# sim_test: seeded deterministic simulation + OOM sweep + gradient check
+# BUILD_SIM=ON  (default ON, requires no extra deps)
+# BUILD_FUZZ=ON (default OFF, requires clang -fsanitize=fuzzer or AFL)
+
+option(BUILD_SIM  "Build the seeded simulation / OOM-sweep test harness" ON)
+option(BUILD_FUZZ "Build libFuzzer / AFL fuzz entry points (requires clang)" OFF)
+
+if(BUILD_SIM)
+    add_executable(sim_test tools/sim_test.c)
+    target_link_libraries(sim_test cml_static m)
+    cml_link_all(sim_test)
+    # Register as a quick smoke-run (single seed, no oom sweep, no grad check)
+    add_test(NAME sim_test COMMAND sim_test --seed 0xC0FFEE --iters 32)
+endif()
+
+if(BUILD_FUZZ)
+    if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+        message(WARNING "BUILD_FUZZ requires clang; skipping fuzz targets")
+    else()
+        add_executable(fuzz_ir tools/fuzz_ir.c)
+        target_link_libraries(fuzz_ir cml_static m)
+        cml_link_all(fuzz_ir)
+        target_compile_options(fuzz_ir PRIVATE -fsanitize=fuzzer,address,undefined)
+        target_link_options(fuzz_ir    PRIVATE -fsanitize=fuzzer,address,undefined)
+
+        # Minimal corpus seed so libFuzzer starts with a valid-ish input
+        add_custom_command(TARGET fuzz_ir POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    ${CMAKE_BINARY_DIR}/corpus/fuzz_ir
+            COMMAND ${CMAKE_COMMAND} -E echo_append ""
+                    > ${CMAKE_BINARY_DIR}/corpus/fuzz_ir/seed0
+        )
+
+        message(STATUS "  fuzz_ir built — run: ./build/bin/fuzz_ir build/corpus/fuzz_ir/")
+    endif()
+endif()
+
 message(STATUS "")
 message(STATUS "C-ML ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
 message(STATUS "  LLVM: ${LLVM_BACKEND_FOUND}  CUDA: ${CUDAToolkit_FOUND}  ROCm: ${hip_FOUND}  Metal: ${METAL_FOUND}")
 message(STATUS "  Vulkan: ${ENABLE_VULKAN}  WebGPU: ${ENABLE_WEBGPU}  OpenCL: ${OpenCL_FOUND}")
 message(STATUS "  NV Driver: ${ENABLE_NV_DRIVER}  AM Driver: ${ENABLE_AM_DRIVER}  NIR: ${ENABLE_NIR}  NAK: ${ENABLE_NAK}")
-message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Distributed: ${ENABLE_DISTRIBUTED}  IB: ${ENABLE_IB_TRANSPORT}")
+message(STATUS "  Tests: ${BUILD_TESTS}  Examples: ${BUILD_EXAMPLES}  Sim: ${BUILD_SIM}  Fuzz: ${BUILD_FUZZ}  Distributed: ${ENABLE_DISTRIBUTED}  IB: ${ENABLE_IB_TRANSPORT}")
 message(STATUS "")

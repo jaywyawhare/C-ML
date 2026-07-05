@@ -51,6 +51,21 @@ void   cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size
 /* Optional: flush this thread's caches back to central (call before thread exit if desired) */
 void   cml_allocator_flush_thread_cache(void);
 
+/* Fault injection for simulation / OOM testing.
+ *
+ * cml_malloc_fault_after(n): the next n successful allocations succeed normally;
+ *   the (n+1)-th call returns NULL (simulates OOM).  n=0 → fail immediately.
+ *   Call cml_malloc_fault_reset() to disable.
+ *
+ * cml_malloc_fault_reset(): disable fault injection (default state).
+ *
+ * cml_malloc_alloc_index(): returns how many allocations have been made since
+ *   the last reset — useful to binary-search for the failing site.
+ */
+void   cml_malloc_fault_after(int n);
+void   cml_malloc_fault_reset(void);
+long   cml_malloc_alloc_index(void);
+
 #ifdef __cplusplus
 }
 #endif
