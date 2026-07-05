@@ -31,7 +31,10 @@ typedef void (*kernel_fn_t)(void);
 struct CMLLLVMBackend {
     LLVMOrcLLJITRef     jit;          /* persistent; lives until destroy    */
     LLVMTargetMachineRef tm;
-    LLVMContextRef       ctx;          /* shared; outlives all modules       */
+    /* No shared ctx: each kernel gets its own LLVMContextCreate() so the
+     * context lifetime is tied to the ORC TSC/TSM, not to the backend.
+     * LLVMOrcCreateNewThreadSafeContextFromLLVMContext transfers ownership,
+     * so a shared backend->ctx would become dangling after the first kernel. */
     bool                 initialized;
     int                  kernel_count; /* for unique symbol names            */
     kernel_fn_t          op_cache[OP_CACHE_SIZE]; /* index = UOpType        */
@@ -92,15 +95,6 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
         return NULL;
     }
 
-    /* Shared context for all modules. */
-    b->ctx = LLVMContextCreate();
-    if (!b->ctx) {
-        LLVMOrcDisposeLLJIT(b->jit);
-        LLVMDisposeTargetMachine(b->tm);
-        cml_free(b);
-        return NULL;
-    }
-
     b->initialized = true;
     LOG_DEBUG("LLVM JIT backend initialized (native CPU, persistent JIT)");
     return b;
@@ -110,7 +104,6 @@ void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
     if (!backend) return;
     if (backend->jit)  LLVMOrcDisposeLLJIT(backend->jit);
     if (backend->tm)   LLVMDisposeTargetMachine(backend->tm);
-    if (backend->ctx)  LLVMContextDispose(backend->ctx);
     cml_free(backend);
 }
 
@@ -984,7 +977,9 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
 
 /* -------------------------------------------------------------------------
  * Compile + add to persistent JIT; return callable function pointer.
- * ctx must be backend->ctx (shared). ORC borrows but doesn't own it here.
+ * mod was created in a fresh per-kernel context (LLVMContextCreate).
+ * We extract that context via LLVMGetModuleContext and transfer its
+ * ownership to the TSC; the JIT then owns TSM→TSC→context.
  * ---------------------------------------------------------------------- */
 static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
                                       LLVMModuleRef mod,
@@ -1017,11 +1012,15 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
     }
 #endif
 
-    /* Wrap module for ORC — TSC wraps (doesn't own) backend->ctx. */
+    /* Transfer the module's context to ORC.  LLVMGetModuleContext returns the
+     * raw context that was passed to LLVMModuleCreateWithNameInContext when the
+     * module was built; wrapping it here transfers ownership to the TSC.
+     * The JIT then owns TSM → TSC → context, so there is no dangling pointer. */
+    LLVMContextRef mod_ctx = LLVMGetModuleContext(mod);
     LLVMOrcThreadSafeContextRef tsc =
-        LLVMOrcCreateNewThreadSafeContextFromLLVMContext(backend->ctx);
+        LLVMOrcCreateNewThreadSafeContextFromLLVMContext(mod_ctx);
     LLVMOrcThreadSafeModuleRef tsm = LLVMOrcCreateNewThreadSafeModule(mod, tsc);
-    LLVMOrcDisposeThreadSafeContext(tsc); /* safe: TSM keeps module alive */
+    LLVMOrcDisposeThreadSafeContext(tsc); /* drop our ref; TSM keeps context alive */
 
     LLVMOrcJITDylibRef jd = LLVMOrcLLJITGetMainJITDylib(backend->jit);
     LLVMErrorRef add_err  = LLVMOrcLLJITAddLLVMIRModule(backend->jit, jd, tsm);
@@ -1107,39 +1106,50 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         char fn_name[64];
         snprintf(fn_name, sizeof(fn_name), "cml_k%d", backend->kernel_count++);
 
+        /* Fresh context per kernel: LLVMOrcCreateNewThreadSafeContextFromLLVMContext
+         * transfers ownership, so a shared backend context becomes dangling after the
+         * first AddLLVMIRModule.  Give each kernel its own context; compile_and_lookup
+         * transfers ownership to ORC (TSC → TSM → JIT). */
+        LLVMContextRef kern_ctx = LLVMContextCreate();
+        if (!kern_ctx) return cpu_execute_node(node);
+
         LLVMModuleRef mod = NULL;
 
         if (is_binary_op(type)) {
-            mod = build_binary_op(backend->ctx, type, fn_name);
+            mod = build_binary_op(kern_ctx, type, fn_name);
         } else if (is_unary_op(type)) {
-            mod = build_unary_op(backend->ctx, type, fn_name);
+            mod = build_unary_op(kern_ctx, type, fn_name);
         } else if (is_reduction(type)) {
-            mod = build_reduction(backend->ctx, type, fn_name);
+            mod = build_reduction(kern_ctx, type, fn_name);
         } else if (type == UOP_MATMUL) {
-            mod = build_matmul_kernel(backend->ctx, fn_name);
+            mod = build_matmul_kernel(kern_ctx, fn_name);
         } else if (type == UOP_FILL) {
-            mod = build_fill_op(backend->ctx, fn_name);
+            mod = build_fill_op(kern_ctx, fn_name);
         } else if (type == UOP_WHERE) {
-            mod = build_where_op(backend->ctx, fn_name);
+            mod = build_where_op(kern_ctx, fn_name);
         } else if (type == UOP_GATHER) {
-            mod = build_gather_op(backend->ctx, fn_name);
+            mod = build_gather_op(kern_ctx, fn_name);
         } else if (type == UOP_PERMUTE) {
             if (node->num_inputs >= 1 && node->inputs[0] && node->inputs[0]->ndim == 2)
-                mod = build_permute_2d(backend->ctx, fn_name);
-            else
+                mod = build_permute_2d(kern_ctx, fn_name);
+            else {
+                LLVMContextDispose(kern_ctx);
                 return cpu_execute_node(node);
+            }
         } else if (type == UOP_RESHAPE) {
-            mod = build_reshape_op(backend->ctx, fn_name);
+            mod = build_reshape_op(kern_ctx, fn_name);
         } else if (type == UOP_EXPAND) {
-            mod = build_expand_op(backend->ctx, fn_name);
+            mod = build_expand_op(kern_ctx, fn_name);
         } else {
             LOG_DEBUG("LLVM: Unsupported op %d, CPU fallback", type);
+            LLVMContextDispose(kern_ctx);
             return cpu_execute_node(node);
         }
 
-        if (!mod) return cpu_execute_node(node);
+        if (!mod) { LLVMContextDispose(kern_ctx); return cpu_execute_node(node); }
 
         fn = compile_and_lookup(backend, mod, fn_name);
+        /* kern_ctx ownership transferred to JIT via compile_and_lookup; do not free. */
         if (!fn) return cpu_execute_node(node);
 
         backend->op_cache[cache_idx] = fn;
