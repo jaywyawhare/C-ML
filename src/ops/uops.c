@@ -3902,8 +3902,8 @@ Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device) {
     memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
 
     if (cml_ir_add_uop(ir, UOP_ALLOC, NULL, 0, params) != 0) {
-        free(params->shape);
-        free(params);
+        cml_free(params->shape);
+        cml_free(params);
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }

@@ -88,7 +88,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
         LOG_ERROR("LLVM: Failed to create LLJIT: %s", msg);
         LLVMDisposeErrorMessage(msg);
         LLVMDisposeTargetMachine(b->tm);
-        free(b);
+        cml_free(b);
         return NULL;
     }
 
@@ -97,7 +97,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
     if (!b->ctx) {
         LLVMOrcDisposeLLJIT(b->jit);
         LLVMDisposeTargetMachine(b->tm);
-        free(b);
+        cml_free(b);
         return NULL;
     }
 
@@ -111,7 +111,7 @@ void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
     if (backend->jit)  LLVMOrcDisposeLLJIT(backend->jit);
     if (backend->tm)   LLVMDisposeTargetMachine(backend->tm);
     if (backend->ctx)  LLVMContextDispose(backend->ctx);
-    free(backend);
+    cml_free(backend);
 }
 
 /* -------------------------------------------------------------------------

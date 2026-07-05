@@ -24,7 +24,7 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
         return NULL;
     }
 
-    CMLHCQQueue* queue = (CMLHCQQueue*)calloc(1, sizeof(CMLHCQQueue));
+    CMLHCQQueue* queue = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
     if (!queue) {
         LOG_ERROR("Failed to allocate CMLHCQQueue");
         return NULL;
@@ -156,11 +156,11 @@ void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
     if (ops && ops->signal_destroy) {
         ops->signal_destroy(signal);
         if (signal->backend == CML_HCQ_VULKAN || signal->backend == CML_HCQ_AM)
-            free(signal);
+            cml_free(signal);
         return;
     }
 
-    free(signal);
+    cml_free(signal);
 }
 
 int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {

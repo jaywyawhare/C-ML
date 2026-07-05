@@ -249,7 +249,7 @@ void cml_dispatch_free(CMLDispatchContext* ctx) {
     dispatch_destroy_hcq_queues();
 
     bool was_global = (ctx == g_dispatch_ctx);
-    free(ctx);
+    cml_free(ctx);
     if (was_global)
         g_dispatch_ctx = NULL;
 }

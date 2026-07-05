@@ -162,7 +162,7 @@ void* cml_buffer_cache_alloc(size_t size) {
         g_buffer_cache.bytes_cached -= bucket->bucket_size;
         pthread_mutex_unlock(&g_exec_alloc_lock);
 
-        free(cached);
+        cml_free(cached);
         /* Don't zero — callers that need zeroing (e.g. reduce ops) do it themselves.
          * Most ops (matmul, add, relu, conv) write every output element. */
         return data;
@@ -198,7 +198,7 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
 
     if (bucket->count >= BUFFER_CACHE_MAX_PER_BUCKET) {
         pthread_mutex_unlock(&g_exec_alloc_lock);
-        free(cached);
+        cml_free(cached);
         exec_pool_free(ptr, bucket->bucket_size);
         return;
     }

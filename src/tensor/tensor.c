@@ -618,9 +618,9 @@ static int tensor_refresh_shape_from_node(Tensor* t, struct IRNode* node) {
         return -1;
 
     if (t->shape)
-        free(t->shape);
+        cml_free(t->shape);
     if (t->strides)
-        free(t->strides);
+        cml_free(t->strides);
 
     t->shape = tensor_shape_copy(node->output_shape, node->output_ndim);
     if (!t->shape)
@@ -630,7 +630,7 @@ static int tensor_refresh_shape_from_node(Tensor* t, struct IRNode* node) {
     t->numel = tensor_numel(t->shape, t->ndim);
     t->strides = compute_contiguous_strides(t->shape, t->ndim);
     if (!t->strides && t->ndim > 0) {
-        free(t->shape);
+        cml_free(t->shape);
         t->shape = NULL;
         return -1;
     }
@@ -857,13 +857,13 @@ void tensor_free(Tensor* t) {
     autograd_free_tensor_hooks(t);
 
     if (t->quant_data) {
-        free(t->quant_data);
+        cml_free(t->quant_data);
         t->quant_data = NULL;
         t->quant_data_bytes = 0;
         t->quant_type = CML_QUANT_NONE;
     }
 
-    free(t);
+    cml_free(t);
 }
 
 Tensor* tensor_clone(Tensor* t) {
