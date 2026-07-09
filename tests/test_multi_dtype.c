@@ -148,6 +148,53 @@ static int test_int_unary(void) {
     return ok;
 }
 
+/* global reductions across dtypes. */
+static int test_reductions_global(void) {
+    double a[] = {1.0, 2.0, 3.0, 4.0, 5.0};   /* sum 15, mean 3 */
+    Tensor* ta = tensor_from_data(a, (int[]){5}, 1, &cfg_f64);
+    ReduceParams rp = {NULL, 0, false};
+    Tensor* s = uop_sum(ta, &rp);  tensor_ensure_executed(s);
+    Tensor* m = uop_mean(ta, &rp); tensor_ensure_executed(m);
+    int ok = s->dtype == DTYPE_FLOAT64 &&
+             fabs(((const double*)s->data)[0] - 15.0) < 1e-12 &&
+             fabs(((const double*)m->data)[0] - 3.0) < 1e-12;
+
+    int64_t b[] = {1000000000000LL, 2000000000000LL, 3};  /* exact in int64 */
+    Tensor* tb = tensor_from_data(b, (int[]){3}, 1, &cfg_i64);
+    Tensor* sb = uop_sum(tb, &rp); tensor_ensure_executed(sb);
+    ok = ok && ((const int64_t*)sb->data)[0] == 3000000000003LL;
+
+    int32_t c[] = {3, -7, 42, 10};
+    Tensor* tc = tensor_from_data(c, (int[]){4}, 1, &cfg_i32);
+    Tensor* mx = uop_max_reduce(tc, &rp); tensor_ensure_executed(mx);
+    Tensor* mn = uop_min_reduce(tc, &rp); tensor_ensure_executed(mn);
+    ok = ok && ((const int32_t*)mx->data)[0] == 42 && ((const int32_t*)mn->data)[0] == -7;
+
+    tensor_free(ta); tensor_free(tb); tensor_free(tc);
+    tensor_free(s); tensor_free(m); tensor_free(sb); tensor_free(mx); tensor_free(mn);
+    return ok;
+}
+
+/* per-dimension reductions on an f64 [2,3] matrix. */
+static int test_reductions_axis(void) {
+    double a[] = {1, 2, 3, 4, 5, 6};   /* [[1,2,3],[4,5,6]] */
+    Tensor* ta = tensor_from_data(a, (int[]){2, 3}, 2, &cfg_f64);
+
+    int d1 = 1; ReduceParams rp1 = {&d1, 1, false};   /* sum cols -> [6,15] */
+    Tensor* s1 = uop_sum(ta, &rp1); tensor_ensure_executed(s1);
+    const double* s1d = (const double*)s1->data;
+    int ok = s1->numel == 2 && fabs(s1d[0] - 6.0) < 1e-12 && fabs(s1d[1] - 15.0) < 1e-12;
+
+    int d0 = 0; ReduceParams rp0 = {&d0, 1, false};   /* sum rows -> [5,7,9] */
+    Tensor* s0 = uop_sum(ta, &rp0); tensor_ensure_executed(s0);
+    const double* s0d = (const double*)s0->data;
+    ok = ok && s0->numel == 3 &&
+         fabs(s0d[0] - 5.0) < 1e-12 && fabs(s0d[1] - 7.0) < 1e-12 && fabs(s0d[2] - 9.0) < 1e-12;
+
+    tensor_free(ta); tensor_free(s1); tensor_free(s0);
+    return ok;
+}
+
 int main(void) {
     printf("=== multi-dtype compute: f64 + integers ===\n");
     check("f64_arith",     test_f64_arith());
@@ -157,6 +204,8 @@ int main(void) {
     check("f64_broadcast", test_f64_broadcast());
     check("f64_unary",     test_f64_unary());
     check("int_unary",     test_int_unary());
+    check("reductions_global", test_reductions_global());
+    check("reductions_axis",   test_reductions_axis());
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
 }

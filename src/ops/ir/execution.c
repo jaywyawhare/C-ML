@@ -774,6 +774,82 @@ static int cpu_unary_generic(UOpType type, const void* in, size_t in_n,
     }
 }
 
+static int is_reduction_op(UOpType t) {
+    return t == UOP_SUM || t == UOP_MEAN || t == UOP_MAX_REDUCE || t == UOP_MIN_REDUCE;
+}
+
+/* Dtype-generic reduction (sum/mean/max/min). All layouts — global, 2D-per-dim,
+ * and N-d-per-dim — collapse to a single (outer, inner, count) formulation:
+ * output p reduces `count` elements starting at (p/inner)*count*inner + (p%inner)
+ * with stride `inner`. Mean/sum accumulate in double then cast to the output
+ * type (int mean truncates, matching the same-dtype output convention). */
+static int cpu_reduce_generic(struct IRNode* node, DType dt) {
+    Tensor* inp = node->inputs[0];
+    Tensor* out = node->output;
+    if (!inp || !inp->data || !out->data) return -1;
+
+    UOpType type = node->type;
+    int op; /* 0 sum, 1 mean, 2 max, 3 min */
+    if      (type == UOP_SUM)        op = 0;
+    else if (type == UOP_MEAN)       op = 1;
+    else if (type == UOP_MAX_REDUCE) op = 2;
+    else if (type == UOP_MIN_REDUCE) op = 3;
+    else return -1;
+
+    const void* in = inp->data;
+    void* outp     = out->data;
+
+    size_t outer = 1, inner = 1, count = inp->numel;
+    ReduceParams* rp = (ReduceParams*)node->params;
+    if (rp && rp->num_dims == 1 && inp->ndim >= 1) {
+        int rdim = rp->dims[0];
+        if (rdim < 0) rdim += inp->ndim;
+        if (rdim >= 0 && rdim < inp->ndim) {
+            count = (size_t)inp->shape[rdim];
+            inner = 1;
+            for (int d = rdim + 1; d < inp->ndim; d++) inner *= (size_t)inp->shape[d];
+            outer = 1;
+            for (int d = 0; d < rdim; d++) outer *= (size_t)inp->shape[d];
+        }
+    }
+    size_t nout = outer * inner;
+    if (count == 0) return -1;
+
+#define CML_REDUCE_T(CTYPE)                                                       \
+    do {                                                                          \
+        const CTYPE* A = (const CTYPE*)in;                                        \
+        CTYPE* O       = (CTYPE*)outp;                                            \
+        for (size_t p = 0; p < nout; p++) {                                       \
+            size_t start = (p / inner) * count * inner + (p % inner);             \
+            if (op == 2) {                                                        \
+                CTYPE m = A[start];                                               \
+                for (size_t r = 1; r < count; r++) { CTYPE v = A[start + r * inner]; if (v > m) m = v; } \
+                O[p] = m;                                                         \
+            } else if (op == 3) {                                                 \
+                CTYPE m = A[start];                                               \
+                for (size_t r = 1; r < count; r++) { CTYPE v = A[start + r * inner]; if (v < m) m = v; } \
+                O[p] = m;                                                         \
+            } else {                                                              \
+                double s = 0;                                                     \
+                for (size_t r = 0; r < count; r++) s += (double)A[start + r * inner]; \
+                if (op == 1) s /= (double)count;                                  \
+                O[p] = (CTYPE)s;                                                  \
+            }                                                                     \
+        }                                                                         \
+    } while (0)
+
+    switch (dt) {
+    case DTYPE_FLOAT64: CML_REDUCE_T(double);  return 0;
+    case DTYPE_INT64:   CML_REDUCE_T(int64_t); return 0;
+    case DTYPE_INT32:   CML_REDUCE_T(int32_t); return 0;
+    case DTYPE_INT16:   CML_REDUCE_T(int16_t); return 0;
+    case DTYPE_INT8:    CML_REDUCE_T(int8_t);  return 0;
+    case DTYPE_UINT8:   CML_REDUCE_T(uint8_t); return 0;
+    default:            return -1;
+    }
+#undef CML_REDUCE_T
+}
+
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
@@ -854,6 +930,16 @@ int cpu_execute_node(struct IRNode* node) {
             out->is_executed  = true;
             return 0;
         }
+    }
+    if (out->dtype != DTYPE_FLOAT32 && is_reduction_op(node->type) &&
+        node->num_inputs >= 1 && node->inputs[0]->data &&
+        node->inputs[0]->dtype == out->dtype) {
+        /* Handle here or fail cleanly — never fall through to the f32 path,
+         * which would reinterpret the bytes. */
+        int r = cpu_reduce_generic(node, out->dtype);
+        node->is_executed = true;
+        out->is_executed  = true;
+        return r;
     }
 
     switch (node->type) {
