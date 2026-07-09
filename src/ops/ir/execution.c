@@ -909,17 +909,40 @@ int cpu_execute_node(struct IRNode* node) {
 #define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
 
     /* Multi-dtype fast exit: non-float32 elementwise ops are computed in their
-     * native C type (float32 keeps the SIMD path in the switch below). */
+     * native C type (float32 keeps the SIMD path in the switch below). Mixed-
+     * dtype inputs are promoted to the (already promoted) output dtype here. */
     if (out->dtype != DTYPE_FLOAT32 && is_elementwise_binary(node->type) &&
-        node->num_inputs >= 2 && node->inputs[0]->data && node->inputs[1]->data &&
-        node->inputs[0]->dtype == out->dtype && node->inputs[1]->dtype == out->dtype) {
-        if (cpu_binary_generic(node->type, node->inputs[0]->data, in1_numel,
-                               node->inputs[1]->data, in2_numel, out->data,
-                               out->numel, out->dtype) == 0) {
+        node->num_inputs >= 2 && node->inputs[0]->data && node->inputs[1]->data) {
+        const void* a = node->inputs[0]->data;
+        const void* b = node->inputs[1]->data;
+        void* tmpa = NULL;
+        void* tmpb = NULL;
+        int ok = 1;
+        size_t esz = cml_dtype_size(out->dtype);
+        if (node->inputs[0]->dtype != out->dtype) {
+            tmpa = cml_malloc(in1_numel * esz);
+            if (!tmpa || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
+                                         tmpa, out->dtype, in1_numel) != 0) ok = 0;
+            a = tmpa;
+        }
+        if (ok && node->inputs[1]->dtype != out->dtype) {
+            tmpb = cml_malloc(in2_numel * esz);
+            if (!tmpb || cml_cast_buffer(node->inputs[1]->data, node->inputs[1]->dtype,
+                                         tmpb, out->dtype, in2_numel) != 0) ok = 0;
+            b = tmpb;
+        }
+        int rc = ok ? cpu_binary_generic(node->type, a, in1_numel, b, in2_numel,
+                                         out->data, out->numel, out->dtype) : -1;
+        cml_free(tmpa);
+        cml_free(tmpb);
+        if (rc == 0) {
             node->is_executed = true;
             out->is_executed  = true;
             return 0;
         }
+        /* out is non-f32: never fall through to the f32 path (it would reinterpret
+         * the bytes). Fail cleanly for dtypes we can't handle (e.g. f16/bf16). */
+        return -1;
     }
     if (out->dtype != DTYPE_FLOAT32 && is_elementwise_unary(node->type) &&
         node->num_inputs >= 1 && node->inputs[0]->data &&

@@ -1218,6 +1218,68 @@ Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, cons
     return t;
 }
 
+static bool cml_dtype_is_int(DType d) {
+    return d == DTYPE_INT8 || d == DTYPE_INT16 || d == DTYPE_INT32 || d == DTYPE_INT64 ||
+           d == DTYPE_UINT8 || d == DTYPE_UINT16 || d == DTYPE_UINT32 || d == DTYPE_UINT64 ||
+           d == DTYPE_BOOL;
+}
+static bool cml_dtype_direct(DType d) {
+    return d == DTYPE_FLOAT32 || d == DTYPE_FLOAT64 || cml_dtype_is_int(d);
+}
+static int64_t cml_load_i64(const void* p, size_t i, DType d) {
+    switch (d) {
+    case DTYPE_INT8:   return ((const int8_t*)p)[i];
+    case DTYPE_INT16:  return ((const int16_t*)p)[i];
+    case DTYPE_INT32:  return ((const int32_t*)p)[i];
+    case DTYPE_INT64:  return ((const int64_t*)p)[i];
+    case DTYPE_UINT8:
+    case DTYPE_BOOL:   return ((const uint8_t*)p)[i];
+    case DTYPE_UINT16: return ((const uint16_t*)p)[i];
+    case DTYPE_UINT32: return ((const uint32_t*)p)[i];
+    case DTYPE_UINT64: return (int64_t)((const uint64_t*)p)[i];
+    default:           return 0;
+    }
+}
+static double cml_load_f64(const void* p, size_t i, DType d) {
+    if (d == DTYPE_FLOAT32) return (double)((const float*)p)[i];
+    if (d == DTYPE_FLOAT64) return ((const double*)p)[i];
+    return (double)cml_load_i64(p, i, d);
+}
+static void cml_store_i64(void* p, size_t i, DType d, int64_t v) {
+    switch (d) {
+    case DTYPE_INT8:   ((int8_t*)p)[i]   = (int8_t)v; break;
+    case DTYPE_INT16:  ((int16_t*)p)[i]  = (int16_t)v; break;
+    case DTYPE_INT32:  ((int32_t*)p)[i]  = (int32_t)v; break;
+    case DTYPE_INT64:  ((int64_t*)p)[i]  = v; break;
+    case DTYPE_UINT8:  ((uint8_t*)p)[i]  = (uint8_t)v; break;
+    case DTYPE_BOOL:   ((uint8_t*)p)[i]  = v ? 1 : 0; break;
+    case DTYPE_UINT16: ((uint16_t*)p)[i] = (uint16_t)v; break;
+    case DTYPE_UINT32: ((uint32_t*)p)[i] = (uint32_t)v; break;
+    case DTYPE_UINT64: ((uint64_t*)p)[i] = (uint64_t)v; break;
+    default: break;
+    }
+}
+static void cml_store_f64(void* p, size_t i, DType d, double v) {
+    if (d == DTYPE_FLOAT32)      ((float*)p)[i]  = (float)v;
+    else if (d == DTYPE_FLOAT64) ((double*)p)[i] = v;
+    else                         cml_store_i64(p, i, d, (int64_t)v);
+}
+
+/* Precision-preserving element-wise dtype conversion of a raw buffer.
+ * int->int goes via int64 (lossless for all integer widths); anything touching
+ * a float goes via double. Returns 0 on success, -1 if a dtype isn't one of the
+ * directly-supported types (f16/bf16/fp8 fall back to the caller). */
+int cml_cast_buffer(const void* src, DType from, void* dst, DType to, size_t n) {
+    if (!src || !dst) return -1;
+    if (!cml_dtype_direct(from) || !cml_dtype_direct(to)) return -1;
+    bool int_to_int = cml_dtype_is_int(from) && cml_dtype_is_int(to);
+    for (size_t i = 0; i < n; i++) {
+        if (int_to_int) cml_store_i64(dst, i, to, cml_load_i64(src, i, from));
+        else            cml_store_f64(dst, i, to, cml_load_f64(src, i, from));
+    }
+    return 0;
+}
+
 Tensor* tensor_cast(Tensor* a, DType dtype) {
     if (!a) return NULL;
     if (a->dtype == dtype) return tensor_clone(a);
@@ -1227,9 +1289,11 @@ Tensor* tensor_cast(Tensor* a, DType dtype) {
     Tensor* out = tensor_create(dtype, a->device, a->ndim, a->shape, false);
     if (!out) return NULL;
 
-    for (size_t i = 0; i < a->numel; i++) {
-        float val = tensor_get_float(a, i);
-        tensor_set_float(out, i, val);
+    /* Precision-preserving direct conversion; fall back to the float path only
+     * for half/bf16/fp8 which tensor_get_float/set_float handle. */
+    if (cml_cast_buffer(a->data, a->dtype, out->data, dtype, a->numel) != 0) {
+        for (size_t i = 0; i < a->numel; i++)
+            tensor_set_float(out, i, tensor_get_float(a, i));
     }
     return out;
 }

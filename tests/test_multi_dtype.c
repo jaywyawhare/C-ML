@@ -20,6 +20,8 @@ static int check(const char* name, int ok) {
     return ok;
 }
 
+static const TensorConfig cfg_f32 = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                                     .has_dtype = true, .has_device = true};
 static const TensorConfig cfg_f64 = {.dtype = DTYPE_FLOAT64, .device = DEVICE_CPU,
                                      .has_dtype = true, .has_device = true};
 static const TensorConfig cfg_i32 = {.dtype = DTYPE_INT32, .device = DEVICE_CPU,
@@ -195,6 +197,46 @@ static int test_reductions_axis(void) {
     return ok;
 }
 
+/* mixed-dtype binary ops promote to the wider type (numpy-style). */
+static int test_promotion(void) {
+    float  af[] = {1.0f, 2.0f, 3.0f};
+    double bd[] = {0.5, 0.5, 0.5};
+    Tensor* ta = tensor_from_data(af, (int[]){3}, 1, &cfg_f32);
+    Tensor* tb = tensor_from_data(bd, (int[]){3}, 1, &cfg_f64);
+
+    Tensor* s = uop_add(ta, tb);   /* f32 + f64 -> f64 */
+    tensor_ensure_executed(s);
+    int ok = s->dtype == DTYPE_FLOAT64;
+    const double* sd = (const double*)s->data;
+    ok = ok && fabs(sd[0] - 1.5) < 1e-12 && fabs(sd[1] - 2.5) < 1e-12 && fabs(sd[2] - 3.5) < 1e-12;
+
+    /* int32 + int64 -> int64, computed exactly */
+    int32_t ai[] = {1000000};
+    int64_t bi[] = {1000000000000LL};
+    Tensor* tia = tensor_from_data(ai, (int[]){1}, 1, &cfg_i32);
+    Tensor* tib = tensor_from_data(bi, (int[]){1}, 1, &cfg_i64);
+    Tensor* si = uop_add(tia, tib);
+    tensor_ensure_executed(si);
+    ok = ok && si->dtype == DTYPE_INT64 && ((const int64_t*)si->data)[0] == 1000001000000LL;
+
+    tensor_free(ta); tensor_free(tb); tensor_free(s);
+    tensor_free(tia); tensor_free(tib); tensor_free(si);
+    return ok;
+}
+
+/* precision-preserving cast (not routed through f32). */
+static int test_cast_precision(void) {
+    int64_t a[] = {9007199254740993LL, 5};   /* 2^53 + 1, unrepresentable in f32/f64 exactly */
+    Tensor* ta = tensor_from_data(a, (int[]){2}, 1, &cfg_i64);
+    Tensor* tb = tensor_cast(ta, DTYPE_INT32);   /* int64 -> int32 truncates value, but low bits exact */
+    Tensor* tc = tensor_cast(ta, DTYPE_INT64);   /* int64 -> int64 exact */
+    int ok = tb->dtype == DTYPE_INT32 && tc->dtype == DTYPE_INT64 &&
+             ((const int64_t*)tc->data)[0] == 9007199254740993LL &&
+             ((const int32_t*)tb->data)[1] == 5;
+    tensor_free(ta); tensor_free(tb); tensor_free(tc);
+    return ok;
+}
+
 int main(void) {
     printf("=== multi-dtype compute: f64 + integers ===\n");
     check("f64_arith",     test_f64_arith());
@@ -206,6 +248,8 @@ int main(void) {
     check("int_unary",     test_int_unary());
     check("reductions_global", test_reductions_global());
     check("reductions_axis",   test_reductions_axis());
+    check("promotion",         test_promotion());
+    check("cast_precision",    test_cast_precision());
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
 }

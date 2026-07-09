@@ -30,7 +30,14 @@ static Tensor* uop_binary(Tensor* a, Tensor* b, UOpType type) {
         node->needs_input_grad[0] = a->requires_grad;
         node->needs_input_grad[1] = b->requires_grad;
     }
-    return tensor_from_ir_node(node, ir);
+    Tensor* t = tensor_from_ir_node(node, ir);
+    if (t) {
+        /* numpy-style dtype promotion for mixed-dtype operands. */
+        DType pd = cml_promote_dtype(a->dtype, b->dtype);
+        t->dtype = pd;
+        node->output_dtype = pd;
+    }
+    return t;
 }
 
 Tensor* uop_add(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_ADD); }
@@ -74,7 +81,13 @@ Tensor* uop_max(Tensor* a, Tensor* b) {
         node->needs_input_grad[1] = b->requires_grad;
     }
 
-    return tensor_from_ir_node(node, ir);
+    Tensor* t = tensor_from_ir_node(node, ir);
+    if (t) {
+        DType pd = cml_promote_dtype(a->dtype, b->dtype);
+        t->dtype = pd;
+        node->output_dtype = pd;
+    }
+    return t;
 }
 
 Tensor* uop_cmplt(Tensor* a, Tensor* b) {

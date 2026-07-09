@@ -95,6 +95,11 @@ size_t cml_dtype_size(DType dtype);
 size_t tensor_numel(int* shape, int ndim);
 DType cml_promote_dtype(DType dtype1, DType dtype2);
 
+/* Precision-preserving element-wise dtype conversion of a raw buffer of n
+ * elements (int->int lossless via int64, else via double). Returns 0 on
+ * success, -1 if a dtype isn't directly supported (f16/bf16/fp8). */
+int cml_cast_buffer(const void* src, DType from, void* dst, DType to, size_t n);
+
 /* Returns allocated strides array (caller must free) */
 size_t* compute_contiguous_strides(int* shape, int ndim);
 
