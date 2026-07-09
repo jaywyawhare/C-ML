@@ -126,7 +126,9 @@ Tensor* uop_cmplt(Tensor* a, Tensor* b) {
         node->needs_input_grad[1] = false;
     }
 
-    return tensor_from_ir_node(node, ir);
+    Tensor* t = tensor_from_ir_node(node, ir);
+    if (t) { t->dtype = DTYPE_BOOL; node->output_dtype = DTYPE_BOOL; }  /* comparisons return bool */
+    return t;
 }
 
 static Tensor* uop_unary(Tensor* a, UOpType type) {
@@ -2408,11 +2410,28 @@ DEFINE_CMP_BINARY_UOP(uop_rshift, UOP_RSHIFT)
 DEFINE_CMP_BINARY_UOP(uop_logical_and, UOP_LOGICAL_AND)
 DEFINE_CMP_BINARY_UOP(uop_logical_or, UOP_LOGICAL_OR)
 
-DEFINE_CMP_BINARY_UOP(uop_cmpeq, UOP_CMPEQ)
-DEFINE_CMP_BINARY_UOP(uop_cmpne, UOP_CMPNE)
-DEFINE_CMP_BINARY_UOP(uop_cmple, UOP_CMPLE)
-DEFINE_CMP_BINARY_UOP(uop_cmpgt, UOP_CMPGT)
-DEFINE_CMP_BINARY_UOP(uop_cmpge, UOP_CMPGE)
+/* Comparisons return DTYPE_BOOL (numpy-style). Shares the no-grad binary body
+ * with DEFINE_CMP_BINARY_UOP but stamps the output dtype to bool. */
+#define DEFINE_BOOL_CMP_UOP(name, uop_type)                                                        \
+    Tensor* name(Tensor* a, Tensor* b) {                                                           \
+        if (!a || !b) return NULL;                                                                 \
+        CMLGraph_t ir = cml_ir_get_or_create_context();                                            \
+        if (!ir) return NULL;                                                                      \
+        Tensor* inputs[] = {a, b};                                                                 \
+        if (cml_ir_add_uop(ir, uop_type, inputs, 2, NULL) != 0) return NULL;                      \
+        struct IRNode* node = cml_ir_get_tail(ir);                                                 \
+        if (cml_ir_compute_broadcast_shape(node) != 0) return NULL;                                \
+        node->requires_grad = false;                                                               \
+        Tensor* t = tensor_from_ir_node(node, ir);                                                 \
+        if (t) { t->dtype = DTYPE_BOOL; node->output_dtype = DTYPE_BOOL; }                          \
+        return t;                                                                                  \
+    }
+
+DEFINE_BOOL_CMP_UOP(uop_cmpeq, UOP_CMPEQ)
+DEFINE_BOOL_CMP_UOP(uop_cmpne, UOP_CMPNE)
+DEFINE_BOOL_CMP_UOP(uop_cmple, UOP_CMPLE)
+DEFINE_BOOL_CMP_UOP(uop_cmpgt, UOP_CMPGT)
+DEFINE_BOOL_CMP_UOP(uop_cmpge, UOP_CMPGE)
 
 #undef DEFINE_BINARY_UOP
 #undef DEFINE_CMP_BINARY_UOP

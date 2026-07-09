@@ -668,6 +668,11 @@ static int is_half_dtype(DType d) {
     return d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16;
 }
 
+static int is_comparison_op(UOpType t) {
+    return t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE ||
+           t == UOP_CMPGE || t == UOP_CMPEQ || t == UOP_CMPNE;
+}
+
 static int is_elementwise_binary(UOpType t) {
     return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV ||
            t == UOP_MAX ||
@@ -1057,12 +1062,21 @@ int cpu_execute_node(struct IRNode* node) {
                        node->inputs[0]->dtype != DTYPE_FLOAT32 ||
                        node->inputs[1]->dtype != DTYPE_FLOAT32);
     if (_mdt_binary && node->inputs[0]->data && node->inputs[1]->data) {
-        DType odt   = out->dtype;
-        DType cdt   = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;  /* compute dtype */
+        DType odt = out->dtype;
+        /* Compute dtype: comparisons compare in the promoted INPUT type (output
+         * is bool, not the compare type); half computes in f32; otherwise compute
+         * directly in the output type. A final cast handles compute != output. */
+        DType cdt;
+        if (is_comparison_op(node->type)) {
+            cdt = cml_promote_dtype(node->inputs[0]->dtype, node->inputs[1]->dtype);
+            if (is_half_dtype(cdt)) cdt = DTYPE_FLOAT32;
+        } else {
+            cdt = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;
+        }
         size_t cesz = cml_dtype_size(cdt);
         const void* a = node->inputs[0]->data;
         const void* b = node->inputs[1]->data;
-        void* tmpa = NULL, *tmpb = NULL, *obuf = out->data;
+        void* tmpa = NULL, *tmpb = NULL;
         int ok = 1;
         if (node->inputs[0]->dtype != cdt) {
             tmpa = cml_malloc(in1_numel * cesz);
@@ -1076,14 +1090,16 @@ int cpu_execute_node(struct IRNode* node) {
                                          tmpb, cdt, in2_numel) != 0) ok = 0;
             b = tmpb;
         }
-        if (ok && is_half_dtype(odt)) { obuf = cml_malloc(out->numel * cesz); if (!obuf) ok = 0; }
+        int need_conv = (cdt != odt);
+        void* obuf = out->data;
+        if (ok && need_conv) { obuf = cml_malloc(out->numel * cesz); if (!obuf) ok = 0; }
         int rc = ok ? cpu_binary_generic(node->type, a, in1_numel, b, in2_numel,
                                          obuf, out->numel, cdt) : -1;
-        if (rc == 0 && is_half_dtype(odt))
-            rc = cml_cast_buffer(obuf, DTYPE_FLOAT32, out->data, odt, out->numel);
+        if (rc == 0 && need_conv)
+            rc = cml_cast_buffer(obuf, cdt, out->data, odt, out->numel);
         cml_free(tmpa);
         cml_free(tmpb);
-        if (is_half_dtype(odt) && obuf != out->data) cml_free(obuf);
+        if (need_conv && obuf != out->data) cml_free(obuf);
         if (rc == 0) { node->is_executed = true; out->is_executed = true; return 0; }
         /* A non-f32 tensor is involved: never fall through to the f32 SIMD path. */
         return -1;
@@ -1621,7 +1637,21 @@ int cpu_execute_node(struct IRNode* node) {
         size_t a_numel    = node->inputs[1]->numel;
         size_t b_numel    = node->inputs[2]->numel;
 
-        if (cond_numel == a_numel && a_numel == b_numel && a_numel == out->numel) {
+        /* cond may be bool/int/f64 (e.g. a native-bool comparison result); read
+         * it in float32 by converting first so the != 0 test is correct. */
+        float* cond_f32 = NULL;
+        if (node->inputs[0]->dtype != DTYPE_FLOAT32) {
+            cond_f32 = (float*)cml_malloc(cond_numel * sizeof(float));
+            if (!cond_f32 ||
+                cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
+                                cond_f32, DTYPE_FLOAT32, cond_numel) != 0) {
+                cml_free(cond_f32);
+                return -1;
+            }
+            cond_data = cond_f32;
+        }
+
+        if (!cond_f32 && cond_numel == a_numel && a_numel == b_numel && a_numel == out->numel) {
             simd_where_f32(cond_data, a_data, b_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
@@ -1631,6 +1661,7 @@ int cpu_execute_node(struct IRNode* node) {
                 out_data[i] = (cond_data[ci] != 0.0f) ? a_data[ai] : b_data[bi];
             }
         }
+        cml_free(cond_f32);
         break;
     }
 

@@ -237,7 +237,7 @@ static int test_cast_precision(void) {
     return ok;
 }
 
-/* comparisons across dtypes produce 0/1 in the promoted dtype; cast -> bool. */
+/* comparisons return DTYPE_BOOL (numpy-style), across input dtypes. */
 static int test_comparisons(void) {
     int32_t a[] = {1, 5, 3, 2};
     int32_t b[] = {2, 2, 2, 2};
@@ -246,28 +246,33 @@ static int test_comparisons(void) {
 
     Tensor* lt = uop_cmplt(ta, tb); tensor_ensure_executed(lt);  /* [1,0,0,0] */
     Tensor* gt = uop_cmpgt(ta, tb); tensor_ensure_executed(gt);  /* [0,1,1,0] */
-    const int32_t* ld = (const int32_t*)lt->data;
-    const int32_t* gd = (const int32_t*)gt->data;
-    int ok = lt->dtype == DTYPE_INT32 &&
+    const uint8_t* ld = (const uint8_t*)lt->data;   /* bool storage is uint8 */
+    const uint8_t* gd = (const uint8_t*)gt->data;
+    int ok = lt->dtype == DTYPE_BOOL && gt->dtype == DTYPE_BOOL &&
              ld[0] == 1 && ld[1] == 0 && ld[2] == 0 && ld[3] == 0 &&
              gd[0] == 0 && gd[1] == 1 && gd[2] == 1 && gd[3] == 0;
 
-    /* cast the comparison mask to a real bool tensor */
-    Tensor* mask = tensor_cast(lt, DTYPE_BOOL);
-    const uint8_t* md = (const uint8_t*)mask->data;
-    ok = ok && mask->dtype == DTYPE_BOOL && md[0] == 1 && md[1] == 0;
-
-    /* f64 equality */
+    /* f64 equality also yields bool */
     double c[] = {1.0, 2.0, 3.0};
     double d[] = {1.0, 9.0, 3.0};
     Tensor* tc = tensor_from_data(c, (int[]){3}, 1, &cfg_f64);
     Tensor* td = tensor_from_data(d, (int[]){3}, 1, &cfg_f64);
     Tensor* eq = uop_cmpeq(tc, td); tensor_ensure_executed(eq);
-    const double* ed = (const double*)eq->data;
-    ok = ok && ed[0] == 1.0 && ed[1] == 0.0 && ed[2] == 1.0;
+    const uint8_t* ed = (const uint8_t*)eq->data;
+    ok = ok && eq->dtype == DTYPE_BOOL && ed[0] == 1 && ed[1] == 0 && ed[2] == 1;
+
+    /* a bool mask multiplied by a float promotes to float 0.0/1.0 */
+    float fv[] = {10.0f, 20.0f, 30.0f, 40.0f};
+    Tensor* tf = tensor_from_data(fv, (int[]){4}, 1, &cfg_f32);
+    Tensor* masked = uop_mul(tf, lt);   /* f32 * bool -> f32 */
+    tensor_ensure_executed(masked);
+    const float* mk = (const float*)masked->data;
+    ok = ok && masked->dtype == DTYPE_FLOAT32 &&
+         mk[0] == 10.0f && mk[1] == 0.0f && mk[2] == 0.0f && mk[3] == 0.0f;
 
     tensor_free(ta); tensor_free(tb); tensor_free(lt); tensor_free(gt);
-    tensor_free(mask); tensor_free(tc); tensor_free(td); tensor_free(eq);
+    tensor_free(tc); tensor_free(td); tensor_free(eq);
+    tensor_free(tf); tensor_free(masked);
     return ok;
 }
 

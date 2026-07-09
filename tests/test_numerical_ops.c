@@ -382,19 +382,16 @@ static int test_comparison_ops(void) {
     tensor_ensure_executed(le); tensor_ensure_executed(gt);
     tensor_ensure_executed(ge);
 
-    float* deq = eq->data; float* dne = ne->data;
-    float* dle = le->data; float* dgt = gt->data;
-    float* dge = ge->data;
-
-    
+    /* comparisons now return DTYPE_BOOL; read values via tensor_get_float. */
+    if (eq->dtype != DTYPE_BOOL || gt->dtype != DTYPE_BOOL) return 0;
     float eeq[] = {1,0,0,0}, ene[] = {0,1,1,1};
     float ele[] = {1,0,1,0}, egt[] = {0,1,0,1}, ege[] = {1,1,0,1};
     for (int i = 0; i < n; i++) {
-        if (!APPROX(deq[i], eeq[i])) return 0;
-        if (!APPROX(dne[i], ene[i])) return 0;
-        if (!APPROX(dle[i], ele[i])) return 0;
-        if (!APPROX(dgt[i], egt[i])) return 0;
-        if (!APPROX(dge[i], ege[i])) return 0;
+        if (!APPROX(tensor_get_float(eq, i), eeq[i])) return 0;
+        if (!APPROX(tensor_get_float(ne, i), ene[i])) return 0;
+        if (!APPROX(tensor_get_float(le, i), ele[i])) return 0;
+        if (!APPROX(tensor_get_float(gt, i), egt[i])) return 0;
+        if (!APPROX(tensor_get_float(ge, i), ege[i])) return 0;
     }
     tensor_free(ta); tensor_free(tb);
     tensor_free(eq); tensor_free(ne); tensor_free(le);
