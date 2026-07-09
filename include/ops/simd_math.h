@@ -1,8 +1,12 @@
 /*
- * SIMD-optimized math operations for all transcendental and element-wise functions.
- * Supports SSE, AVX, AVX-512, and ARM NEON with runtime detection.
- * Uses SLEEF library if available for high-accuracy transcendentals,
- * with custom polynomial fallbacks otherwise.
+ * Portable element-wise / transcendental math kernels.
+ *
+ * The hand-rolled SSE/AVX/AVX-512/NEON intrinsics and the optional SLEEF
+ * dependency were removed.  Shape-specialized SIMD is now emitted by the LLVM
+ * JIT backend (src/ops/ir/llvm/llvm_backend.c); the implementations behind this
+ * API are portable scalar loops that the C compiler auto-vectorizes.  The API
+ * (including CMLSimdCaps) is kept for source compatibility — the caps struct
+ * now reports no hand-rolled SIMD.
  */
 
 #ifndef CML_SIMD_MATH_H

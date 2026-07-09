@@ -7,8 +7,58 @@ compile-time constants, so LLVM produces optimal SIMD (fixed width, full
 unroll, no remainder branch, no runtime broadcast logic) instead of relying
 on the hand-rolled intrinsics as the CPU fast path.
 
-Status: **plan only** — no code changes yet. Correctness gate is a numerical
-parity harness + benchmark (see §5), run before anything is deleted.
+Status: **implemented** on branch `shape-specific-simd`. See "Implementation
+status" below for what shipped and where it diverged from the original plan.
+
+---
+
+## Implementation status
+
+**Done:**
+- **Shape-specialized JIT emission** (`src/ops/ir/llvm/llvm_backend.c`): kernels
+  are now keyed by `(op type + concrete shape)` via an open-addressed,
+  linear-probed cache (`shape_key` / `cache_lookup`), replacing the
+  direct-mapped-by-op-type cache.  Every builder bakes its sizes in as
+  `LLVMConstInt` and resolves broadcasting at codegen time (`bcast_index`): the
+  runtime `urem`/`select` broadcast logic is gone, and constant trip counts let
+  LLVM fully vectorize/unroll with no runtime remainder branch.  Covers binary,
+  unary, reduction, where, fill, gather, permute-2d, reshape, expand, matmul.
+- **Numerical parity gate** (`tests/test_simd_parity.c`, wired into CTest):
+  3-way check (scalar ref / executed path / hand-rolled simd) over a
+  width-boundary size matrix and all broadcast modes, with an explicit tight
+  jit-vs-simd parity assertion.  Passes 20/20.
+- **Hand-rolled SIMD removed**: all SSE/AVX/AVX-512/NEON intrinsics, the SLEEF
+  `dlopen`, and CPUID dispatch were stripped from `src/ops/simd_math.c`,
+  `simd_utils.c`, `simd_views.c`, and the inline intrinsics in
+  `src/backend/backend.c`.  What remains is portable scalar C (compiler
+  auto-vectorized at -O3).
+
+**Divergence from the original plan (§2–§3):** rather than *deleting* the three
+`simd_*` translation units and rerouting ~37 call sites, the implementations
+were **replaced with portable scalar C while preserving the public API**
+(including `CMLSimdCaps`).  Rationale: the caps API and `simd_*` symbols are
+referenced in ~40+ sites (interpreter, graph cache, backward, sequential, torch
+eager, backends, benchmarks); preserving the API removed the hand-rolled SIMD
+with zero call-site churn and far lower regression risk.  The net effect is the
+same — no hand-rolled SIMD remains; the interpreter fallback is compiler-
+vectorized scalar and the JIT emits the shape-specialized SIMD.
+
+**Note on the execution path:** the default eager path is
+`cpu_execute_ir → cpu_execute_node` (the interpreter), *not* the LLVM per-node
+backend, which is a separate opt-in emitter (AOT / dispatch / `CML_BACKEND`).
+So in the default configuration the shape-specialized SIMD is available through
+the JIT backend, while the interpreter relies on compiler auto-vectorization of
+the now-scalar `simd_*`.  Wiring the interpreter to the shape-specialized JIT by
+default is a possible follow-up (see §6.5).
+
+**Not done (optional, §2.3 / §6):** explicit `<W x float>` vector-IR emission
+(the constant-bound auto-vectorized kernels suffice); a dedicated perf
+benchmark asserting no regression (functional parity + the existing
+`benchmarks/` and `test_convergence`/`test_zoo_models` cover correctness).
+
+---
+
+Original plan follows.
 
 ---
 

@@ -1,7 +1,8 @@
 /*
- * SIMD-optimized view operations: transpose, gather, scatter, slice copy.
- * Compile-time detection, runtime dispatch, scalar fallback.
- * Supports SSE, AVX, AVX-512, ARM NEON.
+ * View operations: transpose, gather, scatter, slice copy.
+ * Hand-rolled SSE/AVX/NEON intrinsics were removed; these are portable scalar
+ * loops (compiler auto-vectorized), with shape-specialized SIMD emitted by the
+ * LLVM JIT backend for the compiled path.
  */
 
 #ifndef CML_SIMD_VIEWS_H
