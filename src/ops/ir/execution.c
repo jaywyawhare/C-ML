@@ -666,7 +666,9 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
  * ---------------------------------------------------------------------- */
 static int is_elementwise_binary(UOpType t) {
     return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV ||
-           t == UOP_MAX;
+           t == UOP_MAX ||
+           t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE ||
+           t == UOP_CMPGE || t == UOP_CMPEQ || t == UOP_CMPNE;
 }
 
 #define CML_BCAST_BINARY(CTYPE, EXPR)                                          \
@@ -682,6 +684,14 @@ static int is_elementwise_binary(UOpType t) {
         }                                                                      \
     } while (0)
 
+#define CML_CMP_CASES(CTYPE)                                                   \
+    case UOP_CMPLT: CML_BCAST_BINARY(CTYPE, (CTYPE)(x <  y)); return 0;        \
+    case UOP_CMPGT: CML_BCAST_BINARY(CTYPE, (CTYPE)(x >  y)); return 0;        \
+    case UOP_CMPLE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x <= y)); return 0;        \
+    case UOP_CMPGE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x >= y)); return 0;        \
+    case UOP_CMPEQ: CML_BCAST_BINARY(CTYPE, (CTYPE)(x == y)); return 0;        \
+    case UOP_CMPNE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x != y)); return 0;
+
 #define CML_BINARY_FLOAT(CTYPE, EPS)                                           \
     switch (type) {                                                            \
     case UOP_ADD: CML_BCAST_BINARY(CTYPE, x + y); return 0;                    \
@@ -689,6 +699,7 @@ static int is_elementwise_binary(UOpType t) {
     case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
     case UOP_DIV: CML_BCAST_BINARY(CTYPE, x / (y + (CTYPE)(EPS))); return 0;   \
     case UOP_MAX: CML_BCAST_BINARY(CTYPE, x > y ? x : y); return 0;            \
+    CML_CMP_CASES(CTYPE)                                                       \
     default: return -1;                                                        \
     }
 
@@ -699,6 +710,7 @@ static int is_elementwise_binary(UOpType t) {
     case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
     case UOP_DIV: CML_BCAST_BINARY(CTYPE, y != 0 ? x / y : 0); return 0;       \
     case UOP_MAX: CML_BCAST_BINARY(CTYPE, x > y ? x : y); return 0;            \
+    CML_CMP_CASES(CTYPE)                                                       \
     default: return -1;                                                        \
     }
 
@@ -706,6 +718,7 @@ static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n,
                               const void* in2, size_t in2_n, void* out, size_t n,
                               DType dt) {
     switch (dt) {
+    case DTYPE_FLOAT32: CML_BINARY_FLOAT(float, 1e-8f);
     case DTYPE_FLOAT64: CML_BINARY_FLOAT(double, 1e-12);
     case DTYPE_INT64:   CML_BINARY_INT(int64_t);
     case DTYPE_INT32:   CML_BINARY_INT(int32_t);
@@ -908,11 +921,15 @@ int cpu_execute_node(struct IRNode* node) {
 
 #define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
 
-    /* Multi-dtype fast exit: non-float32 elementwise ops are computed in their
-     * native C type (float32 keeps the SIMD path in the switch below). Mixed-
-     * dtype inputs are promoted to the (already promoted) output dtype here. */
-    if (out->dtype != DTYPE_FLOAT32 && is_elementwise_binary(node->type) &&
-        node->num_inputs >= 2 && node->inputs[0]->data && node->inputs[1]->data) {
+    /* Multi-dtype fast exit: any elementwise binary op that touches a non-f32
+     * tensor (output or either input) is computed in the output dtype's native
+     * C type, casting inputs as needed. Pure-f32 ops keep the SIMD path below. */
+    int _mdt_binary = is_elementwise_binary(node->type) && node->num_inputs >= 2 &&
+                      node->inputs[0] && node->inputs[1] &&
+                      (out->dtype != DTYPE_FLOAT32 ||
+                       node->inputs[0]->dtype != DTYPE_FLOAT32 ||
+                       node->inputs[1]->dtype != DTYPE_FLOAT32);
+    if (_mdt_binary && node->inputs[0]->data && node->inputs[1]->data) {
         const void* a = node->inputs[0]->data;
         const void* b = node->inputs[1]->data;
         void* tmpa = NULL;
@@ -940,8 +957,9 @@ int cpu_execute_node(struct IRNode* node) {
             out->is_executed  = true;
             return 0;
         }
-        /* out is non-f32: never fall through to the f32 path (it would reinterpret
-         * the bytes). Fail cleanly for dtypes we can't handle (e.g. f16/bf16). */
+        /* A non-f32 tensor is involved: never fall through to the f32 SIMD path
+         * (it would reinterpret the bytes). Fail cleanly for dtypes we can't
+         * handle here (e.g. f16/bf16). */
         return -1;
     }
     if (out->dtype != DTYPE_FLOAT32 && is_elementwise_unary(node->type) &&

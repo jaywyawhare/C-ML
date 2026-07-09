@@ -237,6 +237,40 @@ static int test_cast_precision(void) {
     return ok;
 }
 
+/* comparisons across dtypes produce 0/1 in the promoted dtype; cast -> bool. */
+static int test_comparisons(void) {
+    int32_t a[] = {1, 5, 3, 2};
+    int32_t b[] = {2, 2, 2, 2};
+    Tensor* ta = tensor_from_data(a, (int[]){4}, 1, &cfg_i32);
+    Tensor* tb = tensor_from_data(b, (int[]){4}, 1, &cfg_i32);
+
+    Tensor* lt = uop_cmplt(ta, tb); tensor_ensure_executed(lt);  /* [1,0,0,0] */
+    Tensor* gt = uop_cmpgt(ta, tb); tensor_ensure_executed(gt);  /* [0,1,1,0] */
+    const int32_t* ld = (const int32_t*)lt->data;
+    const int32_t* gd = (const int32_t*)gt->data;
+    int ok = lt->dtype == DTYPE_INT32 &&
+             ld[0] == 1 && ld[1] == 0 && ld[2] == 0 && ld[3] == 0 &&
+             gd[0] == 0 && gd[1] == 1 && gd[2] == 1 && gd[3] == 0;
+
+    /* cast the comparison mask to a real bool tensor */
+    Tensor* mask = tensor_cast(lt, DTYPE_BOOL);
+    const uint8_t* md = (const uint8_t*)mask->data;
+    ok = ok && mask->dtype == DTYPE_BOOL && md[0] == 1 && md[1] == 0;
+
+    /* f64 equality */
+    double c[] = {1.0, 2.0, 3.0};
+    double d[] = {1.0, 9.0, 3.0};
+    Tensor* tc = tensor_from_data(c, (int[]){3}, 1, &cfg_f64);
+    Tensor* td = tensor_from_data(d, (int[]){3}, 1, &cfg_f64);
+    Tensor* eq = uop_cmpeq(tc, td); tensor_ensure_executed(eq);
+    const double* ed = (const double*)eq->data;
+    ok = ok && ed[0] == 1.0 && ed[1] == 0.0 && ed[2] == 1.0;
+
+    tensor_free(ta); tensor_free(tb); tensor_free(lt); tensor_free(gt);
+    tensor_free(mask); tensor_free(tc); tensor_free(td); tensor_free(eq);
+    return ok;
+}
+
 int main(void) {
     printf("=== multi-dtype compute: f64 + integers ===\n");
     check("f64_arith",     test_f64_arith());
@@ -250,6 +284,7 @@ int main(void) {
     check("reductions_axis",   test_reductions_axis());
     check("promotion",         test_promotion());
     check("cast_precision",    test_cast_precision());
+    check("comparisons",       test_comparisons());
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
 }
