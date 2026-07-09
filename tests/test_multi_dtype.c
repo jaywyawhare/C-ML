@@ -271,6 +271,69 @@ static int test_comparisons(void) {
     return ok;
 }
 
+/* f64 and int matmul in native precision. */
+static int test_matmul(void) {
+    /* f64 [2,3] @ [3,2] */
+    double a[] = {1, 2, 3, 4, 5, 6};          /* [[1,2,3],[4,5,6]] */
+    double b[] = {7, 8, 9, 10, 11, 12};       /* [[7,8],[9,10],[11,12]] */
+    Tensor* ta = tensor_from_data(a, (int[]){2, 3}, 2, &cfg_f64);
+    Tensor* tb = tensor_from_data(b, (int[]){3, 2}, 2, &cfg_f64);
+    Tensor* c  = uop_matmul(ta, tb);
+    tensor_ensure_executed(c);
+    /* [[1*7+2*9+3*11, 1*8+2*10+3*12],[...]] = [[58,64],[139,154]] */
+    const double* cd = (const double*)c->data;
+    int ok = c->dtype == DTYPE_FLOAT64 && c->numel == 4 &&
+             fabs(cd[0] - 58) < 1e-9 && fabs(cd[1] - 64) < 1e-9 &&
+             fabs(cd[2] - 139) < 1e-9 && fabs(cd[3] - 154) < 1e-9;
+
+    /* int32 matmul, exact integer accumulation */
+    int32_t ai[] = {1, 2, 3, 4};              /* [[1,2],[3,4]] */
+    int32_t bi[] = {5, 6, 7, 8};              /* [[5,6],[7,8]] */
+    Tensor* tia = tensor_from_data(ai, (int[]){2, 2}, 2, &cfg_i32);
+    Tensor* tib = tensor_from_data(bi, (int[]){2, 2}, 2, &cfg_i32);
+    Tensor* ci  = uop_matmul(tia, tib);
+    tensor_ensure_executed(ci);
+    /* [[1*5+2*7, 1*6+2*8],[3*5+4*7, 3*6+4*8]] = [[19,22],[43,50]] */
+    const int32_t* cid = (const int32_t*)ci->data;
+    ok = ok && ci->dtype == DTYPE_INT32 &&
+         cid[0] == 19 && cid[1] == 22 && cid[2] == 43 && cid[3] == 50;
+
+    /* f64 precision: (1e8)·(1) + (1)·(1) accumulated exactly in f64 */
+    double pa[] = {1e8, 1.0};                 /* [1,2] */
+    double pb[] = {1.0, 1.0};                 /* [2,1] */
+    Tensor* tpa = tensor_from_data(pa, (int[]){1, 2}, 2, &cfg_f64);
+    Tensor* tpb = tensor_from_data(pb, (int[]){2, 1}, 2, &cfg_f64);
+    Tensor* pc  = uop_matmul(tpa, tpb);
+    tensor_ensure_executed(pc);
+    ok = ok && ((const double*)pc->data)[0] == 100000001.0;
+
+    tensor_free(ta); tensor_free(tb); tensor_free(c);
+    tensor_free(tia); tensor_free(tib); tensor_free(ci);
+    tensor_free(tpa); tensor_free(tpb); tensor_free(pc);
+    return ok;
+}
+
+/* f64 direct conv2d: 3x3 input, 2x2 identity-ish kernel, stride 1, no pad. */
+static int test_conv2d(void) {
+    double in[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};   /* [1,1,3,3] */
+    double w[]  = {1, 0, 0, 1};                   /* [1,1,2,2] */
+    Tensor* ti = tensor_from_data(in, (int[]){1, 1, 3, 3}, 4, &cfg_f64);
+    Tensor* tw = tensor_from_data(w,  (int[]){1, 1, 2, 2}, 4, &cfg_f64);
+
+    int ks[] = {2, 2}, st[] = {1, 1}, pd[] = {0, 0}, dl[] = {1, 1};
+    Conv2DParams p = {.kernel_size = ks, .stride = st, .padding = pd, .dilation = dl,
+                      .groups = 1, .bias = false, .use_winograd = false};
+    Tensor* c = uop_conv2d(ti, tw, NULL, &p);
+    tensor_ensure_executed(c);
+    /* out = [[1+5, 2+6],[4+8, 5+9]] = [[6,8],[12,14]] */
+    const double* cd = (const double*)c->data;
+    int ok = c && c->dtype == DTYPE_FLOAT64 && c->numel == 4 &&
+             fabs(cd[0] - 6) < 1e-9 && fabs(cd[1] - 8) < 1e-9 &&
+             fabs(cd[2] - 12) < 1e-9 && fabs(cd[3] - 14) < 1e-9;
+    tensor_free(ti); tensor_free(tw); tensor_free(c);
+    return ok;
+}
+
 int main(void) {
     printf("=== multi-dtype compute: f64 + integers ===\n");
     check("f64_arith",     test_f64_arith());
@@ -285,6 +348,8 @@ int main(void) {
     check("promotion",         test_promotion());
     check("cast_precision",    test_cast_precision());
     check("comparisons",       test_comparisons());
+    check("matmul",            test_matmul());
+    check("conv2d",            test_conv2d());
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
 }

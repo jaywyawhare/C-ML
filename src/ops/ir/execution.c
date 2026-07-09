@@ -863,6 +863,112 @@ static int cpu_reduce_generic(struct IRNode* node, DType dt) {
 #undef CML_REDUCE_T
 }
 
+/* Dtype-generic matmul C[b] = A[b] @ B[b] over `batch` matrices of [M,K]x[K,N].
+ * a_stride/b_stride are per-batch element offsets (0 = operand shared across the
+ * batch, enabling A- or B-broadcast). Float accumulates in double, integers in
+ * int64, then cast to the output type. Returns 0 on success, -1 on bad dtype. */
+static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch,
+                              size_t a_stride, size_t b_stride,
+                              int M, int K, int N, DType dt) {
+#define CML_MATMUL_T(CTYPE, ACC)                                               \
+    do {                                                                       \
+        const CTYPE* a = (const CTYPE*)A;                                      \
+        const CTYPE* b = (const CTYPE*)B;                                      \
+        CTYPE* c       = (CTYPE*)C;                                            \
+        for (int bt = 0; bt < batch; bt++) {                                  \
+            const CTYPE* ab = a + (size_t)bt * a_stride;                       \
+            const CTYPE* bb = b + (size_t)bt * b_stride;                       \
+            CTYPE* cb       = c + (size_t)bt * (size_t)M * N;                  \
+            for (int m = 0; m < M; m++)                                        \
+                for (int n = 0; n < N; n++) {                                  \
+                    ACC s = 0;                                                 \
+                    for (int k = 0; k < K; k++)                                \
+                        s += (ACC)ab[(size_t)m * K + k] * (ACC)bb[(size_t)k * N + n]; \
+                    cb[(size_t)m * N + n] = (CTYPE)s;                          \
+                }                                                              \
+        }                                                                      \
+    } while (0)
+
+    switch (dt) {
+    case DTYPE_FLOAT64: CML_MATMUL_T(double,  double);  return 0;
+    case DTYPE_INT64:   CML_MATMUL_T(int64_t, int64_t); return 0;
+    case DTYPE_INT32:   CML_MATMUL_T(int32_t, int64_t); return 0;
+    case DTYPE_INT16:   CML_MATMUL_T(int16_t, int64_t); return 0;
+    case DTYPE_INT8:    CML_MATMUL_T(int8_t,  int64_t); return 0;
+    default:            return -1;
+    }
+#undef CML_MATMUL_T
+}
+
+/* Dtype-generic direct conv2d (naive but fully general: groups / stride /
+ * padding / dilation / optional bias). The f32 path uses Winograd/im2col+BLAS;
+ * this reference implementation backs the non-f32 dtypes. All operands must
+ * share the dtype. Returns 0 on success, -1 on bad dtype/args. */
+static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
+    Tensor* input_t  = node->inputs[0];
+    Tensor* weight_t = node->inputs[1];
+    Tensor* out      = node->output;
+    if (!input_t || !weight_t || !out) return -1;
+    if (!input_t->data || !weight_t->data || !out->data) return -1;
+    if (input_t->ndim != 4 || weight_t->ndim != 4) return -1;
+    if (input_t->dtype != dt || weight_t->dtype != dt) return -1;
+
+    const void* bias = NULL;
+    if (node->num_inputs >= 3 && node->inputs[2]) {
+        if (node->inputs[2]->dtype != dt) return -1;
+        bias = node->inputs[2]->data;
+    }
+
+    Conv2DParams* p = (Conv2DParams*)node->params;
+    int batch  = input_t->shape[0], in_ch = input_t->shape[1];
+    int in_h   = input_t->shape[2], in_w  = input_t->shape[3];
+    int out_ch = weight_t->shape[0], kh = weight_t->shape[2], kw = weight_t->shape[3];
+    int sh = p && p->stride   ? p->stride[0]   : 1, sw = p && p->stride   ? p->stride[1]   : 1;
+    int ph = p && p->padding  ? p->padding[0]  : 0, pw = p && p->padding  ? p->padding[1]  : 0;
+    int dh = p && p->dilation ? p->dilation[0] : 1, dw = p && p->dilation ? p->dilation[1] : 1;
+    int groups = p ? p->groups : 1; if (groups < 1) groups = 1;
+    int out_h = out->shape[2], out_w = out->shape[3];
+    int icg = in_ch / groups, ocg = out_ch / groups;
+    if (icg <= 0 || ocg <= 0) return -1;
+
+#define CML_CONV_T(CTYPE, ACC)                                                        \
+    do {                                                                              \
+        const CTYPE* I = (const CTYPE*)input_t->data;                                 \
+        const CTYPE* W = (const CTYPE*)weight_t->data;                                \
+        const CTYPE* B = (const CTYPE*)bias;                                          \
+        CTYPE* O = (CTYPE*)out->data;                                                 \
+        for (int b = 0; b < batch; b++)                                               \
+            for (int oc = 0; oc < out_ch; oc++) {                                     \
+                int g = oc / ocg;                                                     \
+                for (int oh = 0; oh < out_h; oh++)                                    \
+                    for (int ow = 0; ow < out_w; ow++) {                              \
+                        ACC acc = B ? (ACC)B[oc] : (ACC)0;                            \
+                        for (int ci = 0; ci < icg; ci++) {                            \
+                            int ic = g * icg + ci;                                    \
+                            for (int r = 0; r < kh; r++)                              \
+                                for (int s = 0; s < kw; s++) {                        \
+                                    int ih = oh * sh - ph + r * dh;                   \
+                                    int iw = ow * sw - pw + s * dw;                   \
+                                    if (ih < 0 || ih >= in_h || iw < 0 || iw >= in_w) continue; \
+                                    ACC iv = (ACC)I[(((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw]; \
+                                    ACC wv = (ACC)W[(((size_t)oc * icg + ci) * kh + r) * kw + s]; \
+                                    acc += iv * wv;                                   \
+                                }                                                     \
+                        }                                                             \
+                        O[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow] = (CTYPE)acc; \
+                    }                                                                 \
+            }                                                                         \
+    } while (0)
+
+    switch (dt) {
+    case DTYPE_FLOAT64: CML_CONV_T(double,  double);  return 0;
+    case DTYPE_INT64:   CML_CONV_T(int64_t, int64_t); return 0;
+    case DTYPE_INT32:   CML_CONV_T(int32_t, int64_t); return 0;
+    default:            return -1;
+    }
+#undef CML_CONV_T
+}
+
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
@@ -1337,6 +1443,30 @@ int cpu_execute_node(struct IRNode* node) {
         int M = a->shape[a->ndim - 2];
         int K = a->shape[a->ndim - 1];
         int N = b->shape[b->ndim - 1];
+
+        /* Non-float32 matmul: computed in the native type. Requires all three
+         * tensors to share the dtype (mixed-dtype matmul isn't promoted here);
+         * otherwise fail cleanly rather than reinterpret bytes as float.
+         * Quantized weights (int8/GGUF) are NOT this case — they keep f32
+         * activations and are handled by the quant dispatch just below. */
+        if (b->quant_type == CML_QUANT_NONE &&
+            (out->dtype != DTYPE_FLOAT32 || a->dtype != DTYPE_FLOAT32 ||
+             b->dtype != DTYPE_FLOAT32)) {
+            if (a->dtype != out->dtype || b->dtype != out->dtype)
+                return -1;
+            size_t mn = (size_t)M * (size_t)N;
+            int batch = (mn > 0) ? (int)(out->numel / mn) : 1;
+            if (batch < 1) batch = 1;
+            size_t a_stride = (a->numel == (size_t)M * (size_t)K) ? 0 : (size_t)M * (size_t)K;
+            size_t b_stride = (b->numel == (size_t)K * (size_t)N) ? 0 : (size_t)K * (size_t)N;
+            if (cpu_matmul_generic(a->data, b->data, out->data, batch,
+                                   a_stride, b_stride, M, K, N, out->dtype) == 0) {
+                node->is_executed = true;
+                out->is_executed  = true;
+                return 0;
+            }
+            return -1;
+        }
 
         if (b->quant_type == CML_QUANT_GGUF_Q8_0 && b->quant_data) {
             if (gguf_q8_0_matmul(in1_data, b->quant_data, out_data, M, K, N) == 0)
@@ -3494,6 +3624,16 @@ int cpu_execute_node(struct IRNode* node) {
         Tensor* weight_t = node->inputs[1];
         if (input_t->ndim != 4 || weight_t->ndim != 4)
             return -1;
+
+        /* Non-float32 conv2d: direct (naive) reference computation. */
+        if (out->dtype != DTYPE_FLOAT32) {
+            if (cpu_conv2d_generic(node, out->dtype) == 0) {
+                node->is_executed = true;
+                out->is_executed  = true;
+                return 0;
+            }
+            return -1;
+        }
 
         Conv2DParams* p  = (Conv2DParams*)node->params;
         int batch        = input_t->shape[0];
