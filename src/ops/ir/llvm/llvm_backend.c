@@ -1121,6 +1121,15 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 
     UOpType type = node->type;
 
+    /* The JIT kernels are float32-only; defer any non-f32 tensor (output or
+     * input) to the interpreter, which has the dtype-generic compute path. */
+    if (out->dtype != DTYPE_FLOAT32)
+        return cpu_execute_node(node);
+    for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
+        if (node->inputs[_i] && node->inputs[_i]->dtype != DTYPE_FLOAT32)
+            return cpu_execute_node(node);
+    }
+
     /* Ops that still go to the CPU scalar path. */
     if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE)
         return cpu_execute_node(node);

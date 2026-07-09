@@ -655,6 +655,67 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
         }                                                                                          \
     } while (0)
 
+/* -------------------------------------------------------------------------
+ * Non-float32 elementwise binary compute.
+ *
+ * The float32 hot path (SIMD + the broadcast loops below) stays as-is; when an
+ * op's output dtype is something else (float64 / integer types) we run this
+ * dtype-generic path, which mirrors the same broadcasting semantics. This is
+ * the first increment of real multi-dtype compute — the executor was formerly
+ * float32-only. Returns 0 on success, -1 if (dtype, op) isn't handled here.
+ * ---------------------------------------------------------------------- */
+static int is_elementwise_binary(UOpType t) {
+    return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV ||
+           t == UOP_MAX;
+}
+
+#define CML_BCAST_BINARY(CTYPE, EXPR)                                          \
+    do {                                                                       \
+        const CTYPE* A = (const CTYPE*)in1;                                    \
+        const CTYPE* B = (const CTYPE*)in2;                                    \
+        CTYPE* O       = (CTYPE*)out;                                          \
+        for (size_t i = 0; i < n; i++) {                                       \
+            size_t i1 = (in1_n == n) ? i : (in1_n <= 1 ? 0 : i % in1_n);       \
+            size_t i2 = (in2_n == n) ? i : (in2_n <= 1 ? 0 : i % in2_n);       \
+            CTYPE x = A[i1], y = B[i2];                                        \
+            O[i] = (EXPR);                                                     \
+        }                                                                      \
+    } while (0)
+
+#define CML_BINARY_FLOAT(CTYPE, EPS)                                           \
+    switch (type) {                                                            \
+    case UOP_ADD: CML_BCAST_BINARY(CTYPE, x + y); return 0;                    \
+    case UOP_SUB: CML_BCAST_BINARY(CTYPE, x - y); return 0;                    \
+    case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
+    case UOP_DIV: CML_BCAST_BINARY(CTYPE, x / (y + (CTYPE)(EPS))); return 0;   \
+    case UOP_MAX: CML_BCAST_BINARY(CTYPE, x > y ? x : y); return 0;            \
+    default: return -1;                                                        \
+    }
+
+#define CML_BINARY_INT(CTYPE)                                                  \
+    switch (type) {                                                            \
+    case UOP_ADD: CML_BCAST_BINARY(CTYPE, x + y); return 0;                    \
+    case UOP_SUB: CML_BCAST_BINARY(CTYPE, x - y); return 0;                    \
+    case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
+    case UOP_DIV: CML_BCAST_BINARY(CTYPE, y != 0 ? x / y : 0); return 0;       \
+    case UOP_MAX: CML_BCAST_BINARY(CTYPE, x > y ? x : y); return 0;            \
+    default: return -1;                                                        \
+    }
+
+static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n,
+                              const void* in2, size_t in2_n, void* out, size_t n,
+                              DType dt) {
+    switch (dt) {
+    case DTYPE_FLOAT64: CML_BINARY_FLOAT(double, 1e-12);
+    case DTYPE_INT64:   CML_BINARY_INT(int64_t);
+    case DTYPE_INT32:   CML_BINARY_INT(int32_t);
+    case DTYPE_INT16:   CML_BINARY_INT(int16_t);
+    case DTYPE_INT8:    CML_BINARY_INT(int8_t);
+    case DTYPE_UINT8:   CML_BINARY_INT(uint8_t);
+    default:            return -1;
+    }
+}
+
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
@@ -712,6 +773,20 @@ int cpu_execute_node(struct IRNode* node) {
     }
 
 #define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
+
+    /* Multi-dtype fast exit: non-float32 elementwise binary ops are computed in
+     * their native C type (float32 keeps the SIMD path in the switch below). */
+    if (out->dtype != DTYPE_FLOAT32 && is_elementwise_binary(node->type) &&
+        node->num_inputs >= 2 && node->inputs[0]->data && node->inputs[1]->data &&
+        node->inputs[0]->dtype == out->dtype && node->inputs[1]->dtype == out->dtype) {
+        if (cpu_binary_generic(node->type, node->inputs[0]->data, in1_numel,
+                               node->inputs[1]->data, in2_numel, out->data,
+                               out->numel, out->dtype) == 0) {
+            node->is_executed = true;
+            out->is_executed  = true;
+            return 0;
+        }
+    }
 
     switch (node->type) {
     case UOP_ADD:
