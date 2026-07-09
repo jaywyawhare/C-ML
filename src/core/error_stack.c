@@ -46,6 +46,18 @@ void error_stack_set_notify(ErrorStackNotifyFn fn, void* context) {
     pthread_mutex_unlock(&g_notify_lock);
 }
 
+const char* cml_error_string(int code) {
+    switch (code) {
+    case CM_SUCCESS:                 return "success";
+    case CM_MEMORY_ALLOCATION_ERROR: return "memory allocation error";
+    case CM_INVALID_ARGUMENT:        return "invalid argument";
+    case CM_OPERATION_FAILED:        return "operation failed";
+    case CM_NOT_IMPLEMENTED:         return "not implemented";
+    case CM_INVALID_STATE:           return "invalid state";
+    default:                         return "unknown error";
+    }
+}
+
 void error_stack_init(void) { error_stack_ensure_initialized(); }
 
 void error_stack_clear(void) {
