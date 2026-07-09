@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <math.h>
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
@@ -139,6 +141,127 @@ void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache) {
     LOG_INFO("Paged KV cache set on serving context");
 }
 
+void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn,
+                           void* model, int vocab_size, int eos_token_id) {
+    if (!ctx) return;
+    ctx->forward_fn    = forward_fn;
+    ctx->model         = model;
+    ctx->vocab_size    = vocab_size;
+    ctx->eos_token_id  = eos_token_id;
+    LOG_INFO("Serving model attached (vocab=%d, eos=%d)", vocab_size, eos_token_id);
+}
+
+/* xorshift RNG for stochastic sampling (per-context determinism not required;
+ * greedy decoding — temperature <= 0 — is fully deterministic). */
+static uint32_t serving_rng_state = 0x2545F491u;
+static float serving_rand_uniform(void) {
+    uint32_t x = serving_rng_state;
+    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    serving_rng_state = x;
+    return (float)(x & 0xffffff) / (float)0x1000000;
+}
+
+static int serving_argmax(const float* logits, int n) {
+    int best = 0;
+    float bv = logits[0];
+    for (int i = 1; i < n; i++)
+        if (logits[i] > bv) { bv = logits[i]; best = i; }
+    return best;
+}
+
+/* Sample a token id from logits. temperature <= 0 => greedy argmax; otherwise
+ * temperature scaling + nucleus (top-p) sampling. */
+static int serving_sample(const float* logits, int vocab, float temperature, float top_p) {
+    if (temperature <= 0.0f || vocab <= 1)
+        return serving_argmax(logits, vocab);
+
+    /* softmax with temperature (numerically stable) */
+    float* probs = (float*)cml_malloc((size_t)vocab * sizeof(float));
+    if (!probs) return serving_argmax(logits, vocab);
+
+    float maxl = logits[0];
+    for (int i = 1; i < vocab; i++) if (logits[i] > maxl) maxl = logits[i];
+    float sum = 0.0f;
+    for (int i = 0; i < vocab; i++) {
+        float p = expf((logits[i] - maxl) / temperature);
+        probs[i] = p; sum += p;
+    }
+    float inv = (sum > 0.0f) ? 1.0f / sum : 0.0f;
+    for (int i = 0; i < vocab; i++) probs[i] *= inv;
+
+    /* nucleus: build a simple descending cutoff by cumulative mass. We avoid a
+     * full sort by iterating with a running threshold: draw against the top-p
+     * renormalised distribution over tokens whose cumulative prob (in descending
+     * order) is within top_p. Approximate via a threshold pass. */
+    if (top_p > 0.0f && top_p < 1.0f) {
+        /* find the probability threshold t such that mass(prob >= t) ~ top_p */
+        float lo = 0.0f, hi = 1.0f, thresh = 0.0f;
+        for (int it = 0; it < 24; it++) {
+            float mid = 0.5f * (lo + hi);
+            float mass = 0.0f;
+            for (int i = 0; i < vocab; i++) if (probs[i] >= mid) mass += probs[i];
+            if (mass > top_p) lo = mid; else hi = mid;
+            thresh = mid;
+        }
+        float kept = 0.0f;
+        for (int i = 0; i < vocab; i++) { if (probs[i] < thresh) probs[i] = 0.0f; else kept += probs[i]; }
+        if (kept > 0.0f) { float k = 1.0f / kept; for (int i = 0; i < vocab; i++) probs[i] *= k; }
+    }
+
+    float r = serving_rand_uniform();
+    float cum = 0.0f;
+    int chosen = vocab - 1;
+    for (int i = 0; i < vocab; i++) { cum += probs[i]; if (r <= cum) { chosen = i; break; } }
+    cml_free(probs);
+    return chosen;
+}
+
+/* Generate one token for an active DECODING request. Returns 0 on success. */
+static int serving_generate_one(CMLServingContext* ctx, CMLSequenceRequest* req) {
+    float* logits = (float*)cml_malloc((size_t)ctx->vocab_size * sizeof(float));
+    if (!logits) { LOG_ERROR("serving_generate_one: logits alloc failed"); return -1; }
+
+    int rc;
+    if (req->num_generated == 0) {
+        /* prefill: run the whole prompt, logits are for the next token */
+        rc = ctx->forward_fn(ctx->model, req->prompt_tokens, req->num_prompt_tokens,
+                             0, logits, ctx->vocab_size);
+        req->current_pos = req->num_prompt_tokens;
+        if (req->first_token_time_ms == 0.0) req->first_token_time_ms = serving_time_ms();
+    } else {
+        int last = req->generated_tokens[req->num_generated - 1];
+        rc = ctx->forward_fn(ctx->model, &last, 1, req->current_pos, logits, ctx->vocab_size);
+        req->current_pos++;
+    }
+
+    if (rc != 0) {
+        cml_free(logits);
+        req->status = CML_SEQ_STATUS_ERROR;
+        LOG_ERROR("serving_generate_one: model forward failed for request %d", req->request_id);
+        return -1;
+    }
+
+    int tok = serving_sample(logits, ctx->vocab_size, req->temperature, req->top_p);
+    cml_free(logits);
+
+    /* grow the generated-token buffer if needed */
+    if (req->num_generated >= req->gen_capacity) {
+        int new_cap = req->gen_capacity > 0 ? req->gen_capacity * 2 : 16;
+        int* grown = (int*)realloc(req->generated_tokens, (size_t)new_cap * sizeof(int));
+        if (!grown) { LOG_ERROR("serving_generate_one: token buffer grow failed"); return -1; }
+        req->generated_tokens = grown;
+        req->gen_capacity = new_cap;
+    }
+    req->generated_tokens[req->num_generated++] = tok;
+
+    if ((ctx->eos_token_id >= 0 && tok == ctx->eos_token_id) ||
+        req->num_generated >= req->max_new_tokens) {
+        req->status = CML_SEQ_STATUS_FINISHED;
+        if (req->finish_time_ms == 0.0) req->finish_time_ms = serving_time_ms();
+    }
+    return 0;
+}
+
 int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens,
                        int num_tokens, int max_new_tokens) {
     if (!ctx) {
@@ -232,13 +355,27 @@ int cml_serving_step(CMLServingContext* ctx) {
                   req->request_id, ctx->batch_size);
     }
 
-    /* Transition any PREFILL requests to DECODING (prefill is "done" once
-       admitted; the actual prefill compute happens externally) */
+    /* Transition any PREFILL requests to DECODING. */
     for (int i = 0; i < ctx->batch_size; i++) {
         CMLSequenceRequest* req = ctx->active_batch[i];
-        if (req && req->status == CML_SEQ_STATUS_PREFILL) {
+        if (req && req->status == CML_SEQ_STATUS_PREFILL)
             req->status = CML_SEQ_STATUS_DECODING;
-            req->first_token_time_ms = serving_time_ms();
+    }
+
+    /* If a model forward callback is attached, advance every active DECODING
+     * request by one token (continuous batching: one step = one token/seq). */
+    if (ctx->forward_fn && ctx->vocab_size > 0) {
+        for (int i = 0; i < ctx->batch_size; i++) {
+            CMLSequenceRequest* req = ctx->active_batch[i];
+            if (req && req->status == CML_SEQ_STATUS_DECODING)
+                serving_generate_one(ctx, req);
+        }
+    } else {
+        /* No model attached: mark first-token time so bookkeeping stays sane. */
+        for (int i = 0; i < ctx->batch_size; i++) {
+            CMLSequenceRequest* req = ctx->active_batch[i];
+            if (req && req->first_token_time_ms == 0.0)
+                req->first_token_time_ms = serving_time_ms();
         }
     }
 

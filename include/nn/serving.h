@@ -1,8 +1,10 @@
 /*
  * Continuous batching / serving scheduler for LLM inference.
- * Handles request queuing, batch admission, and lifecycle tracking.
- * The actual forward pass / token generation is NOT done here; this is
- * purely the scheduling and bookkeeping layer.
+ * Handles request queuing, batch admission, lifecycle tracking, and — when a
+ * model forward callback is attached via cml_serving_set_model — the actual
+ * autoregressive token generation (forward -> sample -> append -> stop on EOS
+ * or max_new_tokens). The model callback owns the forward pass and KV cache;
+ * the scheduler owns batching, sampling, and bookkeeping.
  */
 
 #ifndef CML_NN_SERVING_H
@@ -28,6 +30,16 @@ typedef enum {
     CML_SEQ_STATUS_FINISHED,
     CML_SEQ_STATUS_ERROR,
 } CMLSequenceStatus;
+
+/*
+ * Model forward callback. Given input tokens at a sequence position, writes
+ * `vocab_size` next-token logits into logits_out. For the prefill of a request
+ * it receives the whole prompt at position 0; for each decode step it receives
+ * the single previous token at its position. The callback owns the KV cache.
+ * Returns 0 on success, non-zero on failure.
+ */
+typedef int (*CMLServingForwardFn)(void* model, const int* tokens, int num_tokens,
+                                   int position, float* logits_out, int vocab_size);
 
 typedef struct CMLSequenceRequest {
     int request_id;
@@ -90,6 +102,13 @@ typedef struct CMLServingContext {
     /* Stats */
     CMLServingStats stats;
     int next_request_id;
+
+    /* Model forward hook (set via cml_serving_set_model). When non-NULL, the
+     * scheduler drives autoregressive generation; when NULL it only schedules. */
+    CMLServingForwardFn forward_fn;
+    void* model;
+    int vocab_size;
+    int eos_token_id;      /* generation stops when this token is produced (<0 = none) */
 } CMLServingContext;
 
 CMLServingConfig cml_serving_default_config(void);
@@ -100,6 +119,14 @@ void cml_serving_free(CMLServingContext* ctx);
 
 /* KV cache is not owned; caller must keep it alive */
 void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache);
+
+/*
+ * Attach a model forward callback so cml_serving_step actually generates tokens.
+ * `vocab_size` is the logits width the callback produces; `eos_token_id` stops a
+ * sequence early when produced (pass a negative value to disable).
+ */
+void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn,
+                           void* model, int vocab_size, int eos_token_id);
 
 /* Returns request_id on success, -1 on failure (e.g. queue full).
  * prompt_tokens is copied internally. max_new_tokens 0 = use config default. */
