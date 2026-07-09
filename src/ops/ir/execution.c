@@ -664,6 +664,10 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
  * the first increment of real multi-dtype compute — the executor was formerly
  * float32-only. Returns 0 on success, -1 if (dtype, op) isn't handled here.
  * ---------------------------------------------------------------------- */
+static int is_half_dtype(DType d) {
+    return d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16;
+}
+
 static int is_elementwise_binary(UOpType t) {
     return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV ||
            t == UOP_MAX ||
@@ -761,6 +765,23 @@ static int is_elementwise_unary(UOpType t) {
 
 static int cpu_unary_generic(UOpType type, const void* in, size_t in_n,
                              void* out, size_t n, DType dt) {
+    if (dt == DTYPE_FLOAT32) {  /* used for half-precision compute-in-f32 */
+        switch (type) {
+        case UOP_NEG:     CML_UNARY_MAP(float, -x);                     return 0;
+        case UOP_ABS:     CML_UNARY_MAP(float, fabsf(x));               return 0;
+        case UOP_SQUARE:  CML_UNARY_MAP(float, x * x);                  return 0;
+        case UOP_EXP:     CML_UNARY_MAP(float, expf(x));                return 0;
+        case UOP_LOG:     CML_UNARY_MAP(float, logf(x + 1e-8f));        return 0;
+        case UOP_SQRT:    CML_UNARY_MAP(float, sqrtf(fabsf(x)));        return 0;
+        case UOP_RSQRT:   CML_UNARY_MAP(float, 1.0f / sqrtf(fabsf(x) + 1e-8f)); return 0;
+        case UOP_RECIP:   CML_UNARY_MAP(float, 1.0f / x);              return 0;
+        case UOP_SIN:     CML_UNARY_MAP(float, sinf(x));               return 0;
+        case UOP_COS:     CML_UNARY_MAP(float, cosf(x));               return 0;
+        case UOP_TANH:    CML_UNARY_MAP(float, tanhf(x));              return 0;
+        case UOP_SIGMOID: CML_UNARY_MAP(float, 1.0f / (1.0f + expf(-x))); return 0;
+        default: return -1;
+        }
+    }
     if (dt == DTYPE_FLOAT64) {
         switch (type) {
         case UOP_NEG:     CML_UNARY_MAP(double, -x);                    return 0;
@@ -796,10 +817,9 @@ static int is_reduction_op(UOpType t) {
  * output p reduces `count` elements starting at (p/inner)*count*inner + (p%inner)
  * with stride `inner`. Mean/sum accumulate in double then cast to the output
  * type (int mean truncates, matching the same-dtype output convention). */
-static int cpu_reduce_generic(struct IRNode* node, DType dt) {
+static int cpu_reduce_generic(struct IRNode* node, const void* in, void* outp, DType dt) {
     Tensor* inp = node->inputs[0];
-    Tensor* out = node->output;
-    if (!inp || !inp->data || !out->data) return -1;
+    if (!inp || !in || !outp) return -1;
 
     UOpType type = node->type;
     int op; /* 0 sum, 1 mean, 2 max, 3 min */
@@ -808,9 +828,6 @@ static int cpu_reduce_generic(struct IRNode* node, DType dt) {
     else if (type == UOP_MAX_REDUCE) op = 2;
     else if (type == UOP_MIN_REDUCE) op = 3;
     else return -1;
-
-    const void* in = inp->data;
-    void* outp     = out->data;
 
     size_t outer = 1, inner = 1, count = inp->numel;
     ReduceParams* rp = (ReduceParams*)node->params;
@@ -852,6 +869,7 @@ static int cpu_reduce_generic(struct IRNode* node, DType dt) {
     } while (0)
 
     switch (dt) {
+    case DTYPE_FLOAT32: CML_REDUCE_T(float);   return 0;
     case DTYPE_FLOAT64: CML_REDUCE_T(double);  return 0;
     case DTYPE_INT64:   CML_REDUCE_T(int64_t); return 0;
     case DTYPE_INT32:   CML_REDUCE_T(int32_t); return 0;
@@ -890,6 +908,7 @@ static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch,
     } while (0)
 
     switch (dt) {
+    case DTYPE_FLOAT32: CML_MATMUL_T(float,   float);   return 0;
     case DTYPE_FLOAT64: CML_MATMUL_T(double,  double);  return 0;
     case DTYPE_INT64:   CML_MATMUL_T(int64_t, int64_t); return 0;
     case DTYPE_INT32:   CML_MATMUL_T(int32_t, int64_t); return 0;
@@ -1028,65 +1047,91 @@ int cpu_execute_node(struct IRNode* node) {
 #define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
 
     /* Multi-dtype fast exit: any elementwise binary op that touches a non-f32
-     * tensor (output or either input) is computed in the output dtype's native
-     * C type, casting inputs as needed. Pure-f32 ops keep the SIMD path below. */
+     * tensor (output or either input) is computed in a native C type, casting
+     * inputs as needed. Half types (f16/bf16) can't be computed natively, so the
+     * compute dtype is f32 and the f32 result is stored back as half. Pure-f32
+     * ops keep the SIMD path below. */
     int _mdt_binary = is_elementwise_binary(node->type) && node->num_inputs >= 2 &&
                       node->inputs[0] && node->inputs[1] &&
                       (out->dtype != DTYPE_FLOAT32 ||
                        node->inputs[0]->dtype != DTYPE_FLOAT32 ||
                        node->inputs[1]->dtype != DTYPE_FLOAT32);
     if (_mdt_binary && node->inputs[0]->data && node->inputs[1]->data) {
+        DType odt   = out->dtype;
+        DType cdt   = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;  /* compute dtype */
+        size_t cesz = cml_dtype_size(cdt);
         const void* a = node->inputs[0]->data;
         const void* b = node->inputs[1]->data;
-        void* tmpa = NULL;
-        void* tmpb = NULL;
+        void* tmpa = NULL, *tmpb = NULL, *obuf = out->data;
         int ok = 1;
-        size_t esz = cml_dtype_size(out->dtype);
-        if (node->inputs[0]->dtype != out->dtype) {
-            tmpa = cml_malloc(in1_numel * esz);
+        if (node->inputs[0]->dtype != cdt) {
+            tmpa = cml_malloc(in1_numel * cesz);
             if (!tmpa || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
-                                         tmpa, out->dtype, in1_numel) != 0) ok = 0;
+                                         tmpa, cdt, in1_numel) != 0) ok = 0;
             a = tmpa;
         }
-        if (ok && node->inputs[1]->dtype != out->dtype) {
-            tmpb = cml_malloc(in2_numel * esz);
+        if (ok && node->inputs[1]->dtype != cdt) {
+            tmpb = cml_malloc(in2_numel * cesz);
             if (!tmpb || cml_cast_buffer(node->inputs[1]->data, node->inputs[1]->dtype,
-                                         tmpb, out->dtype, in2_numel) != 0) ok = 0;
+                                         tmpb, cdt, in2_numel) != 0) ok = 0;
             b = tmpb;
         }
+        if (ok && is_half_dtype(odt)) { obuf = cml_malloc(out->numel * cesz); if (!obuf) ok = 0; }
         int rc = ok ? cpu_binary_generic(node->type, a, in1_numel, b, in2_numel,
-                                         out->data, out->numel, out->dtype) : -1;
+                                         obuf, out->numel, cdt) : -1;
+        if (rc == 0 && is_half_dtype(odt))
+            rc = cml_cast_buffer(obuf, DTYPE_FLOAT32, out->data, odt, out->numel);
         cml_free(tmpa);
         cml_free(tmpb);
-        if (rc == 0) {
-            node->is_executed = true;
-            out->is_executed  = true;
-            return 0;
-        }
-        /* A non-f32 tensor is involved: never fall through to the f32 SIMD path
-         * (it would reinterpret the bytes). Fail cleanly for dtypes we can't
-         * handle here (e.g. f16/bf16). */
+        if (is_half_dtype(odt) && obuf != out->data) cml_free(obuf);
+        if (rc == 0) { node->is_executed = true; out->is_executed = true; return 0; }
+        /* A non-f32 tensor is involved: never fall through to the f32 SIMD path. */
         return -1;
     }
     if (out->dtype != DTYPE_FLOAT32 && is_elementwise_unary(node->type) &&
         node->num_inputs >= 1 && node->inputs[0]->data &&
         node->inputs[0]->dtype == out->dtype) {
-        if (cpu_unary_generic(node->type, node->inputs[0]->data, in1_numel,
-                              out->data, out->numel, out->dtype) == 0) {
-            node->is_executed = true;
-            out->is_executed  = true;
-            return 0;
+        DType odt   = out->dtype;
+        DType cdt   = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;
+        const void* in = node->inputs[0]->data;
+        void* tmpin = NULL, *obuf = out->data;
+        int ok = 1;
+        if (node->inputs[0]->dtype != cdt) {
+            tmpin = cml_malloc(in1_numel * cml_dtype_size(cdt));
+            if (!tmpin || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
+                                          tmpin, cdt, in1_numel) != 0) ok = 0;
+            in = tmpin;
         }
+        if (ok && is_half_dtype(odt)) { obuf = cml_malloc(out->numel * sizeof(float)); if (!obuf) ok = 0; }
+        int rc = ok ? cpu_unary_generic(node->type, in, in1_numel, obuf, out->numel, cdt) : -1;
+        if (rc == 0 && is_half_dtype(odt))
+            rc = cml_cast_buffer(obuf, DTYPE_FLOAT32, out->data, odt, out->numel);
+        cml_free(tmpin);
+        if (is_half_dtype(odt) && obuf != out->data) cml_free(obuf);
+        if (rc == 0) { node->is_executed = true; out->is_executed = true; return 0; }
+        return -1;
     }
     if (out->dtype != DTYPE_FLOAT32 && is_reduction_op(node->type) &&
         node->num_inputs >= 1 && node->inputs[0]->data &&
         node->inputs[0]->dtype == out->dtype) {
-        /* Handle here or fail cleanly — never fall through to the f32 path,
-         * which would reinterpret the bytes. */
-        int r = cpu_reduce_generic(node, out->dtype);
+        /* Handle here or fail cleanly — never fall through to the f32 path. */
+        DType odt = out->dtype;
+        int rc;
+        if (is_half_dtype(odt)) {
+            /* compute in f32: convert input, reduce, convert output back to half */
+            float* fin = cml_malloc(in1_numel * sizeof(float));
+            float* fout = cml_malloc(out->numel * sizeof(float));
+            rc = (fin && fout &&
+                  cml_cast_buffer(node->inputs[0]->data, odt, fin, DTYPE_FLOAT32, in1_numel) == 0)
+                     ? cpu_reduce_generic(node, fin, fout, DTYPE_FLOAT32) : -1;
+            if (rc == 0) rc = cml_cast_buffer(fout, DTYPE_FLOAT32, out->data, odt, out->numel);
+            cml_free(fin); cml_free(fout);
+        } else {
+            rc = cpu_reduce_generic(node, node->inputs[0]->data, out->data, odt);
+        }
         node->is_executed = true;
         out->is_executed  = true;
-        return r;
+        return rc;
     }
 
     switch (node->type) {

@@ -1224,7 +1224,8 @@ static bool cml_dtype_is_int(DType d) {
            d == DTYPE_BOOL;
 }
 static bool cml_dtype_direct(DType d) {
-    return d == DTYPE_FLOAT32 || d == DTYPE_FLOAT64 || cml_dtype_is_int(d);
+    return d == DTYPE_FLOAT32 || d == DTYPE_FLOAT64 || d == DTYPE_FLOAT16 ||
+           d == DTYPE_BFLOAT16 || cml_dtype_is_int(d);
 }
 static int64_t cml_load_i64(const void* p, size_t i, DType d) {
     switch (d) {
@@ -1241,8 +1242,10 @@ static int64_t cml_load_i64(const void* p, size_t i, DType d) {
     }
 }
 static double cml_load_f64(const void* p, size_t i, DType d) {
-    if (d == DTYPE_FLOAT32) return (double)((const float*)p)[i];
-    if (d == DTYPE_FLOAT64) return ((const double*)p)[i];
+    if (d == DTYPE_FLOAT32)  return (double)((const float*)p)[i];
+    if (d == DTYPE_FLOAT64)  return ((const double*)p)[i];
+    if (d == DTYPE_FLOAT16)  return (double)fp16_to_float(((const uint16_t*)p)[i]);
+    if (d == DTYPE_BFLOAT16) return (double)bf16_to_float(((const uint16_t*)p)[i]);
     return (double)cml_load_i64(p, i, d);
 }
 static void cml_store_i64(void* p, size_t i, DType d, int64_t v) {
@@ -1260,9 +1263,11 @@ static void cml_store_i64(void* p, size_t i, DType d, int64_t v) {
     }
 }
 static void cml_store_f64(void* p, size_t i, DType d, double v) {
-    if (d == DTYPE_FLOAT32)      ((float*)p)[i]  = (float)v;
-    else if (d == DTYPE_FLOAT64) ((double*)p)[i] = v;
-    else                         cml_store_i64(p, i, d, (int64_t)v);
+    if (d == DTYPE_FLOAT32)       ((float*)p)[i]    = (float)v;
+    else if (d == DTYPE_FLOAT64)  ((double*)p)[i]   = v;
+    else if (d == DTYPE_FLOAT16)  ((uint16_t*)p)[i] = float_to_fp16((float)v);
+    else if (d == DTYPE_BFLOAT16) ((uint16_t*)p)[i] = float_to_bf16((float)v);
+    else                          cml_store_i64(p, i, d, (int64_t)v);
 }
 
 /* Precision-preserving element-wise dtype conversion of a raw buffer.

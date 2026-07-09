@@ -334,6 +334,51 @@ static int test_conv2d(void) {
     return ok;
 }
 
+static const TensorConfig cfg_f16  = {.dtype = DTYPE_FLOAT16,  .device = DEVICE_CPU,
+                                      .has_dtype = true, .has_device = true};
+static const TensorConfig cfg_bf16 = {.dtype = DTYPE_BFLOAT16, .device = DEVICE_CPU,
+                                      .has_dtype = true, .has_device = true};
+
+/* f16/bf16 compute (in f32, stored as half). Values read back via
+ * tensor_get_float; tolerances reflect half precision. */
+static int test_half(void) {
+    float av[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float bv[] = {0.5f, 1.5f, 2.5f, 0.25f};
+    Tensor* af = tensor_from_data(av, (int[]){4}, 1, &cfg_f32);
+    Tensor* bf = tensor_from_data(bv, (int[]){4}, 1, &cfg_f32);
+
+    /* f16 binary + unary + reduction */
+    Tensor* a = tensor_cast(af, DTYPE_FLOAT16);
+    Tensor* b = tensor_cast(bf, DTYPE_FLOAT16);
+    int ok = a && b && a->dtype == DTYPE_FLOAT16;
+
+    Tensor* s = uop_add(a, b); tensor_ensure_executed(s);
+    Tensor* m = uop_mul(a, b); tensor_ensure_executed(m);
+    Tensor* ng = uop_neg(a);   tensor_ensure_executed(ng);
+    ok = ok && s->dtype == DTYPE_FLOAT16 && m->dtype == DTYPE_FLOAT16;
+    for (int i = 0; i < 4; i++) {
+        ok = ok && fabsf(tensor_get_float(s, i) - (av[i] + bv[i])) < 1e-2f;
+        ok = ok && fabsf(tensor_get_float(m, i) - (av[i] * bv[i])) < 1e-2f;
+        ok = ok && fabsf(tensor_get_float(ng, i) - (-av[i])) < 1e-2f;
+    }
+    ReduceParams rp = {NULL, 0, false};
+    Tensor* sm = uop_sum(a, &rp); tensor_ensure_executed(sm);   /* 1+2+3+4 = 10 */
+    ok = ok && sm->dtype == DTYPE_FLOAT16 && fabsf(tensor_get_float(sm, 0) - 10.0f) < 1e-1f;
+
+    /* bf16 add (wider tolerance — 8-bit mantissa) */
+    Tensor* ba = tensor_cast(af, DTYPE_BFLOAT16);
+    Tensor* bb = tensor_cast(bf, DTYPE_BFLOAT16);
+    Tensor* bs = uop_add(ba, bb); tensor_ensure_executed(bs);
+    ok = ok && bs->dtype == DTYPE_BFLOAT16;
+    for (int i = 0; i < 4; i++)
+        ok = ok && fabsf(tensor_get_float(bs, i) - (av[i] + bv[i])) < 1e-1f;
+
+    tensor_free(af); tensor_free(bf); tensor_free(a); tensor_free(b);
+    tensor_free(s); tensor_free(m); tensor_free(ng); tensor_free(sm);
+    tensor_free(ba); tensor_free(bb); tensor_free(bs);
+    return ok;
+}
+
 int main(void) {
     printf("=== multi-dtype compute: f64 + integers ===\n");
     check("f64_arith",     test_f64_arith());
@@ -350,6 +395,7 @@ int main(void) {
     check("comparisons",       test_comparisons());
     check("matmul",            test_matmul());
     check("conv2d",            test_conv2d());
+    check("half_f16_bf16",     test_half());
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
 }
