@@ -108,6 +108,46 @@ static int test_f64_broadcast(void) {
     return ok;
 }
 
+/* f64 unary: neg/abs plus exp/log round-trip in double precision. */
+static int test_f64_unary(void) {
+    double a[] = {0.5, 1.0, 2.0, 4.0};
+    Tensor* ta = tensor_from_data(a, (int[]){4}, 1, &cfg_f64);
+
+    Tensor* ng = uop_neg(ta);  tensor_ensure_executed(ng);
+    Tensor* ab = uop_abs(uop_neg(ta)); tensor_ensure_executed(ab);
+    Tensor* rt = uop_exp(uop_log(ta)); tensor_ensure_executed(rt); /* exp(log(x)) ~ x */
+    Tensor* sq = uop_sqrt(ta); tensor_ensure_executed(sq);
+
+    const double* ngd = (const double*)ng->data;
+    const double* abd = (const double*)ab->data;
+    const double* rtd = (const double*)rt->data;
+    const double* sqd = (const double*)sq->data;
+    int ok = ng->dtype == DTYPE_FLOAT64;
+    for (int i = 0; i < 4; i++) {
+        ok = ok && fabs(ngd[i] + a[i]) < 1e-12;
+        ok = ok && fabs(abd[i] - a[i]) < 1e-12;
+        ok = ok && fabs(rtd[i] - a[i]) < 1e-6;      /* f64 round-trip is tight */
+        ok = ok && fabs(sqd[i] - sqrt(a[i])) < 1e-12;
+    }
+    tensor_free(ta);
+    return ok;
+}
+
+/* integer neg/abs. */
+static int test_int_unary(void) {
+    int32_t a[] = {-5, 3, -100, 42};
+    Tensor* ta = tensor_from_data(a, (int[]){4}, 1, &cfg_i32);
+    Tensor* ng = uop_neg(ta); tensor_ensure_executed(ng);
+    Tensor* ab = uop_abs(ta); tensor_ensure_executed(ab);
+    const int32_t* ngd = (const int32_t*)ng->data;
+    const int32_t* abd = (const int32_t*)ab->data;
+    int ok = ng->dtype == DTYPE_INT32 &&
+             ngd[0] == 5 && ngd[2] == 100 &&
+             abd[0] == 5 && abd[2] == 100 && abd[3] == 42;
+    tensor_free(ta); tensor_free(ng); tensor_free(ab);
+    return ok;
+}
+
 int main(void) {
     printf("=== multi-dtype compute: f64 + integers ===\n");
     check("f64_arith",     test_f64_arith());
@@ -115,6 +155,8 @@ int main(void) {
     check("i32_exact",     test_i32_exact());
     check("i64_exact",     test_i64_exact());
     check("f64_broadcast", test_f64_broadcast());
+    check("f64_unary",     test_f64_unary());
+    check("int_unary",     test_int_unary());
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
 }

@@ -716,6 +716,64 @@ static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n,
     }
 }
 
+static int is_elementwise_unary(UOpType t) {
+    switch (t) {
+    case UOP_NEG: case UOP_ABS: case UOP_SQUARE:
+    case UOP_EXP: case UOP_LOG: case UOP_SQRT: case UOP_RSQRT: case UOP_RECIP:
+    case UOP_SIN: case UOP_COS: case UOP_TANH: case UOP_SIGMOID:
+        return true;
+    default:
+        return false;
+    }
+}
+
+#define CML_UNARY_MAP(CTYPE, EXPR)                                             \
+    do {                                                                       \
+        const CTYPE* A = (const CTYPE*)in;                                     \
+        CTYPE* O       = (CTYPE*)out;                                          \
+        for (size_t i = 0; i < n; i++) {                                       \
+            size_t ii = (in_n == n) ? i : (in_n <= 1 ? 0 : i % in_n);          \
+            CTYPE x = A[ii];                                                   \
+            O[i] = (EXPR);                                                     \
+        }                                                                      \
+    } while (0)
+
+#define CML_UNARY_INT(CTYPE)                                                   \
+    switch (type) {                                                            \
+    case UOP_NEG:    CML_UNARY_MAP(CTYPE, -x);          return 0;              \
+    case UOP_ABS:    CML_UNARY_MAP(CTYPE, x < 0 ? -x : x); return 0;           \
+    case UOP_SQUARE: CML_UNARY_MAP(CTYPE, x * x);       return 0;              \
+    default: return -1;                                                        \
+    }
+
+static int cpu_unary_generic(UOpType type, const void* in, size_t in_n,
+                             void* out, size_t n, DType dt) {
+    if (dt == DTYPE_FLOAT64) {
+        switch (type) {
+        case UOP_NEG:     CML_UNARY_MAP(double, -x);                    return 0;
+        case UOP_ABS:     CML_UNARY_MAP(double, fabs(x));               return 0;
+        case UOP_SQUARE:  CML_UNARY_MAP(double, x * x);                 return 0;
+        case UOP_EXP:     CML_UNARY_MAP(double, exp(x));                return 0;
+        case UOP_LOG:     CML_UNARY_MAP(double, log(x + 1e-12));        return 0;
+        case UOP_SQRT:    CML_UNARY_MAP(double, sqrt(fabs(x)));         return 0;
+        case UOP_RSQRT:   CML_UNARY_MAP(double, 1.0 / sqrt(fabs(x) + 1e-12)); return 0;
+        case UOP_RECIP:   CML_UNARY_MAP(double, 1.0 / x);              return 0;
+        case UOP_SIN:     CML_UNARY_MAP(double, sin(x));               return 0;
+        case UOP_COS:     CML_UNARY_MAP(double, cos(x));               return 0;
+        case UOP_TANH:    CML_UNARY_MAP(double, tanh(x));              return 0;
+        case UOP_SIGMOID: CML_UNARY_MAP(double, 1.0 / (1.0 + exp(-x))); return 0;
+        default: return -1;
+        }
+    }
+    switch (dt) {  /* integer types: only sign/abs/square are meaningful */
+    case DTYPE_INT64: CML_UNARY_INT(int64_t);
+    case DTYPE_INT32: CML_UNARY_INT(int32_t);
+    case DTYPE_INT16: CML_UNARY_INT(int16_t);
+    case DTYPE_INT8:  CML_UNARY_INT(int8_t);
+    default: return -1;
+    }
+}
+
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
@@ -774,14 +832,24 @@ int cpu_execute_node(struct IRNode* node) {
 
 #define BROADCAST_IDX(tensor_ptr, out_ptr, flat_i) _broadcast_idx(tensor_ptr, out_ptr, flat_i)
 
-    /* Multi-dtype fast exit: non-float32 elementwise binary ops are computed in
-     * their native C type (float32 keeps the SIMD path in the switch below). */
+    /* Multi-dtype fast exit: non-float32 elementwise ops are computed in their
+     * native C type (float32 keeps the SIMD path in the switch below). */
     if (out->dtype != DTYPE_FLOAT32 && is_elementwise_binary(node->type) &&
         node->num_inputs >= 2 && node->inputs[0]->data && node->inputs[1]->data &&
         node->inputs[0]->dtype == out->dtype && node->inputs[1]->dtype == out->dtype) {
         if (cpu_binary_generic(node->type, node->inputs[0]->data, in1_numel,
                                node->inputs[1]->data, in2_numel, out->data,
                                out->numel, out->dtype) == 0) {
+            node->is_executed = true;
+            out->is_executed  = true;
+            return 0;
+        }
+    }
+    if (out->dtype != DTYPE_FLOAT32 && is_elementwise_unary(node->type) &&
+        node->num_inputs >= 1 && node->inputs[0]->data &&
+        node->inputs[0]->dtype == out->dtype) {
+        if (cpu_unary_generic(node->type, node->inputs[0]->data, in1_numel,
+                              out->data, out->numel, out->dtype) == 0) {
             node->is_executed = true;
             out->is_executed  = true;
             return 0;
