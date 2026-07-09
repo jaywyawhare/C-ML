@@ -7,43 +7,31 @@
 #include "alloc/cml_allocator.h"
 
 /*
- * CPU kernel function pointer type.
- * On the CPU backend the compiled_kernel field of CMLHCQKernelDesc is cast
- * to this signature.  The function receives the args array and arg count
- * and is expected to execute synchronously.
+ * Every backend — including CPU — is a first-class entry in the
+ * CMLHCQBackendOps table (see hcq_backend.c). These thin dispatchers just look
+ * up the ops for a queue/signal's backend and forward; there are no per-backend
+ * special-cases here anymore.
  */
-typedef void (*cml_cpu_kernel_fn)(void** args, int num_args);
 
 CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->queue_create)
         return ops->queue_create();
-
-    if (backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported HCQ backend type: %d", (int)backend);
-        return NULL;
-    }
-
-    CMLHCQQueue* queue = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
-    if (!queue) {
-        LOG_ERROR("Failed to allocate CMLHCQQueue");
-        return NULL;
-    }
-    queue->backend          = CML_HCQ_CPU;
-    queue->native_handle    = NULL;
-    queue->num_wait_signals = 0;
-    queue->active           = true;
-    return queue;
+    LOG_ERROR("Unsupported HCQ backend type: %d", (int)backend);
+    return NULL;
 }
 
 void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
 
-    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
+    /* Read backend before destroy — the ops may free the queue wrapper. */
+    CMLHCQBackendType backend   = queue->backend;
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->queue_destroy) {
         ops->queue_destroy(queue);
-        if (queue->backend == CML_HCQ_VULKAN || queue->backend == CML_HCQ_AM)
+        /* Vulkan/AM tear down the native handle but leave the wrapper to us. */
+        if (backend == CML_HCQ_VULKAN || backend == CML_HCQ_AM)
             free(queue);
         return;
     }
@@ -57,24 +45,11 @@ int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
         LOG_ERROR("NULL queue or descriptor in submit_kernel");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
     if (ops && ops->submit_kernel)
         return ops->submit_kernel(queue, desc);
-
-    if (queue->backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported backend %d for submit_kernel", (int)queue->backend);
-        return -1;
-    }
-
-    if (!desc->compiled_kernel) {
-        LOG_ERROR("CPU kernel function pointer is NULL");
-        return -1;
-    }
-
-    cml_cpu_kernel_fn fn = (cml_cpu_kernel_fn)desc->compiled_kernel;
-    fn(desc->args, desc->num_args);
-    return 0;
+    LOG_ERROR("Unsupported backend %d for submit_kernel", (int)queue->backend);
+    return -1;
 }
 
 int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
@@ -83,23 +58,11 @@ int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
         LOG_ERROR("NULL queue in memcpy_h2d");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
     if (ops && ops->memcpy_h2d)
         return ops->memcpy_h2d(queue, dst_device, src_host, bytes);
-
-    if (queue->backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported backend %d for memcpy_h2d", (int)queue->backend);
-        return -1;
-    }
-
-    /* CPU: host and device memory are the same address space. */
-    if (!dst_device || !src_host) {
-        LOG_ERROR("NULL pointer in CPU memcpy_h2d");
-        return -1;
-    }
-    memcpy(dst_device, src_host, bytes);
-    return 0;
+    LOG_ERROR("Unsupported backend %d for memcpy_h2d", (int)queue->backend);
+    return -1;
 }
 
 int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
@@ -108,54 +71,30 @@ int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
         LOG_ERROR("NULL queue in memcpy_d2h");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
     if (ops && ops->memcpy_d2h)
         return ops->memcpy_d2h(queue, dst_host, src_device, bytes);
-
-    if (queue->backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported backend %d for memcpy_d2h", (int)queue->backend);
-        return -1;
-    }
-
-    if (!dst_host || !src_device) {
-        LOG_ERROR("NULL pointer in CPU memcpy_d2h");
-        return -1;
-    }
-    memcpy(dst_host, src_device, bytes);
-    return 0;
+    LOG_ERROR("Unsupported backend %d for memcpy_d2h", (int)queue->backend);
+    return -1;
 }
 
 CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->signal_create)
         return ops->signal_create();
-
-    if (backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported HCQ backend type %d for signal", (int)backend);
-        return NULL;
-    }
-
-    CMLHCQSignal* signal = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
-    if (!signal) {
-        LOG_ERROR("Failed to allocate CMLHCQSignal");
-        return NULL;
-    }
-    signal->backend        = CML_HCQ_CPU;
-    signal->timeline_value = 0;
-    signal->native_handle  = NULL;
-    signal->signaled       = false;
-    return signal;
+    LOG_ERROR("Unsupported HCQ backend type %d for signal", (int)backend);
+    return NULL;
 }
 
 void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
 
-    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(signal->backend);
+    CMLHCQBackendType backend   = signal->backend;
+    const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->signal_destroy) {
         ops->signal_destroy(signal);
-        if (signal->backend == CML_HCQ_VULKAN || signal->backend == CML_HCQ_AM)
+        if (backend == CML_HCQ_VULKAN || backend == CML_HCQ_AM)
             cml_free(signal);
         return;
     }
@@ -168,20 +107,11 @@ int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
         LOG_ERROR("NULL queue or signal in signal_record");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
     if (ops && ops->signal_record)
         return ops->signal_record(queue, signal);
-
-    if (queue->backend != CML_HCQ_CPU && queue->backend != CML_HCQ_VULKAN) {
-        LOG_ERROR("Unsupported backend %d for signal_record", (int)queue->backend);
-        return -1;
-    }
-
-    /* CPU/Vulkan: everything is synchronous, so the signal is immediately ready. */
-    signal->signaled = true;
-    signal->timeline_value++;
-    return 0;
+    LOG_ERROR("Unsupported backend %d for signal_record", (int)queue->backend);
+    return -1;
 }
 
 int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
@@ -189,31 +119,11 @@ int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
         LOG_ERROR("NULL queue or signal in queue_wait");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
     if (ops && ops->queue_wait)
         return ops->queue_wait(queue, signal);
-
-    if (queue->backend != CML_HCQ_CPU && queue->backend != CML_HCQ_VULKAN) {
-        LOG_ERROR("Unsupported backend %d for queue_wait", (int)queue->backend);
-        return -1;
-    }
-
-    /*
-     * CPU: execution is synchronous so if signal_record was called it is
-     * already signaled.  We just verify and add it to the wait list for
-     * bookkeeping.
-     */
-    if (!signal->signaled) {
-        LOG_WARNING("CPU HCQ: queue_wait on unsignaled signal %p -- "
-                    "this should not happen in synchronous mode",
-                    (void*)signal);
-    }
-
-    if (queue->num_wait_signals < CML_HCQ_MAX_WAIT_SIGNALS) {
-        queue->wait_signals[queue->num_wait_signals++] = signal;
-    }
-    return 0;
+    LOG_ERROR("Unsupported backend %d for queue_wait", (int)queue->backend);
+    return -1;
 }
 
 int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
@@ -221,27 +131,11 @@ int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
         LOG_ERROR("NULL signal in signal_wait_cpu");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(signal->backend);
     if (ops && ops->signal_wait_cpu)
         return ops->signal_wait_cpu(signal, timeout_ms);
-
-    if (signal->backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported backend %d for signal_wait_cpu", (int)signal->backend);
-        return -1;
-    }
-
-    /*
-     * CPU: everything completes synchronously so the signal is either
-     * already set or something is wrong.  No busy-wait needed.
-     */
-    (void)timeout_ms;
-    if (!signal->signaled) {
-        LOG_WARNING("CPU HCQ: signal_wait_cpu on unsignaled signal %p",
-                    (void*)signal);
-        return -1;
-    }
-    return 0;
+    LOG_ERROR("Unsupported backend %d for signal_wait_cpu", (int)signal->backend);
+    return -1;
 }
 
 int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
@@ -249,19 +143,11 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
         LOG_ERROR("NULL queue in queue_synchronize");
         return -1;
     }
-
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(queue->backend);
     if (ops && ops->queue_synchronize)
         return ops->queue_synchronize(queue);
-
-    if (queue->backend != CML_HCQ_CPU) {
-        LOG_ERROR("Unsupported backend %d for queue_synchronize", (int)queue->backend);
-        return -1;
-    }
-
-    /* CPU: synchronous -- nothing to wait for. */
-    queue->num_wait_signals = 0;
-    return 0;
+    LOG_ERROR("Unsupported backend %d for queue_synchronize", (int)queue->backend);
+    return -1;
 }
 
 CMLHCQPipeline* cml_hcq_pipeline_create(void) {
