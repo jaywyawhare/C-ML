@@ -205,6 +205,12 @@ static void close_loop(LLVMBuilderRef bld, LoopInfo* info,
     LLVMAddIncoming(info->i, in_vals, in_bbs, 2);
 }
 
+/* Element LLVM type for a tensor dtype the JIT emits kernels for (f32/f64). */
+static LLVMTypeRef elem_type(LLVMContextRef ctx, DType dt) {
+    return (dt == DTYPE_FLOAT64) ? LLVMDoubleTypeInContext(ctx)
+                                 : LLVMFloatTypeInContext(ctx);
+}
+
 /* Resolve an input's element index at loop position i for a shape known at
  * codegen time.  Broadcasting collapses to a constant here: in_n == out_n is a
  * straight index (no arithmetic), in_n == 1 is a constant-0 splat, and only the
@@ -254,9 +260,9 @@ static LLVMValueRef extern_f32(LLVMModuleRef mod, LLVMContextRef ctx,
  * ---------------------------------------------------------------------- */
 static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
                                      const char* fn_name, int64_t out_numel,
-                                     int64_t in0_numel, int64_t in1_numel) {
+                                     int64_t in0_numel, int64_t in1_numel, DType dt) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
+    LLVMTypeRef f32    = elem_type(ctx, dt);  /* element type (f32 or f64) */
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
@@ -333,9 +339,9 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
  * ---------------------------------------------------------------------- */
 static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
                                     const char* fn_name, int64_t out_numel,
-                                    int64_t in_numel) {
+                                    int64_t in_numel, DType dt) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
+    LLVMTypeRef f32    = elem_type(ctx, dt);  /* element type (f32 or f64) */
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
@@ -1121,12 +1127,15 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 
     UOpType type = node->type;
 
-    /* The JIT kernels are float32-only; defer any non-f32 tensor (output or
-     * input) to the interpreter, which has the dtype-generic compute path. */
-    if (out->dtype != DTYPE_FLOAT32)
+    /* The JIT emits typed kernels for float32 (all ops) and float64 (elementwise
+     * binary/unary). Any other dtype, or mixed-dtype operands, go to the
+     * interpreter's dtype-generic path. */
+    DType edt = out->dtype;
+    int f64_ok = (edt == DTYPE_FLOAT64) && (is_binary_op(type) || is_unary_op(type));
+    if (edt != DTYPE_FLOAT32 && !f64_ok)
         return cpu_execute_node(node);
     for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
-        if (node->inputs[_i] && node->inputs[_i]->dtype != DTYPE_FLOAT32)
+        if (node->inputs[_i] && node->inputs[_i]->dtype != edt)
             return cpu_execute_node(node);
     }
 
@@ -1211,7 +1220,8 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     }
 
     /* ---- Shape-keyed kernel cache lookup ----------------------------- */
-    uint64_t key = shape_key(type, s0, s1, s2, s3);
+    /* Fold the element dtype into the key so f32 and f64 kernels are distinct. */
+    uint64_t key = shape_key(type, s0, s1, s2, s3) ^ ((uint64_t)edt * 0x9E3779B97F4A7C15ULL);
     unsigned slot = 0;
     kernel_fn_t fn = cache_lookup(backend, key, &slot);
 
@@ -1229,9 +1239,9 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         LLVMModuleRef mod = NULL;
 
         if (is_binary_op(type)) {
-            mod = build_binary_op(kern_ctx, type, fn_name, s0, s1, s2);
+            mod = build_binary_op(kern_ctx, type, fn_name, s0, s1, s2, edt);
         } else if (is_unary_op(type)) {
-            mod = build_unary_op(kern_ctx, type, fn_name, s0, s1);
+            mod = build_unary_op(kern_ctx, type, fn_name, s0, s1, edt);
         } else if (is_reduction(type)) {
             mod = build_reduction(kern_ctx, type, fn_name, s0);
         } else if (type == UOP_MATMUL) {
