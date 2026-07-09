@@ -17,6 +17,7 @@
 #include "ops/ir/dispatch.h"
 #include "ops/ir/cpu_lazy_materialize.h"
 #include "core/gguf_quant.h"
+#include "core/quantization.h"
 #include "alloc/tlsf_alloc.h"
 #include <pthread.h>
 #include <stdio.h>
@@ -1072,6 +1073,12 @@ int cpu_execute_node(struct IRNode* node) {
                 break;
         } else if (b->quant_type == CML_QUANT_GGUF_Q4_0 && b->quant_data) {
             if (gguf_q4_0_matmul(in1_data, b->quant_data, out_data, M, K, N) == 0)
+                break;
+        } else if (b->quant_type == CML_QUANT_AFFINE_INT8 && b->data) {
+            /* Weight-only int8: int8 weights stay compressed, x/y are f32. */
+            if (cml_qmatmul_affine_int8(in1_data, (const int8_t*)b->data,
+                                        b->quant_scale, b->quant_zero_point,
+                                        out_data, M, K, N) == 0)
                 break;
         }
 

@@ -1125,8 +1125,13 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE)
         return cpu_execute_node(node);
 
-    /* Prefer BLAS for matmul when available. */
+    /* Prefer BLAS for matmul when available; also defer quantized-weight matmul
+     * to the interpreter, which has the int8/GGUF dispatch (the JIT kernel would
+     * misread the int8 weight buffer as float32). */
     if (type == UOP_MATMUL) {
+        if (node->num_inputs >= 2 && node->inputs[1] &&
+            node->inputs[1]->quant_type != CML_QUANT_NONE)
+            return cpu_execute_node(node);
         extern CMLBlasContext* get_blas_context(void);
         CMLBlasContext* blas = get_blas_context();
         if (blas && blas->initialized)

@@ -110,6 +110,77 @@ Tensor* cml_dequantize_int8(Tensor* tensor, const QuantParams* params) {
     return dequantized;
 }
 
+Tensor* cml_quantize_weight_int8(Tensor* weight, bool symmetric) {
+    if (!weight) {
+        LOG_ERROR("cml_quantize_weight_int8: NULL weight");
+        return NULL;
+    }
+    tensor_ensure_executed(weight);
+    if (!weight->data) {
+        LOG_ERROR("cml_quantize_weight_int8: weight has no data");
+        return NULL;
+    }
+
+    QuantParams qp = cml_quantize_compute_params(weight, symmetric);
+
+    int* shape = tensor_shape_copy(weight->shape, weight->ndim);
+    if (!shape) return NULL;
+
+    TensorConfig config = {.dtype = DTYPE_INT8, .device = weight->device,
+                           .has_dtype = true, .has_device = true};
+    Tensor* q = tensor_empty(shape, weight->ndim, &config);
+    cml_free(shape);
+    if (!q) return NULL;
+    tensor_ensure_executed(q);
+    if (!q->data) { tensor_free(q); return NULL; }
+
+    int8_t* qdata = (int8_t*)q->data;
+    for (size_t i = 0; i < weight->numel; i++) {
+        float v = tensor_get_float(weight, i);
+        int32_t qi = (int32_t)roundf(v / qp.scale) + qp.zero_point;
+        if (qi < -128) qi = -128;
+        if (qi > 127) qi = 127;
+        qdata[i] = (int8_t)qi;
+    }
+
+    q->quant_type       = CML_QUANT_AFFINE_INT8;
+    q->quant_scale      = qp.scale;
+    q->quant_zero_point = qp.zero_point;
+    return q;
+}
+
+int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale,
+                            int32_t zero_point, float* y, int M, int K, int N) {
+    if (!x || !w || !y || M <= 0 || K <= 0 || N <= 0)
+        return -1;
+
+    for (int m = 0; m < M; m++) {
+        float* yr       = y + (size_t)m * N;
+        const float* xr = x + (size_t)m * K;
+        memset(yr, 0, (size_t)N * sizeof(float));
+
+        float xsum = 0.0f;
+        for (int k = 0; k < K; k++) {
+            float xmk = xr[k];
+            xsum += xmk;
+            const int8_t* wr = w + (size_t)k * N;
+            /* contiguous in n — the compiler auto-vectorizes this */
+            for (int n = 0; n < N; n++)
+                yr[n] += xmk * (float)wr[n];
+        }
+
+        if (zero_point != 0) {
+            float zc = (float)zero_point * xsum;
+            for (int n = 0; n < N; n++)
+                yr[n] = scale * (yr[n] - zc);
+        } else {
+            for (int n = 0; n < N; n++)
+                yr[n] *= scale;
+        }
+    }
+    return 0;
+}
+
 Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParams* out_params) {
     if (!tensor) {
         LOG_ERROR("cml_quantize_uint8: NULL tensor");

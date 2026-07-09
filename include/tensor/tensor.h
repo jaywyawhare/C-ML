@@ -41,6 +41,7 @@ typedef enum {
     CML_QUANT_NONE = 0,
     CML_QUANT_GGUF_Q8_0,
     CML_QUANT_GGUF_Q4_0,
+    CML_QUANT_AFFINE_INT8, /* per-tensor affine int8: q = round(x/scale)+zero_point */
 } CMLQuantType;
 
 typedef struct Tensor {
@@ -84,6 +85,10 @@ typedef struct Tensor {
     CMLQuantType quant_type;
     void* quant_data;
     size_t quant_data_bytes;
+    /* Affine-int8 dequant params (used when quant_type == CML_QUANT_AFFINE_INT8;
+     * the int8 weights live in ->data). dequant = (q - zero_point) * scale. */
+    float quant_scale;
+    int32_t quant_zero_point;
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);

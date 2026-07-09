@@ -24,6 +24,24 @@ Tensor* cml_dequantize_int8(Tensor* tensor, const QuantParams* params);
 Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParams* out_params);
 Tensor* cml_dequantize_uint8(Tensor* tensor, const QuantParams* params);
 
+/*
+ * Weight-only affine-int8 quantization for matmul.
+ *
+ * cml_quantize_weight_int8 quantizes a 2D [K,N] float weight into an int8
+ * tensor that carries its affine params (quant_type = CML_QUANT_AFFINE_INT8,
+ * quant_scale/quant_zero_point set, int8 data in ->data).  When such a tensor is
+ * the right-hand operand of a matmul, the executor dispatches to the fast
+ * integer-weight path below instead of dequantizing to f32 first.
+ */
+Tensor* cml_quantize_weight_int8(Tensor* weight, bool symmetric);
+
+/*
+ * y[M,N] = scale * ( x[M,K] @ w[K,N] - zero_point * rowsum(x) )
+ * where w is int8 and x/y are float32.  Returns 0 on success, -1 on bad args.
+ */
+int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale,
+                            int32_t zero_point, float* y, int M, int K, int N);
+
 /* NF4 (Normal Float 4-bit) lookup table - 16 values optimal for normal distribution */
 extern const float CML_NF4_TABLE[16];
 
