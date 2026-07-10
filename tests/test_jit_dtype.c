@@ -25,6 +25,10 @@ static const TensorConfig cfg_f64 = {.dtype = DTYPE_FLOAT64, .device = DEVICE_CP
                                      .has_dtype = true, .has_device = true};
 static const TensorConfig cfg_f32 = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                                      .has_dtype = true, .has_device = true};
+static const TensorConfig cfg_i32 = {.dtype = DTYPE_INT32, .device = DEVICE_CPU,
+                                     .has_dtype = true, .has_device = true};
+static const TensorConfig cfg_i64 = {.dtype = DTYPE_INT64, .device = DEVICE_CPU,
+                                     .has_dtype = true, .has_device = true};
 
 int main(void) {
     printf("=== JIT typed codegen (f64) ===\n");
@@ -101,6 +105,30 @@ int main(void) {
         gok = gd[0] == 2.0f && gd[1] == 10.0f && gd[2] == 23.0f;
     }
     check("jit_gather_2d", gok);
+
+    /* JIT integer codegen: i32/i64 add/mul/neg with exact integer results. */
+    int32_t ia[] = {16777216, 3, -5};   /* 2^24 (not exact in f32) */
+    int32_t ib[] = {1, 4, 5};
+    Tensor* i0 = tensor_from_data(ia, (int[]){3}, 1, &cfg_i32);
+    Tensor* i1 = tensor_from_data(ib, (int[]){3}, 1, &cfg_i32);
+    Tensor* isum = uop_add(i0, i1);      /* [16777217, 7, 0] */
+    Tensor* ineg = uop_neg(i0);          /* [-16777216, -3, 5] */
+    int64_t la[] = {1000000, 7};
+    int64_t lb[] = {1000000, 8};
+    Tensor* l0 = tensor_from_data(la, (int[]){2}, 1, &cfg_i64);
+    Tensor* l1 = tensor_from_data(lb, (int[]){2}, 1, &cfg_i64);
+    Tensor* lmul = uop_mul(l0, l1);      /* [1e12, 56] */
+    cml_llvm_execute(be, cml_ir_get_or_create_context());
+    int iok = isum->data && ineg->data && lmul->data;
+    if (iok) {
+        const int32_t* s = (const int32_t*)isum->data;
+        const int32_t* n2 = (const int32_t*)ineg->data;
+        const int64_t* m = (const int64_t*)lmul->data;
+        iok = s[0] == 16777217 && s[1] == 7 && s[2] == 0 &&
+              n2[0] == -16777216 && n2[2] == 5 &&
+              m[0] == 1000000000000LL && m[1] == 56;
+    }
+    check("jit_integer_codegen", iok);
 
     cml_llvm_backend_destroy(be);
     printf("\nResults: %d/%d passed\n", g_pass, g_total);

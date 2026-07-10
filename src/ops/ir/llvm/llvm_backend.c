@@ -205,10 +205,17 @@ static void close_loop(LLVMBuilderRef bld, LoopInfo* info,
     LLVMAddIncoming(info->i, in_vals, in_bbs, 2);
 }
 
-/* Element LLVM type for a tensor dtype the JIT emits kernels for (f32/f64). */
+/* Element LLVM type for a tensor dtype the JIT emits kernels for (f32/f64/int). */
 static LLVMTypeRef elem_type(LLVMContextRef ctx, DType dt) {
-    return (dt == DTYPE_FLOAT64) ? LLVMDoubleTypeInContext(ctx)
-                                 : LLVMFloatTypeInContext(ctx);
+    switch (dt) {
+    case DTYPE_FLOAT64: return LLVMDoubleTypeInContext(ctx);
+    case DTYPE_INT64:   return LLVMInt64TypeInContext(ctx);
+    case DTYPE_INT32:   return LLVMInt32TypeInContext(ctx);
+    default:            return LLVMFloatTypeInContext(ctx);
+    }
+}
+static int dtype_is_int_jit(DType dt) {
+    return dt == DTYPE_INT32 || dt == DTYPE_INT64;
 }
 
 /* Resolve an input's element index at loop position i for a shape known at
@@ -292,6 +299,30 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef v1   = LLVMBuildLoad2(bld, f32, gep1, "v1");
 
     LLVMValueRef result = NULL;
+    if (dtype_is_int_jit(dt)) {
+        /* Integer arithmetic (i32/i64). Only add/sub/mul/div/max are routed to
+         * the JIT for integer dtypes (see the dispatch guard). */
+        switch (type) {
+        case UOP_ADD: result = LLVMBuildAdd(bld, v0, v1, "r"); break;
+        case UOP_SUB: result = LLVMBuildSub(bld, v0, v1, "r"); break;
+        case UOP_MUL: result = LLVMBuildMul(bld, v0, v1, "r"); break;
+        case UOP_DIV: {
+            /* guard divide-by-zero: y==0 ? 0 : x/y (matches interpreter) */
+            LLVMValueRef zero = LLVMConstInt(f32, 0, 0);
+            LLVMValueRef isz  = LLVMBuildICmp(bld, LLVMIntEQ, v1, zero, "isz");
+            LLVMValueRef safe = LLVMBuildSelect(bld, isz, LLVMConstInt(f32, 1, 0), v1, "safe");
+            LLVMValueRef q    = LLVMBuildSDiv(bld, v0, safe, "q");
+            result = LLVMBuildSelect(bld, isz, zero, q, "r");
+            break;
+        }
+        case UOP_MAX: {
+            LLVMValueRef cmp = LLVMBuildICmp(bld, LLVMIntSGT, v0, v1, "gt");
+            result = LLVMBuildSelect(bld, cmp, v0, v1, "r");
+            break;
+        }
+        default: result = LLVMBuildAdd(bld, v0, v1, "r"); break;
+        }
+    } else
     switch (type) {
     case UOP_ADD:  result = LLVMBuildFAdd(bld, v0, v1, "r"); break;
     case UOP_SUB:  result = LLVMBuildFSub(bld, v0, v1, "r"); break;
@@ -366,6 +397,23 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef val    = LLVMBuildLoad2(bld, f32, gep_in, "val");
 
     LLVMValueRef result = NULL;
+    if (dtype_is_int_jit(dt)) {
+        /* Integer unary (i32/i64): only neg/abs/square are routed here. */
+        LLVMValueRef zero = LLVMConstInt(f32, 0, 0);
+        switch (type) {
+        case UOP_NEG:    result = LLVMBuildSub(bld, zero, val, "r"); break;
+        case UOP_SQUARE: result = LLVMBuildMul(bld, val, val, "r"); break;
+        case UOP_ABS: {
+            LLVMValueRef neg = LLVMBuildSub(bld, zero, val, "neg");
+            LLVMValueRef isn = LLVMBuildICmp(bld, LLVMIntSLT, val, zero, "isn");
+            result = LLVMBuildSelect(bld, isn, neg, val, "r");
+            break;
+        }
+        default: result = val; break;
+        }
+        goto store_result;
+    }
+
     LLVMValueRef zero_f = LLVMConstReal(f32, 0.0);
     LLVMValueRef one_f  = LLVMConstReal(f32, 1.0);
 
@@ -558,6 +606,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
 
+store_result:;
     LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
     LLVMBuildStore(bld, result, gep_out);
     close_loop(bld, &loop, entry);
@@ -1222,12 +1271,17 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 
     UOpType type = node->type;
 
-    /* The JIT emits typed kernels for float32 (all ops) and float64 (elementwise
-     * binary/unary). Any other dtype, or mixed-dtype operands, go to the
-     * interpreter's dtype-generic path. */
+    /* The JIT emits typed kernels for float32 (all ops), float64 (elementwise
+     * binary/unary), and int32/int64 (a restricted elementwise set: add/sub/mul/
+     * div/max, neg/abs/square). Any other dtype/op, or mixed-dtype operands, go to
+     * the interpreter's dtype-generic path. */
     DType edt = out->dtype;
     int f64_ok = (edt == DTYPE_FLOAT64) && (is_binary_op(type) || is_unary_op(type));
-    if (edt != DTYPE_FLOAT32 && !f64_ok)
+    int int_ok = (edt == DTYPE_INT32 || edt == DTYPE_INT64) &&
+                 (type == UOP_ADD || type == UOP_SUB || type == UOP_MUL ||
+                  type == UOP_DIV || type == UOP_MAX ||
+                  type == UOP_NEG || type == UOP_ABS || type == UOP_SQUARE);
+    if (edt != DTYPE_FLOAT32 && !f64_ok && !int_ok)
         return cpu_execute_node(node);
     for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
         if (node->inputs[_i] && node->inputs[_i]->dtype != edt)
