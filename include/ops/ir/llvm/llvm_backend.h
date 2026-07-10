@@ -26,6 +26,8 @@ void cml_llvm_backend_destroy(CMLLLVMBackend* backend);
 int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir);
 int cml_llvm_execute_up_to(CMLLLVMBackend* backend, CMLGraph_t ir,
                            struct IRNode* target_node);
+/* Execute one node via the JIT (falls back to the interpreter internally). */
+int cml_llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node);
 
 #ifdef __cplusplus
 }

@@ -47,6 +47,22 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
     }
     return g_llvm_backend;
 }
+
+/* The shape-specialized LLVM JIT is the default execution path; it falls back to
+ * the scalar interpreter per-node for unsupported ops/shapes. Set CML_DISABLE_JIT=1
+ * (or CML_BACKEND=interp) to force the pure interpreter (reference path). */
+static int cml_ir_use_jit(void) {
+    static int checked = 0, enabled = 1;
+    if (!checked) {
+        const char* dis = getenv("CML_DISABLE_JIT");
+        if (dis && dis[0] == '1') enabled = 0;
+        const char* be = getenv("CML_BACKEND");
+        if (be && (strcasecmp(be, "interp") == 0 || strcasecmp(be, "interpreter") == 0))
+            enabled = 0;
+        checked = 1;
+    }
+    return enabled;
+}
 #endif
 
 #define BUFFER_CACHE_MIN_BUCKET 6  // 64 bytes (2^6)
@@ -4608,6 +4624,11 @@ int cpu_execute_ir(CMLGraph_t ir) {
         }
     }
 
+#ifdef CML_HAS_LLVM_BACKEND
+    /* Default path: JIT each node (shape-specialized SIMD), interpreter fallback. */
+    CMLLLVMBackend* jit = cml_ir_use_jit() ? cml_get_llvm_backend() : NULL;
+#endif
+
     struct IRNode* node = ir->head;
     while (node) {
         // Skip nodes that have already been executed and still have valid output
@@ -4622,7 +4643,18 @@ int cpu_execute_ir(CMLGraph_t ir) {
             continue;
         }
 
-        if (cpu_execute_node(node) != 0) {
+        int _rc;
+#ifdef CML_HAS_LLVM_BACKEND
+        if (jit) {
+            _rc = cml_llvm_execute_node(jit, node);
+            if (_rc != 0) _rc = cpu_execute_node(node); /* interpreter fallback */
+        } else {
+            _rc = cpu_execute_node(node);
+        }
+#else
+        _rc = cpu_execute_node(node);
+#endif
+        if (_rc != 0) {
             LOG_WARNING("CPU fallback: failed to execute node");
         }
         g_total_nodes_executed++;

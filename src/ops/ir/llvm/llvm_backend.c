@@ -1139,8 +1139,11 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
             return cpu_execute_node(node);
     }
 
-    /* Ops that still go to the CPU scalar path. */
-    if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE)
+    /* Ops that go to the CPU interpreter: conv/stride/slice are unsupported by
+     * the JIT; gather is an indexing op whose JIT kernel's layout assumptions
+     * don't match the interpreter for all cases (correctness over JIT here). */
+    if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE ||
+        type == UOP_GATHER)
         return cpu_execute_node(node);
 
     /* Prefer BLAS for matmul when available; also defer quantized-weight matmul
@@ -1176,6 +1179,11 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         s1 = (int64_t)node->inputs[0]->numel;
     } else if (is_reduction(type)) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
+            return cpu_execute_node(node);
+        /* The JIT reduction kernel is a GLOBAL reduce (all elements -> scalar).
+         * Per-axis reductions (output numel > 1) must use the interpreter, which
+         * handles the axis layout. */
+        if (out->numel != 1)
             return cpu_execute_node(node);
         s0 = (int64_t)node->inputs[0]->numel;
     } else if (type == UOP_MATMUL) {
@@ -1381,6 +1389,13 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 /* -------------------------------------------------------------------------
  * Public graph execution
  * ---------------------------------------------------------------------- */
+/* Execute a single node via the JIT (falls back to the interpreter internally
+ * for unsupported ops / shapes). Public entry for the default execution path. */
+int cml_llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
+    if (!backend || !node) return -1;
+    return llvm_execute_node(backend, node);
+}
+
 int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir) {
     if (!backend || !ir) return -1;
     struct IRNode* node = ir->head;
