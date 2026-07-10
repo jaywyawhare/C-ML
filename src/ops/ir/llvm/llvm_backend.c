@@ -1246,9 +1246,13 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 
     Tensor* out = node->output;
     if (!out->data && out->numel > 0) {
-        out->data = cml_buffer_cache_alloc(out->numel * sizeof(float));
+        /* Size by the actual dtype (f64/int kernels write 8 bytes/elem, not 4),
+         * and flag the buffer so tensor_free routes it to cml_buffer_cache_free
+         * (not cml_free, which would over-read a nonexistent header). */
+        out->data = cml_buffer_cache_alloc(out->numel * cml_dtype_size(out->dtype));
         if (!out->data) { LOG_ERROR("LLVM: OOM for output tensor"); return -1; }
-        out->owns_data = true;
+        out->owns_data        = true;
+        out->from_buffer_cache = true;
     }
 
     UOpType type = node->type;

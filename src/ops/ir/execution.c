@@ -4674,7 +4674,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
                 if (n->output && n->output->data && new_plan->buffers[idx] &&
                     new_plan->buffer_sizes[idx] == (size_t)n->output->numel) {
                     memcpy(new_plan->buffers[idx], n->output->data,
-                           n->output->numel * sizeof(float));
+                           n->output->numel * cml_dtype_size(n->output->dtype));
                 }
                 idx++;
                 n = n->next;

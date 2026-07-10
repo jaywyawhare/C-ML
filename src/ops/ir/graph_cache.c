@@ -50,6 +50,9 @@ uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
         for (int i = 0; i < node->output->ndim; i++) {
             hash = hash_combine(hash, (uint64_t)node->output->shape[i]);
         }
+        /* dtype affects buffer byte-size, so a plan sized for one dtype must not
+         * be reused for a same-shape graph of another dtype. */
+        hash = hash_combine(hash, (uint64_t)node->output->dtype);
     }
 
     hash = hash_combine(hash, (uint64_t)node->num_inputs);
@@ -223,7 +226,10 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
             node->output->numel < ((size_t)1 << 40)) {
             plan->buffer_sizes[idx]   = node->output->numel;
             plan->output_tensors[idx] = node->output;
-            size_t nbytes             = (size_t)node->output->numel * sizeof(float);
+            /* Size by the actual dtype — bool/int/f16/f64 outputs are not 4 bytes
+             * (an f32-hardcoded size corrupts the heap for non-f32 tensors). */
+            size_t nbytes             = (size_t)node->output->numel *
+                                        cml_dtype_size(node->output->dtype);
             plan->buffers[idx] =
                 cml_aligned_alloc(cml_alloc_size_aligned(nbytes, 32), 32);
             if (!plan->buffers[idx]) {
