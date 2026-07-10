@@ -717,12 +717,12 @@ static int is_elementwise_binary(UOpType t) {
     case UOP_CMPEQ: CML_BCAST_BINARY(CTYPE, (CTYPE)(x == y)); return 0;        \
     case UOP_CMPNE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x != y)); return 0;
 
-#define CML_BINARY_FLOAT(CTYPE, EPS)                                           \
+#define CML_BINARY_FLOAT(CTYPE)                                                \
     switch (type) {                                                            \
     case UOP_ADD: CML_BCAST_BINARY(CTYPE, x + y); return 0;                    \
     case UOP_SUB: CML_BCAST_BINARY(CTYPE, x - y); return 0;                    \
     case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
-    case UOP_DIV: CML_BCAST_BINARY(CTYPE, x / (y + (CTYPE)(EPS))); return 0;   \
+    case UOP_DIV: CML_BCAST_BINARY(CTYPE, x / y); return 0;  /* IEEE: /0 = inf */ \
     case UOP_MAX: CML_BCAST_BINARY(CTYPE, x > y ? x : y); return 0;            \
     CML_CMP_CASES(CTYPE)                                                       \
     default: return -1;                                                        \
@@ -743,8 +743,8 @@ static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n,
                               const void* in2, size_t in2_n, void* out, size_t n,
                               DType dt) {
     switch (dt) {
-    case DTYPE_FLOAT32: CML_BINARY_FLOAT(float, 1e-8f);
-    case DTYPE_FLOAT64: CML_BINARY_FLOAT(double, 1e-12);
+    case DTYPE_FLOAT32: CML_BINARY_FLOAT(float);
+    case DTYPE_FLOAT64: CML_BINARY_FLOAT(double);
     case DTYPE_INT64:   CML_BINARY_INT(int64_t);
     case DTYPE_INT32:   CML_BINARY_INT(int32_t);
     case DTYPE_INT16:   CML_BINARY_INT(int16_t);
@@ -792,9 +792,9 @@ static int cpu_unary_generic(UOpType type, const void* in, size_t in_n,
         case UOP_ABS:     CML_UNARY_MAP(float, fabsf(x));               return 0;
         case UOP_SQUARE:  CML_UNARY_MAP(float, x * x);                  return 0;
         case UOP_EXP:     CML_UNARY_MAP(float, expf(x));                return 0;
-        case UOP_LOG:     CML_UNARY_MAP(float, logf(x + 1e-8f));        return 0;
-        case UOP_SQRT:    CML_UNARY_MAP(float, sqrtf(fabsf(x)));        return 0;
-        case UOP_RSQRT:   CML_UNARY_MAP(float, 1.0f / sqrtf(fabsf(x) + 1e-8f)); return 0;
+        case UOP_LOG:     CML_UNARY_MAP(float, logf(x));               return 0;
+        case UOP_SQRT:    CML_UNARY_MAP(float, sqrtf(x));              return 0;
+        case UOP_RSQRT:   CML_UNARY_MAP(float, 1.0f / sqrtf(x));       return 0;
         case UOP_RECIP:   CML_UNARY_MAP(float, 1.0f / x);              return 0;
         case UOP_SIN:     CML_UNARY_MAP(float, sinf(x));               return 0;
         case UOP_COS:     CML_UNARY_MAP(float, cosf(x));               return 0;
@@ -809,9 +809,9 @@ static int cpu_unary_generic(UOpType type, const void* in, size_t in_n,
         case UOP_ABS:     CML_UNARY_MAP(double, fabs(x));               return 0;
         case UOP_SQUARE:  CML_UNARY_MAP(double, x * x);                 return 0;
         case UOP_EXP:     CML_UNARY_MAP(double, exp(x));                return 0;
-        case UOP_LOG:     CML_UNARY_MAP(double, log(x + 1e-12));        return 0;
-        case UOP_SQRT:    CML_UNARY_MAP(double, sqrt(fabs(x)));         return 0;
-        case UOP_RSQRT:   CML_UNARY_MAP(double, 1.0 / sqrt(fabs(x) + 1e-12)); return 0;
+        case UOP_LOG:     CML_UNARY_MAP(double, log(x));               return 0;
+        case UOP_SQRT:    CML_UNARY_MAP(double, sqrt(x));              return 0;
+        case UOP_RSQRT:   CML_UNARY_MAP(double, 1.0 / sqrt(x));        return 0;
         case UOP_RECIP:   CML_UNARY_MAP(double, 1.0 / x);              return 0;
         case UOP_SIN:     CML_UNARY_MAP(double, sin(x));               return 0;
         case UOP_COS:     CML_UNARY_MAP(double, cos(x));               return 0;
@@ -1242,7 +1242,7 @@ int cpu_execute_node(struct IRNode* node) {
             for (size_t i = 0; i < out->numel; i++) {
                 size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
                 size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
-                out_data[i] = in1_data[i1] / (in2_data[i2] + 1e-8f);
+                out_data[i] = in1_data[i1] / in2_data[i2];
             }
         }
         break;
@@ -1278,7 +1278,7 @@ int cpu_execute_node(struct IRNode* node) {
             simd_log_f32(in1_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
-                out_data[i] = logf(in1_data[i % in1_numel] + 1e-8f);
+                out_data[i] = logf(in1_data[i % in1_numel]);
             }
         }
         break;
@@ -1290,7 +1290,7 @@ int cpu_execute_node(struct IRNode* node) {
             simd_sqrt_f32(in1_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
-                out_data[i] = sqrtf(fabsf(in1_data[i % in1_numel]));
+                out_data[i] = sqrtf(in1_data[i % in1_numel]);
             }
         }
         break;
@@ -1812,7 +1812,7 @@ int cpu_execute_node(struct IRNode* node) {
         if (!in1_data)
             return -1;
         for (size_t i = 0; i < out->numel; i++)
-            out_data[i] = log2f(in1_data[i % in1_numel] + 1e-8f);
+            out_data[i] = log2f(in1_data[i % in1_numel]);
         break;
 
     case UOP_EXP2:
@@ -1857,7 +1857,7 @@ int cpu_execute_node(struct IRNode* node) {
             return -1;
         for (size_t i = 0; i < out->numel; i++) {
             float x     = in1_data[i % in1_numel];
-            out_data[i] = 1.0f / sqrtf(fabsf(x) + 1e-8f);
+            out_data[i] = 1.0f / sqrtf(x);
         }
         break;
 
@@ -2559,7 +2559,7 @@ int cpu_execute_node(struct IRNode* node) {
         for (size_t i = 0; i < out->numel; i++) {
             size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
             size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
-            out_data[i] = floorf(in1_data[i1] / (in2_data[i2] + 1e-8f));
+            out_data[i] = floorf(in1_data[i1] / in2_data[i2]);
         }
         break;
 

@@ -327,12 +327,9 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     case UOP_ADD:  result = LLVMBuildFAdd(bld, v0, v1, "r"); break;
     case UOP_SUB:  result = LLVMBuildFSub(bld, v0, v1, "r"); break;
     case UOP_MUL:  result = LLVMBuildFMul(bld, v0, v1, "r"); break;
-    case UOP_DIV: {
-        LLVMValueRef eps   = LLVMConstReal(f32, 1e-8);
-        LLVMValueRef denom = LLVMBuildFAdd(bld, v1, eps, "denom");
-        result = LLVMBuildFDiv(bld, v0, denom, "r");
+    case UOP_DIV:
+        result = LLVMBuildFDiv(bld, v0, v1, "r");   /* IEEE: /0 = inf */
         break;
-    }
     case UOP_MAX: {
         LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, v0, v1, "gt");
         result = LLVMBuildSelect(bld, cmp, v0, v1, "r");
@@ -426,18 +423,13 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         result = call1(bld, f32, INTR1(mod, ctx, "llvm.fabs", 9, f32), val, "r");
         break;
 
-    case UOP_SQRT: {
-        LLVMValueRef av = call1(bld, f32, INTR1(mod, ctx, "llvm.fabs", 9, f32), val, "av");
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.sqrt", 9, f32), av, "r");
+    case UOP_SQRT:
+        result = call1(bld, f32, INTR1(mod, ctx, "llvm.sqrt", 9, f32), val, "r");
         break;
-    }
 
     case UOP_RSQRT: {
-        LLVMValueRef av  = call1(bld, f32, INTR1(mod, ctx, "llvm.fabs", 9, f32), val, "av");
-        LLVMValueRef sq  = call1(bld, f32, INTR1(mod, ctx, "llvm.sqrt", 9, f32), av, "sq");
-        LLVMValueRef eps = LLVMConstReal(f32, 1e-8f);
-        LLVMValueRef s   = LLVMBuildFAdd(bld, sq, eps, "s");
-        result = LLVMBuildFDiv(bld, one_f, s, "r");
+        LLVMValueRef sq  = call1(bld, f32, INTR1(mod, ctx, "llvm.sqrt", 9, f32), val, "sq");
+        result = LLVMBuildFDiv(bld, one_f, sq, "r");
         break;
     }
 
@@ -453,19 +445,13 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         result = call1(bld, f32, INTR1(mod, ctx, "llvm.exp2", 9, f32), val, "r");
         break;
 
-    case UOP_LOG: {
-        LLVMValueRef eps  = LLVMConstReal(f32, 1e-8f);
-        LLVMValueRef safe = LLVMBuildFAdd(bld, val, eps, "safe");
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.log", 8, f32), safe, "r");
+    case UOP_LOG:
+        result = call1(bld, f32, INTR1(mod, ctx, "llvm.log", 8, f32), val, "r");
         break;
-    }
 
-    case UOP_LOG2: {
-        LLVMValueRef eps  = LLVMConstReal(f32, 1e-8f);
-        LLVMValueRef safe = LLVMBuildFAdd(bld, val, eps, "safe");
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.log2", 9, f32), safe, "r");
+    case UOP_LOG2:
+        result = call1(bld, f32, INTR1(mod, ctx, "llvm.log2", 9, f32), val, "r");
         break;
-    }
 
     case UOP_SIN:
         result = call1(bld, f32, INTR1(mod, ctx, "llvm.sin", 8, f32), val, "r");
@@ -478,9 +464,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     case UOP_TAN: {
         LLVMValueRef s  = call1(bld, f32, INTR1(mod, ctx, "llvm.sin", 8, f32), val, "s");
         LLVMValueRef c  = call1(bld, f32, INTR1(mod, ctx, "llvm.cos", 8, f32), val, "c");
-        LLVMValueRef eps= LLVMConstReal(f32, 1e-8f);
-        LLVMValueRef cd = LLVMBuildFAdd(bld, c, eps, "cd");
-        result = LLVMBuildFDiv(bld, s, cd, "r");
+        result = LLVMBuildFDiv(bld, s, c, "r");
         break;
     }
 
@@ -535,9 +519,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
     case UOP_RECIP: {
-        LLVMValueRef eps = LLVMConstReal(f32, 1e-8f);
-        LLVMValueRef d   = LLVMBuildFAdd(bld, val, eps, "d");
-        result = LLVMBuildFDiv(bld, one_f, d, "r");
+        result = LLVMBuildFDiv(bld, one_f, val, "r");   /* IEEE: 1/0 = inf */
         break;
     }
 

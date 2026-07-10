@@ -47,7 +47,7 @@ void cml_print_simd_caps(void) {
     }
 
 UNARY(simd_exp_f32,     expf(x))
-UNARY(simd_log_f32,     logf(x + 1e-8f))
+UNARY(simd_log_f32,     logf(x))
 UNARY(simd_sqrt_f32,    sqrtf(x))
 UNARY(simd_rsqrt_f32,   1.0f / sqrtf(x))
 UNARY(simd_recip_f32,   1.0f / x)
@@ -78,7 +78,7 @@ BINARY(simd_max_f32,   (x >  y) ? x : y)
 BINARY(simd_add_f32,   x + y)
 BINARY(simd_sub_f32,   x - y)
 BINARY(simd_mul_f32,   x * y)
-BINARY(simd_div_f32,   x / (y + 1e-8f))
+BINARY(simd_div_f32,   x / y)
 
 #undef BINARY
 
