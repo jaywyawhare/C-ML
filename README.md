@@ -74,7 +74,7 @@ int main(void) {
 | **Training** | 11 optimizers, 13 losses, 8 LR schedulers, gradient checkpointing, DDP, pipeline & tensor parallel |
 | **Compiler** | IR fusion (5 patterns), linearization, codegen to C/PTX/SPIR-V/WGSL/MSL, AOT, JIT, kernel cache |
 | **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL — userspace drivers for NV (RM ioctl) and AMD (KFD) |
-| **Runtime** | SIMD (SSE/AVX/AVX-512/NEON), BLAS, TLSF allocator, memory pools, thread pool |
+| **Runtime** | LLVM JIT by default (shape-specialized SIMD; interpreter fallback), multi-dtype compute (f32/f64/f16/bf16/int), BLAS, TLSF allocator, memory pools, thread pool |
 | **I/O** | GGUF, SafeTensors, ONNX, PyTorch .pth, int8/NF4 quantization |
 | **Python** | CFFI bindings, NumPy integration, operator overloading |
 
