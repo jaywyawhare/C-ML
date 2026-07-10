@@ -37,7 +37,7 @@ static float ev2(Tensor* (*op)(Tensor*, Tensor*), float a, float b) {
     Tensor* tb = tensor_from_data((float[]){b}, (int[]){1}, 1, &f32);
     Tensor* r  = op(ta, tb);
     tensor_ensure_executed(r);
-    float v = ((float*)r->data)[0];
+    float v = tensor_get_float(r, 0);   /* dtype-aware: comparisons return bool */
     tensor_free(ta); tensor_free(tb); tensor_free(r);
     return v;
 }
@@ -63,6 +63,19 @@ int main(void) {
     /* reciprocal(0) -> inf */
     check("recip_exact_4",   ev1(uop_recip, 4.0f) == 0.25f);
     check("recip_zero_inf",  isinf(ev1(uop_recip, 0.0f)));
+
+    /* inf/nan propagation (IEEE) */
+    float inf = INFINITY, nan = NAN;
+    check("inf_plus_one",    isinf(ev2(uop_add, inf, 1.0f)));
+    check("inf_minus_inf",   isnan(ev2(uop_sub, inf, inf)));
+    check("inf_times_zero",  isnan(ev2(uop_mul, inf, 0.0f)));
+    check("nan_add",         isnan(ev2(uop_add, nan, 1.0f)));
+    check("nan_mul",         isnan(ev2(uop_mul, nan, 2.0f)));
+
+    /* comparisons with nan (IEEE: all false except !=) — results are bool 0/1 */
+    check("nan_lt_false",    ev2(uop_cmplt, nan, 1.0f) == 0.0f);
+    check("nan_eq_false",    ev2(uop_cmpeq, nan, nan) == 0.0f);
+    check("nan_ne_true",     ev2(uop_cmpne, nan, nan) == 1.0f);
 
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
