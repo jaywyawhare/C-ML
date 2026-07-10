@@ -650,6 +650,101 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
 }
 
 /* -------------------------------------------------------------------------
+ * Per-axis reduction: out[p] = reduce over `count` elements at stride `inner`
+ * starting at base(p) = (p/inner)*count*inner + (p%inner), for p in [0, nout).
+ * This is the same (outer,inner,count) formulation the interpreter uses; all
+ * three are baked as constants. Same signature as the global reducer (the i64
+ * param is ignored) so the dispatch call-through is uniform.
+ * ---------------------------------------------------------------------- */
+static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
+                                          const char* fn_name, int64_t outer,
+                                          int64_t inner, int64_t count) {
+    LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
+    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
+    LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
+    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
+    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+
+    LLVMTypeRef params[] = { ptr, ptr, i64 };
+    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 3, 0);
+    LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
+    add_noalias(ctx, fn, 2);
+    LLVMValueRef in_p  = LLVMGetParam(fn, 0);
+    LLVMValueRef out_p = LLVMGetParam(fn, 1);
+
+    LLVMValueRef c_nout   = LLVMConstInt(i64, (unsigned long long)(outer * inner), 0);
+    LLVMValueRef c_inner  = LLVMConstInt(i64, (unsigned long long)inner, 0);
+    LLVMValueRef c_count  = LLVMConstInt(i64, (unsigned long long)count, 0);
+    LLVMValueRef c_cinner = LLVMConstInt(i64, (unsigned long long)(count * inner), 0);
+    LLVMValueRef z   = LLVMConstInt(i64, 0, 0);
+    LLVMValueRef one = LLVMConstInt(i64, 1, 0);
+    float init_val = (type == UOP_MAX_REDUCE) ? -3.402823466e+38f : 0.0f;
+    LLVMValueRef init = LLVMConstReal(f32, (double)init_val);
+
+    LLVMBasicBlockRef entry  = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
+    LLVMBasicBlockRef p_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "p.hdr");
+    LLVMBasicBlockRef p_body = LLVMAppendBasicBlockInContext(ctx, fn, "p.body");
+    LLVMBasicBlockRef r_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "r.hdr");
+    LLVMBasicBlockRef r_body = LLVMAppendBasicBlockInContext(ctx, fn, "r.body");
+    LLVMBasicBlockRef r_done = LLVMAppendBasicBlockInContext(ctx, fn, "r.done");
+    LLVMBasicBlockRef p_exit = LLVMAppendBasicBlockInContext(ctx, fn, "p.exit");
+
+    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMPositionBuilderAtEnd(bld, entry);
+    LLVMBuildBr(bld, p_hdr);
+
+    LLVMPositionBuilderAtEnd(bld, p_hdr);
+    LLVMValueRef p = LLVMBuildPhi(bld, i64, "p");
+    LLVMBuildCondBr(bld, LLVMBuildICmp(bld, LLVMIntULT, p, c_nout, "pc"), p_body, p_exit);
+
+    LLVMPositionBuilderAtEnd(bld, p_body);
+    LLVMValueRef base = LLVMBuildAdd(bld,
+        LLVMBuildMul(bld, LLVMBuildUDiv(bld, p, c_inner, "pd"), c_cinner, "b0"),
+        LLVMBuildURem(bld, p, c_inner, "pm"), "base");
+    LLVMBuildBr(bld, r_hdr);
+
+    LLVMPositionBuilderAtEnd(bld, r_hdr);
+    LLVMValueRef r   = LLVMBuildPhi(bld, i64, "r");
+    LLVMValueRef acc = LLVMBuildPhi(bld, f32, "acc");
+    LLVMBuildCondBr(bld, LLVMBuildICmp(bld, LLVMIntULT, r, c_count, "rc"), r_body, r_done);
+
+    LLVMPositionBuilderAtEnd(bld, r_body);
+    LLVMValueRef idx = LLVMBuildAdd(bld, base, LLVMBuildMul(bld, r, c_inner, "ri"), "idx");
+    LLVMValueRef v   = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, in_p, &idx, 1, "gp"), "v");
+    LLVMValueRef nacc;
+    if (type == UOP_MAX_REDUCE) {
+        LLVMValueRef c = LLVMBuildFCmp(bld, LLVMRealOGT, v, acc, "gt");
+        nacc = LLVMBuildSelect(bld, c, v, acc, "mx");
+    } else {
+        nacc = LLVMBuildFAdd(bld, acc, v, "s");
+    }
+    LLVMValueRef rnext = LLVMBuildAdd(bld, r, one, "rn");
+    LLVMBuildBr(bld, r_hdr);
+
+    LLVMValueRef r_in[]   = { z, rnext };  LLVMBasicBlockRef rb[] = { p_body, r_body };
+    LLVMAddIncoming(r, r_in, rb, 2);
+    LLVMValueRef acc_in[] = { init, nacc }; LLVMAddIncoming(acc, acc_in, rb, 2);
+
+    LLVMPositionBuilderAtEnd(bld, r_done);
+    LLVMValueRef final_v = acc;
+    if (type == UOP_MEAN) {
+        LLVMValueRef cf = LLVMBuildUIToFP(bld, c_count, f32, "cf");
+        final_v = LLVMBuildFDiv(bld, acc, cf, "mean");
+    }
+    LLVMBuildStore(bld, final_v, LLVMBuildGEP2(bld, f32, out_p, &p, 1, "op"));
+    LLVMValueRef pnext = LLVMBuildAdd(bld, p, one, "pn");
+    LLVMBuildBr(bld, p_hdr);
+
+    LLVMValueRef p_in[] = { z, pnext }; LLVMBasicBlockRef pb[] = { entry, r_done };
+    LLVMAddIncoming(p, p_in, pb, 2);
+
+    LLVMPositionBuilderAtEnd(bld, p_exit);
+    LLVMBuildRetVoid(bld);
+    LLVMDisposeBuilder(bld);
+    return mod;
+}
+
+/* -------------------------------------------------------------------------
  * Fill: out[i] = val  (val passed at runtime — allows caching)
  * Signature: void(ptr out, i64 n, float val)
  * ---------------------------------------------------------------------- */
@@ -1180,12 +1275,27 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     } else if (is_reduction(type)) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
             return cpu_execute_node(node);
-        /* The JIT reduction kernel is a GLOBAL reduce (all elements -> scalar).
-         * Per-axis reductions (output numel > 1) must use the interpreter, which
-         * handles the axis layout. */
-        if (out->numel != 1)
+        /* Compute the (outer, inner, count) reduction layout (global reduce is
+         * outer=inner=1, count=numel). s0=numel (global), s1/s2/s3=outer/inner/count. */
+        Tensor* inp   = node->inputs[0];
+        int64_t outer = 1, inner = 1, count = (int64_t)inp->numel;
+        ReduceParams* rp = (ReduceParams*)node->params;
+        if (rp && rp->num_dims == 1 && inp->ndim >= 1) {
+            int rdim = rp->dims[0];
+            if (rdim < 0) rdim += inp->ndim;
+            if (rdim >= 0 && rdim < inp->ndim) {
+                count = (int64_t)inp->shape[rdim];
+                inner = 1;
+                for (int d = rdim + 1; d < inp->ndim; d++) inner *= (int64_t)inp->shape[d];
+                outer = 1;
+                for (int d = 0; d < rdim; d++) outer *= (int64_t)inp->shape[d];
+            }
+        }
+        /* If the derived layout doesn't match the output size, fall back. */
+        if ((int64_t)out->numel != outer * inner)
             return cpu_execute_node(node);
-        s0 = (int64_t)node->inputs[0]->numel;
+        s0 = (int64_t)inp->numel;
+        s1 = outer; s2 = inner; s3 = count;
     } else if (type == UOP_MATMUL) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
@@ -1251,7 +1361,10 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         } else if (is_unary_op(type)) {
             mod = build_unary_op(kern_ctx, type, fn_name, s0, s1, edt);
         } else if (is_reduction(type)) {
-            mod = build_reduction(kern_ctx, type, fn_name, s0);
+            if (out->numel == 1)
+                mod = build_reduction(kern_ctx, type, fn_name, s0);           /* global */
+            else
+                mod = build_reduction_axis(kern_ctx, type, fn_name, s1, s2, s3); /* per-axis */
         } else if (type == UOP_MATMUL) {
             mod = build_matmul_kernel(kern_ctx, fn_name, s0, s1, s2);
         } else if (type == UOP_FILL) {

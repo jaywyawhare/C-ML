@@ -11,6 +11,7 @@
 #include "ops/uops.h"
 #include "ops/ir/context.h"
 #include "ops/ir/llvm/llvm_backend.h"
+#include <string.h>
 
 static int g_pass = 0, g_total = 0;
 static int check(const char* name, int ok) {
@@ -67,6 +68,25 @@ int main(void) {
     const float* zd = (const float*)z->data;
     check("jit_f32_still_works",
           z->dtype == DTYPE_FLOAT32 && zd && zd[0] == 5.0f && zd[1] == 7.0f && zd[2] == 9.0f);
+
+    /* JIT per-axis reduction: [2,3] f32, sum over each axis. */
+    float rv[] = {1, 2, 3, 4, 5, 6};   /* [[1,2,3],[4,5,6]] */
+    Tensor* rt   = tensor_from_data(rv, (int[]){2, 3}, 2, &cfg_f32);
+    int d1 = 1; ReduceParams rp1 = {&d1, 1, false};
+    Tensor* s1t  = uop_sum(rt, &rp1);   /* -> [6, 15] */
+    int d0 = 0; ReduceParams rp0 = {&d0, 1, false};
+    Tensor* s0t  = uop_sum(rt, &rp0);   /* -> [5, 7, 9] */
+    Tensor* gsum = uop_sum(rt, &(ReduceParams){NULL, 0, false});  /* global -> 21 */
+    cml_llvm_execute(be, cml_ir_get_or_create_context());
+    int rok = s1t->data && s0t->data && gsum->data;
+    if (rok) {
+        const float* a1 = (const float*)s1t->data;
+        const float* a0 = (const float*)s0t->data;
+        rok = s1t->numel == 2 && a1[0] == 6 && a1[1] == 15 &&
+              s0t->numel == 3 && a0[0] == 5 && a0[1] == 7 && a0[2] == 9 &&
+              ((const float*)gsum->data)[0] == 21.0f;
+    }
+    check("jit_reduction_axis_and_global", rok);
 
     cml_llvm_backend_destroy(be);
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
