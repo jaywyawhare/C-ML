@@ -1532,8 +1532,12 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
         return NULL;
     }
 
-    /* Output shape: indices.shape + input.shape[gather_dim+1:] (NumPy-style gather). */
-    int out_ndim = indices->ndim + input->ndim - 1;
+    /* Output shape: indices.shape + input.shape[gather_dim+1:] (NumPy-style gather).
+     * out_ndim = indices->ndim + (input->ndim - 1 - gather_dim); the old formula
+     * (indices->ndim + input->ndim - 1) over-counted by gather_dim and left the
+     * trailing shape entries uninitialized (garbage numel) for non-zero dims. */
+    int tail     = input->ndim - 1 - gather_dim;
+    int out_ndim = indices->ndim + tail;
     if (out_ndim <= 0) {
         CML_ERR_NULL("uop_gather: invalid output rank");
     }
@@ -1541,7 +1545,6 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
     if (!out_shape)
         return NULL;
     memcpy(out_shape, indices->shape, (size_t)indices->ndim * sizeof(int));
-    int tail = input->ndim - 1 - gather_dim;
     if (tail > 0) {
         memcpy(out_shape + indices->ndim, input->shape + gather_dim + 1,
                (size_t)tail * sizeof(int));

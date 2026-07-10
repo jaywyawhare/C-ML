@@ -1234,11 +1234,8 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
             return cpu_execute_node(node);
     }
 
-    /* Ops that go to the CPU interpreter: conv/stride/slice are unsupported by
-     * the JIT; gather is an indexing op whose JIT kernel's layout assumptions
-     * don't match the interpreter for all cases (correctness over JIT here). */
-    if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE ||
-        type == UOP_GATHER)
+    /* Ops that always go to the CPU interpreter (unsupported by the JIT). */
+    if (type == UOP_CONV2D || type == UOP_STRIDE || type == UOP_SLICE)
         return cpu_execute_node(node);
 
     /* Prefer BLAS for matmul when available; also defer quantized-weight matmul
@@ -1317,8 +1314,18 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     } else if (type == UOP_GATHER) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
-        Tensor* inp = node->inputs[0];
-        if (inp->ndim < 2) return cpu_execute_node(node);
+        Tensor* inp  = node->inputs[0];
+        Tensor* idx  = node->inputs[1];
+        /* The JIT kernel implements exactly out[i] = input[i*C + idx[i]] for a 2D
+         * input [R,C], 1D indices [R], gathering the LAST dim, output [R]. Any
+         * other config (generic N-d gather, non-last dim) uses the interpreter,
+         * which also bounds-checks indices. */
+        GatherParams* gp = (GatherParams*)node->params;
+        int dim = gp ? gp->dim : -1;
+        if (dim < 0) dim += inp->ndim;
+        if (inp->ndim != 2 || idx->ndim != 1 || dim != inp->ndim - 1 ||
+            out->numel != (size_t)inp->shape[0] || idx->numel != (size_t)inp->shape[0])
+            return cpu_execute_node(node);
         s0 = (int64_t)out->numel;
         s1 = (int64_t)inp->shape[inp->ndim-1];
     } else if (type == UOP_PERMUTE) {

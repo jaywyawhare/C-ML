@@ -88,6 +88,20 @@ int main(void) {
     }
     check("jit_reduction_axis_and_global", rok);
 
+    /* JIT gather (cross-entropy shape): input [3,4], indices [3], gather last dim. */
+    float gin[] = {0,1,2,3,  10,11,12,13,  20,21,22,23};   /* [3,4] */
+    float gidx[] = {2, 0, 3};                               /* pick col 2,0,3 */
+    Tensor* gt = tensor_from_data(gin, (int[]){3, 4}, 2, &cfg_f32);
+    Tensor* it = tensor_from_data(gidx, (int[]){3}, 1, &cfg_f32);
+    Tensor* go = uop_gather(gt, it, -1);   /* -> [2, 10, 23] */
+    cml_llvm_execute(be, cml_ir_get_or_create_context());
+    int gok = go && go->data && go->numel == 3;
+    if (gok) {
+        const float* gd = (const float*)go->data;
+        gok = gd[0] == 2.0f && gd[1] == 10.0f && gd[2] == 23.0f;
+    }
+    check("jit_gather_2d", gok);
+
     cml_llvm_backend_destroy(be);
     printf("\nResults: %d/%d passed\n", g_pass, g_total);
     return (g_pass == g_total) ? 0 : 1;
