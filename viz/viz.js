@@ -25,12 +25,23 @@ const State = {
   showValidationAcc: false,
   // SSE connections
   _sse: {},
+  // Per-stream connection health: "live" | "reconnecting"
+  _conn: {},
+  // Timestamp (ms) of the most recent data received on any stream
+  _lastDataTs: 0,
+  // When the active tab started waiting for its data (for skeleton→empty grace)
+  _waitStart: {},
   // Cytoscape instances
   _cyOps: null,
   _cyModel: null,
+  _cyOpsResizeObserver: null,
   // Chart resize observers
   _chartObservers: [],
 };
+
+// Grace period (ms) to show a loading skeleton before falling back to an
+// empty/marketing state when no data has arrived yet.
+const LOAD_GRACE_MS = 1200;
 
 // ═══════════════════════════════════════════════════════════════
 // Helpers
@@ -77,11 +88,23 @@ function sseConnect(name, onData) {
 
   const es = new EventSource(`/${name}/stream`);
   State._sse[name] = es;
+  State._conn[name] = "reconnecting";
+  updateConnStatus();
+
+  es.onopen = () => {
+    State._conn[name] = "live";
+    updateConnStatus();
+  };
 
   es.onmessage = (event) => {
     try {
       const json = JSON.parse(event.data);
-      if (!json.error) onData(json);
+      State._conn[name] = "live";
+      if (!json.error) {
+        State._lastDataTs = Date.now();
+        updateConnStatus();
+        onData(json);
+      }
     } catch (e) {
       console.error(`SSE parse error (${name}):`, e);
     }
@@ -89,10 +112,12 @@ function sseConnect(name, onData) {
 
   es.onerror = () => {
     es.close();
+    State._conn[name] = "reconnecting";
+    updateConnStatus();
     // Fallback: poll once
     fetch(`/${name}`, { cache: "no-store" })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && !d.error) onData(d); })
+      .then(d => { if (d && !d.error) { State._lastDataTs = Date.now(); onData(d); } })
       .catch(() => {});
     // Retry SSE after 3s
     setTimeout(() => {
@@ -106,6 +131,60 @@ function sseDisconnect(name) {
     State._sse[name].close();
     delete State._sse[name];
   }
+  delete State._conn[name];
+  updateConnStatus();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Connection status pill
+// ═══════════════════════════════════════════════════════════════
+function relativeTime(ms) {
+  if (!ms) return "";
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 1) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
+}
+
+function updateConnStatus() {
+  const pill = document.getElementById("conn-status");
+  if (!pill) return;
+  const dot = pill.querySelector(".conn-dot");
+  const label = pill.querySelector(".conn-label");
+  const time = pill.querySelector(".conn-time");
+
+  const states = Object.values(State._conn);
+  let status;
+  if (states.length === 0) status = "offline";
+  else if (states.includes("live")) status = "live";
+  else status = "reconnecting";
+
+  pill.dataset.state = status;
+  if (dot) dot.className = "conn-dot " + status;
+  if (label) {
+    label.textContent = status === "live" ? "Live"
+      : status === "reconnecting" ? "Reconnecting…" : "Idle";
+  }
+  if (time) {
+    time.textContent = State._lastDataTs ? `· updated ${relativeTime(State._lastDataTs)}` : "";
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Loading skeletons
+// ═══════════════════════════════════════════════════════════════
+// True while a tab is still within its initial loading grace window and has
+// received no data yet — used to show a shimmer skeleton instead of an empty state.
+function isLoading(tab, hasData) {
+  if (hasData) return false;
+  const start = State._waitStart[tab];
+  return start && (Date.now() - start) < LOAD_GRACE_MS;
+}
+
+function skeletonBlock(className, styleObj) {
+  return el("div", { className: "skeleton " + (className || ""), style: styleObj || {} });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -137,10 +216,23 @@ function switchTab(tabId) {
   }
 }
 
+function renderActiveTab() {
+  if (State.activeTab === "graph") renderGraphView();
+  else if (State.activeTab === "training") renderTrainingView();
+  else if (State.activeTab === "codegen") renderCodeGenView();
+}
+
 function connectDataForTab(tabId) {
   const needsGraph    = tabId === "graph";
   const needsTraining = tabId === "graph" || tabId === "training";
   const needsKernels  = tabId === "graph" || tabId === "codegen";
+
+  // Start the loading-skeleton grace window for this tab, then re-render once
+  // it lapses so a skeleton flips to the empty/marketing state if no data came.
+  if (State._waitStart[tabId] === undefined) {
+    State._waitStart[tabId] = Date.now();
+    setTimeout(() => { if (State.activeTab === tabId) renderActiveTab(); }, LOAD_GRACE_MS + 50);
+  }
 
   if (needsGraph) {
     sseConnect("graph", d => { State.graph = d; renderGraphView(); });
@@ -213,6 +305,7 @@ function toCytoscapeElements(graph) {
     const isDead = node.is_dead;
     const isFused = node.is_fused;
     const label = node.label || String(id);
+    const isUnknown = /^unknown$/i.test(label.trim());
     const color = node.color || getNodeColor(label, isDead, isFused);
     const width = Math.max(80, label.length * 9 + 40);
     elements.push({
@@ -220,7 +313,7 @@ function toCytoscapeElements(graph) {
         id: String(id), label, color, isDead, isFused, width,
         parent: (isFused && node.fusedKernelId) ? node.fusedKernelId : undefined
       },
-      classes: (isDead ? "dead " : "") + (isFused ? "fused" : "")
+      classes: (isDead ? "dead " : "") + (isFused ? "fused " : "") + (isUnknown ? "unknown" : "")
     });
   }
 
@@ -283,6 +376,20 @@ function renderGraphView() {
 
     header.appendChild(viewTabs);
 
+    // Right-side group: node search + legend
+    const right = el("div", { className: "graph-header-right" });
+
+    // Node search
+    const search = el("div", { className: "graph-search" });
+    search.appendChild(svgIcon('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', 14, 14));
+    const searchInput = el("input", {
+      type: "text", id: "graph-search-input", placeholder: "Search nodes…",
+      autocomplete: "off", spellcheck: "false"
+    });
+    searchInput.addEventListener("input", (e) => filterGraphNodes(e.target.value));
+    search.appendChild(searchInput);
+    right.appendChild(search);
+
     // Legend
     const legend = el("div", { className: "legend", id: "ops-legend" });
     [
@@ -303,13 +410,15 @@ function renderGraphView() {
       li.appendChild(el("span", { className: "legend-label" }, item.label));
       legend.appendChild(li);
     });
-    header.appendChild(legend);
+    right.appendChild(legend);
+    header.appendChild(right);
     container.appendChild(header);
 
     // Content area
     const content = el("div", { className: "graph-content" });
     content.appendChild(el("div", { className: "graph-pane", id: "graph-ops-pane", style: { zIndex: "1" } }));
     content.appendChild(el("div", { className: "model-pane", id: "graph-model-pane", style: { display: "none" } }));
+    content.appendChild(buildGraphControls());
     container.appendChild(content);
 
     // View tab click handlers
@@ -336,7 +445,12 @@ function renderGraphView() {
   // Render Ops Topology
   const opsPaneEl = document.getElementById("graph-ops-pane");
   if (!graph || Object.keys(graph).length === 0) {
-    if (!opsPaneEl.querySelector(".empty-state")) {
+    if (isLoading("graph", false)) {
+      if (!opsPaneEl.querySelector(".graph-skeleton")) {
+        opsPaneEl.innerHTML = "";
+        opsPaneEl.appendChild(graphSkeleton());
+      }
+    } else if (!opsPaneEl.querySelector(".empty-state")) {
       opsPaneEl.innerHTML = "";
       const empty = el("div", { className: "empty-state" },
         svgIcon('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>', 48, 48),
@@ -347,9 +461,9 @@ function renderGraphView() {
     return;
   }
 
-  // Clear empty state if present
-  const emptyEl = opsPaneEl.querySelector(".empty-state");
-  if (emptyEl) { opsPaneEl.innerHTML = ""; }
+  // Clear loading/empty placeholders if present
+  const placeholderEl = opsPaneEl.querySelector(".empty-state, .graph-skeleton");
+  if (placeholderEl) { opsPaneEl.innerHTML = ""; }
 
   // Ensure cytoscape container exists
   if (!opsPaneEl.querySelector("#cy-ops")) {
@@ -390,6 +504,21 @@ function renderGraphView() {
 
   initCyOpsInteraction(State._cyOps);
 
+  // Auto-fit the graph when its container resizes (window/tab layout changes).
+  if (typeof ResizeObserver !== "undefined" && !State._cyOpsResizeObserver) {
+    let rafId = 0;
+    State._cyOpsResizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (State._cyOps && State.graphView === "ops") {
+          State._cyOps.resize();
+          State._cyOps.fit(undefined, 40);
+        }
+      });
+    });
+    State._cyOpsResizeObserver.observe(opsPaneEl);
+  }
+
   // Model Architecture
   if (modelSummary) {
     renderModelArchitecture(modelSummary);
@@ -415,6 +544,14 @@ function cytoscapeOpsStyle() {
     { selector: "node.dead", style: {
       "border-color": "#ef4444", "border-style": "dashed", "border-width": 2,
       "background-color": "#18181b", "color": "#a1a1aa"
+    }},
+    { selector: "node.unknown", style: {
+      "border-color": "#52525b", "border-style": "dashed", "border-width": 1,
+      "background-color": "#141417", "color": "#71717a", "font-style": "italic"
+    }},
+    { selector: ".search-hidden", style: { "opacity": 0.08, "transition-duration": "0.15s" }},
+    { selector: "node.search-match", style: {
+      "border-color": "#22d3ee", "border-width": 3, "color": "#e4e4e7", "z-index": 9999
     }},
     { selector: "node:selected", style: {
       "border-color": "#fff", "border-width": 2, "background-color": "#27272a", "z-index": 999
@@ -485,6 +622,91 @@ function initCyOpsInteraction(cy) {
   cy.on("tap", "node", (evt) => {
     cy.animate({ center: { eles: evt.target }, zoom: 1.2 }, { duration: 300 });
   });
+}
+
+// ── Graph controls (zoom / fit / relayout) ───────────────────────
+function buildGraphControls() {
+  const wrap = el("div", { className: "graph-controls" });
+  const mk = (title, iconHtml, onClick) => {
+    const b = el("button", { className: "graph-control-btn", title, "aria-label": title });
+    b.appendChild(svgIcon(iconHtml, 16, 16));
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  const cy = () => State._cyOps;
+  wrap.appendChild(mk("Zoom in", '<line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    () => { const c = cy(); if (c) c.zoom({ level: c.zoom() * 1.25, renderedPosition: { x: c.width() / 2, y: c.height() / 2 } }); }));
+  wrap.appendChild(mk("Zoom out", '<line x1="8" y1="11" x2="14" y2="11"/><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    () => { const c = cy(); if (c) c.zoom({ level: c.zoom() / 1.25, renderedPosition: { x: c.width() / 2, y: c.height() / 2 } }); }));
+  wrap.appendChild(mk("Fit to view", '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+    () => { const c = cy(); if (c) c.animate({ fit: { padding: 40 } }, { duration: 250 }); }));
+  wrap.appendChild(mk("Re-run layout", '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+    () => {
+      const c = cy(); if (!c) return;
+      const n = c.nodes().length;
+      c.layout({
+        name: "dagre", rankDir: "LR", ranker: "network-simplex",
+        nodeSep: n < 10 ? 70 : n < 20 ? 50 : 35, rankSep: n < 10 ? 90 : n < 20 ? 65 : 50,
+        edgeSep: Math.max(25, 50 - n), padding: 35, fit: true, animate: true, animationDuration: 300
+      }).run();
+    }));
+  return wrap;
+}
+
+// ── Node search / filter ──────────────────────────────────────────
+function filterGraphNodes(query) {
+  const cy = State._cyOps;
+  if (!cy) return;
+  const q = (query || "").trim().toLowerCase();
+  cy.elements().removeClass("search-hidden search-match");
+  if (!q) return;
+  const matches = cy.nodes().filter(n => (n.data("label") || "").toLowerCase().includes(q));
+  if (matches.length === 0) {
+    cy.nodes().addClass("search-hidden");
+    return;
+  }
+  const keep = matches.union(matches.connectedEdges()).union(matches.neighborhood());
+  cy.elements().not(keep).addClass("search-hidden");
+  matches.addClass("search-match");
+}
+
+// ── Loading skeleton for the graph pane ───────────────────────────
+function graphSkeleton() {
+  const wrap = el("div", { className: "graph-skeleton" });
+  for (let i = 0; i < 5; i++) {
+    const row = el("div", { className: "graph-skeleton-row" });
+    const count = 2 + (i % 3);
+    for (let j = 0; j < count; j++) {
+      row.appendChild(skeletonBlock("graph-skeleton-node"));
+    }
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function trainingSkeleton() {
+  const wrap = el("div", { className: "skeleton-wrap training-skeleton" });
+  const cards = el("div", { className: "skeleton-cards" });
+  for (let i = 0; i < 4; i++) cards.appendChild(skeletonBlock("skeleton-card"));
+  wrap.appendChild(cards);
+  const charts = el("div", { className: "skeleton-charts" });
+  charts.appendChild(skeletonBlock("skeleton-chart"));
+  charts.appendChild(skeletonBlock("skeleton-chart"));
+  wrap.appendChild(charts);
+  return wrap;
+}
+
+function codegenSkeleton() {
+  const wrap = el("div", { className: "skeleton-wrap codegen-skeleton" });
+  const side = el("div", { className: "skeleton-sidebar" });
+  for (let i = 0; i < 6; i++) side.appendChild(skeletonBlock("skeleton-row"));
+  wrap.appendChild(side);
+  const main = el("div", { className: "skeleton-main" });
+  for (let i = 0; i < 14; i++) {
+    main.appendChild(skeletonBlock("skeleton-line", { width: (45 + ((i * 7) % 50)) + "%" }));
+  }
+  wrap.appendChild(main);
+  return wrap;
 }
 
 
@@ -786,6 +1008,11 @@ function renderCodeGenView() {
 
   container.innerHTML = "";
 
+  if (!hasKernelData && isLoading("codegen", hasKernelData)) {
+    container.appendChild(codegenSkeleton());
+    return;
+  }
+
   if (!hasKernelData) {
     renderCodeGenEmpty(container);
     return;
@@ -858,21 +1085,49 @@ function renderCodeGenView() {
   // Code panes
   const panes = el("div", { className: "codegen-panes" });
 
-  function makeCodePane(title, badge, badgeColor, source) {
+  function iconBtn(title, iconHtml, onClick) {
+    const b = el("button", { className: "code-action-btn", title, "aria-label": title });
+    b.appendChild(svgIcon(iconHtml, 14, 14));
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function makeCodePane(title, badge, badgeColor, source, filename, diffSet, diffClass) {
     const pane = el("div", { className: "code-pane" });
     const header = el("div", { className: "code-pane-header" });
-    header.appendChild(el("span", {}, title));
-    header.appendChild(el("span", { style: { color: badgeColor, fontSize: "10px" } }, badge));
+    header.appendChild(el("span", { className: "code-pane-title" }, title));
+
+    const headerRight = el("div", { className: "code-pane-actions" });
+    headerRight.appendChild(el("span", { className: "code-pane-badge", style: { color: badgeColor } }, badge));
+    const copyBtn = iconBtn("Copy code",
+      '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+      () => {
+        const done = () => {
+          copyBtn.classList.add("copied");
+          setTimeout(() => copyBtn.classList.remove("copied"), 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(source).then(done).catch(() => {});
+        }
+      });
+    headerRight.appendChild(copyBtn);
+    headerRight.appendChild(iconBtn("Download",
+      '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+      () => downloadText(filename, source)));
+    header.appendChild(headerRight);
     pane.appendChild(header);
 
     const body = el("div", { className: "code-pane-body" });
     const pre = document.createElement("pre");
     const code = document.createElement("code");
-    // highlight.js
-    const highlighted = hljs.highlight(source, { language: "c" }).value;
-    // Wrap each line for line numbers
-    const lines = highlighted.split("\n");
-    code.innerHTML = lines.map(l => `<span class="code-line">${l}</span>`).join("\n");
+    // highlight.js — indices map 1:1 with raw source lines
+    const highlighted = hljs.highlight(source, { language: "c" }).value.split("\n");
+    const rawLines = source.split("\n");
+    code.innerHTML = highlighted.map((l, i) => {
+      const raw = (rawLines[i] || "").trim();
+      const cls = (diffSet && raw && diffSet.has(raw)) ? ` ${diffClass}` : "";
+      return `<span class="code-line${cls}">${l}</span>`;
+    }).join("\n");
     pre.appendChild(code);
     body.appendChild(pre);
     pane.appendChild(body);
@@ -895,22 +1150,62 @@ function renderCodeGenView() {
       }).join("\n\n")
     : "// No optimized kernels available";
 
-  panes.appendChild(makeCodePane(
+  // Line-level diff: lines only in one side get tinted.
+  const toLineSet = (s) => new Set(s.split("\n").map(l => l.trim()).filter(Boolean));
+  const origLines = toLineSet(originalSource);
+  const optLines = toLineSet(optimizedSource);
+  const removedSet = new Set([...origLines].filter(l => !optLines.has(l)));
+  const addedSet = new Set([...optLines].filter(l => !origLines.has(l)));
+
+  const origPane = makeCodePane(
     "ORIGINAL IR (Unoptimized)",
     `${kernelData.unoptimized?.deadNodes || 0} DEAD NODES`,
     "var(--accent-error)",
-    originalSource
-  ));
-  panes.appendChild(makeCodePane(
+    originalSource,
+    `original_${acc}.${ext}`,
+    removedSet, "removed"
+  );
+  const optPane = makeCodePane(
     "OPTIMIZED KERNELS (Fused)",
     `${kernelData.optimized?.fusedKernels || 0} FUSED KERNELS`,
     "var(--accent-success)",
-    optimizedSource
-  ));
+    optimizedSource,
+    `optimized_${acc}.${ext}`,
+    addedSet, "added"
+  );
+  panes.appendChild(origPane);
+  panes.appendChild(optPane);
 
   main.appendChild(panes);
   layout.appendChild(main);
   container.appendChild(layout);
+
+  // Scroll-sync the two code panes.
+  syncScroll(origPane.querySelector(".code-pane-body"), optPane.querySelector(".code-pane-body"));
+}
+
+// Download a string as a file (client-side, no server round-trip).
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: filename || "kernel.txt" });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+// Mirror vertical scrolling between two elements without feedback loops.
+function syncScroll(a, b) {
+  if (!a || !b) return;
+  let lock = false;
+  const link = (from, to) => from.addEventListener("scroll", () => {
+    if (lock) { lock = false; return; }
+    lock = true;
+    to.scrollTop = from.scrollTop;
+  });
+  link(a, b);
+  link(b, a);
 }
 
 function renderCodeGenEmpty(container) {
@@ -977,6 +1272,11 @@ function renderTrainingView() {
   const data = State.training;
 
   container.innerHTML = "";
+
+  if ((!data || data.error) && isLoading("training", data && !data.error)) {
+    container.appendChild(trainingSkeleton());
+    return;
+  }
 
   if (!data || data.error) {
     renderTrainingEmpty(container, data);
@@ -1473,6 +1773,19 @@ document.addEventListener("DOMContentLoaded", () => {
   $$(".topbar-button").forEach(btn => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
+
+  // Keyboard shortcuts: 1/2/3 switch tabs (ignored while typing in a field).
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+    const map = { "1": "graph", "2": "training", "3": "codegen" };
+    if (map[e.key]) switchTab(map[e.key]);
+  });
+
+  // Live connection-status ticker (updates "updated Ns ago").
+  updateConnStatus();
+  setInterval(updateConnStatus, 1000);
 
   // Initial render
   renderGraphView();

@@ -1111,3 +1111,230 @@ button { font-family: inherit; }
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   UI polish additions
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Connection status pill ───────────────────────────────── */
+.conn-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  justify-content: flex-end;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.conn-dot.live {
+  background: var(--accent-success);
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  animation: conn-pulse 2s infinite;
+}
+
+.conn-dot.reconnecting {
+  background: var(--accent-warning);
+  animation: conn-blink 1s steps(2, start) infinite;
+}
+
+.conn-dot.offline { background: var(--accent-error); }
+
+.conn-label { font-weight: 600; color: var(--text-primary); }
+.conn-time { color: var(--text-tertiary); }
+
+@keyframes conn-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes conn-blink {
+  50% { opacity: 0.35; }
+}
+
+/* ── Skeleton loaders ─────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 37%,
+    rgba(255, 255, 255, 0.04) 63%);
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.graph-skeleton {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.graph-skeleton-row { display: flex; gap: 40px; }
+.graph-skeleton-node { width: 96px; height: 40px; }
+
+.skeleton-wrap { height: 100%; padding: 24px; overflow: hidden; }
+.training-skeleton { display: flex; flex-direction: column; gap: 20px; }
+.skeleton-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.skeleton-card { height: 84px; }
+.skeleton-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1; }
+.skeleton-chart { min-height: 240px; height: 100%; }
+
+.codegen-skeleton { display: flex; gap: 0; padding: 0; }
+.skeleton-sidebar {
+  width: 280px; padding: 24px; display: flex; flex-direction: column; gap: 14px;
+  border-right: 1px solid var(--border-color);
+}
+.skeleton-row { height: 40px; }
+.skeleton-main { flex: 1; padding: 32px; display: flex; flex-direction: column; gap: 12px; }
+.skeleton-line { height: 14px; }
+
+/* ── Graph header right group + search ────────────────────── */
+.graph-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.graph-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  transition: border-color 0.15s, color 0.15s;
+}
+.graph-search:focus-within {
+  border-color: var(--accent-primary);
+  color: var(--text-secondary);
+}
+.graph-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 130px;
+}
+.graph-search input::placeholder { color: var(--text-tertiary); }
+
+/* ── Graph controls overlay ───────────────────────────────── */
+.graph-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 20;
+}
+.graph-control-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.graph-control-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.graph-control-btn:active { transform: translateY(1px); }
+
+/* ── Code pane header actions + diff ──────────────────────── */
+.code-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.code-pane-title { letter-spacing: 0.02em; }
+.code-pane-badge { font-size: 10px; font-weight: 600; }
+
+.code-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.code-action-btn:hover {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #333;
+}
+.code-action-btn.copied {
+  color: var(--accent-success);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.code-line.removed {
+  background: rgba(239, 68, 68, 0.12);
+  box-shadow: inset 2px 0 0 var(--accent-error);
+}
+.code-line.added {
+  background: rgba(16, 185, 129, 0.12);
+  box-shadow: inset 2px 0 0 var(--accent-success);
+}
+
+/* ── Tab-switch fade ──────────────────────────────────────── */
+.tab-content.active { animation: tab-fade 0.18s ease; }
+@keyframes tab-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .conn-time { display: none; }
+  .conn-status { min-width: auto; }
+  .graph-search input { width: 90px; }
+}
+
+@media (max-width: 720px) {
+  .topbar { padding: 0 14px; }
+  .topbar-button span { display: none; }
+  .topbar-button { padding: 8px 10px; }
+  .title { font-size: 16px; }
+  .conn-label { display: none; }
+  .graph-header { padding: 0 14px; }
+  .legend { display: none; }
+  .skeleton-cards { grid-template-columns: 1fr 1fr; }
+}
