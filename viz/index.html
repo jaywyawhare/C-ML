@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>C-ML Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 18 12 15 21 9 3 6 12 2 12'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="viz.css">
   <link rel="stylesheet" href="assets/styles/vs2015.min.css">
 </head>
@@ -46,7 +47,11 @@
           </button>
         </div>
 
-        <div style="width: 140px;"></div>
+        <div class="conn-status" id="conn-status" title="Data stream status">
+          <span class="conn-dot"></span>
+          <span class="conn-label">Connecting…</span>
+          <span class="conn-time"></span>
+        </div>
       </div>
 
       <!-- Panel -->
