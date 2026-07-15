@@ -439,8 +439,13 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params) {
         return NULL;
     }
 
-    new_strides[params->new_ndim - 1] = 1;
-    for (int i = params->new_ndim - 2; i >= 0; i--) {
+    /* Compute the broadcast strides for EVERY dim, including the last.  A
+     * broadcast dim (orig size 1, new size > 1) must get stride 0 so all its
+     * indices alias the single source element; only genuinely-present dims keep
+     * the source stride.  The last dim was previously hardcoded to 1, which gave
+     * a broadcast trailing dim a non-zero stride and made strided readers index
+     * past the (smaller) source buffer. */
+    for (int i = params->new_ndim - 1; i >= 0; i--) {
         if (i < prepend) {
             new_strides[i] = 0;
         } else {
@@ -448,8 +453,7 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params) {
             if (broadcast_shape[i] == 1 && params->new_shape[i] != 1) {
                 new_strides[i] = 0;
             } else {
-                new_strides[i] = orig_strides[orig_idx] *
-                                 ((size_t)params->new_shape[i] / (size_t)broadcast_shape[i]);
+                new_strides[i] = orig_strides[orig_idx];
             }
         }
     }

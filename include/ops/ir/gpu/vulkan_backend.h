@@ -18,6 +18,7 @@ struct Tensor;
 typedef struct Tensor Tensor;
 struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
+struct IRNode;
 
 /* Vulkan type aliases (avoid requiring vulkan.h) */
 typedef uint32_t VkFlags;
@@ -209,6 +210,13 @@ int              cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend,
 
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir);
 int cml_vulkan_synchronize(CMLVulkanBackend* backend);
+
+/* Execute one IR node on the GPU (float32 elementwise + 2D matmul).
+ * Returns 0 on success, -1 for unsupported op/dtype (caller falls back to CPU). */
+int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node);
+
+/* Process-wide Vulkan backend (lazy init); NULL if no device is available. */
+CMLVulkanBackend* cml_vulkan_get_backend(void);
 
 #ifdef __cplusplus
 }

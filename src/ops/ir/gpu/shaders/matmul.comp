@@ -1,0 +1,14 @@
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(std430, binding = 0) readonly  buffer BufA { float a[]; };
+layout(std430, binding = 1) writeonly buffer BufC { float c[]; };
+layout(std430, binding = 2) readonly  buffer BufB { float b[]; };
+layout(std430, binding = 3) readonly  buffer BufP { uint M; uint N; uint K; uint p3; };
+void main() {
+    uint row = gl_GlobalInvocationID.y;
+    uint col = gl_GlobalInvocationID.x;
+    if (row >= M || col >= N) return;
+    float sum = 0.0;
+    for (uint k = 0u; k < K; k++) sum += a[row * K + k] * b[k * N + col];
+    c[row * N + col] = sum;
+}

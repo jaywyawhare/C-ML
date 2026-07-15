@@ -10,6 +10,18 @@
 #include <strings.h>
 #include "alloc/cml_allocator.h"
 
+/* cml_malloc-backed strndup: strings produced here are released with cml_free
+ * elsewhere in this file, so they must carry a cml AllocHeader (system strndup
+ * does not, which makes cml_free over-read). */
+static char* cml_strndup_(const char* s, size_t n) {
+    char* r = (char*)cml_malloc(n + 1);
+    if (r) {
+        memcpy(r, s, n);
+        r[n] = '\0';
+    }
+    return r;
+}
+
 static int is_image_file(const char* name) {
     const char* ext = strrchr(name, '.');
     if (!ext) return 0;
@@ -293,11 +305,15 @@ Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batc
 
 void cml_imagenet_free(CMLImageNetLoader* loader) {
     if (!loader) return;
+    /* cml_imagenet_open mixes allocators: the path strings come from cml_strdup
+     * (free via cml_free), but the image_paths/labels arrays and the loader
+     * struct come from system malloc/calloc (free via free()).  Using the wrong
+     * deallocator makes cml_free read a non-existent AllocHeader (heap over-read). */
     for (int i = 0; i < loader->num_samples; i++)
-        cml_free(loader->image_paths[i]);
-    cml_free(loader->image_paths);
-    cml_free(loader->labels);
-    cml_free(loader);
+        cml_free(loader->image_paths[i]); /* cml_strdup'd */
+    free(loader->image_paths);            /* malloc'd */
+    free(loader->labels);                 /* malloc'd */
+    free(loader);                         /* calloc'd */
 }
 
 static void collect_audio_recursive(const char* dir, char*** paths, char*** transcripts,
@@ -382,7 +398,7 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
                     size_t tlen = strlen(text);
                     while (tlen > 0 && (text[tlen - 1] == '\n' || text[tlen - 1] == '\r'))
                         tlen--;
-                    transcript = strndup(text, tlen);
+                    transcript = cml_strndup_(text, tlen);
                     break;
                 }
             }
@@ -448,7 +464,7 @@ static char* json_parse_string(char* p, char** out) {
         p++;
     }
     if (*p != '"') return NULL;
-    *out = strndup(start, p - start);
+    *out = cml_strndup_(start, (size_t)(p - start));
     return p + 1;
 }
 

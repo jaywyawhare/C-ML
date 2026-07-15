@@ -1245,12 +1245,24 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     if (!node || !node->output) return -1;
 
     Tensor* out = node->output;
+
+    /* UOP_EXPAND (broadcast) produces a view whose data ALIASES the smaller
+     * source buffer (out->numel > input numel, owns_data==false).  Because
+     * out->data is already non-NULL, the allocation below is skipped and a JIT
+     * expand kernel would write out->numel elements into the small aliased
+     * buffer — a heap overflow that silently corrupts adjacent memory (JIT code
+     * is not sanitizer-instrumented).  The interpreter's UOP_EXPAND correctly
+     * allocates a fresh full-size buffer and broadcasts, so defer to it. */
+    if (node->type == UOP_EXPAND)
+        return cpu_execute_node(node);
+
     if (!out->data && out->numel > 0) {
         /* Size by the actual dtype — f64/int kernels write 8 bytes/elem, not 4;
          * sizeof(float) under-allocated and the kernel overflowed its output. */
         out->data = cml_buffer_cache_alloc(out->numel * cml_dtype_size(out->dtype));
         if (!out->data) { LOG_ERROR("LLVM: OOM for output tensor"); return -1; }
-        out->owns_data = true;
+        out->owns_data         = true;
+        out->from_buffer_cache = true; /* mirror interpreter: route free to cml_buffer_cache_free */
     }
 
     UOpType type = node->type;

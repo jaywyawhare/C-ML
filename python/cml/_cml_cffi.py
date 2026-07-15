@@ -5,7 +5,39 @@ This module defines the CFFI interface to the C-ML library.
 It exposes the necessary C structures and functions for Python.
 """
 
+import os
+import subprocess
 from cffi import FFI
+
+# Repo root = .../C-ML  (this file is at .../C-ML/python/cml/_cml_cffi.py).
+# Use absolute paths so the build works regardless of the invoking cwd.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_INCLUDE_DIR = os.path.join(_REPO_ROOT, "include")
+
+# Link the STATIC archive: the shared lib is built with hidden visibility and
+# only exports CML_API-marked symbols, but the cdef references the full internal
+# API.  The static archive carries every symbol; we add its transitive deps
+# (LLVM, OpenCL, BLAS-via-dlopen, pthread) below.
+_STATIC_LIB = None
+for _c in (os.path.join(_REPO_ROOT, "build", "lib", "libcml.a"),
+           os.path.join(_REPO_ROOT, "lib", "libcml.a")):
+    if os.path.exists(_c):
+        _STATIC_LIB = _c
+        break
+
+def _llvm_link_flags():
+    for exe in ("llvm-config", "llvm-config-18", "llvm-config-17", "llvm-config-16"):
+        try:
+            # --link-shared -> -lLLVM (shared); static LLVM component libs are not
+            # -fPIC and cannot be linked into the CFFI shared module.
+            out = subprocess.check_output(
+                [exe, "--link-shared", "--libs", "--ldflags", "--system-libs"], text=True)
+            return out.split()
+        except Exception:
+            continue
+    return []
+
+_EXTRA_LINK = _llvm_link_flags() + ["-lOpenCL", "-lstdc++", "-lm", "-ldl", "-lpthread"]
 
 ffi = FFI()
 
@@ -101,6 +133,7 @@ ffi.cdef(
         CMLBackendBuffer_t buffer_handle;
 
         void* user_data;
+        ...;
     } Tensor;
 
     // TensorConfig struct (full definition - used in creation functions)
@@ -757,7 +790,6 @@ ffi.cdef(
     int cml_dist_allreduce(Tensor* tensor, DistReduceOp op);
     int cml_dist_barrier(void);
 
-    void* tensor_data_ptr(Tensor* t);
 
     // torch/torch_c.h — PyTorch-like C API
     typedef struct TorchTensorOptions {
@@ -863,15 +895,12 @@ ffi.set_source(
     #include "cml.h"
     #include "tensor/tensor.h"
     #include "torch/torch_c.h"
+    #include "distributed/distributed.h"
     """,
-    libraries=["cml", "m", "dl", "pthread"],
-    include_dirs=["../../include"],
-    library_dirs=["../../lib", "../../build/lib"],
+    include_dirs=[_INCLUDE_DIR],
     extra_compile_args=["-std=c11", "-O2"],
-    extra_link_args=[
-        "-Wl,-rpath,$ORIGIN/../../lib",
-        "-Wl,-rpath,$ORIGIN/../../build/lib",
-    ],
+    extra_objects=[_STATIC_LIB] if _STATIC_LIB else [],
+    extra_link_args=_EXTRA_LINK,
 )
 
 if __name__ == "__main__":

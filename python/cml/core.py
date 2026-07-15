@@ -6,6 +6,17 @@ import operator
 import numpy as np
 from cml._cml_lib import ffi, lib
 
+
+def _get_lib():
+    """Return the loaded CFFI ``lib`` handle (compat accessor used by submodules)."""
+    return lib
+
+
+def _get_ffi():
+    """Return the CFFI ``ffi`` instance."""
+    return ffi
+
+
 DEVICE_CPU = 0
 DEVICE_CUDA = 1
 DEVICE_METAL = 2

@@ -62,15 +62,6 @@ static bool numerical_grad_check(const char* name, Tensor* param,
         return false;
     }
 
-#if CML_GRAD_CHECK_ASAN
-    (void)loss_fn;
-    (void)ctx;
-    (void)eps;
-    (void)tol;
-    printf("  SKIP [%s]: numerical finite-diff under ASan (IR intern/decompose)\n", name);
-    return true;
-#else
-
     float* data = (float*)tensor_data_ptr(param);
     float* grad = (float*)tensor_data_ptr(param->grad);
     if (!data || !grad) {
@@ -100,7 +91,6 @@ static bool numerical_grad_check(const char* name, Tensor* param,
         }
     }
     return true;
-#endif
 }
 
 typedef struct { Linear* layer; Tensor* input; } LinearCtx;
@@ -464,9 +454,12 @@ static float lstm_cell_loss_fn(void* vctx) {
     Tensor* h_out = NULL;
     Tensor* c_out = NULL;
     lstm_cell_forward(c->cell, c->input, c->h_prev, c->c_prev, &h_out, &c_out);
+    /* Loss must match what the analytical backward seeds (h_out only).  Including
+     * c_out here while cml_backward() only backprops h_out made the analytical
+     * gradient omit the c_out path -> mismatch.  h_out already depends on every
+     * gate and the cell state, so this exercises the full LSTM backward. */
     float loss = 0.0f;
     if (h_out) loss += tensor_sum_all(h_out);
-    if (c_out) loss += tensor_sum_all(c_out);
     return loss;
 }
 
@@ -817,18 +810,18 @@ int main(void) {
     required_run    = tests_run;
     required_passed = tests_passed;
 
-    printf("\n  -- Expected failures (autograd backward WIP) --\n");
-    RUN_TEST_XFAIL(conv1d);
-    RUN_TEST_XFAIL(conv2d);
-    RUN_TEST_XFAIL(conv3d);
-    RUN_TEST_XFAIL(batchnorm2d);
-    RUN_TEST_XFAIL(layernorm);
-    RUN_TEST_XFAIL(groupnorm);
-    RUN_TEST_XFAIL(rnn_cell);
-    RUN_TEST_XFAIL(lstm_cell);
-    RUN_TEST_XFAIL(gru_cell);
-    RUN_TEST_XFAIL(embedding);
-    RUN_TEST_XFAIL(softmax);
+    printf("\n  -- conv / norm / recurrent layers --\n");
+    RUN_TEST(conv1d);
+    RUN_TEST(conv2d);
+    RUN_TEST(conv3d);
+    RUN_TEST(batchnorm2d);
+    RUN_TEST(layernorm);
+    RUN_TEST(groupnorm);
+    RUN_TEST(rnn_cell);
+    RUN_TEST(lstm_cell);
+    RUN_TEST(gru_cell);
+    RUN_TEST(embedding);
+    RUN_TEST(softmax);
 
     printf("\n%d/%d passed", tests_passed, tests_run);
     if (required_passed < required_run)

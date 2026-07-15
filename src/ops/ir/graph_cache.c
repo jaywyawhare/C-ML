@@ -218,12 +218,21 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     while (node && idx < plan->num_nodes) {
         plan->nodes[idx] = node;
 
-        if (node->output && node->output->numel > 0 &&
+        /* Only plan-cache nodes that OWN a full numel*elemsize buffer.  Movement
+         * ops (UOP_EXPAND/RESHAPE/PERMUTE/...) alias a smaller source buffer with
+         * an enlarged numel and owns_data=false; copying numel*elemsize out of them
+         * over-reads the aliased buffer (heap-buffer-overflow).  Skipping them just
+         * means they re-alias on a cache hit — cheap and correct. */
+        if (node->output && node->output->numel > 0 && node->output->owns_data &&
             (int)node->output->dtype >= 0 && (int)node->output->dtype < 32 &&
             node->output->numel < ((size_t)1 << 40)) {
-            plan->buffer_sizes[idx]   = node->output->numel;
+            /* buffer_sizes holds BYTES (numel * dtype size), not element count, so
+             * the plan buffer and its memcpy/rebind are correct for every dtype —
+             * sizeof(float) over-read int16/f16 sources and under-copied f64/i64. */
+            size_t nbytes             = (size_t)node->output->numel *
+                                        cml_dtype_size(node->output->dtype);
+            plan->buffer_sizes[idx]   = nbytes;
             plan->output_tensors[idx] = node->output;
-            size_t nbytes             = (size_t)node->output->numel * sizeof(float);
             plan->buffers[idx] =
                 cml_aligned_alloc(cml_alloc_size_aligned(nbytes, 32), 32);
             if (!plan->buffers[idx]) {

@@ -198,7 +198,7 @@ int main(void) {
 
     printf("\nGEMM Throughput Benchmark (float32, C = A @ B, square NxN)\n\n");
 
-    int sizes[]   = {2048, 4096};
+    int sizes[]   = {512, 1024, 2048, 4096};
     int num_sizes = (int)(sizeof(sizes) / sizeof(sizes[0]));
 
     for (int si = 0; si < num_sizes; si++) {
@@ -213,7 +213,7 @@ int main(void) {
         if (have_blas)
             print_row("Raw BLAS (cblas_sgemm)", bench_blas(blas, N, iters));
 
-        if (N <= 1024)
+        if (N <= 2048)
             print_row("CML tensor_matmul", bench_tensor_matmul(N, iters));
 
         printf("  -- fused: matmul + bias + relu --\n");
@@ -221,7 +221,7 @@ int main(void) {
         if (have_blas)
             print_row("BLAS + manual bias+relu", bench_blas_unfused(blas, N, iters));
 
-        if (N <= 1024)
+        if (N <= 2048)
             print_row("CML fused (matmul+add+relu)", bench_tensor_fused(N, iters));
 
         printf("\n");

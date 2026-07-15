@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "ops/ir/gpu/vk_shaders.h" /* embedded glslc-compiled SPIR-V: binary / unary / matmul */
 
 #ifdef __linux__
 #include <dlfcn.h>
@@ -957,6 +958,159 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
     return 0;
 }
 
+
+/* Process-wide lazily-initialised Vulkan backend for the execution path.
+ * Returns NULL if no Vulkan device is available (caller stays on CPU). */
+static CMLVulkanBackend* g_vk_backend       = NULL;
+static int               g_vk_backend_tried = 0;
+
+CMLVulkanBackend* cml_vulkan_get_backend(void) {
+    if (g_vk_backend_tried)
+        return g_vk_backend;
+    g_vk_backend_tried = 1;
+    if (!cml_vulkan_available())
+        return NULL;
+    CMLVulkanBackend* be = cml_vulkan_backend_create();
+    if (be && cml_vulkan_backend_init(be) == 0) {
+        g_vk_backend = be;
+    } else if (be) {
+        cml_vulkan_backend_free(be);
+    }
+    return g_vk_backend;
+}
+
+/* Classify an IR node for GPU dispatch.
+ * Returns: 1=binary elementwise, 2=unary elementwise, 3=matmul, 0=unsupported.
+ * On a supported op, *op_code holds the shader's op selector. */
+static int vk_classify(UOpType t, int num_inputs, int* op_code) {
+    *op_code = 0;
+    if (t == UOP_MATMUL)
+        return 3;
+    if (num_inputs == 2) {
+        switch (t) {
+            case UOP_ADD: *op_code = 0; return 1;
+            case UOP_SUB: *op_code = 1; return 1;
+            case UOP_MUL: *op_code = 2; return 1;
+            case UOP_DIV: *op_code = 3; return 1;
+            case UOP_MAX: *op_code = 4; return 1;
+            default:      return 0;
+        }
+    }
+    if (num_inputs == 1) {
+        switch (t) {
+            case UOP_RELU:    *op_code = 0; return 2;
+            case UOP_NEG:     *op_code = 1; return 2;
+            case UOP_EXP:     *op_code = 2; return 2;
+            case UOP_SQRT:    *op_code = 3; return 2;
+            case UOP_SQUARE:  *op_code = 4; return 2;
+            case UOP_SIGMOID: *op_code = 5; return 2;
+            case UOP_TANH:    *op_code = 6; return 2;
+            case UOP_ABS:     *op_code = 7; return 2;
+            case UOP_LOG:     *op_code = 8; return 2;
+            case UOP_RECIP:   *op_code = 9; return 2;
+            case UOP_RSQRT:   *op_code = 10; return 2;
+            default:          return 0;
+        }
+    }
+    return 0;
+}
+
+/* Execute a single IR node on the GPU (float32 only).  Uploads inputs, dispatches
+ * the matching compute shader, downloads the result into node->output->data.
+ * Returns 0 on success, -1 if the op/dtype is unsupported (caller falls back to CPU). */
+int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node) {
+    if (!backend || !backend->initialized || !node || !node->output)
+        return -1;
+
+    Tensor* out = node->output;
+    if (out->dtype != DTYPE_FLOAT32 || out->numel == 0)
+        return -1;
+
+    int op_code = 0;
+    int kind    = vk_classify(node->type, node->num_inputs, &op_code);
+    if (kind == 0)
+        return -1;
+
+    Tensor* in0 = (node->num_inputs >= 1 && node->inputs) ? node->inputs[0] : NULL;
+    Tensor* in1 = (node->num_inputs >= 2 && node->inputs) ? node->inputs[1] : NULL;
+    if (!in0 || !in0->data || in0->dtype != DTYPE_FLOAT32)
+        return -1;
+    if ((kind == 1 || kind == 3) && (!in1 || !in1->data || in1->dtype != DTYPE_FLOAT32))
+        return -1;
+
+    /* matmul: 2D only, dims from shapes */
+    uint32_t P[4]  = {0, 0, 0, 0};
+    uint32_t gx = 1, gy = 1;
+    const uint32_t* spv = NULL;
+    size_t spv_size = 0;
+    int num_bufs = 0;
+    size_t n = out->numel;
+
+    if (kind == 3) {
+        if (in0->ndim != 2 || in1->ndim != 2 || out->ndim != 2)
+            return -1;
+        uint32_t M = (uint32_t)out->shape[0], N = (uint32_t)out->shape[1];
+        uint32_t K = (uint32_t)in0->shape[1];
+        if ((uint32_t)in1->shape[0] != K)
+            return -1;
+        P[0] = M; P[1] = N; P[2] = K;
+        gx = (N + 15u) / 16u; gy = (M + 15u) / 16u;
+        spv = VK_SPV_MATMUL; spv_size = VK_SPV_MATMUL_SIZE; num_bufs = 4;
+    } else if (kind == 1) {
+        P[0] = (uint32_t)n; P[1] = (uint32_t)op_code;
+        P[2] = (uint32_t)in0->numel; P[3] = (uint32_t)in1->numel;
+        gx = ((uint32_t)n + 255u) / 256u;
+        spv = VK_SPV_BINARY; spv_size = VK_SPV_BINARY_SIZE; num_bufs = 4;
+    } else { /* unary */
+        P[0] = (uint32_t)n; P[1] = (uint32_t)op_code;
+        gx = ((uint32_t)n + 255u) / 256u;
+        spv = VK_SPV_UNARY; spv_size = VK_SPV_UNARY_SIZE; num_bufs = 3;
+    }
+
+    if (!out->data) {
+        out->data = cml_calloc(n, sizeof(float));
+        if (!out->data) return -1;
+        out->owns_data = true;
+    }
+
+    CMLVulkanKernel* kernel = cml_vulkan_kernel_create(backend, spv, spv_size, "main", num_bufs);
+    if (!kernel) return -1;
+
+    int rc = -1;
+    CMLVulkanBuffer* b_in0 = cml_vulkan_buffer_create(backend, in0->numel * sizeof(float), true);
+    CMLVulkanBuffer* b_out = cml_vulkan_buffer_create(backend, n * sizeof(float), true);
+    CMLVulkanBuffer* b_in1 = in1 ? cml_vulkan_buffer_create(backend, in1->numel * sizeof(float), true)
+                                 : NULL;
+    CMLVulkanBuffer* b_par = cml_vulkan_buffer_create(backend, sizeof(P), true);
+    if (!b_in0 || !b_out || !b_par || (in1 && !b_in1))
+        goto done;
+
+    cml_vulkan_buffer_upload(backend, b_in0, in0->data, in0->numel * sizeof(float));
+    if (b_in1) cml_vulkan_buffer_upload(backend, b_in1, in1->data, in1->numel * sizeof(float));
+    cml_vulkan_buffer_upload(backend, b_par, P, sizeof(P));
+
+    cml_vulkan_kernel_bind_buffer(backend, kernel, 0, b_in0);
+    cml_vulkan_kernel_bind_buffer(backend, kernel, 1, b_out);
+    if (kind == 2) {
+        cml_vulkan_kernel_bind_buffer(backend, kernel, 2, b_par);
+    } else {
+        cml_vulkan_kernel_bind_buffer(backend, kernel, 2, b_in1);
+        cml_vulkan_kernel_bind_buffer(backend, kernel, 3, b_par);
+    }
+
+    cml_vulkan_kernel_dispatch(backend, kernel, gx, gy, 1);
+    cml_vulkan_synchronize(backend);
+    cml_vulkan_buffer_download(backend, b_out, out->data, n * sizeof(float));
+    rc = 0;
+
+done:
+    if (b_in0) cml_vulkan_buffer_free(backend, b_in0);
+    if (b_in1) cml_vulkan_buffer_free(backend, b_in1);
+    if (b_out) cml_vulkan_buffer_free(backend, b_out);
+    if (b_par) cml_vulkan_buffer_free(backend, b_par);
+    cml_vulkan_kernel_free(backend, kernel);
+    return rc;
+}
 
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized || !ir) return -1;

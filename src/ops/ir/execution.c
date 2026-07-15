@@ -8,6 +8,9 @@
 #ifdef CML_HAS_LLVM_BACKEND
 #include "ops/ir/llvm/llvm_backend.h"
 #endif
+#ifdef CML_HAS_VULKAN
+#include "ops/ir/gpu/vulkan_backend.h"
+#endif
 #include "backend/blas.h"
 #include "backend/threadpool.h"
 #include "backend/device.h"
@@ -62,6 +65,19 @@ static int cml_ir_use_jit(void) {
         checked = 1;
     }
     return enabled;
+}
+#endif
+
+#ifdef CML_HAS_VULKAN
+/* Opt-in GPU execution: CML_USE_VULKAN=1 routes supported float32 nodes
+ * (elementwise + 2D matmul) to the Vulkan compute backend; CPU/JIT otherwise. */
+static int cml_ir_use_vulkan(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char* e = getenv("CML_USE_VULKAN");
+        cached = (e && e[0] == '1') ? 1 : 0;
+    }
+    return cached;
 }
 #endif
 
@@ -4614,7 +4630,8 @@ int cpu_execute_ir(CMLGraph_t ir) {
         while (node && idx < plan->num_nodes) {
             if (node->output && node->output->numel > 0 && !node->output->data &&
                 plan->buffers[idx] &&
-                plan->buffer_sizes[idx] == (size_t)node->output->numel) {
+                plan->buffer_sizes[idx] ==
+                    (size_t)node->output->numel * cml_dtype_size(node->output->dtype)) {
                 node->output->data        = plan->buffers[idx];
                 node->output->owns_data   = false;
                 plan->output_tensors[idx] = node->output;
@@ -4644,6 +4661,20 @@ int cpu_execute_ir(CMLGraph_t ir) {
         }
 
         int _rc;
+#ifdef CML_HAS_VULKAN
+        /* GPU path (opt-in): dispatch supported nodes to Vulkan; on any miss
+         * (unsupported op/dtype or no device) fall through to JIT/CPU. */
+        if (cml_ir_use_vulkan()) {
+            CMLVulkanBackend* vk = cml_vulkan_get_backend();
+            if (vk && cml_vulkan_execute_node(vk, node) == 0) {
+                node->is_executed         = true;
+                node->output->is_executed = true;
+                g_total_nodes_executed++;
+                node = node->next;
+                continue;
+            }
+        }
+#endif
 #ifdef CML_HAS_LLVM_BACKEND
         if (jit) {
             _rc = cml_llvm_execute_node(jit, node);
@@ -4672,9 +4703,10 @@ int cpu_execute_ir(CMLGraph_t ir) {
             size_t idx       = 0;
             while (n && idx < new_plan->num_nodes) {
                 if (n->output && n->output->data && new_plan->buffers[idx] &&
-                    new_plan->buffer_sizes[idx] == (size_t)n->output->numel) {
+                    new_plan->buffer_sizes[idx] ==
+                        (size_t)n->output->numel * cml_dtype_size(n->output->dtype)) {
                     memcpy(new_plan->buffers[idx], n->output->data,
-                           n->output->numel * sizeof(float));
+                           new_plan->buffer_sizes[idx]);
                 }
                 idx++;
                 n = n->next;

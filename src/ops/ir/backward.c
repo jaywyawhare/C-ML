@@ -113,6 +113,42 @@ static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     }
 }
 
+/* Return a pointer to @a t's data as a CONTIGUOUS, numel-sized float buffer.
+ * Broadcast/strided views (e.g. UOP_EXPAND output) have numel > their backing
+ * storage and stride-0 dims; reading them linearly by numel over-reads the
+ * small source buffer (heap overflow) and is numerically wrong.  For such
+ * non-contiguous views we gather into a fresh buffer via the view's strides.
+ * Sets *owned=true when the caller must cml_free the returned buffer. */
+static float* backward_contiguous(Tensor* t, bool* owned) {
+    *owned = false;
+    if (!t || !t->data)
+        return t ? (float*)t->data : NULL;
+    if (t->is_contiguous && t->storage_offset == 0)
+        return (float*)t->data;
+
+    size_t n   = t->numel;
+    float* buf = (float*)cml_malloc(n * sizeof(float));
+    if (!buf)
+        return (float*)t->data; /* best effort: fall back to raw (may be small) */
+
+    const float* src = (const float*)t->data;
+    int nd           = t->ndim;
+    for (size_t i = 0; i < n; i++) {
+        size_t rem = i;
+        size_t off = t->storage_offset;
+        for (int d = nd - 1; d >= 0; d--) {
+            size_t dim   = (size_t)t->shape[d];
+            size_t coord = dim ? rem % dim : 0;
+            if (dim)
+                rem /= dim;
+            off += coord * (t->strides ? t->strides[d] : 0);
+        }
+        buf[i] = src[off];
+    }
+    *owned = true;
+    return buf;
+}
+
 static int cpu_backward_node(struct IRNode* node) {
     if (!node || !node->output)
         return 0;
@@ -164,8 +200,9 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in2 && in2->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data  = (float*)g1->data;
-                float* in2_data = (float*)in2->data;
+                float* g1_data   = (float*)g1->data;
+                bool   in2_owned = false;
+                float* in2_data  = backward_contiguous(in2, &in2_owned);
                 if (in1->numel == out_numel && in2->numel == out_numel) {
                     /* Fast path: no broadcast, SIMD fused multiply-add */
                     size_t i = 0;
@@ -184,13 +221,16 @@ static int cpu_backward_node(struct IRNode* node) {
                     for (size_t i = 0; i < out_numel; i++)
                         g1_data[i % in1->numel] += out_grad[i] * in2_data[i % in2->numel];
                 }
+                if (in2_owned)
+                    cml_free(in2_data);
             }
         }
         if (in2 && in2->requires_grad && in1 && in1->data) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
-                float* g2_data  = (float*)g2->data;
-                float* in1_data = (float*)in1->data;
+                float* g2_data   = (float*)g2->data;
+                bool   in1_owned = false;
+                float* in1_data  = backward_contiguous(in1, &in1_owned);
                 if (in1->numel == out_numel && in2->numel == out_numel) {
                     size_t i = 0;
 #ifdef __AVX__
@@ -208,6 +248,8 @@ static int cpu_backward_node(struct IRNode* node) {
                     for (size_t i = 0; i < out_numel; i++)
                         g2_data[i % in2->numel] += out_grad[i] * in1_data[i % in1->numel];
                 }
+                if (in1_owned)
+                    cml_free(in1_data);
             }
         }
         break;
@@ -737,15 +779,42 @@ static int cpu_backward_node(struct IRNode* node) {
     }
 
     case UOP_EXPAND:
-        // d(expand(a))/da = sum along expanded dimensions
-        // Expand broadcasts input to larger shape; backward sums gradients
-        // back to the original shape.
+        // d(expand(a))/da = sum along broadcast dimensions.
+        // The output index must be mapped to the input index by broadcast rules
+        // (shapes aligned from the right; a dim of size 1 in the input maps every
+        // output coord to 0).  The old `i % in1->numel` mapping is only correct
+        // for trailing-dim broadcasts and silently scatters gradients into wrong
+        // positions for e.g. [1,C,1,1]->[N,C,H,W] (batchnorm/groupnorm affine).
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data && out->data) {
                 float* g1_data = (float*)g1->data;
-                for (size_t i = 0; i < out_numel; i++) {
-                    g1_data[i % in1->numel] += out_grad[i];
+                int    ond     = out->ndim;
+                int    ind     = in1->ndim;
+                if (ond <= 16 && ind <= 16 && ind <= ond && out->shape && in1->shape) {
+                    int    prepend = ond - ind;
+                    size_t in_str[16];
+                    size_t acc = 1;
+                    for (int d = ind - 1; d >= 0; d--) {
+                        in_str[d] = acc;
+                        acc *= (size_t)in1->shape[d];
+                    }
+                    for (size_t i = 0; i < out_numel; i++) {
+                        size_t rem    = i;
+                        size_t in_idx = 0;
+                        for (int d = ond - 1; d >= 0; d--) {
+                            size_t coord = rem % (size_t)out->shape[d];
+                            rem /= (size_t)out->shape[d];
+                            int id = d - prepend;
+                            if (id >= 0 && in1->shape[id] != 1)
+                                in_idx += coord * in_str[id];
+                        }
+                        g1_data[in_idx] += out_grad[i];
+                    }
+                } else {
+                    /* High-rank fallback: contiguous-tiling approximation. */
+                    for (size_t i = 0; i < out_numel; i++)
+                        g1_data[i % in1->numel] += out_grad[i];
                 }
             }
         }
@@ -782,6 +851,24 @@ static int cpu_backward_node(struct IRNode* node) {
         int cog = C_out / groups;   /* output channels per group */
         int col_h = cig * kH * kW;
         int col_w = oH * oW;
+
+        /* Bias gradient: grad_bias[c] = sum over batch and spatial of out_grad[n,c,·,·]. */
+        if (node->num_inputs >= 3 && node->inputs[2] && node->inputs[2]->requires_grad) {
+            Tensor* bias = node->inputs[2];
+            Tensor* gb   = ensure_grad(bias);
+            if (gb && gb->data && bias->numel == (size_t)C_out) {
+                float* gb_data = (float*)gb->data;
+                for (int n = 0; n < NB; n++) {
+                    for (int c = 0; c < C_out; c++) {
+                        const float* og = out_grad + ((size_t)n * C_out + c) * oH * oW;
+                        float s = 0.0f;
+                        for (int j = 0; j < oH * oW; j++)
+                            s += og[j];
+                        gb_data[c] += s;
+                    }
+                }
+            }
+        }
 
         CMLBlasContext* blas = get_blas_context();
 

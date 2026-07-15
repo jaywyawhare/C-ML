@@ -57,6 +57,9 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     conv_params.stride   = stride_arr;
     conv_params.padding  = padding_arr;
     conv_params.dilation = dilation_arr;
+    conv_params.groups   = conv2d->groups; /* MUST init: uop_conv2d copies groups; leaving it
+                                            * uninitialised makes ch_per_group = channels/garbage,
+                                            * yielding a 0/garbage-dim GEMM (intermittent hang). */
 
     Tensor* bias = NULL;
     if (conv2d->use_bias && bias_param && bias_param->tensor) {

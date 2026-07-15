@@ -556,6 +556,8 @@ set_target_properties(cml_static PROPERTIES
     OUTPUT_NAME "cml"
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
+    # -fPIC so the archive can be linked into the Python CFFI shared module.
+    POSITION_INDEPENDENT_CODE ON
 )
 target_compile_definitions(cml_static PUBLIC CML_STATIC_DEFINE)
 cml_link_all(cml_static)
