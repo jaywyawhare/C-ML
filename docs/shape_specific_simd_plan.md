@@ -45,7 +45,7 @@ vectorized scalar and the JIT emits the shape-specialized SIMD.
 
 **Note on the execution path:** the default eager path is
 `cpu_execute_ir → cpu_execute_node` (the interpreter), *not* the LLVM per-node
-backend, which is a separate opt-in emitter (AOT / dispatch / `CML_BACKEND`).
+backend, which is a separate opt-in emitter (AOT / dispatch / `BACKEND`).
 So in the default configuration the shape-specialized SIMD is available through
 the JIT backend, while the interpreter relies on compiler auto-vectorization of
 the now-scalar `simd_*`.  Wiring the interpreter to the shape-specialized JIT by

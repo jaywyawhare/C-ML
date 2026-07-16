@@ -225,7 +225,7 @@ def main():
     print("\nRunning torch_c (CPU) benchmarks...")
     all_results["torch_c"] = bench_torch_c(binary)
 
-    gpu = bench_torch_c(binary, env_extra={"CML_BACKEND": "opencl"})
+    gpu = bench_torch_c(binary, env_extra={"BACKEND": "opencl"})
     if gpu:
         print("Running torch_c (OpenCL) benchmarks...")
         all_results["torch_c(OpenCL)"] = gpu

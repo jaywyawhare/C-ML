@@ -579,7 +579,7 @@ def main():
 
     # CML OpenCL
     print(f"\nRunning CML (OpenCL)...")
-    cml_ocl = bench_cml(cml_binary, env_extra={"CML_BACKEND": "opencl"})
+    cml_ocl = bench_cml(cml_binary, env_extra={"BACKEND": "opencl"})
     if cml_ocl:
         all_results["CML(OpenCL)"] = cml_ocl
 

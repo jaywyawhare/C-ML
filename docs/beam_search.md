@@ -99,7 +99,7 @@ typedef struct {
 |----------|-------------|
 | `cml_beam_search_create()` | Create a BEAM search context |
 | `cml_beam_search_free(ctx)` | Free a BEAM search context |
-| `cml_beam_search_enabled()` | Check if BEAM search is enabled (via `CML_BEAM` env var) |
+| `cml_beam_search_enabled()` | Check if BEAM search is enabled (via `BEAM` env var) |
 | `cml_beam_search_tune(ctx, hash, total, ndim, shape, best)` | Tune using heuristic estimation |
 | `cml_beam_search_tune_hw(ctx, hash, total, timing_fn, data, best)` | Tune using hardware timing callback |
 | `cml_beam_search_lookup(ctx, hash, best)` | Look up cached config |
@@ -114,10 +114,10 @@ typedef struct {
 ### Environment Variable
 
 ```bash
-export CML_BEAM=0    # Disable BEAM search
-export CML_BEAM=4    # Enable with beam width 4 (default)
-export CML_BEAM=8    # Wider search (more candidates evaluated)
-export CML_BEAM=16   # Exhaustive search
+export BEAM=0    # Disable BEAM search
+export BEAM=4    # Enable with beam width 4 (default)
+export BEAM=8    # Wider search (more candidates evaluated)
+export BEAM=16   # Exhaustive search
 ```
 
 ### Context Defaults
@@ -176,7 +176,7 @@ cml_beam_cache_load(ctx, "beam_cache.bin");
 CMLBeamSearchCtx* ctx = cml_beam_search_create();
 
 if (!cml_beam_search_enabled()) {
-    printf("BEAM search disabled (set CML_BEAM env var)\n");
+    printf("BEAM search disabled (set BEAM env var)\n");
     return;
 }
 
@@ -244,9 +244,9 @@ A variant is skipped during autotuning if M < TSM or N < TSN or M/N/K not divisi
 ### Environment Variable
 
 ```bash
-export CML_BEAM=0    # Disable: use static matmul / matmul_naive only
+export BEAM=0    # Disable: use static matmul / matmul_naive only
 # unset or nonzero  # Enable with all compiled variants (default)
-export CML_BEAM=4    # Limit search to the first 4 applicable variants
+export BEAM=4    # Limit search to the first 4 applicable variants
 ```
 
 When disabled, the backend falls back to:

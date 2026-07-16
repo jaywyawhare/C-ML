@@ -248,18 +248,18 @@ static void check_and_launch_viz(void) {
         return;
     }
 
-    const char* viz_launched = getenv("CML_VIZ_LAUNCHED");
+    const char* viz_launched = getenv("VIZ_LAUNCHED");
     if (viz_launched && viz_launched[0] != '\0') {
         return;
     }
 
 #ifdef _WIN32
-    const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("CML_VIZ_SCRIPT"),
+    const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("VIZ_SCRIPT"),
                                NULL};
 #else
     const char* try_paths[] = {
         "scripts/viz.py",        "../scripts/viz.py",      "/usr/local/share/cml/viz.py",
-        "/usr/share/cml/viz.py", getenv("CML_VIZ_SCRIPT"), NULL};
+        "/usr/share/cml/viz.py", getenv("VIZ_SCRIPT"), NULL};
 #endif
 
     const char* script_path = NULL;
@@ -280,8 +280,8 @@ static void check_and_launch_viz(void) {
 
 #ifdef _WIN32
     GetModuleFileName(NULL, exe_path, sizeof(exe_path));
-    _putenv_s("CML_VIZ_LAUNCHED", "1");
-    _putenv_s("CML_VIZ", "1");
+    _putenv_s("VIZ_LAUNCHED", "1");
+    _putenv_s("VIZ", "1");
 
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "python \"%s\" \"%s\"", script_path, exe_path);
@@ -299,8 +299,8 @@ static void check_and_launch_viz(void) {
         return;
     }
 
-    setenv("CML_VIZ_LAUNCHED", "1", 1);
-    setenv("CML_VIZ", "1", 1);
+    setenv("VIZ_LAUNCHED", "1", 1);
+    setenv("VIZ", "1", 1);
 
     char script_buf[1024];
     strncpy(script_buf, script_path, sizeof(script_buf) - 1);
@@ -349,8 +349,8 @@ static void check_and_launch_viz(void) {
         exe_path[len] = '\0';
     }
 
-    setenv("CML_VIZ_LAUNCHED", "1", 1);
-    setenv("CML_VIZ", "1", 1);
+    setenv("VIZ_LAUNCHED", "1", 1);
+    setenv("VIZ", "1", 1);
 
     char python_cmd[] = "python3";
     char script_buf[1024];
@@ -640,12 +640,7 @@ void cml_summary(Module* module) {
         printf("=");
     printf("\n\n");
 
-    const char* viz_env     = getenv("VIZ");
-    const char* cml_viz_env = getenv("CML_VIZ");
-    bool viz_enabled = (viz_env && (strcmp(viz_env, "1") == 0 || strcmp(viz_env, "true") == 0)) ||
-                       (cml_viz_env && (strcmp(cml_viz_env, "1") == 0));
-
-    if (viz_enabled) {
+    if (cml_viz_enabled()) {
         ModelArchitecture* arch = model_architecture_create();
         if (arch) {
             if (model_architecture_extract(module, arch) == 0) {

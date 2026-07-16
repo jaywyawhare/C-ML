@@ -107,9 +107,9 @@ def run_tinygrad(N, device):
 def run_cml_single(N, backend="cpu", blas_lib=None):
     env = os.environ.copy()
     if backend == "opencl":
-        env["CML_BACKEND"] = "opencl"
+        env["BACKEND"] = "opencl"
     if blas_lib:
-        env["CML_BLAS_LIB"] = blas_lib
+        env["BLAS_LIB"] = blas_lib
 
     result = subprocess.run(
         ["./build/bin/bench_cross_framework"],
@@ -180,7 +180,7 @@ def main():
     # CML CPU - need to set BLAS lib path
     print("Running CML (CPU)...")
     venv_path = "/home/arrry/dev/personal/C-ML/benchmarks/.venv/lib/python3.14/site-packages/scipy_openblas64/lib/libscipy_openblas64_.so"
-    blas_lib = os.environ.get("CML_BLAS_LIB") or venv_path
+    blas_lib = os.environ.get("BLAS_LIB") or venv_path
     results["CML(CPU)"] = {}
     for N in [512, 1024, 2048]:
         results["CML(CPU)"][N] = run_cml(N, "cpu", blas_lib)

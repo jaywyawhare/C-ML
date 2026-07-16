@@ -2,7 +2,7 @@
 # MLPerf Training v4.0 - BERT Pretraining
 # Target: 0.72 masked LM accuracy
 set -e
-export CML_BACKEND=${CML_BACKEND:-cuda}
+export BACKEND=${BACKEND:-cuda}
 ./build/bin/mlperf_resnet50 \
     --data-dir=${BERT_DATA_DIR:-/data/bert} \
     --batch-size=${BS:-64} \

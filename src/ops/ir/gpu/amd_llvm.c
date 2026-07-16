@@ -27,7 +27,7 @@ static void ensure_amdgpu_targets(void) {
 }
 
 static const char* detect_gpu_arch(void) {
-    const char* env = getenv("CML_AMD_ARCH");
+    const char* env = getenv("AMD_ARCH");
     if (env && env[0]) return env;
 
     FILE* f = fopen("/sys/class/kfd/kfd/topology/nodes/1/properties", "r");

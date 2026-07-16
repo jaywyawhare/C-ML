@@ -69,7 +69,7 @@ A rigorous cross-framework comparison covering five workloads on float32:
 **C binary** (`benchmarks/bench_cross_framework.c`):
 - Compiles to `build/bin/bench_cross_framework`
 - Outputs JSON so the Python driver can parse it
-- Respects `CML_BACKEND=opencl` to benchmark the GPU path
+- Respects `BACKEND=opencl` to benchmark the GPU path
 - Uses median of 5 rounds; 3 iterations/round for N=2048 to reduce thermal throttle
 - Includes cooldown sleeps between heavy 2048-size runs
 
@@ -78,7 +78,7 @@ A rigorous cross-framework comparison covering five workloads on float32:
 ./build/bin/bench_cross_framework
 
 # GPU benchmark via OpenCL
-CML_BACKEND=opencl ./build/bin/bench_cross_framework
+BACKEND=opencl ./build/bin/bench_cross_framework
 ```
 
 **Python driver** (`benchmarks/bench_all.py`):

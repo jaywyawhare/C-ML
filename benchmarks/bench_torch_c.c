@@ -9,8 +9,8 @@
  *   4. MLP training step: forward + MSE loss + backward + SGD step
  *   5. Conv2d forward: batch=8, 3x32x32 -> 16x30x30
  *
- * Set CML_BACKEND=opencl to benchmark OpenCL GPU path.
- * Set CML_BACKEND=metal to benchmark Metal GPU path (macOS).
+ * Set BACKEND=opencl to benchmark OpenCL GPU path.
+ * Set BACKEND=metal to benchmark Metal GPU path (macOS).
  */
 #define _POSIX_C_SOURCE 199309L
 #include "torch/torch_c.h"
@@ -322,7 +322,7 @@ static double bench_conv2d(void) {
 }
 
 int main(void) {
-    const char* backend = getenv("CML_BACKEND");
+    const char* backend = getenv("BACKEND");
     if (backend && strcmp(backend, "metal") == 0) {
         g_device = DEVICE_METAL;
         fprintf(stderr, "bench_torch_c: using Metal GPU backend\n");

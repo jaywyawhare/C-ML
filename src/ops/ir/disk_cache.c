@@ -121,7 +121,7 @@ static int mkdirs(const char* path) {
 }
 
 static char* default_path(void) {
-    const char* cache_dir = getenv("CML_CACHE_DIR");
+    const char* cache_dir = getenv("CACHE_DIR");
     if (cache_dir) {
         size_t len = strlen(cache_dir) + 32;
         char* buf = cml_malloc(len);
@@ -141,7 +141,7 @@ static char* default_path(void) {
 }
 
 bool cml_disk_cache_enabled(void) {
-    const char* env = getenv("CML_DISK_CACHE");
+    const char* env = getenv("DISK_CACHE");
     if (!env) return false;
     return env[0] == '1' || env[0] == 'y' || env[0] == 'Y';
 }

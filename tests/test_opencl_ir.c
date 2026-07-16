@@ -34,7 +34,7 @@ static float max_abs_diff(float* a, float* b, int n) {
     return mx;
 }
 
-/* Run an op on CPU, then on GPU (via CML_BACKEND=opencl), compare results */
+/* Run an op on CPU, then on GPU (via BACKEND=opencl), compare results */
 static void test_matmul(void) {
     printf("Testing MATMUL on GPU...\n");
     int M = 64, K = 128, N = 64;
@@ -62,7 +62,7 @@ static void test_matmul(void) {
     cml_reset_ir_context();
 
     /* GPU via OpenCL */
-    setenv("CML_BACKEND", "opencl", 1);
+    setenv("BACKEND", "opencl", 1);
     Tensor* ta_gpu = tensor_from_data(a_data, shape_a, 2, &cfg);
     Tensor* tb_gpu = tensor_from_data(b_data, shape_b, 2, &cfg);
     Tensor* tc_gpu = uop_matmul(ta_gpu, tb_gpu);
@@ -76,7 +76,7 @@ static void test_matmul(void) {
     tensor_free(tb_gpu);
     tensor_free(tc_gpu);
     cml_reset_ir_context();
-    unsetenv("CML_BACKEND");
+    unsetenv("BACKEND");
 
     cml_free(a_data);
     cml_free(b_data);
@@ -104,7 +104,7 @@ static void test_elementwise(void) {
         cml_reset_ir_context();
 
         /* GPU */
-        setenv("CML_BACKEND", "opencl", 1);
+        setenv("BACKEND", "opencl", 1);
         t = tensor_from_data(data, shape, 1, &cfg);
         r = uop_relu(t);
         float* gpu_res = (float*)tensor_data_ptr(r);
@@ -112,7 +112,7 @@ static void test_elementwise(void) {
         CHECK("RELU correctness", diff < 1e-5f);
         tensor_free(t); tensor_free(r);
         cml_reset_ir_context();
-        unsetenv("CML_BACKEND");
+        unsetenv("BACKEND");
         cml_free(cpu_copy);
     }
 
@@ -133,7 +133,7 @@ static void test_elementwise(void) {
         cml_reset_ir_context();
 
         /* GPU */
-        setenv("CML_BACKEND", "opencl", 1);
+        setenv("BACKEND", "opencl", 1);
         ta = tensor_from_data(data, shape, 1, &cfg);
         tb = tensor_from_data(data2, shape2, 1, &cfg);
         r = uop_add(ta, tb);
@@ -142,7 +142,7 @@ static void test_elementwise(void) {
         CHECK("ADD broadcast correctness", diff < 1e-5f);
         tensor_free(ta); tensor_free(tb); tensor_free(r);
         cml_reset_ir_context();
-        unsetenv("CML_BACKEND");
+        unsetenv("BACKEND");
         cml_free(cpu_copy);
         cml_free(data2);
     }
@@ -163,7 +163,7 @@ static void test_large_matmul_perf(void) {
     TensorConfig cfg = {0};
 
     /* Warmup + time GPU */
-    setenv("CML_BACKEND", "opencl", 1);
+    setenv("BACKEND", "opencl", 1);
     for (int warmup = 0; warmup < 2; warmup++) {
         Tensor* ta = tensor_from_data(a_data, shape_a, 2, &cfg);
         Tensor* tb = tensor_from_data(b_data, shape_b, 2, &cfg);
@@ -186,7 +186,7 @@ static void test_large_matmul_perf(void) {
     }
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double gpu_ms = ((t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) * 1e-6) / iters;
-    unsetenv("CML_BACKEND");
+    unsetenv("BACKEND");
 
     /* Time CPU */
     clock_gettime(CLOCK_MONOTONIC, &t0);

@@ -27,12 +27,12 @@ build() {
 run_tests() {
     local dest="$1"
     mkdir -p "$dest"
-    export CML_PROCESS_REPLAY=1
-    export CML_PROCESS_REPLAY_DIR="$dest"
+    export PROCESS_REPLAY=1
+    export PROCESS_REPLAY_DIR="$dest"
     cd "$BUILD_DIR"
     ctest --output-on-failure || true
-    unset CML_PROCESS_REPLAY
-    unset CML_PROCESS_REPLAY_DIR
+    unset PROCESS_REPLAY
+    unset PROCESS_REPLAY_DIR
 }
 
 count_kernels() {

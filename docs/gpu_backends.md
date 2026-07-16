@@ -543,8 +543,8 @@ Each valid combination is compiled into its own `beam_gemm_N` OpenCL kernel at b
 **Environment variable:**
 
 ```bash
-export CML_BEAM=0    # Disable BEAM (use static matmul / matmul_naive)
-export CML_BEAM=4    # Limit search to first 4 applicable variants
+export BEAM=0    # Disable BEAM (use static matmul / matmul_naive)
+export BEAM=4    # Limit search to first 4 applicable variants
 # unset              # Enable with all compiled variants (default)
 ```
 

@@ -386,12 +386,12 @@ def main():
     all_results["cml"] = bench_cml(cml_binary)
 
     print(f"\nRunning CML (GPU) benchmarks...")
-    cml_gpu = bench_cml(cml_binary, env_extra={"CML_BACKEND": "opencl"})
+    cml_gpu = bench_cml(cml_binary, env_extra={"BACKEND": "opencl"})
     if cml_gpu:
         all_results["cml(OpenCL)"] = cml_gpu
 
     print(f"\nRunning CML (Metal) benchmarks...")
-    cml_metal = bench_cml(cml_binary, env_extra={"CML_BACKEND": "metal"})
+    cml_metal = bench_cml(cml_binary, env_extra={"BACKEND": "metal"})
     if cml_metal:
         all_results["cml(Metal)"] = cml_metal
 

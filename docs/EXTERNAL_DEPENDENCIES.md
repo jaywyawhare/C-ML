@@ -31,7 +31,7 @@ sudo dnf install openblas-devel        # Fedora
 
 macOS uses the built-in Accelerate framework by default.
 
-Override: `CML_BLAS_LIB=/path/to/libblas.so`
+Override: `BLAS_LIB=/path/to/libblas.so`
 
 ### SLEEF
 

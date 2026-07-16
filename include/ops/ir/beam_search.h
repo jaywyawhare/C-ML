@@ -1,7 +1,7 @@
 /*
  * BEAM search kernel optimization.
  * Parametric kernel tuning: try N launch configs (block size, unroll,
- * vectorization width) and pick fastest. Enable via CML_BEAM=N env var.
+ * vectorization width) and pick fastest. Enable via BEAM=N env var.
  */
 
 #ifndef CML_OPS_IR_BEAM_SEARCH_H

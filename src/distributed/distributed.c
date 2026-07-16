@@ -21,14 +21,12 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
 
     /* Auto-detect from environment */
     if (world_size < 0) {
-        const char* ws_env = getenv("CML_WORLD_SIZE");
-        if (!ws_env) ws_env = getenv("WORLD_SIZE");
+        const char* ws_env = getenv("WORLD_SIZE");
         world_size = ws_env ? atoi(ws_env) : 1;
     }
 
     if (rank < 0) {
-        const char* rank_env = getenv("CML_RANK");
-        if (!rank_env) rank_env = getenv("RANK");
+        const char* rank_env = getenv("RANK");
         if (!rank_env) rank_env = getenv("LOCAL_RANK");
         rank = rank_env ? atoi(rank_env) : 0;
     }

@@ -282,7 +282,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     gctx->world_size = world_size;
 
     /* Read environment configuration */
-    const char* addr_env = getenv("CML_MASTER_ADDR");
+    const char* addr_env = getenv("MASTER_ADDR");
     if (addr_env && addr_env[0] != '\0') {
         strncpy(gctx->master_addr, addr_env, sizeof(gctx->master_addr) - 1);
         gctx->master_addr[sizeof(gctx->master_addr) - 1] = '\0';
@@ -291,7 +291,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         gctx->master_addr[sizeof(gctx->master_addr) - 1] = '\0';
     }
 
-    const char* port_env = getenv("CML_GLOO_PORT");
+    const char* port_env = getenv("GLOO_PORT");
     if (port_env && port_env[0] != '\0') {
         gctx->port_base = atoi(port_env);
         if (gctx->port_base <= 0)

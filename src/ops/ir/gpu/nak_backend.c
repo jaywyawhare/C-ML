@@ -48,7 +48,7 @@ static void* try_open_nak(void) {
         if (lib) return lib;
     }
 
-    const char* mesa_path = getenv("CML_NAK_LIB");
+    const char* mesa_path = getenv("NAK_LIB");
     if (mesa_path) {
         void* lib = dlopen(mesa_path, RTLD_LAZY);
         if (lib) return lib;

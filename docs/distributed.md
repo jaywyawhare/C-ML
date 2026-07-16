@@ -26,8 +26,8 @@ CML reads environment variables for auto-configuration when `world_size` or
 
 | Variable           | Fallback        | Description               |
 |--------------------|-----------------|---------------------------|
-| `CML_WORLD_SIZE`   | `WORLD_SIZE`    | Total number of processes |
-| `CML_RANK`         | `RANK`, `LOCAL_RANK` | This process's rank  |
+| `WORLD_SIZE`   | `WORLD_SIZE`    | Total number of processes |
+| `RANK`         | `RANK`, `LOCAL_RANK` | This process's rank  |
 
 ### C API
 
@@ -500,8 +500,8 @@ Use `torchrun`-style launching or set environment variables manually:
 
 ```bash
 # 2-GPU single-node
-CML_WORLD_SIZE=2 CML_RANK=0 ./train &
-CML_WORLD_SIZE=2 CML_RANK=1 ./train &
+WORLD_SIZE=2 RANK=0 ./train &
+WORLD_SIZE=2 RANK=1 ./train &
 wait
 ```
 

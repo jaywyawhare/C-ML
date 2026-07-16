@@ -284,22 +284,22 @@ static int test_env_backend_selection(void) {
     cml_dispatch_detect_backends(ctx);
 
     // Save original env
-    char* original = getenv("CML_BACKEND");
+    char* original = getenv("BACKEND");
     char* saved = NULL;
     if (original) {
         saved = cml_strdup(original);
     }
 
     // Test setting via env
-    setenv("CML_BACKEND", "fallback", 1);
+    setenv("BACKEND", "fallback", 1);
     int result = cml_dispatch_set_from_env(ctx);
 
     // Restore original env
     if (saved) {
-        setenv("CML_BACKEND", saved, 1);
+        setenv("BACKEND", saved, 1);
         cml_free(saved);
     } else {
-        unsetenv("CML_BACKEND");
+        unsetenv("BACKEND");
     }
 
     if (result != 0) {

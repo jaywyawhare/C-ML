@@ -25,7 +25,7 @@ static int cache_slot(uint64_t hash) {
 }
 
 bool cml_beam_search_enabled(void) {
-    const char* env = getenv("CML_BEAM");
+    const char* env = getenv("BEAM");
     if (!env) return false;
     int val = atoi(env);
     return val > 0;
@@ -40,7 +40,7 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
     }
 
     /* Read beam width from environment; fall back to default. */
-    const char* env = getenv("CML_BEAM");
+    const char* env = getenv("BEAM");
     if (env) {
         int w = atoi(env);
         ctx->beam_width = (w > 0) ? w : CML_BEAM_DEFAULT_WIDTH;

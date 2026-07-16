@@ -985,7 +985,7 @@ int cml_dispatch_set_from_env(CMLDispatchContext* ctx) {
     if (!ctx)
         return -1;
 
-    const char* env = getenv("CML_BACKEND");
+    const char* env = getenv("BACKEND");
     if (!env)
         return 0;
 
@@ -1017,10 +1017,10 @@ int cml_dispatch_set_from_env(CMLDispatchContext* ctx) {
     } else if (strcasecmp(env, "opencl") == 0 || strcasecmp(env, "cl") == 0) {
         backend = CML_BACKEND_OPENCL;
     } else {
-        LOG_WARNING("Unknown CML_BACKEND value: %s", env);
+        LOG_WARNING("Unknown BACKEND value: %s", env);
         return -1;
     }
 
-    LOG_INFO("CML_BACKEND=%s -> %s", env, backend_names[backend]);
+    LOG_INFO("BACKEND=%s -> %s", env, backend_names[backend]);
     return cml_dispatch_set_preferred(ctx, backend);
 }

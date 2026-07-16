@@ -1,6 +1,6 @@
 /* GPU (Vulkan) execution path end-to-end test.
  *
- * Sets CML_USE_VULKAN=1 *before* cml_init so the execution path routes supported
+ * Sets USE_VULKAN=1 *before* cml_init so the execution path routes supported
  * float32 nodes (elementwise + 2D matmul) to the Vulkan compute backend, then
  * verifies the results match a direct CPU computation.  When no Vulkan device is
  * present the path falls back to CPU, so this test also passes on CPU-only hosts. */
@@ -34,7 +34,7 @@ static void check(const char* name, Tensor* out, const float* expect, int n) {
 }
 
 int main(void) {
-    setenv("CML_USE_VULKAN", "1", 1); /* must precede any execution */
+    setenv("USE_VULKAN", "1", 1); /* must precede any execution */
     cml_init();
 
     int vk = cml_vulkan_available();

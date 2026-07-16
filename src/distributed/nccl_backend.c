@@ -89,12 +89,12 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
         return nccl->ncclGetUniqueId(unique_id);
     }
 
-    const char* master_addr = getenv("CML_MASTER_ADDR");
+    const char* master_addr = getenv("MASTER_ADDR");
     if (!master_addr || master_addr[0] == '\0') {
         master_addr = NCCL_BOOTSTRAP_DEFAULT_ADDR;
     }
     int port = NCCL_BOOTSTRAP_DEFAULT_PORT;
-    const char* port_env = getenv("CML_NCCL_PORT");
+    const char* port_env = getenv("NCCL_PORT");
     if (port_env && port_env[0] != '\0') {
         int parsed = atoi(port_env);
         if (parsed > 0) {
@@ -173,7 +173,7 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
     master.sin_family = AF_INET;
     master.sin_port = htons((uint16_t)port);
     if (inet_pton(AF_INET, master_addr, &master.sin_addr) <= 0) {
-        LOG_ERROR("NCCL bootstrap: invalid CML_MASTER_ADDR '%s'", master_addr);
+        LOG_ERROR("NCCL bootstrap: invalid MASTER_ADDR '%s'", master_addr);
         close(sock);
         return -1;
     }

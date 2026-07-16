@@ -65,10 +65,10 @@ static void check_env_init(void) {
     if (checked) return;
     checked = true;
 
-    const char* env = getenv("CML_PROCESS_REPLAY");
+    const char* env = getenv("PROCESS_REPLAY");
     if (!env || env[0] == '\0') return;
 
-    const char* dir = getenv("CML_PROCESS_REPLAY_DIR");
+    const char* dir = getenv("PROCESS_REPLAY_DIR");
     if (!dir || dir[0] == '\0') dir = "/tmp/cml_process_replay";
 
     cml_process_replay_enable(dir);

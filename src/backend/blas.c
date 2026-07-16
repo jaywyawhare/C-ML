@@ -187,7 +187,7 @@ CMLBlasContext* cml_blas_init(void) {
         return NULL;
     }
 
-    const char* env_blas = getenv("CML_BLAS_LIB");
+    const char* env_blas = getenv("BLAS_LIB");
     if (env_blas && env_blas[0] != '\0') {
         ctx->lib_handle = LIB_LOAD(env_blas);
         if (ctx->lib_handle) {
@@ -211,7 +211,7 @@ CMLBlasContext* cml_blas_init(void) {
             LIB_CLOSE(ctx->lib_handle);
             ctx->lib_handle = NULL;
         }
-        LOG_WARNING("Failed to load BLAS from CML_BLAS_LIB=%s, trying defaults", env_blas);
+        LOG_WARNING("Failed to load BLAS from BLAS_LIB=%s, trying defaults", env_blas);
     }
 
     /* Probe ILP64 paths before LP64 — scipy_openblas64 is significantly faster

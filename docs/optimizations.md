@@ -417,7 +417,7 @@ static const char* blas_library_paths[] = {
 };
 
 // Environment variable override
-const char* env_blas = getenv("CML_BLAS_LIB");
+const char* env_blas = getenv("BLAS_LIB");
 ```
 
 ### 4.2 BLAS Operations

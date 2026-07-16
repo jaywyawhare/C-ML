@@ -842,14 +842,14 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
 
     b->initialized = true;
 
-    const char* beam_env = getenv("CML_BEAM");
+    const char* beam_env = getenv("BEAM");
     int beam_width = 0;  /* default: all variants */
     if (beam_env) {
         beam_width = atoi(beam_env);
         if (beam_width < 0) beam_width = 0;
     }
 
-    /* CML_BEAM=0 explicitly disables, absent means auto-enable */
+    /* BEAM=0 explicitly disables, absent means auto-enable */
     if (beam_env && beam_width == 0) {
         b->beam_width = 0;  /* explicitly disabled */
     } else {
