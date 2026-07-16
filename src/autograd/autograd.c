@@ -412,10 +412,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         }
     }
 
-    const char* viz     = getenv("CML_VIZ");
-    const char* viz_env = getenv("VIZ");
-    if ((viz && viz[0] != '\0') ||
-        (viz_env && (viz_env[0] == '1' || strcmp(viz_env, "true") == 0))) {
+    if (cml_viz_enabled()) {
         if (tensor->ir_context) {
             cml_ir_optimize(tensor->ir_context);
         }
@@ -423,9 +420,9 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         const char* out_path = "graph.json";
         int rc               = autograd_export_json(tensor, out_path);
         if (rc != 0) {
-            LOG_WARNING("CML_VIZ export failed rc=%d", rc);
+            LOG_WARNING("VIZ export failed rc=%d", rc);
         } else {
-            LOG_INFO("CML_VIZ exported graph to %s", out_path);
+            LOG_INFO("VIZ exported graph to %s", out_path);
         }
         if (tensor->ir_context) {
             char* kernel_json_raw = cml_ir_export_kernel_analysis(tensor->ir_context, false);
@@ -437,7 +434,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                     fprintf(f, "{\"unoptimized\":%s,\"optimized\":%s}", kernel_json_raw,
                             kernel_json_opt ? kernel_json_opt : "{}");
                     fclose(f);
-                    LOG_INFO("CML_VIZ exported kernels to kernels.json");
+                    LOG_INFO("VIZ exported kernels to kernels.json");
                 }
                 cml_free(kernel_json_raw);
             }

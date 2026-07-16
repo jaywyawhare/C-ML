@@ -261,6 +261,36 @@ const char* uop_type_to_string(UOpType type) {
         return "RAND_INT";
     case UOP_COUNT:
         return "COUNT";
+    case UOP_RELU:
+        return "RELU";
+    case UOP_LEAKY_RELU:
+        return "LEAKY_RELU";
+    case UOP_GELU:
+        return "GELU";
+    case UOP_SILU:
+        return "SILU";
+    case UOP_ELU:
+        return "ELU";
+    case UOP_SELU:
+        return "SELU";
+    case UOP_MISH:
+        return "MISH";
+    case UOP_HARDSWISH:
+        return "HARDSWISH";
+    case UOP_LINEAR:
+        return "LINEAR";
+    case UOP_ALLOC:
+        return "ALLOC";
+    case UOP_CHUNK:
+        return "CHUNK";
+    case UOP_SPLIT:
+        return "SPLIT";
+    case UOP_DIAGONAL:
+        return "DIAGONAL";
+    case UOP_MASKED_SELECT:
+        return "MASKED_SELECT";
+    case UOP_MESHGRID:
+        return "MESHGRID";
     default:
         return "UNKNOWN";
     }

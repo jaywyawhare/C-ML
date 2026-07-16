@@ -1436,19 +1436,12 @@ Tensor* tensor_dot(Tensor* a, Tensor* b) {
     if (a->ndim != 1 || b->ndim != 1 || a->numel != b->numel) {
         CML_ERR_NULL("tensor_dot: both tensors must be 1D with same size");
     }
-    tensor_ensure_executed(a);
-    tensor_ensure_executed(b);
-    if (!a->data || !b->data) return NULL;
-
-    float sum = 0.0f;
-    for (size_t i = 0; i < a->numel; i++) {
-        sum += tensor_get_float(a, i) * tensor_get_float(b, i);
-    }
-
-    int shape[] = {1};
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
-    Tensor* out = tensor_full(shape, 1, &config, sum);
-    return out;
+    /* Lazy: dot(a,b) = sum(a * b) — builds IR, defers execution, and is now
+     * differentiable (was: eager tensor_ensure_executed + get_float loop). */
+    Tensor* prod = uop_mul(a, b);
+    if (!prod) return NULL;
+    ReduceParams params = {.dims = NULL, .num_dims = 0, .keepdim = true};
+    return uop_sum(prod, &params);
 }
 
 Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode) {

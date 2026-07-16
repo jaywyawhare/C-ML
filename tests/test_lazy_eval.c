@@ -285,7 +285,10 @@ static void test_chained_lazy_via_data_ptr(void) {
           && APPROX_EQ(cd[2], 0.0f) && APPROX_EQ(cd[3], 4.0f);
     }
     CHECK("chained relu result correct", ok);
-    CHECK("c node is executed after data_ptr", c_node && c_node->is_executed);
+    /* relu now lowers to max(x,0) in the decompose pass, so c->ir_node points at
+     * the replacement node; assert the observable tensor-level execution flag. */
+    (void)c_node;
+    CHECK("c executed after data_ptr", c->is_executed);
 
     tensor_free(a); tensor_free(b); tensor_free(c);
     cml_reset_ir_context();

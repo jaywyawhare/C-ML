@@ -2,6 +2,7 @@
 #include "core/threefry.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,104 +120,27 @@ Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
     }
 
     int out_f = lora->out_features;
-    int r = lora->rank;
 
-    /* Ensure all tensors are executed and get data pointers */
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(lora->base_weight);
-    tensor_ensure_executed(lora->lora_A);
-    tensor_ensure_executed(lora->lora_B);
-
-    float* x_data = (float*)tensor_data_ptr(input);
-    float* W_data = (float*)tensor_data_ptr(lora->base_weight);
-    float* A_data = (float*)tensor_data_ptr(lora->lora_A);
-    float* B_data = (float*)tensor_data_ptr(lora->lora_B);
-
-    if (!x_data || !W_data || !A_data || !B_data) {
-        LOG_ERROR("Failed to get data pointers for forward pass");
-        return NULL;
-    }
-
-    TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
-
-    /* Allocate output tensor [batch, out_features] */
-    int out_shape[2] = {batch, out_f};
-    Tensor* output = tensor_zeros(out_shape, 2, &cfg);
-    if (!output) {
-        LOG_ERROR("Failed to allocate output tensor");
-        return NULL;
-    }
-    tensor_ensure_executed(output);
-    float* out_data = (float*)tensor_data_ptr(output);
-
-    /*
-     * Step 1: base_out = input @ base_weight^T
-     * input: [batch, in_f], W: [out_f, in_f] => out: [batch, out_f]
-     * out[b][o] = sum_i( input[b][i] * W[o][i] )
-     */
-    for (int b = 0; b < batch; b++) {
-        for (int o = 0; o < out_f; o++) {
-            float sum = 0.0f;
-            for (int i = 0; i < in_f; i++) {
-                sum += x_data[b * in_f + i] * W_data[o * in_f + i];
-            }
-            out_data[b * out_f + o] = sum;
-        }
-    }
-
-    /* If already merged, the LoRA contribution is baked into W, so we're done */
+    /* Lazy: out = input·Wᵀ + scaling·((input·Aᵀ)·Bᵀ). Builds IR, defers
+     * execution, and is autograd-differentiable (was: eager triple matmul on
+     * raw data pointers). uop_linear(x, w, b) computes x·wᵀ + b. */
+    Tensor* base = uop_linear(input, lora->base_weight, NULL);   /* [batch, out_f] */
+    if (!base) return NULL;
     if (lora->merged) {
-        return output;
+        return base;   /* LoRA contribution baked into W already */
     }
 
-    /*
-     * Step 2: lora_out = scaling * input @ A^T @ B^T
-     *
-     * First: tmp = input @ A^T
-     * input: [batch, in_f], A: [rank, in_f] => tmp: [batch, rank]
-     * tmp[b][r] = sum_i( input[b][i] * A[r][i] )
-     */
-    float* tmp = (float*)cml_calloc((size_t)batch * (size_t)r, sizeof(float));
-    if (!tmp) {
-        LOG_ERROR("Failed to allocate temporary buffer for LoRA forward");
-        tensor_free(output);
-        return NULL;
-    }
+    Tensor* tmp = uop_linear(input, lora->lora_A, NULL);         /* [batch, rank]  */
+    if (!tmp) return NULL;
+    Tensor* delta = uop_linear(tmp, lora->lora_B, NULL);         /* [batch, out_f] */
+    if (!delta) return NULL;
 
-    for (int b = 0; b < batch; b++) {
-        for (int ri = 0; ri < r; ri++) {
-            float sum = 0.0f;
-            for (int i = 0; i < in_f; i++) {
-                sum += x_data[b * in_f + i] * A_data[ri * in_f + i];
-            }
-            tmp[b * r + ri] = sum;
-        }
-    }
-
-    /*
-     * Then: lora_result = tmp @ B^T
-     * tmp: [batch, rank], B: [out_f, rank] => lora_result: [batch, out_f]
-     * lora_result[b][o] = sum_r( tmp[b][r] * B[o][r] )
-     *
-     * Add scaling * lora_result to output
-     */
-    for (int b = 0; b < batch; b++) {
-        for (int o = 0; o < out_f; o++) {
-            float sum = 0.0f;
-            for (int ri = 0; ri < r; ri++) {
-                sum += tmp[b * r + ri] * B_data[o * r + ri];
-            }
-            out_data[b * out_f + o] += lora->scaling * sum;
-        }
-    }
-
-    cml_free(tmp);
-    return output;
+    int sshape[2] = {batch, out_f};
+    Tensor* scale = uop_fill_ex(sshape, 2, lora->scaling, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!scale) return NULL;
+    Tensor* scaled = uop_mul(delta, scale);
+    if (!scaled) return NULL;
+    return uop_add(base, scaled);
 }
 
 int cml_lora_linear_merge(CMLLoRALinear* lora) {

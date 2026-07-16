@@ -142,29 +142,18 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
     if (!ones)
         return NULL;
 
-    Tensor* half_const = tensor_ones(input_shape, input_ndim, &config);
+    /* Lazy constants (was: eager tensor_ones + tensor_data_ptr fill loop). */
+    Tensor* half_const = uop_fill_ex(input_shape, input_ndim, 0.5f, input->dtype, input->device);
     if (!half_const) {
         tensor_free(ones);
         return NULL;
     }
-    float* half_data = (float*)tensor_data_ptr(half_const);
-    if (half_data) {
-        for (size_t i = 0; i < half_const->numel; i++) {
-            half_data[i] = 0.5f;
-        }
-    }
 
-    Tensor* sqrt_const = tensor_ones(input_shape, input_ndim, &config);
+    Tensor* sqrt_const = uop_fill_ex(input_shape, input_ndim, sqrt_2_pi, input->dtype, input->device);
     if (!sqrt_const) {
         tensor_free(ones);
         tensor_free(half_const);
         return NULL;
-    }
-    float* sqrt_data = (float*)tensor_data_ptr(sqrt_const);
-    if (sqrt_data) {
-        for (size_t i = 0; i < sqrt_const->numel; i++) {
-            sqrt_data[i] = sqrt_2_pi;
-        }
     }
 
     scaled = tensor_mul(sqrt_const, input);

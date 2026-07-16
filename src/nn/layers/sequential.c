@@ -463,14 +463,21 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
     if (!seq || !input)
         return NULL;
 
-    /* Zero-IR fast path: only in eval mode, only when fully supported */
-    if (!((Module*)seq)->training) {
+    /* Zero-IR fast path and cached-graph execution both return tensors detached
+     * from the autograd graph, so they are only valid when no backward pass will
+     * follow. Gate on grad being disabled (not merely eval mode) — otherwise a
+     * training loop on a not-yet-train()-flagged model silently stops learning. */
+    bool autograd_active = autograd_is_grad_enabled();
+
+    /* Zero-IR fast path: only in eval mode with autograd off, only when fully supported */
+    if (!((Module*)seq)->training && !autograd_active) {
         if (seq->fast_path && fast_path_shapes_match(seq->fast_path, input)) {
             return fast_path_run(seq->fast_path, input);
         }
     }
 
-    if (seq->enable_graph_cache && seq->cached_graph && shapes_match(seq->cached_graph, input)) {
+    if (!autograd_active && seq->enable_graph_cache && seq->cached_graph &&
+        shapes_match(seq->cached_graph, input)) {
         Tensor* cached_output = execute_cached_forward(seq, input);
         if (cached_output) {
             return cached_output; // Cache hit!
@@ -515,11 +522,12 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
         }
     }
 
-    /* Build the zero-IR fast path after the first successful eval-mode forward */
-    if (!((Module*)seq)->training && !seq->fast_path) {
+    /* Build the zero-IR fast path after the first successful eval-mode forward
+     * (only when autograd is off — the fast path detaches from the grad graph). */
+    if (!((Module*)seq)->training && !autograd_active && !seq->fast_path) {
         seq->fast_path = fast_path_build(seq, input);
         if (seq->fast_path)
-            fprintf(stderr, "[CML] Zero-IR fast path built (%d ops)\n", seq->fast_path->num_ops);
+            LOG_DEBUG("Zero-IR fast path built (%d ops)", seq->fast_path->num_ops);
     }
 
     return output;

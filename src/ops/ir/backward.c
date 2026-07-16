@@ -756,21 +756,39 @@ static int cpu_backward_node(struct IRNode* node) {
     }
 
     case UOP_PERMUTE: {
-        // For 2D transpose: grad_input = transpose(grad_output)
-        // If forward is: output = transpose(input), shape [M,N] -> [N,M]
-        // Then backward is: input.grad = transpose(output.grad)
-        if (in1 && in1->requires_grad && in1->ndim == 2 && out->ndim == 2) {
+        // grad flows back through the inverse permutation. Using the same
+        // index mapping as the forward (in_coord[perm[i]] = out_coord[i]),
+        // scatter each output-grad element back to its source input position.
+        if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 float* g1_data = (float*)g1->data;
-                // out.grad has shape [N, M], we need to transpose it to [M, N]
-                int N = out->shape[0]; // transposed rows
-                int M = out->shape[1]; // transposed cols
-                // Transpose the gradient back
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < M; j++) {
-                        // out_grad[i,j] -> g1[j,i]
-                        g1_data[j * N + i] += out_grad[i * M + j];
+                if (in1->ndim == 2 && out->ndim == 2) {
+                    // 2D transpose fast path.
+                    int N = out->shape[0];
+                    int M = out->shape[1];
+                    for (int i = 0; i < N; i++)
+                        for (int j = 0; j < M; j++)
+                            g1_data[j * N + i] += out_grad[i * M + j];
+                } else {
+                    PermuteParams* pp = (PermuteParams*)node->params;
+                    int nd = in1->ndim;
+                    if (pp && pp->perm && nd <= 16) {
+                        size_t in_strides[16];
+                        size_t s = 1;
+                        for (int i = nd - 1; i >= 0; i--) { in_strides[i] = s; s *= (size_t)in1->shape[i]; }
+                        int out_coord[16];
+                        for (size_t o = 0; o < out_numel; o++) {
+                            size_t rem = o;
+                            for (int i = nd - 1; i >= 0; i--) {
+                                out_coord[i] = (int)(rem % (size_t)out->shape[i]);
+                                rem /= (size_t)out->shape[i];
+                            }
+                            size_t in_lin = 0;
+                            for (int i = 0; i < nd; i++)
+                                in_lin += (size_t)out_coord[i] * in_strides[pp->perm[i]];
+                            g1_data[in_lin] += out_grad[o];
+                        }
                     }
                 }
             }

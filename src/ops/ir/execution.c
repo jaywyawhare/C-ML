@@ -52,14 +52,14 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
 }
 
 /* The shape-specialized LLVM JIT is the default execution path; it falls back to
- * the scalar interpreter per-node for unsupported ops/shapes. Set CML_DISABLE_JIT=1
- * (or CML_BACKEND=interp) to force the pure interpreter (reference path). */
+ * the scalar interpreter per-node for unsupported ops/shapes. Set DISABLE_JIT=1
+ * (or BACKEND=interp) to force the pure interpreter (reference path). */
 static int cml_ir_use_jit(void) {
     static int checked = 0, enabled = 1;
     if (!checked) {
-        const char* dis = getenv("CML_DISABLE_JIT");
+        const char* dis = getenv("DISABLE_JIT");
         if (dis && dis[0] == '1') enabled = 0;
-        const char* be = getenv("CML_BACKEND");
+        const char* be = getenv("BACKEND");
         if (be && (strcasecmp(be, "interp") == 0 || strcasecmp(be, "interpreter") == 0))
             enabled = 0;
         checked = 1;
@@ -69,12 +69,12 @@ static int cml_ir_use_jit(void) {
 #endif
 
 #ifdef CML_HAS_VULKAN
-/* Opt-in GPU execution: CML_USE_VULKAN=1 routes supported float32 nodes
+/* Opt-in GPU execution: USE_VULKAN=1 routes supported float32 nodes
  * (elementwise + 2D matmul) to the Vulkan compute backend; CPU/JIT otherwise. */
 static int cml_ir_use_vulkan(void) {
     static int cached = -1;
     if (cached < 0) {
-        const char* e = getenv("CML_USE_VULKAN");
+        const char* e = getenv("USE_VULKAN");
         cached = (e && e[0] == '1') ? 1 : 0;
     }
     return cached;
@@ -1487,34 +1487,57 @@ int cpu_execute_node(struct IRNode* node) {
         Tensor* inp      = node->inputs[0];
 
         /* Check if this is a per-dimension reduction (not global) */
-        if (rp && rp->num_dims == 1 && inp->ndim == 2) {
+        if (rp && rp->num_dims == 1 && inp->ndim >= 2) {
             int reduce_dim = rp->dims[0];
             if (reduce_dim < 0)
                 reduce_dim += inp->ndim;
-            int rows = inp->shape[0];
-            int cols = inp->shape[1];
 
-            if (reduce_dim == 1) {
-                /* Max along cols: output [rows] or [rows,1] */
-                for (int r = 0; r < rows; r++) {
-                    float mx = in1_data[r * cols];
-                    for (int c = 1; c < cols; c++) {
-                        float v = in1_data[r * cols + c];
-                        if (v > mx)
-                            mx = v;
+            if (inp->ndim == 2) {
+                int rows = inp->shape[0];
+                int cols = inp->shape[1];
+                if (reduce_dim == 1) {
+                    /* Max along cols: output [rows] or [rows,1] */
+                    for (int r = 0; r < rows; r++) {
+                        float mx = in1_data[r * cols];
+                        for (int c = 1; c < cols; c++) {
+                            float v = in1_data[r * cols + c];
+                            if (v > mx)
+                                mx = v;
+                        }
+                        out_data[r] = mx;
                     }
-                    out_data[r] = mx;
+                } else { /* reduce_dim == 0 */
+                    /* Max along rows: output [cols] or [1,cols] */
+                    for (int c = 0; c < cols; c++) {
+                        float mx = in1_data[c];
+                        for (int r = 1; r < rows; r++) {
+                            float v = in1_data[r * cols + c];
+                            if (v > mx)
+                                mx = v;
+                        }
+                        out_data[c] = mx;
+                    }
                 }
-            } else { /* reduce_dim == 0 */
-                /* Max along rows: output [cols] or [1,cols] */
-                for (int c = 0; c < cols; c++) {
-                    float mx = in1_data[c];
-                    for (int r = 1; r < rows; r++) {
-                        float v = in1_data[r * cols + c];
-                        if (v > mx)
-                            mx = v;
+            } else {
+                /* Generic N-dim per-dimension max (mirrors UOP_SUM) */
+                int reduce_size = inp->shape[reduce_dim];
+                size_t inner = 1;
+                for (int d = reduce_dim + 1; d < inp->ndim; d++)
+                    inner *= (size_t)inp->shape[d];
+                size_t outer = 1;
+                for (int d = 0; d < reduce_dim; d++)
+                    outer *= (size_t)inp->shape[d];
+                for (size_t o = 0; o < outer; o++) {
+                    for (size_t i = 0; i < inner; i++) {
+                        size_t base = o * (size_t)reduce_size * inner + i;
+                        float mx = in1_data[base];
+                        for (int r = 1; r < reduce_size; r++) {
+                            float v = in1_data[base + (size_t)r * inner];
+                            if (v > mx)
+                                mx = v;
+                        }
+                        out_data[o * inner + i] = mx;
                     }
-                    out_data[c] = mx;
                 }
             }
         } else {
@@ -1698,22 +1721,44 @@ int cpu_execute_node(struct IRNode* node) {
     }
 
     case UOP_PERMUTE: {
-        // 2D transpose: swap rows and columns
         Tensor* in = node->inputs[0];
-        if (!in || !in->data || in->ndim != 2) {
-            LOG_WARNING("CPU fallback: UOP_PERMUTE requires 2D input");
-            for (size_t i = 0; i < out->numel; i++) {
-                out_data[i] = 0.0f;
-            }
+        if (!in || !in->data) {
+            LOG_WARNING("CPU fallback: UOP_PERMUTE missing input");
+            for (size_t i = 0; i < out->numel; i++) out_data[i] = 0.0f;
+            break;
+        }
+        float* in_data_perm = (float*)in->data;
+
+        // 2D transpose fast path (cache-blocked SIMD).
+        if (in->ndim == 2) {
+            simd_transpose_f32(in_data_perm, out_data, in->shape[0], in->shape[1]);
             break;
         }
 
-        float* in_data_perm = (float*)in->data;
-        int rows            = in->shape[0];
-        int cols            = in->shape[1];
-
-        // Use cache-blocked SIMD transpose
-        simd_transpose_f32(in_data_perm, out_data, rows, cols);
+        // General N-D permute: out_shape[i] = in_shape[perm[i]], so for each
+        // output element, in_coord[perm[i]] = out_coord[i].
+        PermuteParams* pp = (PermuteParams*)node->params;
+        int nd = in->ndim;
+        if (!pp || !pp->perm || nd > 16) {
+            LOG_WARNING("CPU fallback: UOP_PERMUTE bad params (ndim=%d)", nd);
+            for (size_t i = 0; i < out->numel; i++) out_data[i] = 0.0f;
+            break;
+        }
+        size_t in_strides[16];
+        size_t s = 1;
+        for (int i = nd - 1; i >= 0; i--) { in_strides[i] = s; s *= (size_t)in->shape[i]; }
+        int out_coord[16];
+        for (size_t o = 0; o < out->numel; o++) {
+            size_t rem = o;
+            for (int i = nd - 1; i >= 0; i--) {
+                out_coord[i] = (int)(rem % (size_t)out->shape[i]);
+                rem /= (size_t)out->shape[i];
+            }
+            size_t in_lin = 0;
+            for (int i = 0; i < nd; i++)
+                in_lin += (size_t)out_coord[i] * in_strides[pp->perm[i]];
+            out_data[o] = in_data_perm[in_lin];
+        }
         break;
     }
 
@@ -4739,7 +4784,7 @@ static int cml_ir_use_fusion_scheduler(void) {
     static int s_enabled = 0;
 
     if (!s_checked) {
-        const char* env = getenv("CML_FUSION_SCHEDULER");
+        const char* env = getenv("FUSION_SCHEDULER");
         s_enabled       = (env && env[0] == '1');
         s_checked       = 1;
     }
@@ -4751,6 +4796,12 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_cpu");
         return -1;
+    }
+
+    /* Ensure primitives before the fusion scheduler (which otherwise would see
+     * composite ops). Idempotent. */
+    if (!ir->is_decomposed) {
+        cml_ir_decompose(ir);
     }
 
     if (cml_ir_use_fusion_scheduler()) {
@@ -4766,8 +4817,15 @@ int cml_ir_execute(CMLGraph_t ir) {
         return -1;
     }
 
-    /* Check if graph should target a GPU backend via CML_BACKEND env */
-    const char* backend_env = getenv("CML_BACKEND");
+    /* Lower composite ops to primitives before *any* backend sees the graph,
+     * so the CPU / fusion / JIT / GPU paths all operate on the minimal UOP set.
+     * Idempotent (guarded by ir->is_decomposed). */
+    if (!ir->is_decomposed) {
+        cml_ir_decompose(ir);
+    }
+
+    /* Check if graph should target a GPU backend via BACKEND env */
+    const char* backend_env = getenv("BACKEND");
     if (backend_env &&
         (strcasecmp(backend_env, "opencl") == 0 || strcasecmp(backend_env, "cl") == 0)) {
         CMLDispatchContext* ctx = cml_dispatch_get_global();
@@ -4790,14 +4848,14 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
 
     target_node->is_used = true;
 
-    /* Check if graph should target a GPU backend via CML_BACKEND env.
+    /* Check if graph should target a GPU backend via BACKEND env.
      * Cache env check + dispatch context to avoid repeated getenv()/lookup. */
     static int s_backend_checked              = 0;
     static int s_use_backend                  = 0;
     static CMLBackendType s_backend_type      = CML_BACKEND_CPU_FALLBACK;
     static CMLDispatchContext* s_dispatch_ctx = NULL;
     if (!s_backend_checked) {
-        const char* backend_env = getenv("CML_BACKEND");
+        const char* backend_env = getenv("BACKEND");
         if (backend_env) {
             if (strcasecmp(backend_env, "metal") == 0 || strcasecmp(backend_env, "mtl") == 0) {
                 s_backend_type = CML_BACKEND_METAL;

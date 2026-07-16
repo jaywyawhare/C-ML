@@ -153,12 +153,47 @@ static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     MaxPool3d* pool = (MaxPool3d*)module;
     if (!input || input->ndim != 5) return NULL;  // [N, C, D, H, W]
 
+    int N = input->shape[0], C = input->shape[1];
+    int D = input->shape[2], H = input->shape[3], W = input->shape[4];
+
+    /* Lazy, composed from the tested 2D pool — no new UOP. Max is separable, so
+     * a 3D max-pool == pool (H,W) then pool D. Each axis is placed in the 2D
+     * pool's spatial slot via reshape (no permute needed); backward is automatic
+     * from the reshape/pool grad rules. (dilation=1 path; eager fallback below.) */
+    if (pool->dilation[0] == 1 && pool->dilation[1] == 1 && pool->dilation[2] == 1) {
+        int s1[4] = {N * C * D, 1, H, W};
+        ReshapeParams r1 = {.new_shape = s1, .new_ndim = 4};
+        Tensor* x1 = uop_reshape(input, &r1);
+        if (!x1) return NULL;
+        Pool2DParams pHW = {.kernel_size = {pool->kernel_size[1], pool->kernel_size[2]},
+                            .stride = {pool->stride[1], pool->stride[2]},
+                            .padding = {pool->padding[1], pool->padding[2]},
+                            .dilation = {1, 1}, .ceil_mode = pool->ceil_mode, .count_include_pad = false};
+        Tensor* y1 = uop_maxpool2d(x1, &pHW);          /* [N*C*D, 1, oh, ow] */
+        if (!y1 || y1->ndim != 4) return NULL;
+        int oh = y1->shape[2], ow = y1->shape[3];
+
+        int s2[4] = {N * C, 1, D, oh * ow};
+        ReshapeParams r2 = {.new_shape = s2, .new_ndim = 4};
+        Tensor* x2 = uop_reshape(y1, &r2);
+        if (!x2) return NULL;
+        Pool2DParams pD = {.kernel_size = {pool->kernel_size[0], 1},
+                           .stride = {pool->stride[0], 1},
+                           .padding = {pool->padding[0], 0},
+                           .dilation = {1, 1}, .ceil_mode = pool->ceil_mode, .count_include_pad = false};
+        Tensor* y2 = uop_maxpool2d(x2, &pD);           /* [N*C, 1, od, oh*ow] */
+        if (!y2 || y2->ndim != 4) return NULL;
+        int od = y2->shape[2];
+
+        int s3[5] = {N, C, od, oh, ow};
+        ReshapeParams r3 = {.new_shape = s3, .new_ndim = 5};
+        return uop_reshape(y2, &r3);
+    }
+
+    /* Eager fallback (dilation != 1). */
     tensor_ensure_executed(input);
     float* in_data = (float*)input->data;
     if (!in_data) return NULL;
-
-    int N = input->shape[0], C = input->shape[1];
-    int D = input->shape[2], H = input->shape[3], W = input->shape[4];
 
     int out_d = (D + 2 * pool->padding[0] - pool->dilation[0] * (pool->kernel_size[0] - 1) - 1) / pool->stride[0] + 1;
     int out_h = (H + 2 * pool->padding[1] - pool->dilation[1] * (pool->kernel_size[1] - 1) - 1) / pool->stride[1] + 1;
@@ -304,12 +339,31 @@ AvgPool3d* nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode
 static Tensor* maxpool1d_forward(Module* module, Tensor* input) {
     MaxPool1d* pool = (MaxPool1d*)module;
     if (!input || input->ndim != 3) return NULL;  // [N, C, L]
+    int N = input->shape[0], C = input->shape[1], L = input->shape[2];
 
+    /* Lazy path: 1D pooling == 2D pooling over a singleton height dim, reusing
+     * the (differentiable) uop_maxpool2d. The 2D lazy path needs dilation=1. */
+    if (pool->dilation == 1) {
+        int s4[4] = {N, C, 1, L};
+        ReshapeParams rp = {.new_shape = s4, .new_ndim = 4};
+        Tensor* x4 = uop_reshape(input, &rp);
+        if (!x4) return NULL;
+        Pool2DParams p2 = {
+            .kernel_size = {1, pool->kernel_size}, .stride = {1, pool->stride},
+            .padding = {0, pool->padding}, .dilation = {1, 1},
+            .ceil_mode = pool->ceil_mode, .count_include_pad = false,
+        };
+        Tensor* y4 = uop_maxpool2d(x4, &p2);
+        if (!y4 || y4->ndim != 4) return NULL;
+        int s3[3] = {y4->shape[0], y4->shape[1], y4->shape[3]};
+        ReshapeParams rp2 = {.new_shape = s3, .new_ndim = 3};
+        return uop_reshape(y4, &rp2);
+    }
+
+    /* Eager fallback for dilation != 1 (no lazy dilated-pool UOP yet). */
     tensor_ensure_executed(input);
     float* in_data = (float*)input->data;
     if (!in_data) return NULL;
-
-    int N = input->shape[0], C = input->shape[1], L = input->shape[2];
     int out_l;
     if (pool->ceil_mode)
         out_l = (int)ceilf((float)(L + 2 * pool->padding - pool->dilation * (pool->kernel_size - 1) - 1) / pool->stride + 1);
@@ -360,44 +414,24 @@ MaxPool1d* nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, 
 static Tensor* avgpool1d_forward(Module* module, Tensor* input) {
     AvgPool1d* pool = (AvgPool1d*)module;
     if (!input || input->ndim != 3) return NULL;  // [N, C, L]
-
-    tensor_ensure_executed(input);
-    float* in_data = (float*)input->data;
-    if (!in_data) return NULL;
-
     int N = input->shape[0], C = input->shape[1], L = input->shape[2];
-    int out_l;
-    if (pool->ceil_mode)
-        out_l = (int)ceilf((float)(L + 2 * pool->padding - pool->kernel_size) / pool->stride + 1);
-    else
-        out_l = (L + 2 * pool->padding - pool->kernel_size) / pool->stride + 1;
 
-    int out_shape[] = {N, C, out_l};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 3, &config);
-    if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
-
-    for (int n = 0; n < N; n++) {
-        for (int c = 0; c < C; c++) {
-            for (int ol = 0; ol < out_l; ol++) {
-                float sum = 0.0f;
-                int count = 0;
-                for (int k = 0; k < pool->kernel_size; k++) {
-                    int il = ol * pool->stride - pool->padding + k;
-                    if (il >= 0 && il < L) {
-                        sum += in_data[n * C * L + c * L + il];
-                        count++;
-                    } else if (pool->count_include_pad) {
-                        count++;
-                    }
-                }
-                out_data[n * C * out_l + c * out_l + ol] = count > 0 ? sum / count : 0.0f;
-            }
-        }
-    }
-    return output;
+    /* Lazy: 1D avg-pool == 2D avg-pool over a singleton height dim, reusing the
+     * (differentiable) uop_avgpool2d (which honors count_include_pad). */
+    int s4[4] = {N, C, 1, L};
+    ReshapeParams rp = {.new_shape = s4, .new_ndim = 4};
+    Tensor* x4 = uop_reshape(input, &rp);
+    if (!x4) return NULL;
+    Pool2DParams p2 = {
+        .kernel_size = {1, pool->kernel_size}, .stride = {1, pool->stride},
+        .padding = {0, pool->padding}, .dilation = {1, 1},
+        .ceil_mode = pool->ceil_mode, .count_include_pad = pool->count_include_pad,
+    };
+    Tensor* y4 = uop_avgpool2d(x4, &p2);
+    if (!y4 || y4->ndim != 4) return NULL;
+    int s3[3] = {y4->shape[0], y4->shape[1], y4->shape[3]};
+    ReshapeParams rp2 = {.new_shape = s3, .new_ndim = 3};
+    return uop_reshape(y4, &rp2);
 }
 
 static void avgpool1d_free(Module* module) { cml_free(module); }
