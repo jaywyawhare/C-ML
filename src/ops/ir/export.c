@@ -450,29 +450,38 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
     append_format(&buffer, &offset, &capacity, "{");
 
-    // Count nodes and analyze
-    int total_nodes          = 0;
-    int dead_nodes           = 0;
-    int fused_kernels        = 0;
-    int fusion_opportunities = 0;
+    // Count nodes and fusion structure.
+    int total_nodes   = 0;
+    int dead_nodes    = 0;
+    int fused_groups  = 0;   // number of fused kernels (each collapses several ops)
+    int fused_members = 0;   // total ops belonging to some fused kernel
 
     struct IRNode* node = ir->head;
     while (node) {
         total_nodes++;
-        if (node->is_used == false && node->use_count == 0) {
+        if (node->is_used == false && node->use_count == 0)
             dead_nodes++;
-        }
-        if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
-            fused_kernels++;
+        if (node->fused_kernel) {
+            fused_members++;
+            if (node->fused_kernel->ops[0] == node)
+                fused_groups++;
         }
         node = node->next;
     }
 
+    // Unoptimized view: one kernel per node; nothing removed; fusion is only an
+    // opportunity. Optimized view: dead code removed and fused groups collapsed
+    // to a single kernel — this is what makes the before/after differ.
+    int shown_kernels = optimized
+                            ? (total_nodes - dead_nodes) - (fused_members - fused_groups)
+                            : total_nodes;
     append_format(&buffer, &offset, &capacity,
                   "\"nodeCount\":%d,\"kernelCount\":%d,\"deadNodes\":%d,\"fusedKernels\":%d,"
                   "\"fusionOpportunities\":%d,",
-                  total_nodes, total_nodes - dead_nodes, dead_nodes, fused_kernels,
-                  fusion_opportunities);
+                  total_nodes, shown_kernels,
+                  optimized ? 0 : dead_nodes,
+                  optimized ? fused_groups : 0,
+                  optimized ? 0 : fused_groups);
 
     append_format(&buffer, &offset, &capacity, "\"kernels\":[");
 
@@ -482,9 +491,16 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
     while (node) {
         if (optimized && !node->is_used && node->use_count == 0) {
-            node = node->next;
+            node = node->next;  // optimized view removes dead code
             continue;
         }
+        if (optimized && node->fused_kernel && node->fused_kernel->ops[0] != node) {
+            node = node->next;  // optimized view collapses fused members into the head
+            continue;
+        }
+        // A node renders AS a fused kernel only in the optimized view; the
+        // unoptimized view shows every op as its own standalone kernel.
+        bool as_fused = optimized && node->fused_kernel && node->fused_kernel->ops[0] == node;
 
         if (!first_kernel) {
             append_format(&buffer, &offset, &capacity, ",");
@@ -496,7 +512,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
         append_format(&buffer, &offset, &capacity, "\"name\":");
         char kernel_name[64];
-        if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
+        if (as_fused) {
             snprintf(kernel_name, sizeof(kernel_name), "fused_kernel_%d", kernel_idx);
         } else {
             snprintf(kernel_name, sizeof(kernel_name), "kernel_%s_%d",
@@ -511,7 +527,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
         append_format(&buffer, &offset, &capacity, "\"code\":");
         char* code = NULL;
-        if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
+        if (as_fused) {
             code = generate_fused_kernel_code(node->fused_kernel);
         } else {
             code = generate_kernel_code_snippet(node);
@@ -523,7 +539,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
         append_format(&buffer, &offset, &capacity, "\"inputs\":[");
 
-        if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
+        if (as_fused) {
             // For fused kernels, collect ALL unique inputs from all ops
             // that are not produced by previous ops in the chain
             FusedKernel* fk = node->fused_kernel;
@@ -584,7 +600,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         append_format(&buffer, &offset, &capacity, "],");
 
         append_format(&buffer, &offset, &capacity, "\"output\":");
-        if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
+        if (as_fused) {
             // For fused kernel, output is the output of the LAST op
             FusedKernel* fk = node->fused_kernel;
             if (fk->num_ops > 0) {
@@ -599,16 +615,16 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
         append_format(&buffer, &offset, &capacity, ",");
 
         append_format(&buffer, &offset, &capacity, "\"isDead\":%s,\"isFused\":%s",
-                      (!node->is_used && node->use_count == 0) ? "true" : "false",
-                      (node->fused_kernel) ? "true" : "false");
+                      (!optimized && !node->is_used && node->use_count == 0) ? "true" : "false",
+                      as_fused ? "true" : "false");
 
-        // Fused Kernel ID (for grouping)
-        if (node->fused_kernel) {
+        // Fused Kernel ID (for grouping) — only meaningful in the optimized view
+        if (as_fused) {
             append_format(&buffer, &offset, &capacity, ",\"fusedKernelId\":\"%p\"",
                           (void*)node->fused_kernel);
         }
 
-        if (node->fused_kernel && node->fused_kernel->ops[0] == node) {
+        if (as_fused) {
             append_format(&buffer, &offset, &capacity, ",\"ops\":[");
             FusedKernel* fk = node->fused_kernel;
             for (int i = 0; i < fk->num_ops; i++) {

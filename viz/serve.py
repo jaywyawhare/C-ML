@@ -12,10 +12,20 @@ import json
 import mimetypes
 import os
 import socketserver
+import sys
 import threading
 import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
+
+# Merge the experiment-tracker (exp_server) so this one server hosts both the
+# original viz AND the W&B-style dashboard (at /experiments + /api/*).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import exp_server
+except Exception:
+    exp_server = None
 
 # Configuration
 ROOT = Path(__file__).resolve().parent
@@ -75,7 +85,7 @@ class VizHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         # CORS headers on every response
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "*")
         super().end_headers()
 
@@ -83,8 +93,46 @@ class VizHandler(SimpleHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if exp_server and path in exp_server.POST_API:
+            n = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(n) or b"{}")
+                return self._json_response(exp_server.POST_API[path](body))
+            except Exception as ex:
+                return self._json_response({"error": str(ex)}, status=500)
+        self._json_response({"error": "not found"}, status=404)
+
+    def _exp_api(self, path):
+        qs = parse_qs(urlparse(self.path).query)
+        try:
+            result = exp_server.API[path](qs)
+        except Exception as ex:
+            return self._json_response({"error": str(ex)}, status=500)
+        if isinstance(result, str):  # CSV export etc.
+            return self._send_bytes(result.encode(), "text/csv")
+        self._json_response(result)
+
+    def _exp_image(self):
+        qs = parse_qs(urlparse(self.path).query)
+        rid, rel = qs.get("run", [""])[0], qs.get("path", [""])[0]
+        full = os.path.join(exp_server.RUNS_DIR, rid, rel)
+        if os.path.isfile(full) and os.path.abspath(full).startswith(os.path.abspath(exp_server.RUNS_DIR)):
+            return self._send_bytes(open(full, "rb").read(), "application/octet-stream")
+        self._send_bytes(b"", "application/octet-stream", status=404)
+
     def do_GET(self):
         path = self.path.split("?")[0]  # Strip query params
+
+        # Experiment-tracker routes (merged from exp_server)
+        if exp_server:
+            if path in ("/experiments", "/experiments/"):
+                return self._serve_static("exp.html")
+            if path == "/api/image":
+                return self._exp_image()
+            if path in exp_server.API:
+                return self._exp_api(path)
 
         # Route dispatch
         if path == "/health":
@@ -294,7 +342,7 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8001"))
+    port = int(os.environ.get("PORT", "6969"))
     host = os.environ.get("HOST", "0.0.0.0")
 
     server = ThreadedHTTPServer((host, port), VizHandler)

@@ -23,6 +23,66 @@ static bool g_zero_grad_called           = false;
 static Module* g_current_model           = NULL; 
 static bool g_architecture_exported      = false;
 static bool g_manual_epoch_control       = false;
+/* Set by classification losses; read once during the following loss capture. */
+static Tensor* g_acc_pred                 = NULL;
+static Tensor* g_acc_target               = NULL;
+
+void training_metrics_note_prediction(Tensor* prediction, Tensor* target) {
+    g_acc_pred   = prediction;
+    g_acc_target = target;
+}
+
+/* Classification accuracy from a prediction/logit tensor and its target.
+ * Last dim of `pred` is the class dimension. `target` may be one-hot ([..,C])
+ * or class indices ([..]). C==1 is treated as binary (threshold 0.5).
+ * Returns -1.0f when accuracy is not well-defined for the given tensors. */
+static float compute_classification_accuracy(Tensor* pred, Tensor* target) {
+    if (!pred || !target)
+        return -1.0f;
+    if (tensor_ensure_executed(pred) != 0 || tensor_ensure_executed(target) != 0)
+        return -1.0f;
+    if (pred->dtype != DTYPE_FLOAT32 || !pred->data || pred->ndim < 1)
+        return -1.0f;
+    int    C = pred->shape[pred->ndim - 1];
+    if (C < 1)
+        return -1.0f;
+    size_t N = pred->numel / (size_t)C;
+    if (N == 0)
+        return -1.0f;
+    const float* p = (const float*)pred->data;
+
+    bool onehot  = ((size_t)target->numel == pred->numel);
+    bool indices = ((size_t)target->numel == N);
+    if (!onehot && !indices)
+        return -1.0f;
+
+    size_t correct = 0;
+    for (size_t i = 0; i < N; i++) {
+        const float* row = p + i * (size_t)C;
+        if (C == 1) {
+            int pred_pos = row[0] >= 0.5f ? 1 : 0;
+            int tgt_pos  = tensor_get_float(target, i) >= 0.5f ? 1 : 0;
+            correct += (pred_pos == tgt_pos);
+            continue;
+        }
+        int pmax = 0;
+        for (int c = 1; c < C; c++)
+            if (row[c] > row[pmax])
+                pmax = c;
+        int tclass;
+        if (onehot) {
+            tclass = 0;
+            for (int c = 1; c < C; c++)
+                if (tensor_get_float(target, i * (size_t)C + c) >
+                    tensor_get_float(target, i * (size_t)C + tclass))
+                    tclass = c;
+        } else {
+            tclass = (int)tensor_get_float(target, i);
+        }
+        correct += (pmax == tclass);
+    }
+    return (float)correct / (float)N;
+}
 static double get_time_sec(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -851,10 +911,7 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
         if (grad_norm > 0.0f) {
             training_metrics_set_gradient_norm(metrics, grad_norm);
         }
-        const char* viz     = getenv("CML_VIZ");
-        const char* viz_env = getenv("VIZ");
-        if ((viz && viz[0] != '\0') ||
-            (viz_env && (viz_env[0] == '1' || strcmp(viz_env, "true") == 0))) {
+        if (cml_viz_enabled()) {
             const char* metrics_path = "training.json";
             training_metrics_export_epoch_update(metrics, epoch, metrics_path);
         }
@@ -864,6 +921,10 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
     tensor_free(outputs);
 
     return 0;
+}
+bool cml_viz_enabled(void) {
+    const char* v = getenv("VIZ");
+    return v && v[0] != '\0' && strcmp(v, "0") != 0 && strcmp(v, "false") != 0;
 }
 void training_metrics_mark_zero_grad(void) { g_zero_grad_called = true; }
 static void training_metrics_auto_detect_epoch(Optimizer* optimizer) {
@@ -998,10 +1059,20 @@ void training_metrics_auto_capture_loss(Tensor* loss_tensor) {
                 fabsf(g_global_metrics->best_loss) < 1e-6f) {
                 g_global_metrics->best_loss = loss_value;
             }
+            if (g_acc_pred && g_acc_target) {
+                float acc = compute_classification_accuracy(g_acc_pred, g_acc_target);
+                if (acc >= 0.0f) {
+                    g_global_metrics->epoch_training_accuracies[g_current_epoch] = acc;
+                    if (g_current_epoch == 0 || acc > g_global_metrics->best_accuracy)
+                        g_global_metrics->best_accuracy = acc;
+                }
+            }
             const char* metrics_path = "training.json";
             training_metrics_export_json(g_global_metrics, metrics_path, true);
         }
     }
+    g_acc_pred   = NULL;
+    g_acc_target = NULL;
 }
 void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
     if (!g_global_metrics || !optimizer)

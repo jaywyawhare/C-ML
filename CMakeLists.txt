@@ -191,6 +191,7 @@ set(CORE_SOURCES
     src/core/model_architecture.c
     src/core/training_loop.c
     src/core/training_metrics.c
+    src/core/experiment.c
     src/core/serialization.c
     src/core/gguf.c
     src/core/safetensors.c
@@ -632,6 +633,9 @@ function(cml_add_example target_name source_file)
 endfunction()
 
 if(BUILD_EXAMPLES)
+    cml_add_example(experiment_demo examples/experiment_demo.c)
+    cml_add_example(sweep_runner examples/sweep_runner.c)
+    cml_add_example(hyperband_sweep examples/hyperband_sweep.c)
     cml_add_example(torch_c_example examples/tutorials/torch_c_example.c)
     cml_add_example(bench_torch_eager benchmarks/bench_torch_eager.c)
     cml_add_example(hello_cml examples/tutorials/hello_cml.c)

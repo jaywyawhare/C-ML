@@ -23,7 +23,7 @@ from pathlib import Path
 # Configuration
 HERE = Path(__file__).resolve().parent
 VIZ_SERVER_SCRIPT = HERE.parent / "viz" / "serve.py"
-DEFAULT_PORT = 8001
+DEFAULT_PORT = 6969
 SERVER_TIMEOUT = 10  # seconds
 
 
@@ -109,7 +109,7 @@ def run_target(args: list, cwd: str = None) -> int:
         int: Exit code from the executable
     """
     env = os.environ.copy()
-    env["CML_VIZ"] = "1"
+    env["VIZ"] = "1"
 
     try:
         return subprocess.call(args, env=env, cwd=cwd)

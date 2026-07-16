@@ -84,9 +84,22 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
 TrainingMetrics* training_metrics_get_global(void);
 void training_metrics_auto_capture_loss(Tensor* loss_tensor);
 void training_metrics_auto_capture_optimizer(Optimizer* optimizer);
+
+/*
+ * Classification losses call this with (prediction, target) so the metrics layer
+ * can auto-compute per-epoch accuracy during loss capture. Pointers are only read
+ * during the immediately-following backward pass; not retained.
+ */
+void training_metrics_note_prediction(Tensor* prediction, Tensor* target);
 void training_metrics_init_global(void);
 void training_metrics_cleanup_global(void);
 void training_metrics_mark_zero_grad(void);
+
+/*
+ * True if visualization export is requested via the VIZ env var.
+ * Truthy = set to any value other than "" / "0" / "false".
+ */
+bool cml_viz_enabled(void);
 void training_metrics_set_expected_epochs(size_t num_epochs);
 void training_metrics_register_model(Module* model);
 void training_metrics_auto_export_architecture(Module* model);

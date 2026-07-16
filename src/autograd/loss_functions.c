@@ -7,6 +7,7 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 #include "core/error_stack.h"
+#include "core/training_metrics.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -60,6 +61,7 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("BCE Loss: input or target is NULL");
     }
+    training_metrics_note_prediction(input, target);
 
     if (input->numel != target->numel && input->numel != 1 && target->numel != 1) {
         LOG_ERROR("BCE Loss: shape mismatch - input: %zu, target: %zu", input->numel,
@@ -108,6 +110,7 @@ Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("Cross Entropy Loss: input or target is NULL");
     }
+    training_metrics_note_prediction(input, target);
 
     if (target->ndim != 1) {
         CML_ERR_NULL("Cross Entropy Loss: target must be 1D");
@@ -589,6 +592,7 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     if (!input || !target) {
         CML_ERR_NULL("Cross Entropy Loss (smooth): input or target is NULL");
     }
+    training_metrics_note_prediction(input, target);
 
     if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
         CML_ERR_NULL("Cross Entropy Loss (smooth): label_smoothing must be in [0, 1]");
@@ -770,6 +774,7 @@ Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets) {
     if (!log_probs || !targets) {
         CML_ERR_NULL("NLL Loss: log_probs or targets is NULL");
     }
+    training_metrics_note_prediction(log_probs, targets);
 
     if (targets->ndim != 1) {
         CML_ERR_NULL("NLL Loss: targets must be 1D");

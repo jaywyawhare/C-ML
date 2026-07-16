@@ -657,6 +657,16 @@ button { font-family: inherit; }
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
+.metric-card.sky {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(56, 189, 248, 0.05));
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.metric-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
 /* Charts row */
 .charts-row {
   margin-top: 12px;

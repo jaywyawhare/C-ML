@@ -947,57 +947,171 @@ function transpileOp(op, backend, index) {
   return gpuMap[type] || `// ${type}: Custom operation`;
 }
 
+// SIMD (AVX2) intrinsics for the vectorizable elementwise ops.
+const SIMD_OP = {
+  ADD: (a, b) => `_mm256_add_ps(${a}, ${b})`,
+  SUB: (a, b) => `_mm256_sub_ps(${a}, ${b})`,
+  MUL: (a, b) => `_mm256_mul_ps(${a}, ${b})`,
+  DIV: (a, b) => `_mm256_div_ps(${a}, ${b})`,
+  MAX: (a, b) => `_mm256_max_ps(${a}, ${b})`,
+  MIN: (a, b) => `_mm256_min_ps(${a}, ${b})`,
+  SQRT: (a) => `_mm256_sqrt_ps(${a})`,
+  RSQRT: (a) => `_mm256_rsqrt_ps(${a})`,
+  NEG: (a) => `_mm256_sub_ps(_mm256_setzero_ps(), ${a})`,
+  RECIP: (a) => `_mm256_div_ps(_mm256_set1_ps(1.0f), ${a})`,
+  RELU: (a) => `_mm256_max_ps(${a}, _mm256_setzero_ps())`,
+  SQUARE: (a) => `_mm256_mul_ps(${a}, ${a})`,
+};
+
 function generateKernelCode(kernel, backend) {
-  const isFused = kernel.isFused || (kernel.ops && kernel.ops.length > 0);
-  const name = kernel.name;
   const inputs = kernel.inputs || [];
   const output = kernel.output || "out";
-  let code = "";
+  const name = kernel.name;
+  const wgsl = backend === "wgsl";
+  const cuda_like = backend === "cuda" || backend === "rocm";
+  const gpu = ["cuda", "rocm", "opencl", "metal", "wgsl"].includes(backend);
+  const iv = backend === "metal" ? "id" : gpu ? "idx" : "i";
+  const arr = (nm) => `${nm}[${iv}]`;
 
-  if (backend === "cuda") {
-    code += `__global__ void ${name}(${[...inputs.map(n => `float* ${n}`), `float* ${output}`, "int n"].join(", ")}) {\n`;
-    code += `    int idx = blockIdx.x * blockDim.x + threadIdx.x;\n    if (idx >= n) return;\n\n`;
-  } else if (backend === "metal") {
-    code += `kernel void ${name}(\n`;
-    inputs.forEach((inp, i) => { code += `    device const float* ${inp} [[buffer(${i})]],\n`; });
-    code += `    device float* ${output} [[buffer(${inputs.length})]],\n    uint id [[thread_position_in_grid]]) {\n    if (id >= n) return;\n\n`;
-  } else if (backend === "opencl") {
-    code += `__kernel void ${name}(${[...inputs.map(n => `__global const float* ${n}`), `__global float* ${output}`, "int n"].join(", ")}) {\n`;
-    code += `    int idx = get_global_id(0);\n    if (idx >= n) return;\n\n`;
-  } else if (backend === "wgsl") {
-    code += `@compute @workgroup_size(64)\nfn ${name}(@builtin(global_invocation_id) id: vec3<u32>) {\n`;
-    code += `    let idx = id.x;\n    if (idx >= n) { return; }\n\n`;
-  } else {
-    code += `void ${name}(float** inputs_ptr, float** outputs_ptr, int n) {\n`;
-    inputs.forEach((inp, i) => { code += `    float* ${inp} = inputs_ptr[${i}];\n`; });
-    code += `    float* ${output} = outputs_ptr[0];\n\n`;
-    if (backend === "cpu") code += `    #pragma omp parallel for\n`;
-    code += `    for (int i = 0; i < n; i++) {\n`;
+  // scalar op -> expression, with per-backend math builtin names
+  function opExpr(type, a, b) {
+    const F = wgsl
+      ? { max: "max", min: "min", exp: "exp", log: "log", sqrt: "sqrt", abs: "abs", sin: "sin", cos: "cos", tanh: "tanh" }
+      : gpu
+      ? { max: "max", min: "min", exp: "exp", log: "log", sqrt: "sqrt", abs: "fabs", sin: "sin", cos: "cos", tanh: "tanh" }
+      : { max: "fmaxf", min: "fminf", exp: "expf", log: "logf", sqrt: "sqrtf", abs: "fabsf", sin: "sinf", cos: "cosf", tanh: "tanhf" };
+    const one = wgsl ? "1.0" : "1.0f", zero = wgsl ? "0.0" : "0.0f";
+    switch (type) {
+      case "ADD": return `${a} + ${b}`;
+      case "SUB": return `${a} - ${b}`;
+      case "MUL": return `${a} * ${b}`;
+      case "DIV": return `${a} / ${b}`;
+      case "MAX": return `${F.max}(${a}, ${b})`;
+      case "MIN": return `${F.min}(${a}, ${b})`;
+      case "NEG": return `-${a}`;
+      case "RECIP": return `${one} / ${a}`;
+      case "EXP": return `${F.exp}(${a})`;
+      case "LOG": return `${F.log}(${a})`;
+      case "SQRT": return `${F.sqrt}(${a})`;
+      case "ABS": return `${F.abs}(${a})`;
+      case "SIN": return `${F.sin}(${a})`;
+      case "COS": return `${F.cos}(${a})`;
+      case "TANH": return `${F.tanh}(${a})`;
+      case "SQUARE": return `${a} * ${a}`;
+      case "RELU": return `${F.max}(${a}, ${zero})`;
+      case "SIGMOID": return `${one} / (${one} + ${F.exp}(-${a}))`;
+      case "FILL": return zero;
+      default: return a;
+    }
   }
+  // intermediate-register declaration (typed in WGSL)
+  const decl = (nm, expr) => (wgsl ? `let ${nm}: f32 = ${expr};` : `float ${nm} = ${expr};`);
+  const ops = (kernel.isFused && kernel.ops && kernel.ops.length) ? kernel.ops
+            : [{ type: kernel.type, inputs: inputs, output: output }];
 
-  if (isFused && kernel.ops) {
-    code += `        // Fused Kernel Body\n`;
-    kernel.ops.forEach((op, idx) => {
-      const indexer = (backend === "c" || backend === "cpu") ? "[i]" : (backend === "metal" ? "[id]" : "[idx]");
-      const mappedInputs = op.inputs.map(inp => inputs.includes(inp) ? `${inp}${indexer}` : inp);
-      const mappedOutput = (op.output === output) ? `${op.output}${indexer}` : op.output;
-      const mappedOp = { ...op, inputs: mappedInputs, output: mappedOutput };
-      const indent = (backend === "c" || backend === "cpu") ? "        " : "    ";
-      let line = transpileOp(mappedOp, backend, idx);
-      if (op.output !== output && line.match(/^\w+\s*=/)) line = `float ${line}`;
-      code += `${indent}${line}\n`;
+  // ── C (SIMD) — AVX2 vectorized loop + scalar remainder ───────────────────
+  if (backend === "c_simd") {
+    const canVec = ops.every(o => SIMD_OP[o.type]);
+    const L = [`#include <immintrin.h>`, `void ${name}(float** inputs_ptr, float** outputs_ptr, int n) {`];
+    inputs.forEach((inp, i) => L.push(`    const float* restrict ${inp} = inputs_ptr[${i}];`));
+    L.push(`    float* restrict ${output} = outputs_ptr[0];`);
+    if (!canVec) {
+      const bad = [...new Set(ops.filter(o => !SIMD_OP[o.type]).map(o => o.type))].join(", ");
+      L.push(`    // no direct AVX2 intrinsic for ${bad} — SLEEF or scalar fallback:`);
+      L.push(`    for (int i = 0; i < n; i++) {`);
+      emitScalar(L, "        ");
+      L.push(`    }`, `}`);
+      return L.join("\n");
+    }
+    L.push(`    int i = 0;`, `    for (; i + 8 <= n; i += 8) {`);
+    inputs.forEach(inp => L.push(`        __m256 v${inp} = _mm256_loadu_ps(${inp} + i);`));
+    const reg = {};
+    ops.forEach(op => {
+      const a = `v${op.inputs[0]}`, b = op.inputs[1] != null ? `v${op.inputs[1]}` : undefined;
+      const expr = SIMD_OP[op.type](a, b);
+      if (op.output === output) L.push(`        _mm256_storeu_ps(${output} + i, ${expr});`);
+      else { L.push(`        __m256 v${op.output} = ${expr};`); reg[op.output] = 1; }
     });
-  } else {
-    const indexer = (backend === "c" || backend === "cpu") ? "[i]" : (backend === "metal" ? "[id]" : "[idx]");
-    const mappedInputs = inputs.map(inp => `${inp}${indexer}`);
-    const mappedOutput = `${output}${indexer}`;
-    const indent = (backend === "c" || backend === "cpu") ? "        " : "    ";
-    code += `${indent}${transpileOp({ type: kernel.type, inputs: mappedInputs, output: mappedOutput }, backend)}\n`;
+    L.push(`    }`, `    for (; i < n; i++) {   // scalar remainder`);
+    emitScalar(L, "        ");
+    L.push(`    }`, `}`);
+    return L.join("\n");
   }
 
-  if (backend === "c" || backend === "cpu") code += `    }\n`;
-  code += `}\n`;
-  return code;
+  function emitScalar(L, bi) {
+    const reg = {};
+    ops.forEach(op => {
+      const a = op.inputs[0] != null ? (reg[op.inputs[0]] ? op.inputs[0] : arr(op.inputs[0])) : "in0";
+      const b = op.inputs[1] != null ? (reg[op.inputs[1]] ? op.inputs[1] : arr(op.inputs[1])) : undefined;
+      const expr = opExpr(op.type, a, b);
+      if (op.output === output) L.push(`${bi}${arr(output)} = ${expr};`);
+      else { L.push(`${bi}${decl(op.output, expr)}`); reg[op.output] = 1; }
+    });
+  }
+
+  const L = [];
+  // ── signature + buffer setup ──────────────────────────────────────────────
+  if (cuda_like) {
+    if (backend === "rocm") L.push(`#include <hip/hip_runtime.h>`);
+    L.push(`__global__ void ${name}(${[...inputs.map(n => `const float* __restrict__ ${n}`), `float* __restrict__ ${output}`, "int n"].join(", ")}) {`);
+    // (grid-stride loop emitted in the body — no per-thread bounds check needed)
+  } else if (backend === "opencl") {
+    L.push(`__kernel void ${name}(${[...inputs.map(n => `__global const float* restrict ${n}`), `__global float* restrict ${output}`, "int n"].join(", ")}) {`);
+    L.push(`    int ${iv} = get_global_id(0);`, `    if (${iv} >= n) return;`);
+  } else if (backend === "metal") {
+    L.push(`#include <metal_stdlib>`, `using namespace metal;`, `kernel void ${name}(`);
+    inputs.forEach((inp, i) => L.push(`    device const float* ${inp} [[buffer(${i})]],`));
+    L.push(`    device float* ${output} [[buffer(${inputs.length})]],`,
+           `    constant uint& n [[buffer(${inputs.length + 1})]],`,
+           `    uint ${iv} [[thread_position_in_grid]]) {`, `    if (${iv} >= n) return;`);
+  } else if (wgsl) {
+    inputs.forEach((inp, i) => L.push(`@group(0) @binding(${i}) var<storage, read> ${inp}: array<f32>;`));
+    L.push(`@group(0) @binding(${inputs.length}) var<storage, read_write> ${output}: array<f32>;`, ``);
+    L.push(`@compute @workgroup_size(64)`, `fn ${name}(@builtin(global_invocation_id) gid: vec3<u32>) {`,
+           `    let ${iv} = gid.x;`, `    if (${iv} >= arrayLength(&${output})) { return; }`);
+  } else {
+    L.push(`void ${name}(float** inputs_ptr, float** outputs_ptr, int n) {`);
+    inputs.forEach((inp, i) => L.push(`    const float* restrict ${inp} = inputs_ptr[${i}];`));
+    L.push(`    float* restrict ${output} = outputs_ptr[0];`);
+  }
+
+  // ── body ──────────────────────────────────────────────────────────────────
+  const REDUCTIONS = { SUM: 1, MEAN: 1, MAX_REDUCE: 1, MIN_REDUCE: 1, PROD: 1 };
+  if (kernel.type === "MATMUL") {
+    L.push(`    // ${output}[M,N] = ${inputs[0] || "A"}[M,K] * ${inputs[1] || "B"}[K,N]`,
+           `    for (int m = 0; m < M; m++)`, `        for (int col = 0; col < N; col++) {`,
+           `            float acc = 0.0f;`,
+           `            for (int k = 0; k < K; k++) acc += ${inputs[0] || "A"}[m*K+k] * ${inputs[1] || "B"}[k*N+col];`,
+           `            ${output}[m*N+col] = acc;`, `        }`);
+  } else if (kernel.type === "LINEAR") {
+    L.push(`    // Linear: ${output}[M,N] = ${inputs[0] || "X"} · ${inputs[1] || "W"}ᵀ${inputs[2] ? " + " + inputs[2] : ""}`,
+           `    for (int m = 0; m < M; m++)`, `        for (int col = 0; col < N; col++) {`,
+           `            float acc = ${inputs[2] ? `${inputs[2]}[col]` : "0.0f"};`,
+           `            for (int k = 0; k < K; k++) acc += ${inputs[0] || "X"}[m*K+k] * ${inputs[1] || "W"}[col*K+k];`,
+           `            ${output}[m*N+col] = acc;`, `        }`);
+  } else if (REDUCTIONS[kernel.type]) {
+    const prod = kernel.type === "PROD";
+    L.push(`    float acc = ${prod ? "1.0f" : "0.0f"};`,
+           `    for (int j = 0; j < n; j++) acc ${prod ? "*=" : "+="} ${inputs[0] || "in0"}[j];`,
+           `    ${output}[0] = ${kernel.type === "MEAN" ? "acc / (float)n" : "acc"};`);
+  } else {
+    // elementwise — single op or a fused chain
+    if (cuda_like) {
+      // grid-stride loop: correct for any launch config + high occupancy (idiomatic CUDA/HIP)
+      L.push(`    for (int ${iv} = blockIdx.x * blockDim.x + threadIdx.x; ${iv} < n; ${iv} += gridDim.x * blockDim.x) {`);
+      emitScalar(L, "        ");
+      L.push(`    }`);
+    } else if (gpu) {
+      emitScalar(L, "    ");   // OpenCL/Metal/WGSL: one work-item per element (NDRange handles the rest)
+    } else {
+      if (backend === "cpu") L.push(`    #pragma omp parallel for simd`);
+      L.push(`    for (int i = 0; i < n; i++) {`);
+      emitScalar(L, "        ");
+      L.push(`    }`);
+    }
+  }
+  L.push(`}`);
+  return L.join("\n");
 }
 
 function renderCodeGenView() {
@@ -1032,6 +1146,7 @@ function renderCodeGenView() {
     { id: "c", name: "C (Scalar)", icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>', desc: "Portable C99 implementation" },
     { id: "c_simd", name: "C (SIMD)", icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', desc: "AVX2/NEON vector intrinsics" },
     { id: "cuda", name: "NVIDIA CUDA", icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', desc: "High-performance GPU backend" },
+    { id: "rocm", name: "AMD ROCm (HIP)", icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', desc: "AMD GPU via HIP" },
     { id: "metal", name: "Apple Metal", icon: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', desc: "Optimized for Apple Silicon" },
     { id: "opencl", name: "OpenCL", icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', desc: "Cross-platform GPU acceleration" },
     { id: "wgsl", name: "WebGPU (WGSL)", icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>', desc: "Next-gen web graphics" },
@@ -1073,7 +1188,7 @@ function renderCodeGenView() {
   const main = el("div", { className: "codegen-main" });
 
   // Toolbar
-  const ext = acc === "cuda" ? "cu" : acc === "metal" ? "metal" : acc === "wgsl" ? "wgsl" : acc === "opencl" ? "cl" : "c";
+  const ext = acc === "cuda" ? "cu" : acc === "rocm" ? "hip.cpp" : acc === "metal" ? "metal" : acc === "wgsl" ? "wgsl" : acc === "opencl" ? "cl" : "c";
   const toolbar = el("div", { className: "codegen-toolbar" });
   const fnDiv = el("div", { className: "codegen-toolbar-filename" });
   fnDiv.appendChild(svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>'));
@@ -1273,6 +1388,16 @@ function renderTrainingView() {
 
   container.innerHTML = "";
 
+  // Merged: the Training tab now hosts the full W&B-style experiment dashboard
+  // (multi-run tracking, sweeps, curves, lineage, …) served from this same server.
+  const dash = document.createElement("iframe");
+  dash.src = "/experiments";
+  dash.title = "Experiment Dashboard";
+  dash.style.cssText = "width:100%;height:calc(100vh - 108px);border:0;border-radius:10px;background:#0a0b0f;display:block;";
+  container.appendChild(dash);
+  return;
+  /* eslint-disable no-unreachable */
+
   if ((!data || data.error) && isLoading("training", data && !data.error)) {
     container.appendChild(trainingSkeleton());
     return;
@@ -1390,8 +1515,10 @@ function renderTrainingView() {
   layout.appendChild(header);
 
   // ── Metric Cards ───────────────────────────────────────────
-  const cardCount = 2 + (hasTestingData ? 2 : 0) + (hasValidationData ? 2 : 0);
-  const cards = el("div", { className: "metric-cards", style: { gridTemplateColumns: `repeat(${cardCount}, 1fr)` } });
+  const pct = v => (v != null && isFinite(v)) ? (v * 100).toFixed(2) + "%" : "N/A";
+  const fx6 = v => (v != null && isFinite(v)) ? v.toFixed(6) : "N/A";
+  const cardCount = 4 + (hasTestingData ? 2 : 0) + (hasValidationData ? 2 : 0);
+  const cards = el("div", { className: "metric-cards", style: { gridTemplateColumns: `repeat(${cardCount}, minmax(0, 1fr))` } });
 
   function addCard(label, value, colorClass) {
     const c = el("div", { className: `metric-card ${colorClass}` });
@@ -1400,12 +1527,15 @@ function renderTrainingView() {
     cards.appendChild(c);
   }
 
-  addCard("Training Loss", latestTrainingLoss?.toFixed(6) || "N/A", "indigo");
-  if (hasTestingData) addCard("Testing Loss", latestTestingLoss != null ? latestTestingLoss.toFixed(6) : "N/A", "amber");
-  if (hasValidationData) addCard("Validation Loss", latestValidationLoss?.toFixed(6) || "N/A", "red");
-  addCard("Training Accuracy", (latestTrainingAccuracy * 100)?.toFixed(2) + "%" || "N/A", "emerald");
-  if (hasTestingData) addCard("Testing Accuracy", latestTestingAccuracy != null ? (latestTestingAccuracy * 100).toFixed(2) + "%" : "N/A", "amber");
-  if (hasValidationData) addCard("Validation Accuracy", (latestValidationAccuracy * 100)?.toFixed(2) + "%" || "N/A", "red");
+  // Loss cards, then accuracy cards — each group ends with its best-so-far.
+  addCard("Training Loss", fx6(latestTrainingLoss), "indigo");
+  if (hasTestingData) addCard("Testing Loss", fx6(latestTestingLoss), "amber");
+  if (hasValidationData) addCard("Validation Loss", fx6(latestValidationLoss), "red");
+  addCard("Best Loss", fx6(d.best_loss), "sky");
+  addCard("Training Accuracy", pct(latestTrainingAccuracy), "emerald");
+  if (hasTestingData) addCard("Testing Accuracy", pct(latestTestingAccuracy), "amber");
+  if (hasValidationData) addCard("Validation Accuracy", pct(latestValidationAccuracy), "red");
+  addCard("Best Accuracy", pct(d.best_accuracy), "emerald");
   layout.appendChild(cards);
 
   // ── Charts ─────────────────────────────────────────────────
@@ -1549,11 +1679,18 @@ function renderTrainingView() {
   function formatTime(s) {
     if (s >= 3600) return `${(s / 3600).toFixed(2)}hr`;
     if (s >= 60) return `${(s / 60).toFixed(2)}min`;
+    if (s > 0 && s < 0.1) return `${(s * 1000).toFixed(0)}ms`;
     return `${s.toFixed(2)}s`;
   }
 
+  function abbrev(n) {
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+    return `${n.toFixed(1)}`;
+  }
+
   function formatEpochsPerHour(eph) {
-    if (eph >= 1) return `${eph.toFixed(1)}/hr`;
+    if (eph >= 1) return `${abbrev(eph)}/hr`;
     if (eph * 60 >= 1) return `${(eph * 60).toFixed(1)}/min`;
     return `${(eph * 3600).toFixed(1)}/sec`;
   }
@@ -1580,8 +1717,8 @@ function renderTrainingView() {
   }
 
   addMetric("Time/Epoch", avgEpochTime ? formatTime(avgEpochTime) : "N/A");
-  addMetric("Total Time", totalTime ? `${(totalTime / 60).toFixed(1)}m` : "N/A");
-  addMetric("Est. Remaining", estimatedRemaining ? `${(estimatedRemaining / 60).toFixed(1)}m` : "N/A");
+  addMetric("Total Time", totalTime ? formatTime(totalTime) : "N/A");
+  addMetric("Est. Remaining", d.is_training ? (estimatedRemaining ? formatTime(estimatedRemaining) : "N/A") : "Done");
   addMetric("Epochs/Hour", epochsPerHour ? formatEpochsPerHour(epochsPerHour) : "N/A");
 
   // Learning rate with schedule badge
