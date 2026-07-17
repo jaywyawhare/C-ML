@@ -638,6 +638,31 @@ static LLVMModuleRef gpu_build_reduction(LLVMContextRef ctx, UOpType type,
     } else if (type == UOP_MIN_REDUCE) {
         LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpFMin, out_gep, val,
                            LLVMAtomicOrderingMonotonic, 0);
+    } else if (type == UOP_PROD) {
+        /* LLVM has no atomic float multiply, so accumulate the product with a
+         * compare-and-swap loop:  do { cur = out[0]; } while(!cas(out,cur,cur*val)).
+         * out[0] must be host-initialized to 1.0 (the product identity). */
+        LLVMBasicBlockRef pre = LLVMGetInsertBlock(bld);
+        LLVMBasicBlockRef loop_bb = LLVMAppendBasicBlockInContext(ctx, fn, "cas_loop");
+        LLVMBasicBlockRef done_bb = LLVMAppendBasicBlockInContext(ctx, fn, "cas_done");
+
+        LLVMValueRef init = LLVMBuildLoad2(bld, f32, out_gep, "cur0");
+        LLVMBuildBr(bld, loop_bb);
+
+        LLVMPositionBuilderAtEnd(bld, loop_bb);
+        LLVMValueRef cur = LLVMBuildPhi(bld, f32, "cur");
+        LLVMValueRef desired = LLVMBuildFMul(bld, cur, val, "prod");
+        LLVMValueRef xchg = LLVMBuildAtomicCmpXchg(
+            bld, out_gep, cur, desired,
+            LLVMAtomicOrderingMonotonic, LLVMAtomicOrderingMonotonic, 0);
+        LLVMValueRef old = LLVMBuildExtractValue(bld, xchg, 0, "old");
+        LLVMValueRef ok  = LLVMBuildExtractValue(bld, xchg, 1, "ok");
+        LLVMValueRef in_vals[] = { init, old };
+        LLVMBasicBlockRef in_bbs[] = { pre, loop_bb };
+        LLVMAddIncoming(cur, in_vals, in_bbs, 2);
+        LLVMBuildCondBr(bld, ok, done_bb, loop_bb);
+
+        LLVMPositionBuilderAtEnd(bld, done_bb);
     }
 
     LLVMBuildRetVoid(bld);
@@ -1246,7 +1271,7 @@ static bool is_unary_op(UOpType type) {
 
 static bool is_reduction(UOpType type) {
     return type == UOP_SUM || type == UOP_MEAN || type == UOP_MAX_REDUCE ||
-           type == UOP_MIN_REDUCE;
+           type == UOP_MIN_REDUCE || type == UOP_PROD;
 }
 
 static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
@@ -1516,6 +1541,8 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
             d_out = gpu_alloc_filled(cg, out->numel, FLT_MAX);
         else if (type == UOP_MAX_REDUCE)
             d_out = gpu_alloc_filled(cg, out->numel, -FLT_MAX);
+        else if (type == UOP_PROD)
+            d_out = gpu_alloc_filled(cg, out->numel, 1.0f);  // product identity for the CAS loop
         else
             d_out = gpu_alloc_zero(cg, out->numel);  // zero-init for atomicAdd
         if (!d_in || !d_out) goto reduce_cleanup;

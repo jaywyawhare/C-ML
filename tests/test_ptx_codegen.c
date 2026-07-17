@@ -221,6 +221,33 @@ static void test_binary_pow(void) {
     PASS();
 }
 
+static void test_binary_mod(void) {
+    TEST(binary_mod_div_rn);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
+    char* ptx = cml_ptx_gen_binary(cg, UOP_MOD, "kernel_mod");
+    ASSERT_NOT_NULL(ptx);
+    /* Integer-semantics MOD must use IEEE div.rn, not the ~2 ULP div.approx,
+     * else floor(a/b) is off-by-one on exact quotients. */
+    ASSERT_CONTAINS(ptx, "div.rn.f32");
+    ASSERT_CONTAINS(ptx, "cvt.rmi.f32.f32");   /* floor */
+    if (strstr(ptx, "div.approx.f32")) { FAIL("MOD still uses div.approx"); cml_free(ptx); cml_ptx_codegen_destroy(cg); return; }
+    cml_free(ptx);
+    cml_ptx_codegen_destroy(cg);
+    PASS();
+}
+
+static void test_binary_idiv(void) {
+    TEST(binary_idiv_div_rn);
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
+    char* ptx = cml_ptx_gen_binary(cg, UOP_IDIV, "kernel_idiv");
+    ASSERT_NOT_NULL(ptx);
+    ASSERT_CONTAINS(ptx, "div.rn.f32");
+    if (strstr(ptx, "div.approx.f32")) { FAIL("IDIV still uses div.approx"); cml_free(ptx); cml_ptx_codegen_destroy(cg); return; }
+    cml_free(ptx);
+    cml_ptx_codegen_destroy(cg);
+    PASS();
+}
+
 static void test_fill(void) {
     TEST(fill);
     CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
@@ -368,6 +395,8 @@ int main(void) {
     test_binary_max();
     test_binary_cmplt();
     test_binary_pow();
+    test_binary_mod();
+    test_binary_idiv();
 
     test_fill();
     test_where();

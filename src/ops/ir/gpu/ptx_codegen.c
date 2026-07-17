@@ -373,17 +373,19 @@ char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name)
             "    selp.f32 %%f2, 0f3F800000, 0f00000000, %%p1;\n\n"); // 1.0 : 0.0
         break;
     case UOP_MOD:
-        // mod(a, b) = a - b * floor(a / b)
+        // mod(a, b) = a - b * floor(a / b). Must use div.rn (IEEE round-to-
+        // nearest), NOT div.approx: the ~2 ULP error of div.approx makes
+        // floor(a/b) off-by-one on exact quotients (e.g. floor(6/3) -> 1).
         pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
-            "    div.approx.f32 %%f2, %%f0, %%f1;\n"    // a / b
+            "    div.rn.f32 %%f2, %%f0, %%f1;\n"        // a / b (full precision)
             "    cvt.rmi.f32.f32 %%f2, %%f2;\n"          // floor(a / b)
             "    mul.f32 %%f2, %%f2, %%f1;\n"             // b * floor(a/b)
             "    sub.f32 %%f2, %%f0, %%f2;\n\n");         // a - b*floor(a/b)
         break;
     case UOP_IDIV:
-        // idiv(a, b) = floor(a / b)
+        // idiv(a, b) = floor(a / b) — div.rn for the same reason as MOD.
         pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
-            "    div.approx.f32 %%f2, %%f0, %%f1;\n"    // a / b
+            "    div.rn.f32 %%f2, %%f0, %%f1;\n"        // a / b (full precision)
             "    cvt.rmi.f32.f32 %%f2, %%f2;\n\n");      // floor(a / b)
         break;
     default:
