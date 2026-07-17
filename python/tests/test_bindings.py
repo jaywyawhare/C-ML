@@ -104,5 +104,59 @@ def test_nn_forward_and_optimizer_construct():
     assert opt is not None
 
 
+def test_single_model_training_converges():
+    """A hand-written training loop must converge — previously the autograd graph
+    accumulated on the reused parameters and the loss diverged/hung. backward()
+    now detaches the loss and step() resets the per-step graph automatically."""
+    import cml.nn as nn
+    import cml.optim as optim
+
+    N = 20
+    x = (np.arange(N) / (N - 1) * 2 - 1).astype(np.float32).reshape(N, 1)
+    y = (2 * x + 1).astype(np.float32)
+    X, Y = cml.tensor(x), cml.tensor(y)
+    lin = nn.Linear(1, 1)
+    lin.train(True)
+    opt = optim.SGD(lin, lr=0.05)
+    lv = None
+    for _ in range(400):
+        opt.zero_grad()
+        loss = cml.mse_loss(lin(X), Y)
+        cml.backward(loss)
+        opt.step()
+        lv = float(np.asarray(loss.numpy()).reshape(-1)[0])
+    assert lv is not None and lv < 0.01, f"did not converge: {lv}"
+
+
+def test_multiple_models_with_reset_graph():
+    """Training several models in one process works when reset_graph() is called
+    between them (drops the shape-keyed plan cache from the previous model)."""
+    import cml.nn as nn
+    import cml.optim as optim
+
+    np.random.seed(0)
+    N = 24
+    x = np.random.randn(N, 3).astype(np.float32)
+    y = (x @ np.array([1.0, -2.0, 0.5], np.float32) + 0.3).reshape(N, 1).astype(np.float32)
+    X, Y = cml.tensor(x), cml.tensor(y)
+
+    finals = []
+    for _ in range(3):
+        m = nn.Linear(3, 1)
+        opt = optim.SGD(m, lr=0.1)
+        lv = None
+        for _ in range(300):
+            opt.zero_grad()
+            loss = cml.mse_loss(m(X), Y)
+            cml.backward(loss)
+            opt.step()
+            lv = float(np.asarray(loss.numpy()).reshape(-1)[0])
+        finals.append(lv)
+        del m, opt, loss
+        cml.reset_graph()
+
+    assert all(f < 0.05 for f in finals), f"a model did not converge: {finals}"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))

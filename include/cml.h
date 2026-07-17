@@ -394,6 +394,17 @@ void cml_reset_ir_context(void);
  */
 void cml_reset_ir_graph_only(void);
 
+/* End-of-training-step boundary: detaches `keep` (typically the loss, so its
+ * value stays readable) from the autograd graph, then discards the accumulated
+ * graph so the next step starts fresh. Call once per optimizer step in a
+ * hand-written training loop to avoid unbounded graph growth on reused
+ * parameters. Safe to call with keep == NULL. */
+void cml_autograd_step_end(Tensor* keep);
+
+/* Post-step graph+plan-cache reset; call once per optimizer step (see cml.c). */
+void cml_autograd_reset_after_step(void);
+void cml_optim_realize_params(Optimizer* opt);
+
 void cml_kernel_cache_clear(void);
 void cml_kernel_cache_stats(size_t* hits, size_t* misses, size_t* count, size_t* memory);
 double cml_kernel_cache_hit_rate(void);

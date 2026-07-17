@@ -700,6 +700,11 @@ ffi.cdef(
     // cml.h: IR context management
 
     void cml_reset_ir_context(void);
+    void cml_reset_ir_graph_only(void);
+    void cml_autograd_step_end(Tensor* keep);
+    void cml_autograd_reset_after_step(void);
+    void cml_optim_realize_params(Optimizer* opt);
+    int tensor_realize(Tensor* t);
 
     // cml.h: Kernel cache
 
@@ -894,6 +899,7 @@ ffi.set_source(
     """
     #include "cml.h"
     #include "tensor/tensor.h"
+    #include "tensor/realize.h"
     #include "torch/torch_c.h"
     #include "distributed/distributed.h"
     """,

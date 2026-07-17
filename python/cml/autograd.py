@@ -3,6 +3,11 @@
 from cml._cml_lib import ffi, lib
 from cml.core import Tensor, _TensorView
 
+# Detaching the loss after backward (and resetting the graph in optimizer.step)
+# keeps a hand-written training loop from piling every step's autograd graph onto
+# the reused parameters. Feature-detected so an un-rebuilt extension still works.
+_HAS_REALIZE = hasattr(lib, "tensor_realize")
+
 
 def backward(loss, grad=None, retain_graph=False, create_graph=False):
     """Run backward pass on a loss tensor.
@@ -15,6 +20,12 @@ def backward(loss, grad=None, retain_graph=False, create_graph=False):
     """
     grad_ptr = grad._tensor if grad is not None else ffi.NULL
     lib.cml_backward(loss._tensor, grad_ptr, retain_graph, create_graph)
+    # Detach (materialize) the loss so its value stays readable and it survives
+    # the graph reset that optimizer.step() performs. Skipped when the caller
+    # wants to keep the graph for another backward.
+    if _HAS_REALIZE and not retain_graph and not create_graph \
+            and loss is not None and loss._tensor != ffi.NULL:
+        lib.tensor_realize(loss._tensor)
 
 
 def get_grad(tensor):

@@ -65,6 +65,11 @@ def seed(s: int) -> None:
     """Set random seed for reproducibility."""
     ...
 
+def reset_graph() -> None:
+    """Fully reset autograd/IR state and caches. Call between training different
+    models in the same process (after releasing the previous model/optimizer)."""
+    ...
+
 # =============================================================================
 # Device and DType Management
 # =============================================================================

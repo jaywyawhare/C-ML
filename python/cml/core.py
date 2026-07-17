@@ -69,6 +69,18 @@ def init():
     lib.cml_init()
 
 
+def reset_graph():
+    """Fully reset the global autograd/IR state and drop all execution caches.
+
+    Training a model already resets its own step graph automatically. Call this
+    only *between* training different models in the same process, after releasing
+    the previous model/optimizer (e.g. ``del model, opt``), to clear cached
+    execution plans that are keyed by tensor shape and would otherwise be
+    replayed with the previous model's freed buffers. Do NOT call it mid-step.
+    """
+    lib.cml_reset_ir_context()
+
+
 def cleanup():
     lib.cml_cleanup()
 

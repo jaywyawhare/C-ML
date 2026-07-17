@@ -1,4 +1,5 @@
 #include "cml.h"
+#include "tensor/realize.h"
 #include "core/logging.h"
 #include "core/training_metrics.h"
 #include "core/error_stack.h"
@@ -883,6 +884,55 @@ Tensor* cml_nn_nll_loss(Tensor* log_probs, Tensor* targets) {
 
 void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
     tensor_backward(tensor, gradient, retain_graph, create_graph);
+}
+
+/* End-of-training-step boundary. Detaches `keep` (typically the loss) from the
+ * autograd graph — materializing its data so callers can still read it — and
+ * then discards the accumulated forward/backward graph. Without this, a hand-
+ * written training loop that reuses the same parameters piles every step's graph
+ * onto them, so each backward re-traverses all prior steps (O(n^2) blow-up and
+ * compounding gradients). The C convergence tests get this implicitly by freeing
+ * the loss each step; this gives the same guarantee explicitly and is safe for
+ * language bindings that keep the loss object alive (it's detached first, so the
+ * reset never frees a tensor the caller still references). */
+/* Declared in ops/ir/graph_cache.c — drops cached execution plans (whose tensor
+ * pointers dangle once the graph is freed) without freeing the pooled buffers. */
+void cml_graph_cache_reset_global(void);
+
+void cml_autograd_step_end(Tensor* keep) {
+    if (keep)
+        tensor_realize(keep);   /* materialize + detach so the reset won't free it */
+    cml_autograd_reset_after_step();
+}
+
+/* Post-optimizer-step graph reset. Frees the accumulated autograd graph AND
+ * drops the execution-plan cache, which would otherwise keep pointers into this
+ * step's freed intermediate buffers and be replayed (crash) for a differently-
+ * allocated tensor of the same shape — e.g. a second model in the same process.
+ * The pooled buffers themselves and the parameters' realized data are kept, so
+ * this is safe to call every step (unlike the full cml_reset_ir_context). */
+void cml_autograd_reset_after_step(void) {
+    cml_ir_reset_graph_only();
+}
+
+/* Materialize every parameter (and its gradient) into owned storage, so they no
+ * longer borrow data from execution-plan buffers. Called before the plan cache
+ * is dropped in a training step, which would otherwise free the buffers the
+ * parameters point at. */
+void cml_optim_realize_params(Optimizer* opt) {
+    if (!opt)
+        return;
+    for (int g = 0; g < opt->num_param_groups; g++) {
+        ParameterGroup* pg = &opt->param_groups[g];
+        for (int i = 0; i < pg->num_parameters; i++) {
+            Parameter* p = pg->parameters[i];
+            if (p && p->tensor) {
+                tensor_realize(p->tensor);
+                if (p->tensor->grad)
+                    tensor_realize(p->tensor->grad);
+            }
+        }
+    }
 }
 void cml_zero_grad(Tensor* tensor) { tensor_zero_grad(tensor); }
 void cml_no_grad(void) { autograd_no_grad_enter(); }

@@ -2,6 +2,11 @@
 
 from cml._cml_lib import ffi, lib
 
+# After applying the update, discard the accumulated autograd graph so the next
+# step starts fresh (the loss was already detached in autograd.backward). Without
+# this, a reused-parameter training loop grows the graph without bound.
+_HAS_STEP_RESET = hasattr(lib, "cml_autograd_reset_after_step")
+
 
 def _as_module(model):
     """Cast a model's concrete layer handle (Sequential*, Linear*, ...) to the
@@ -31,6 +36,8 @@ class Optimizer:
 
     def step(self):
         lib.cml_optim_step(self._optimizer)
+        if _HAS_STEP_RESET:
+            lib.cml_autograd_reset_after_step()
 
     def zero_grad(self):
         lib.cml_optim_zero_grad(self._optimizer)
@@ -57,6 +64,13 @@ class Optimizer:
     def __del__(self):
         if hasattr(self, '_optimizer') and self._optimizer != ffi.NULL:
             lib.optimizer_free(self._optimizer)
+            # A training run just ended. The per-step graph-only reset keeps the
+            # execution-plan cache warm (fine while THIS model trains), but those
+            # plans point at this run's buffers. Do a full reset now — safe here
+            # since no step is in flight — so training another model of the same
+            # shape in the same process doesn't replay a stale plan and crash.
+            if hasattr(lib, "cml_reset_ir_context"):
+                lib.cml_reset_ir_context()
 
 
 class Adam(Optimizer):

@@ -12,7 +12,7 @@ except ImportError as e:
     )
 
 from cml.core import (
-    init, cleanup, seed,
+    init, cleanup, seed, reset_graph,
     Tensor, tensor,
     get_device, set_device, get_dtype, set_dtype,
     is_device_available, is_grad_enabled,
