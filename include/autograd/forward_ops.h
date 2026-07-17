@@ -11,6 +11,13 @@ Tensor* tensor_add(Tensor* a, Tensor* b);
 Tensor* tensor_sub(Tensor* a, Tensor* b);
 Tensor* tensor_mul(Tensor* a, Tensor* b);
 Tensor* tensor_div(Tensor* a, Tensor* b);
+/* In-place elementwise (eager): a op= b, mutating a's realized buffer directly
+ * (no IR node, no allocation). f32 only; b may match a, be a scalar, or a
+ * trailing broadcast. Returns a. Does not participate in autograd. */
+Tensor* tensor_add_(Tensor* a, Tensor* b);
+Tensor* tensor_sub_(Tensor* a, Tensor* b);
+Tensor* tensor_mul_(Tensor* a, Tensor* b);
+Tensor* tensor_div_(Tensor* a, Tensor* b);
 Tensor* tensor_exp(Tensor* a);
 Tensor* tensor_log(Tensor* a);
 Tensor* tensor_sqrt(Tensor* a);

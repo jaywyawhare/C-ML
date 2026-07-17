@@ -91,6 +91,12 @@ Tensor* cml_empty_1d(int size);
 Tensor* cml_tensor_1d(const float* data, int size);
 
 Tensor* cml_add(Tensor* a, Tensor* b);
+/* In-place elementwise (eager): a op= b into a's realized buffer, no allocation.
+ * f32 only; b matches a, is a scalar, or a trailing broadcast. Not autograd-tracked. */
+Tensor* cml_add_(Tensor* a, Tensor* b);
+Tensor* cml_sub_(Tensor* a, Tensor* b);
+Tensor* cml_mul_(Tensor* a, Tensor* b);
+Tensor* cml_div_(Tensor* a, Tensor* b);
 Tensor* cml_sub(Tensor* a, Tensor* b);
 Tensor* cml_mul(Tensor* a, Tensor* b);
 Tensor* cml_div(Tensor* a, Tensor* b);

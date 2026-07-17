@@ -706,6 +706,10 @@ Tensor* cml_add(Tensor* a, Tensor* b) { return tensor_add(a, b); }
 Tensor* cml_sub(Tensor* a, Tensor* b) { return tensor_sub(a, b); }
 Tensor* cml_mul(Tensor* a, Tensor* b) { return tensor_mul(a, b); }
 Tensor* cml_div(Tensor* a, Tensor* b) { return tensor_div(a, b); }
+Tensor* cml_add_(Tensor* a, Tensor* b) { return tensor_add_(a, b); }
+Tensor* cml_sub_(Tensor* a, Tensor* b) { return tensor_sub_(a, b); }
+Tensor* cml_mul_(Tensor* a, Tensor* b) { return tensor_mul_(a, b); }
+Tensor* cml_div_(Tensor* a, Tensor* b) { return tensor_div_(a, b); }
 Tensor* cml_exp(Tensor* a) { return tensor_exp(a); }
 Tensor* cml_log(Tensor* a) { return tensor_log(a); }
 Tensor* cml_sqrt(Tensor* a) { return tensor_sqrt(a); }

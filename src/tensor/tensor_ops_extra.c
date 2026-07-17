@@ -325,3 +325,60 @@ Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
 
     return result;
 }
+
+/* ── In-place elementwise ops (eager) ───────────────────────────────────────
+ * a op= b, mutating a's realized buffer directly (no new IR node / no alloc) —
+ * for optimizer/manual updates and gradient accumulation. Realizes both inputs
+ * first, then SIMD-updates a. f32 only; b may be a's shape, a scalar [1], or a
+ * contiguous trailing broadcast (i % b->numel). Returns a, or NULL on error.
+ * These operate on the materialized buffer and do NOT participate in autograd. */
+#include "tensor/realize.h"
+#include "ops/simd_math.h"
+
+typedef enum { CML_IP_ADD, CML_IP_SUB, CML_IP_MUL, CML_IP_DIV } CMLInplaceKind;
+
+static Tensor* cml_inplace_binary(Tensor* a, Tensor* b, CMLInplaceKind k) {
+    if (!a || !b) return NULL;
+    if (tensor_realize(a) != 0 || tensor_realize(b) != 0) return NULL;
+    if (!a->data || !b->data) return NULL;
+    if (a->dtype != DTYPE_FLOAT32 || b->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("in-place ops are float32-only");
+        return NULL;
+    }
+    float* ad = (float*)a->data;
+    const float* bd = (const float*)b->data;
+    size_t an = a->numel, bn = b->numel;
+    if (bn == an) {
+        switch (k) {
+        case CML_IP_ADD: simd_add_f32(ad, bd, ad, an); break;
+        case CML_IP_SUB: simd_sub_f32(ad, bd, ad, an); break;
+        case CML_IP_MUL: simd_mul_f32(ad, bd, ad, an); break;
+        case CML_IP_DIV: simd_div_f32(ad, bd, ad, an); break;
+        }
+    } else if (bn == 1) {
+        float s = bd[0];
+        switch (k) {
+        case CML_IP_ADD: simd_add_scalar_f32(ad,  s, ad, an); break;
+        case CML_IP_SUB: simd_add_scalar_f32(ad, -s, ad, an); break;
+        case CML_IP_MUL: simd_mul_scalar_f32(ad,  s, ad, an); break;
+        case CML_IP_DIV: simd_mul_scalar_f32(ad, (s != 0.0f) ? 1.0f / s : 0.0f, ad, an); break;
+        }
+    } else {
+        if (bn == 0 || an % bn != 0) { LOG_ERROR("in-place: incompatible shapes"); return NULL; }
+        for (size_t i = 0; i < an; i++) {
+            float bv = bd[i % bn];
+            switch (k) {
+            case CML_IP_ADD: ad[i] += bv; break;
+            case CML_IP_SUB: ad[i] -= bv; break;
+            case CML_IP_MUL: ad[i] *= bv; break;
+            case CML_IP_DIV: ad[i] /= bv; break;
+            }
+        }
+    }
+    return a;
+}
+
+Tensor* tensor_add_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_ADD); }
+Tensor* tensor_sub_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_SUB); }
+Tensor* tensor_mul_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_MUL); }
+Tensor* tensor_div_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_DIV); }
