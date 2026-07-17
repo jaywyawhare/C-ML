@@ -382,3 +382,93 @@ Tensor* tensor_add_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_
 Tensor* tensor_sub_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_SUB); }
 Tensor* tensor_mul_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_MUL); }
 Tensor* tensor_div_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_DIV); }
+
+/* ── FFT (1-D discrete Fourier transform) ───────────────────────────────────
+ * Radix-2 iterative Cooley-Tukey for power-of-two n (O(n log n)); O(n^2) DFT
+ * fallback otherwise. In-place on separate real/imag buffers. inverse!=0 does
+ * the inverse transform (1/n normalized). */
+#include <math.h>
+
+int cml_fft_1d(float* re, float* im, int n, int inverse) {
+    if (n <= 0 || !re || !im) return -1;
+    if ((n & (n - 1)) == 0) {
+        /* bit-reversal permutation */
+        for (int i = 1, j = 0; i < n; i++) {
+            int bit = n >> 1;
+            for (; j & bit; bit >>= 1) j ^= bit;
+            j ^= bit;
+            if (i < j) { float t;
+                t = re[i]; re[i] = re[j]; re[j] = t;
+                t = im[i]; im[i] = im[j]; im[j] = t; }
+        }
+        for (int len = 2; len <= n; len <<= 1) {
+            double ang = 2.0 * M_PI / len * (inverse ? 1.0 : -1.0);
+            float wr = (float)cos(ang), wi = (float)sin(ang);
+            for (int i = 0; i < n; i += len) {
+                float cwr = 1.0f, cwi = 0.0f;
+                for (int k = 0; k < len / 2; k++) {
+                    float ur = re[i + k],        ui = im[i + k];
+                    float xr = re[i + k + len/2], xi = im[i + k + len/2];
+                    float vr = xr * cwr - xi * cwi;
+                    float vi = xr * cwi + xi * cwr;
+                    re[i + k]         = ur + vr; im[i + k]         = ui + vi;
+                    re[i + k + len/2] = ur - vr; im[i + k + len/2] = ui - vi;
+                    float nwr = cwr * wr - cwi * wi;
+                    float nwi = cwr * wi + cwi * wr;
+                    cwr = nwr; cwi = nwi;
+                }
+            }
+        }
+        if (inverse) for (int i = 0; i < n; i++) { re[i] /= (float)n; im[i] /= (float)n; }
+        return 0;
+    }
+    /* non-power-of-two: naive DFT into temporaries */
+    float* tr = (float*)cml_malloc((size_t)n * sizeof(float));
+    float* ti = (float*)cml_malloc((size_t)n * sizeof(float));
+    if (!tr || !ti) { cml_free(tr); cml_free(ti); return -1; }
+    double s = inverse ? 1.0 : -1.0;
+    for (int k = 0; k < n; k++) {
+        double sr = 0.0, si = 0.0;
+        for (int t = 0; t < n; t++) {
+            double ang = s * 2.0 * M_PI * (double)k * (double)t / (double)n;
+            double c = cos(ang), sn = sin(ang);
+            sr += (double)re[t] * c - (double)im[t] * sn;
+            si += (double)re[t] * sn + (double)im[t] * c;
+        }
+        tr[k] = (float)(inverse ? sr / n : sr);
+        ti[k] = (float)(inverse ? si / n : si);
+    }
+    memcpy(re, tr, (size_t)n * sizeof(float));
+    memcpy(im, ti, (size_t)n * sizeof(float));
+    cml_free(tr); cml_free(ti);
+    return 0;
+}
+
+/* Tensor FFT of a 1-D complex signal stored as [n, 2] (last dim = {real, imag}).
+ * Returns a new [n, 2] tensor. inverse!=0 does the inverse transform. */
+Tensor* cml_fft(Tensor* x, int inverse) {
+    if (!x) return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data) return NULL;
+    if (x->ndim < 1 || x->shape[x->ndim - 1] != 2 || x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("cml_fft: input must be float32 with last dim == 2 (complex)");
+        return NULL;
+    }
+    int n = (int)(x->numel / 2);
+    float* re = (float*)cml_malloc((size_t)n * sizeof(float));
+    float* im = (float*)cml_malloc((size_t)n * sizeof(float));
+    if (!re || !im) { cml_free(re); cml_free(im); return NULL; }
+    const float* xd = (const float*)x->data;
+    for (int i = 0; i < n; i++) { re[i] = xd[2*i]; im[i] = xd[2*i + 1]; }
+    if (cml_fft_1d(re, im, n, inverse) != 0) { cml_free(re); cml_free(im); return NULL; }
+    TensorConfig cfg = { .dtype = DTYPE_FLOAT32, .device = x->device,
+                         .has_dtype = true, .has_device = true };
+    Tensor* out = tensor_empty(x->shape, x->ndim, &cfg);  /* materialized leaf */
+    if (out && out->data) {
+        float* od = (float*)out->data;
+        for (int i = 0; i < n; i++) { od[2*i] = re[i]; od[2*i + 1] = im[i]; }
+        out->is_executed = true;   /* holds real data; do not recompute */
+    }
+    cml_free(re); cml_free(im);
+    return out;
+}

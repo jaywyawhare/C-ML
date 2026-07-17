@@ -90,6 +90,12 @@ Tensor* cml_ones_1d(int size);
 Tensor* cml_empty_1d(int size);
 Tensor* cml_tensor_1d(const float* data, int size);
 
+/* 1-D FFT. cml_fft_1d transforms separate real/imag buffers in place (radix-2 for
+ * power-of-two n, O(n^2) DFT otherwise); inverse!=0 = inverse (1/n normalized).
+ * cml_fft transforms a complex signal tensor stored as [n,2] and returns [n,2]. */
+int     cml_fft_1d(float* re, float* im, int n, int inverse);
+Tensor* cml_fft(Tensor* x, int inverse);
+
 Tensor* cml_add(Tensor* a, Tensor* b);
 /* In-place elementwise (eager): a op= b into a's realized buffer, no allocation.
  * f32 only; b matches a, is a scalar, or a trailing broadcast. Not autograd-tracked. */
