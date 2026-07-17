@@ -224,48 +224,134 @@ static int gloo_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     return 0;
 }
 
+/* Tags reserved for collectives (kept distinct from user send/recv tags, which
+ * callers pass explicitly; the ring-allreduce uses [0, 2*world_size)). */
+#define GLOO_TAG_BCAST   1000001
+#define GLOO_TAG_GATHER  1000002
+
 static int gloo_broadcast(Tensor* tensor, int src_rank, void* ctx) {
-    (void)ctx;
-    (void)src_rank;
-    if (!tensor)
+    GlooContext* gctx = get_gloo_ctx(ctx);
+    if (!tensor || !tensor->data)
         return -1;
 
-    /* In single-process mode, broadcast is a no-op */
+    /* Single-process: nothing to broadcast */
+    if (!gctx || gctx->world_size <= 1)
+        return 0;
+
+    if (src_rank < 0 || src_rank >= gctx->world_size) {
+        LOG_ERROR("Gloo broadcast: invalid src_rank %d", src_rank);
+        return -1;
+    }
+
+    /* Root fans the tensor out to every peer; everyone else receives from root.
+     * Sends are sequential and each is matched by that peer's single recv, so
+     * there is no deadlock. */
+    if (gctx->rank == src_rank) {
+        for (int peer = 0; peer < gctx->world_size; peer++) {
+            if (peer == gctx->rank) continue;
+            if (gloo_send(tensor, peer, GLOO_TAG_BCAST, ctx) != 0)
+                return -1;
+        }
+    } else {
+        if (gloo_recv(tensor, src_rank, GLOO_TAG_BCAST, ctx) != 0)
+            return -1;
+    }
+
     LOG_DEBUG("Gloo broadcast from rank %d (numel: %zu)", src_rank, tensor->numel);
     return 0;
 }
 
 static int gloo_allgather(Tensor** output, Tensor* input, void* ctx) {
-    (void)ctx;
-    if (!output || !input)
+    GlooContext* gctx = get_gloo_ctx(ctx);
+    if (!output || !input || !input->data)
         return -1;
 
-    /* Single-process: just copy input to output[0] */
-    if (output[0] && output[0]->data && input->data) {
-        memcpy(output[0]->data, input->data, input->numel * sizeof(float));
-    }
+    int ws   = gctx ? gctx->world_size : 1;
+    int rank = gctx ? gctx->rank : 0;
 
+    /* Place our own contribution at output[rank]. */
+    if (output[rank] && output[rank]->data)
+        memcpy(output[rank]->data, input->data, input->numel * sizeof(float));
+
+    if (!gctx || ws <= 1)
+        return 0;
+
+    /* Exchange with every peer; the lower rank of each pair sends first so the
+     * blocking sockets never both block on send. */
+    for (int peer = 0; peer < ws; peer++) {
+        if (peer == rank) continue;
+        if (!output[peer] || !output[peer]->data) {
+            LOG_ERROR("Gloo allgather: output[%d] not allocated", peer);
+            return -1;
+        }
+        if (rank < peer) {
+            if (gloo_send(input, peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
+            if (gloo_recv(output[peer], peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
+        } else {
+            if (gloo_recv(output[peer], peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
+            if (gloo_send(input, peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
+        }
+    }
     return 0;
 }
 
 static int gloo_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, void* ctx) {
-    (void)ctx;
-    (void)op;
-    if (!output || !input)
+    GlooContext* gctx = get_gloo_ctx(ctx);
+    if (!output || !input || !output->data || !input->data)
         return -1;
 
-    /* Single-process: copy relevant chunk */
-    if (output->data && input->data) {
+    int ws   = gctx ? gctx->world_size : 1;
+    int rank = gctx ? gctx->rank : 0;
+
+    if (!gctx || ws <= 1) {
         size_t copy_size = output->numel < input->numel ? output->numel : input->numel;
         memcpy(output->data, input->data, copy_size * sizeof(float));
+        return 0;
     }
 
+    /* Reduce the full input across all ranks, then keep this rank's slice.
+     * (Reuses the ring all-reduce, which is correct and deadlock-free.) */
+    DistProcessGroup* group = cml_dist_get_default_group();
+    if (!group || !group->ops) return -1;
+
+    size_t off = (size_t)rank * output->numel;
+    if (off + output->numel > input->numel) {
+        LOG_ERROR("Gloo reduce_scatter: output slice [%zu,%zu) exceeds input numel %zu",
+                  off, off + output->numel, input->numel);
+        return -1;
+    }
+
+    float* tmp = (float*)cml_malloc(input->numel * sizeof(float));
+    if (!tmp) return -1;
+    memcpy(tmp, input->data, input->numel * sizeof(float));
+
+    int rc = cml_ring_allreduce(tmp, input->numel, ws, rank, op,
+                                group->ops, group->backend_ctx);
+    if (rc != 0) { cml_free(tmp); return -1; }
+
+    memcpy(output->data, tmp + off, output->numel * sizeof(float));
+    cml_free(tmp);
     return 0;
 }
 
 static int gloo_barrier(void* ctx) {
-    (void)ctx;
-    /* Single-process: no-op */
+    GlooContext* gctx = get_gloo_ctx(ctx);
+    if (!gctx || gctx->world_size <= 1)
+        return 0;
+
+    /* Rank 0 waits for a token from every peer, then releases them all. A raw
+     * one-byte handshake on the (idle, fully-drained) peer sockets. */
+    char token = 1;
+    int ws = gctx->world_size, rank = gctx->rank;
+    if (rank == 0) {
+        for (int p = 1; p < ws; p++)
+            if (recv_all(gctx->peer_fds[p], &token, 1) != 0) return -1;
+        for (int p = 1; p < ws; p++)
+            if (send_all(gctx->peer_fds[p], &token, 1) != 0) return -1;
+    } else {
+        if (send_all(gctx->peer_fds[0], &token, 1) != 0) return -1;
+        if (recv_all(gctx->peer_fds[0], &token, 1) != 0) return -1;
+    }
     return 0;
 }
 

@@ -5,6 +5,26 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/* Deadlock-free paired send/recv for a ring step.
+ *
+ * The naive "send to right, then recv from left" order deadlocks once a chunk
+ * exceeds the kernel socket send buffer: every rank blocks in send() and nobody
+ * is receiving. Ordering by rank parity breaks the cycle — even ranks send then
+ * receive, odd ranks receive then send — so a blocking sender is always paired
+ * with a peer that has already posted (or is about to post) the matching
+ * receive. The send and recv buffers are disjoint here, so this is safe. */
+static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right,
+                         Tensor* recv_t, int left, int tag, void* ctx, int rank) {
+    if ((rank & 1) == 0) {
+        int r = ops->send(send_t, right, tag, ctx);
+        if (r != 0) return r;
+        return ops->recv(recv_t, left, tag, ctx);
+    }
+    int r = ops->recv(recv_t, left, tag, ctx);
+    if (r != 0) return r;
+    return ops->send(send_t, right, tag, ctx);
+}
+
 static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp op) {
     for (size_t i = 0; i < n; i++) {
         switch (op) {
@@ -86,11 +106,9 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         recv_tensor.shape = recv_shape;
         recv_tensor.dtype = DTYPE_FLOAT32;
 
-        /* Send to right neighbor, recv from left neighbor */
-        int ret = ops->send(&send_tensor, right, step, ctx);
-        if (ret != 0) { cml_free(recv_buf); return -1; }
-
-        ret = ops->recv(&recv_tensor, left, step, ctx);
+        /* Send to right neighbor, recv from left neighbor (parity-ordered) */
+        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left,
+                                step, ctx, rank);
         if (ret != 0) { cml_free(recv_buf); return -1; }
 
         /* Reduce received data into local chunk */
@@ -131,10 +149,8 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         recv_tensor.shape = recv_shape;
         recv_tensor.dtype = DTYPE_FLOAT32;
 
-        int ret = ops->send(&send_tensor, right, world_size + step, ctx);
-        if (ret != 0) { cml_free(recv_buf); return -1; }
-
-        ret = ops->recv(&recv_tensor, left, world_size + step, ctx);
+        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left,
+                                world_size + step, ctx, rank);
         if (ret != 0) { cml_free(recv_buf); return -1; }
     }
 
