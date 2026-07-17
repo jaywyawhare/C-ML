@@ -581,6 +581,52 @@ static void sgd_step(Optimizer* optimizer) {
     }
 }
 
+/* In-place SGD update (lr / momentum / weight_decay) applied directly to the
+ * parameter buffers from param->grad->data — allocates NO IR nodes. This is what
+ * lets a static-graph training step stay zero-rebuild (the normal sgd_step emits
+ * a uop_sgd_step per parameter each iteration). Matches sgd_step's math
+ * (dampening=0, nesterov=false). Intended for SGD optimizers; other optimizers
+ * fall back to their node-emitting step (so static mode isn't fully rebuild-free
+ * for them yet). Returns 1 if it handled the step in-place, 0 otherwise. */
+int optimizer_step_inplace(Optimizer* optimizer) {
+    if (!optimizer) return 0;
+    if (!optimizer->name || strcmp(optimizer->name, "SGD") != 0) {
+        optimizer_step(optimizer);   /* non-SGD: correct, but allocates nodes */
+        return 0;
+    }
+    for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+        ParameterGroup* group = &optimizer->param_groups[g_idx];
+        float lr = group->lr, weight_decay = group->weight_decay, momentum = group->momentum;
+
+        if (momentum > 0.0f && !group->state) {
+            group->state = optimizer_alloc_state(group, sizeof(SGDMomentumState), sgd_state_init);
+            if (!group->state) { LOG_ERROR("Failed to allocate SGD momentum state"); continue; }
+        }
+        SGDMomentumState** states = momentum > 0.0f ? (SGDMomentumState**)group->state : NULL;
+
+        for (int i = 0; i < group->num_parameters; i++) {
+            Parameter* param = group->parameters[i];
+            if (!param || !param->tensor || !param->requires_grad) continue;
+            Tensor* t = param->tensor;
+            Tensor* grad = tensor_get_grad(t);
+            if (!grad || !grad->data || !t->data ||
+                t->dtype != DTYPE_FLOAT32 || grad->dtype != DTYPE_FLOAT32) continue;
+            Tensor* mom = (momentum > 0.0f && states && states[i]) ? states[i]->momentum_buffer : NULL;
+            float* p = (float*)t->data;
+            const float* gd = (const float*)grad->data;
+            float* buf = (mom && mom->data) ? (float*)mom->data : NULL;
+            size_t n = t->numel;
+            for (size_t k = 0; k < n; k++) {
+                float d = gd[k] + weight_decay * p[k];
+                if (buf) { buf[k] = momentum * buf[k] + d; d = buf[k]; }
+                p[k] -= lr * d;
+            }
+        }
+        group->step_count++;
+    }
+    return 1;
+}
+
 static void generic_zero_grad(Optimizer* optimizer) {
     if (!optimizer)
         return;

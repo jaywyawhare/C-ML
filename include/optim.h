@@ -68,6 +68,12 @@ ParameterGroup* optimizer_get_param_group(Optimizer* optimizer, int index);
 
 void optimizer_step(Optimizer* optimizer);
 
+/* In-place parameter update from param->grad->data with NO IR-node allocation
+ * (SGD math: lr/momentum/weight_decay). Used by the static-graph training mode
+ * to keep the step zero-rebuild. Non-SGD optimizers fall back to optimizer_step.
+ * Returns 1 if applied in-place, 0 if it fell back. */
+int optimizer_step_inplace(Optimizer* optimizer);
+
 void optimizer_set_metrics(Optimizer* optimizer, void* metrics);
 
 void optimizer_zero_grad(Optimizer* optimizer);

@@ -1,12 +1,13 @@
-/* Zero-rebuild static graph: build a graph once, then re-run it with new input /
+/* Zero-rebuild static graph: build a graph once, then re-run it on new input /
  * weight buffers via cml_ir_reexecute — no per-iteration rebuild (constant node
  * count), results identical to a fresh dynamic rebuild.
  *
- *  - inference: swap the input buffer, re-run, compare to a dynamic rebuild.
- *  - training : re-run fwd+bwd each step + in-place SGD, loss must converge, and
- *               it must stay correct under the default TinyJit (cml_ir_reexecute
- *               bypasses TinyJit's stale replay). */
+ *  - inference : swap the input buffer, re-run, compare to a dynamic rebuild.
+ *  - training  : re-run fwd+bwd each step + in-place SGD; loss converges, and it
+ *                stays correct under the default TinyJit (cml_ir_reexecute
+ *                bypasses TinyJit's replay). */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "cml.h"
@@ -43,7 +44,6 @@ static void test_static_inference(void) {
     float inA[16], inB[16];
     for (int i = 0; i < 16; i++) { inA[i] = 0.1f * i - 0.5f; inB[i] = 0.2f * (i % 6) - 0.3f; }
 
-    /* static: one graph, run A then B then A via re-execute */
     cml_reset_ir_context();
     CMLGraph_t ir = cml_ir_get_or_create_context();
     float xbuf[16]; memcpy(xbuf, inA, sizeof inA);
@@ -59,7 +59,6 @@ static void test_static_inference(void) {
     memcpy(outA2_s, tensor_data_ptr(out), sizeof outA2_s);
     int n3 = node_count(ir);
 
-    /* dynamic baseline: fresh rebuild per input */
     cml_reset_ir_context();
     float xb2[16]; memcpy(xb2, inA, sizeof inA);
     float outA_d[4]; memcpy(outA_d, tensor_data_ptr(build_mlp(cml_tensor_2d(xb2, 4, 4))), sizeof outA_d);
@@ -101,8 +100,8 @@ static void test_static_training(void) {
     float lr = 0.05f, loss0 = 0, lossN = 0;
     int n_after_first = 0, n_last = 0;
     for (int it = 0; it < 50; it++) {
-        if (it == 0) tensor_backward(loss, NULL, false, false);  /* builds fwd+bwd */
-        else         cml_ir_reexecute(ir);                       /* re-runs, zero rebuild */
+        if (it == 0) tensor_backward(loss, NULL, false, false);
+        else         cml_ir_reexecute(ir);
         float l = ((float*)tensor_data_ptr(loss))[0];
         if (it == 0)  { loss0 = l; }
         if (it == 1)  { n_after_first = node_count(ir); }

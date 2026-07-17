@@ -10,6 +10,7 @@
 #include "autograd/loss_functions.h"
 #include "autograd/autograd.h"
 #include "ops/ir/context.h"
+#include "ops/ir/execution.h"   /* cml_ir_reexecute for the static-graph mode */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -412,6 +413,17 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
     if (callbacks.on_training_begin) {
         callbacks.on_training_begin(callbacks.user_data);
     }
+
+    /* Zero-rebuild static-graph mode: the fwd+bwd graph is built ONCE (first
+     * batch) around fixed input buffers, then every later batch of the same shape
+     * memcpys new data into those buffers, cml_ir_reexecute()s the graph (no
+     * rebuild, no node allocation), and applies an in-place SGD step. */
+    bool  sg_mode     = config->static_graph;
+    bool  sg_captured = false;
+    CMLGraph_t sg_ir  = NULL;
+    Tensor* sg_X = NULL, *sg_Y = NULL, *sg_loss = NULL;
+    size_t  sg_xn = 0, sg_yn = 0;
+
     for (int epoch = 0; epoch < epochs; epoch++) {
         if (callbacks.on_epoch_begin) {
             callbacks.on_epoch_begin(epoch, callbacks.user_data);
@@ -425,18 +437,56 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             if (callbacks.on_batch_begin) {
                 callbacks.on_batch_begin(epoch, batch->batch_index, callbacks.user_data);
             }
+
+            /* ---- static-graph fast path (after the first batch is captured) ---- */
+            if (sg_mode && sg_captured) {
+                if (batch->X) tensor_realize(batch->X);
+                if (batch->y) tensor_realize(batch->y);
+                if (!batch->X || !batch->y ||
+                    batch->X->numel != sg_xn || batch->y->numel != sg_yn ||
+                    !batch->X->data || !batch->y->data) {
+                    /* shape changed (e.g. a smaller trailing batch) — skip it */
+                    batch_free(batch);
+                    continue;
+                }
+                memcpy(sg_X->data, batch->X->data, sg_xn * sizeof(float));
+                memcpy(sg_Y->data, batch->y->data, sg_yn * sizeof(float));
+                cml_ir_reexecute(sg_ir);                 /* re-run fwd+bwd, no rebuild */
+                float loss_value = tensor_get_float(sg_loss, 0);
+                epoch_loss += loss_value;
+                num_batches++;
+                optimizer_step_inplace(optimizer);       /* in-place SGD, no nodes */
+                if (callbacks.on_batch_end)
+                    callbacks.on_batch_end(epoch, batch->batch_index, loss_value, callbacks.user_data);
+                batch_free(batch);
+                continue;
+            }
+
             /* Realize batch tensors so they survive the graph reset, then
              * clear the previous iteration's computation graph. */
             if (batch->X) tensor_realize(batch->X);
             if (batch->y) tensor_realize(batch->y);
-            cml_ir_reset_global_context();
-            Tensor* output = module_forward(model, batch->X);
+            if (!(sg_mode && !sg_captured))
+                cml_ir_reset_global_context();
+            /* In static mode the first batch builds the graph around persistent
+             * clones of X/y so it can be reused (batch tensors are freed below). */
+            Tensor* fwd_input = batch->X;
+            Tensor* loss_target = batch->y;
+            if (sg_mode && !sg_captured) {
+                cml_ir_reset_global_context();
+                sg_X = tensor_clone(batch->X);
+                sg_Y = tensor_clone(batch->y);
+                if (!sg_X || !sg_Y) { LOG_ERROR("static_graph: clone failed"); batch_free(batch); return -1; }
+                sg_xn = batch->X->numel; sg_yn = batch->y->numel;
+                fwd_input = sg_X; loss_target = sg_Y;
+            }
+            Tensor* output = module_forward(model, fwd_input);
             if (!output) {
                 LOG_ERROR("Forward pass failed");
                 batch_free(batch);
                 return -1;
             }
-            Tensor* loss = loss_fn(output, batch->y);
+            Tensor* loss = loss_fn(output, loss_target);
             if (!loss) {
                 LOG_ERROR("Loss computation failed");
                 tensor_free(output);
@@ -520,7 +570,18 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
                     cml_free(params);
                 }
             }
-            optimizer->step(optimizer);
+            /* static mode: in-place SGD (no IR nodes), then CAPTURE the graph so
+             * every later batch reuses it. The optimizer's normal step would emit
+             * uop_sgd_step nodes into this graph — breaking the static reuse — so
+             * we use the in-place update on the first batch too. */
+            if (sg_mode && !sg_captured) {
+                optimizer_step_inplace(optimizer);
+                sg_ir     = cml_ir_get_or_create_context();
+                sg_loss   = loss;              /* kept: part of the static graph */
+                sg_captured = true;
+            } else {
+                optimizer->step(optimizer);
+            }
             if (use_progress_bar && num_batches % 10 == 0) {
                 float progress = 100.0f *
                                  (float)(epoch * train_loader->total_batches + batch->batch_index) /
@@ -534,8 +595,11 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             if (callbacks.on_batch_end) {
                 callbacks.on_batch_end(epoch, batch->batch_index, loss_value, callbacks.user_data);
             }
-            tensor_free(loss);
-            tensor_free(output);
+            /* In static mode the loss/output tensors ARE the persistent graph — keep them. */
+            if (!sg_mode) {
+                tensor_free(loss);
+                tensor_free(output);
+            }
             batch_free(batch);
         }
         float avg_loss = num_batches > 0 ? epoch_loss / (float)num_batches : 0.0f;
@@ -571,6 +635,14 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
     }
     if (callbacks.on_training_end) {
         callbacks.on_training_end(callbacks.user_data);
+    }
+
+    /* Static mode: free the persistent input clones and drop the reused graph
+     * (frees the kept output/loss tensors with it). */
+    if (sg_mode && sg_captured) {
+        cml_ir_reset_global_context();
+        if (sg_X) tensor_free(sg_X);
+        if (sg_Y) tensor_free(sg_Y);
     }
 
     return 0;

@@ -128,6 +128,17 @@ typedef struct TrainingConfig {
     float early_stopping_min_delta;
     bool use_checkpointing;           // Enable gradient checkpointing
     int checkpoint_every_n_layers;    // Checkpoint every N layers (0 = auto)
+    bool static_graph;                // Zero-rebuild static graph: build the
+                                      // fwd+bwd graph once, then reuse it every
+                                      // batch (memcpy new data into fixed input
+                                      // buffers + cml_ir_reexecute + in-place SGD)
+                                      // instead of resetting/rebuilding per batch.
+                                      // Requires a constant batch shape and an SGD
+                                      // optimizer for a fully rebuild-free step.
+                                      // The reused graph relies on global context
+                                      // state, so run one static training per
+                                      // process (don't mix with other full-graph
+                                      // executions in the same process).
 } TrainingConfig;
 
 void training_config_default(TrainingConfig* config);
