@@ -54,17 +54,14 @@ static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, vo
             best_size = e->size;
         }
     }
-    if (best >= 0) {
+    /* Reuse a pooled buffer ONLY when the caller isn't copying host data into
+     * it (COPY_HOST_PTR needs a fresh clCreateBuffer). Previously the reused
+     * slot was marked in_use *before* this check and then abandoned on the
+     * host-ptr path, permanently leaking the slot and defeating pooling. */
+    if (best >= 0 && !(host_ptr && (flags & CL_MEM_COPY_HOST_PTR))) {
         g_gpu_pool.entries[best].in_use = true;
-        cl_mem buf = g_gpu_pool.entries[best].buffer;
-        /* If caller supplied host data, write it into the reused buffer */
-        if (host_ptr && (flags & CL_MEM_COPY_HOST_PTR)) {
-            /* Caller must enqueue a write after this; for simplicity we
-               create a fresh buffer when host_ptr is given. */
-        } else {
-            if (errcode) *errcode = CL_SUCCESS;
-            return buf;
-        }
+        if (errcode) *errcode = CL_SUCCESS;
+        return g_gpu_pool.entries[best].buffer;
     }
 
     /* No suitable buffer found — allocate a new one */

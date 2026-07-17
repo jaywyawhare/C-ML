@@ -274,11 +274,23 @@ static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
     if (bytes == 0) return NULL;
 
     CMLOCLBufferEntry* e = ocl_find_buffer(b, t);
-    if (e && e->valid)
+    if (e && e->valid) {
+        /* Leaf inputs (weights/activations) can be mutated in place between
+         * executions (e.g. an optimizer weight update) while keeping the same
+         * allocation, so the cached device copy may be stale — re-upload the
+         * current host contents (the buffer itself is still reused). Computed
+         * GPU-resident intermediates (is_input==false) live on the device and
+         * are never stale, so they are left untouched. */
+        if (e->is_input && e->size == bytes && t->data)
+            clEnqueueWriteBuffer(b->queue, e->gpu_buf, CL_FALSE, 0, bytes, t->data, 0, NULL, NULL);
         return e->gpu_buf;
+    }
 
     CMLOCLBufferEntry* cached = ocl_find_cached_input(b, t->data, bytes);
     if (cached) {
+        /* Same staleness concern for a buffer shared by data pointer. */
+        if (cached->size == bytes && t->data)
+            clEnqueueWriteBuffer(b->queue, cached->gpu_buf, CL_FALSE, 0, bytes, t->data, 0, NULL, NULL);
         cached->tensor = t;
         return cached->gpu_buf;
     }
