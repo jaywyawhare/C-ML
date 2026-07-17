@@ -164,12 +164,48 @@ def _cmp(self, other, np_op):
     return NotImplemented
 
 
+def tensor(data, dtype=None, device=None, requires_grad=False) -> "Tensor":
+    """PyTorch/numpy-style tensor factory.
+
+    ``cml.tensor([[1, 2], [3, 4]])`` builds a tensor from (nested) lists, a
+    scalar, a tuple, or a numpy array.
+    """
+    return Tensor(data, dtype=dtype, device=device, requires_grad=requires_grad)
+
+
 class Tensor:
     _shape_cache: Optional[Tuple[int, ...]] = None
 
-    def __init__(self, c_tensor):
-        self._tensor = c_tensor
+    def __init__(self, data=None, dtype=None, device=None, requires_grad=False):
+        """Create a tensor.
+
+        Accepts either raw data (a Python scalar / (nested) list / tuple /
+        numpy array) — the ergonomic, PyTorch-style path — or, internally, an
+        existing C tensor handle (a CFFI cdata pointer) which is simply wrapped.
+        """
         self._shape_cache = None
+
+        # Internal fast path: wrap an existing C tensor pointer as-is.
+        if isinstance(data, ffi.CData):
+            self._tensor = data
+            return
+        if data is None:
+            self._tensor = ffi.NULL
+            return
+
+        # User path: build from Python / numpy data.
+        arr = data if isinstance(data, np.ndarray) else np.asarray(data)
+        if arr.ndim == 0:                    # scalar -> 1-element 1-D tensor
+            arr = arr.reshape(1)
+        built = Tensor.from_numpy(arr, requires_grad=requires_grad, dtype=dtype)
+        # Take ownership of the built C tensor; neutralize the temporary so its
+        # __del__ doesn't free the handle we just adopted.
+        self._tensor = built._tensor
+        built._tensor = ffi.NULL
+        if device is not None:
+            moved = self.to(device=device)
+            if moved is not self:
+                self._tensor, moved._tensor = moved._tensor, self._tensor
 
     def __del__(self):
         if (
@@ -179,41 +215,62 @@ class Tensor:
         ):
             lib.tensor_free(self._tensor)
 
-    def __add__(self, other):
+    @staticmethod
+    def _as_operand(other):
+        """Coerce a binary-op operand to a Tensor (scalars become a 1-element
+        tensor that the C ops broadcast), or return None for unsupported types."""
         if isinstance(other, Tensor):
-            return Tensor(lib.cml_add(self._tensor, other._tensor))
-        raise TypeError(f"Cannot add Tensor and {type(other)}")
+            return other
+        if isinstance(other, (bool, int, float)):
+            return Tensor.from_numpy(np.array([float(other)], dtype=np.float32))
+        return None
+
+    def __add__(self, other):
+        o = self._as_operand(other)
+        if o is None:
+            return NotImplemented
+        return Tensor(lib.cml_add(self._tensor, o._tensor))
 
     def __radd__(self, other):
         return self.__add__(other)
 
     def __sub__(self, other):
-        if isinstance(other, Tensor):
-            return Tensor(lib.cml_sub(self._tensor, other._tensor))
-        raise TypeError(f"Cannot subtract Tensor and {type(other)}")
+        o = self._as_operand(other)
+        if o is None:
+            return NotImplemented
+        return Tensor(lib.cml_sub(self._tensor, o._tensor))
 
     def __rsub__(self, other):
-        if isinstance(other, Tensor):
-            return Tensor(lib.cml_sub(other._tensor, self._tensor))
-        raise TypeError(f"Cannot subtract {type(other)} and Tensor")
+        o = self._as_operand(other)
+        if o is None:
+            return NotImplemented
+        return Tensor(lib.cml_sub(o._tensor, self._tensor))
 
     def __mul__(self, other):
-        if isinstance(other, Tensor):
-            return Tensor(lib.cml_mul(self._tensor, other._tensor))
-        raise TypeError(f"Cannot multiply Tensor and {type(other)}")
+        o = self._as_operand(other)
+        if o is None:
+            return NotImplemented
+        return Tensor(lib.cml_mul(self._tensor, o._tensor))
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __truediv__(self, other):
-        if isinstance(other, Tensor):
-            return Tensor(lib.cml_div(self._tensor, other._tensor))
-        raise TypeError(f"Cannot divide Tensor by {type(other)}")
+        o = self._as_operand(other)
+        if o is None:
+            return NotImplemented
+        return Tensor(lib.cml_div(self._tensor, o._tensor))
+
+    def __rtruediv__(self, other):
+        o = self._as_operand(other)
+        if o is None:
+            return NotImplemented
+        return Tensor(lib.cml_div(o._tensor, self._tensor))
 
     def __matmul__(self, other):
         if isinstance(other, Tensor):
             return Tensor(lib.cml_matmul(self._tensor, other._tensor))
-        raise TypeError(f"Cannot matmul Tensor and {type(other)}")
+        return NotImplemented
 
     @property
     def shape(self) -> Tuple[int, ...]:
