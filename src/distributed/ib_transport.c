@@ -27,7 +27,21 @@ typedef struct ibv_context     ibv_context;
 typedef struct ibv_pd          ibv_pd;
 typedef struct ibv_cq          ibv_cq;
 typedef struct ibv_qp          ibv_qp;
-typedef struct ibv_mr          ibv_mr;
+
+/* Public libibverbs ABI layout for struct ibv_mr (stable for years). Defined
+ * fully — rather than left opaque — so we can read the driver-assigned lkey/rkey
+ * that ibv_reg_mr writes here. A work request whose SGE lkey doesn't match the
+ * MR's real key is rejected by the HCA with a local-protection error, which is
+ * why the previous lkey=0 made every send/recv fail on real hardware. */
+typedef struct ibv_mr {
+    ibv_context* context;
+    ibv_pd*      pd;
+    void*        addr;
+    size_t       length;
+    uint32_t     handle;
+    uint32_t     lkey;
+    uint32_t     rkey;
+} ibv_mr;
 
 typedef struct ibv_qp_init_attr {
     void* qp_context;
@@ -553,7 +567,7 @@ int cml_ib_send(CMLIBTransport* ib, int peer, const void* buf, size_t size) {
     ibv_sge sge = {
         .addr = (uint64_t)(uintptr_t)buf,
         .length = (uint32_t)size,
-        .lkey = 0
+        .lkey = mr->lkey            /* real driver-assigned key */
     };
 
     ibv_send_wr wr;
@@ -591,7 +605,7 @@ int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
     ibv_sge sge = {
         .addr = (uint64_t)(uintptr_t)buf,
         .length = (uint32_t)size,
-        .lkey = 0
+        .lkey = mr->lkey            /* real driver-assigned key */
     };
 
     ibv_recv_wr wr;
@@ -611,6 +625,25 @@ int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
     rc = poll_completion(ib, 30000);
     ib_api.dereg_mr(mr);
     return rc;
+}
+
+/* Deadlock-free paired send/recv for a ring step. cml_ib_send blocks until its
+ * RC send is acked, which requires the receiver to already have a recv posted —
+ * so every rank sending first (the old order) deadlocks with no receives up.
+ * Ordering by rank parity guarantees a pre-posted receive for each send. Since
+ * each call blocks to completion, only one WR is outstanding at a time, so the
+ * shared completion queue is unambiguous. Return codes are checked (they were
+ * previously ignored, silently reducing garbage). */
+static int ib_ring_sendrecv(CMLIBTransport* ib, int right, const void* sbuf, size_t sbytes,
+                            int left, void* rbuf, size_t rbytes, int rank) {
+    if ((rank & 1) == 0) {
+        if (sbytes && cml_ib_send(ib, right, sbuf, sbytes) != 0) return -1;
+        if (rbytes && cml_ib_recv(ib, left, rbuf, rbytes) != 0) return -1;
+    } else {
+        if (rbytes && cml_ib_recv(ib, left, rbuf, rbytes) != 0) return -1;
+        if (sbytes && cml_ib_send(ib, right, sbuf, sbytes) != 0) return -1;
+    }
+    return 0;
 }
 
 int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) {
@@ -646,10 +679,11 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
         if (send_off + sc > count) sc = (send_off < count) ? count - send_off : 0;
         if (recv_off + rc > count) rc = (recv_off < count) ? count - recv_off : 0;
 
-        if (sc > 0)
-            cml_ib_send(ib, right, data + send_off, sc * (size_t)elem_size);
-        if (rc > 0)
-            cml_ib_recv(ib, left, recv_buf, rc * (size_t)elem_size);
+        if (ib_ring_sendrecv(ib, right, data + send_off, sc * (size_t)elem_size,
+                             left, recv_buf, rc * (size_t)elem_size, rank) != 0) {
+            cml_free(recv_buf);
+            return -1;
+        }
 
         for (size_t i = 0; i < rc; i++)
             data[recv_off + i] += recv_buf[i];
@@ -668,10 +702,11 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
         if (send_off + sc > count) sc = (send_off < count) ? count - send_off : 0;
         if (recv_off + rc > count) rc = (recv_off < count) ? count - recv_off : 0;
 
-        if (sc > 0)
-            cml_ib_send(ib, right, data + send_off, sc * (size_t)elem_size);
-        if (rc > 0)
-            cml_ib_recv(ib, left, data + recv_off, rc * (size_t)elem_size);
+        if (ib_ring_sendrecv(ib, right, data + send_off, sc * (size_t)elem_size,
+                             left, data + recv_off, rc * (size_t)elem_size, rank) != 0) {
+            cml_free(recv_buf);
+            return -1;
+        }
     }
 
     cml_free(recv_buf);
@@ -681,13 +716,13 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
 int cml_ib_barrier(CMLIBTransport* ib) {
     if (!ib || !ib->connected) return -1;
 
-    uint8_t dummy = 0;
+    uint8_t sdummy = 0, rdummy = 0;
     int left  = (ib->rank - 1 + ib->world_size) % ib->world_size;
     int right = (ib->rank + 1) % ib->world_size;
 
     for (int round = 0; round < ib->world_size - 1; round++) {
-        if (cml_ib_send(ib, right, &dummy, 1) != 0) return -1;
-        if (cml_ib_recv(ib, left, &dummy, 1) != 0) return -1;
+        if (ib_ring_sendrecv(ib, right, &sdummy, 1, left, &rdummy, 1, ib->rank) != 0)
+            return -1;
     }
     return 0;
 }
@@ -711,8 +746,8 @@ CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size)
     reg->mr = mr;
     reg->addr = addr;
     reg->size = size;
-    reg->lkey = 0;
-    reg->rkey = 0;
+    reg->lkey = mr->lkey;
+    reg->rkey = mr->rkey;
 
     return reg;
 }
