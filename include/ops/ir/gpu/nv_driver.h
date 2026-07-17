@@ -92,9 +92,16 @@ typedef struct CMLGraph* CMLGraph_t;
 #define NV_SEMAPHORE_RELEASE           0x00
 #define NV_SEMAPHORE_ACQUIRE_GEQ      0x01
 
-/* GPFIFO entry encoding */
+/* GPFIFO entry encoding (NVIDIA class cl906f GP_ENTRY, Fermi+ / used by
+ * Volta/Ampere GPFIFO channels):
+ *   GP_ENTRY0.GET      = bits 31:2   -> va[31:2]      (byte addr, dword aligned)
+ *   GP_ENTRY1.GET_HI   = bits 39:32  -> va[39:32]
+ *   GP_ENTRY1.LENGTH   = bits 62:42  -> length in dwords
+ * So the pushbuffer va is placed *masked* (bits 39:2), NOT shifted: the prior
+ * `(va >> 2)` shifted the address by 2 into the wrong bit positions, making the
+ * GPU fetch commands from the wrong address. */
 #define NV_GPFIFO_ENTRY(gpu_va, len_dwords) \
-    (((uint64_t)(len_dwords) << 42) | (((gpu_va) >> 2) & 0x3FFFFFFFFFFULL))
+    (((uint64_t)(gpu_va) & 0xFFFFFFFFFCULL) | ((uint64_t)(len_dwords) << 42))
 
 #define NV_GPFIFO_DEFAULT_ENTRIES  64
 #define NV_GPFIFO_ENTRY_BYTES      8

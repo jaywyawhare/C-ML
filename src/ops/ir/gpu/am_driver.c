@@ -962,6 +962,10 @@ int cml_am_sdma_copy(CMLAMDriver* drv, uint64_t dst_va, uint64_t src_va, size_t 
     am_mb();
     *sq->write_ptr = wp;
     am_mb();
+    /* SDMA doorbell/wptr are byte offsets on RDNA: amdgpu's
+     * sdma_v5_2_ring_set_wptr writes `ring->wptr << 2` (dword wptr -> bytes) to
+     * both the wptr register and the doorbell, so `wp` (accumulated in bytes)
+     * is the correct value here. */
     *sq->doorbell = (uint32_t)(wp);
 
     return 0;
@@ -1673,7 +1677,12 @@ CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object,
         kernel->kernarg_size         = kd.kernarg_size;
         kernel->kern_code_entry_offset = kd.kernel_code_entry_byte_offset;
 
-        bool is_gfx10_plus = (drv->gfx_version[3] >= '1' && drv->gfx_version[4] >= '0');
+        /* gfx10+ means the numeric part after "gfx" is >= 1000 (gfx10xx/11xx/
+         * 12xx are 4-digit; gfx9xx is 3-digit). atoi stops at any letter suffix
+         * (e.g. "gfx90a" -> 90). The prior char-compare wrongly classified all
+         * gfx9xx as gfx10+ ('9' >= '1'). */
+        int gfx_num = atoi(drv->gfx_version + 3);
+        bool is_gfx10_plus = (gfx_num >= 1000);
         kernel->vgpr_count = amdgpu_vgpr_count(kd.compute_pgm_rsrc1, is_gfx10_plus);
         kernel->sgpr_count = amdgpu_sgpr_count(kd.compute_pgm_rsrc1);
 

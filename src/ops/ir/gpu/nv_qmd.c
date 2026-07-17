@@ -10,7 +10,11 @@
  */
 
 static void qmd_set_field(uint32_t *data, int word, int lo, int hi, uint32_t val) {
-    uint32_t mask = ((1U << (hi - lo + 1)) - 1) << lo;
+    int width = hi - lo + 1;
+    /* 1U << 32 is undefined behaviour, so build the field mask without it when
+     * the field spans a full 32 bits. */
+    uint32_t field_mask = (width >= 32) ? 0xFFFFFFFFu : ((1U << width) - 1);
+    uint32_t mask = field_mask << lo;
     data[word] = (data[word] & ~mask) | ((val << lo) & mask);
 }
 
