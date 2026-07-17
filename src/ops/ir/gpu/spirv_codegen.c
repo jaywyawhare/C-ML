@@ -568,8 +568,11 @@ uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
         spirv_builder_emit(b, GLSLstd450FSign); spirv_builder_emit(b, id_val);
         break;
     default:
-        /* Unsupported op: just pass through */
+        /* Unsupported unary op: pass through keeps the module structurally valid,
+         * but mark it invalid so finalize returns NULL (caller falls back to CPU)
+         * rather than silently computing the identity. */
         id_result = id_val;
+        b->overflow = true;
         break;
     }
 
@@ -796,10 +799,14 @@ uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name
         spirv_builder_emit(b, id_bv);
         break;
     default:
-        /* Fallback: add */
+        /* Unsupported op (e.g. CMPLT/MOD/IDIV): emit a structurally-valid copy
+         * to keep id_res defined, but mark the module invalid so finalize
+         * returns NULL and the caller falls back to CPU. Previously this
+         * silently emitted FAdd, turning those ops into addition. */
         emit_op(b, SpvOpFAdd, 5); spirv_builder_emit(b, id_float);
         spirv_builder_emit(b, id_res); spirv_builder_emit(b, id_a);
         spirv_builder_emit(b, id_bv);
+        b->overflow = true;
         break;
     }
 

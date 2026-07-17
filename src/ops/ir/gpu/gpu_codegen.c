@@ -1615,10 +1615,13 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
         int32_t out_w_val = (int32_t)out->shape[3];
         int32_t kh        = (int32_t)weight->shape[2];
         int32_t kw        = (int32_t)weight->shape[3];
+        /* stride[2]/padding[2] are fixed 2-element arrays, so [1] is always the
+         * real W value — do NOT fall back to [0] when it's 0 (that clobbered a
+         * legitimate asymmetric stride/pad of e.g. (1,0)). */
         int32_t sh        = cp->stride ? (int32_t)cp->stride[0] : 1;
-        int32_t sw        = cp->stride ? (int32_t)(cp->stride[1] ? cp->stride[1] : cp->stride[0]) : 1;
+        int32_t sw        = cp->stride ? (int32_t)cp->stride[1] : 1;
         int32_t ph        = cp->padding ? (int32_t)cp->padding[0] : 0;
-        int32_t pw        = cp->padding ? (int32_t)(cp->padding[1] ? cp->padding[1] : cp->padding[0]) : 0;
+        int32_t pw        = cp->padding ? (int32_t)cp->padding[1] : 0;
 
         void* args[] = { &d_input, &d_weight, &d_bias, &d_out,
                          &batch, &in_c, &in_h, &in_w,

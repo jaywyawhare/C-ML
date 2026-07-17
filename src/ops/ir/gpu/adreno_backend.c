@@ -9,6 +9,10 @@
 #include "alloc/cml_allocator.h"
 
 #define CL_SUCCESS                  0
+#define CL_TRUE                     1
+#define CL_MEM_READ_WRITE           (1 << 0)
+#define CL_MEM_WRITE_ONLY           (1 << 1)
+#define CL_MEM_READ_ONLY            (1 << 2)
 #define CL_DEVICE_TYPE_GPU          (1 << 2)
 #define CL_PLATFORM_NAME            0x0902
 #define CL_DEVICE_NAME              0x102B
@@ -337,6 +341,129 @@ void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
     cml_free(backend);
 }
 
+/* OpenCL C expression for an elementwise unary op (operand `a`), or NULL. */
+static const char* adreno_unary_expr(UOpType t) {
+    switch (t) {
+    case UOP_NEG:     return "-a";
+    case UOP_EXP:     return "exp(a)";
+    case UOP_LOG:     return "log(a)";
+    case UOP_SQRT:    return "sqrt(a)";
+    case UOP_ABS:     return "fabs(a)";
+    case UOP_SIN:     return "sin(a)";
+    case UOP_COS:     return "cos(a)";
+    case UOP_RELU:    return "fmax(a, 0.0f)";
+    case UOP_SIGMOID: return "1.0f/(1.0f+exp(-a))";
+    case UOP_TANH:    return "tanh(a)";
+    default:          return NULL;
+    }
+}
+
+/* OpenCL C expression for an elementwise binary op (operands `a`,`b`), or NULL. */
+static const char* adreno_binary_expr(UOpType t) {
+    switch (t) {
+    case UOP_ADD: return "a + b";
+    case UOP_SUB: return "a - b";
+    case UOP_MUL: return "a * b";
+    case UOP_DIV: return "a / b";
+    case UOP_MAX: return "fmax(a, b)";
+    case UOP_POW: return "pow(a, b)";
+    default:      return NULL;
+    }
+}
+
+/* Dispatch one same-shape elementwise node on the GPU. Returns 0 on success,
+ * 1 if the op/shape isn't GPU-eligible (caller should fall back), -1 on error. */
+static int adreno_dispatch_elementwise(CMLAdrenoBackend* backend, struct IRNode* node, int idx) {
+    Tensor* out = node->output;
+    if (!out) return 1;
+    int nin = node->num_inputs;
+
+    const char* expr = NULL;
+    if (nin == 1) expr = adreno_unary_expr(node->type);
+    else if (nin == 2) expr = adreno_binary_expr(node->type);
+    if (!expr) return 1;   /* unsupported op */
+
+    /* Only the no-broadcast case is handled by this simple 1:1 kernel. */
+    for (int i = 0; i < nin; i++)
+        if (!node->inputs[i] || node->inputs[i]->numel != out->numel) return 1;
+
+    size_t n = out->numel;
+    if (n == 0) return 1;
+
+    for (int i = 0; i < nin; i++) tensor_ensure_executed(node->inputs[i]);
+    for (int i = 0; i < nin; i++)
+        if (!node->inputs[i]->data) return 1;
+
+    if (!out->data) {
+        out->data = (float*)cml_malloc(n * sizeof(float));
+        if (!out->data) return -1;
+        out->owns_data = true;
+    }
+
+    char src[1024], kname[32];
+    snprintf(kname, sizeof(kname), "ew_%d", idx);
+    if (nin == 1) {
+        snprintf(src, sizeof(src),
+            "__kernel void %s(__global float* out, __global const float* in, uint n){\n"
+            "  uint gid = get_global_id(0);\n"
+            "  if (gid < n) { float a = in[gid]; out[gid] = %s; }\n}\n", kname, expr);
+    } else {
+        snprintf(src, sizeof(src),
+            "__kernel void %s(__global float* out, __global const float* in0, __global const float* in1, uint n){\n"
+            "  uint gid = get_global_id(0);\n"
+            "  if (gid < n) { float a = in0[gid]; float b = in1[gid]; out[gid] = %s; }\n}\n", kname, expr);
+    }
+
+    const char* src_ptr = src; size_t src_len = strlen(src); cl_int err = 0;
+    void* prog = fn_clCreateProgramWithSource(backend->cl_context, 1, &src_ptr, &src_len, &err);
+    if (err != CL_SUCCESS || !prog) { LOG_ERROR("Adreno: create program failed (%d)", err); return -1; }
+    err = fn_clBuildProgram(prog, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
+    if (err != CL_SUCCESS) { LOG_ERROR("Adreno: build failed (%d)", err); fn_clReleaseProgram(prog); return -1; }
+    void* kern = fn_clCreateKernel(prog, kname, &err);
+    if (err != CL_SUCCESS || !kern) { LOG_ERROR("Adreno: create kernel failed (%d)", err); fn_clReleaseProgram(prog); return -1; }
+
+    int rc = -1;
+    size_t bytes = n * sizeof(float);
+    void* d_out = fn_clCreateBuffer(backend->cl_context, CL_MEM_WRITE_ONLY, bytes, NULL, &err);
+    void* d_in0 = (err == CL_SUCCESS)
+        ? fn_clCreateBuffer(backend->cl_context, CL_MEM_READ_ONLY, bytes, NULL, &err) : NULL;
+    void* d_in1 = NULL;
+    if (nin == 2 && err == CL_SUCCESS)
+        d_in1 = fn_clCreateBuffer(backend->cl_context, CL_MEM_READ_ONLY, bytes, NULL, &err);
+    if (err != CL_SUCCESS || !d_out || !d_in0 || (nin == 2 && !d_in1)) {
+        LOG_ERROR("Adreno: buffer alloc failed (%d)", err);
+        goto cleanup;
+    }
+
+    if (fn_clEnqueueWriteBuffer(backend->cl_queue, d_in0, CL_TRUE, 0, bytes, node->inputs[0]->data, 0, NULL, NULL) != CL_SUCCESS)
+        goto cleanup;
+    if (nin == 2 &&
+        fn_clEnqueueWriteBuffer(backend->cl_queue, d_in1, CL_TRUE, 0, bytes, node->inputs[1]->data, 0, NULL, NULL) != CL_SUCCESS)
+        goto cleanup;
+
+    cl_uint nn = (cl_uint)n;
+    cl_uint ai = 0;
+    if (fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_out) != CL_SUCCESS) goto cleanup;
+    if (fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_in0) != CL_SUCCESS) goto cleanup;
+    if (nin == 2 && fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_in1) != CL_SUCCESS) goto cleanup;
+    if (fn_clSetKernelArg(kern, ai++, sizeof(cl_uint), &nn) != CL_SUCCESS) goto cleanup;
+
+    size_t gws = n;
+    if (fn_clEnqueueNDRangeKernel(backend->cl_queue, kern, 1, NULL, &gws, NULL, 0, NULL, NULL) != CL_SUCCESS) goto cleanup;
+    if (fn_clEnqueueReadBuffer(backend->cl_queue, d_out, CL_TRUE, 0, bytes, out->data, 0, NULL, NULL) != CL_SUCCESS) goto cleanup;
+
+    out->is_executed = true;
+    rc = 0;
+
+cleanup:
+    if (d_out && fn_clReleaseMemObject) fn_clReleaseMemObject(d_out);
+    if (d_in0 && fn_clReleaseMemObject) fn_clReleaseMemObject(d_in0);
+    if (d_in1 && fn_clReleaseMemObject) fn_clReleaseMemObject(d_in1);
+    fn_clReleaseKernel(kern);
+    fn_clReleaseProgram(prog);
+    return rc;
+}
+
 int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized) {
         LOG_ERROR("Adreno backend not initialized");
@@ -352,51 +479,19 @@ int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {
     int status = 0;
 
     while (node) {
-        const char* op_name = uop_type_to_string(node->type);
-        LOG_DEBUG("Adreno execute: node %d, op=%s, inputs=%d", node_idx, op_name, node->num_inputs);
-
-        char kernel_src[1024];
-        snprintf(kernel_src, sizeof(kernel_src),
-                 "__kernel void op_%d(__global float* out, __global const float* in, uint n) {\n"
-                 "    uint gid = get_global_id(0);\n"
-                 "    if (gid < n) out[gid] = in[gid]; /* placeholder for op %s */\n"
-                 "}\n",
-                 node_idx, op_name);
-
-        const char* src_ptr = kernel_src;
-        size_t src_len = strlen(kernel_src);
-        cl_int err = 0;
-
-        void* program = fn_clCreateProgramWithSource(backend->cl_context, 1, &src_ptr, &src_len, &err);
-        if (err != CL_SUCCESS || !program) {
-            LOG_ERROR("Adreno execute: clCreateProgramWithSource failed for node %d (err=%d)", node_idx, err);
-            status = -1;
-            break;
+        if (node->is_executed && node->output && node->output->is_executed) {
+            node = node->next; node_idx++; continue;
         }
 
-        err = fn_clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
-        if (err != CL_SUCCESS) {
-            LOG_ERROR("Adreno execute: clBuildProgram failed for node %d (err=%d)", node_idx, err);
-            fn_clReleaseProgram(program);
-            status = -1;
-            break;
+        /* Try a real GPU elementwise dispatch; fall back to the CPU interpreter
+         * for unsupported ops / shapes (broadcast, matmul, reductions, ...). */
+        int r = adreno_dispatch_elementwise(backend, node, node_idx);
+        if (r == -1) { status = -1; break; }
+        if (r == 1) {
+            if (cpu_execute_node(node) != 0) { status = -1; break; }
+            if (node->output) node->output->is_executed = true;
         }
-
-        char kernel_name[32];
-        snprintf(kernel_name, sizeof(kernel_name), "op_%d", node_idx);
-
-        void* kernel = fn_clCreateKernel(program, kernel_name, &err);
-        if (err != CL_SUCCESS || !kernel) {
-            LOG_ERROR("Adreno execute: clCreateKernel failed for node %d (err=%d)", node_idx, err);
-            fn_clReleaseProgram(program);
-            status = -1;
-            break;
-        }
-
-        LOG_DEBUG("Adreno execute: kernel compiled for node %d (op=%s)", node_idx, op_name);
-
-        fn_clReleaseKernel(kernel);
-        fn_clReleaseProgram(program);
+        node->is_executed = true;
 
         node = node->next;
         node_idx++;
