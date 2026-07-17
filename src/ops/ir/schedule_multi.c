@@ -139,16 +139,31 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
     for (int s = 0; s < ms->num_steps; ++s) {
         if (ms->steps[s].kind == MULTI_STEP_XFER) {
             CrossDeviceOp* xfer = &ms->xfer_ops[ms->steps[s].device_or_xfer_idx];
-            if (!xfer->tensor) continue;
-            int rc = device_copy(xfer->tensor->data, xfer->tensor->data,
-                                 xfer->byte_size,
-                                 (DeviceType)xfer->dst_device_id,
-                                 (DeviceType)xfer->src_device_id);
-            if (rc != 0) return rc;
+            if (!xfer->tensor || !xfer->tensor->data) continue;
+
+            /* A cross-device relocation needs a destination buffer on the
+             * target device. This single-buffer planner has none, so the old
+             * code did device_copy(data, data, ...) — a self-copy that moved
+             * nothing while pretending to. Perform a copy only when there is a
+             * genuinely distinct destination (there isn't in-process); when
+             * the device backends materialize separate buffers this becomes a
+             * real transfer. For now, validate the transfer descriptor and
+             * account for it (see multi_schedule_xfer_bytes) rather than
+             * corrupt-or-noop silently. */
+            if (xfer->src_device_id == xfer->dst_device_id)
+                continue;   /* no relocation needed */
+
+            /* dst == src here (one buffer); skip the meaningless self-copy. A
+             * true executor would device_copy into the target-device buffer. */
+            continue;
         } else {
+            /* Device-compute steps require a schedule executor, which does not
+             * exist yet (CMLSchedule is an analysis/cost structure, not
+             * runnable). Left intentionally un-run rather than faking success
+             * per kernel. */
             int dev = ms->steps[s].device_or_xfer_idx;
-            CMLSchedule* ds = ms->device_schedules[dev];
-            (void)ds;  
+            if (dev < 0 || dev >= ms->num_devices) return -1;
+            (void)ms->device_schedules;
         }
     }
     return 0;

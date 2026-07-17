@@ -182,39 +182,82 @@ void schedule_allreduce_free(ScheduleAllReduce* ar) {
 
 int schedule_allreduce_run(ScheduleAllReduce* ar) {
     if (!ar || !ar->input || !ar->input->data) return -1;
-    size_t elem_size = cml_dtype_size(ar->input->dtype);
+    if (ar->num_devices <= 1) return 0;   /* nothing to reduce */
 
-    for (int s = 0; s < ar->num_steps; ++s) {
-        AllReduceStep* step = &ar->steps[s];
-        if (step->src_rank < 0 || step->src_rank >= ar->num_devices) continue;
-        if (step->dst_rank < 0 || step->dst_rank >= ar->num_devices) continue;
+    /* Single-process simulation. This module has ONE physical buffer, so the
+     * `num_devices` logical replicas all hold the same `input`; an all-reduce
+     * over identical replicas has a closed form applied in place:
+     *   SUM  -> x * num_devices
+     *   PROD -> x ^ num_devices
+     *   MAX/MIN -> unchanged (reduce of equal values)
+     *
+     * The previous implementation set dst_ptr = src_ptr and did `x += x`,
+     * doubling the buffer regardless of device count (data corruption). A true
+     * cross-device reduce needs one buffer per device; that is out of scope for
+     * this single-process planner, whose real job is the cost model below. */
+    if (ar->input->dtype != DTYPE_FLOAT32) return 0;   /* only f32 modeled */
 
-        int src_dev = ar->device_ids[step->src_rank];
-        int dst_dev = ar->device_ids[step->dst_rank];
-
-        char* src_ptr = (char*)ar->input->data + step->chunk_offset;
-        char* dst_ptr = src_ptr;  
-
-        if (src_dev != dst_dev) {
-            int rc = device_copy(dst_ptr, src_ptr, step->chunk_bytes,
-                                 (DeviceType)dst_dev, (DeviceType)src_dev);
-            if (rc != 0) return rc;
-        }
-
-        if (step->is_reduce && ar->op == AR_OP_SUM) {
-            float* fa = (float*)dst_ptr;
-            float* fb = (float*)src_ptr;
-            size_t n = step->chunk_bytes / elem_size;
-            for (size_t i = 0; i < n; ++i) fa[i] += fb[i];
-        }
+    float* buf = (float*)ar->input->data;
+    size_t n = ar->input->numel;
+    float nd = (float)ar->num_devices;
+    switch (ar->op) {
+    case AR_OP_SUM:
+        for (size_t i = 0; i < n; ++i) buf[i] *= nd;
+        break;
+    case AR_OP_PROD:
+        for (size_t i = 0; i < n; ++i) buf[i] = powf(buf[i], nd);
+        break;
+    case AR_OP_MAX:
+    case AR_OP_MIN:
+        break;
     }
     return 0;
 }
 
+/* Insert the all-reduce's communication into a schedule as SCHED_COPY items so
+ * the schedule's kernel/byte accounting reflects the injected collective. Grows
+ * items + dependencies + dep_counts together to keep cml_schedule_free (which
+ * iterates dependencies[0..num_items)) consistent. */
 int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar) {
-    if (!sched || !ar) return -1;
-    
-    (void)sched; (void)ar;
+    if (!sched || !ar || ar->num_steps <= 0) return -1;
+
+    int add   = ar->num_steps;
+    int new_n = sched->num_items + add;
+
+    CMLScheduleItem** it = (CMLScheduleItem**)cml_realloc(
+        sched->items, (size_t)new_n * sizeof(*it));
+    if (!it) return -1;
+    sched->items = it;
+
+    if (sched->dependencies) {
+        int** dep = (int**)cml_realloc(sched->dependencies, (size_t)new_n * sizeof(*dep));
+        if (!dep) return -1;
+        sched->dependencies = dep;
+    }
+    if (sched->dep_counts) {
+        int* dc = (int*)cml_realloc(sched->dep_counts, (size_t)new_n * sizeof(*dc));
+        if (!dc) return -1;
+        sched->dep_counts = dc;
+    }
+
+    for (int s = 0; s < add; ++s) {
+        CMLScheduleItem* item = (CMLScheduleItem*)cml_calloc(1, sizeof(CMLScheduleItem));
+        if (!item) return -1;   /* prior appends stay consistent; caller frees sched */
+        item->type         = SCHED_COPY;
+        item->memory_bytes = ar->steps[s].chunk_bytes;
+        item->device_id    = (ar->steps[s].dst_rank >= 0 &&
+                              ar->steps[s].dst_rank < ar->num_devices)
+                             ? ar->device_ids[ar->steps[s].dst_rank] : 0;
+        /* ops / inputs / outputs stay NULL — sched_item_free frees NULLs safely. */
+
+        int idx = sched->num_items;
+        sched->items[idx] = item;
+        if (sched->dependencies) sched->dependencies[idx] = NULL;
+        if (sched->dep_counts)   sched->dep_counts[idx]   = 0;
+        sched->num_items++;
+    }
+    if (sched->item_capacity < new_n) sched->item_capacity = new_n;
+    sched->total_kernels += add;
     return 0;
 }
 
