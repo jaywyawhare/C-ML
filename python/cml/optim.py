@@ -1,5 +1,7 @@
 """Optimization algorithms for training."""
 
+import sys
+
 from cml._cml_lib import ffi, lib
 
 # After applying the update, discard the accumulated autograd graph so the next
@@ -64,13 +66,9 @@ class Optimizer:
     def __del__(self):
         if hasattr(self, '_optimizer') and self._optimizer != ffi.NULL:
             lib.optimizer_free(self._optimizer)
-            # A training run just ended. The per-step graph-only reset keeps the
-            # execution-plan cache warm (fine while THIS model trains), but those
-            # plans point at this run's buffers. Do a full reset now — safe here
-            # since no step is in flight — so training another model of the same
-            # shape in the same process doesn't replay a stale plan and crash.
-            if hasattr(lib, "cml_reset_ir_context"):
-                lib.cml_reset_ir_context()
+            self._optimizer = ffi.NULL
+            if not sys.is_finalizing() and hasattr(lib, "cml_reset_ir_graph_only"):
+                lib.cml_reset_ir_graph_only()
 
 
 class Adam(Optimizer):

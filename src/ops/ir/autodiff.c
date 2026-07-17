@@ -242,8 +242,33 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
             GatherParams* gp = (GatherParams*)nd->params;
             int dim = gp ? gp->dim : -1;
             if (dim < 0) dim += a->ndim;
-            if (dim >= 0 && dim < a->ndim && nd->num_inputs > 1)
-                gm_accum(&map, a, uop_scatter_add(nd->inputs[1], g, dim, a->shape[dim]));
+            if (dim >= 0 && dim < a->ndim && nd->num_inputs > 1) {
+                Tensor* idx = nd->inputs[1];
+                /* NumPy-style gather with a 1-D index collapses the gathered dim,
+                 * so g and idx have rank a->ndim-1. scatter_add is same-rank, so
+                 * reshape both to a's shape with a size-1 slot at `dim` — the
+                 * scatter then expands that slot back to a->shape[dim]. (This is
+                 * the cross-entropy path: a=[N,C], dim=1, g/idx=[N] -> [N,1].)
+                 * When g already matches a's rank (same-rank gather), fall through
+                 * to the direct scatter. */
+                int rshape[16];
+                size_t want = 1;
+                if (a->ndim <= 16) {
+                    for (int i = 0; i < a->ndim; i++) rshape[i] = a->shape[i];
+                    rshape[dim] = 1;
+                    for (int i = 0; i < a->ndim; i++) want *= (size_t)rshape[i];
+                }
+                if (a->ndim <= 16 && g->numel == want && idx->numel == want) {
+                    /* Reshape only the gradient: scatter_add's rank check is
+                     * against src(=g), and its execution reads idx linearly, so
+                     * the 1-D index can be passed as-is (no extra reshape node on
+                     * the integer index tensor). */
+                    Tensor* g2 = ad_reshape(g, rshape, a->ndim);
+                    gm_accum(&map, a, uop_scatter_add(idx, g2, dim, a->shape[dim]));
+                } else {
+                    gm_accum(&map, a, uop_scatter_add(idx, g, dim, a->shape[dim]));
+                }
+            }
             break;
         }
         case UOP_STACK: {                     /* each input is slice t along stack dim */

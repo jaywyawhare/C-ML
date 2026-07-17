@@ -71,7 +71,13 @@ typedef struct Tensor {
     bool retains_grad; /* PyTorch retain_grad(): keep .grad after backward */
     struct Tensor* grad; // Gradient tensor (also lazy!)
 
-    int ref_count;       // Reference counting
+    int ref_count;       // Reference counting (internal graph/API references)
+    /* External references held outside the C core (e.g. a Python/other-language
+     * wrapper that will free the tensor itself). While > 0, a graph teardown
+     * (cml_ir_free) must NOT free this tensor out from under its owner: it is
+     * detached from the graph and kept alive instead. See tensor_pin/
+     * tensor_release and tensor_free. */
+    int external_refs;
     struct Tensor* base; // Base tensor (if this is a view)
 
     size_t* strides;       // Stride array (for efficient views)
@@ -132,6 +138,13 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
 #include "tensor/tensor_views.h"
 
 void tensor_free(Tensor* t);
+
+/* External-ownership refcount (for language bindings). tensor_pin() records that
+ * an external owner holds this tensor; tensor_release() drops that hold and frees
+ * the tensor if nothing else references it. While pinned, a graph teardown detaches
+ * the tensor instead of freeing it, so the owner's later free is always safe. */
+void tensor_pin(Tensor* t);
+void tensor_release(Tensor* t);
 Tensor* tensor_clone(Tensor* t);
 float tensor_get_float(Tensor* t, size_t idx);
 void tensor_set_float(Tensor* t, size_t idx, float value);

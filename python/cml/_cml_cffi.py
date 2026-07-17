@@ -705,6 +705,8 @@ ffi.cdef(
     void cml_autograd_reset_after_step(void);
     void cml_optim_realize_params(Optimizer* opt);
     int tensor_realize(Tensor* t);
+    void tensor_pin(Tensor* t);
+    void tensor_release(Tensor* t);
 
     // cml.h: Kernel cache
 
