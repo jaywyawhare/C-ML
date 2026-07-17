@@ -105,7 +105,14 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
                 break;
             }
 
-            if (entry->trace && entry->trace->is_complete) {
+            /* Only replay a trace that actually captured kernel launches.
+             * Kernel recording is not yet wired into the CPU/JIT execution path,
+             * so traces are currently empty; replaying an empty trace is a no-op
+             * that leaves the output buffers at their first-run (STALE) values.
+             * Requiring num_entries>0 makes replay faithful, and falling through
+             * re-executes for real (correct) until recording is implemented. */
+            if (entry->trace && entry->trace->is_complete &&
+                entry->trace->num_entries > 0) {
                 void *tensor_ptrs[CML_TRACE_MAX_ENTRIES];
                 int n = 0;
                 struct IRNode *node = ir->head;
@@ -155,6 +162,14 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
             node = node->next;
         }
         trace->num_slots = n;
+    }
+
+    /* Don't cache an empty trace (no kernels were recorded): a cached empty
+     * trace would be "replayed" as a no-op on the next same-hash call, returning
+     * stale outputs. Leaving it uncached means the next call re-executes for real. */
+    if (trace->num_entries == 0) {
+        cml_trace_free(trace);
+        return rc;
     }
 
     if (jit->count < CML_JIT_CACHE_SIZE) {
