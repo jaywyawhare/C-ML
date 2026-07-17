@@ -284,19 +284,22 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
                 continue;
             }
 
-            if (stage == num_stages - 1) {
-                /* Last stage: use the sliced gradient from the loss */
-                mb_output->grad = grad_slices[mb];
-            }
-            /* For intermediate stages, the gradient was already set by
-             * tensor_backward of the downstream stage via the autograd graph. */
-
-            tensor_backward(mb_output, NULL, false, false);
+            /* Last stage is seeded with the sliced loss gradient (passed as the
+             * backward seed, which tensor_backward CLONES — so we retain
+             * ownership of the slice and free it below; the previous code raw-
+             * assigned it into mb_output->grad, leaving ownership unmanaged).
+             * Intermediate stages get NULL: their gradient already arrived via
+             * the autograd graph from the downstream stage. */
+            Tensor* seed = (stage == num_stages - 1) ? grad_slices[mb] : NULL;
+            tensor_backward(mb_output, seed, false, false);
 
             LOG_DEBUG("Pipeline backward: completed stage %d, micro-batch %d", stage, mb);
         }
     }
 
+    /* We own the grad slices end-to-end (backward cloned them). */
+    for (int mb = 0; mb < num_mb; mb++)
+        tensor_free(grad_slices[mb]);
     cml_free(grad_slices);
 
     LOG_DEBUG("Pipeline backward completed: %d stages, %d micro-batches",
