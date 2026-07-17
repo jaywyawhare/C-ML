@@ -15,6 +15,16 @@ import pytest
 import cml
 
 
+@pytest.fixture(autouse=True)
+def _reset_between_tests():
+    """Clear the IR graph + execution/buffer caches after each test. By teardown
+    time the test's local tensors/optimizers are already collected, so this full
+    reset runs at a controlled point (no GC-order fragility) and stops per-test
+    state from accumulating across the suite."""
+    yield
+    cml.reset_graph()
+
+
 def test_tensor_factory_from_nested_list():
     t = cml.tensor([[1.0, 2.0], [3.0, 4.0]])
     assert t.shape == (2, 2)
@@ -156,6 +166,57 @@ def test_multiple_models_with_reset_graph():
         cml.reset_graph()
 
     assert all(f < 0.05 for f in finals), f"a model did not converge: {finals}"
+
+
+def test_cross_entropy_gradient_matches_analytic():
+    """cross_entropy's gradient must flow to the logits. It used to be silently
+    zero (None): the gather VJP's scatter_add rejected the rank-reduced gradient,
+    so no gradient reached the input. The correct gradient is softmax - onehot,
+    averaged over the batch."""
+    np.random.seed(0)
+    logits = cml.tensor(np.random.randn(5, 4).astype(np.float32), requires_grad=True)
+    labels = cml.tensor(np.array([0, 3, 1, 2, 0], np.float32))
+    loss = cml.cross_entropy_loss(logits, labels)
+    cml.backward(loss)
+    g = cml.get_grad(logits)
+    assert g is not None, "cross_entropy produced no gradient for the logits"
+    raw = logits.numpy()
+    sm = np.exp(raw - raw.max(1, keepdims=True))
+    sm /= sm.sum(1, keepdims=True)
+    onehot = np.eye(4)[[0, 3, 1, 2, 0]]
+    expected = (sm - onehot) / 5
+    np.testing.assert_allclose(np.asarray(g.numpy()), expected, atol=1e-4)
+    # This test does a bare forward+backward with no optimizer, so no step/__del__
+    # reset fires to drop the accumulated graph. Clear it explicitly so it doesn't
+    # contaminate the next test.
+    del loss, g
+    cml.reset_graph()
+
+
+def test_bce_training_converges():
+    """A binary-classification training loop with bce_loss must converge (a
+    non-softmax loss path that trains reliably under the per-step graph reset)."""
+    import cml.nn as nn
+    import cml.optim as optim
+
+    np.random.seed(0)
+    N = 40
+    X = np.random.randn(N, 4).astype(np.float32)
+    Y = (np.random.rand(N, 1) > 0.5).astype(np.float32)
+    Xt, Yt = cml.tensor(X), cml.tensor(Y)
+    m = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 1), nn.Sigmoid())
+    m.set_training(True)
+    opt = optim.Adam(m, lr=0.02)
+    first = last = None
+    for _ in range(25):
+        opt.zero_grad()
+        loss = cml.bce_loss(m(Xt), Yt)
+        cml.backward(loss)
+        opt.step()
+        last = float(np.asarray(loss.numpy()).reshape(-1)[0])
+        if first is None:
+            first = last
+    assert last < first, f"bce did not decrease: {first} -> {last}"
 
 
 if __name__ == "__main__":

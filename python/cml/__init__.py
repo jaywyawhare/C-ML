@@ -34,4 +34,18 @@ from cml import optim
 from cml import losses
 from cml import distributed
 
-from cml.losses import mse_loss, bce_loss, cross_entropy_loss
+# Convenience top-level access (PyTorch-style: cml.Adam, cml.Linear, cml.ReLU).
+from cml.optim import (
+    Adam, SGD, RMSprop, AdaGrad, AdamW, NAdam, Adamax, Adadelta, LAMB, LARS, Muon,
+)
+from cml.nn import (
+    Sequential, Linear, ReLU, Sigmoid, Tanh, LeakyReLU, PReLU, Dropout, Flatten,
+    Conv1d, Conv2d, Conv3d, MaxPool1d, MaxPool2d, MaxPool3d,
+    AvgPool1d, AvgPool2d, AvgPool3d, BatchNorm1d, BatchNorm2d, Embedding,
+)
+
+from cml.losses import (
+    mse_loss, mae_loss, bce_loss, cross_entropy_loss, huber_loss,
+    kl_div_loss, kl_divergence, nll_loss, sparse_cross_entropy_loss,
+    triplet_margin_loss, cosine_embedding_loss,
+)

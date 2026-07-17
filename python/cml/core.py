@@ -200,6 +200,11 @@ class Tensor:
         # Internal fast path: wrap an existing C tensor pointer as-is.
         if isinstance(data, ffi.CData):
             self._tensor = data
+            # Register external ownership so a graph teardown (e.g. the per-step
+            # reset inside optimizer.step()) detaches this tensor instead of
+            # freeing it out from under this wrapper. Released in __del__.
+            if data != ffi.NULL:
+                lib.tensor_pin(data)
             return
         if data is None:
             self._tensor = ffi.NULL
@@ -225,7 +230,9 @@ class Tensor:
             and self._tensor is not None
             and self._tensor != ffi.NULL
         ):
-            lib.tensor_free(self._tensor)
+            # Drop our external reference; frees the tensor unless the C core
+            # still holds it (mirrors the tensor_pin() taken when wrapping).
+            lib.tensor_release(self._tensor)
 
     @staticmethod
     def _as_operand(other):

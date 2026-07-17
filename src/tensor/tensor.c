@@ -235,6 +235,7 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->ir_node        = NULL;
     t->grad           = NULL;
     t->ref_count      = 1;
+    t->external_refs  = 0;
     t->base           = NULL;
     t->strides        = compute_contiguous_strides(t->shape, ndim);
     if (!t->strides && ndim > 0) {
@@ -717,8 +718,9 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->grad          = NULL;
 
     // Memory management
-    t->ref_count = 1;
-    t->base      = NULL;
+    t->ref_count    = 1;
+    t->external_refs = 0;
+    t->base         = NULL;
 
     t->strides = compute_contiguous_strides(t->shape, t->ndim);
     if (!t->strides && t->ndim > 0) {
@@ -807,6 +809,49 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
     return t;
 }
 
+/* Detach a tensor from the IR graph without freeing it: copy any borrowed
+ * execution-plan data into an owned allocation so the tensor is self-contained,
+ * then clear all links into the (possibly about-to-be-freed) graph. Used when a
+ * graph teardown encounters a tensor an external owner still holds. */
+static void tensor_detach_keep(Tensor* t) {
+    if (!t)
+        return;
+    if (t->data && !t->owns_data) {
+        size_t nbytes = t->numel * cml_dtype_size(t->dtype);
+        void* owned    = cml_malloc(nbytes);
+        if (owned) {
+            memcpy(owned, t->data, nbytes);
+            t->data      = owned;
+            t->owns_data = true;
+        } else {
+            /* Can't copy — drop the borrowed pointer so we never free plan memory. */
+            t->data = NULL;
+        }
+    }
+    if (t->ir_node) {
+        struct IRNode* node = (struct IRNode*)t->ir_node;
+        if (node->output == t)
+            node->output = NULL;
+        t->ir_node = NULL;
+    }
+    t->ir_context       = NULL;
+    t->saved_ir_node    = NULL;
+    t->saved_ir_context = NULL;
+}
+
+void tensor_pin(Tensor* t) {
+    if (t)
+        t->external_refs++;
+}
+
+void tensor_release(Tensor* t) {
+    if (!t)
+        return;
+    if (t->external_refs > 0)
+        t->external_refs--;
+    tensor_free(t);
+}
+
 void tensor_free(Tensor* t) {
     if (!t)
         return;
@@ -814,6 +859,15 @@ void tensor_free(Tensor* t) {
     t->ref_count--;
     if (t->ref_count > 0)
         return;
+
+    /* An external owner (e.g. a language binding) still holds this tensor. Don't
+     * free it — a graph teardown must not pull it out from under the owner.
+     * Detach it from the graph and keep it alive; tensor_release() frees it once
+     * the owner is done. ref_count stays at 0 so a later free proceeds. */
+    if (t->external_refs > 0) {
+        tensor_detach_keep(t);
+        return;
+    }
 
     cml_graph_cache_forget_tensor(t);
 

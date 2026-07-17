@@ -1,6 +1,7 @@
 """High-level convenience API for common ML tasks."""
 
 from typing import List, Optional, Callable
+import numpy as np
 import cml
 from cml.core import Tensor
 from cml.nn import Sequential, Linear, ReLU, Dropout
@@ -61,10 +62,16 @@ def train_model(
         cml.backward(loss)
         opt.step()
 
-        if verbose and (epoch + 1) % max(1, epochs // 10) == 0:
-            print(f"Epoch {epoch + 1:3d}/{epochs}: Loss computed")
+        # Record the scalar value, NOT the loss Tensor. Keeping live loss tensors
+        # past the loop (e.g. by returning them) makes them outlive `opt`, whose
+        # __del__ runs a graph/cache reset that would then free buffers those
+        # tensors still borrow — a crash. Floats sidestep that and match the
+        # familiar Keras-style history.
+        loss_value = float(np.asarray(loss.numpy()).reshape(-1)[0])
+        losses.append(loss_value)
 
-        losses.append(loss)
+        if verbose and (epoch + 1) % max(1, epochs // 10) == 0:
+            print(f"Epoch {epoch + 1:3d}/{epochs}: loss={loss_value:.6f}")
 
     if verbose:
         print("Training complete!")
