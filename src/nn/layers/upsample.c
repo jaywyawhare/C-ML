@@ -1,6 +1,7 @@
 #include "nn/layers/upsample.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +26,25 @@ static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
     int in_h       = input->shape[2];
     int in_w       = input->shape[3];
 
+    /* Integer upscale = pure repeat -> reshape + expand + reshape (lazy, so it
+     * builds IR and is graph-autodiff differentiable). Non-integer nearest
+     * falls through to the eager reference below. */
+    if (in_h > 0 && in_w > 0 && out_h % in_h == 0 && out_w % in_w == 0) {
+        int kh = out_h / in_h, kw = out_w / in_w;
+        int s6[6] = {batch, channels, in_h, 1, in_w, 1};
+        ReshapeParams r1 = {s6, 6};
+        Tensor* t1 = uop_reshape(input, &r1);
+        if (!t1) return NULL;
+        int e6[6] = {batch, channels, in_h, kh, in_w, kw};
+        ExpandParams ep = {e6, 6};
+        Tensor* t2 = uop_expand(t1, &ep);
+        if (!t2) return NULL;
+        int s4[4] = {batch, channels, out_h, out_w};
+        ReshapeParams r2 = {s4, 4};
+        return uop_reshape(t2, &r2);
+    }
+
+    tensor_ensure_executed(input);
     int out_shape[] = {batch, channels, out_h, out_w};
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};

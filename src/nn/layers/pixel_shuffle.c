@@ -1,6 +1,7 @@
 #include "nn/layers/pixel_shuffle.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -11,9 +12,6 @@ Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
         LOG_ERROR("f_pixel_shuffle: NULL input");
         return NULL;
     }
-
-    tensor_ensure_executed(input);
-
     if (input->ndim != 4) {
         LOG_ERROR("f_pixel_shuffle: expected 4D input [N, C*r^2, H, W], got %dD", input->ndim);
         return NULL;
@@ -37,46 +35,23 @@ Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
     }
 
     int out_channels = in_channels / (r * r);
-    int out_h        = in_h * r;
-    int out_w        = in_w * r;
 
-    int out_shape[] = {batch, out_channels, out_h, out_w};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 4, &config);
-    if (!output)
-        return NULL;
+    /* Pure rearrange = reshape -> permute -> reshape (lazy, so it builds IR and
+     * is graph-autodiff differentiable — was an eager ->data loop).
+     * input[n, c*r*r+r1*r+r2, h, w] -> out[n, c, h*r+r1, w*r+r2]. */
+    int s6[6] = {batch, out_channels, r, r, in_h, in_w};   /* split C -> (c,r1,r2) */
+    ReshapeParams rs1 = {s6, 6};
+    Tensor* t1 = uop_reshape(input, &rs1);
+    if (!t1) return NULL;
 
-    float* in_data  = (float*)input->data;
-    float* out_data = (float*)output->data;
+    int perm[6] = {0, 1, 4, 2, 5, 3};                      /* -> [N,C,H,r1,W,r2] */
+    PermuteParams pp = {perm, 6};
+    Tensor* t2 = uop_permute(t1, &pp);
+    if (!t2) return NULL;
 
-    if (!in_data || !out_data) {
-        tensor_free(output);
-        return NULL;
-    }
-
-    /* Rearrange: input[n, c*r*r + r1*r + r2, h, w] -> output[n, c, h*r + r1, w*r + r2] */
-    for (int n = 0; n < batch; n++) {
-        for (int c = 0; c < out_channels; c++) {
-            for (int r1 = 0; r1 < r; r1++) {
-                for (int r2 = 0; r2 < r; r2++) {
-                    int ic = c * r * r + r1 * r + r2;
-
-                    for (int h = 0; h < in_h; h++) {
-                        for (int w = 0; w < in_w; w++) {
-                            int oh = h * r + r1;
-                            int ow = w * r + r2;
-
-                            float val = in_data[((n * in_channels + ic) * in_h + h) * in_w + w];
-                            out_data[((n * out_channels + c) * out_h + oh) * out_w + ow] = val;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return output;
+    int s4[4] = {batch, out_channels, in_h * r, in_w * r};
+    ReshapeParams rs2 = {s4, 4};
+    return uop_reshape(t2, &rs2);
 }
 
 Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
@@ -84,8 +59,6 @@ Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
         LOG_ERROR("f_pixel_unshuffle: NULL input");
         return NULL;
     }
-
-    tensor_ensure_executed(input);
 
     if (input->ndim != 4) {
         LOG_ERROR("f_pixel_unshuffle: expected 4D input [N, C, H*r, W*r], got %dD", input->ndim);
@@ -113,43 +86,21 @@ Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
     int out_h        = in_h / r;
     int out_w        = in_w / r;
 
-    int out_shape[] = {batch, out_channels, out_h, out_w};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 4, &config);
-    if (!output)
-        return NULL;
+    /* Inverse rearrange (lazy): reshape -> permute -> reshape.
+     * input[n, c, h*r+r1, w*r+r2] -> out[n, c*r*r+r1*r+r2, h, w]. */
+    int s6[6] = {batch, in_channels, out_h, r, out_w, r};  /* split H*r->(h,r1), W*r->(w,r2) */
+    ReshapeParams rs1 = {s6, 6};
+    Tensor* t1 = uop_reshape(input, &rs1);
+    if (!t1) return NULL;
 
-    float* in_data  = (float*)input->data;
-    float* out_data = (float*)output->data;
+    int perm[6] = {0, 1, 3, 5, 2, 4};                      /* -> [N,C,r1,r2,h,w] */
+    PermuteParams pp = {perm, 6};
+    Tensor* t2 = uop_permute(t1, &pp);
+    if (!t2) return NULL;
 
-    if (!in_data || !out_data) {
-        tensor_free(output);
-        return NULL;
-    }
-
-    /* Rearrange: input[n, c, h*r + r1, w*r + r2] -> output[n, c*r*r + r1*r + r2, h, w] */
-    for (int n = 0; n < batch; n++) {
-        for (int c = 0; c < in_channels; c++) {
-            for (int r1 = 0; r1 < r; r1++) {
-                for (int r2 = 0; r2 < r; r2++) {
-                    int oc = c * r * r + r1 * r + r2;
-
-                    for (int h = 0; h < out_h; h++) {
-                        for (int w = 0; w < out_w; w++) {
-                            int ih = h * r + r1;
-                            int iw = w * r + r2;
-
-                            float val = in_data[((n * in_channels + c) * in_h + ih) * in_w + iw];
-                            out_data[((n * out_channels + oc) * out_h + h) * out_w + w] = val;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return output;
+    int s4[4] = {batch, out_channels, out_h, out_w};
+    ReshapeParams rs2 = {s4, 4};
+    return uop_reshape(t2, &rs2);
 }
 
 static Tensor* pixel_shuffle_forward(Module* module, Tensor* input) {

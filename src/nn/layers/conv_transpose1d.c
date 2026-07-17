@@ -2,6 +2,7 @@
 #include "nn/init.h"
 #include "nn.h"
 #include "tensor/tensor.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -25,9 +26,6 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(layer->weight->tensor);
-
     int batch       = input->shape[0];
     int in_channels = input->shape[1];
     int in_length   = input->shape[2];
@@ -46,62 +44,37 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     int d            = layer->dilation;
 
     int out_length = (in_length - 1) * s - 2 * p + d * (ks - 1) + opad + 1;
-
     if (out_length <= 0) {
         LOG_ERROR("ConvTranspose1d: invalid output length (%d)", out_length);
         return NULL;
     }
 
-    int out_shape[] = {batch, out_channels, out_length};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 3, &config);
-    if (!output)
-        return NULL;
+    /* Lazy: run as a height-1 ConvTranspose2d so it builds IR, decomposes to
+     * primitives, and is graph-autodiff differentiable (was an eager loop). */
+    Tensor* w = layer->weight->tensor;                     /* [Cin,Cout,ks] */
+    int xs[4] = {batch, in_channels, 1, in_length};
+    ReshapeParams ri = {xs, 4};
+    Tensor* x4 = uop_reshape(input, &ri);
+    if (!x4) return NULL;
+    int wsz[4] = {w->shape[0], w->shape[1], 1, ks};
+    ReshapeParams rw = {wsz, 4};
+    Tensor* w4 = uop_reshape(w, &rw);
+    if (!w4) return NULL;
 
-    float* in_data  = (float*)input->data;
-    float* w_data   = (float*)layer->weight->tensor->data;
-    float* out_data = (float*)output->data;
+    Tensor* bias = (layer->use_bias && layer->bias) ? layer->bias->tensor : NULL;
+    ConvTranspose2DParams p2 = {0};
+    p2.kernel_size[0] = 1;    p2.kernel_size[1] = ks;
+    p2.stride[0] = 1;         p2.stride[1] = s;
+    p2.padding[0] = 0;        p2.padding[1] = p;
+    p2.output_padding[0] = 0; p2.output_padding[1] = opad;
+    p2.dilation[0] = 1;       p2.dilation[1] = d;
+    p2.use_bias = bias != NULL;
+    Tensor* y4 = uop_conv_transpose2d(x4, w4, bias, &p2);  /* [N,Cout,1,OL] */
+    if (!y4) return NULL;
 
-    if (!in_data || !w_data || !out_data) {
-        tensor_free(output);
-        return NULL;
-    }
-    memset(out_data, 0, (size_t)batch * out_channels * out_length * sizeof(float));
-    for (int b = 0; b < batch; b++) {
-        for (int ic = 0; ic < in_channels; ic++) {
-            for (int il = 0; il < in_length; il++) {
-                float in_val = in_data[(b * in_channels + ic) * in_length + il];
-
-                for (int oc = 0; oc < out_channels; oc++) {
-                    for (int k = 0; k < ks; k++) {
-                        int ol = il * s - p + k * d;
-
-                        if (ol >= 0 && ol < out_length) {
-                            float w_val = w_data[(ic * out_channels + oc) * ks + k];
-                            out_data[(b * out_channels + oc) * out_length + ol] += in_val * w_val;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if (layer->use_bias && layer->bias && layer->bias->tensor) {
-        tensor_ensure_executed(layer->bias->tensor);
-        float* bias_data = (float*)layer->bias->tensor->data;
-        if (bias_data) {
-            for (int b = 0; b < batch; b++) {
-                for (int oc = 0; oc < out_channels; oc++) {
-                    float bv = bias_data[oc];
-                    for (int ol = 0; ol < out_length; ol++) {
-                        out_data[(b * out_channels + oc) * out_length + ol] += bv;
-                    }
-                }
-            }
-        }
-    }
-
-    return output;
+    int ys[3] = {batch, out_channels, out_length};
+    ReshapeParams ro = {ys, 3};
+    return uop_reshape(y4, &ro);
 }
 
 static void conv_transpose1d_free(Module* module) {
