@@ -36,6 +36,7 @@ DATA_FILES = {
     "training": "training.json",
     "model_architecture": "model_architecture.json",
     "kernels": "kernels.json",
+    "flamegraph": "flamegraph.json",
 }
 
 # In-memory cache: {path_str: (mtime, raw_bytes, parsed_json, etag)}
@@ -147,6 +148,8 @@ class VizHandler(SimpleHTTPRequestHandler):
             self._handle_data("model_architecture")
         elif path == "/kernels":
             self._handle_data("kernels")
+        elif path == "/flamegraph":
+            self._handle_data("flamegraph")
         elif path == "/graph/stream":
             self._handle_sse("graph")
         elif path == "/training/stream":

@@ -162,6 +162,7 @@ graph_*.json
 kernels.json
 model_architecture.json
 training.json
+flamegraph.json
 
 # Profiling outputs
 callgrind.out

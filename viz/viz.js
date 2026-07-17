@@ -16,6 +16,9 @@ const State = {
   graphView: "ops",   // "ops" | "model"
   // CodeGen
   activeAccelerator: "cuda",
+  // Execution flamegraph (Kernel Studio)
+  flamegraph: null,
+  _flameZoom: null,   // id of the zoomed-in node, or null for the whole step
   // Training checkboxes
   showTrainingLoss: true,
   showTestingLoss: false,
@@ -253,6 +256,10 @@ function connectDataForTab(tabId) {
   } else {
     sseDisconnect("kernels");
   }
+
+  // The flamegraph is written at program exit (a one-shot artifact, not a live
+  // stream), so fetch it once when Kernel Studio opens rather than via SSE.
+  if (tabId === "codegen") loadFlamegraph();
 }
 
 
@@ -1114,6 +1121,152 @@ function generateKernelCode(kernel, backend) {
   return L.join("\n");
 }
 
+// ═══════════════════════════════════════════════════════════════
+// EXECUTION FLAMEGRAPH  (per-fused-kernel timing of one fwd+bwd step)
+// ═══════════════════════════════════════════════════════════════
+
+// Color by kernel kind; fused chains get the accent so a collapsed hot chain
+// reads as one wide bar. Root/phase rows are neutral scaffolding.
+const FLAME_COLORS = {
+  fused:    "#8b5cf6",
+  matmul:   "#06b6d4",
+  conv:     "#f59e0b",
+  elemwise: "#10b981",
+  reduce:   "#ef4444",
+  movement: "#6b7280",
+  other:    "#64748b",
+  phase:    "#3b4252",
+  root:     "#252b3b",
+};
+
+// The flamegraph.json is emitted at process exit, so fetch it on demand.
+function loadFlamegraph() {
+  fetch("/flamegraph", { cache: "no-store" })
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      State.flamegraph = (d && Array.isArray(d.spans) && d.spans.length) ? d : null;
+      if (State.activeTab === "codegen") renderCodeGenView();
+    })
+    .catch(() => {});
+}
+
+// Fold the flat span list into a phase → kind → kernel tree, summing ms. Each
+// node gets a stable id path so zoom survives a re-render.
+function buildFlameTree(fg) {
+  const root = { id: "", name: "step", kind: "root", ms: 0, count: 0, children: {} };
+  for (const s of fg.spans) {
+    const steps = [
+      { key: "ph:" + s.phase, label: s.phase, kind: "phase" },
+      { key: "kd:" + s.kind,  label: s.kind,  kind: s.kind  },
+      { key: "op:" + s.op + ":" + s.numel, label: s.op, kind: s.kind, numel: s.numel },
+    ];
+    let node = root; root.ms += s.ms; root.count++;
+    for (const st of steps) {
+      let child = node.children[st.key];
+      if (!child) {
+        child = { id: node.id + "/" + st.key, name: st.label, kind: st.kind,
+                  numel: st.numel, ms: 0, count: 0, children: {} };
+        node.children[st.key] = child;
+      }
+      child.ms += s.ms; child.count++;
+      node = child;
+    }
+  }
+  return root;
+}
+
+function findFlameNode(node, id) {
+  if (node.id === id) return node;
+  for (const k in node.children) {
+    const r = findFlameNode(node.children[k], id);
+    if (r) return r;
+  }
+  return null;
+}
+
+// Icicle layout: one row per depth, cell width proportional to ms.
+function layoutFlame(view) {
+  const cells = [];
+  const total = view.ms || 1;
+  (function walk(node, depth, x) {
+    cells.push({ node, depth, x, w: node.ms / total });
+    let cx = x;
+    Object.values(node.children)
+      .sort((a, b) => b.ms - a.ms)
+      .forEach(k => { walk(k, depth + 1, cx); cx += k.ms / total; });
+  })(view, 0, 0);
+  return cells;
+}
+
+function renderFlameSection() {
+  const sec = el("div", { className: "flame-section" });
+  const head = el("div", { className: "flame-head" });
+  head.appendChild(el("h2", { className: "flame-title" }, "Execution Flamegraph"));
+  head.appendChild(el("button", { className: "flame-refresh", onClick: loadFlamegraph }, "↻ Refresh"));
+  sec.appendChild(head);
+
+  const fg = State.flamegraph;
+  if (!fg) {
+    const hint = el("div", { className: "flame-empty" });
+    hint.appendChild(document.createTextNode("No profile yet. Run a program with "));
+    hint.appendChild(el("code", {}, "VIZ=1 FLAMEGRAPH=1"));
+    hint.appendChild(document.createTextNode(" to time each fused kernel of a forward+backward step, then Refresh."));
+    sec.appendChild(hint);
+    return sec;
+  }
+
+  sec.appendChild(el("div", { className: "flame-sub" },
+    `${fg.num_spans} kernels · ${(fg.total_ms || 0).toFixed(2)} ms total`));
+
+  const root = buildFlameTree(fg);
+  const view = (State._flameZoom && findFlameNode(root, State._flameZoom)) || root;
+
+  if (view !== root) {
+    const crumb = el("div", { className: "flame-crumb" });
+    crumb.appendChild(el("button",
+      { className: "flame-crumb-btn", onClick: () => { State._flameZoom = null; renderCodeGenView(); } },
+      "⤺ reset zoom"));
+    crumb.appendChild(el("span", { className: "flame-crumb-cur" }, view.name));
+    sec.appendChild(crumb);
+  }
+
+  const cells = layoutFlame(view);
+  const maxDepth = cells.reduce((m, c) => Math.max(m, c.depth), 0);
+  const ROW = 24;
+  const chart = el("div", { className: "flame-chart", style: { height: (maxDepth + 1) * ROW + "px" } });
+
+  for (const c of cells) {
+    const n = c.node;
+    const pct = (c.w * 100);
+    const cell = el("div", {
+      className: "flame-cell",
+      style: {
+        left: (c.x * 100) + "%", width: pct + "%",
+        top: (c.depth * ROW) + "px", height: (ROW - 3) + "px",
+        background: FLAME_COLORS[n.kind] || FLAME_COLORS.other,
+      },
+      title: `${n.name}\n${n.ms.toFixed(3)} ms · ${pct.toFixed(1)}% · ${n.count}×`
+             + (n.numel ? ` · ${n.numel} elems` : ""),
+    }, el("span", { className: "flame-label" }, n.name));
+    cell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (Object.keys(n.children).length) { State._flameZoom = n.id; renderCodeGenView(); }
+    });
+    chart.appendChild(cell);
+  }
+  sec.appendChild(chart);
+
+  const legend = el("div", { className: "flame-legend" });
+  ["fused", "matmul", "conv", "elemwise", "reduce", "movement", "other"].forEach(k => {
+    const item = el("span", { className: "flame-leg" });
+    item.appendChild(el("i", { style: { background: FLAME_COLORS[k] } }));
+    item.appendChild(document.createTextNode(k));
+    legend.appendChild(item);
+  });
+  sec.appendChild(legend);
+  return sec;
+}
+
 function renderCodeGenView() {
   const container = $("#tab-codegen");
   const data = State.kernels;
@@ -1121,6 +1274,10 @@ function renderCodeGenView() {
     ((data.unoptimized?.kernels?.length > 0) || (data.optimized?.kernels?.length > 0));
 
   container.innerHTML = "";
+
+  // Execution flamegraph sits at the top of Kernel Studio and is shown whether
+  // or not kernel-analysis data is present (it profiles a real execution).
+  container.appendChild(renderFlameSection());
 
   if (!hasKernelData && isLoading("codegen", hasKernelData)) {
     container.appendChild(codegenSkeleton());

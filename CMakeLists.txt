@@ -244,6 +244,7 @@ set(OPS_SOURCES
     src/ops/ir/intern.c
     src/ops/ir/context.c
     src/ops/ir/execution.c
+    src/ops/ir/flamegraph.c
     src/ops/ir/cpu_lazy_materialize.c
     src/ops/ir/backward.c
     src/ops/ir/export.c

@@ -19,6 +19,7 @@
 #include "ops/simd_math.h"
 #include "ops/winograd.h"
 #include "ops/ir/dispatch.h"
+#include "ops/ir/flamegraph.h"
 #include "ops/ir/cpu_lazy_materialize.h"
 #include "core/gguf_quant.h"
 #include "core/quantization.h"
@@ -4946,6 +4947,13 @@ int cpu_execute_ir(CMLGraph_t ir) {
             continue;
         }
 
+        /* Flamegraph: bracket this node's dispatch at fused-kernel granularity
+         * (a fused chain is a single node here). Opt-in via FLAMEGRAPH; the
+         * enabled check is a cached bool so the off-path cost is ~nil. GPU-path
+         * nodes take their own `continue` above and aren't timed in this slice. */
+        const int    _flame = cml_flame_enabled();
+        const double _flame_t0 = _flame ? cml_flame_now_ms() : 0.0;
+
         int _rc;
 #ifdef CML_HAS_VULKAN
         /* GPU path (opt-in): dispatch supported nodes to Vulkan; on any miss
@@ -4974,6 +4982,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
         if (_rc != 0) {
             LOG_WARNING("CPU fallback: failed to execute node");
         }
+        if (_flame) cml_flame_record(node, cml_flame_now_ms() - _flame_t0);
         g_total_nodes_executed++;
 
         node = node->next;
