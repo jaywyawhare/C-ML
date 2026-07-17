@@ -217,22 +217,162 @@ bool cml_ib_available(void) {
     return found;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * Mock verbs (IB_MOCK=1): a TCP-loopback emulation of the tiny verbs subset
+ * this transport uses, so the RDMA data-path logic — MR key handling, the ring
+ * all-reduce, parity-ordered send/recv, poll_completion — runs on a plain
+ * socket mesh with no HCA. mock_post_send/recv ASSERT the work-request SGE lkey
+ * is one that mock_reg_mr handed out, i.e. they fail loudly if the lkey ever
+ * regresses to 0 (the exact bug this validates). One mock transport per
+ * process; enable by setting IB_MOCK=1 before cml_ib_create.
+ * ══════════════════════════════════════════════════════════════════════════ */
+static char     MOCK_CTX, MOCK_PD, MOCK_CQ;      /* non-NULL sentinels */
+static int      mock_rank = -1, mock_ws = 0;
+static int*     mock_fds = NULL;                 /* [rank] -> socket, self = -1 */
+static uint32_t mock_next_key = 0x1000;          /* real keys start well above 0 */
+#define MOCK_MAX_MR 512
+static uint32_t mock_keys[MOCK_MAX_MR];
+static int      mock_num_keys = 0;
+static int      mock_pending = 0;
+static uint64_t mock_wc_wrid = 0;
+static int      mock_wc_status = 0;
+
+static int mock_send_all(int fd, const void* b, size_t n) {
+    const char* p = b;
+    while (n) { ssize_t k = send(fd, p, n, 0); if (k <= 0) { if (k < 0 && errno == EINTR) continue; return -1; } p += k; n -= (size_t)k; }
+    return 0;
+}
+static int mock_recv_all(int fd, void* b, size_t n) {
+    char* p = b;
+    while (n) { ssize_t k = recv(fd, p, n, 0); if (k <= 0) { if (k < 0 && errno == EINTR) continue; return -1; } p += k; n -= (size_t)k; }
+    return 0;
+}
+static int mock_key_known(uint32_t lkey) {
+    for (int i = 0; i < mock_num_keys; i++) if (mock_keys[i] == lkey) return 1;
+    return 0;
+}
+
+static ibv_device** mock_get_device_list(int* n) { static ibv_device* d[1]; d[0] = (ibv_device*)&MOCK_CTX; if (n) *n = 1; return d; }
+static void mock_free_device_list(ibv_device** l) { (void)l; }
+static ibv_context* mock_open_device(ibv_device* d) { (void)d; return (ibv_context*)&MOCK_CTX; }
+static int mock_close_device(ibv_context* c) { (void)c;
+    if (mock_fds) { for (int i = 0; i < mock_ws; i++) if (mock_fds[i] >= 0) close(mock_fds[i]); cml_free(mock_fds); mock_fds = NULL; }
+    return 0;
+}
+static ibv_pd* mock_alloc_pd(ibv_context* c) { (void)c; return (ibv_pd*)&MOCK_PD; }
+static int mock_dealloc_pd(ibv_pd* p) { (void)p; return 0; }
+static ibv_cq* mock_create_cq(ibv_context* c, int cqe, void* x, void* ch, int cv) { (void)c; (void)cqe; (void)x; (void)ch; (void)cv; return (ibv_cq*)&MOCK_CQ; }
+static int mock_destroy_cq(ibv_cq* q) { (void)q; return 0; }
+static ibv_qp* mock_create_qp(ibv_pd* p, ibv_qp_init_attr* a) { (void)p; (void)a; static int qpc = 100; int* h = (int*)cml_malloc(sizeof(int)); if (!h) return NULL; *h = qpc++; return (ibv_qp*)h; }
+static int mock_destroy_qp(ibv_qp* q) { cml_free(q); return 0; }
+static int mock_modify_qp(ibv_qp* q, ibv_qp_attr* a, int m) { (void)q; (void)a; (void)m; return 0; }
+static ibv_mr* mock_reg_mr(ibv_pd* p, void* addr, size_t len, int access) { (void)p; (void)access;
+    ibv_mr* mr = (ibv_mr*)cml_calloc(1, sizeof(ibv_mr)); if (!mr) return NULL;
+    mr->addr = addr; mr->length = len; mr->lkey = mock_next_key; mr->rkey = mock_next_key; mock_next_key++;
+    if (mock_num_keys < MOCK_MAX_MR) mock_keys[mock_num_keys++] = mr->lkey;
+    return mr;
+}
+static int mock_dereg_mr(ibv_mr* mr) { cml_free(mr); return 0; }
+static int mock_post_send(ibv_qp* q, ibv_send_wr* wr, ibv_send_wr** bad) { (void)q; (void)bad;
+    int peer = (int)wr->wr_id; ibv_sge* sge = wr->sg_list;
+    int ok = sge && mock_key_known(sge->lkey) && peer >= 0 && peer < mock_ws && mock_fds && mock_fds[peer] >= 0;
+    if (!ok) LOG_ERROR("MOCK IB post_send: invalid SGE lkey=%u / peer=%d (lkey must be a registered MR key)", sge ? sge->lkey : 0, peer);
+    else if (sge->length > 0) ok = (mock_send_all(mock_fds[peer], (const void*)(uintptr_t)sge->addr, sge->length) == 0);
+    mock_pending = 1; mock_wc_wrid = wr->wr_id; mock_wc_status = ok ? 0 : 1;
+    return 0;
+}
+static int mock_post_recv(ibv_qp* q, ibv_recv_wr* wr, ibv_recv_wr** bad) { (void)q; (void)bad;
+    int peer = (int)wr->wr_id; ibv_sge* sge = wr->sg_list;
+    int ok = sge && mock_key_known(sge->lkey) && peer >= 0 && peer < mock_ws && mock_fds && mock_fds[peer] >= 0;
+    if (!ok) LOG_ERROR("MOCK IB post_recv: invalid SGE lkey=%u / peer=%d", sge ? sge->lkey : 0, peer);
+    else if (sge->length > 0) ok = (mock_recv_all(mock_fds[peer], (void*)(uintptr_t)sge->addr, sge->length) == 0);
+    mock_pending = 1; mock_wc_wrid = wr->wr_id; mock_wc_status = ok ? 0 : 1;
+    return 0;
+}
+static int mock_poll_cq(ibv_cq* cq, int ne, ibv_wc* wc) { (void)cq; (void)ne;
+    if (mock_pending) { if (wc) { wc->wr_id = mock_wc_wrid; wc->status = mock_wc_status; wc->opcode = 0; wc->byte_len = 0; wc->qp_num = 0; } mock_pending = 0; return 1; }
+    return 0;
+}
+static int mock_query_port(ibv_context* c, uint8_t port, ibv_port_attr* pa) { (void)c; (void)port; if (pa) { memset(pa, 0, sizeof(*pa)); pa->lid = (uint16_t)(mock_rank + 1); } return 0; }
+static int mock_query_qp(ibv_qp* q, ibv_qp_attr* a, int m, ibv_qp_init_attr* ia) { (void)m; (void)ia; if (a) { memset(a, 0, sizeof(*a)); a->qp_num = (uint32_t)(q ? *(int*)q : 0); } return 0; }
+
+/* Gloo-style mesh: connect to higher ranks, accept from lower ones. */
+static int mock_build_mesh(int rank, int ws) {
+    mock_fds = (int*)cml_calloc((size_t)ws, sizeof(int));
+    if (!mock_fds) return -1;
+    for (int i = 0; i < ws; i++) mock_fds[i] = -1;
+    if (ws <= 1) return 0;
+
+    const char* pe = getenv("IB_MOCK_PORT");
+    int base = pe ? atoi(pe) : 39590;
+    if (base <= 0) base = 39590;
+
+    int lfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (lfd < 0) return -1;
+    int opt = 1; setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in a; memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET; a.sin_addr.s_addr = INADDR_ANY; a.sin_port = htons((uint16_t)(base + rank));
+    if (bind(lfd, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(lfd, ws) < 0) { close(lfd); return -1; }
+
+    for (int peer = rank + 1; peer < ws; peer++) {
+        int s = socket(AF_INET, SOCK_STREAM, 0); if (s < 0) { close(lfd); return -1; }
+        struct sockaddr_in pa; memset(&pa, 0, sizeof(pa));
+        pa.sin_family = AF_INET; pa.sin_port = htons((uint16_t)(base + peer)); inet_pton(AF_INET, "127.0.0.1", &pa.sin_addr);
+        int conn = 0;
+        for (int r = 0; r < 100; r++) { if (connect(s, (struct sockaddr*)&pa, sizeof(pa)) == 0) { conn = 1; break; } usleep(100000); }
+        if (!conn) { close(s); close(lfd); return -1; }
+        if (mock_send_all(s, &rank, sizeof(rank)) != 0) { close(s); close(lfd); return -1; }
+        mock_fds[peer] = s;
+    }
+    for (int i = 0; i < rank; i++) {
+        int c = accept(lfd, NULL, NULL); if (c < 0) { close(lfd); return -1; }
+        int pr = -1;
+        if (mock_recv_all(c, &pr, sizeof(pr)) != 0 || pr < 0 || pr >= ws) { close(c); close(lfd); return -1; }
+        mock_fds[pr] = c;
+    }
+    close(lfd);
+    return 0;
+}
+
+static int install_mock_ib_api(int rank, int ws) {
+    mock_rank = rank; mock_ws = ws; mock_num_keys = 0; mock_pending = 0; mock_next_key = 0x1000;
+    if (mock_build_mesh(rank, ws) != 0) { LOG_ERROR("MOCK IB: mesh setup failed"); return -1; }
+    ib_api.get_device_list = mock_get_device_list; ib_api.free_device_list = mock_free_device_list;
+    ib_api.open_device = mock_open_device;         ib_api.close_device = mock_close_device;
+    ib_api.alloc_pd = mock_alloc_pd;               ib_api.dealloc_pd = mock_dealloc_pd;
+    ib_api.create_cq = mock_create_cq;             ib_api.destroy_cq = mock_destroy_cq;
+    ib_api.create_qp = mock_create_qp;             ib_api.destroy_qp = mock_destroy_qp;
+    ib_api.modify_qp = mock_modify_qp;
+    ib_api.reg_mr = mock_reg_mr;                   ib_api.dereg_mr = mock_dereg_mr;
+    ib_api.post_send = mock_post_send;             ib_api.post_recv = mock_post_recv;
+    ib_api.poll_cq = mock_poll_cq;
+    ib_api.query_port = mock_query_port;           ib_api.query_qp = mock_query_qp;
+    return 0;
+}
+
 CMLIBTransport* cml_ib_create(int rank, int world_size) {
     if (rank < 0 || world_size <= 0 || rank >= world_size) {
         LOG_ERROR("Invalid rank=%d world_size=%d", rank, world_size);
         return NULL;
     }
 
-    void* lib = dlopen("libibverbs.so.1", RTLD_LAZY);
-    if (!lib) lib = dlopen("libibverbs.so", RTLD_LAZY);
-    if (!lib) {
-        LOG_ERROR("Failed to load libibverbs: %s", dlerror());
-        return NULL;
-    }
+    int use_mock = (getenv("IB_MOCK") != NULL);
+    void* lib = NULL;
 
-    if (!load_ib_symbols(lib)) {
-        dlclose(lib);
-        return NULL;
+    if (use_mock) {
+        if (install_mock_ib_api(rank, world_size) != 0)
+            return NULL;
+    } else {
+        lib = dlopen("libibverbs.so.1", RTLD_LAZY);
+        if (!lib) lib = dlopen("libibverbs.so", RTLD_LAZY);
+        if (!lib) {
+            LOG_ERROR("Failed to load libibverbs: %s", dlerror());
+            return NULL;
+        }
+        if (!load_ib_symbols(lib)) {
+            dlclose(lib);
+            return NULL;
+        }
     }
 
     int num_devs = 0;
@@ -334,7 +474,12 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
         }
     }
 
-    LOG_INFO("IB transport created: rank %d/%d, %d QPs", rank, world_size, world_size - 1);
+    /* The mock's socket mesh is already established, so no real QP handshake is
+     * needed — mark connected and skip cml_ib_connect. */
+    if (use_mock) ib->connected = true;
+
+    LOG_INFO("IB transport created%s: rank %d/%d, %d QPs",
+             use_mock ? " (MOCK)" : "", rank, world_size, world_size - 1);
     return ib;
 }
 
@@ -458,7 +603,10 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
 }
 
 int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
-    if (!ib || !peer_addrs || num_peers != ib->world_size - 1) return -1;
+    if (!ib) return -1;
+    /* Mock transport is already connected via its socket mesh at create time. */
+    if (ib->connected) return 0;
+    if (!peer_addrs || num_peers != ib->world_size - 1) return -1;
 
     ibv_port_attr port_attr;
     if (ib_api.query_port(ib->ib_ctx, 1, &port_attr) != 0) {
