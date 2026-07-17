@@ -218,6 +218,11 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
         LOG_ERROR("cml_column_parallel_forward: uop_linear failed");
         return NULL;
     }
+    /* Materialize at the layer boundary (a TP layer is a natural
+     * communication/realization point). This keeps the autograd node intact for
+     * backward while giving callers a concrete activation to chain — matching
+     * the materialized-input contract the rest of the TP path expects. */
+    tensor_ensure_executed(output);
     return output;
 }
 
@@ -352,6 +357,8 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
         LOG_ERROR("cml_row_parallel_forward: uop_linear failed");
         return NULL;
     }
+    /* Materialize at the layer boundary (see cml_column_parallel_forward). */
+    tensor_ensure_executed(output);
     return output;
 }
 

@@ -42,6 +42,13 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config);
 
 Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input);
 
+/* Slice a global batch along dim 0 into this rank's shard (extra rows go to the
+ * lowest ranks when world_size doesn't divide the batch). Returns a fresh tensor
+ * the caller owns; returns `full_batch` unchanged at world_size==1. Feed each
+ * rank its shard so data parallelism trains on distinct data rather than N
+ * identical replicas. */
+Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch);
+
 /* Bucketed all-reduce of gradients, averaged by world_size.
  * Call after tensor_backward() and before optimizer_step(). */
 int cml_ddp_sync_gradients(CMLDataParallel* ddp);
