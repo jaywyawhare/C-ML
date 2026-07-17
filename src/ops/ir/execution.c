@@ -4850,11 +4850,11 @@ int cpu_execute_node(struct IRNode* node) {
     }
 
     default:
-        LOG_WARNING("CPU fallback: unsupported op type %d", node->type);
-        for (size_t i = 0; i < out->numel; i++) {
-            out_data[i] = 0.0f;
-        }
-        break;
+        /* No handler: fail loudly. Zero-filling here would mark the node
+         * executed and let garbage propagate as if it were a real result. */
+        LOG_ERROR("CPU execute: unsupported op type %d (%s)", node->type,
+                  uop_type_to_string(node->type));
+        return -1;
     }
 
     /* Matmul epilogue: bias-add + activation folded onto the gemm, applied

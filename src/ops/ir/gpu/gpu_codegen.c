@@ -266,8 +266,11 @@ static LLVMModuleRef gpu_build_binary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
     default:
-        result = LLVMBuildFAdd(bld, v0, v1, "fallback");
-        break;
+        /* No emitter for this op: return NULL so the caller falls back to the
+         * CPU path instead of silently computing a+b. */
+        LOG_WARNING("GPU codegen: no binary emitter for op %d, deferring to CPU", type);
+        LLVMDisposeBuilder(bld);
+        return NULL;
     }
 
     LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &gid_64, 1, "pout");
@@ -475,8 +478,11 @@ static LLVMModuleRef gpu_build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
     default:
-        result = val;
-        break;
+        /* No emitter for this op: return NULL so the caller falls back to the
+         * CPU path instead of silently emitting the identity function. */
+        LOG_WARNING("GPU codegen: no unary emitter for op %d, deferring to CPU", type);
+        LLVMDisposeBuilder(bld);
+        return NULL;
     }
 
     #undef GPU_INTRINSIC1

@@ -1171,6 +1171,12 @@ ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int 
     return nn_conv_transpose1d(in_channels, out_channels, kernel_size, stride, padding,
                                output_padding, use_bias, dtype, device);
 }
+ConvTranspose2d* cml_nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
+                                         int stride, int padding, int output_padding, bool use_bias,
+                                         DType dtype, DeviceType device) {
+    return nn_conv_transpose2d(in_channels, out_channels, kernel_size, stride, padding,
+                               output_padding, use_bias, dtype, device);
+}
 BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
                                 bool track_running_stats, DType dtype, DeviceType device) {
     return nn_batchnorm3d(num_features, eps, momentum, affine, track_running_stats, dtype, device);

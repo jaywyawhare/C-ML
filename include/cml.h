@@ -243,6 +243,9 @@ Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int st
 ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
                                           int stride, int padding, int output_padding,
                                           bool use_bias, DType dtype, DeviceType device);
+ConvTranspose2d* cml_nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
+                                          int stride, int padding, int output_padding,
+                                          bool use_bias, DType dtype, DeviceType device);
 ConvTranspose3d* cml_nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
                                           int stride, int padding, int output_padding,
                                           bool use_bias, DType dtype, DeviceType device);

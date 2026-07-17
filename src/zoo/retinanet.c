@@ -3,6 +3,7 @@
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor_manipulation.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
@@ -22,6 +23,7 @@ typedef struct {
     Sequential* layer2;
     Sequential* layer3;
     Sequential* layer4;
+    Sequential* layer5;
 } ResNet50Backbone;
 
 static Tensor* backbone_forward(Module* module, Tensor* input) {
@@ -35,7 +37,9 @@ static Tensor* backbone_forward(Module* module, Tensor* input) {
     if (!x) return NULL;
     x = module_forward((Module*)bb->layer3, x);
     if (!x) return NULL;
-    return module_forward((Module*)bb->layer4, x);
+    x = module_forward((Module*)bb->layer4, x);
+    if (!x) return NULL;
+    return module_forward((Module*)bb->layer5, x);
 }
 
 static void backbone_free(Module* module) {
@@ -45,6 +49,7 @@ static void backbone_free(Module* module) {
     if (bb->layer2) module_free((Module*)bb->layer2);
     if (bb->layer3) module_free((Module*)bb->layer3);
     if (bb->layer4) module_free((Module*)bb->layer4);
+    if (bb->layer5) module_free((Module*)bb->layer5);
     cml_free(bb);
 }
 
@@ -60,9 +65,26 @@ typedef struct {
     Module* extra_p7;
 } FPN;
 
+/* Lateral 1x1 conv on this level's backbone feature, plus the coarser pyramid
+ * level upsampled (nearest) to this level's spatial size. */
+static Tensor* fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser) {
+    Tensor* lat = module_forward(lateral, c);
+    if (!lat) return NULL;
+    int out_size[2] = {lat->shape[2], lat->shape[3]};
+    Tensor* up = f_interpolate(p_coarser, out_size, 2, UPSAMPLE_NEAREST, false);
+    if (!up) return NULL;
+    return uop_add(lat, up);
+}
+
+/* Standalone module interface takes a single tensor, so it maps C5 -> P5.
+ * The full top-down pyramid runs in retinanet_forward, which can see the
+ * intermediate backbone stages. */
 static Tensor* fpn_forward(Module* module, Tensor* input) {
-    (void)module;
-    return input;
+    FPN* fpn = (FPN*)module;
+    if (!fpn || !input) return NULL;
+    Tensor* p5 = module_forward(fpn->lateral5, input);
+    if (!p5) return NULL;
+    return module_forward(fpn->smooth5, p5);
 }
 
 static void fpn_free(Module* module) {
@@ -130,15 +152,34 @@ static Tensor* retinanet_forward(Module* module, Tensor* input) {
     if (!net || !input)
         return NULL;
 
-    Tensor* features = module_forward(net->backbone, input);
-    if (!features)
-        return NULL;
+    ResNet50Backbone* bb = (ResNet50Backbone*)net->backbone;
+    FPN* fpn             = (FPN*)net->fpn;
+    if (!bb || !fpn) return NULL;
 
-    Tensor* cls_out = module_forward(net->cls_subnet, features);
-    if (!cls_out)
-        return NULL;
+    Tensor* x = module_forward((Module*)bb->backbone_stem, input);
+    if (!x) return NULL;
+    Tensor* c2 = module_forward((Module*)bb->layer2, x);
+    if (!c2) return NULL;
+    Tensor* c3 = module_forward((Module*)bb->layer3, c2);
+    if (!c3) return NULL;
+    Tensor* c4 = module_forward((Module*)bb->layer4, c3);
+    if (!c4) return NULL;
+    Tensor* c5 = module_forward((Module*)bb->layer5, c4);
+    if (!c5) return NULL;
 
-    return cls_out;
+    /* Top-down pathway. The single-tensor Module interface can only carry one
+     * pyramid level forward, so the classification subnet runs on the finest
+     * level P3; per-level heads would need multi-output support. */
+    Tensor* p5 = module_forward(fpn->lateral5, c5);
+    if (!p5) return NULL;
+    Tensor* p4 = fpn_topdown_add(fpn->lateral4, c4, p5);
+    if (!p4) return NULL;
+    Tensor* p3 = fpn_topdown_add(fpn->lateral3, c3, p4);
+    if (!p3) return NULL;
+    p3 = module_forward(fpn->smooth3, p3);
+    if (!p3) return NULL;
+
+    return module_forward(net->cls_subnet, p3);
 }
 
 static void retinanet_free(Module* module) {
@@ -228,6 +269,23 @@ Module* cml_zoo_retinanet_create(const RetinaNetConfig* cfg, DType dtype, Device
         sequential_add(blk, (Module*)nn_batchnorm2d(1024, 1e-5f, 0.1f, true, true, dtype, device));
         sequential_add(blk, (Module*)nn_relu(false));
         sequential_add(bb->layer4, (Module*)blk);
+    }
+
+    bb->layer5 = nn_sequential();
+    for (int i = 0; i < 3; i++) {
+        int in_ch = (i == 0) ? 1024 : 2048;
+        int stride = (i == 0) ? 2 : 1;
+        Sequential* blk = nn_sequential();
+        sequential_add(blk, (Module*)nn_conv2d(in_ch, 512, 1, 1, 0, 1, false, dtype, device));
+        sequential_add(blk, (Module*)nn_batchnorm2d(512, 1e-5f, 0.1f, true, true, dtype, device));
+        sequential_add(blk, (Module*)nn_relu(false));
+        sequential_add(blk, (Module*)nn_conv2d(512, 512, 3, stride, 1, 1, false, dtype, device));
+        sequential_add(blk, (Module*)nn_batchnorm2d(512, 1e-5f, 0.1f, true, true, dtype, device));
+        sequential_add(blk, (Module*)nn_relu(false));
+        sequential_add(blk, (Module*)nn_conv2d(512, 2048, 1, 1, 0, 1, false, dtype, device));
+        sequential_add(blk, (Module*)nn_batchnorm2d(2048, 1e-5f, 0.1f, true, true, dtype, device));
+        sequential_add(blk, (Module*)nn_relu(false));
+        sequential_add(bb->layer5, (Module*)blk);
     }
 
     net->backbone = (Module*)bb;

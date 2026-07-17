@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dirent.h>
+#endif
 #include "alloc/cml_allocator.h"
 
 CMLTinyFS* cml_tinyfs_create(const char* base_path, int num_shards, size_t shard_size) {
@@ -116,10 +121,65 @@ int cml_tinyfs_delete(CMLTinyFS* fs, const char* name) {
     return remove(path);
 }
 
+/* Returns the stored tensor names (the ".tfs" suffix stripped). Caller frees
+ * each string and the array with cml_free. NULL with *count==0 when empty. */
 char** cml_tinyfs_list(CMLTinyFS* fs, int* count) {
-    (void)fs;
     if (count) *count = 0;
-    return NULL; /* Would require directory listing */
+    if (!fs || !fs->initialized || !count) return NULL;
+
+    char** names = NULL;
+    int n = 0, cap = 0;
+
+#ifdef _WIN32
+    char pattern[512];
+    snprintf(pattern, sizeof(pattern), "%s\\*.tfs", fs->base_path);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return NULL;
+    do {
+        const char* fname = fd.cFileName;
+#else
+    DIR* dir = opendir(fs->base_path);
+    if (!dir) return NULL;
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        const char* fname = ent->d_name;
+#endif
+        size_t len = strlen(fname);
+        if (len > 4 && strcmp(fname + len - 4, ".tfs") == 0) {
+            if (n == cap) {
+                int new_cap = cap ? cap * 2 : 8;
+                char** grown = (char**)cml_realloc(names, (size_t)new_cap * sizeof(char*));
+                if (!grown) goto fail;
+                names = grown;
+                cap = new_cap;
+            }
+            char* name = (char*)cml_malloc(len - 3);
+            if (!name) goto fail;
+            memcpy(name, fname, len - 4);
+            name[len - 4] = '\0';
+            names[n++] = name;
+        }
+#ifdef _WIN32
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+#else
+    }
+    closedir(dir);
+#endif
+
+    *count = n;
+    return names;
+
+fail:
+#ifdef _WIN32
+    FindClose(h);
+#else
+    closedir(dir);
+#endif
+    for (int i = 0; i < n; i++) cml_free(names[i]);
+    cml_free(names);
+    return NULL;
 }
 
 size_t cml_tinyfs_used_bytes(const CMLTinyFS* fs) {

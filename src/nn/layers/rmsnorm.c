@@ -51,7 +51,6 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
     tensor_free(eps_tensor);
     if (!mean_sq_eps)
         return NULL;
-    tensor_free(eps_tensor);
     Tensor* rms = uop_sqrt(mean_sq_eps);
     if (!rms)
         return NULL;

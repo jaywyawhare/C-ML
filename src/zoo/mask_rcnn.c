@@ -3,6 +3,7 @@
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor_manipulation.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
@@ -115,9 +116,26 @@ typedef struct {
     Module* smooth5;
 } FPN;
 
+/* Lateral 1x1 conv on this level's backbone feature, plus the coarser pyramid
+ * level upsampled (nearest) to this level's spatial size. */
+static Tensor* fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser) {
+    Tensor* lat = module_forward(lateral, c);
+    if (!lat) return NULL;
+    int out_size[2] = {lat->shape[2], lat->shape[3]};
+    Tensor* up = f_interpolate(p_coarser, out_size, 2, UPSAMPLE_NEAREST, false);
+    if (!up) return NULL;
+    return uop_add(lat, up);
+}
+
+/* Standalone module interface takes a single tensor, so it maps C5 -> P5.
+ * The full top-down pyramid runs in mask_rcnn_forward, which can see the
+ * intermediate backbone stages. */
 static Tensor* fpn_forward(Module* module, Tensor* input) {
-    (void)module;
-    return input;
+    FPN* fpn = (FPN*)module;
+    if (!fpn || !input) return NULL;
+    Tensor* p5 = module_forward(fpn->lateral5, input);
+    if (!p5) return NULL;
+    return module_forward(fpn->smooth5, p5);
 }
 
 static void fpn_free(Module* module) {
@@ -316,10 +334,36 @@ static Tensor* mask_rcnn_forward(Module* module, Tensor* input) {
     MaskRCNN* net = (MaskRCNN*)module;
     if (!net || !input) return NULL;
 
-    Tensor* features = module_forward(net->backbone, input);
-    if (!features) return NULL;
+    Backbone* bb = (Backbone*)net->backbone;
+    FPN* fpn     = (FPN*)net->fpn;
+    if (!bb || !fpn) return NULL;
 
-    Tensor* rpn_out = module_forward(net->rpn, features);
+    Tensor* c1 = module_forward((Module*)bb->stem, input);
+    if (!c1) return NULL;
+    Tensor* c2 = module_forward((Module*)bb->layer1, c1);
+    if (!c2) return NULL;
+    Tensor* c3 = module_forward((Module*)bb->layer2, c2);
+    if (!c3) return NULL;
+    Tensor* c4 = module_forward((Module*)bb->layer3, c3);
+    if (!c4) return NULL;
+    Tensor* c5 = module_forward((Module*)bb->layer4, c4);
+    if (!c5) return NULL;
+
+    /* Top-down pathway. The single-tensor Module interface can only carry one
+     * pyramid level forward, so the RPN/ROI path runs on the finest level P2;
+     * P3-P5 heads would need multi-output support. */
+    Tensor* p5 = module_forward(fpn->lateral5, c5);
+    if (!p5) return NULL;
+    Tensor* p4 = fpn_topdown_add(fpn->lateral4, c4, p5);
+    if (!p4) return NULL;
+    Tensor* p3 = fpn_topdown_add(fpn->lateral3, c3, p4);
+    if (!p3) return NULL;
+    Tensor* p2 = fpn_topdown_add(fpn->lateral2, c2, p3);
+    if (!p2) return NULL;
+    p2 = module_forward(fpn->smooth2, p2);
+    if (!p2) return NULL;
+
+    Tensor* rpn_out = module_forward(net->rpn, p2);
     if (!rpn_out) return NULL;
 
     return module_forward(net->roi_head, rpn_out);
