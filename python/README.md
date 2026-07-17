@@ -56,6 +56,29 @@ import cml.functional          # EarlyStopping, MetricsTracker, TrainingContext
 
 The top-level `cml` namespace exposes what you need 90% of the time. Everything else lives in submodules.
 
+The common layers, optimizers, and losses are also re-exported directly on `cml`
+(PyTorch-style), so you can skip the submodule import for quick work:
+
+```python
+import cml
+
+model = cml.Sequential()
+model.add(cml.Linear(784, 128))
+model.add(cml.ReLU())
+model.add(cml.Dropout(0.2))
+model.add(cml.Linear(128, 10))
+
+optimizer = cml.Adam(model, lr=1e-3)
+loss = cml.cross_entropy_loss(model(X), y)
+```
+
+Top-level re-exports: optimizers (`Adam`, `SGD`, `RMSprop`, `AdaGrad`, `AdamW`,
+`NAdam`, `Adamax`, `Adadelta`, `LAMB`, `LARS`, `Muon`); layers (`Sequential`,
+`Linear`, `ReLU`, `Sigmoid`, `Tanh`, `LeakyReLU`, `PReLU`, `Dropout`, `Flatten`,
+`Conv1d/2d/3d`, `MaxPool1d/2d/3d`, `AvgPool1d/2d/3d`, `BatchNorm1d/2d`,
+`Embedding`); and all loss functions. The full set of layers/optimizers still
+lives in `cml.nn` / `cml.optim`.
+
 ## API at a Glance
 
 ### Tensors
@@ -102,12 +125,22 @@ optim.ReduceOnPlateau(opt, patience=5)    optim.OneCycleLR(opt, max_lr=0.01, tot
 
 ### Losses
 
+All loss functions are exported at the top level (and still available under
+`cml.losses`):
+
 ```python
-cml.mse_loss(pred, target)                cml.bce_loss(pred, target)
-cml.cross_entropy_loss(logits, labels)    cml.losses.nll_loss(log_probs, targets)
-cml.losses.huber_loss(pred, target)       cml.losses.kl_div_loss(p, q)
-cml.losses.triplet_margin_loss(a, p, n)   cml.losses.cosine_embedding_loss(x1, x2, t)
+cml.mse_loss(pred, target)                cml.mae_loss(pred, target)
+cml.bce_loss(pred, target)                cml.huber_loss(pred, target, delta=1.0)
+cml.cross_entropy_loss(logits, labels)    cml.nll_loss(log_probs, targets)
+cml.kl_div_loss(p, q)                     cml.sparse_cross_entropy_loss(logits, labels)
+cml.triplet_margin_loss(a, p, n)          cml.cosine_embedding_loss(x1, x2, t)
 ```
+
+`cross_entropy_loss` applies softmax internally and expects `labels` to be a **1-D
+tensor of integer class indices** (PyTorch-style), one per sample — not one-hot
+vectors. On invalid inputs (e.g. a wrong target shape or dtype) the loss raises a
+`RuntimeError` with a message pointing at the argument shapes, rather than
+returning a broken/NULL tensor.
 
 ### Autograd
 

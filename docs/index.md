@@ -48,6 +48,7 @@ C-ML is a production-ready machine learning library written in pure C, providing
 - **[Speculative Decoding](speculative_decoding.md)** - Draft-verify generation
 - **[Kernel Studio](kernel_studio.md)** - Visualization and debugging
 - **[Kernel Studio Quick Reference](kernel_studio_quickref.md)** - Shortcuts and UI map
+- **[Environment Variables](env_vars.md)** - Runtime flags: DEBUG, NOOPT, BEAM, WINO, JIT, and more
 - **[Benchmarks](benchmarks.md)** - Performance benchmarks
 - **[Examples](examples.md)** - `examples/` walkthrough and patterns
 - **[Python Bindings](python_installation.md)** - CFFI install, NumPy, packaging

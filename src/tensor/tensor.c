@@ -15,6 +15,7 @@
 #include "ops/uops.h"
 #include "backend/backend_buffer.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #include "backend/device.h"
 #include "core/error_stack.h"
 #include "core/config.h"
@@ -480,6 +481,8 @@ float tensor_get_float(Tensor* t, size_t idx) {
         if (!data)
             return 0.0f;
     }
+    if (t && cml_flag_enabled(CML_FLAG_CHECK_OOB) && idx >= t->numel)
+        LOG_ERROR("CHECK_OOB: tensor_get_float index %zu out of bounds (numel=%zu)", idx, t->numel);
     if (!t || !t->data || idx >= t->numel)
         return 0.0f;
 
@@ -536,6 +539,8 @@ float tensor_get_float(Tensor* t, size_t idx) {
 }
 
 void tensor_set_float(Tensor* t, size_t idx, float value) {
+    if (t && cml_flag_enabled(CML_FLAG_CHECK_OOB) && idx >= t->numel)
+        LOG_ERROR("CHECK_OOB: tensor_set_float index %zu out of bounds (numel=%zu)", idx, t->numel);
     if (!t || idx >= t->numel)
         return;
     if (!t->is_executed) {

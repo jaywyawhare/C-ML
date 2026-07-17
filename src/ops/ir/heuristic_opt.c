@@ -1,6 +1,7 @@
 #include "ops/ir/heuristic_opt.h"
 #include "ops/ir/linearize.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -130,7 +131,7 @@ static CMLOptList* optimize_reduce(const struct LinearProgram* prog,
     int reduce_ax = find_reduce_axis(prog);
     int reduce_extent = (reduce_ax < prog->num_axes) ? prog->loop_axes[reduce_ax] : 0;
 
-    if (cfg->use_local_memory && reduce_extent > 1) {
+    if (cfg->use_local_memory && cml_flag(CML_FLAG_SPLIT_REDUCEOP) && reduce_extent > 1) {
         int local_tile = pick_power2_tile(reduce_extent, 64);
         if (local_tile < 32 && reduce_extent >= 32 && reduce_extent % 32 == 0)
             local_tile = 32;

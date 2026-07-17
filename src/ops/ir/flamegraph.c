@@ -1,6 +1,7 @@
 #include "ops/ir/flamegraph.h"
 #include "ops/ir/internal.h"
 #include "alloc/cml_allocator.h"
+#include "core/cml_flags.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,9 @@ int cml_flame_enabled(void) {
     if (!checked) {
         const char* v = getenv("FLAMEGRAPH");
         on      = v && v[0] != '\0' && strcmp(v, "0") != 0 && strcmp(v, "false") != 0;
+        /* PROFILE is the general profiling switch; it implies flamegraph capture. */
+        if (cml_flag_enabled(CML_FLAG_PROFILE))
+            on = 1;
         checked = 1;
     }
     return on;

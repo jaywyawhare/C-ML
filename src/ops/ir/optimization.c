@@ -3,6 +3,7 @@
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -750,6 +751,13 @@ int cml_ir_optimize(CMLGraph_t ir) {
         return -1;
     }
 
+    /* NOOPT keeps the structural passes above (needed for correct execution) but
+     * skips the optimizing transforms: rewrite rules, fusion, and reordering. */
+    if (cml_flag_enabled(CML_FLAG_NOOPT)) {
+        LOG_INFO("NOOPT set: skipping IR rewrite/fusion/reorder passes");
+        return 0;
+    }
+
     {
         CMLRewriteRegistry* builtin = cml_rewrite_builtin_rules();
         if (builtin) {
@@ -764,7 +772,7 @@ int cml_ir_optimize(CMLGraph_t ir) {
         }
     }
 
-    if (fuse_operations(ir) != 0) {
+    if (!cml_flag_enabled(CML_FLAG_DISABLE_FUSION) && fuse_operations(ir) != 0) {
         LOG_WARNING("Operation fusion encountered issues, continuing...");
     }
 

@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "ops/ir/disk_cache.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -141,6 +142,9 @@ static char* default_path(void) {
 }
 
 bool cml_disk_cache_enabled(void) {
+    /* CACHELEVEL < 2 disables the on-disk cache (0 none, 1 memory only). */
+    if (cml_flag(CML_FLAG_CACHELEVEL) < 2)
+        return false;
     const char* env = getenv("DISK_CACHE");
     if (!env) return false;
     return env[0] == '1' || env[0] == 'y' || env[0] == 'Y';

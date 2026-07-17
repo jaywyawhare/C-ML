@@ -5,6 +5,7 @@
 #include "ops/ir/gpu/amx.h"
 #include "ops/ir/gpu/xmx.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +41,9 @@ CMLTCConfig cml_tc_get_config(void) {
 }
 
 bool cml_tc_available(void) {
+    /* TC=0 disables tensor-core usage entirely (default TC=1). */
+    if (!cml_flag_enabled(CML_FLAG_TC))
+        return false;
     return cml_wmma_available() || cml_amx_available() || cml_xmx_available();
 }
 
@@ -51,6 +55,10 @@ typedef enum {
 } CMLTCHardware;
 
 static CMLTCHardware tc_detect_hardware(void) {
+    /* TC_SELECT forces a specific backend (-1 auto): 1 WMMA, 2 AMX, 3 XMX. */
+    int sel = cml_flag(CML_FLAG_TC_SELECT);
+    if (sel >= TC_HW_NONE && sel <= TC_HW_XMX)
+        return (CMLTCHardware)sel;
     if (cml_wmma_available()) return TC_HW_WMMA;
     if (cml_amx_available())  return TC_HW_AMX;
     if (cml_xmx_available())  return TC_HW_XMX;
@@ -450,6 +458,20 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node,
 int cml_tc_optimize(CMLGraph_t graph) {
     if (!graph || !graph->head) return 0;
     if (!cml_tc_available()) return 0;
+
+    /* TC_OPT raises how aggressively matmuls are pushed onto tensor cores
+     * (0 = default). 1 permits padding to reach TC tile sizes; 2 additionally
+     * prefers fp16 accumulation and halves the minimum eligible dimensions. */
+    int tc_opt = cml_flag(CML_FLAG_TC_OPT);
+    if (tc_opt >= 1) {
+        g_tc_config.allow_padding = true;
+        if (tc_opt >= 2) {
+            g_tc_config.prefer_fp16 = true;
+            g_tc_config.min_m       = CML_TC_DEFAULT_MIN_DIM / 2;
+            g_tc_config.min_n       = CML_TC_DEFAULT_MIN_DIM / 2;
+            g_tc_config.min_k       = CML_TC_DEFAULT_MIN_DIM / 2;
+        }
+    }
 
     CMLTCHardware hw = tc_detect_hardware();
     int tile_m, tile_n, tile_k;

@@ -185,6 +185,7 @@ endif()
 set(CORE_SOURCES
     src/cml.c
     src/core/logging.c
+    src/core/cml_flags.c
     src/core/config.c
     src/core/dataset.c
     src/core/augmentation.c

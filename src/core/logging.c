@@ -1,10 +1,12 @@
 #include "core/logging.h"
 #include "core/error_stack.h"
+#include "core/cml_flags.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 LogLevel g_log_level = LOG_LEVEL_ERROR;
 
@@ -42,5 +44,15 @@ void cml_log_message(LogLevel level, const char* file, int line, const char* fun
 
     const char* level_str[] = {"DEBUG", "INFO", "WARNING", "ERROR"};
 
-    fprintf(stderr, "%s [%s] %s:%d %s(): %s\n", time_str, level_str[level], file, line, func, msg);
+    /* Color the level tag on a TTY unless NO_COLOR is set (tinygrad-style). */
+    static const char* level_color[] = {"\033[90m", "\033[36m", "\033[33m", "\033[31m"};
+    bool use_color = !cml_flag_enabled(CML_FLAG_NO_COLOR) && isatty(fileno(stderr));
+
+    if (use_color) {
+        fprintf(stderr, "%s [%s%s\033[0m] %s:%d %s(): %s\n", time_str, level_color[level],
+                level_str[level], file, line, func, msg);
+    } else {
+        fprintf(stderr, "%s [%s] %s:%d %s(): %s\n", time_str, level_str[level], file, line, func,
+                msg);
+    }
 }

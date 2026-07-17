@@ -14,8 +14,10 @@
  */
 #include "ops/simd_math.h"
 #include "ops/simd_utils.h"
+#include "core/cml_flags.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -46,7 +48,26 @@ void cml_print_simd_caps(void) {
         for (size_t i = 0; i < n; i++) { float x = in[i]; out[i] = (expr); } \
     }
 
-UNARY(simd_exp_f32,     expf(x))
+/* Schraudolph-style polynomial exp: packs a linear function of x into the IEEE
+ * exponent field (~1e-3 relative error, no libm call). Used only when
+ * TRANSCENDENTAL forces approximation (>=2); default keeps the accurate expf. */
+static inline float fast_expf(float x) {
+    if (x > 88.0f)  x = 88.0f;
+    if (x < -88.0f) x = -88.0f;
+    union { uint32_t i; float f; } v;
+    v.i = (uint32_t)(12102203.0f * x + 1064866805.0f);
+    return v.f;
+}
+
+void simd_exp_f32(const float* in, float* out, size_t n) {
+    if (!in || !out || n == 0) return;
+    int approx = cml_flag(CML_FLAG_TRANSCENDENTAL) >= 2;
+    for (size_t i = 0; i < n; i++) {
+        float x = in[i];
+        out[i]  = approx ? fast_expf(x) : expf(x);
+    }
+}
+
 UNARY(simd_log_f32,     logf(x))
 UNARY(simd_sqrt_f32,    sqrtf(x))
 UNARY(simd_rsqrt_f32,   1.0f / sqrtf(x))

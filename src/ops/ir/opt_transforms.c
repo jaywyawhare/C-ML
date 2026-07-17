@@ -1,6 +1,7 @@
 #include "ops/ir/opt_transforms.h"
 #include "ops/ir/linearize.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -95,6 +96,9 @@ static int prog_get_axis_extent(const LinearProgram* prog, int axis) {
 /* ── Individual transform implementations ── */
 
 static int apply_local(int axis, int amount, LinearProgram* prog) {
+    /* NOLOCALS suppresses all local/shared-memory tiling. */
+    if (cml_flag_enabled(CML_FLAG_NOLOCALS))
+        return -1;
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
         LOG_WARNING("OPT_LOCAL: invalid axis %d", axis);

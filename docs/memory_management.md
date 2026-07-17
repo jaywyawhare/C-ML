@@ -347,6 +347,63 @@ void cml_device_free(void* ptr, DeviceType device);
 These delegate to the device abstraction layer (`device_alloc` / `device_free`) which routes to the appropriate backend (CPU `malloc`, CUDA `cuMemAlloc`, etc.).
 
 
+## Tensor Reference Counting and External Ownership
+
+Individual `Tensor` structs are managed by reference counting, independent of the
+allocators above. A tensor carries two counters:
+
+| Field | Meaning |
+|---|---|
+| `ref_count` | Internal graph/API references. `tensor_free()` decrements it and only proceeds once it reaches 0. |
+| `external_refs` | References held **outside** the C core — e.g. a Python (or other language) wrapper that will free the tensor itself. |
+
+### Why external references exist
+
+C-ML executes lazily and rewrites/tears down the IR graph at run boundaries (and,
+per step, inside `optimizer.step()`). A language binding, however, may still hold a
+wrapper object pointing at a tensor that the graph teardown is about to free —
+which would leave the wrapper with a dangling pointer (use-after-free). The
+`external_refs` counter closes that gap.
+
+### API
+
+```c
+void tensor_pin(Tensor* t);      // ++external_refs: an external owner now holds t
+void tensor_release(Tensor* t);  // --external_refs, then tensor_free(t)
+```
+
+### Detach-and-keep semantics
+
+`tensor_free()` checks `external_refs` before releasing memory:
+
+- If `external_refs == 0`, it frees normally (clears the IR-node back-pointer,
+  forgets the tensor from the graph cache, releases data and metadata).
+- If `external_refs > 0`, it **does not free**. Instead it *detaches* the tensor
+  from the graph and keeps it alive: any borrowed execution-plan buffer is copied
+  into an owned allocation (so the tensor is self-contained), and all links into
+  the possibly-about-to-be-freed graph (`ir_node`, `ir_context`, saved IR state)
+  are cleared. The tensor's `ref_count` stays at 0, so the owner's later
+  `tensor_release()` performs the real free.
+
+This makes a graph teardown safe even while an external owner holds the tensor:
+the tensor is snapshotted out of the graph rather than pulled out from under the
+owner.
+
+### Usage from a language binding
+
+```c
+Tensor* t = /* some tensor returned by the C core */;
+tensor_pin(t);          // wrapper takes ownership
+// ... graph may reset/teardown any number of times; t stays valid ...
+tensor_release(t);      // wrapper is done; frees t if nothing else references it
+```
+
+The Python bindings do exactly this: wrapping a C tensor pointer calls
+`tensor_pin()`, and the wrapper's `__del__` calls `tensor_release()`. This is what
+lets Python tensors survive the per-step graph reset that `optimizer.step()`
+performs during training.
+
+
 ## Choosing the Right Allocator
 
 | Scenario | Recommended Allocator |

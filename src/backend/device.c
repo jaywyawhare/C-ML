@@ -1,5 +1,6 @@
 #include "backend/device.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #include "tensor/tensor.h"
 #include "nn/layers/linear.h"
 #include <stdio.h>
@@ -460,6 +461,14 @@ Tensor* tensor_ones_auto(int* shape, int ndim, int dtype) {
 void* device_alloc(size_t size, DeviceType device) {
     if (size == 0) {
         LOG_ERROR("Cannot allocate zero bytes");
+        return NULL;
+    }
+
+    /* MAX_BUFFER_SIZE caps a single allocation (0 = unlimited), matching
+     * tinygrad's guard against runaway buffer sizes. */
+    int cap = cml_flag(CML_FLAG_MAX_BUFFER_SIZE);
+    if (cap > 0 && size > (size_t)cap) {
+        LOG_ERROR("Allocation of %zu bytes exceeds MAX_BUFFER_SIZE=%d", size, cap);
         return NULL;
     }
 

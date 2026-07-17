@@ -7,6 +7,7 @@ gsap.registerPlugin(ScrollTrigger)
 
 const tabs = [
   { id: 'quick', label: 'Quick Start' },
+  { id: 'python', label: 'Python' },
   { id: 'training', label: 'Training' },
   { id: 'dataset', label: 'Dataset Hub' },
   { id: 'gpu', label: 'GPU' },
@@ -53,6 +54,53 @@ int main(void) {
         {'    '}<span className="fn">cml_cleanup</span>();{'\n'}
         {'    '}<span className="kw">return</span> <span className="num">0</span>;{'\n'}
         {'}'}
+      </>
+    ),
+  },
+  python: {
+    plain: `import cml
+import numpy as np
+
+cml.init()
+
+# NumPy in, PyTorch-style API out -- all off the top-level cml.* namespace
+X = cml.Tensor.from_numpy(np.random.randn(64, 4).astype("float32"))
+y = cml.Tensor.from_numpy(np.random.randint(0, 3, 64))  # 1-D class indices
+
+model = cml.Sequential()
+model.add(cml.Linear(4, 16))
+model.add(cml.ReLU())
+model.add(cml.Linear(16, 3))
+
+# Train with Adam
+opt = cml.Adam(model, lr=0.01)
+for epoch in range(100):
+    opt.zero_grad()
+    loss = cml.cross_entropy_loss(model(X), y)
+    loss.backward()
+    opt.step()
+
+cml.cleanup()`,
+    jsx: (
+      <>
+        <span className="kw">import</span> cml{'\n'}
+        <span className="kw">import</span> numpy <span className="kw">as</span> np{'\n\n'}
+        cml.<span className="fn">init</span>(){'\n\n'}
+        <span className="cm"># NumPy in, PyTorch-style API out -- all off the top-level cml.* namespace</span>{'\n'}
+        X = cml.<span className="type">Tensor</span>.<span className="fn">from_numpy</span>(np.random.<span className="fn">randn</span>(<span className="num">64</span>, <span className="num">4</span>).<span className="fn">astype</span>(<span className="str">"float32"</span>)){'\n'}
+        y = cml.<span className="type">Tensor</span>.<span className="fn">from_numpy</span>(np.random.<span className="fn">randint</span>(<span className="num">0</span>, <span className="num">3</span>, <span className="num">64</span>)){'  '}<span className="cm"># 1-D class indices</span>{'\n\n'}
+        model = cml.<span className="fn">Sequential</span>(){'\n'}
+        model.<span className="fn">add</span>(cml.<span className="fn">Linear</span>(<span className="num">4</span>, <span className="num">16</span>)){'\n'}
+        model.<span className="fn">add</span>(cml.<span className="fn">ReLU</span>()){'\n'}
+        model.<span className="fn">add</span>(cml.<span className="fn">Linear</span>(<span className="num">16</span>, <span className="num">3</span>)){'\n\n'}
+        <span className="cm"># Train with Adam</span>{'\n'}
+        opt = cml.<span className="fn">Adam</span>(model, lr=<span className="num">0.01</span>){'\n'}
+        <span className="kw">for</span> epoch <span className="kw">in</span> <span className="fn">range</span>(<span className="num">100</span>):{'\n'}
+        {'    '}opt.<span className="fn">zero_grad</span>(){'\n'}
+        {'    '}loss = cml.<span className="fn">cross_entropy_loss</span>(<span className="fn">model</span>(X), y){'\n'}
+        {'    '}loss.<span className="fn">backward</span>(){'\n'}
+        {'    '}opt.<span className="fn">step</span>(){'\n\n'}
+        cml.<span className="fn">cleanup</span>()
       </>
     ),
   },

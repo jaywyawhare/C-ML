@@ -194,7 +194,18 @@ Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim);
 ```c
 float* tensor_data_ptr(Tensor* t);  // Materialize lazy tensor, return data pointer
 void   tensor_free(Tensor* t);
+
+// External-ownership refcount (for language bindings that outlive the graph)
+void   tensor_pin(Tensor* t);       // Record an external owner; survives graph teardown
+void   tensor_release(Tensor* t);   // Drop the external hold; frees if nothing else refers
 ```
+
+`tensor_pin()`/`tensor_release()` let a caller outside the C core (e.g. the Python
+wrapper) hold a tensor safely across a graph teardown. While a tensor is pinned,
+`tensor_free()` (and a graph reset such as the optimizer's per-step reset) will
+**detach** it from the IR graph and keep it alive instead of freeing it out from
+under the owner; the eventual `tensor_release()` performs the real free. See
+[Memory Management → Tensor Reference Counting and External Ownership](memory_management.md#tensor-reference-counting-and-external-ownership).
 
 ### Example
 

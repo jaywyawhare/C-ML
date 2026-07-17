@@ -388,7 +388,13 @@ section {
   gap: 0;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+
+.code-tabs::-webkit-scrollbar { display: none; }
+
+.code-tab { flex: 0 0 auto; white-space: nowrap; }
 
 .code-tab {
   font-family: var(--font-mono);

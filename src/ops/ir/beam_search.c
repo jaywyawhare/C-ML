@@ -2,6 +2,7 @@
 #include "ops/ir/opt_transforms.h"
 #include "ops/ir/linearize.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -25,10 +26,7 @@ static int cache_slot(uint64_t hash) {
 }
 
 bool cml_beam_search_enabled(void) {
-    const char* env = getenv("BEAM");
-    if (!env) return false;
-    int val = atoi(env);
-    return val > 0;
+    return cml_flag(CML_FLAG_BEAM) > 0;
 }
 
 CMLBeamSearchCtx* cml_beam_search_create(void) {
@@ -39,14 +37,9 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
         return NULL;
     }
 
-    /* Read beam width from environment; fall back to default. */
-    const char* env = getenv("BEAM");
-    if (env) {
-        int w = atoi(env);
-        ctx->beam_width = (w > 0) ? w : CML_BEAM_DEFAULT_WIDTH;
-    } else {
-        ctx->beam_width = CML_BEAM_DEFAULT_WIDTH;
-    }
+    /* Read beam width from the central flag registry; fall back to default. */
+    int w           = cml_flag(CML_FLAG_BEAM);
+    ctx->beam_width = (w > 0) ? w : CML_BEAM_DEFAULT_WIDTH;
 
     ctx->warmup_runs    = CML_BEAM_DEFAULT_WARMUP;
     ctx->timing_runs    = CML_BEAM_DEFAULT_TIMING;
@@ -71,6 +64,9 @@ void cml_beam_search_free(CMLBeamSearchCtx* ctx) {
 int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                            CMLBeamConfig* best_out) {
     if (!ctx || !best_out) return -1;
+
+    /* IGNORE_BEAM_CACHE forces a fresh search by treating every lookup as a miss. */
+    if (cml_flag_enabled(CML_FLAG_IGNORE_BEAM_CACHE)) return -1;
 
     int slot = cache_slot(kernel_hash);
 

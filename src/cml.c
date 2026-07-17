@@ -1,6 +1,7 @@
 #include "cml.h"
 #include "tensor/realize.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #include "core/training_metrics.h"
 #include "core/error_stack.h"
 #include "core/cleanup.h"
@@ -35,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 #include <limits.h>
@@ -375,6 +377,25 @@ static void check_and_launch_viz(void) {
 static const char* g_build_info = "C-ML Library\n"
                                   "Features: autograd, nn, optim, logging, memory_management";
 
+/* Map the DEFAULT_FLOAT env var (FLOAT32/FLOAT/HALF/FLOAT16/BFLOAT16/FLOAT64/
+ * DOUBLE) to a DType, mirroring tinygrad's DEFAULT_FLOAT. Falls back to
+ * DTYPE_FLOAT32 when unset or unrecognized. */
+static DType cml_default_float_from_env(void) {
+    const char* v = getenv("DEFAULT_FLOAT");
+    if (!v || !*v)
+        return DTYPE_FLOAT32;
+    if (strcasecmp(v, "HALF") == 0 || strcasecmp(v, "FLOAT16") == 0)
+        return DTYPE_FLOAT16;
+    if (strcasecmp(v, "BFLOAT16") == 0)
+        return DTYPE_BFLOAT16;
+    if (strcasecmp(v, "FLOAT64") == 0 || strcasecmp(v, "DOUBLE") == 0)
+        return DTYPE_FLOAT64;
+    if (strcasecmp(v, "FLOAT32") == 0 || strcasecmp(v, "FLOAT") == 0)
+        return DTYPE_FLOAT32;
+    LOG_WARNING("Unrecognized DEFAULT_FLOAT='%s', using FLOAT32", v);
+    return DTYPE_FLOAT32;
+}
+
 int cml_init(void) {
     if (g_cml_initialized) {
         g_cml_init_count++;
@@ -388,10 +409,21 @@ int cml_init(void) {
 
     error_stack_init();
 
-    cml_set_log_level(LOG_LEVEL_ERROR);
+    /* Read the central flag registry from the environment before anything else
+     * so DEBUG/NOOPT/etc. take effect for the rest of initialization. */
+    cml_flags_init();
+
+    /* DEBUG=n raises the log verbosity (default is ERROR-only):
+     *   0 -> ERROR (quiet), 1-2 -> INFO, >=3 -> DEBUG (everything). */
+    int debug = cml_flag(CML_FLAG_DEBUG);
+    cml_set_log_level(debug >= 3 ? LOG_LEVEL_DEBUG : debug >= 1 ? LOG_LEVEL_INFO : LOG_LEVEL_ERROR);
+    if (debug >= 1)
+        cml_flags_dump(stderr);
 
     cml_set_default_device(DEVICE_CPU);
-    cml_set_default_dtype(DTYPE_FLOAT32);
+
+    /* DEFAULT_FLOAT overrides the default float dtype (tinygrad-style). */
+    cml_set_default_dtype(cml_default_float_from_env());
 
     cml_random_seed();
 
@@ -902,6 +934,18 @@ void cml_graph_cache_reset_global(void);
 void cml_autograd_step_end(Tensor* keep) {
     if (keep)
         tensor_realize(keep);   /* materialize + detach so the reset won't free it */
+    /* FUSE_OPTIM requests keeping the optimizer update in the backward graph.
+     * The eager optimizer path can't fuse graph nodes yet, so we honor the
+     * request conservatively: keep the per-step reset (correctness) and note it
+     * once. Full graph-level fusion is a follow-up. */
+    if (cml_flag_enabled(CML_FLAG_FUSE_OPTIM)) {
+        static bool warned = false;
+        if (!warned) {
+            LOG_INFO("FUSE_OPTIM set: optimizer-update graph fusion is not yet "
+                     "implemented; using the standard per-step path");
+            warned = true;
+        }
+    }
     cml_autograd_reset_after_step();
 }
 

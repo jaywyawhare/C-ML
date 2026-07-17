@@ -6,6 +6,7 @@
 #include "ops/ir/graph_cache.h"
 #include "ops/ir/schedule.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #ifdef CML_HAS_LLVM_BACKEND
 #include "ops/ir/llvm/llvm_backend.h"
 #endif
@@ -59,8 +60,12 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
 static int cml_ir_use_jit(void) {
     static int checked = 0, enabled = 1;
     if (!checked) {
-        const char* dis = getenv("DISABLE_JIT");
-        if (dis && dis[0] == '1') enabled = 0;
+        if (cml_flag_enabled(CML_FLAG_DISABLE_JIT)) enabled = 0;
+        /* JIT=0 disables JIT (like DISABLE_JIT); 1/2 keep it on. */
+        if (cml_flag(CML_FLAG_JIT) == 0) enabled = 0;
+        /* VALIDATE_WITH_CPU routes execution through the CPU reference path so
+         * results can be trusted as a baseline for the accelerated backends. */
+        if (cml_flag_enabled(CML_FLAG_VALIDATE_WITH_CPU)) enabled = 0;
         const char* be = getenv("BACKEND");
         if (be && (strcasecmp(be, "interp") == 0 || strcasecmp(be, "interpreter") == 0))
             enabled = 0;
@@ -4021,7 +4026,10 @@ int cpu_execute_node(struct IRNode* node) {
          * Only beneficial when in_channels >= 16: for shallow inputs (e.g. 3-ch RGB)
          * the 16 mini-GEMMs each have K=in_ch which is too small to amortise the
          * input/output transform overhead, making im2col+GEMM faster. */
-        if (p && p->use_winograd && conv_blas && conv_blas->initialized && ch_per_group_in >= 16 &&
+        /* WINO overrides the per-op decision: 0 forces off, 1 forces on, unset -> per-op. */
+        bool wino_ok = cml_flag_was_set(CML_FLAG_WINO) ? (cml_flag(CML_FLAG_WINO) > 0)
+                                                       : (p && p->use_winograd);
+        if (p && wino_ok && conv_blas && conv_blas->initialized && ch_per_group_in >= 16 &&
             kernel_h == 3 && kernel_w == 3 && stride_h == 1 && stride_w == 1 && dilation_h == 1 &&
             dilation_w == 1) {
             int ret =
@@ -5038,8 +5046,7 @@ static int cml_ir_use_fusion_scheduler(void) {
          * FUSION_SCHEDULER=0 or DISABLE_FUSION=1). It is validated 114/114 and
          * collapses elementwise chains into single JIT/blocked kernels. */
         const char* env = getenv("FUSION_SCHEDULER");
-        const char* dis = getenv("DISABLE_FUSION");
-        s_enabled       = !(env && env[0] == '0') && !(dis && dis[0] == '1');
+        s_enabled       = !(env && env[0] == '0') && !cml_flag_enabled(CML_FLAG_DISABLE_FUSION);
         s_checked       = 1;
     }
 

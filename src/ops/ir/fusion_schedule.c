@@ -15,6 +15,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -477,7 +478,11 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
                     }
                 }
             }
-            sched->memory_plan = cml_memory_plan_create(nb, buf_sizes, buf_first, buf_last);
+            /* NO_MEMORY_PLANNER leaves memory_plan NULL, so buffers are allocated
+             * independently instead of sharing planner-assigned offsets. */
+            sched->memory_plan = cml_flag_enabled(CML_FLAG_NO_MEMORY_PLANNER)
+                                     ? NULL
+                                     : cml_memory_plan_create(nb, buf_sizes, buf_first, buf_last);
         }
 
         cml_free(buf_sizes);
