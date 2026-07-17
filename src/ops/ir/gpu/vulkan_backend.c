@@ -1121,84 +1121,25 @@ done:
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized || !ir) return -1;
 
-    CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return -1;
-
-    struct IRNode* node = ir->head;
-    int result = 0;
-    int local_size = 256;
-
-    while (node && result == 0) {
-        if (!node->output || !node->output->data) {
-            if (node->output && node->output->numel > 0 && !node->output->data) {
-                node->output->data = cml_calloc(node->output->numel, sizeof(float));
-            }
-        }
-
-        size_t spirv_size = 0;
-        uint32_t* spirv = NULL;
-        int num_bufs = 0;
-        UOpType op = node->type;
-
-        if (cml_schedule_is_elementwise(op) && node->num_inputs == 1) {
-            spirv = cml_spirv_gen_unary(cg, op, "main", &spirv_size);
-            num_bufs = 3; /* in, out, params */
-        } else if (cml_schedule_is_elementwise(op) && node->num_inputs == 2) {
-            spirv = cml_spirv_gen_binary(cg, op, "main", &spirv_size);
-            num_bufs = 3;
-        } else if (op == UOP_MATMUL) {
-            spirv = cml_spirv_gen_matmul(cg, "main", &spirv_size);
-            num_bufs = 3;
-        }
-
-        if (!spirv) {
-            node = node->next;
+    /* Delegate to the validated per-node path. The previous inline
+     * reimplementation created kernels with a params/dims binding it never
+     * actually bound (so the generated shaders read an unbound `n`/M,N,K
+     * descriptor) and silently skipped any node it couldn't handle, leaving
+     * that node's output uncomputed. cml_vulkan_execute_node binds shader
+     * parameters correctly. If any node can't run on Vulkan we fail the whole
+     * graph so the dispatcher falls back to the CPU interpreter rather than
+     * returning partial/garbage results. */
+    for (struct IRNode* node = ir->head; node; node = node->next) {
+        if (node->is_executed && node->output && node->output->is_executed)
             continue;
-        }
-
-        CMLVulkanKernel* kernel = cml_vulkan_kernel_create(backend, spirv, spirv_size,
-                                                             "main", num_bufs);
-        cml_free(spirv);
-        if (!kernel) {
-            node = node->next;
+        if (!node->output)
             continue;
-        }
-
-        size_t n = node->output->numel;
-        uint32_t groups = ((uint32_t)n + local_size - 1) / local_size;
-
-            CMLVulkanBuffer* in_bufs[2] = {NULL, NULL};
-        for (int i = 0; i < node->num_inputs && i < 2; i++) {
-            if (node->inputs[i] && node->inputs[i]->data) {
-                size_t sz = node->inputs[i]->numel * sizeof(float);
-                in_bufs[i] = cml_vulkan_buffer_create(backend, sz, true);
-                if (in_bufs[i])
-                    cml_vulkan_buffer_upload(backend, in_bufs[i], node->inputs[i]->data, sz);
-            }
-        }
-
-        CMLVulkanBuffer* out_buf = cml_vulkan_buffer_create(backend, n * sizeof(float), true);
-
-            if (in_bufs[0]) cml_vulkan_kernel_bind_buffer(backend, kernel, 0, in_bufs[0]);
-        if (out_buf) cml_vulkan_kernel_bind_buffer(backend, kernel, 1, out_buf);
-        if (node->num_inputs > 1 && in_bufs[1])
-            cml_vulkan_kernel_bind_buffer(backend, kernel, 2, in_bufs[1]);
-
-        cml_vulkan_kernel_dispatch(backend, kernel, groups, 1, 1);
-
-            if (out_buf && node->output->data)
-            cml_vulkan_buffer_download(backend, out_buf, node->output->data, n * sizeof(float));
-
-            for (int i = 0; i < 2; i++)
-            if (in_bufs[i]) cml_vulkan_buffer_free(backend, in_bufs[i]);
-        if (out_buf) cml_vulkan_buffer_free(backend, out_buf);
-        cml_vulkan_kernel_free(backend, kernel);
-
-        node = node->next;
+        if (cml_vulkan_execute_node(backend, node) != 0)
+            return -1;
+        node->is_executed = true;
+        node->output->is_executed = true;
     }
-
-    cml_spirv_codegen_destroy(cg);
-    return result;
+    return 0;
 }
 
 int cml_vulkan_synchronize(CMLVulkanBackend* backend) {
