@@ -11,42 +11,63 @@ UPSAMPLE_BICUBIC = 2
 class Module:
     def __init__(self, c_module):
         self._module = c_module
+        # A module frees its own C handle unless it has been handed to a parent
+        # container (e.g. Sequential) that owns and frees it — see add()/append().
+        self._owned = True
+
+    def _as_module(self):
+        """Concrete layer handles are typed (Linear*, Sequential*, ...); the
+        generic module_* C functions take the base Module*, so cast."""
+        return ffi.cast("Module*", self._module)
 
     def __call__(self, input_tensor):
         return self.forward(input_tensor)
 
     def forward(self, input_tensor):
-        return Tensor(lib.cml_nn_module_forward(self._module, input_tensor._tensor))
+        return Tensor(lib.cml_nn_module_forward(self._as_module(), input_tensor._tensor))
 
     def set_training(self, training=True):
-        lib.cml_nn_module_set_training(self._module, training)
+        lib.cml_nn_module_set_training(self._as_module(), training)
 
     def is_training(self):
-        return lib.cml_nn_module_is_training(self._module)
+        return lib.cml_nn_module_is_training(self._as_module())
 
     def eval(self):
-        lib.cml_nn_module_eval(self._module)
+        lib.cml_nn_module_eval(self._as_module())
         return self
 
     def train(self, mode=True):
         if mode:
-            lib.cml_nn_module_train(self._module)
+            lib.cml_nn_module_train(self._as_module())
         else:
-            lib.cml_nn_module_eval(self._module)
+            lib.cml_nn_module_eval(self._as_module())
         return self
 
     def __del__(self):
-        if self._module != ffi.NULL:
-            lib.module_free(self._module)
+        m = getattr(self, "_module", None)
+        if m is not None and m != ffi.NULL and getattr(self, "_owned", False):
+            # Layer handles are typed as their concrete struct (Linear*, ReLU*,
+            # ...); module_free takes the base Module*, so cast. Modules owned by
+            # a parent container are freed by that parent — don't double-free.
+            lib.module_free(ffi.cast("Module*", m))
+            self._module = ffi.NULL
 
 
 class Sequential(Module):
-    def __init__(self):
+    def __init__(self, *modules):
+        """Sequential() or Sequential(layer1, layer2, ...) (PyTorch-style)."""
         super().__init__(lib.cml_nn_sequential())
         self.layers = []
+        for m in modules:
+            self.add(m)
 
     def add(self, layer):
-        self._module = lib.cml_nn_sequential_add(self._module, layer._module)
+        self._module = lib.cml_nn_sequential_add(
+            ffi.cast("Sequential*", self._module),
+            ffi.cast("Module*", layer._module),
+        )
+        # The Sequential (C side) now owns and frees this child.
+        layer._owned = False
         self.layers.append(layer)
         return self
 
@@ -63,12 +84,16 @@ class ModuleList(Module):
         self._children = []
 
     def append(self, module):
-        lib.module_list_append(self._module, module._module)
+        lib.module_list_append(
+            ffi.cast("ModuleList*", self._module), ffi.cast("Module*", module._module))
+        module._owned = False   # the ModuleList now owns and frees this child
         self._children.append(module)
         return self
 
     def insert(self, index, module):
-        lib.module_list_insert(self._module, index, module._module)
+        lib.module_list_insert(
+            ffi.cast("ModuleList*", self._module), index, ffi.cast("Module*", module._module))
+        module._owned = False
         self._children.insert(index, module)
 
     def __getitem__(self, index):
@@ -87,7 +112,11 @@ class ModuleDict(Module):
         self._children = {}
 
     def __setitem__(self, key, module):
-        lib.module_dict_add(self._module, key.encode("utf-8"), module._module)
+        lib.module_dict_add(
+            ffi.cast("ModuleDict*", self._module),
+            key.encode("utf-8"),
+            ffi.cast("Module*", module._module))
+        module._owned = False   # the ModuleDict now owns and frees this child
         self._children[key] = module
 
     def __getitem__(self, key):

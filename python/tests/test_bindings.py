@@ -90,5 +90,19 @@ def test_numpy_roundtrip_preserves_shape_and_values():
     np.testing.assert_allclose(t.numpy(), arr, rtol=1e-6)
 
 
+def test_nn_forward_and_optimizer_construct():
+    """The nn wrappers pass concrete layer handles where the C API wants Module*;
+    these used to raise a CFFI TypeError. Verify forward + optimizer build work."""
+    import cml.nn as nn
+    import cml.optim as optim
+
+    model = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 2))  # *modules ctor
+    x = cml.tensor(np.random.randn(6, 4).astype(np.float32))
+    out = model(x)
+    assert out.shape == (6, 2)
+    opt = optim.Adam(model, lr=1e-3)   # must construct without a type error
+    assert opt is not None
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))

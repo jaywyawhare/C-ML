@@ -3,6 +3,12 @@
 from cml._cml_lib import ffi, lib
 
 
+def _as_module(model):
+    """Cast a model's concrete layer handle (Sequential*, Linear*, ...) to the
+    base Module* expected by the generic module_/optimizer C functions."""
+    return ffi.cast("Module*", model._module)
+
+
 def _collect_parameters(model):
     """Collect parameters from a Module, returning (Parameter**, num_params).
 
@@ -11,7 +17,7 @@ def _collect_parameters(model):
     """
     params_out = ffi.new("Parameter***")
     num_params_out = ffi.new("int*")
-    ret = lib.module_collect_parameters(model._module, params_out, num_params_out, True)
+    ret = lib.module_collect_parameters(_as_module(model), params_out, num_params_out, True)
     if ret != 0:
         raise RuntimeError("Failed to collect parameters from model")
     return params_out[0], num_params_out[0]
@@ -56,7 +62,7 @@ class Optimizer:
 class Adam(Optimizer):
     def __init__(self, model, lr=0.001, weight_decay=0.0, beta1=0.9, beta2=0.999, epsilon=1e-8):
         optimizer = lib.cml_optim_adam_for_model(
-            model._module, float(lr), float(weight_decay),
+            _as_module(model), float(lr), float(weight_decay),
             float(beta1), float(beta2), float(epsilon)
         )
         super().__init__(optimizer)
@@ -65,7 +71,7 @@ class Adam(Optimizer):
 class SGD(Optimizer):
     def __init__(self, model, lr=0.01, momentum=0.0, weight_decay=0.0):
         optimizer = lib.cml_optim_sgd_for_model(
-            model._module, float(lr), float(momentum), float(weight_decay)
+            _as_module(model), float(lr), float(momentum), float(weight_decay)
         )
         super().__init__(optimizer)
 
