@@ -192,6 +192,22 @@ int cml_dist_barrier(void) {
     return g_default_group->ops->barrier(g_default_group->backend_ctx);
 }
 
+int cml_dist_send(Tensor* tensor, int dst_rank, int tag) {
+    if (!g_default_group || !g_default_group->initialized)
+        return -1;
+    if (!g_default_group->ops->send)
+        return -1;
+    return g_default_group->ops->send(tensor, dst_rank, tag, g_default_group->backend_ctx);
+}
+
+int cml_dist_recv(Tensor* tensor, int src_rank, int tag) {
+    if (!g_default_group || !g_default_group->initialized)
+        return -1;
+    if (!g_default_group->ops->recv)
+        return -1;
+    return g_default_group->ops->recv(tensor, src_rank, tag, g_default_group->backend_ctx);
+}
+
 DistWork* cml_dist_allreduce_async(Tensor* tensor, DistReduceOp op) {
     if (!g_default_group || !g_default_group->initialized)
         return NULL;

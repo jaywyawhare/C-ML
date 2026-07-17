@@ -30,6 +30,13 @@ typedef struct CMLPipelineParallel {
     /* Micro-batch buffers */
     Tensor*** micro_batch_outputs; /* [stage][micro_batch] */
     int num_micro_batches;
+
+    /* Distributed (cross-rank) mode: this rank owns exactly one stage
+     * (stage_id == rank). These cache the per-micro-batch input/output tensors
+     * of THIS rank's stage so the distributed backward can back-propagate and
+     * stream input-gradients upstream. */
+    Tensor** dist_stage_inputs;   /* [micro_batch] — recv'd (or sliced on rank 0) */
+    Tensor** dist_stage_outputs;  /* [micro_batch] — this stage's forward output */
 } CMLPipelineParallel;
 
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
@@ -38,6 +45,21 @@ CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
 Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input);
 
 int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
+
+/* True cross-rank pipeline parallelism: world_size == num_stages and this rank
+ * runs ONLY stage `rank`, streaming micro-batch activations to rank+1 and
+ * receiving from rank-1 over the process group. Because each stage is a separate
+ * process, stages run concurrently — real pipeline overlap. `input` is used only
+ * on rank 0; every other rank passes NULL and receives from upstream. Returns
+ * the assembled output on the LAST rank and NULL on all others (check rank). */
+Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input);
+
+/* Mirror of the distributed forward: the last rank seeds gradients from
+ * `grad_output` (its per-sample loss gradient, same shape as the forward
+ * output); every rank back-props its stage and streams the input-gradient
+ * upstream so all stages get weight gradients. Must follow a
+ * cml_pipeline_dist_forward on the same pipeline. */
+int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
 
 void cml_pipeline_free(CMLPipelineParallel* pipeline);
 
