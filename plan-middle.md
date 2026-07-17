@@ -8,7 +8,7 @@ Branch: `shape-specific-simd`. Nothing pushed to remote.
 - `ctest` (ASan build): **111 / 111** — whole suite memory-clean
 - `grad_check`: **18 / 18 hard tests** (no more XFAIL), ASan-clean, stable across runs
 - GPU exec test (`test_gpu_exec`): **6 / 6** on Intel Iris Xe (Vulkan)
-- Heavy tests with `CML_USE_VULKAN=1`: grad_check 18/18, test_new_features 40/40, test_multi_dtype 15/15
+- Heavy tests with `USE_VULKAN=1`: grad_check 18/18, test_new_features 40/40, test_multi_dtype 15/15
 - Python binding: builds + `numpy ↔ C-ML` round-trip verified
 
 ---
@@ -48,7 +48,7 @@ The existing Vulkan backend had solid device/buffer/dispatch infra but its **han
 - **Shaders** (`src/ops/ir/gpu/shaders/`): `binary.comp` (add/sub/mul/div/max + broadcast), `unary.comp` (relu/neg/exp/sqrt/square/sigmoid/tanh/abs/log/recip/rsqrt), `matmul.comp` (2D) → compiled to embedded SPIR-V (`include/ops/ir/gpu/vk_shaders.h`, regen via `tools/gen_vk_shaders.sh`).
 - **`cml_vulkan_execute_node()`** — classifies a node, uploads inputs, dispatches the shader on GPU, downloads result; returns −1 for unsupported → CPU fallback.
 - **`cml_vulkan_get_backend()`** — lazy process-wide backend.
-- **Wired into `cpu_execute_ir`**: `CML_USE_VULKAN=1` routes supported f32 nodes to Vulkan with per-node CPU/JIT fallback.
+- **Wired into `cpu_execute_ir`**: `USE_VULKAN=1` routes supported f32 nodes to Vulkan with per-node CPU/JIT fallback.
 - **Verified** on Iris Xe: add/mul/sub/relu/matmul/chained all match CPU exactly; default path unchanged (opt-in).
 
 ### 6. Python binding (CFFI) — built & working

@@ -92,7 +92,7 @@ Evidence:
 - Dispatch env parser supports many values (`cuda`, `rocm`, `vulkan`, `nv`, `am`, `nir`, `webgpu`, `opencl`): `src/ops/ir/dispatch.c:901-941`.
 
 Impact:
-- `CML_BACKEND=cuda` and others may not behave as expected on direct `cml_ir_execute` paths.
+- `BACKEND=cuda` and others may not behave as expected on direct `cml_ir_execute` paths.
 - Surprising differences between APIs depending on entry point.
 
 What is missing:
