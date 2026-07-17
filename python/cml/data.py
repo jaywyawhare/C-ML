@@ -1,15 +1,20 @@
 """Data loading and preprocessing."""
 
 from typing import Tuple, List, Optional, Union
-import cml
 from cml.core import Tensor
+
+
+def _num_samples(X: Tensor) -> int:
+    """Sample count = dim-0 length (Tensor.size is total numel, not rows)."""
+    shape = X.shape
+    return shape[0] if shape else 0
 
 
 class Dataset:
     def __init__(self, X: Tensor, y: Optional[Tensor] = None):
         self.X = X
         self.y = y
-        self.size = X.size
+        self.size = _num_samples(X)
 
     def __len__(self) -> int:
         return self.size
@@ -17,15 +22,21 @@ class Dataset:
     def __getitem__(self, idx: Union[int, slice]) -> Tuple[Tensor, Optional[Tensor]]:
         if isinstance(idx, slice):
             start = idx.start or 0
-            stop = idx.stop or self.size
+            stop = self.size if idx.stop is None else idx.stop
             X_batch = self.X.slice(start, stop)
-            y_batch = self.y.slice(start, stop) if self.y else None
+            y_batch = self.y.slice(start, stop) if self.y is not None else None
             return X_batch, y_batch
         else:
             # Single item
             X_item = self.X.slice(idx, idx + 1)
-            y_item = self.y.slice(idx, idx + 1) if self.y else None
+            y_item = self.y.slice(idx, idx + 1) if self.y is not None else None
             return X_item, y_item
+
+    def select(self, indices) -> Tuple[Tensor, Optional[Tensor]]:
+        """Samples at the given (possibly non-contiguous) indices."""
+        X_batch = self.X.index_select(indices)
+        y_batch = self.y.index_select(indices) if self.y is not None else None
+        return X_batch, y_batch
 
 
 class DataLoader:
@@ -46,15 +57,16 @@ class DataLoader:
         self.num_workers = num_workers
         self.indices = list(range(len(self.dataset)))
 
-        if shuffle:
-            import random
-            random.shuffle(self.indices)
-
     def __iter__(self):
-        for i in range(0, len(self.dataset), self.batch_size):
-            batch_size = min(self.batch_size, len(self.dataset) - i)
-            X_batch, y_batch = self.dataset[i : i + batch_size]
-            yield X_batch, y_batch
+        n = len(self.dataset)
+        if self.shuffle:
+            import random
+            random.shuffle(self.indices)  # fresh order every epoch
+            for i in range(0, n, self.batch_size):
+                yield self.dataset.select(self.indices[i : i + self.batch_size])
+        else:
+            for i in range(0, n, self.batch_size):
+                yield self.dataset[i : min(i + self.batch_size, n)]
 
     def __len__(self) -> int:
         return (len(self.dataset) + self.batch_size - 1) // self.batch_size
@@ -75,13 +87,23 @@ def train_test_split(
     y: Optional[Tensor] = None,
     test_size: float = 0.2,
     random_state: Optional[int] = None,
+    shuffle: bool = True,
 ) -> Tuple:
-    if random_state is not None:
-        cml.seed(random_state)
-
-    num_samples = X.size
+    num_samples = _num_samples(X)
     num_test = int(num_samples * test_size)
     num_train = num_samples - num_test
+
+    if shuffle:
+        import random
+        rng = random.Random(random_state)
+        indices = list(range(num_samples))
+        rng.shuffle(indices)
+        train_idx, test_idx = indices[:num_train], indices[num_train:]
+        X_train = X.index_select(train_idx)
+        X_test = X.index_select(test_idx)
+        if y is not None:
+            return X_train, X_test, y.index_select(train_idx), y.index_select(test_idx)
+        return X_train, X_test
 
     X_train = X.slice(0, num_train)
     X_test = X.slice(num_train, num_samples)
@@ -140,7 +162,7 @@ def split_into_batches(
     X: Tensor, y: Optional[Tensor] = None, batch_size: int = 32
 ) -> List[Tuple]:
     batches = []
-    num_samples = X.size
+    num_samples = _num_samples(X)
 
     for i in range(0, num_samples, batch_size):
         end = min(i + batch_size, num_samples)

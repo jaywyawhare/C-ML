@@ -202,6 +202,7 @@ ffi.cdef(
     typedef struct Conv2d { ...; } Conv2d;
     typedef struct Conv3d { ...; } Conv3d;
     typedef struct ConvTranspose1d { ...; } ConvTranspose1d;
+    typedef struct ConvTranspose2d { ...; } ConvTranspose2d;
     typedef struct ConvTranspose3d { ...; } ConvTranspose3d;
     typedef struct ReLU { ...; } ReLU;
     typedef struct Sigmoid { ...; } Sigmoid;
@@ -270,6 +271,11 @@ ffi.cdef(
     bool tensor_is_contiguous(Tensor* t);
     Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorConfig* config);
 
+    // Lazy view/index ops (from ops/uops.h)
+
+    Tensor* uop_shrink(Tensor* a, int* starts, int* ends, int num_dims);
+    Tensor* uop_gather(Tensor* input, Tensor* indices, int dim);
+
     // Module functions (from nn.h)
 
     void module_free(Module* module);
@@ -278,6 +284,7 @@ ffi.cdef(
     bool module_is_training(Module* module);
     int module_collect_parameters(Module* module, Parameter*** params_out, int* num_params_out,
                                   bool recursive);
+    void cml_free(void* ptr);
 
     // Optimizer functions (from optim.h)
 
@@ -529,6 +536,9 @@ ffi.cdef(
     Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride,
                           int padding, int dilation, bool use_bias, DType dtype, DeviceType device);
     ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
+                                              int stride, int padding, int output_padding,
+                                              bool use_bias, DType dtype, DeviceType device);
+    ConvTranspose2d* cml_nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
                                               int stride, int padding, int output_padding,
                                               bool use_bias, DType dtype, DeviceType device);
     ConvTranspose3d* cml_nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,

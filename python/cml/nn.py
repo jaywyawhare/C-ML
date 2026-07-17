@@ -8,6 +8,38 @@ UPSAMPLE_BILINEAR = 1
 UPSAMPLE_BICUBIC = 2
 
 
+class Parameter:
+    """View over a C Parameter. The underlying tensor and struct stay owned by
+    their module; this wrapper only reads them."""
+
+    def __init__(self, c_param):
+        self._param = c_param
+
+    @property
+    def name(self):
+        if self._param.name == ffi.NULL:
+            return ""
+        return ffi.string(self._param.name).decode()
+
+    @property
+    def requires_grad(self):
+        return bool(self._param.requires_grad)
+
+    @property
+    def tensor(self):
+        t = self._param.tensor
+        return Tensor(t) if t != ffi.NULL else None
+
+    data = tensor
+
+    @property
+    def grad(self):
+        t = self._param.tensor
+        if t == ffi.NULL or t.grad == ffi.NULL:
+            return None
+        return Tensor(t.grad)
+
+
 class Module:
     def __init__(self, c_module):
         self._module = c_module
@@ -31,6 +63,20 @@ class Module:
 
     def is_training(self):
         return lib.cml_nn_module_is_training(self._as_module())
+
+    def parameters(self, recursive=True):
+        """The module's parameters as a list of Parameter views (optimizers use
+        the raw C array via optim._collect_parameters instead)."""
+        params_out = ffi.new("Parameter***")
+        num_out = ffi.new("int*")
+        ret = lib.module_collect_parameters(self._as_module(), params_out, num_out, recursive)
+        if ret != 0:
+            raise RuntimeError("Failed to collect parameters from module")
+        arr, n = params_out[0], num_out[0]
+        result = [Parameter(arr[i]) for i in range(n)]
+        if arr != ffi.NULL:
+            lib.cml_free(arr)  # entries stay owned by their modules; only the array is ours
+        return result
 
     def eval(self):
         lib.cml_nn_module_eval(self._as_module())
@@ -224,6 +270,7 @@ def _make_conv_transpose(c_fn_name, cls_name):
 
 
 ConvTranspose1d = _make_conv_transpose('cml_nn_conv_transpose1d', 'ConvTranspose1d')
+ConvTranspose2d = _make_conv_transpose('cml_nn_conv_transpose2d', 'ConvTranspose2d')
 ConvTranspose3d = _make_conv_transpose('cml_nn_conv_transpose3d', 'ConvTranspose3d')
 
 

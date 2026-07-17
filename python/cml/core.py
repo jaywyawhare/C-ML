@@ -386,6 +386,28 @@ class Tensor:
     def view(self, *new_shape) -> "Tensor":
         return self.reshape(*new_shape)
 
+    def slice(self, start: int, stop: int) -> "Tensor":
+        """Contiguous slice [start, stop) along dim 0, like tensor[start:stop]."""
+        nd = self.ndim
+        shape = self.shape
+        if nd < 1:
+            raise ValueError("slice requires at least a 1-D tensor")
+        n = shape[0]
+        if start < 0:
+            start += n
+        if stop < 0:
+            stop += n
+        start = max(0, min(start, n))
+        stop = max(start, min(stop, n))
+        starts = ffi.new("int[]", [start] + [0] * (nd - 1))
+        ends = ffi.new("int[]", [stop] + list(shape[1:]))
+        return Tensor(lib.uop_shrink(self._tensor, starts, ends, nd))
+
+    def index_select(self, indices) -> "Tensor":
+        """Rows at the given indices along dim 0 (lazy gather)."""
+        idx = Tensor([float(i) for i in indices])
+        return Tensor(lib.uop_gather(self._tensor, idx._tensor, 0))
+
     def transpose(self, dim0=0, dim1=1):
         return Tensor(lib.cml_transpose(self._tensor, dim0, dim1))
 
@@ -561,6 +583,12 @@ class Tensor:
         return tensor
 
     def to(self, device: Union[int, str] = None, dtype: Union[int, str] = None) -> "Tensor":
+        if device is not None:
+            dev = device.lower() if isinstance(device, str) else device
+            if dev not in (DEVICE_CPU, "cpu"):
+                raise NotImplementedError(
+                    f"Tensor.to: only CPU tensors are supported, got device={device!r}"
+                )
         if dtype is not None:
             return self.cast(dtype)
         return self.clone()

@@ -139,10 +139,9 @@ def get_loss_function(loss_fn: str) -> Callable:
 
 
 def batch_iterator(X: Tensor, y: Tensor, batch_size: int):
-    num_samples = X.size
+    shape = X.shape
+    num_samples = shape[0] if shape else 0
 
     for i in range(0, num_samples, batch_size):
-        if i + batch_size <= num_samples:
-            X_batch = X.slice(i, i + batch_size)
-            y_batch = y.slice(i, i + batch_size)
-            yield X_batch, y_batch
+        stop = min(i + batch_size, num_samples)  # include the last partial batch
+        yield X.slice(i, stop), y.slice(i, stop)

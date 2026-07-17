@@ -39,9 +39,18 @@ from cml.optim import (
     Adam, SGD, RMSprop, AdaGrad, AdamW, NAdam, Adamax, Adadelta, LAMB, LARS, Muon,
 )
 from cml.nn import (
-    Sequential, Linear, ReLU, Sigmoid, Tanh, LeakyReLU, PReLU, Dropout, Flatten,
-    Conv1d, Conv2d, Conv3d, MaxPool1d, MaxPool2d, MaxPool3d,
-    AvgPool1d, AvgPool2d, AvgPool3d, BatchNorm1d, BatchNorm2d, Embedding,
+    Module, Parameter, Sequential, ModuleList, ModuleDict, Identity,
+    Linear, ReLU, Sigmoid, Tanh, LeakyReLU, PReLU, Dropout, Flatten,
+    Conv1d, Conv2d, Conv3d, ConvTranspose1d, ConvTranspose2d, ConvTranspose3d,
+    MaxPool1d, MaxPool2d, MaxPool3d,
+    AvgPool1d, AvgPool2d, AvgPool3d,
+    AdaptiveAvgPool1d, AdaptiveAvgPool2d, AdaptiveMaxPool1d, AdaptiveMaxPool2d,
+    BatchNorm1d, BatchNorm2d, BatchNorm3d,
+    LayerNorm, LayerNorm2d, InstanceNorm2d, GroupNorm, Embedding,
+    RNNCell, LSTMCell, GRUCell, RNN, LSTM, GRU,
+    MultiHeadAttention, TransformerEncoderLayer, TransformerDecoderLayer,
+    TransformerEncoder, TransformerDecoder,
+    Upsample, PixelShuffle, PixelUnshuffle,
 )
 
 from cml.losses import (
