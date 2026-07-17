@@ -52,8 +52,15 @@ void cml_row_parallel_free(CMLRowParallelLinear* rp);
 /* Caller must all-reduce sum outputs across ranks for the final result. */
 Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input);
 
-/* All tensors in partials must have the same shape and dtype. */
+/* All tensors in partials must have the same shape and dtype. Sums a set of
+ * in-process partials (single-process simulation of tensor parallelism). */
 Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts);
+
+/* Sum a row-parallel forward partial across ranks IN PLACE via the default
+ * process group (real distributed collective; no-op at world_size==1). Because
+ * all-reduce-sum has an identity gradient, the in-place reduction preserves
+ * correct per-rank gradients for the sharded weight. Returns 0 on success. */
+int cml_row_parallel_all_reduce(Tensor* partial);
 
 /* Returns a freshly allocated copy of the shard data. */
 Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank);

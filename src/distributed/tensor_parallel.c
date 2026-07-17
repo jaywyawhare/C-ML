@@ -1,26 +1,12 @@
 #include "distributed/tensor_parallel.h"
+#include "distributed/distributed.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "alloc/cml_allocator.h"
-
-/* output[i][j] = sum_k input[i][k] * weight[j][k]  (weight stored as [N,K]) */
-static void matmul_weight_transposed(const float* input, int M, int K,
-                                     const float* weight, int N,
-                                     float* output)
-{
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            float sum = 0.0f;
-            for (int k = 0; k < K; k++) {
-                sum += input[i * K + k] * weight[j * K + k];
-            }
-            output[i * N + j] = sum;
-        }
-    }
-}
 
 Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank)
 {
@@ -220,46 +206,18 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input)
         return NULL;
     }
 
-    int local_out = cp->weight->shape[0]; /* out_features / tp_size */
+    (void)batch;
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(cp->weight);
-    const float* input_data  = (const float*)tensor_data_ptr(input);
-    const float* weight_data = (const float*)tensor_data_ptr(cp->weight);
-    if (!input_data || !weight_data) {
-        LOG_ERROR("cml_column_parallel_forward: failed to get data pointers");
+    /* Single autograd-tracked fused node: output = input @ weight^T + bias
+     * ([batch, out/tp]). Building it through uop_linear (instead of a raw
+     * matmul into a fresh buffer) links the output into the IR graph, so
+     * tensor_backward produces a gradient for the sharded `weight`/`bias`.
+     * The previous raw-matmul path had no autograd edge → TP was inference-only. */
+    Tensor* output = uop_linear(input, cp->weight, cp->bias);
+    if (!output) {
+        LOG_ERROR("cml_column_parallel_forward: uop_linear failed");
         return NULL;
     }
-
-    size_t out_elems = (size_t)batch * local_out;
-    float* out_data = (float*)cml_malloc(out_elems * sizeof(float));
-    if (!out_data) {
-        LOG_ERROR("cml_column_parallel_forward: allocation failed");
-        return NULL;
-    }
-
-    /* output[i, j] = sum_k input[i, k] * weight[j, k] */
-    matmul_weight_transposed(input_data, batch, in_features,
-                             weight_data, local_out, out_data);
-
-    /* Add bias if present */
-    if (cp->bias) {
-        tensor_ensure_executed(cp->bias);
-        const float* bias_data = (const float*)tensor_data_ptr(cp->bias);
-        if (bias_data) {
-            for (int i = 0; i < batch; i++) {
-                for (int j = 0; j < local_out; j++) {
-                    out_data[i * local_out + j] += bias_data[j];
-                }
-            }
-        }
-    }
-
-    int out_shape[2] = {batch, local_out};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(out_data, out_shape, 2, &cfg);
-    cml_free(out_data);
     return output;
 }
 
@@ -381,49 +339,19 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input)
         return NULL;
     }
 
-    int out_features = rp->out_features;
+    (void)batch;
+    (void)local_in;
 
-    tensor_ensure_executed(input);
-    tensor_ensure_executed(rp->weight);
-    const float* input_data  = (const float*)tensor_data_ptr(input);
-    const float* weight_data = (const float*)tensor_data_ptr(rp->weight);
-    if (!input_data || !weight_data) {
-        LOG_ERROR("cml_row_parallel_forward: failed to get data pointers");
+    /* Autograd-tracked partial: output = input_shard @ weight^T (+ bias on
+     * rank 0), shape [batch, out_features]. This is each rank's PARTIAL — the
+     * caller must all-reduce-sum the partials across ranks (see
+     * cml_row_parallel_all_reduce) for the final result. Built via uop_linear
+     * so gradients flow back to the sharded `weight`. */
+    Tensor* output = uop_linear(input, rp->weight, rp->bias);
+    if (!output) {
+        LOG_ERROR("cml_row_parallel_forward: uop_linear failed");
         return NULL;
     }
-
-    size_t out_elems = (size_t)batch * out_features;
-    float* out_data = (float*)cml_malloc(out_elems * sizeof(float));
-    if (!out_data) {
-        LOG_ERROR("cml_row_parallel_forward: allocation failed");
-        return NULL;
-    }
-
-    /* output[i, j] = sum_k input[i, k] * weight[j, k]
-     * weight is [out_features, in_features / tp_size]
-     * input  is [batch, in_features / tp_size]
-     */
-    matmul_weight_transposed(input_data, batch, local_in,
-                             weight_data, out_features, out_data);
-
-    /* Add bias (only rank 0 has bias) */
-    if (rp->bias) {
-        tensor_ensure_executed(rp->bias);
-        const float* bias_data = (const float*)tensor_data_ptr(rp->bias);
-        if (bias_data) {
-            for (int i = 0; i < batch; i++) {
-                for (int j = 0; j < out_features; j++) {
-                    out_data[i * out_features + j] += bias_data[j];
-                }
-            }
-        }
-    }
-
-    int out_shape[2] = {batch, out_features};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_from_data(out_data, out_shape, 2, &cfg);
-    cml_free(out_data);
     return output;
 }
 
@@ -494,4 +422,20 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
     cml_free(sum_data);
     cml_free(out_shape);
     return result;
+}
+
+int cml_row_parallel_all_reduce(Tensor* partial)
+{
+    if (!partial) {
+        LOG_ERROR("cml_row_parallel_all_reduce: partial is NULL");
+        return -1;
+    }
+    /* Sum this rank's row-parallel partial with every other rank's, in place,
+     * using the real process-group collective (a no-op at world_size==1).
+     *
+     * The gradient of an all-reduce-sum is the identity to each rank's input,
+     * so overwriting the materialized partial in place keeps per-rank weight
+     * gradients correct: dL/d(partial_r) == dL/d(reduced) for every rank r. */
+    tensor_ensure_executed(partial);
+    return cml_dist_allreduce(partial, DIST_REDUCE_SUM);
 }
