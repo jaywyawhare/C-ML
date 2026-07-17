@@ -1347,10 +1347,19 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
 
     cpu_fallback:
         /* Download inputs, execute on CPU */
-        for (int i = 0; i < node->num_inputs; i++) {
-            Tensor* inp = node->inputs[i];
-            if (inp && !inp->data && ocl_find_buffer(b, inp))
-                ocl_download(b, inp);
+        {
+            int downloaded = 0;
+            for (int i = 0; i < node->num_inputs; i++) {
+                Tensor* inp = node->inputs[i];
+                if (inp && !inp->data && ocl_find_buffer(b, inp)) {
+                    ocl_download(b, inp);
+                    downloaded = 1;
+                }
+            }
+            /* ocl_download enqueues a NON-blocking read; the CPU op below reads
+             * inp->data immediately, so we must finish the queue first or it
+             * reads stale/uninitialized host memory. */
+            if (downloaded) clFinish(b->queue);
         }
         cpu_execute_node(node);
         node->is_executed = true;

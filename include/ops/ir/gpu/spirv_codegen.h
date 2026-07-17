@@ -23,6 +23,7 @@ typedef struct SPIRVBuilder {
     uint32_t* words;
     size_t    len;
     size_t    cap;
+    bool      overflow;   /* set if a word emit failed (OOM) — output invalid */
     uint32_t  next_id;    /* next SSA ID to allocate */
 
     /* Cached type IDs */

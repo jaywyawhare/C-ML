@@ -1,5 +1,6 @@
 #include "ops/ir/gpu/webgpu_backend.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"   /* cml_calloc/cml_free used on all platforms */
 
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +16,6 @@
 #define WGPU_LIB_NAME "libwgpu_native.dylib"
 #elif defined(_WIN32)
 #include <windows.h>
-#include "alloc/cml_allocator.h"
 #define WGPU_LIB_NAME "wgpu_native.dll"
 #endif
 

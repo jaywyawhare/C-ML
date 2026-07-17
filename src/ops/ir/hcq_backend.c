@@ -208,24 +208,26 @@ static int hcq_vulkan_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
 }
 
 static CMLHCQSignal* hcq_vulkan_signal_create(void) {
-    CMLHCQSignal* s = calloc(1, sizeof(CMLHCQSignal));
+    /* Must use the CML allocator: hcq.c frees this wrapper with cml_free for the
+     * VULKAN/AM backends, so system calloc here would corrupt the heap. */
+    CMLHCQSignal* s = cml_calloc(1, sizeof(CMLHCQSignal));
     if (!s)
         return NULL;
     s->backend = CML_HCQ_VULKAN;
     if (cml_hcq_vulkan_signal_create(s) != 0) {
-        free(s);
+        cml_free(s);
         return NULL;
     }
     return s;
 }
 
 static CMLHCQSignal* hcq_am_signal_create(void) {
-    CMLHCQSignal* s = calloc(1, sizeof(CMLHCQSignal));
+    CMLHCQSignal* s = cml_calloc(1, sizeof(CMLHCQSignal));
     if (!s)
         return NULL;
     s->backend = CML_HCQ_AM;
     if (cml_hcq_am_signal_create(s) != 0) {
-        free(s);
+        cml_free(s);
         return NULL;
     }
     return s;

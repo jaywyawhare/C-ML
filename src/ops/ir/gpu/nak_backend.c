@@ -1,5 +1,6 @@
 #include "ops/ir/gpu/nak_backend.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"   /* cml_calloc/cml_free used on all platforms */
 
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,6 @@
 #include <dlfcn.h>
 #else
 #include <windows.h>
-#include "alloc/cml_allocator.h"
 #define dlopen(path, flags) ((void*)LoadLibraryA(path))
 #define dlsym(handle, sym)  ((void*)GetProcAddress((HMODULE)(handle), (sym)))
 #define dlclose(handle)     FreeLibrary((HMODULE)(handle))

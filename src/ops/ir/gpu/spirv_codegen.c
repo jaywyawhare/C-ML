@@ -149,8 +149,11 @@ void spirv_builder_destroy(SPIRVBuilder* b) {
 
 void spirv_builder_emit(SPIRVBuilder* b, uint32_t word) {
     if (b->len >= b->cap) {
-        b->cap *= 2;
-        b->words = (uint32_t*)cml_realloc(b->words, b->cap * sizeof(uint32_t));
+        size_t ncap = b->cap * 2;
+        uint32_t* nw = (uint32_t*)cml_realloc(b->words, ncap * sizeof(uint32_t));
+        if (!nw) { b->overflow = true; return; }  /* drop instead of NULL-deref */
+        b->words = nw;
+        b->cap = ncap;
     }
     b->words[b->len++] = word;
 }
@@ -205,7 +208,11 @@ static void emit_entry_point(SPIRVBuilder* b, uint32_t func_id, uint32_t global_
 }
 
 static void emit_execution_mode(SPIRVBuilder* b, uint32_t func_id, int lx, int ly, int lz) {
-    emit_op(b, SpvExecutionModeLocalSize, 6);
+    /* OpExecutionMode (opcode 16) <func> LocalSize(17) lx ly lz.
+     * The opcode must be SpvOpExecutionMode; SpvExecutionModeLocalSize is the
+     * mode *operand* emitted below — previously it was wrongly used as the
+     * opcode too, which made every generated module fail SPIR-V validation. */
+    emit_op(b, SpvOpExecutionMode, 6);
     spirv_builder_emit(b, func_id);
     spirv_builder_emit(b, SpvExecutionModeLocalSize);
     spirv_builder_emit(b, (uint32_t)lx);
@@ -256,6 +263,7 @@ static uint32_t __attribute__((unused)) emit_uint_constant(SPIRVBuilder* b, uint
 }
 
 uint32_t* spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size) {
+    if (b->overflow || b->len == 0) return NULL;  /* truncated → don't ship invalid SPIR-V */
     uint32_t* result = (uint32_t*)cml_malloc(b->len * sizeof(uint32_t));
     if (!result) return NULL;
     memcpy(result, b->words, b->len * sizeof(uint32_t));

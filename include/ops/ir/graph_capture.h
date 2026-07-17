@@ -52,6 +52,12 @@ typedef struct CMLCapturedGraph {
     void* backend_graph;       /* e.g., cudaGraph_t */
     void* backend_instance;    /* e.g., cudaGraphExec_t */
 
+    /* Backend teardown hooks captured alongside the handles so the graph can be
+     * destroyed without holding a reference to the backend. Each takes the
+     * corresponding handle above; NULL if the backend has nothing to free. */
+    int (*backend_destroy_instance)(void* instance); /* e.g. cuGraphExecDestroy */
+    int (*backend_destroy_graph)(void* graph);       /* e.g. cuGraphDestroy     */
+
     double capture_time_ms;
     double last_replay_time_ms;
     double total_replay_time_ms;

@@ -108,6 +108,11 @@ int cml_cuda_graph_end_capture(CMLCUDAGraphBackend* gb, CMLCapturedGraph* out) {
 
     out->backend_graph = graph;
     out->backend_instance = exec;
+    /* Store the destroy hooks so cml_cuda_graph_free can release the GPU
+     * resources without a live backend reference. CUgraph/CUgraphExec are void*
+     * and CUresult is int, so these match int(*)(void*). */
+    out->backend_destroy_instance = (int (*)(void*))gb->cuGraphExecDestroy;
+    out->backend_destroy_graph    = (int (*)(void*))gb->cuGraphDestroy;
     out->state = CML_CAPTURE_READY;
     out->replay_count = 0;
     out->total_replay_time_ms = 0;
@@ -133,13 +138,17 @@ int cml_cuda_graph_replay(CMLCUDAGraphBackend* gb, CMLCapturedGraph* graph) {
 void cml_cuda_graph_free(CMLCapturedGraph* graph) {
     if (!graph) return;
 
-    /*
-     * Backend resources are cleaned up here. The caller is responsible
-     * for having a valid CMLCUDAGraphBackend to load the destroy symbols.
-     * We store the function pointers inline to avoid requiring the backend
-     * at free time -- the graph owns its resources.
-     */
-    (void)graph;
+    /* Destroy the CUDA exec first, then the graph (exec depends on graph), using
+     * the hooks captured at instantiation. Previously this was a no-op, leaking
+     * the CUgraphExec + CUgraph on every teardown. */
+    if (graph->backend_instance && graph->backend_destroy_instance) {
+        graph->backend_destroy_instance(graph->backend_instance);
+        graph->backend_instance = NULL;
+    }
+    if (graph->backend_graph && graph->backend_destroy_graph) {
+        graph->backend_destroy_graph(graph->backend_graph);
+        graph->backend_graph = NULL;
+    }
 }
 
 /* Integration hooks for graph_capture.c backend dispatch */
