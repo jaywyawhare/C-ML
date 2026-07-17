@@ -31,6 +31,20 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
         rank = rank_env ? atoi(rank_env) : 0;
     }
 
+    /* Validate: an unset/garbage WORLD_SIZE (e.g. "0") would otherwise reach the
+     * averaging path as 1/world_size = inf, and a rank outside [0,world_size)
+     * corrupts every collective's peer indexing. */
+    if (world_size < 1) {
+        LOG_ERROR("Distributed init: invalid world_size=%d (must be >= 1)", world_size);
+        pthread_mutex_unlock(&g_dist_mutex);
+        return -1;
+    }
+    if (rank < 0 || rank >= world_size) {
+        LOG_ERROR("Distributed init: invalid rank=%d for world_size=%d", rank, world_size);
+        pthread_mutex_unlock(&g_dist_mutex);
+        return -1;
+    }
+
     g_default_group = cml_calloc(1, sizeof(DistProcessGroup));
     if (!g_default_group) {
         pthread_mutex_unlock(&g_dist_mutex);

@@ -316,6 +316,21 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
         return NULL;
     }
 
+    /* This binding hardcodes MPICH-family integer handle constants
+     * (CML_MPI_COMM_WORLD/FLOAT/SUM/...). OpenMPI instead uses POINTER handles
+     * (addresses of ompi_mpi_* globals) and 64-bit datatype/op handles, which
+     * do not fit these int-typed signatures — passing the MPICH constants to
+     * OpenMPI yields garbage handles and undefined behavior. Detect OpenMPI via
+     * one of its private globals and refuse rather than crash; the caller then
+     * falls back to the Gloo backend. */
+    if (dlsym(handle, "ompi_mpi_comm_world")) {
+        LOG_WARNING("MPI backend: detected Open MPI, whose pointer-based handle "
+                    "ABI is not supported by this integer-handle binding; "
+                    "falling back to another backend");
+        dlclose(handle);
+        return NULL;
+    }
+
     MPIContext* mpi = cml_calloc(1, sizeof(MPIContext));
     if (!mpi) {
         dlclose(handle);
