@@ -82,10 +82,10 @@ static char** list_subdirs(const char* path, int* count) {
         if (!is_directory(full)) continue;
         if (*count >= cap) {
             cap *= 2;
-            char** tmp = realloc(dirs, cap * sizeof(char*));
+            char** tmp = cml_realloc(dirs, cap * sizeof(char*));
             if (!tmp) {
-                for (int i = 0; i < *count; i++) free(dirs[i]);
-                free(dirs);
+                for (int i = 0; i < *count; i++) cml_free(dirs[i]);
+                cml_free(dirs);
                 closedir(d);
                 *count = 0;
                 return NULL;
@@ -117,10 +117,10 @@ static char** list_files_in_dir(const char* path, int (*filter)(const char*), in
         if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) continue;
         if (*count >= cap) {
             cap *= 2;
-            char** tmp = realloc(files, cap * sizeof(char*));
+            char** tmp = cml_realloc(files, cap * sizeof(char*));
             if (!tmp) {
-                for (int i = 0; i < *count; i++) free(files[i]);
-                free(files);
+                for (int i = 0; i < *count; i++) cml_free(files[i]);
+                cml_free(files);
                 closedir(d);
                 *count = 0;
                 return NULL;
@@ -221,20 +221,20 @@ CMLImageNetLoader* cml_imagenet_open(const char* dir_path, int image_size) {
         return NULL;
     }
 
-    CMLImageNetLoader* loader = calloc(1, sizeof(CMLImageNetLoader));
+    CMLImageNetLoader* loader = cml_calloc(1, sizeof(CMLImageNetLoader));
     if (!loader) {
-        for (int i = 0; i < num_classes; i++) free(class_dirs[i]);
-        free(class_dirs);
+        for (int i = 0; i < num_classes; i++) cml_free(class_dirs[i]);
+        cml_free(class_dirs);
         return NULL;
     }
-    loader->image_paths = malloc(total * sizeof(char*));
-    loader->labels = malloc(total * sizeof(int));
+    loader->image_paths = cml_malloc(total * sizeof(char*));
+    loader->labels = cml_malloc(total * sizeof(int));
     if (!loader->image_paths || !loader->labels) {
-        free(loader->image_paths);
-        free(loader->labels);
-        free(loader);
-        for (int i = 0; i < num_classes; i++) free(class_dirs[i]);
-        free(class_dirs);
+        cml_free(loader->image_paths);
+        cml_free(loader->labels);
+        cml_free(loader);
+        for (int i = 0; i < num_classes; i++) cml_free(class_dirs[i]);
+        cml_free(class_dirs);
         return NULL;
     }
     loader->num_classes = num_classes;
@@ -305,15 +305,14 @@ Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batc
 
 void cml_imagenet_free(CMLImageNetLoader* loader) {
     if (!loader) return;
-    /* cml_imagenet_open mixes allocators: the path strings come from cml_strdup
-     * (free via cml_free), but the image_paths/labels arrays and the loader
-     * struct come from system malloc/calloc (free via free()).  Using the wrong
-     * deallocator makes cml_free read a non-existent AllocHeader (heap over-read). */
+    /* All allocations here go through the CML allocator (cml_strdup for the path
+     * strings, cml_malloc/cml_calloc for the arrays and struct), so everything is
+     * released with cml_free — no allocator mismatch. */
     for (int i = 0; i < loader->num_samples; i++)
-        cml_free(loader->image_paths[i]); /* cml_strdup'd */
-    free(loader->image_paths);            /* malloc'd */
-    free(loader->labels);                 /* malloc'd */
-    free(loader);                         /* calloc'd */
+        cml_free(loader->image_paths[i]);
+    cml_free(loader->image_paths);
+    cml_free(loader->labels);
+    cml_free(loader);
 }
 
 static void collect_audio_recursive(const char* dir, char*** paths, char*** transcripts,
@@ -339,15 +338,11 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
 
         if (*count >= *cap) {
             *cap *= 2;
-            char** tmp_p = realloc(*paths, *cap * sizeof(char*));
-            char** tmp_t = realloc(*transcripts, *cap * sizeof(char*));
-            if (!tmp_p || !tmp_t) {
-                free(tmp_p);
-                free(tmp_t);
-                return;
-            }
-            *paths       = tmp_p;
-            *transcripts = tmp_t;
+            char** tmp_p = cml_realloc(*paths, *cap * sizeof(char*));
+            if (tmp_p) *paths = tmp_p;
+            char** tmp_t = cml_realloc(*transcripts, *cap * sizeof(char*));
+            if (tmp_t) *transcripts = tmp_t;
+            if (!tmp_p || !tmp_t) return;   /* *paths/*transcripts freed by caller */
         }
 
         (*paths)[*count] = cml_strdup(full);
@@ -355,7 +350,10 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
         char txt_path[2048];
         snprintf(txt_path, sizeof(txt_path), "%s", full);
         char* ext = strrchr(txt_path, '.');
-        if (ext) strcpy(ext, ".txt");
+        if (ext) {
+            size_t off = (size_t)(ext - txt_path);
+            if (off + 5 <= sizeof(txt_path)) memcpy(ext, ".txt", 5); /* incl NUL, bounded */
+        }
 
         char* transcript = NULL;
         FILE* tf = fopen(txt_path, "r");

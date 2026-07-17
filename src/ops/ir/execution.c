@@ -663,29 +663,27 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
     return 0;
 }
 
-/* Fast broadcast binary op for 2D: [R,C] op [1,C] (row broadcast) */
-#define BROADCAST_ROW_OP(op_expr)                                                                  \
+/* Fast broadcast binary op for 2D: [R,C] op [1,C] (row broadcast) — each row is a
+ * full-length SIMD op against the shared [C] operand. */
+#define BROADCAST_ROW_SIMD(simd_fn)                                                                \
     do {                                                                                           \
-        for (size_t r = 0; r < rows; r++) {                                                        \
-            const float* a_row = in1_data + r * cols;                                              \
-            float* o_row       = out_data + r * cols;                                              \
-            for (size_t c = 0; c < cols; c++) {                                                    \
-                o_row[c] = a_row[c] op_expr in2_data[c];                                           \
-            }                                                                                      \
-        }                                                                                          \
+        for (size_t r = 0; r < rows; r++)                                                          \
+            simd_fn(in1_data + r * cols, in2_data, out_data + r * cols, cols);                     \
     } while (0)
 
-/* Fast broadcast binary op for 2D: [R,C] op [R,1] (col broadcast) */
-#define BROADCAST_COL_OP(op_expr)                                                                  \
+/* Fast broadcast binary op for 2D: [R,C] +/- [R,1] via SIMD scalar add (sgn=+1
+ * for add, -1 for sub, since sub has no dedicated scalar kernel). */
+#define BROADCAST_COL_ADDSCALAR(sgn)                                                               \
     do {                                                                                           \
-        for (size_t r = 0; r < rows; r++) {                                                        \
-            const float* a_row = in1_data + r * cols;                                              \
-            float* o_row       = out_data + r * cols;                                              \
-            float bval         = in2_data[r];                                                      \
-            for (size_t c = 0; c < cols; c++) {                                                    \
-                o_row[c] = a_row[c] op_expr bval;                                                  \
-            }                                                                                      \
-        }                                                                                          \
+        for (size_t r = 0; r < rows; r++)                                                          \
+            simd_add_scalar_f32(in1_data + r * cols, (sgn) * in2_data[r], out_data + r * cols, cols); \
+    } while (0)
+
+/* Fast broadcast binary op for 2D: [R,C] * [R,1] via SIMD scalar multiply. */
+#define BROADCAST_COL_MULSCALAR()                                                                  \
+    do {                                                                                           \
+        for (size_t r = 0; r < rows; r++)                                                          \
+            simd_mul_scalar_f32(in1_data + r * cols, in2_data[r], out_data + r * cols, cols);      \
     } while (0)
 
 /* -------------------------------------------------------------------------
@@ -1327,9 +1325,9 @@ int cpu_execute_node(struct IRNode* node) {
             size_t rows, cols;
             int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
             if (bcast == 1) {
-                BROADCAST_ROW_OP(+);
+                BROADCAST_ROW_SIMD(simd_add_f32);
             } else if (bcast == 2) {
-                BROADCAST_COL_OP(+);
+                BROADCAST_COL_ADDSCALAR(1.0f);
             } else {
                 for (size_t i = 0; i < out->numel; i++) {
                     size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
@@ -1349,9 +1347,9 @@ int cpu_execute_node(struct IRNode* node) {
             size_t rows, cols;
             int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
             if (bcast == 1) {
-                BROADCAST_ROW_OP(-);
+                BROADCAST_ROW_SIMD(simd_sub_f32);
             } else if (bcast == 2) {
-                BROADCAST_COL_OP(-);
+                BROADCAST_COL_ADDSCALAR(-1.0f);
             } else {
                 for (size_t i = 0; i < out->numel; i++) {
                     size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
@@ -1371,9 +1369,9 @@ int cpu_execute_node(struct IRNode* node) {
             size_t rows, cols;
             int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
             if (bcast == 1) {
-                BROADCAST_ROW_OP(*);
+                BROADCAST_ROW_SIMD(simd_mul_f32);
             } else if (bcast == 2) {
-                BROADCAST_COL_OP(*);
+                BROADCAST_COL_MULSCALAR();
             } else {
                 for (size_t i = 0; i < out->numel; i++) {
                     size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);

@@ -52,3 +52,40 @@ jobs:
 
       - name: Run tests
         run: cd build && ctest --output-on-failure
+
+  sanitizers:
+    # AddressSanitizer + UndefinedBehaviorSanitizer build — catches heap
+    # corruption, use-after-free, allocator mismatches, and UB that the plain
+    # Debug build silently tolerates.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-asan-${{ runner.os }}-${{ hashFiles('src/**', 'include/**') }}
+          restore-keys: ccache-asan-${{ runner.os }}-
+
+      - name: Configure CMake (ASan + UBSan)
+        run: |
+          cmake -B build-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DBUILD_EXAMPLES=OFF \
+            -DENABLE_SANITIZERS=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build build-asan -j$(nproc)
+
+      - name: Run tests (sanitized)
+        run: cd build-asan && ctest --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
