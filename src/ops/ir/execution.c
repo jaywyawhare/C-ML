@@ -1320,7 +1320,7 @@ int cpu_execute_node(struct IRNode* node) {
         if (!in1_data || !in2_data)
             return -1;
         if (in1_numel == in2_numel && in1_numel == out->numel) {
-            simd_add_f32(in1_data, in2_data, out_data, out->numel);
+            simd_add_f32_parallel(in1_data, in2_data, out_data, out->numel);
         } else {
             size_t rows, cols;
             int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
@@ -1342,7 +1342,7 @@ int cpu_execute_node(struct IRNode* node) {
         if (!in1_data || !in2_data)
             return -1;
         if (in1_numel == in2_numel && in1_numel == out->numel) {
-            simd_sub_f32(in1_data, in2_data, out_data, out->numel);
+            simd_sub_f32_parallel(in1_data, in2_data, out_data, out->numel);
         } else {
             size_t rows, cols;
             int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
@@ -1364,7 +1364,7 @@ int cpu_execute_node(struct IRNode* node) {
         if (!in1_data || !in2_data)
             return -1;
         if (in1_numel == in2_numel && in1_numel == out->numel) {
-            simd_mul_f32(in1_data, in2_data, out_data, out->numel);
+            simd_mul_f32_parallel(in1_data, in2_data, out_data, out->numel);
         } else {
             size_t rows, cols;
             int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols);
@@ -1801,7 +1801,7 @@ int cpu_execute_node(struct IRNode* node) {
         if (!in1_data || !in2_data)
             return -1;
         if (in1_numel == in2_numel && in1_numel == out->numel) {
-            simd_max_f32(in1_data, in2_data, out_data, out->numel);
+            simd_max_f32_parallel(in1_data, in2_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
                 size_t i1   = (in1_numel == 1) ? 0 : i % in1_numel;

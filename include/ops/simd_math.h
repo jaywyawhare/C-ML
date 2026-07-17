@@ -79,6 +79,8 @@ void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
 void simd_set_parallel_threshold(size_t threshold);
 void simd_add_f32_parallel(const float* a, const float* b, float* out, size_t n);
 void simd_mul_f32_parallel(const float* a, const float* b, float* out, size_t n);
+void simd_sub_f32_parallel(const float* a, const float* b, float* out, size_t n);
+void simd_max_f32_parallel(const float* a, const float* b, float* out, size_t n);
 void simd_exp_f32_parallel(const float* in, float* out, size_t n);
 float simd_sum_f32_parallel(const float* data, size_t n);
 
