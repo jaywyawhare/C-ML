@@ -1929,4 +1929,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Connect data for initial tab
   connectDataForTab("graph");
+
+  // ── Unified-shell integration ─────────────────────────────────────────────
+  // When embedded, the shell drives the active tab via the URL hash + postMessage,
+  // and we announce readiness so it can (re)apply the pending tab after load.
+  const _hashTab = () => {
+    const h = (location.hash || "").replace(/^#/, "");
+    return (h === "graph" || h === "training" || h === "codegen") ? h : null;
+  };
+  const _t = _hashTab();
+  if (_t) switchTab(_t);
+  window.addEventListener("hashchange", () => { const t = _hashTab(); if (t) switchTab(t); });
+  window.addEventListener("message", (e) => {
+    if (e && e.data && e.data.type === "cml-view" && e.data.tab) switchTab(e.data.tab);
+  });
+  try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: "cml-viz-ready" }, "*"); } catch (_) {}
 });

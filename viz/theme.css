@@ -1,0 +1,28 @@
+/* Shared design tokens for the whole C-ML dashboard (shell + Visualizer +
+ * Experiment tracker) so the three surfaces read as one product. Both sub-apps
+ * already use the indigo accent + dark theme; these are the canonical values. */
+:root {
+  /* accent + status */
+  --accent:   #6366f1;
+  --accent-2: #8b5cf6;
+  --ok:       #10b981;
+  --warn:     #f59e0b;
+  --err:      #ef4444;
+  --info:     #06b6d4;
+
+  /* surfaces */
+  --bg:       #0a0b0f;
+  --bg-elev:  #12141c;
+  --bg-elev2: #161925;
+
+  /* text + lines */
+  --text:   #e6e8ef;
+  --muted:  #8b90a5;
+  --border: rgba(255, 255, 255, 0.08);
+
+  --radius:    8px;
+  --radius-sm: 6px;
+  --topbar-h:  52px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+}
