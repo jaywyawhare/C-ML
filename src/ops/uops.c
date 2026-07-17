@@ -1773,7 +1773,17 @@ Tensor* uop_softmax(Tensor* x, int dim) {
     if (!max_x)
         return NULL;
 
-    Tensor* x_sub_max = uop_sub(x, max_x);
+    /* Broadcast the reduced max/sum back to x's shape *explicitly* (via EXPAND)
+     * rather than relying on binary-op broadcast: EXPAND has an exact VJP, so
+     * graph-autodiff differentiates softmax correctly (implicit broadcast does
+     * not reduce the gradient row-wise for [rows,N]-[rows,1]). */
+    ExpandParams ep = {x->shape, x->ndim};
+
+    Tensor* max_e = uop_expand(max_x, &ep);
+    if (!max_e)
+        return NULL;
+
+    Tensor* x_sub_max = uop_sub(x, max_e);
     if (!x_sub_max)
         return NULL;
 
@@ -1790,7 +1800,11 @@ Tensor* uop_softmax(Tensor* x, int dim) {
     if (!sum_exp)
         return NULL;
 
-    return uop_div(exp_x, sum_exp);
+    Tensor* sum_e = uop_expand(sum_exp, &ep);
+    if (!sum_e)
+        return NULL;
+
+    return uop_div(exp_x, sum_e);
 }
 
 Tensor* uop_leaky_relu(Tensor* x, float negative_slope) {
@@ -3213,6 +3227,67 @@ Tensor* uop_unfold(Tensor* a, int kernel_size, int stride) {
     node->output_shape[out_ndim - 2] = num_windows;
     node->output_shape[out_ndim - 1] = kernel_size;
     node->output_ndim = out_ndim;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+/* col2im: [..., num_windows, kernel_size] -> [..., output_len] (scatter-add,
+ * the adjoint of uop_unfold). */
+Tensor* uop_fold(Tensor* a, int kernel_size, int stride, int output_len) {
+    if (!a || a->ndim < 2) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    FoldParams* params = cml_malloc(sizeof(FoldParams));
+    if (!params) return NULL;
+    params->kernel_size = kernel_size;
+    params->stride = stride > 0 ? stride : 1;
+    params->output_len = output_len;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_FOLD, inputs, 1, params) != 0) {
+        cml_free(params);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+
+    int out_ndim = a->ndim - 1;   /* drops the kernel_size axis */
+    node->output_shape = cml_malloc((size_t)out_ndim * sizeof(int));
+    for (int i = 0; i < a->ndim - 2; i++) node->output_shape[i] = a->shape[i];
+    node->output_shape[out_ndim - 1] = output_len;
+    node->output_ndim = out_ndim;
+    if (a->requires_grad) { node->requires_grad = true; node->needs_input_grad[0] = true; }
+
+    return tensor_from_ir_node(node, ir);
+}
+
+/* index_add (adjoint of gather): out = src with axis `dim` resized to dim_size,
+ * out[index[i], ..] += src[i, ..].  inputs = [index, src]. */
+Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size) {
+    if (!index || !src) return NULL;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+    int d = dim < 0 ? src->ndim + dim : dim;
+    if (d < 0 || d >= src->ndim) return NULL;
+
+    ScatterAddParams* params = cml_malloc(sizeof(ScatterAddParams));
+    if (!params) return NULL;
+    params->dim = d;
+    params->dim_size = dim_size;
+
+    Tensor* inputs[] = {index, src};
+    if (cml_ir_add_uop(ir, UOP_SCATTER_ADD, inputs, 2, params) != 0) {
+        cml_free(params);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+
+    int nd = src->ndim;
+    node->output_shape = cml_malloc((size_t)nd * sizeof(int));
+    for (int i = 0; i < nd; i++) node->output_shape[i] = src->shape[i];
+    node->output_shape[d] = dim_size;
+    node->output_ndim = nd;
+    if (src->requires_grad) { node->requires_grad = true; node->needs_input_grad[1] = true; }
 
     return tensor_from_ir_node(node, ir);
 }

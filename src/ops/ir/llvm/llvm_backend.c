@@ -1211,6 +1211,114 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
 }
 
 /* -------------------------------------------------------------------------
+ * Fused elementwise chain: native JIT codegen
+ *
+ * Emits ONE function that evaluates the whole elementwise chain in a single
+ * loop, keeping intermediates in SSA values (registers) — no intermediate
+ * buffers. LLVM's O2 vectorizer turns the arithmetic steps into SIMD. This is
+ * the true-codegen path for UOP_FUSED_ELEMENTWISE (the blocked C interpreter in
+ * execution.c is the fallback when the JIT is unavailable).
+ *   ABI: void kern(const float** in, float* out)
+ *   out_numel and each input's numel are baked in as compile-time constants, so
+ *   broadcasting resolves at codegen time exactly like the other kernels.
+ * ---------------------------------------------------------------------- */
+#define FE_UNUSED_REF (-1000000)   /* matches FUSED_UNUSED_REF in execution.c */
+
+/* Emit the scalar result of one primitive elementwise op. Mirrors fused_eval_block
+ * (execution.c) and the per-op emission in build_binary_op/build_unary_op. */
+static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMContextRef ctx,
+                               LLVMTypeRef f32, UOpType op,
+                               LLVMValueRef a, LLVMValueRef b, LLVMValueRef c, float konst) {
+    LLVMValueRef zero = LLVMConstReal(f32, 0.0);
+    switch (op) {
+    case UOP_ADD:     return LLVMBuildFAdd(bld, a, b, "r");
+    case UOP_SUB:     return LLVMBuildFSub(bld, a, b, "r");
+    case UOP_MUL:     return LLVMBuildFMul(bld, a, b, "r");
+    case UOP_DIV:     return LLVMBuildFDiv(bld, a, b, "r");
+    case UOP_MAX:     { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"gt"); return LLVMBuildSelect(bld,c1,a,b,"r"); }
+    case UOP_MINIMUM: { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"lt"); return LLVMBuildSelect(bld,c1,a,b,"r"); }
+    case UOP_POW:     { LLVMValueRef f=INTR1(mod,ctx,"llvm.pow",8,f32);
+                        LLVMTypeRef ft=LLVMFunctionType(f32,(LLVMTypeRef[]){f32,f32},2,0);
+                        return LLVMBuildCall2(bld,ft,f,(LLVMValueRef[]){a,b},2,"r"); }
+    case UOP_NEG:     return LLVMBuildFNeg(bld, a, "r");
+    case UOP_RECIP:   return LLVMBuildFDiv(bld, LLVMConstReal(f32,1.0), a, "r");
+    case UOP_EXP:     return call1(bld,f32,INTR1(mod,ctx,"llvm.exp",8,f32),a,"r");
+    case UOP_LOG:     return call1(bld,f32,INTR1(mod,ctx,"llvm.log",8,f32),a,"r");
+    case UOP_SQRT:    return call1(bld,f32,INTR1(mod,ctx,"llvm.sqrt",9,f32),a,"r");
+    case UOP_SIN:     return call1(bld,f32,INTR1(mod,ctx,"llvm.sin",8,f32),a,"r");
+    case UOP_COS:     return call1(bld,f32,INTR1(mod,ctx,"llvm.cos",8,f32),a,"r");
+    case UOP_ABS:     return call1(bld,f32,INTR1(mod,ctx,"llvm.fabs",9,f32),a,"r");
+    case UOP_CMPLT:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"c"), f32, "r");
+    case UOP_CMPLE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOLE,a,b,"c"), f32, "r");
+    case UOP_CMPGT:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"c"), f32, "r");
+    case UOP_CMPGE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOGE,a,b,"c"), f32, "r");
+    case UOP_CMPEQ:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOEQ,a,b,"c"), f32, "r");
+    case UOP_CMPNE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealUNE,a,b,"c"), f32, "r");
+    case UOP_WHERE:   { LLVMValueRef nz=LLVMBuildFCmp(bld,LLVMRealONE,a,zero,"nz"); return LLVMBuildSelect(bld,nz,b,c,"r"); }
+    case UOP_FILL:    return LLVMConstReal(f32, (double)konst);
+    default:          return zero;
+    }
+}
+
+static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_name,
+        const FusedElementwiseParams* fp, int64_t out_numel,
+        const int64_t* in_numel, int num_inputs) {
+    LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
+    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
+    LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
+    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
+    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+
+    LLVMTypeRef params[] = { ptr /* const float** in */, ptr /* float* out */ };
+    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 2, 0);
+    LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
+
+    LLVMValueRef in_arr = LLVMGetParam(fn, 0);
+    LLVMValueRef out    = LLVMGetParam(fn, 1);
+    LLVMValueRef out_n  = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
+
+    LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
+    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMPositionBuilderAtEnd(bld, entry);
+
+    /* Load each input base pointer once from the float** array (loop-invariant). */
+    LLVMValueRef inptr[32];
+    for (int k = 0; k < num_inputs && k < 32; k++) {
+        LLVMValueRef idxk = LLVMConstInt(i64, (unsigned long long)k, 0);
+        LLVMValueRef gepk = LLVMBuildGEP2(bld, ptr, in_arr, &idxk, 1, "pp");
+        inptr[k] = LLVMBuildLoad2(bld, ptr, gepk, "inp");
+    }
+
+    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "fe");
+
+    int ns = fp->num_steps;
+    LLVMValueRef reg[256];
+    for (int s = 0; s < ns; s++) {
+        int refs[3] = { fp->a[s], fp->b[s], fp->c[s] };
+        LLVMValueRef ops[3];
+        for (int t = 0; t < 3; t++) {
+            int ref = refs[t];
+            if (ref == FE_UNUSED_REF)      { ops[t] = LLVMConstReal(f32, 0.0); continue; }
+            if (ref < 0)                   { ops[t] = reg[-ref - 1]; continue; }
+            if (ref >= num_inputs || ref >= 32) { ops[t] = LLVMConstReal(f32, 0.0); continue; }
+            LLVMValueRef idx = bcast_index(bld, ctx, loop.i, in_numel[ref], out_numel);
+            LLVMValueRef gep = LLVMBuildGEP2(bld, f32, inptr[ref], &idx, 1, "pin");
+            ops[t] = LLVMBuildLoad2(bld, f32, gep, "v");
+        }
+        reg[s] = fe_emit_op(bld, mod, ctx, f32, fp->op[s], ops[0], ops[1], ops[2], fp->konst[s]);
+    }
+
+    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
+    LLVMBuildStore(bld, reg[ns - 1], gep_out);
+    close_loop(bld, &loop, entry);
+
+    LLVMPositionBuilderAtEnd(bld, loop.exit);
+    LLVMBuildRetVoid(bld);
+    LLVMDisposeBuilder(bld);
+    return mod;
+}
+
+/* -------------------------------------------------------------------------
  * Op classification
  * ---------------------------------------------------------------------- */
 static bool is_binary_op(UOpType t) {
@@ -1295,10 +1403,75 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         if (node->num_inputs >= 2 && node->inputs[1] &&
             node->inputs[1]->quant_type != CML_QUANT_NONE)
             return cpu_execute_node(node);
+        /* Matmul with a fused epilogue (bias+activation): the JIT gemm kernel
+         * doesn't apply the epilogue, so defer to the interpreter, which runs
+         * the gemm (BLAS or naive) and then applies the epilogue in-place. */
+        if (node->params)
+            return cpu_execute_node(node);
         extern CMLBlasContext* get_blas_context(void);
         CMLBlasContext* blas = get_blas_context();
         if (blas && blas->initialized)
             return cpu_execute_node(node);
+    }
+
+    /* ---- Fused elementwise chain: native JIT codegen ----------------- *
+     * Bespoke ABI (const float** in, float* out) and a content-hashed cache key
+     * (the chain structure, not just a shape, distinguishes kernels), so it is
+     * handled here rather than in the shape-keyed path below. */
+    if (type == UOP_FUSED_ELEMENTWISE) {
+        FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
+        if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 ||
+            node->num_inputs < 0 || node->num_inputs > 32)
+            return cpu_execute_node(node);
+        int64_t in_numel[32];
+        for (int k = 0; k < node->num_inputs; k++) {
+            Tensor* it = node->inputs[k];
+            if (!it || !it->data || it->dtype != DTYPE_FLOAT32)
+                return cpu_execute_node(node);
+            in_numel[k] = (int64_t)it->numel;
+        }
+        int64_t out_numel = (int64_t)out->numel;
+
+        /* FNV-1a content hash: chain ops/refs/consts + output & input shapes. */
+        uint64_t key = 1469598103934665603ULL;
+        #define FEH(x) do { key ^= (uint64_t)(x); key *= 1099511628211ULL; } while (0)
+        FEH(UOP_FUSED_ELEMENTWISE); FEH(out_numel);
+        FEH((unsigned)node->num_inputs); FEH((unsigned)fp->num_steps);
+        for (int s = 0; s < fp->num_steps; s++) {
+            FEH((unsigned)fp->op[s]); FEH((uint32_t)fp->a[s]);
+            FEH((uint32_t)fp->b[s]);  FEH((uint32_t)fp->c[s]);
+            uint32_t kb; memcpy(&kb, &fp->konst[s], sizeof(kb)); FEH(kb);
+        }
+        for (int k = 0; k < node->num_inputs; k++) FEH(in_numel[k]);
+        #undef FEH
+        if (key == 0) key = 0x9E3779B97F4A7C15ULL;  /* 0 marks an empty slot */
+
+        unsigned fslot = 0;
+        kernel_fn_t ffn = cache_lookup(backend, key, &fslot);
+        if (!ffn) {
+            char fn_name[64];
+            snprintf(fn_name, sizeof(fn_name), "cml_fe%d", backend->kernel_count++);
+            LLVMContextRef kern_ctx = LLVMContextCreate();
+            if (!kern_ctx) return cpu_execute_node(node);
+            LLVMModuleRef mod = build_fused_elementwise(kern_ctx, fn_name, fp,
+                                                        out_numel, in_numel, node->num_inputs);
+            if (!mod) { LLVMContextDispose(kern_ctx); return cpu_execute_node(node); }
+            ffn = compile_and_lookup(backend, mod, fn_name);
+            if (!ffn) return cpu_execute_node(node);
+            backend->op_cache[fslot].key = key;
+            backend->op_cache[fslot].fn  = ffn;
+            LOG_DEBUG("LLVM: compiled fused elementwise kernel steps=%d inputs=%d n=%lld ('%s')",
+                      fp->num_steps, node->num_inputs, (long long)out_numel, fn_name);
+        }
+
+        const float* inptrs[32];
+        for (int k = 0; k < node->num_inputs; k++)
+            inptrs[k] = (const float*)node->inputs[k]->data;
+        typedef void (*fefn_t)(const float**, float*);
+        ((fefn_t)(void*)ffn)(inptrs, (float*)out->data);
+        node->is_executed = true;
+        out->is_executed  = true;
+        return 0;
     }
 
     /* ---- Gather the concrete shape signature ------------------------- *

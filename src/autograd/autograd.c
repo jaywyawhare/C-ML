@@ -1,4 +1,6 @@
 #include "autograd/autograd.h"
+#include "ops/ir/autodiff.h"
+#include "ops/ir/execution.h"
 #include "tensor/realize.h"
 #include "core/training_metrics.h"
 #include "nn.h"
@@ -330,13 +332,20 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         return;
     }
 
-    /* Lazy execution: forward pass values needed before computing gradients */
-    if (tensor_ensure_executed(tensor) != 0) {
-        LOG_ERROR("Failed to execute tensor for backward pass");
-        return;
+    /* Eager autodiff needs the forward realized before it can read activations.
+     * Graph autodiff DEFERS realization: cml_ir_grad builds the backward into the
+     * still-lazy forward graph, then the whole fwd+bwd graph is fused + realized
+     * together (below) — this is what lets forward elementwise chains fuse
+     * (training-forward fusion), with use_count keeping backward-needed
+     * intermediates materialized. Metrics capture moves after the execute. */
+    int graph_mode = cml_autodiff_use_graph();
+    if (!graph_mode) {
+        if (tensor_ensure_executed(tensor) != 0) {
+            LOG_ERROR("Failed to execute tensor for backward pass");
+            return;
+        }
+        training_metrics_auto_capture_loss(tensor);
     }
-
-    training_metrics_auto_capture_loss(tensor);
 
     if (!gradient) {
         /* For scalar tensors (loss), set grad = 1.0 directly instead of
@@ -385,14 +394,26 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
         }
     }
 
-    if (cml_ir_build_backward(tensor->ir_context, tensor->ir_node) != 0) {
-        LOG_ERROR("Failed to build backward graph");
-        return;
-    }
-
-    if (cml_ir_execute_backward(tensor->ir_context) != 0) {
-        LOG_ERROR("Failed to execute backward pass");
-        return;
+    if (graph_mode) {
+        /* Graph-level autodiff: emit VJPs as UOPs into the still-lazy graph, then
+         * fuse + realize the whole fwd+bwd graph together. allow_grad lets the
+         * fuser fuse forward chains (use_count keeps backward-needed intermediates
+         * materialized); it is cleared right after so no lone forward realization
+         * ever fuses differentiable nodes. Assumes a ones/scalar seed. */
+        cml_ir_grad(tensor->ir_context, tensor->ir_node);
+        cml_ir_fuse_set_allow_grad(1);
+        cml_ir_execute(tensor->ir_context);
+        cml_ir_fuse_set_allow_grad(0);
+        training_metrics_auto_capture_loss(tensor);
+    } else {
+        if (cml_ir_build_backward(tensor->ir_context, tensor->ir_node) != 0) {
+            LOG_ERROR("Failed to build backward graph");
+            return;
+        }
+        if (cml_ir_execute_backward(tensor->ir_context) != 0) {
+            LOG_ERROR("Failed to execute backward pass");
+            return;
+        }
     }
 
     if (tensor->backward_hooks && tensor->grad) {

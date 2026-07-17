@@ -247,6 +247,12 @@ const char* uop_type_to_string(UOpType type) {
         return "LOGSIGMOID";
     case UOP_UNFOLD:
         return "UNFOLD";
+    case UOP_FOLD:
+        return "FOLD";
+    case UOP_SCATTER_ADD:
+        return "SCATTER_ADD";
+    case UOP_FUSED_ELEMENTWISE:
+        return "FUSED_ELEMENTWISE";
     case UOP_CONST:
         return "CONST";
     case UOP_RAND_UNIFORM:
@@ -347,7 +353,6 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_COS:
     case UOP_TAN:
     case UOP_POW:
-    case UOP_MATMUL:
     case UOP_WHERE:
     case UOP_CMPLT:
     case UOP_SIGN:
@@ -364,6 +369,7 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_ERF:
     case UOP_COUNT:
         break;
+    case UOP_ELU:            /* ELU/CLAMP both store ClampParams */
     case UOP_CLAMP: {
         ClampParams* p = (ClampParams*)node->params;
         if (p) cml_free(p);
@@ -550,9 +556,18 @@ void cml_ir_free_node_params(struct IRNode* node) {
         }
         break;
     }
+    case UOP_DIAGONAL:       /* DIAG/DIAGONAL both store DiagParams */
     case UOP_DIAG: {
         DiagParams* p = (DiagParams*)node->params;
         if (p) cml_free(p);
+        break;
+    }
+    case UOP_ALLOC: {
+        AllocParams* p = (AllocParams*)node->params;
+        if (p) {
+            if (p->shape) cml_free(p->shape);
+            cml_free(p);
+        }
         break;
     }
     case UOP_ONE_HOT: {
@@ -585,6 +600,34 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_UNFOLD: {
         UnfoldParams* p = (UnfoldParams*)node->params;
         if (p) cml_free(p);
+        break;
+    }
+    case UOP_FOLD: {
+        FoldParams* p = (FoldParams*)node->params;
+        if (p) cml_free(p);
+        break;
+    }
+    case UOP_SCATTER_ADD: {
+        ScatterAddParams* p = (ScatterAddParams*)node->params;
+        if (p) cml_free(p);
+        break;
+    }
+    case UOP_FUSED_ELEMENTWISE: {
+        FusedElementwiseParams* p = (FusedElementwiseParams*)node->params;
+        if (p) {
+            cml_free(p->op); cml_free(p->a); cml_free(p->b);
+            cml_free(p->c); cml_free(p->konst); cml_free(p);
+        }
+        break;
+    }
+    case UOP_MATMUL: {
+        /* Plain matmul has no params; a fused epilogue (cml_ir_fuse_matmul_epilogue)
+         * attaches a FusedElementwiseParams to be freed here. */
+        FusedElementwiseParams* p = (FusedElementwiseParams*)node->params;
+        if (p) {
+            cml_free(p->op); cml_free(p->a); cml_free(p->b);
+            cml_free(p->c); cml_free(p->konst); cml_free(p);
+        }
         break;
     }
     case UOP_MAXPOOL2D:

@@ -2,6 +2,7 @@
 #include "ops/ir/execution.h"
 #include "ops/uops.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/tiny_jit.h"
 #include "ops/ir/graph_cache.h"
 #include "ops/ir/schedule.h"
 #include "core/logging.h"
@@ -1023,6 +1024,140 @@ static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
     default:            return -1;
     }
 #undef CML_CONV_T
+}
+
+/* ── Fused elementwise kernel helpers ─────────────────────────────────── */
+#define FUSED_UNUSED_REF (-1000000)   /* operand slot not used by this op */
+
+/* Which primitive elementwise ops the fused kernel supports (post-decompose set
+ * plus a few pre-decompose ones for robustness). */
+static inline int fused_op_supported(UOpType t) {
+    switch (t) {
+    case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: case UOP_MAX:
+    case UOP_MINIMUM: case UOP_POW: case UOP_NEG: case UOP_RECIP: case UOP_EXP:
+    case UOP_LOG: case UOP_SQRT: case UOP_SIN: case UOP_COS: case UOP_ABS:
+    case UOP_CMPLT: case UOP_CMPLE: case UOP_CMPGT: case UOP_CMPGE:
+    case UOP_CMPEQ: case UOP_CMPNE: case UOP_WHERE: case UOP_FILL:
+        return 1;
+    default: return 0;
+    }
+}
+
+/* ── Blocked, vectorizable fused-kernel evaluation ──────────────────────
+ * The whole elementwise chain is evaluated block-by-block. Per block, each
+ * step runs a tight loop over the block with the op-switch hoisted OUT of the
+ * inner loop, so the arithmetic ops auto-vectorize (SIMD), while the chain's
+ * intermediates live in small L1-resident block buffers instead of full
+ * materialized tensors. This recovers SIMD while keeping the memory-traffic
+ * win of fusion. */
+#define FE_BLK 512
+
+/* Resolve one operand ref to a contiguous block pointer of length `bs`.
+ *   ref == UNUSED           -> NULL (op ignores it)
+ *   ref < 0                 -> prior step result row in tmp (block-local)
+ *   ref >= 0, numel==total  -> the external input, contiguous at i0
+ *   ref >= 0, numel==1      -> scalar splat into `splat`
+ *   ref >= 0, else          -> defensive modulo-broadcast into `splat` */
+static inline const float* fused_operand_block(int ref, const float* const* ind,
+                                               const size_t* innum, const float* tmp,
+                                               size_t i0, int bs, float* splat) {
+    if (ref == FUSED_UNUSED_REF) return NULL;
+    if (ref < 0) return tmp + (size_t)(-ref - 1) * FE_BLK;
+    const float* d = ind[ref];
+    size_t n = innum[ref];
+    if (!d || n == 0) { for (int j = 0; j < bs; j++) splat[j] = 0.0f; return splat; }
+    if (n == 1)       { float v = d[0]; for (int j = 0; j < bs; j++) splat[j] = v; return splat; }
+    /* The fusion pass guarantees external inputs are full-size or scalar, so
+     * full-size is the fast contiguous path. Defensive modulo-broadcast covers
+     * any other size without reading out of bounds. */
+    if (i0 + (size_t)bs <= n) return d + i0;
+    for (int j = 0; j < bs; j++) splat[j] = d[(i0 + (size_t)j) % n];
+    return splat;
+}
+
+/* Evaluate one primitive elementwise op over a block. Operand block pointers
+ * pa/pb/pc are broadcast-resolved (or NULL if unused). Tight per-op loops. */
+static void fused_eval_block(UOpType t, const float* pa, const float* pb,
+                             const float* pc, float k, float* dst, int bs) {
+    switch (t) {
+    case UOP_ADD:     for (int j=0;j<bs;j++) dst[j] = pa[j] + pb[j]; break;
+    case UOP_SUB:     for (int j=0;j<bs;j++) dst[j] = pa[j] - pb[j]; break;
+    case UOP_MUL:     for (int j=0;j<bs;j++) dst[j] = pa[j] * pb[j]; break;
+    case UOP_DIV:     for (int j=0;j<bs;j++) dst[j] = pa[j] / pb[j]; break;
+    case UOP_MAX:     for (int j=0;j<bs;j++) { float a=pa[j],b=pb[j]; dst[j]=a>b?a:b; } break;
+    case UOP_MINIMUM: for (int j=0;j<bs;j++) { float a=pa[j],b=pb[j]; dst[j]=a<b?a:b; } break;
+    case UOP_POW:     for (int j=0;j<bs;j++) dst[j] = powf(pa[j], pb[j]); break;
+    case UOP_NEG:     for (int j=0;j<bs;j++) dst[j] = -pa[j]; break;
+    case UOP_RECIP:   for (int j=0;j<bs;j++) dst[j] = 1.0f / pa[j]; break;
+    case UOP_EXP:     for (int j=0;j<bs;j++) dst[j] = expf(pa[j]); break;
+    case UOP_LOG:     for (int j=0;j<bs;j++) dst[j] = logf(pa[j]); break;
+    case UOP_SQRT:    for (int j=0;j<bs;j++) dst[j] = sqrtf(pa[j]); break;
+    case UOP_SIN:     for (int j=0;j<bs;j++) dst[j] = sinf(pa[j]); break;
+    case UOP_COS:     for (int j=0;j<bs;j++) dst[j] = cosf(pa[j]); break;
+    case UOP_ABS:     for (int j=0;j<bs;j++) dst[j] = fabsf(pa[j]); break;
+    case UOP_CMPLT:   for (int j=0;j<bs;j++) dst[j] = pa[j] <  pb[j] ? 1.0f : 0.0f; break;
+    case UOP_CMPLE:   for (int j=0;j<bs;j++) dst[j] = pa[j] <= pb[j] ? 1.0f : 0.0f; break;
+    case UOP_CMPGT:   for (int j=0;j<bs;j++) dst[j] = pa[j] >  pb[j] ? 1.0f : 0.0f; break;
+    case UOP_CMPGE:   for (int j=0;j<bs;j++) dst[j] = pa[j] >= pb[j] ? 1.0f : 0.0f; break;
+    case UOP_CMPEQ:   for (int j=0;j<bs;j++) dst[j] = pa[j] == pb[j] ? 1.0f : 0.0f; break;
+    case UOP_CMPNE:   for (int j=0;j<bs;j++) dst[j] = pa[j] != pb[j] ? 1.0f : 0.0f; break;
+    case UOP_WHERE:   for (int j=0;j<bs;j++) dst[j] = pa[j] != 0.0f ? pb[j] : pc[j]; break;
+    case UOP_FILL:    for (int j=0;j<bs;j++) dst[j] = k; break;
+    default:          for (int j=0;j<bs;j++) dst[j] = 0.0f; break;
+    }
+}
+
+/* Scalar evaluation of one fused op (matmul epilogue, applied per output element
+ * after the gemm). Mirrors fused_eval_block. */
+static inline float fe_scalar_eval(UOpType t, float a, float b, float c, float k) {
+    switch (t) {
+    case UOP_ADD: return a + b;         case UOP_SUB: return a - b;
+    case UOP_MUL: return a * b;         case UOP_DIV: return a / b;
+    case UOP_MAX: return a > b ? a : b; case UOP_MINIMUM: return a < b ? a : b;
+    case UOP_POW: return powf(a, b);    case UOP_NEG: return -a;
+    case UOP_RECIP: return 1.0f / a;    case UOP_EXP: return expf(a);
+    case UOP_LOG: return logf(a);       case UOP_SQRT: return sqrtf(a);
+    case UOP_SIN: return sinf(a);       case UOP_COS: return cosf(a);
+    case UOP_ABS: return fabsf(a);
+    case UOP_CMPLT: return a <  b ? 1.0f : 0.0f; case UOP_CMPLE: return a <= b ? 1.0f : 0.0f;
+    case UOP_CMPGT: return a >  b ? 1.0f : 0.0f; case UOP_CMPGE: return a >= b ? 1.0f : 0.0f;
+    case UOP_CMPEQ: return a == b ? 1.0f : 0.0f; case UOP_CMPNE: return a != b ? 1.0f : 0.0f;
+    case UOP_WHERE: return a != 0.0f ? b : c;    case UOP_FILL: return k;
+    default: return 0.0f;
+    }
+}
+
+/* Apply a matmul epilogue (bias-add + activation chain) in-place over the gemm
+ * output. Operand refs: MATMUL_ACC_REF -> the gemm result out_data[i];
+ * >=0 -> epilogue input node->inputs[2+ref] (broadcast); <0 -> prior step. */
+void cml_apply_matmul_epilogue(struct IRNode* node, float* out_data, size_t total) {
+    FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
+    if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 || !out_data) return;
+    int ne = node->num_inputs - 2;
+    const float* ein[33]; size_t enm[33];
+    for (int k = 0; k < ne && k < 33; k++) {
+        Tensor* it = node->inputs[2 + k];
+        ein[k] = it ? (const float*)it->data : NULL;
+        enm[k] = it ? it->numel : 0;
+    }
+    int ns = fp->num_steps;
+    for (size_t i = 0; i < total; i++) {
+        float reg[256];
+        for (int s = 0; s < ns; s++) {
+            int refs[3] = { fp->a[s], fp->b[s], fp->c[s] };
+            float v[3];
+            for (int t = 0; t < 3; t++) {
+                int r = refs[t];
+                if (r == FUSED_UNUSED_REF)    v[t] = 0.0f;
+                else if (r == MATMUL_ACC_REF) v[t] = out_data[i];
+                else if (r < 0)               v[t] = reg[-r - 1];
+                else { const float* d = (r < ne) ? ein[r] : NULL; size_t nn = (r < ne) ? enm[r] : 0;
+                       v[t] = (d && nn) ? d[i % nn] : 0.0f; }
+            }
+            reg[s] = fe_scalar_eval(fp->op[s], v[0], v[1], v[2], fp->konst[s]);
+        }
+        out_data[i] = reg[ns - 1];
+    }
 }
 
 int cpu_execute_node(struct IRNode* node) {
@@ -3430,6 +3565,22 @@ int cpu_execute_node(struct IRNode* node) {
             for (int r = 0; r < out_rows; r++)
                 memcpy(out_data + r * out_cols, in1_data + (r_start + r) * in_cols + c_start,
                        (size_t)out_cols * sizeof(float));
+        } else if (inp->ndim <= 16) {
+            /* General N-dim: copy the sub-region [starts[d], ends[d]) per dim. */
+            int nd = inp->ndim;
+            size_t in_str[16];
+            size_t st = 1;
+            for (int d = nd - 1; d >= 0; d--) { in_str[d] = st; st *= (size_t)inp->shape[d]; }
+            for (size_t i = 0; i < out->numel; i++) {
+                size_t rem = i, src = 0;
+                for (int d = nd - 1; d >= 0; d--) {
+                    int osz = out->shape[d];
+                    int c = (int)(rem % (size_t)osz);
+                    rem /= (size_t)osz;
+                    src += (size_t)(sp->starts[d] + c) * in_str[d];
+                }
+                out_data[i] = in1_data[src];
+            }
         }
         break;
     }
@@ -3720,6 +3871,55 @@ int cpu_execute_node(struct IRNode* node) {
                 }
             }
         }
+        break;
+    }
+
+    case UOP_FOLD: {
+        /* col2im (adjoint of UNFOLD): input [..., nw, ks] -> output [..., L]
+         * out[..., w*stride+k] += in[..., w, k]  (overlapping windows sum). */
+        if (!in1_data || !node->params)
+            return -1;
+        FoldParams* fp = (FoldParams*)node->params;
+        int ks     = fp->kernel_size;
+        int stride = fp->stride;
+        int L      = fp->output_len;
+        int ndim_in = node->inputs[0]->ndim;   /* [..., nw, ks] */
+        int nw      = node->inputs[0]->shape[ndim_in - 2];
+        size_t batch = 1;
+        for (int d = 0; d < ndim_in - 2; d++) batch *= (size_t)node->inputs[0]->shape[d];
+        memset(out_data, 0, out->numel * sizeof(float));
+        for (size_t b = 0; b < batch; b++)
+            for (int w = 0; w < nw; w++)
+                for (int k = 0; k < ks; k++)
+                    out_data[b * (size_t)L + (size_t)(w * stride + k)] +=
+                        in1_data[(b * (size_t)nw + w) * ks + k];
+        break;
+    }
+
+    case UOP_SCATTER_ADD: {
+        /* index_add (adjoint of gather): inputs [index, src].
+         * out[.., index[i], ..] += src[.., i, ..] along `dim`. */
+        if (node->num_inputs < 2 || !node->params) return -1;
+        float* idx_data = (float*)node->inputs[0]->data;
+        float* src_data = (float*)node->inputs[1]->data;
+        if (!idx_data || !src_data) return -1;
+        ScatterAddParams* sp = (ScatterAddParams*)node->params;
+        Tensor* src = node->inputs[1];
+        int dim = sp->dim;
+        size_t outer = 1, inner = 1;
+        for (int d = 0; d < dim; d++) outer *= (size_t)src->shape[d];
+        for (int d = dim + 1; d < src->ndim; d++) inner *= (size_t)src->shape[d];
+        size_t src_dim = (size_t)src->shape[dim];
+        size_t out_dim = (size_t)sp->dim_size;
+        memset(out_data, 0, out->numel * sizeof(float));
+        for (size_t o = 0; o < outer; o++)
+            for (size_t j = 0; j < src_dim; j++) {
+                int idx = (int)idx_data[dim == 0 ? j : (o * src_dim + j)];
+                if (idx < 0 || idx >= (int)out_dim) continue;
+                for (size_t k = 0; k < inner; k++)
+                    out_data[(o * out_dim + (size_t)idx) * inner + k] +=
+                        src_data[(o * src_dim + j) * inner + k];
+            }
         break;
     }
 
@@ -4607,12 +4807,55 @@ int cpu_execute_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_FUSED_ELEMENTWISE: {
+        /* Real kernel fusion: one loop evaluates the whole elementwise chain
+         * per output element, keeping intermediates in registers — no
+         * intermediate tensor buffers are materialized. */
+        FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
+        if (!fp || fp->num_steps <= 0 || fp->num_steps > 256) return -1;
+        int ni = node->num_inputs;
+        const float* ind[32];
+        size_t innum[32];
+        for (int k = 0; k < ni && k < 32; k++) {
+            Tensor* it = node->inputs[k];
+            ind[k]   = it ? (const float*)it->data : NULL;
+            innum[k] = it ? it->numel : 0;
+        }
+        int ns = fp->num_steps;
+        size_t total = out->numel;
+        /* per-step block scratch (block-local intermediates) + 3 scalar-splat bufs */
+        float* tmp = (float*)cml_malloc((size_t)ns * FE_BLK * sizeof(float));
+        if (!tmp) return -1;
+        float sa[FE_BLK], sb[FE_BLK], sc[FE_BLK];
+        for (size_t i0 = 0; i0 < total; i0 += FE_BLK) {
+            int bs = (int)((total - i0) < FE_BLK ? (total - i0) : (size_t)FE_BLK);
+            for (int s = 0; s < ns; s++) {
+                const float* pa = fused_operand_block(fp->a[s], ind, innum, tmp, i0, bs, sa);
+                const float* pb = fused_operand_block(fp->b[s], ind, innum, tmp, i0, bs, sb);
+                const float* pc = fused_operand_block(fp->c[s], ind, innum, tmp, i0, bs, sc);
+                /* last step writes straight to the output; earlier steps to tmp */
+                float* dst = (s == ns - 1) ? (out_data + i0) : (tmp + (size_t)s * FE_BLK);
+                fused_eval_block(fp->op[s], pa, pb, pc, fp->konst[s], dst, bs);
+            }
+        }
+        cml_free(tmp);
+        break;
+    }
+
     default:
         LOG_WARNING("CPU fallback: unsupported op type %d", node->type);
         for (size_t i = 0; i < out->numel; i++) {
             out_data[i] = 0.0f;
         }
         break;
+    }
+
+    /* Matmul epilogue: bias-add + activation folded onto the gemm, applied
+     * in-place to the M*N output (f32 only; the fusion pass never attaches an
+     * epilogue to a non-f32 matmul). No extra buffer or pass. */
+    if (node->type == UOP_MATMUL && node->params &&
+        out->dtype == DTYPE_FLOAT32 && out_data) {
+        cml_apply_matmul_epilogue(node, out_data, out->numel);
     }
 
     node->is_executed = true;
@@ -4784,12 +5027,32 @@ static int cml_ir_use_fusion_scheduler(void) {
     static int s_enabled = 0;
 
     if (!s_checked) {
+        /* Real elementwise fusion is the default path (opt out with
+         * FUSION_SCHEDULER=0 or DISABLE_FUSION=1). It is validated 114/114 and
+         * collapses elementwise chains into single JIT/blocked kernels. */
         const char* env = getenv("FUSION_SCHEDULER");
-        s_enabled       = (env && env[0] == '1');
+        const char* dis = getenv("DISABLE_FUSION");
+        s_enabled       = !(env && env[0] == '0') && !(dis && dis[0] == '1');
         s_checked       = 1;
     }
 
     return s_enabled;
+}
+
+/* TinyJit capture/replay: the DEFAULT (opt out with TINYJIT=0). First time a
+ * graph shape is seen, its execution is recorded into a trace; subsequent
+ * identical graphs (same hash+shape — e.g. every training step) replay the trace
+ * instead of re-walking the IR. Combined with the fusion scheduler above this
+ * is the "build once → fuse → JIT → replay every step" persistent training step.
+ * g_in_jit guards the re-entrancy (cml_tinyjit_execute calls cml_ir_execute
+ * internally to record the fused execution on first sight). */
+static CMLTinyJit* g_tinyjit = NULL;
+static __thread int g_in_jit = 0;
+
+static int cml_tinyjit_active(void) {
+    static int checked = 0, on = 0;
+    if (!checked) { const char* e = getenv("TINYJIT"); on = !(e && e[0] == '0'); checked = 1; }
+    return on;
 }
 
 int cml_ir_execute_cpu(CMLGraph_t ir) {
@@ -4804,10 +5067,32 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
         cml_ir_decompose(ir);
     }
 
+    /* Real elementwise fusion on the whole-graph execute path (this is what
+     * backward/optimizer executes go through — cml_ir_execute → here). Without
+     * this, fusion only ran via cml_ir_execute_up_to (tensor realization /
+     * inference) and never for the training step. The fuser has its own
+     * is_executed / use_count / requires_grad guards, so it is safe and
+     * idempotent (already-fused nodes aren't re-fused). Runs before the tinyjit
+     * dispatch so the recorded trace captures the fused execution. */
     if (cml_ir_use_fusion_scheduler()) {
-        return cml_ir_execute_fusion(ir);
+        cml_ir_fuse_elementwise(ir);
+        cml_ir_fuse_matmul_epilogue(ir);   /* fold bias+activation into the gemm */
     }
 
+    if (cml_tinyjit_active() && !g_in_jit) {
+        if (!g_tinyjit) g_tinyjit = cml_tinyjit_create();
+        if (g_tinyjit) {
+            g_in_jit = 1;                 /* re-entrant cml_ir_execute → real path */
+            int rc = cml_tinyjit_execute(g_tinyjit, ir);
+            g_in_jit = 0;
+            return rc;
+        }
+    }
+
+    /* Always go through cpu_execute_ir: it marks the DCE `is_used` flags from
+     * the target and only THEN dispatches to the fusion scheduler. Short-
+     * circuiting here skipped DCE marking, so the fusion path saw is_used=0 on
+     * every node and dropped them all (NULL outputs). */
     return cpu_execute_ir(ir);
 }
 
@@ -4900,10 +5185,22 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
      * so the graph cache and stats stay consistent. */
     if (target_node == ir->tail || !target_node->next) {
         if (cml_ir_use_fusion_scheduler()) {
-            struct IRNode* _n = ir->head;
-            while (_n) {
-                _n->is_used = true;
-                _n          = _n->next;
+            /* Mark only nodes reachable from the target used, so the fusion
+             * scheduler skips dead nodes (e.g. earlier ops whose tensors were
+             * freed) instead of choking on them. */
+            for (struct IRNode* _n = ir->head; _n; _n = _n->next) _n->is_used = false;
+            struct IRNode* stk[4096];
+            int top = 0;
+            stk[top++] = target_node;
+            while (top > 0) {
+                struct IRNode* cur = stk[--top];
+                if (!cur || cur->is_used) continue;
+                cur->is_used = true;
+                for (int i = 0; i < cur->num_inputs && cur->inputs; i++) {
+                    Tensor* inp = cur->inputs[i];
+                    if (inp && inp->ir_node && !((struct IRNode*)inp->ir_node)->is_used && top < 4096)
+                        stk[top++] = (struct IRNode*)inp->ir_node;
+                }
             }
             return cml_ir_execute_fusion(ir);
         }
@@ -4947,11 +5244,12 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
 #undef DCE_STACK_CAP
     }
 
-    /* Fusion scheduler uses the same DCE flags to skip unused nodes. */
-    if (cml_ir_use_fusion_scheduler()) {
-        return cml_ir_execute_fusion(ir);
-    }
-
+    /* Partial (up-to-target) execution always uses this robust is_used-respecting
+     * loop below — including under FUSION_SCHEDULER=1. The fusion path only takes
+     * over full-graph (target==tail) execution, via cpu_execute_ir. Routing
+     * partial execution through the fusion scheduler broke up-to-target
+     * semantics (downstream nodes got executed — test_lazy_eval) and buffer
+     * lifecycle (test_grad_check recip). */
     struct IRNode* node = ir->head;
     while (node) {
         if (node->is_used && !node->is_executed && node->output) {

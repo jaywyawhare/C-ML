@@ -1982,6 +1982,22 @@ static struct IRNode* insert_unfold_last(CMLGraph_t ir, Tensor* in, int in_nd,
     return n;
 }
 
+// FOLD (col2im, adjoint of unfold): [..., nw, ks] -> [..., out_len] scatter-add.
+static struct IRNode* insert_fold_last(CMLGraph_t ir, Tensor* in, int in_nd,
+                                       int ks, int stride, int out_len,
+                                       struct IRNode** head, struct IRNode** tail) {
+    int out_shape[16];
+    for (int i = 0; i < in_nd - 2; i++) out_shape[i] = in->shape[i];
+    out_shape[in_nd - 2] = out_len;
+    FoldParams* fp = cml_malloc(sizeof(FoldParams));
+    if (!fp) return NULL;
+    fp->kernel_size = ks; fp->stride = stride; fp->output_len = out_len;
+    struct IRNode* n = create_primitive_node(ir, UOP_FOLD, &in, 1, fp, out_shape, in_nd - 1);
+    if (!n) { cml_free(fp); return NULL; }
+    chain_append(head, tail, n);
+    return n;
+}
+
 // PERMUTE `in` (ndim nd) by `perm`; out_shape[i] = in->shape[perm[i]].
 static struct IRNode* insert_permute(CMLGraph_t ir, Tensor* in, int nd, const int* perm,
                                      struct IRNode** head, struct IRNode** tail) {
@@ -2349,6 +2365,204 @@ static int decompose_conv3d(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
+// CONV_TRANSPOSE2D → matmul (per-input-position window contributions) →
+// separable FOLD (col2im, scatter to output) → shrink off padding → (+bias).
+// The adjoint of the conv2d im2col. Clean case only (dilation=1,
+// output_padding=0); otherwise leaves the node for the executor.
+static int decompose_conv_transpose2d(CMLGraph_t ir, struct IRNode* node) {
+    Tensor* x = node->inputs[0];             // [N,Cin,H,W]
+    Tensor* w = node->inputs[1];             // [Cin,Cout,kh,kw]
+    Tensor* bias = (node->num_inputs >= 3) ? node->inputs[2] : NULL;
+    if (!x || x->ndim != 4 || !w || w->ndim != 4) return 0;
+    ConvTranspose2DParams* p = (ConvTranspose2DParams*)node->params;
+    if (!p) return 0;
+    int N = x->shape[0], Cin = x->shape[1], H = x->shape[2], W = x->shape[3];
+    int Cout = w->shape[1], kh = w->shape[2], kw = w->shape[3];
+    int sh = p->stride[0], sw = p->stride[1];
+    int ph = p->padding[0], pw = p->padding[1];
+    if (p->dilation[0] != 1 || p->dilation[1] != 1) return 0;
+    if (p->output_padding[0] != 0 || p->output_padding[1] != 0) return 0;
+    if (x->shape[1] != w->shape[0]) return 0;
+
+    int OHf = (H - 1) * sh + kh, OWf = (W - 1) * sw + kw;   // before removing pad
+    int OH = OHf - 2 * ph, OW = OWf - 2 * pw;
+    if (OH <= 0 || OW <= 0) return 0;
+
+    struct IRNode *head = NULL, *tail = NULL;
+
+    // cols[n,h,w,oc,kh,kw] = sum_ic x[n,ic,h,w]*W[ic,oc,kh,kw]  (a matmul)
+    int pA[4] = {0,2,3,1};
+    struct IRNode* xp = insert_permute(ir, x, 4, pA, &head, &tail);        // [N,H,W,Cin]
+    if (!xp) return -1;
+    int xr_s[2] = {N * H * W, Cin};
+    struct IRNode* xr = insert_reshape(ir, xp->output, xr_s, 2, &head, &tail);
+    if (!xr) return -1;
+    int wr_s[2] = {Cin, Cout * kh * kw};
+    struct IRNode* wr = insert_reshape(ir, w, wr_s, 2, &head, &tail);
+    if (!wr) return -1;
+    Tensor* mmin[] = {xr->output, wr->output};
+    int mm_s[2] = {N * H * W, Cout * kh * kw};
+    struct IRNode* mm = create_primitive_node(ir, UOP_MATMUL, mmin, 2, NULL, mm_s, 2);
+    if (!mm) return -1;
+    chain_append(&head, &tail, mm);
+    int c6_s[6] = {N, H, W, Cout, kh, kw};
+    struct IRNode* c6 = insert_reshape(ir, mm->output, c6_s, 6, &head, &tail);
+    if (!c6) return -1;
+
+    // fold W: [N,H,Cout,kh, W,kw] -> [N,H,Cout,kh, OWf]
+    int pW[6] = {0,1,3,4,2,5};
+    struct IRNode* pmW = insert_permute(ir, c6->output, 6, pW, &head, &tail);
+    if (!pmW) return -1;
+    struct IRNode* fW = insert_fold_last(ir, pmW->output, 6, kw, sw, OWf, &head, &tail);
+    if (!fW) return -1;                                                    // [N,H,Cout,kh,OWf]
+    // fold H: [N,Cout,OWf, H,kh] -> [N,Cout,OWf, OHf]
+    int pH[5] = {0,2,4,1,3};
+    struct IRNode* pmH = insert_permute(ir, fW->output, 5, pH, &head, &tail);
+    if (!pmH) return -1;
+    struct IRNode* fH = insert_fold_last(ir, pmH->output, 5, kh, sh, OHf, &head, &tail);
+    if (!fH) return -1;                                                    // [N,Cout,OWf,OHf]
+    int pO[4] = {0,1,3,2};
+    struct IRNode* pmO = insert_permute(ir, fH->output, 4, pO, &head, &tail); // [N,Cout,OHf,OWf]
+    if (!pmO) return -1;
+    struct IRNode* result = pmO;
+
+    // shrink off the padding border: [ph:ph+OH, pw:pw+OW]
+    if (ph > 0 || pw > 0) {
+        ShrinkParams* shp = cml_malloc(sizeof(ShrinkParams));
+        if (!shp) return -1;
+        shp->num_dims = 4;
+        shp->starts = cml_malloc(4 * sizeof(int));
+        shp->ends   = cml_malloc(4 * sizeof(int));
+        if (!shp->starts || !shp->ends) { cml_free(shp->starts); cml_free(shp->ends); cml_free(shp); return -1; }
+        int st[4] = {0, 0, ph, pw}, en[4] = {N, Cout, ph + OH, pw + OW};
+        memcpy(shp->starts, st, 4 * sizeof(int));
+        memcpy(shp->ends, en, 4 * sizeof(int));
+        int os[4] = {N, Cout, OH, OW};
+        struct IRNode* sk = create_primitive_node(ir, UOP_SHRINK, &result->output, 1, shp, os, 4);
+        if (!sk) { cml_free(shp->starts); cml_free(shp->ends); cml_free(shp); return -1; }
+        chain_append(&head, &tail, sk);
+        result = sk;
+    }
+
+    // bias [Cout] -> [1,Cout,1,1] -> expand -> add
+    if (bias && bias->ndim == 1 && bias->shape[0] == Cout) {
+        int br_s[4] = {1, Cout, 1, 1};
+        struct IRNode* br = insert_reshape(ir, bias, br_s, 4, &head, &tail);
+        if (!br) return -1;
+        int be_s[4] = {N, Cout, OH, OW};
+        struct IRNode* be = insert_expand(ir, br->output, be_s, 4, &head, &tail);
+        if (!be) return -1;
+        Tensor* ain[] = {result->output, be->output};
+        struct IRNode* add = create_primitive_node(ir, UOP_ADD, ain, 2, NULL, be_s, 4);
+        if (!add) return -1;
+        chain_append(&head, &tail, add);
+        result = add;
+    }
+
+    (void)result;
+    replace_node_with_chain(ir, node, head, tail);
+    return 0;
+}
+
+// CONV_TRANSPOSE3D → matmul → three separable FOLDs (W,H,D) → shrink → (+bias).
+static int decompose_conv_transpose3d(CMLGraph_t ir, struct IRNode* node) {
+    Tensor* x = node->inputs[0];             // [N,Cin,D,H,W]
+    Tensor* w = node->inputs[1];             // [Cin,Cout,kd,kh,kw]
+    Tensor* bias = (node->num_inputs >= 3) ? node->inputs[2] : NULL;
+    if (!x || x->ndim != 5 || !w || w->ndim != 5) return 0;
+    ConvTranspose3DParams* p = (ConvTranspose3DParams*)node->params;
+    if (!p) return 0;
+    int N = x->shape[0], Cin = x->shape[1], D = x->shape[2], H = x->shape[3], W = x->shape[4];
+    int Cout = w->shape[1], kd = w->shape[2], kh = w->shape[3], kw = w->shape[4];
+    int sd = p->stride[0], sh = p->stride[1], sw = p->stride[2];
+    int pd = p->padding[0], ph = p->padding[1], pw = p->padding[2];
+    if (p->dilation[0] != 1 || p->dilation[1] != 1 || p->dilation[2] != 1) return 0;
+    if (p->output_padding[0] || p->output_padding[1] || p->output_padding[2]) return 0;
+    if (x->shape[1] != w->shape[0]) return 0;
+
+    int ODf = (D - 1) * sd + kd, OHf = (H - 1) * sh + kh, OWf = (W - 1) * sw + kw;
+    int OD = ODf - 2 * pd, OH = OHf - 2 * ph, OW = OWf - 2 * pw;
+    if (OD <= 0 || OH <= 0 || OW <= 0) return 0;
+
+    struct IRNode *head = NULL, *tail = NULL;
+
+    int pA[5] = {0,2,3,4,1};
+    struct IRNode* xp = insert_permute(ir, x, 5, pA, &head, &tail);        // [N,D,H,W,Cin]
+    if (!xp) return -1;
+    int xr_s[2] = {N * D * H * W, Cin};
+    struct IRNode* xr = insert_reshape(ir, xp->output, xr_s, 2, &head, &tail);
+    if (!xr) return -1;
+    int wr_s[2] = {Cin, Cout * kd * kh * kw};
+    struct IRNode* wr = insert_reshape(ir, w, wr_s, 2, &head, &tail);
+    if (!wr) return -1;
+    Tensor* mmin[] = {xr->output, wr->output};
+    int mm_s[2] = {N * D * H * W, Cout * kd * kh * kw};
+    struct IRNode* mm = create_primitive_node(ir, UOP_MATMUL, mmin, 2, NULL, mm_s, 2);
+    if (!mm) return -1;
+    chain_append(&head, &tail, mm);
+    int c8_s[8] = {N, D, H, W, Cout, kd, kh, kw};
+    struct IRNode* c8 = insert_reshape(ir, mm->output, c8_s, 8, &head, &tail);
+    if (!c8) return -1;
+
+    // fold W: [N,D,H,Cout,kd,kh, W,kw] -> [N,D,H,Cout,kd,kh, OWf]
+    int pW[8] = {0,1,2,4,5,6,3,7};
+    struct IRNode* pmW = insert_permute(ir, c8->output, 8, pW, &head, &tail);
+    if (!pmW) return -1;
+    struct IRNode* fW = insert_fold_last(ir, pmW->output, 8, kw, sw, OWf, &head, &tail); // 7D
+    if (!fW) return -1;
+    // fold H: [N,D,Cout,kd,OWf, H,kh] -> [N,D,Cout,kd,OWf, OHf]
+    int pH[7] = {0,1,3,4,6,2,5};
+    struct IRNode* pmH = insert_permute(ir, fW->output, 7, pH, &head, &tail);
+    if (!pmH) return -1;
+    struct IRNode* fH = insert_fold_last(ir, pmH->output, 7, kh, sh, OHf, &head, &tail); // 6D
+    if (!fH) return -1;
+    // fold D: [N,Cout,OWf,OHf, D,kd] -> [N,Cout,OWf,OHf, ODf]
+    int pD[6] = {0,2,4,5,1,3};
+    struct IRNode* pmD = insert_permute(ir, fH->output, 6, pD, &head, &tail);
+    if (!pmD) return -1;
+    struct IRNode* fD = insert_fold_last(ir, pmD->output, 6, kd, sd, ODf, &head, &tail); // 5D
+    if (!fD) return -1;                                                    // [N,Cout,OWf,OHf,ODf]
+    int pO[5] = {0,1,4,3,2};
+    struct IRNode* pmO = insert_permute(ir, fD->output, 5, pO, &head, &tail); // [N,Cout,ODf,OHf,OWf]
+    if (!pmO) return -1;
+    struct IRNode* result = pmO;
+
+    if (pd > 0 || ph > 0 || pw > 0) {
+        ShrinkParams* shp = cml_malloc(sizeof(ShrinkParams));
+        if (!shp) return -1;
+        shp->num_dims = 5;
+        shp->starts = cml_malloc(5 * sizeof(int));
+        shp->ends   = cml_malloc(5 * sizeof(int));
+        if (!shp->starts || !shp->ends) { cml_free(shp->starts); cml_free(shp->ends); cml_free(shp); return -1; }
+        int st[5] = {0, 0, pd, ph, pw}, en[5] = {N, Cout, pd + OD, ph + OH, pw + OW};
+        memcpy(shp->starts, st, 5 * sizeof(int));
+        memcpy(shp->ends, en, 5 * sizeof(int));
+        int os[5] = {N, Cout, OD, OH, OW};
+        struct IRNode* sk = create_primitive_node(ir, UOP_SHRINK, &result->output, 1, shp, os, 5);
+        if (!sk) { cml_free(shp->starts); cml_free(shp->ends); cml_free(shp); return -1; }
+        chain_append(&head, &tail, sk);
+        result = sk;
+    }
+
+    if (bias && bias->ndim == 1 && bias->shape[0] == Cout) {
+        int br_s[5] = {1, Cout, 1, 1, 1};
+        struct IRNode* br = insert_reshape(ir, bias, br_s, 5, &head, &tail);
+        if (!br) return -1;
+        int be_s[5] = {N, Cout, OD, OH, OW};
+        struct IRNode* be = insert_expand(ir, br->output, be_s, 5, &head, &tail);
+        if (!be) return -1;
+        Tensor* ain[] = {result->output, be->output};
+        struct IRNode* add = create_primitive_node(ir, UOP_ADD, ain, 2, NULL, be_s, 5);
+        if (!add) return -1;
+        chain_append(&head, &tail, add);
+        result = add;
+    }
+
+    (void)result;
+    replace_node_with_chain(ir, node, head, tail);
+    return 0;
+}
+
 // Main Decomposition Pass
 
 int cml_ir_decompose(CMLGraph_t ir) {
@@ -2412,6 +2626,8 @@ int cml_ir_decompose(CMLGraph_t ir) {
         case UOP_AVGPOOL2D:  result = decompose_avgpool2d(ir, node);  decomposed = true; break;
         case UOP_CONV2D:     result = decompose_conv2d(ir, node);     decomposed = true; break;
         case UOP_CONV3D:     result = decompose_conv3d(ir, node);     decomposed = true; break;
+        case UOP_CONV_TRANSPOSE2D: result = decompose_conv_transpose2d(ir, node); decomposed = true; break;
+        case UOP_CONV_TRANSPOSE3D: result = decompose_conv_transpose3d(ir, node); decomposed = true; break;
 
         case UOP_MEAN:       result = decompose_mean(ir, node);       decomposed = true; break;
         case UOP_VAR:        result = decompose_var(ir, node);        decomposed = true; break;

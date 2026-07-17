@@ -1026,6 +1026,12 @@ int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node) {
     if (out->dtype != DTYPE_FLOAT32 || out->numel == 0)
         return -1;
 
+    /* A matmul carrying a fused epilogue (bias+activation, params != NULL) needs
+     * the epilogue applied after the gemm; the GPU gemm shader doesn't do that,
+     * so fall back to the CPU path which applies it in-place. */
+    if (node->type == UOP_MATMUL && node->params)
+        return -1;
+
     int op_code = 0;
     int kind    = vk_classify(node->type, node->num_inputs, &op_code);
     if (kind == 0)

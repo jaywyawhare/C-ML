@@ -255,6 +255,7 @@ set(OPS_SOURCES
     src/ops/ir/fusion_patterns.c
     src/ops/ir/dispatch.c
     src/ops/ir/decompose.c
+    src/ops/ir/autodiff.c
     src/ops/ir/pattern_matcher.c
     src/ops/ir/tree_automaton.c
     src/ops/ir/hcq.c
@@ -273,6 +274,7 @@ set(OPS_SOURCES
     src/ops/ir/beam_cuda_timing.c
     src/ops/ir/schedule.c
     src/ops/ir/fusion_schedule.c
+    src/ops/ir/fuse_elementwise.c
     src/ops/ir/linearize.c
     src/ops/ir/rangeify.c
     src/ops/ir/fused_codegen.c

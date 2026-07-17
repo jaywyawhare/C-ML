@@ -224,6 +224,10 @@ typedef enum {
     UOP_SGD_STEP,        // SGD / SGD-momentum in-place update  (SgdStepParams)
     UOP_ADAM_STEP,       // Adam in-place update                (AdamStepParams)
 
+    UOP_FOLD,            // col2im: adjoint of UNFOLD (scatter-add windows) (FoldParams)
+    UOP_SCATTER_ADD,     // index_add: adjoint of GATHER (scatter-ADD rows)  (ScatterAddParams)
+    UOP_FUSED_ELEMENTWISE, // one fused kernel for an elementwise chain (FusedElementwiseParams)
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -702,7 +706,45 @@ typedef struct {
     int stride;       // Stride of the sliding window (default = 1)
 } UnfoldParams;
 
+typedef struct {
+    int kernel_size;  // window size
+    int stride;       // window stride
+    int output_len;   // length of the reconstructed (folded) last axis
+} FoldParams;
+
+typedef struct {
+    int dim;       // axis to scatter-add along (indices select positions here)
+    int dim_size;  // size of the output along `dim`
+} ScatterAddParams;
+
+/* One fused elementwise kernel: a straight-line sequence of primitive
+ * elementwise ops evaluated per output element with register intermediates.
+ * Operand refs: >=0 -> external input index (node->inputs[ref]);
+ *               <0  -> prior step result (step index = -ref-1). Unused = INT_MIN. */
+typedef struct {
+    int      num_steps;
+    UOpType* op;      // op[s]
+    int*     a;       // first operand ref per step
+    int*     b;       // second operand ref (binary), or unused
+    int*     c;       // third operand ref (WHERE=cond,then,else -> a,b,c), or unused
+    float*   konst;   // constant per step (FILL); ignored otherwise
+} FusedElementwiseParams;
+
+/* Matmul epilogue fusion: a FusedElementwiseParams stored on a UOP_MATMUL node's
+ * `params` describes a bias-add + activation chain folded onto the gemm output
+ * (applied in-place to the M*N result, so it costs no extra buffer/pass). In the
+ * chain's operand refs, MATMUL_ACC_REF means "the gemm result at this output
+ * element"; external refs (>=0) index the matmul node's appended epilogue inputs
+ * (node->inputs[2 + ref], e.g. the bias vector broadcast over rows). Every matmul
+ * backend (BLAS, interpreter, JIT gemm) applies it, so attaching it is safe. */
+#define MATMUL_ACC_REF (-2000000)
+
 Tensor* uop_unfold(Tensor* a, int kernel_size, int stride);
+/* col2im: [..., num_windows, kernel_size] -> [..., output_len] by scatter-add. */
+Tensor* uop_fold(Tensor* a, int kernel_size, int stride, int output_len);
+/* index_add (adjoint of gather): out[index[i], ..] += src[i, ..] along `dim`;
+ * out has `src` shape with axis `dim` resized to `dim_size`. */
+Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size);
 void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** out_mean);
 void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean);
 

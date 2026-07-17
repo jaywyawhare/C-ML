@@ -44,6 +44,22 @@ int cml_ir_execute_traced(CMLGraph_t ir);
 /* Fused CPU scheduler entrypoint. */
 int cml_ir_execute_fusion(CMLGraph_t ir);
 
+/* Real elementwise kernel fusion: collapse maximal single-use elementwise
+ * chains into UOP_FUSED_ELEMENTWISE nodes. Returns the number of chains fused.
+ * Mutates the graph in place; safe to run after decompose + autodiff. */
+int cml_ir_fuse_elementwise(CMLGraph_t ir);
+
+/* Allow the fuser to fuse requires_grad (forward) chains too — only safe when
+ * the full fwd+bwd graph is present so use_count reflects backward refs.
+ * tensor_backward sets it around the combined-graph execute; off by default. */
+void cml_ir_fuse_set_allow_grad(int on);
+
+/* Matmul epilogue fusion: fold a single-use elementwise (bias+activation) chain
+ * that consumes a gemm output back INTO the matmul node (applied in-place to the
+ * M*N result by every backend). Run after cml_ir_fuse_elementwise. Returns the
+ * number of matmuls that gained an epilogue. */
+int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir);
+
 #ifdef __cplusplus
 }
 #endif

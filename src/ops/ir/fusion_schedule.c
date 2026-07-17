@@ -9,6 +9,7 @@
  * Buffer elimination: if every user of a producer lives in the same
  * fusion group, the intermediate buffer is eliminated (kept in registers). */
 
+#include "ops/ir/execution.h"
 #include "ops/ir/schedule.h"
 #include "ops/ir/memory_planner.h"
 #include "ops/ir/ir.h"
@@ -549,29 +550,32 @@ void cml_fusion_schedule_print(const CMLFusionSchedule* sched) {
 int cml_ir_execute_fusion(CMLGraph_t ir) {
     if (!ir) return -1;
 
-    CMLFusionSchedule* sched = cml_fusion_schedule_create(ir, NULL);
-    if (!sched) {
-        LOG_ERROR("Failed to create fusion schedule");
-        return -1;
-    }
-
-    /* Execute each group in order */
-    int rc = 0;
-    for (int i = 0; i < sched->num_ordered && rc == 0; i++) {
-        int idx = sched->execution_order[i];
-        CMLFusionGroup* g = sched->groups[idx];
-        if (!g) continue;
-
-        /* Execute each node in the group sequentially (CPU fallback) */
-        for (int j = 0; j < g->num_nodes && rc == 0; j++) {
-            struct IRNode* node = g->nodes[j];
-            if (!node || node->is_executed) continue;
-            if (!node->is_used) continue;  /* DCE: skip nodes not needed for target */
-            rc = cpu_execute_node(node);
-            if (rc == 0) node->is_executed = true;
+    /* Pure-inference decompose: if this whole-graph execute is inference (no
+     * requires_grad node) and not yet decomposed, lower composites (RELU→MAX+FILL)
+     * so elementwise + epilogue fusion can collapse them. Restricted to inference
+     * because decomposing a training graph here (fwd+bwd, partially executed via
+     * this path) corrupts the buffer lifecycle — training graphs are already
+     * decomposed by the cml_ir_execute (backward) path anyway. Re-mark all nodes
+     * used since the new decomposed nodes weren't in the caller's DCE walk (a cold
+     * inference graph has no freed-tensor dead nodes to worry about). */
+    if (!ir->is_decomposed) {
+        int has_grad = 0;
+        for (struct IRNode* p = ir->head; p; p = p->next)
+            if (p->requires_grad) { has_grad = 1; break; }
+        if (!has_grad) {
+            cml_ir_decompose(ir);
+            for (struct IRNode* p = ir->head; p; p = p->next) p->is_used = true;
         }
     }
 
-    cml_fusion_schedule_free(sched);
-    return rc;
+    /* Real kernel fusion: collapse maximal single-use elementwise chains into
+     * UOP_FUSED_ELEMENTWISE nodes so cpu_execute_node runs each chain as ONE
+     * per-element loop with register-held intermediates (no intermediate buffer
+     * materialization). Safe wrt autodiff — only fuses use_count==1 edges. */
+    int fused = cml_ir_fuse_elementwise(ir);
+    if (fused > 0) LOG_DEBUG("Real fusion collapsed %d elementwise chain(s)", fused);
+    /* Fold bias+activation epilogues into their gemms (inference path too). */
+    cml_ir_fuse_matmul_epilogue(ir);
+
+    return cpu_execute_ir(ir);
 }
