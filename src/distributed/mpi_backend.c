@@ -177,6 +177,19 @@ static int mpi_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
                           src_rank, tag, CML_MPI_COMM_WORLD, NULL);
 }
 
+/* Async metadata, kept in its OWN allocation rather than packed into the
+ * MPI_Request buffer. The previous code aliased recvbuf/tensor/numel into the
+ * same 128-byte block MPI writes through as the request handle — MPI's writes
+ * during Iallreduce/Wait could corrupt the packed pointers (and vice-versa).
+ * `request` is a separate opaque buffer sized generously for any MPI_Request. */
+typedef struct MPIAsyncWork {
+    void*   request;   /* opaque MPI_Request storage (MPI writes here) */
+    float*  recvbuf;   /* out-of-place result buffer */
+    Tensor* tensor;    /* destination tensor */
+    size_t  numel;
+    int     scale_ws;  /* >0 → this was an AVG: divide by scale_ws after wait */
+} MPIAsyncWork;
+
 static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !tensor || !tensor->data)
@@ -189,52 +202,34 @@ static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx)
     int mpi_op = mpi_op_to_const(op);
 
     if (mpi->MPI_Iallreduce) {
-        float* recvbuf = (float*)cml_malloc(tensor->numel * sizeof(float));
-        if (!recvbuf) {
-            cml_free(work);
+        MPIAsyncWork* aw = (MPIAsyncWork*)cml_calloc(1, sizeof(MPIAsyncWork));
+        if (!aw) { cml_free(work); return NULL; }
+
+        aw->recvbuf = (float*)cml_malloc(tensor->numel * sizeof(float));
+        aw->request = cml_calloc(1, 128); /* opaque MPI_Request storage */
+        if (!aw->recvbuf || !aw->request) {
+            cml_free(aw->recvbuf); cml_free(aw->request);
+            cml_free(aw); cml_free(work);
             return NULL;
         }
+        aw->tensor   = tensor;
+        aw->numel    = tensor->numel;
+        aw->scale_ws = (op == DIST_REDUCE_AVG) ? cml_dist_get_world_size() : 0;
 
-        /* Allocate MPI_Request handle (opaque, typically pointer-sized) */
-        void* request = cml_calloc(1, 128);
-        if (!request) {
-            cml_free(recvbuf);
-            cml_free(work);
-            return NULL;
-        }
-
-        int result = mpi->MPI_Iallreduce(tensor->data, recvbuf,
-                                           (int)tensor->numel, CML_MPI_FLOAT,
-                                           mpi_op, CML_MPI_COMM_WORLD, request);
-
+        int result = mpi->MPI_Iallreduce(tensor->data, aw->recvbuf,
+                                          (int)tensor->numel, CML_MPI_FLOAT,
+                                          mpi_op, CML_MPI_COMM_WORLD, aw->request);
         if (result != 0) {
-            cml_free(request);
-            cml_free(recvbuf);
-            cml_free(work);
+            cml_free(aw->recvbuf); cml_free(aw->request);
+            cml_free(aw); cml_free(work);
             return NULL;
         }
 
-        /* Store request as internal handle; recvbuf will be copied on wait */
-        work->internal = request;
+        work->internal  = aw;   /* freed by cml_dist_work_free after mpi_wait */
         work->completed = false;
         work->error_code = 0;
-
-        /* We need to copy recvbuf back after wait. Store both in a wrapper. */
-        /* For simplicity, just do the copy after MPI_Wait in mpi_wait. */
-        /* We lose the recvbuf pointer here - use sync fallback for correctness. */
-        /* Actually, store recvbuf alongside the request. */
-        /* Pack: [request_data(128 bytes)][recvbuf_ptr(8 bytes)][tensor_ptr(8 bytes)][numel(8 bytes)] */
-        memcpy((char*)request + 64, &recvbuf, sizeof(float*));
-        memcpy((char*)request + 64 + sizeof(float*), &tensor, sizeof(Tensor*));
-        memcpy((char*)request + 64 + sizeof(float*) + sizeof(Tensor*), &tensor->numel, sizeof(size_t));
-
-        if (op == DIST_REDUCE_AVG) {
-            int ws = cml_dist_get_world_size();
-            memcpy((char*)request + 64 + sizeof(float*) + sizeof(Tensor*) + sizeof(size_t), &ws, sizeof(int));
-        }
-
     } else {
-        /* Fallback to synchronous allreduce */
+        /* No non-blocking allreduce available: fall back to synchronous. */
         int result = mpi_allreduce(tensor, op, ctx);
         work->completed = true;
         work->error_code = result;
@@ -250,30 +245,27 @@ static int mpi_wait(DistWork* work) {
         return work->error_code;
 
     MPIContext* mpi = g_mpi_ctx;
-    if (!mpi || !mpi->MPI_Wait || !work->internal)
+    MPIAsyncWork* aw = (MPIAsyncWork*)work->internal;
+    if (!mpi || !mpi->MPI_Wait || !aw)
         return -1;
 
-    void* request = work->internal;
-    int result = mpi->MPI_Wait(request, NULL);
+    int result = mpi->MPI_Wait(aw->request, NULL);
 
-    if (result == 0) {
-        /* Retrieve packed recvbuf, tensor, and numel */
-        float* recvbuf = NULL;
-        Tensor* tensor = NULL;
-        size_t numel = 0;
-        memcpy(&recvbuf, (char*)request + 64, sizeof(float*));
-        memcpy(&tensor, (char*)request + 64 + sizeof(float*), sizeof(Tensor*));
-        memcpy(&numel, (char*)request + 64 + sizeof(float*) + sizeof(Tensor*), sizeof(size_t));
-
-        if (recvbuf && tensor && tensor->data && numel > 0)
-            memcpy(tensor->data, recvbuf, numel * sizeof(float));
-
-        cml_free(recvbuf);
+    if (result == 0 && aw->recvbuf && aw->tensor && aw->tensor->data && aw->numel > 0) {
+        memcpy(aw->tensor->data, aw->recvbuf, aw->numel * sizeof(float));
+        if (aw->scale_ws > 0) {
+            float scale = 1.0f / (float)aw->scale_ws;
+            float* d = (float*)aw->tensor->data;
+            for (size_t i = 0; i < aw->numel; i++) d[i] *= scale;
+        }
     }
+
+    /* Release the sub-allocations now; cml_dist_work_free frees `aw` itself. */
+    cml_free(aw->recvbuf); aw->recvbuf = NULL;
+    cml_free(aw->request); aw->request = NULL;
 
     work->completed = true;
     work->error_code = result;
-
     return result;
 }
 

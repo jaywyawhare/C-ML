@@ -22,6 +22,12 @@ typedef int ncclResult_t;
 typedef int ncclRedOp_t;
 typedef int ncclDataType_t;
 
+/* ncclDataType_t enum values (NCCL public ABI): ncclInt8=0 ... ncclFloat32=7.
+ * The collectives here operate on float32 tensors, so they must pass 7 — the
+ * previous hardcoded 0 meant ncclInt8, which reinterprets each 4-byte float as
+ * four int8 elements and silently corrupts every reduction. */
+#define NCCL_FLOAT32 7
+
 typedef struct {
     void* handle;    /* dlopen handle */
     ncclResult_t (*ncclCommInitRank)(ncclComm_t*, int, void*, int);
@@ -38,6 +44,13 @@ typedef struct {
     ncclResult_t (*ncclCommGetAsyncError)(ncclComm_t, ncclResult_t*);
     ncclComm_t comm;
     void* stream;    /* CUDA stream (NULL = default stream) */
+
+    /* Resolved from libcudart so we can actually wait for a collective to finish
+     * on the stream before the host reads the result (e.g. the AVG post-scale).
+     * NULL if libcudart isn't present; callers fall back to the enqueue-order
+     * assumption. */
+    void* cudart_handle;
+    int (*cudaStreamSynchronize)(void* stream);
 } NCCLContext;
 
 /* Static context pointer (same pattern as MPI backend) */
@@ -207,6 +220,13 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
     return 0;
 }
 
+/* Block until the collective enqueued on nccl->stream has finished, so the host
+ * may safely read/scale the result. No-op if libcudart wasn't resolved. */
+static void nccl_stream_sync(NCCLContext* nccl) {
+    if (nccl && nccl->cudaStreamSynchronize)
+        nccl->cudaStreamSynchronize(nccl->stream);
+}
+
 static int nccl_map_reduce_op(DistReduceOp op) {
     switch (op) {
     case DIST_REDUCE_SUM: case DIST_REDUCE_AVG: return 0; /* ncclSum */
@@ -226,11 +246,13 @@ static int nccl_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     int nccl_op = nccl_map_reduce_op(op);
 
     int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel,
-                                      0 /* ncclFloat32 */, nccl_op, nccl->comm,
+                                      NCCL_FLOAT32, nccl_op, nccl->comm,
                                       nccl->stream);
 
-    /* Average if requested */
+    /* Average if requested — must wait for the reduce to complete first, else
+     * we'd scale stale data. */
     if (op == DIST_REDUCE_AVG && result == 0) {
+        nccl_stream_sync(nccl);
         float scale = 1.0f / (float)cml_dist_get_world_size();
         float* data = (float*)tensor->data;
         for (size_t i = 0; i < tensor->numel; i++)
@@ -247,7 +269,7 @@ static int nccl_broadcast(Tensor* tensor, int src_rank, void* ctx) {
         return -1;
 
     return nccl->ncclBroadcast(tensor->data, tensor->data, tensor->numel,
-                                0 /* ncclFloat32 */, src_rank, nccl->comm,
+                                NCCL_FLOAT32, src_rank, nccl->comm,
                                 nccl->stream);
 }
 
@@ -270,7 +292,7 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
 
     /* ncclAllGather: each rank sends chunk_size elements, receives world_size * chunk_size */
     int result = nccl->ncclAllGather(input->data, gather_buf, chunk_size,
-                                      0 /* ncclFloat32 */, nccl->comm,
+                                      NCCL_FLOAT32, nccl->comm,
                                       nccl->stream);
 
     if (result != 0) {
@@ -299,7 +321,7 @@ static int nccl_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, v
     int nccl_op = nccl_map_reduce_op(op);
 
     int result = nccl->ncclReduceScatter(input->data, output->data, output->numel,
-                                          0 /* ncclFloat32 */, nccl_op, nccl->comm,
+                                          NCCL_FLOAT32, nccl_op, nccl->comm,
                                           nccl->stream);
 
     /* Average if requested */
@@ -322,7 +344,7 @@ static int nccl_barrier(void* ctx) {
     /* Standard NCCL barrier pattern: allreduce a single dummy element */
     float dummy = 0.0f;
     return nccl->ncclAllReduce(&dummy, &dummy, 1,
-                                0 /* ncclFloat32 */, 0 /* ncclSum */,
+                                NCCL_FLOAT32, 0 /* ncclSum */,
                                 nccl->comm, nccl->stream);
 }
 
@@ -341,7 +363,7 @@ static int nccl_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
         return result;
 
     result = nccl->ncclSend(tensor->data, tensor->numel,
-                             0 /* ncclFloat32 */, dst_rank,
+                             NCCL_FLOAT32, dst_rank,
                              nccl->comm, nccl->stream);
     if (result != 0)
         return result;
@@ -364,7 +386,7 @@ static int nccl_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
         return result;
 
     result = nccl->ncclRecv(tensor->data, tensor->numel,
-                             0 /* ncclFloat32 */, src_rank,
+                             NCCL_FLOAT32, src_rank,
                              nccl->comm, nccl->stream);
     if (result != 0)
         return result;
@@ -382,7 +404,7 @@ static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
 
     /* Launch the allreduce without synchronizing */
     int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel,
-                                      0 /* ncclFloat32 */, nccl_op, nccl->comm,
+                                      NCCL_FLOAT32, nccl_op, nccl->comm,
                                       nccl->stream);
 
     DistWork* work = (DistWork*)cml_calloc(1, sizeof(DistWork));
@@ -395,17 +417,16 @@ static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
         return work;
     }
 
-    /*
-     * If we had CUDA event support, we would record an event here
-     * and store it in work->internal. Without CUDA runtime linkage,
-     * mark as completed immediately (the operation was enqueued on
-     * the NCCL stream and will complete in stream order).
-     */
+    /* Wait for the collective on the stream to actually finish before reporting
+     * completion, so a subsequent wait()/read sees final data rather than a
+     * still-in-flight buffer. (A true event-based async would record an event
+     * into work->internal; with only stream-sync available we complete here.) */
+    nccl_stream_sync(nccl);
     work->internal = NULL;
     work->completed = true;
     work->error_code = 0;
 
-    /* Handle AVG post-scaling */
+    /* Handle AVG post-scaling (safe now that the stream is synced) */
     if (op == DIST_REDUCE_AVG) {
         float scale = 1.0f / (float)cml_dist_get_world_size();
         float* data = (float*)tensor->data;
@@ -465,6 +486,8 @@ static void nccl_destroy(void* ctx) {
 
     if (nccl->handle)
         dlclose(nccl->handle);
+    if (nccl->cudart_handle)
+        dlclose(nccl->cudart_handle);
 
     if (g_nccl_ctx == nccl)
         g_nccl_ctx = NULL;
@@ -491,6 +514,15 @@ DistCommOps* cml_dist_create_nccl_backend(void) {
 
     nccl->handle = handle;
     nccl->stream = NULL; /* default CUDA stream */
+
+    /* Optional: libcudart for real stream synchronization. */
+    nccl->cudart_handle = dlopen("libcudart.so", RTLD_NOW | RTLD_LOCAL);
+    if (!nccl->cudart_handle)
+        nccl->cudart_handle = dlopen("libcudart.so.12", RTLD_NOW | RTLD_LOCAL);
+    if (!nccl->cudart_handle)
+        nccl->cudart_handle = dlopen("libcudart.so.11.0", RTLD_NOW | RTLD_LOCAL);
+    if (nccl->cudart_handle)
+        *(void**)&nccl->cudaStreamSynchronize = dlsym(nccl->cudart_handle, "cudaStreamSynchronize");
 
     /* Load function pointers */
     *(void**)&nccl->ncclCommInitRank = dlsym(handle, "ncclCommInitRank");
