@@ -60,6 +60,20 @@ void cml_ir_fuse_set_allow_grad(int on);
  * number of matmuls that gained an epilogue. */
 int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir);
 
+/* Mark every computed (op) node in the graph as not-yet-executed so the next
+ * cml_ir_execute re-runs it, WITHOUT rebuilding the graph. Leaf/data nodes
+ * (num_inputs==0 — inputs, weights) keep their materialized buffers. This is the
+ * primitive behind a zero-rebuild "static graph": build the graph once, then each
+ * iteration overwrite the input buffers, cml_ir_clear_executed(ir), and
+ * cml_ir_execute(ir) — no new IR nodes are allocated. */
+void cml_ir_clear_executed(CMLGraph_t ir);
+
+/* Zero-rebuild re-run of an already-built static graph after overwriting its
+ * input/weight buffers: clears executed flags and recomputes via cpu_execute_ir
+ * (fusion path when on), bypassing TinyJit's replay (which would return the
+ * first-run values instead of recomputing). No decompose/fusion/allocation. */
+int cml_ir_reexecute(CMLGraph_t ir);
+
 #ifdef __cplusplus
 }
 #endif

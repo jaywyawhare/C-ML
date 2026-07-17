@@ -5055,6 +5055,35 @@ static int cml_tinyjit_active(void) {
     return on;
 }
 
+/* Zero-rebuild static graph: reset the executed flags on computed (op) nodes so
+ * the next execute re-runs them on the current input-buffer contents, reusing
+ * the existing nodes and output buffers. Leaves (num_inputs==0: inputs/weights)
+ * keep their materialized data. */
+void cml_ir_clear_executed(CMLGraph_t ir) {
+    if (!ir) return;
+    for (struct IRNode* p = ir->head; p; p = p->next) {
+        if (p->num_inputs <= 0) continue;   /* leaf/input/weight — keep realized */
+        p->is_executed = false;
+        if (p->output) p->output->is_executed = false;
+    }
+    ir->is_executed = false;
+}
+
+/* Re-run an already-built graph after its input/weight buffers were overwritten,
+ * WITHOUT rebuilding it — the zero-rebuild static-graph step. Recomputes every op
+ * node directly via cpu_execute_ir (the fusion path when enabled); does NOT go
+ * through cml_ir_execute, whose TinyJit replay would return the values recorded on
+ * the first run instead of recomputing from the updated buffers. The graph is
+ * already decomposed + fused from the first execute, so this only re-runs kernels
+ * — no decompose, no fusion pass, no node allocation. */
+int cml_ir_reexecute(CMLGraph_t ir) {
+    if (!ir) return -1;
+    cml_ir_clear_executed(ir);
+    if (cml_ir_use_fusion_scheduler())
+        return cml_ir_execute_fusion(ir);
+    return cpu_execute_ir(ir);
+}
+
 int cml_ir_execute_cpu(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_cpu");
