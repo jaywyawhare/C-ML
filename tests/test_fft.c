@@ -48,6 +48,18 @@ int main(void) {
       int ok = X && xi && fabsf(d[0]-1.0f) < 1e-3f && fabsf(d[2]-2.0f) < 1e-3f && fabsf(d[6]-4.0f) < 1e-3f;
       CHECK("cml_fft tensor round-trip [n,2]", ok); }
 
+    /* 2-D FFT round-trip on a [4,4,2] complex image */
+    { float img[32];
+      for (int i = 0; i < 16; i++) { img[2*i] = (float)((i*7) % 5) - 2.0f; img[2*i+1] = 0.0f; }
+      float orig[32]; for (int i = 0; i < 32; i++) orig[i] = img[i];
+      int shp[3] = {4,4,2};
+      Tensor* x = cml_tensor(img, shp, 3, NULL);
+      Tensor* X = cml_fft2(x, 0);
+      Tensor* xi = cml_fft2(X, 1);
+      float* d = (float*)tensor_data_ptr(xi);
+      int ok = X && xi; for (int i = 0; i < 32 && ok; i++) if (fabsf(d[i] - orig[i]) > 1e-3f) ok = 0;
+      CHECK("cml_fft2 2-D round-trip [4,4,2]", ok); }
+
     printf("\n%s\n", g_fail ? "FFT TESTS FAILED" : "All FFT tests passed");
     return g_fail;
 }

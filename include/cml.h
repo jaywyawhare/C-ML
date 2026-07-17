@@ -95,6 +95,7 @@ Tensor* cml_tensor_1d(const float* data, int size);
  * cml_fft transforms a complex signal tensor stored as [n,2] and returns [n,2]. */
 int     cml_fft_1d(float* re, float* im, int n, int inverse);
 Tensor* cml_fft(Tensor* x, int inverse);
+Tensor* cml_fft2(Tensor* x, int inverse);  /* 2-D FFT of [H,W,2] complex image */
 
 Tensor* cml_add(Tensor* a, Tensor* b);
 /* In-place elementwise (eager): a op= b into a's realized buffer, no allocation.

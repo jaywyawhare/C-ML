@@ -472,3 +472,40 @@ Tensor* cml_fft(Tensor* x, int inverse) {
     cml_free(re); cml_free(im);
     return out;
 }
+
+/* 2-D FFT of a complex image stored as [H, W, 2] (last dim = {real, imag}):
+ * FFT along W (each row) then along H (each column). Returns a new [H,W,2]. */
+Tensor* cml_fft2(Tensor* x, int inverse) {
+    if (!x) return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data) return NULL;
+    if (x->ndim != 3 || x->shape[2] != 2 || x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("cml_fft2: input must be float32 [H,W,2]");
+        return NULL;
+    }
+    int H = x->shape[0], W = x->shape[1];
+    TensorConfig cfg = { .dtype = DTYPE_FLOAT32, .device = x->device,
+                         .has_dtype = true, .has_device = true };
+    Tensor* out = tensor_empty(x->shape, x->ndim, &cfg);
+    if (!out || !out->data) return out;
+    memcpy(out->data, x->data, (size_t)H * W * 2 * sizeof(float));
+    float* od = (float*)out->data;
+    float* re = (float*)cml_malloc((size_t)(H > W ? H : W) * sizeof(float));
+    float* im = (float*)cml_malloc((size_t)(H > W ? H : W) * sizeof(float));
+    if (!re || !im) { cml_free(re); cml_free(im); return out; }
+    /* rows: length-W FFT */
+    for (int r = 0; r < H; r++) {
+        for (int c = 0; c < W; c++) { re[c] = od[(r*W + c)*2]; im[c] = od[(r*W + c)*2 + 1]; }
+        cml_fft_1d(re, im, W, inverse);
+        for (int c = 0; c < W; c++) { od[(r*W + c)*2] = re[c]; od[(r*W + c)*2 + 1] = im[c]; }
+    }
+    /* columns: length-H FFT */
+    for (int c = 0; c < W; c++) {
+        for (int r = 0; r < H; r++) { re[r] = od[(r*W + c)*2]; im[r] = od[(r*W + c)*2 + 1]; }
+        cml_fft_1d(re, im, H, inverse);
+        for (int r = 0; r < H; r++) { od[(r*W + c)*2] = re[r]; od[(r*W + c)*2 + 1] = im[r]; }
+    }
+    cml_free(re); cml_free(im);
+    out->is_executed = true;
+    return out;
+}
