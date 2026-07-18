@@ -3,7 +3,8 @@
 from __future__ import annotations
 from typing import Optional
 from cml._cml_lib import ffi, lib
-from cml.core import Tensor, Module
+from cml.core import Tensor
+from cml.nn import Module
 from cml.torch.memory import MemoryManager
 
 _DEFAULT_FORWARD_METHOD = ffi.new("char[]", b"forward")

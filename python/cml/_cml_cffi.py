@@ -835,36 +835,97 @@ ffi.cdef(
         const char* aot_output_path;
     } TorchPTEExportOptions;
 
+    typedef struct StateDict StateDict;
+
     int torch_init(void);
     int torch_cleanup(void);
+    void torch_get_version(int* major, int* minor, int* patch, const char** version_string);
     void torch_manual_seed(uint64_t seed);
     void torch_set_default_device(DeviceType device);
     void torch_set_default_dtype(DType dtype);
+    DeviceType torch_get_default_device(void);
+    DType torch_get_default_dtype(void);
+    int torch_cuda_device_count(void);
+    TensorConfig torch_options_to_config(const TorchTensorOptions* opts);
 
     TorchTensorOptions torch_options(void);
     TorchTensorOptions torch_options_dtype(TorchTensorOptions opts, DType dtype);
     TorchTensorOptions torch_options_device(TorchTensorOptions opts, DeviceType device);
     TorchTensorOptions torch_options_requires_grad(TorchTensorOptions opts, bool requires_grad);
 
+    Tensor* torch_empty(int* shape, int ndim, const TorchTensorOptions* opts);
     Tensor* torch_zeros(int* shape, int ndim, const TorchTensorOptions* opts);
     Tensor* torch_ones(int* shape, int ndim, const TorchTensorOptions* opts);
+    Tensor* torch_full(int* shape, int ndim, const TorchTensorOptions* opts, float value);
+    Tensor* torch_rand(int* shape, int ndim, const TorchTensorOptions* opts);
     Tensor* torch_randn(int* shape, int ndim, const TorchTensorOptions* opts);
+    Tensor* torch_eye(int n, const TorchTensorOptions* opts);
+    Tensor* torch_arange(float start, float end, float step, const TorchTensorOptions* opts);
+    Tensor* torch_linspace(float start, float end, int steps, const TorchTensorOptions* opts);
+    Tensor* torch_from_blob(void* data, int* shape, int ndim, const TorchTensorOptions* opts);
+    Tensor* torch_zeros_like(Tensor* t);
+    Tensor* torch_ones_like(Tensor* t);
+    Tensor* torch_randn_like(Tensor* t);
+    void torch_tensor_retain(Tensor* t);
     void torch_tensor_free(Tensor* t);
+    int torch_tensor_ref_count(const Tensor* t);
     void* torch_tensor_data_ptr(Tensor* t);
+    float* torch_tensor_data_ptr_f32(Tensor* t);
     int torch_tensor_ndim(const Tensor* t);
     size_t torch_tensor_numel(const Tensor* t);
+    DType torch_tensor_dtype(const Tensor* t);
+    DeviceType torch_tensor_device(const Tensor* t);
+    bool torch_tensor_is_contiguous(const Tensor* t);
+    bool torch_tensor_requires_grad(const Tensor* t);
+    void torch_tensor_set_requires_grad(Tensor* t, bool requires_grad);
+    const int* torch_tensor_sizes(const Tensor* t);
+    bool torch_tensor_is_materialized(const Tensor* t);
+    bool torch_tensor_has_lazy_ir(const Tensor* t);
+    float torch_tensor_item_float(Tensor* t);
+    void torch_tensor_set_item_float(Tensor* t, float value);
 
     Tensor* torch_add(Tensor* a, Tensor* b);
+    Tensor* torch_sub(Tensor* a, Tensor* b);
+    Tensor* torch_mul(Tensor* a, Tensor* b);
+    Tensor* torch_div(Tensor* a, Tensor* b);
     Tensor* torch_matmul(Tensor* a, Tensor* b);
+    Tensor* torch_pow(Tensor* a, Tensor* b);
+    Tensor* torch_sum(Tensor* a, int dim, bool keepdim);
+    Tensor* torch_mean(Tensor* a, int dim, bool keepdim);
+    Tensor* torch_max(Tensor* a, int dim, bool keepdim);
+    Tensor* torch_min(Tensor* a, int dim, bool keepdim);
     Tensor* torch_relu(Tensor* a);
+    Tensor* torch_sigmoid(Tensor* a);
+    Tensor* torch_tanh(Tensor* a);
+    Tensor* torch_softmax(Tensor* a, int dim);
+    Tensor* torch_gelu(Tensor* a);
+    Tensor* torch_reshape(Tensor* a, int* new_shape, int new_ndim);
+    Tensor* torch_transpose(Tensor* a, int dim0, int dim1);
+    Tensor* torch_squeeze(Tensor* a, int dim);
+    Tensor* torch_unsqueeze(Tensor* a, int dim);
+    Tensor* torch_cat(Tensor** tensors, int num_tensors, int dim);
+    Tensor* torch_stack(Tensor** tensors, int num_tensors, int dim);
+    Tensor* torch_clone(Tensor* a);
+    Tensor* torch_detach(Tensor* a);
+    Tensor* torch_contiguous(Tensor* a);
     void torch_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
+    void torch_zero_grad(Tensor* tensor);
     void torch_no_grad(void);
     void torch_enable_grad(void);
+    bool torch_is_grad_enabled(void);
+    Tensor* torch_get_grad(Tensor* t);
 
     Tensor* torch_module_forward(Module* module, Tensor* input);
     void torch_module_train(Module* module);
     void torch_module_eval(Module* module);
+    bool torch_module_is_training(Module* module);
+    void torch_module_zero_grad(Module* module);
+    StateDict* torch_module_state_dict(Module* module, const char* prefix);
+    int torch_module_load_state_dict(Module* module, const StateDict* sd, bool strict);
+    Tensor* torch_state_dict_get(const StateDict* sd, const char* key);
+    void torch_state_dict_free(StateDict* sd);
     Linear* torch_nn_linear(int in_features, int out_features, bool bias);
+    ReLU* torch_nn_relu(void);
     Sequential* torch_nn_sequential(void);
     void torch_nn_sequential_add(Sequential* seq, Module* layer);
     Tensor* torch_nn_sequential_forward(Sequential* seq, Tensor* input);
@@ -872,10 +933,16 @@ ffi.cdef(
 
     Optimizer* torch_optim_adam(Module* model, float lr, float weight_decay,
                                 float beta1, float beta2, float eps);
+    Optimizer* torch_optim_sgd(Module* model, float lr, float momentum, float weight_decay);
     void torch_optim_zero_grad(Optimizer* optimizer);
     void torch_optim_step(Optimizer* optimizer);
     void torch_optim_free(Optimizer* optimizer);
     void torch_reset_ir(void);
+    void torch_reset_ir_soft(void);
+    const char* torch_get_last_error(void);
+    int torch_get_last_error_code(void);
+    bool torch_has_error(void);
+    void torch_clear_error(void);
 
     TorchRuntimeModule* torch_runtime_from_module(Module* module);
     TorchRuntimeModule* torch_runtime_load_aot(const char* path);

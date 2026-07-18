@@ -573,7 +573,10 @@ class Tensor:
 
         shape_array = ffi.new("int[]", shape)
         data_ptr = ffi.cast("void*", arr.ctypes.data)
-        c_tensor = lib.tensor_from_data(data_ptr, shape_array, len(shape), ffi.NULL)
+        # Pass the dtype through — a NULL config defaults to float32, which
+        # reinterprets non-f32 array bytes as float garbage.
+        config = ffi.new("TensorConfig*", {"dtype": target_dtype, "has_dtype": True})
+        c_tensor = lib.tensor_from_data(data_ptr, shape_array, len(shape), config)
         if c_tensor == ffi.NULL:
             raise RuntimeError("Failed to create tensor from numpy array")
 
