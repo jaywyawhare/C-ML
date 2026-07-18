@@ -1,28 +1,154 @@
-/* Shared design tokens for the whole C-ML dashboard (shell + Visualizer +
- * Experiment tracker) so the three surfaces read as one product. Both sub-apps
- * already use the indigo accent + dark theme; these are the canonical values. */
+/* ============================================================================
+ * C-ML design system — "Engineering Instrument"
+ * ----------------------------------------------------------------------------
+ * One shared token layer for the shell, the Visualizer, and the Experiment
+ * tracker so all three read as one instrument. The subject is a from-scratch
+ * ML compiler — a UOP IR, a JIT, kernels, tensors — so the surface is dressed
+ * as a piece of lab equipment: a graphite chassis under a faint blueprint grid,
+ * an amber signal trace for anything live/primary, a cyan trace for the
+ * secondary channel, and mono-forward type for every number and identifier.
+ *
+ * Variable NAMES are kept stable (--accent, --bg, --font, ...) because the two
+ * sub-apps reference them directly; only the VALUES change here.
+ * Fonts are loaded per-page via <link> (Space Grotesk + JetBrains Mono), with
+ * a graceful fallback stack so the tool still reads correctly fully offline.
+ * ========================================================================== */
+
 :root {
-  /* accent + status */
-  --accent:   #6366f1;
-  --accent-2: #8b5cf6;
-  --ok:       #10b981;
-  --warn:     #f59e0b;
-  --err:      #ef4444;
-  --info:     #06b6d4;
+  /* ── Signal channels (interactive / primary) ───────────────────────────── */
+  --accent:      #ffb454;   /* amber trace — live, primary, selected           */
+  --accent-2:    #4ecdc4;   /* cyan trace  — secondary channel / links         */
+  --accent-soft: rgba(255, 180, 84, 0.14);   /* amber wash (hover/active fills) */
+  --accent-line: rgba(255, 180, 84, 0.40);   /* amber hairline                  */
 
-  /* surfaces */
-  --bg:       #0a0b0f;
-  --bg-elev:  #12141c;
-  --bg-elev2: #161925;
+  /* ── Status readouts ───────────────────────────────────────────────────── */
+  --ok:    #57d69a;   /* nominal / converged           */
+  --warn:  #ffce5a;   /* attention                     */
+  --err:   #ff7a7a;   /* fault / diverged              */
+  --info:  #4ecdc4;   /* informational (== cyan trace) */
 
-  /* text + lines */
-  --text:   #e6e8ef;
-  --muted:  #8b90a5;
-  --border: rgba(255, 255, 255, 0.08);
+  /* ── Chassis surfaces (graphite, faintly blue) ─────────────────────────── */
+  --bg:        #0a0e14;   /* base panel / deepest      */
+  --bg-elev:   #0f141d;   /* raised card               */
+  --bg-elev2:  #151b26;   /* control / inset well      */
+  --bg-inset:  #070a0f;   /* recessed (code, canvas)   */
 
-  --radius:    8px;
-  --radius-sm: 6px;
-  --topbar-h:  52px;
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+  /* ── Ink ───────────────────────────────────────────────────────────────── */
+  --text:        #e7ebf2;   /* primary readout          */
+  --text-dim:    #b3bccb;   /* secondary                */
+  --muted:       #7b8698;   /* labels / captions        */
+  --muted-2:     #545e70;   /* faintest / disabled      */
+
+  /* ── Lines & grid ──────────────────────────────────────────────────────── */
+  --border:     rgba(130, 150, 180, 0.12);   /* standard panel edge          */
+  --border-2:   rgba(130, 150, 180, 0.20);   /* stronger / control edge      */
+  --grid:       rgba(120, 145, 180, 0.045);  /* blueprint hairline           */
+  --grid-major: rgba(120, 145, 180, 0.075);  /* blueprint 5-cell rule        */
+
+  /* ── Type ──────────────────────────────────────────────────────────────── */
+  --font: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+
+  /* Fluid type scale (1.20 minor-third), clamped for small screens.            */
+  --fs-100: 11px;                                  /* micro label / eyebrow    */
+  --fs-200: 12px;                                  /* caption / meta           */
+  --fs-300: 13px;                                  /* body-small / control     */
+  --fs-400: 14px;                                  /* body                     */
+  --fs-500: clamp(15px, 1.1vw, 16px);              /* lead                     */
+  --fs-600: clamp(17px, 1.4vw, 19px);              /* card title               */
+  --fs-700: clamp(20px, 1.9vw, 24px);              /* section title            */
+  --fs-800: clamp(26px, 3vw, 34px);                /* page display             */
+
+  --lh-tight: 1.15;
+  --lh-snug:  1.35;
+  --lh-body:  1.55;
+
+  --tracking-eyebrow: 0.14em;   /* uppercased micro labels */
+  --tracking-tight:  -0.01em;   /* display                 */
+
+  /* ── Space scale (4px base) ────────────────────────────────────────────── */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+
+  /* ── Radius (instrument-sharp) ─────────────────────────────────────────── */
+  --radius:     7px;
+  --radius-sm:  5px;
+  --radius-lg:  11px;
+  --radius-pill: 999px;
+
+  /* ── Elevation (low, cool, plus a hairline top-light for the chassis look) ─ */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 20px -8px rgba(0, 0, 0, 0.65);
+  --shadow-pop: 0 12px 40px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border);
+  --glow-accent: 0 0 0 1px var(--accent-line), 0 0 22px -6px rgba(255, 180, 84, 0.45);
+
+  /* ── Chrome ────────────────────────────────────────────────────────────── */
+  --topbar-h: 54px;
+
+  /* ── Motion (deliberate, not scattered) ────────────────────────────────── */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+}
+
+/* Blueprint-grid backdrop: a faint ruled plane behind the chassis. Applied to
+ * the deepest surface (body / shell); panels sit opaque on top of it. */
+.instrument-grid,
+body.instrument-grid {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+}
+
+/* Uppercased instrument eyebrow/label — used for section kickers and stat keys. */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: var(--fs-100);
+  font-weight: 500;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Every number/identifier reads as an instrument readout. */
+.readout { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ── Base niceties shared by all surfaces ─────────────────────────────────── */
+* { box-sizing: border-box; }
+
+::selection { background: var(--accent-soft); color: var(--text); }
+
+/* Visible, on-brand keyboard focus everywhere (accessibility requirement). */
+:where(a, button, input, select, textarea, [tabindex], [role="tab"], [role="button"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Themed, slim scrollbars so panes feel like instrument readouts. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--radius-pill);
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--muted-2); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

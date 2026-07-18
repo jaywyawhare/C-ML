@@ -113,7 +113,7 @@ const codeTheme = {
   ...oneDark,
   'pre[class*="language-"]': {
     ...oneDark['pre[class*="language-"]'],
-    background: '#15130f',
+    background: '#070a0f',
     margin: 0,
     borderRadius: 0,
     padding: '20px 24px',

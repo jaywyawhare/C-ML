@@ -14,7 +14,14 @@ export default function Hero() {
   }, [])
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    // Reduced motion: reveal everything immediately (the elements start at
+    // inline opacity:0 for the reveal, so we must un-hide them, not just skip).
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      inner.current?.querySelectorAll('[style*="opacity"]').forEach((el) => {
+        el.style.opacity = 1
+      })
+      return
+    }
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ delay: 0.3, defaults: { ease: 'power3.out' } })
       tl.fromTo('.hero-badge', { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5 })
