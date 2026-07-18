@@ -62,11 +62,11 @@ def train_model(
         cml.backward(loss)
         opt.step()
 
-        # Record the scalar value, NOT the loss Tensor. Keeping live loss tensors
-        # past the loop (e.g. by returning them) makes them outlive `opt`, whose
-        # __del__ runs a graph/cache reset that would then free buffers those
-        # tensors still borrow — a crash. Floats sidestep that and match the
-        # familiar Keras-style history.
+        # Record the scalar value. Retaining the loss Tensor across steps is
+        # safe (the per-step graph reset copies any Python-held tensor's borrowed
+        # buffer into owned storage via tensor_pin/tensor_detach_keep, so it
+        # survives opt teardown) — but a float is cheaper (no per-step
+        # malloc+copy) and matches the familiar Keras-style history.
         loss_value = float(np.asarray(loss.numpy()).reshape(-1)[0])
         losses.append(loss_value)
 
