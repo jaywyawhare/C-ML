@@ -35,12 +35,39 @@ static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
 
 CMLSpeculativeConfig cml_speculative_default_config(void) {
     CMLSpeculativeConfig cfg;
-    cfg.num_draft_tokens = 5;
-    cfg.temperature      = 0.8f;
-    cfg.top_p            = 0.9f;
-    cfg.top_k            = 40;
-    cfg.do_sample        = true;
+    cfg.num_draft_tokens  = 5;
+    cfg.temperature       = 0.8f;
+    cfg.top_p             = 0.9f;
+    cfg.top_k             = 40;
+    cfg.do_sample         = true;
+    cfg.stochastic_accept = false;
     return cfg;
+}
+
+/* Temperature softmax of one logits row into probs[vocab]. */
+static void softmax_row(const float* row, int vocab, float temperature, float* probs) {
+    float t = temperature > 1e-6f ? temperature : 1.0f;
+    float maxl = row[0];
+    for (int i = 1; i < vocab; i++)
+        if (row[i] > maxl) maxl = row[i];
+    double denom = 0.0;
+    for (int i = 0; i < vocab; i++) {
+        probs[i] = expf((row[i] - maxl) / t);
+        denom += probs[i];
+    }
+    float inv = denom > 0.0 ? (float)(1.0 / denom) : 0.0f;
+    for (int i = 0; i < vocab; i++)
+        probs[i] *= inv;
+}
+
+static int sample_from_probs(const float* probs, int vocab) {
+    float u = (float)rand() / ((float)RAND_MAX + 1.0f);
+    float acc = 0.0f;
+    for (int i = 0; i < vocab; i++) {
+        acc += probs[i];
+        if (u < acc) return i;
+    }
+    return vocab - 1;
 }
 
 CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config,
@@ -130,6 +157,15 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         return NULL;
     }
 
+    /* Stochastic verification needs the draft distribution at each drafted
+     * position; keep the last-row logits per draft step. */
+    bool stochastic = dec->config.stochastic_accept && dec->config.do_sample;
+    float* draft_rows = NULL;
+    if (stochastic) {
+        draft_rows = (float*)cml_malloc((size_t)K * (size_t)dec->vocab_size * sizeof(float));
+        if (!draft_rows) stochastic = false; /* degrade to greedy acceptance */
+    }
+
     /* 1. Draft phase: autoregressively generate K tokens with draft model. */
     double t_draft_start = now_ms();
 
@@ -142,6 +178,18 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
             LOG_WARNING("draft forward returned NULL at step %d", i);
             K = i;  /* Truncate to whatever we managed. */
             break;
+        }
+
+        if (stochastic) {
+            tensor_ensure_executed(draft_logits);
+            const float* d = (const float*)tensor_data_ptr(draft_logits);
+            if (d) {
+                memcpy(draft_rows + (size_t)i * dec->vocab_size,
+                       d + (size_t)(draft_seq_len - 1) * dec->vocab_size,
+                       (size_t)dec->vocab_size * sizeof(float));
+            } else {
+                stochastic = false;
+            }
         }
 
         /* Sample from last position. */
@@ -168,6 +216,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         LOG_ERROR("target forward returned NULL");
         cml_free(full_seq);
         cml_free(draft_tokens);
+        cml_free(draft_rows);
         return NULL;
     }
 
@@ -177,33 +226,90 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
      * logits row (prefix_len - 1 + i): the target predicts "next token
      * given everything up to position prefix_len + i - 1".
      *
-     * We use a simple greedy acceptance criterion: accept if the target
-     * model's argmax at that row equals the draft token. */
+     * Greedy mode: accept iff the target argmax equals the draft token —
+     * the output is then exactly the target model's greedy decode.
+     * Stochastic mode (config.stochastic_accept): Leviathan et al. rule —
+     * accept with prob min(1, p/q), resample rejects from norm(max(0,p-q)). */
     int num_accepted = 0;
     int correction_token = -1;
+    int bonus_token = -1;
 
-    for (int i = 0; i < K; i++) {
-        int target_row = prefix_len - 1 + i;
-        int target_argmax = argmax_at_row(target_logits, target_row,
-                                          dec->vocab_size);
+    if (stochastic) {
+        tensor_ensure_executed(target_logits);
+        const float* tdata = (const float*)tensor_data_ptr(target_logits);
+        int vocab = dec->vocab_size;
+        float* p = (float*)cml_malloc((size_t)vocab * sizeof(float));
+        float* q = (float*)cml_malloc((size_t)vocab * sizeof(float));
+        if (!tdata || !p || !q) {
+            cml_free(p); cml_free(q);
+            tensor_free(target_logits);
+            cml_free(full_seq);
+            cml_free(draft_tokens);
+            cml_free(draft_rows);
+            return NULL;
+        }
 
-        if (target_argmax == draft_tokens[i]) {
-            num_accepted++;
-        } else {
-            /* First mismatch: use target's prediction as correction. */
-            correction_token = target_argmax;
+        for (int i = 0; i < K; i++) {
+            int target_row = prefix_len - 1 + i;
+            softmax_row(tdata + (size_t)target_row * vocab, vocab, temperature, p);
+            softmax_row(draft_rows + (size_t)i * vocab, vocab, temperature, q);
+
+            int tok = draft_tokens[i];
+            float qd = q[tok] > 1e-12f ? q[tok] : 1e-12f;
+            float ratio = p[tok] / qd;
+            float u = (float)rand() / ((float)RAND_MAX + 1.0f);
+            if (u < ratio) {
+                num_accepted++;
+                continue;
+            }
+            /* Reject: resample from the normalized residual max(0, p - q). */
+            double mass = 0.0;
+            for (int j = 0; j < vocab; j++) {
+                p[j] = p[j] > q[j] ? p[j] - q[j] : 0.0f;
+                mass += p[j];
+            }
+            if (mass > 1e-12) {
+                float inv = (float)(1.0 / mass);
+                for (int j = 0; j < vocab; j++) p[j] *= inv;
+                correction_token = sample_from_probs(p, vocab);
+            } else {
+                /* p <= q everywhere it matters: fall back to target argmax. */
+                correction_token = argmax_at_row(target_logits, target_row, vocab);
+            }
             break;
+        }
+
+        if (num_accepted == K) {
+            int last_row = prefix_len + K - 1;
+            softmax_row(tdata + (size_t)last_row * vocab, vocab, temperature, p);
+            bonus_token = sample_from_probs(p, vocab);
+        }
+        cml_free(p);
+        cml_free(q);
+    } else {
+        for (int i = 0; i < K; i++) {
+            int target_row = prefix_len - 1 + i;
+            int target_argmax = argmax_at_row(target_logits, target_row,
+                                              dec->vocab_size);
+
+            if (target_argmax == draft_tokens[i]) {
+                num_accepted++;
+            } else {
+                /* First mismatch: use target's prediction as correction. */
+                correction_token = target_argmax;
+                break;
+            }
+        }
+
+        /* If all K draft tokens accepted, take the bonus token from the
+         * target logits at the last position. */
+        if (num_accepted == K) {
+            int last_row = prefix_len + K - 1;
+            bonus_token = argmax_at_row(target_logits, last_row, dec->vocab_size);
         }
     }
 
-    /* If all K draft tokens accepted, sample one bonus token from the
-     * target logits at the last position. */
-    int bonus_token = -1;
-    if (num_accepted == K) {
-        int last_row = prefix_len + K - 1;
-        bonus_token = argmax_at_row(target_logits, last_row, dec->vocab_size);
-    }
-
+    cml_free(draft_rows);
     tensor_free(target_logits);
 
     /* 4. Build the result. */

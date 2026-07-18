@@ -381,6 +381,174 @@ ParameterGroup* optimizer_get_param_group(Optimizer* optimizer, int index) {
     return &optimizer->param_groups[index];
 }
 
+/* --- Optimizer state (moments) serialization for checkpoints -------------
+ * The per-param state structs are private to this file, so the checkpoint
+ * code in model_io.c delegates here. */
+
+/* Addresses of the tensor slots inside one per-param state struct. */
+static int optim_state_tensor_ptrs(const char* name, void* state, Tensor*** ptrs) {
+    if (!state) return -1;
+    if (strcmp(name, "SGD") == 0) {
+        ptrs[0] = &((SGDMomentumState*)state)->momentum_buffer;
+        return 1;
+    }
+    if (strcmp(name, "Adam") == 0 || strcmp(name, "AdamW") == 0 ||
+        strcmp(name, "Nadam") == 0 || strcmp(name, "AdaMax") == 0) {
+        AdamState* s = (AdamState*)state;
+        ptrs[0] = &s->exp_avg;
+        ptrs[1] = &s->exp_avg_sq;
+        ptrs[2] = &s->max_exp_avg_sq;
+        return 3;
+    }
+    if (strcmp(name, "RMSprop") == 0) {
+        ptrs[0] = &((RMSpropState*)state)->square_avg;
+        return 1;
+    }
+    if (strcmp(name, "Adagrad") == 0) {
+        ptrs[0] = &((AdagradState*)state)->sum_sq_grad;
+        return 1;
+    }
+    if (strcmp(name, "AdaDelta") == 0) {
+        AdaDeltaState* s = (AdaDeltaState*)state;
+        ptrs[0] = &s->acc_grad;
+        ptrs[1] = &s->acc_update;
+        return 2;
+    }
+    if (strcmp(name, "LAMB") == 0) {
+        LAMBState* s = (LAMBState*)state;
+        ptrs[0] = &s->exp_avg;
+        ptrs[1] = &s->exp_avg_sq;
+        return 2;
+    }
+    if (strcmp(name, "LARS") == 0) {
+        ptrs[0] = &((LARSState*)state)->momentum_buffer;
+        return 1;
+    }
+    if (strcmp(name, "Muon") == 0) {
+        ptrs[0] = &((MuonState*)state)->momentum_buffer;
+        return 1;
+    }
+    return -1;
+}
+
+static size_t optim_state_struct_size(const char* name) {
+    if (strcmp(name, "SGD") == 0) return sizeof(SGDMomentumState);
+    if (strcmp(name, "Adam") == 0 || strcmp(name, "AdamW") == 0 ||
+        strcmp(name, "Nadam") == 0 || strcmp(name, "AdaMax") == 0)
+        return sizeof(AdamState);
+    if (strcmp(name, "RMSprop") == 0) return sizeof(RMSpropState);
+    if (strcmp(name, "Adagrad") == 0) return sizeof(AdagradState);
+    if (strcmp(name, "AdaDelta") == 0) return sizeof(AdaDeltaState);
+    if (strcmp(name, "LAMB") == 0) return sizeof(LAMBState);
+    if (strcmp(name, "LARS") == 0) return sizeof(LARSState);
+    if (strcmp(name, "Muon") == 0) return sizeof(MuonState);
+    return 0;
+}
+
+int optimizer_state_save(Optimizer* optimizer, FILE* f) {
+    if (!optimizer || !f) return -1;
+
+    for (int g = 0; g < optimizer->num_param_groups; g++) {
+        ParameterGroup* group = &optimizer->param_groups[g];
+        int32_t num_params = group->num_parameters;
+        fwrite(&num_params, sizeof(int32_t), 1, f);
+
+        /* Slot count per param: 0 when no state exists yet (nothing stepped)
+         * or the optimizer keeps no serializable moments. */
+        Tensor** probe[3];
+        void** states = (void**)group->state;
+        int nslots = 0;
+        if (states) {
+            for (int p = 0; p < num_params && nslots <= 0; p++)
+                if (states[p])
+                    nslots = optim_state_tensor_ptrs(optimizer->name, states[p], probe);
+            if (nslots < 0) nslots = 0;
+        }
+        int32_t nslots32 = nslots;
+        fwrite(&nslots32, sizeof(int32_t), 1, f);
+        if (nslots == 0) continue;
+
+        for (int p = 0; p < num_params; p++) {
+            Tensor** ptrs[3] = {0};
+            int n = states[p] ? optim_state_tensor_ptrs(optimizer->name, states[p], ptrs) : 0;
+            for (int s = 0; s < nslots; s++) {
+                Tensor* t = (s < n && ptrs[s]) ? *ptrs[s] : NULL;
+                uint64_t numel = 0;
+                if (t) {
+                    tensor_ensure_executed(t);
+                    if (tensor_data_ptr(t)) numel = (uint64_t)t->numel;
+                }
+                fwrite(&numel, sizeof(uint64_t), 1, f);
+                if (numel > 0)
+                    fwrite(tensor_data_ptr(t), sizeof(float), (size_t)numel, f);
+            }
+        }
+    }
+    return 0;
+}
+
+int optimizer_state_load(Optimizer* optimizer, FILE* f) {
+    if (!optimizer || !f) return -1;
+
+    size_t ssize = optim_state_struct_size(optimizer->name);
+
+    for (int g = 0; g < optimizer->num_param_groups; g++) {
+        ParameterGroup* group = &optimizer->param_groups[g];
+        int32_t num_params, nslots;
+        if (fread(&num_params, sizeof(int32_t), 1, f) != 1) return 0; /* old checkpoint: no state block */
+        if (fread(&nslots, sizeof(int32_t), 1, f) != 1) return -1;
+        if (num_params != group->num_parameters) {
+            LOG_WARNING("optimizer_state_load: group %d param count mismatch (%d vs %d)",
+                        g, num_params, group->num_parameters);
+            return -1;
+        }
+        if (nslots == 0) continue;
+
+        if (!group->state) {
+            if (ssize == 0) return -1;
+            void** states = cml_calloc((size_t)num_params, sizeof(void*));
+            if (!states) return -1;
+            group->state = states;
+        }
+        void** states = (void**)group->state;
+
+        for (int p = 0; p < num_params; p++) {
+            if (!states[p]) {
+                states[p] = cml_calloc(1, ssize);
+                if (!states[p]) return -1;
+            }
+            Tensor** ptrs[3] = {0};
+            int n = optim_state_tensor_ptrs(optimizer->name, states[p], ptrs);
+            for (int s = 0; s < nslots; s++) {
+                uint64_t numel;
+                if (fread(&numel, sizeof(uint64_t), 1, f) != 1) return -1;
+                if (numel == 0) continue;
+                Tensor* t = (s < n && ptrs[s]) ? *ptrs[s] : NULL;
+                if (!t && s < n && ptrs[s]) {
+                    Parameter* param = group->parameters[p];
+                    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                                        .has_dtype = true, .has_device = true};
+                    if (param && param->tensor && param->tensor->numel == (size_t)numel) {
+                        t = optim_zeros(param->tensor->shape, param->tensor->ndim, &cfg);
+                    } else {
+                        int shape1[1] = {(int)numel};
+                        t = optim_zeros(shape1, 1, &cfg);
+                    }
+                    if (!t) return -1;
+                    *ptrs[s] = t;
+                }
+                if (t && t->numel == (size_t)numel && tensor_data_ptr(t)) {
+                    if (fread(tensor_data_ptr(t), sizeof(float), (size_t)numel, f) != (size_t)numel)
+                        return -1;
+                } else {
+                    if (fseek(f, (long)(numel * sizeof(float)), SEEK_CUR) != 0) return -1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 void optimizer_step(Optimizer* optimizer) {
     if (!optimizer || !optimizer->step)
         return;

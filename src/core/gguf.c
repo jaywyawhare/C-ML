@@ -29,6 +29,11 @@ struct GGUFContext {
     int num_metadata;
     GGUFTensorInfo* tensors;
     uint64_t data_offset;  // Start of tensor data section
+    // Tokenizer metadata (tokenizer.ggml.tokens / .merges), owned by ctx
+    char** tok_tokens;
+    int num_tok_tokens;
+    char** tok_merges;
+    int num_tok_merges;
     // Write buffer
     int write_count;
     uint8_t* write_data;
@@ -136,10 +141,50 @@ GGUFContext* gguf_open_read(const char* filepath) {
 
     for (uint64_t i = 0; i < num_metadata; i++) {
         char* key = read_gguf_string(f);
-        cml_free(key);
         uint32_t val_type;
-        if (fread(&val_type, 4, 1, f) != 1) break;
-        skip_gguf_value(f, val_type);
+        if (fread(&val_type, 4, 1, f) != 1) { cml_free(key); break; }
+
+        /* Capture the tokenizer vocab and BPE merge list; everything else is
+         * skipped as before. */
+        bool is_tokens = key && strcmp(key, "tokenizer.ggml.tokens") == 0;
+        bool is_merges = key && strcmp(key, "tokenizer.ggml.merges") == 0;
+        if ((is_tokens || is_merges) && val_type == GGUF_TYPE_ARRAY) {
+            uint32_t arr_type;
+            uint64_t arr_len;
+            if (fread(&arr_type, 4, 1, f) != 1 || fread(&arr_len, 8, 1, f) != 1) {
+                cml_free(key);
+                break;
+            }
+            if (arr_type == GGUF_TYPE_STRING && arr_len > 0 && arr_len < 10000000ULL) {
+                char** items = cml_calloc((size_t)arr_len, sizeof(char*));
+                uint64_t got = 0;
+                if (items) {
+                    for (uint64_t k = 0; k < arr_len; k++) {
+                        items[k] = read_gguf_string(f);
+                        if (!items[k]) items[k] = cml_strdup("");
+                        got++;
+                    }
+                }
+                if (items && got == arr_len) {
+                    if (is_tokens) {
+                        ctx->tok_tokens = items;
+                        ctx->num_tok_tokens = (int)arr_len;
+                    } else {
+                        ctx->tok_merges = items;
+                        ctx->num_tok_merges = (int)arr_len;
+                    }
+                } else if (items) {
+                    for (uint64_t k = 0; k < got; k++) cml_free(items[k]);
+                    cml_free(items);
+                }
+            } else {
+                for (uint64_t k = 0; k < arr_len; k++)
+                    skip_gguf_value(f, arr_type);
+            }
+        } else {
+            skip_gguf_value(f, val_type);
+        }
+        cml_free(key);
     }
 
     ctx->tensors = cml_calloc(num_tensors, sizeof(GGUFTensorInfo));
@@ -238,9 +283,32 @@ void gguf_close(GGUFContext* ctx) {
         }
         cml_free(ctx->tensors);
     }
+    if (ctx->tok_tokens) {
+        for (int i = 0; i < ctx->num_tok_tokens; i++) cml_free(ctx->tok_tokens[i]);
+        cml_free(ctx->tok_tokens);
+    }
+    if (ctx->tok_merges) {
+        for (int i = 0; i < ctx->num_tok_merges; i++) cml_free(ctx->tok_merges[i]);
+        cml_free(ctx->tok_merges);
+    }
     cml_free(ctx->filepath);
     cml_free(ctx->write_data);
     cml_free(ctx);
+}
+
+int gguf_get_tokenizer(GGUFContext* ctx, char*** tokens_out, int* num_tokens_out,
+                       char*** merges_out, int* num_merges_out) {
+    if (tokens_out) *tokens_out = NULL;
+    if (num_tokens_out) *num_tokens_out = 0;
+    if (merges_out) *merges_out = NULL;
+    if (num_merges_out) *num_merges_out = 0;
+    if (!ctx || !ctx->tok_tokens || ctx->num_tok_tokens <= 0)
+        return -1;
+    if (tokens_out) *tokens_out = ctx->tok_tokens;
+    if (num_tokens_out) *num_tokens_out = ctx->num_tok_tokens;
+    if (merges_out) *merges_out = ctx->tok_merges;
+    if (num_merges_out) *num_merges_out = ctx->num_tok_merges;
+    return 0;
 }
 
 int gguf_get_num_tensors(GGUFContext* ctx) {

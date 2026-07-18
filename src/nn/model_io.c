@@ -186,6 +186,9 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
             fwrite(&g->lr, sizeof(float), 1, f);
             fwrite(&g->step_count, sizeof(int32_t), 1, f);
         }
+        /* Per-parameter moments (Adam m/v, momentum buffers, ...) so resuming
+         * matches the pre-checkpoint optimization trajectory. */
+        optimizer_state_save(optimizer, f);
     }
 
     fclose(f);
@@ -274,6 +277,11 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
             float lr; int32_t step;
             fread(&lr, sizeof(float), 1, f);
             fread(&step, sizeof(int32_t), 1, f);
+        }
+        if (num_groups == optimizer->num_param_groups &&
+            optimizer_state_load(optimizer, f) != 0) {
+            LOG_WARNING("Checkpoint optimizer state could not be restored; "
+                        "moments start from zero");
         }
     }
 

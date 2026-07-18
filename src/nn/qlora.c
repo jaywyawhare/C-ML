@@ -1,6 +1,7 @@
 #include "nn/qlora.h"
 #include "core/threefry.h"
 #include "core/logging.h"
+#include "core/quantization.h"
 #include "tensor/tensor.h"
 
 #include <stdio.h>
@@ -259,26 +260,24 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     int out_f = qlora->out_features;
     int r = qlora->rank;
 
-    /* Step 1: Dequantize base weight to float32 temporary */
-    Tensor* dequant_weight = cml_nf4_tensor_dequantize(qlora->base_weight_nf4);
-    if (!dequant_weight) {
-        LOG_ERROR("cml_qlora_linear_forward: failed to dequantize base weight");
+    const CMLNF4Tensor* nf4 = qlora->base_weight_nf4;
+    if (!nf4 || !nf4->packed_data || !nf4->scales) {
+        LOG_ERROR("cml_qlora_linear_forward: incomplete NF4 base weight");
         return NULL;
     }
 
     tensor_ensure_executed(input);
-    tensor_ensure_executed(dequant_weight);
+    tensor_ensure_executed(nf4->packed_data);
     tensor_ensure_executed(qlora->lora_A);
     tensor_ensure_executed(qlora->lora_B);
 
     float* x_data = (float*)tensor_data_ptr(input);
-    float* W_data = (float*)tensor_data_ptr(dequant_weight);
+    const uint8_t* pdata = (const uint8_t*)tensor_data_ptr(nf4->packed_data);
     float* A_data = (float*)tensor_data_ptr(qlora->lora_A);
     float* B_data = (float*)tensor_data_ptr(qlora->lora_B);
 
-    if (!x_data || !W_data || !A_data || !B_data) {
+    if (!x_data || !pdata || !A_data || !B_data) {
         LOG_ERROR("cml_qlora_linear_forward: failed to get data pointers");
-        tensor_free(dequant_weight);
         return NULL;
     }
 
@@ -294,29 +293,44 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     Tensor* output = tensor_zeros(out_shape, 2, &cfg);
     if (!output) {
         LOG_ERROR("cml_qlora_linear_forward: failed to allocate output tensor");
-        tensor_free(dequant_weight);
         return NULL;
     }
     tensor_ensure_executed(output);
     float* out_data = (float*)tensor_data_ptr(output);
 
     /*
-     * Step 2: base_out = input @ dequant_weight^T
-     * input: [batch, in_f], W: [out_f, in_f] => out: [batch, out_f]
+     * base_out = input @ W^T with W dequantized from NF4 one row at a time —
+     * the full float32 weight is never materialized, so the NF4 memory saving
+     * holds during forward, not just at rest. Peak extra memory: in_f floats.
      * out[b][o] = sum_i( input[b][i] * W[o][i] )
      */
-    for (int b = 0; b < batch; b++) {
-        for (int o = 0; o < out_f; o++) {
+    float* wrow = (float*)cml_malloc((size_t)in_f * sizeof(float));
+    if (!wrow) {
+        LOG_ERROR("cml_qlora_linear_forward: failed to allocate row buffer");
+        tensor_free(output);
+        return NULL;
+    }
+    for (int o = 0; o < out_f; o++) {
+        size_t row_base = (size_t)o * (size_t)in_f;
+        for (int i = 0; i < in_f; i++) {
+            size_t e = row_base + (size_t)i;
+            uint8_t byte = pdata[e >> 1];
+            /* even flat index = high nibble (matches cml_dequantize_nf4) */
+            int idx = (e & 1) ? (byte & 0x0F) : ((byte >> 4) & 0x0F);
+            int blk = (int)(e / (size_t)nf4->block_size);
+            if (blk >= nf4->num_scales) blk = nf4->num_scales - 1;
+            wrow[i] = CML_NF4_TABLE[idx] * nf4->scales[blk];
+        }
+        for (int b = 0; b < batch; b++) {
+            const float* xb = x_data + (size_t)b * (size_t)in_f;
             float sum = 0.0f;
             for (int i = 0; i < in_f; i++) {
-                sum += x_data[b * in_f + i] * W_data[o * in_f + i];
+                sum += xb[i] * wrow[i];
             }
             out_data[b * out_f + o] = sum;
         }
     }
-
-    /* Free the dequantized weight temporary */
-    tensor_free(dequant_weight);
+    cml_free(wrow);
 
     /*
      * Step 3: lora_out = scaling * input @ A^T @ B^T

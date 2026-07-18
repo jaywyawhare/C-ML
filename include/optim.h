@@ -3,6 +3,7 @@
 
 #include "nn.h"
 #include "core/logging.h"
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,6 +66,13 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
 int optimizer_get_param_groups(Optimizer* optimizer, ParameterGroup** groups, int* num_groups);
 
 ParameterGroup* optimizer_get_param_group(Optimizer* optimizer, int index);
+
+/* Serialize / restore the per-parameter optimizer state (Adam moments, SGD
+ * momentum, ...) to/from an open binary stream. Used by model checkpoints so
+ * resumed training continues with the exact optimizer state. Load returns 0
+ * on success and tolerates checkpoints written before state was saved. */
+int optimizer_state_save(Optimizer* optimizer, FILE* f);
+int optimizer_state_load(Optimizer* optimizer, FILE* f);
 
 void optimizer_step(Optimizer* optimizer);
 

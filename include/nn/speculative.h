@@ -20,6 +20,12 @@ typedef struct CMLSpeculativeConfig {
     float top_p;                /* Nucleus sampling */
     int top_k;                  /* Top-k sampling */
     bool do_sample;             /* Use sampling vs greedy */
+    /* Leviathan-style stochastic verification: accept draft token x with
+     * probability min(1, p_target(x)/p_draft(x)) and resample rejections from
+     * the normalized residual max(0, p-q) — preserves the target sampling
+     * distribution at temperature > 0. Default false = greedy argmax
+     * acceptance, which is exact for greedy decoding. */
+    bool stochastic_accept;
 } CMLSpeculativeConfig;
 
 typedef struct CMLSpeculativeResult {

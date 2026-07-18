@@ -406,6 +406,25 @@ int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
         }
     }
 
+    /* Wire the GGUF tokenizer metadata into a BPE tokenizer so generate()
+     * can encode prompts and decode output text. cml_tokenizer_create copies
+     * the strings, so this is safe across gguf_close. */
+    if (!model->tokenizer) {
+        char** tokens = NULL; char** merges = NULL;
+        int num_tokens = 0, num_merges = 0;
+        if (gguf_get_tokenizer(ctx, &tokens, &num_tokens, &merges, &num_merges) == 0) {
+            model->tokenizer = cml_tokenizer_create(tokens, num_tokens, merges, num_merges);
+            if (model->tokenizer)
+                LOG_INFO("Loaded GGUF tokenizer: %d tokens, %d merges",
+                         num_tokens, num_merges);
+            else
+                LOG_WARNING("GGUF tokenizer metadata present but tokenizer creation failed");
+        } else {
+            LOG_WARNING("GGUF file has no tokenizer.ggml.tokens metadata; "
+                        "generate() will return token IDs without text");
+        }
+    }
+
     gguf_close(ctx);
 
     /* If lm_head is not provided, share embed_tokens (weight tying) */
