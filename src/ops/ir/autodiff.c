@@ -389,10 +389,24 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
         }
     }
 
-    /* publish: every value with requires_grad gets its lazy grad tensor */
+    /* publish: every value with requires_grad gets its lazy grad tensor.
+     * Pin the grad as an external reference of its parent value. A grad may be
+     * (or alias) a graph node output; without the pin, the graph teardown frees
+     * it while the surviving parent still holds it via ->grad and frees it again
+     * on destruction — a double free that corrupts the exec buffer cache across
+     * models. Pinning makes the teardown detach-and-keep it instead; the parent
+     * then owns it and releases the pin in tensor_free. Release any prior grad
+     * (e.g. a parameter's grad from the previous step) first. */
     for (int i = 0; i < map.count; i++) {
         Tensor* v = map.items[i].val;
-        if (v && v->requires_grad) v->grad = map.items[i].grad;
+        if (v && v->requires_grad) {
+            Tensor* newg = map.items[i].grad;
+            if (v->grad != newg) {
+                if (v->grad) tensor_release(v->grad);
+                v->grad = newg;
+                if (newg) tensor_pin(newg);
+            }
+        }
     }
 
     cml_free(map.items);
