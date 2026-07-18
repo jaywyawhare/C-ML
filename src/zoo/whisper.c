@@ -3,9 +3,117 @@
 #include "nn.h"
 #include "nn/layers.h"
 #include "nn/model_io.h"
+#include "cml.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#include "alloc/cml_allocator.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+/* ---- Log-mel spectrogram frontend --------------------------------------
+ * Whisper convention: 16 kHz audio, n_fft=400, hop=160, Hann window, mel
+ * filters over 0-8 kHz, log10 clamped to (max - 8), scaled to (x+4)/4. */
+
+#define WHISPER_N_FFT       400
+#define WHISPER_HOP         160
+#define WHISPER_SAMPLE_RATE 16000
+
+static float hz_to_mel(float hz) { return 2595.0f * log10f(1.0f + hz / 700.0f); }
+static float mel_to_hz(float mel) { return 700.0f * (powf(10.0f, mel / 2595.0f) - 1.0f); }
+
+Tensor* cml_whisper_log_mel(const float* audio, int num_samples, int n_mels) {
+    if (!audio || num_samples < WHISPER_N_FFT || n_mels <= 0) {
+        LOG_ERROR("cml_whisper_log_mel: need at least %d samples", WHISPER_N_FFT);
+        return NULL;
+    }
+
+    int n_fft = WHISPER_N_FFT;
+    int n_bins = n_fft / 2 + 1;
+    int frames = 1 + (num_samples - n_fft) / WHISPER_HOP;
+
+    /* Hann window */
+    float* window = (float*)cml_malloc((size_t)n_fft * sizeof(float));
+    float* re = (float*)cml_malloc((size_t)n_fft * sizeof(float));
+    float* im = (float*)cml_malloc((size_t)n_fft * sizeof(float));
+    float* power = (float*)cml_malloc((size_t)frames * (size_t)n_bins * sizeof(float));
+    if (!window || !re || !im || !power) {
+        cml_free(window); cml_free(re); cml_free(im); cml_free(power);
+        return NULL;
+    }
+    for (int i = 0; i < n_fft; i++)
+        window[i] = 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / (float)n_fft));
+
+    for (int t = 0; t < frames; t++) {
+        const float* seg = audio + (size_t)t * WHISPER_HOP;
+        for (int i = 0; i < n_fft; i++) {
+            re[i] = seg[i] * window[i];
+            im[i] = 0.0f;
+        }
+        if (cml_fft_1d(re, im, n_fft, 0) != 0) {
+            cml_free(window); cml_free(re); cml_free(im); cml_free(power);
+            return NULL;
+        }
+        for (int b = 0; b < n_bins; b++)
+            power[(size_t)t * n_bins + b] = re[b] * re[b] + im[b] * im[b];
+    }
+    cml_free(window); cml_free(re); cml_free(im);
+
+    /* Triangular mel filterbank over 0..8 kHz */
+    float mel_lo = hz_to_mel(0.0f);
+    float mel_hi = hz_to_mel((float)WHISPER_SAMPLE_RATE / 2.0f);
+    float* centers = (float*)cml_malloc((size_t)(n_mels + 2) * sizeof(float));
+    if (!centers) { cml_free(power); return NULL; }
+    for (int m = 0; m < n_mels + 2; m++) {
+        float mel = mel_lo + (mel_hi - mel_lo) * (float)m / (float)(n_mels + 1);
+        centers[m] = mel_to_hz(mel) * (float)n_fft / (float)WHISPER_SAMPLE_RATE;
+    }
+
+    int mel_shape[2] = {n_mels, frames};
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                        .has_dtype = true, .has_device = true};
+    Tensor* mel = tensor_empty(mel_shape, 2, &cfg);
+    if (!mel) { cml_free(power); cml_free(centers); return NULL; }
+    float* mdata = (float*)tensor_data_ptr(mel);
+
+    float log_max = -1e30f;
+    for (int m = 0; m < n_mels; m++) {
+        float f0 = centers[m], f1 = centers[m + 1], f2 = centers[m + 2];
+        for (int t = 0; t < frames; t++) {
+            float acc = 0.0f;
+            int b0 = (int)ceilf(f0), b2 = (int)floorf(f2);
+            if (b0 < 0) b0 = 0;
+            if (b2 > n_bins - 1) b2 = n_bins - 1;
+            for (int b = b0; b <= b2; b++) {
+                float w = 0.0f;
+                if ((float)b <= f1 && f1 > f0)
+                    w = ((float)b - f0) / (f1 - f0);
+                else if (f2 > f1)
+                    w = (f2 - (float)b) / (f2 - f1);
+                if (w > 0.0f)
+                    acc += w * power[(size_t)t * n_bins + b];
+            }
+            float v = log10f(acc > 1e-10f ? acc : 1e-10f);
+            mdata[(size_t)m * frames + t] = v;
+            if (v > log_max) log_max = v;
+        }
+    }
+    cml_free(power);
+    cml_free(centers);
+
+    /* Whisper normalization: clamp to (max - 8), scale to roughly [-1, 1]. */
+    float floor_v = log_max - 8.0f;
+    for (size_t i = 0; i < (size_t)n_mels * (size_t)frames; i++) {
+        float v = mdata[i] < floor_v ? floor_v : mdata[i];
+        mdata[i] = (v + 4.0f) / 4.0f;
+    }
+
+    mel->is_executed = true;
+    return mel;
+}
 
 WhisperConfig whisper_tiny_config(void) {
     WhisperConfig cfg = {

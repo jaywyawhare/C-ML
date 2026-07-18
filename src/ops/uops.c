@@ -3630,15 +3630,16 @@ Tensor* uop_pad_replicate(Tensor* a, int* pad_widths, int num_dims) {
     return tensor_from_ir_node(node, ir);
 }
 
-Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask) {
+Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, Tensor* mask,
+                                              Tensor* attn_bias) {
     if (!q || !k || !v) return NULL;
-    
-    
+
+
 
     int d_k = q->shape[q->ndim - 1];
     float scale = 1.0f / sqrtf((float)d_k);
 
-    
+
     PermuteParams perm_params = {0};
     int* perm = cml_malloc((size_t)k->ndim * sizeof(int));
     if (!perm) return NULL;
@@ -3652,28 +3653,38 @@ Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor
     cml_free(perm);
     if (!kt) return NULL;
 
-    
+
     Tensor* scores = uop_matmul(q, kt);
     if (!scores) return NULL;
 
-    
+
     Tensor* scale_t = uop_fill(scores->shape, scores->ndim, scale);
     if (!scale_t) return NULL;
     Tensor* scaled = uop_mul(scores, scale_t);
     if (!scaled) return NULL;
 
-    
+    /* Additive attention bias (e.g. T5 relative position bias), applied to
+     * the scaled logits before masking/softmax; shape must match scores. */
+    if (attn_bias) {
+        scaled = uop_add(scaled, attn_bias);
+        if (!scaled) return NULL;
+    }
+
     if (mask) {
         scaled = uop_masked_fill(scaled, mask, -1e9f);
         if (!scaled) return NULL;
     }
 
-    
+
     Tensor* attn = uop_softmax(scaled, scaled->ndim - 1);
     if (!attn) return NULL;
 
-    
+
     return uop_matmul(attn, v);
+}
+
+Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask) {
+    return uop_scaled_dot_product_attention_bias(q, k, v, mask, NULL);
 }
 
 int uop_execute(UOp* uop) {

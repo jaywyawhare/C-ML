@@ -2,6 +2,7 @@
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor_manipulation.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -21,10 +22,55 @@ CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
     };
 }
 
+/* Single-tensor forward: encode the audio, run the prediction network on a
+ * blank start token, and evaluate the joint at every encoder frame — returns
+ * [frames, vocab] first-step logits. Streaming decode drives
+ * cml_rnnt_encode/predict/joint directly instead. */
 static Tensor* rnnt_forward(Module* module, Tensor* input) {
-    (void)module;
-    (void)input;
-    return NULL;
+    CMLRNNT* net = (CMLRNNT*)module;
+    if (!net || !input) return NULL;
+
+    Tensor* enc = cml_rnnt_encode(module, input);
+    if (!enc || enc->ndim < 1) return NULL;
+
+    int enc_dim = enc->shape[enc->ndim - 1];
+    if (enc_dim <= 0) return NULL;
+    int enc_T = (int)(enc->numel / (size_t)enc_dim);
+    int enc2d_shape[2] = {enc_T, enc_dim};
+    ReshapeParams enc_rp = {enc2d_shape, 2};
+    Tensor* enc2d = uop_reshape(enc, &enc_rp);
+    if (!enc2d) return NULL;
+
+    /* Blank start token (id 0) for the prediction network. */
+    int tok_shape[1] = {1};
+    TensorConfig tcfg = {.dtype = net->dtype, .device = net->device,
+                         .has_dtype = true, .has_device = true};
+    Tensor* blank = tensor_zeros(tok_shape, 1, &tcfg);
+    if (!blank) return NULL;
+    Tensor* pred = cml_rnnt_predict(module, blank);
+    if (!pred || pred->ndim < 1) return NULL;
+
+    int pred_dim = pred->shape[pred->ndim - 1];
+    if (pred_dim <= 0) return NULL;
+    int pred_T = (int)(pred->numel / (size_t)pred_dim);
+    int pred2d_shape[2] = {pred_T, pred_dim};
+    ReshapeParams pred_rp = {pred2d_shape, 2};
+    Tensor* pred2d = uop_reshape(pred, &pred_rp);
+    if (!pred2d) return NULL;
+
+    /* Keep only the last prediction step, broadcast it across encoder frames. */
+    if (pred_T > 1) {
+        int starts[2] = {pred_T - 1, 0};
+        int ends[2]   = {pred_T, pred_dim};
+        pred2d = uop_shrink(pred2d, starts, ends, 2);
+        if (!pred2d) return NULL;
+    }
+    int bcast_shape[2] = {enc_T, pred_dim};
+    ExpandParams ep = {bcast_shape, 2};
+    Tensor* pred_bcast = uop_expand(pred2d, &ep);
+    if (!pred_bcast) return NULL;
+
+    return cml_rnnt_joint(module, enc2d, pred_bcast);
 }
 
 static void rnnt_free(Module* module) {

@@ -6,6 +6,104 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#include "alloc/cml_allocator.h"
+
+/* --- DDIM scheduler ------------------------------------------------------ */
+
+CMLSDScheduler* cml_sd_scheduler_create(int num_timesteps, float beta_start, float beta_end) {
+    if (num_timesteps <= 0) return NULL;
+
+    CMLSDScheduler* s = (CMLSDScheduler*)cml_calloc(1, sizeof(CMLSDScheduler));
+    if (!s) return NULL;
+    s->num_train_timesteps = num_timesteps;
+    s->alphas_cumprod = (float*)cml_malloc((size_t)num_timesteps * sizeof(float));
+    if (!s->alphas_cumprod) { cml_free(s); return NULL; }
+
+    /* SD v1 "scaled_linear": betas linear in sqrt space. */
+    float sb0 = sqrtf(beta_start), sb1 = sqrtf(beta_end);
+    double cum = 1.0;
+    for (int t = 0; t < num_timesteps; t++) {
+        float sb = sb0 + (sb1 - sb0) * (num_timesteps > 1 ? (float)t / (float)(num_timesteps - 1) : 0.0f);
+        float beta = sb * sb;
+        cum *= (double)(1.0f - beta);
+        s->alphas_cumprod[t] = (float)cum;
+    }
+    return s;
+}
+
+void cml_sd_scheduler_free(CMLSDScheduler* sched) {
+    if (!sched) return;
+    cml_free(sched->alphas_cumprod);
+    cml_free(sched->timesteps);
+    cml_free(sched);
+}
+
+int cml_sd_scheduler_set_steps(CMLSDScheduler* sched, int num_inference_steps) {
+    if (!sched || num_inference_steps <= 0 ||
+        num_inference_steps > sched->num_train_timesteps)
+        return -1;
+    cml_free(sched->timesteps);
+    sched->timesteps = (int*)cml_malloc((size_t)num_inference_steps * sizeof(int));
+    if (!sched->timesteps) return -1;
+    int stride = sched->num_train_timesteps / num_inference_steps;
+    for (int i = 0; i < num_inference_steps; i++)
+        sched->timesteps[i] = (num_inference_steps - 1 - i) * stride;  /* descending */
+    sched->num_inference_steps = num_inference_steps;
+    return 0;
+}
+
+int cml_sd_scheduler_step(CMLSDScheduler* sched, const float* eps, float* latent,
+                          size_t numel, int step_index) {
+    if (!sched || !eps || !latent || !sched->timesteps ||
+        step_index < 0 || step_index >= sched->num_inference_steps)
+        return -1;
+
+    int t = sched->timesteps[step_index];
+    int t_prev = (step_index + 1 < sched->num_inference_steps)
+                     ? sched->timesteps[step_index + 1] : -1;
+
+    float a_t = sched->alphas_cumprod[t];
+    float a_prev = t_prev >= 0 ? sched->alphas_cumprod[t_prev] : 1.0f;
+    float sqrt_at = sqrtf(a_t), sqrt_om_at = sqrtf(1.0f - a_t);
+    float sqrt_ap = sqrtf(a_prev), sqrt_om_ap = sqrtf(1.0f - a_prev);
+
+    for (size_t i = 0; i < numel; i++) {
+        float x0 = (latent[i] - sqrt_om_at * eps[i]) / sqrt_at;
+        latent[i] = sqrt_ap * x0 + sqrt_om_ap * eps[i];
+    }
+    return 0;
+}
+
+Tensor* cml_sd_generate(Module* unet, CMLSDScheduler* sched, Tensor* initial_latent,
+                        int num_inference_steps) {
+    if (!unet || !sched || !initial_latent) return NULL;
+    if (cml_sd_scheduler_set_steps(sched, num_inference_steps) != 0) return NULL;
+
+    tensor_ensure_executed(initial_latent);
+    Tensor* latent = tensor_clone(initial_latent);
+    if (!latent) return NULL;
+    tensor_ensure_executed(latent);
+    float* ldata = (float*)tensor_data_ptr(latent);
+    if (!ldata) { tensor_free(latent); return NULL; }
+
+    for (int i = 0; i < num_inference_steps; i++) {
+        Tensor* eps_t = module_forward(unet, latent);
+        if (!eps_t) { tensor_free(latent); return NULL; }
+        tensor_ensure_executed(eps_t);
+        const float* eps = (const float*)tensor_data_ptr(eps_t);
+        if (!eps || eps_t->numel != latent->numel) {
+            LOG_ERROR("cml_sd_generate: UNet output shape mismatch at step %d", i);
+            tensor_free(latent);
+            return NULL;
+        }
+        if (cml_sd_scheduler_step(sched, eps, ldata, latent->numel, i) != 0) {
+            tensor_free(latent);
+            return NULL;
+        }
+    }
+    return latent;
+}
 
 StableDiffusionConfig stable_diffusion_v1_config(void) {
     StableDiffusionConfig cfg = {

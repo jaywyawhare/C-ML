@@ -119,8 +119,8 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     return mha;
 }
 
-Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
-                                     Tensor* value, Tensor* mask) {
+static Tensor* mha_forward_impl(MultiHeadAttention* mha, Tensor* query, Tensor* key,
+                                Tensor* value, Tensor* mask, Tensor* attn_bias) {
     if (!mha || !query || !key || !value) {
         LOG_ERROR("MultiHeadAttention forward: NULL input");
         return NULL;
@@ -137,7 +137,9 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     int num_heads = mha->num_heads;
     int head_dim  = mha->head_dim;
 
-    if (mha->use_flash && seq_q >= 512) {
+    /* Flash path has no attention-bias hook; fall through to standard SDPA
+     * whenever a bias is supplied. */
+    if (mha->use_flash && seq_q >= 512 && !attn_bias) {
         Tensor* Q = uop_linear(query, mha->W_q->tensor, mha->b_q->tensor);
         Tensor* K = uop_linear(key, mha->W_k->tensor, mha->b_k->tensor);
         Tensor* V = uop_linear(value, mha->W_v->tensor, mha->b_v->tensor);
@@ -191,7 +193,7 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     if (!Q_h || !K_h || !V_h) return NULL;
 
     /* Scaled dot-product attention: [B, H, S_q, D] */
-    Tensor* attn_out = uop_scaled_dot_product_attention(Q_h, K_h, V_h, mask);
+    Tensor* attn_out = uop_scaled_dot_product_attention_bias(Q_h, K_h, V_h, mask, attn_bias);
     if (!attn_out) return NULL;
 
     /* [B, H, S_q, D] -> [B, S_q, H, D] -> [B, S_q, E] */
@@ -204,6 +206,16 @@ Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tens
     if (!concat) return NULL;
 
     return uop_linear(concat, mha->W_o->tensor, mha->b_o->tensor);
+}
+
+Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
+                                     Tensor* value, Tensor* mask) {
+    return mha_forward_impl(mha, query, key, value, mask, NULL);
+}
+
+Tensor* multihead_attention_forward_bias(MultiHeadAttention* mha, Tensor* query, Tensor* key,
+                                         Tensor* value, Tensor* mask, Tensor* attn_bias) {
+    return mha_forward_impl(mha, query, key, value, mask, attn_bias);
 }
 
 static Tensor* encoder_layer_forward(Module* module, Tensor* input) {

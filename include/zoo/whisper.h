@@ -40,6 +40,11 @@ WhisperConfig whisper_large_config(void);
 
 Module* cml_zoo_whisper(const WhisperConfig* config);
 
+/* Log-mel spectrogram frontend: 16 kHz mono audio -> [n_mels, frames] tensor
+ * (Whisper convention: n_fft=400, hop=160, Hann window, log10 clamped to
+ * max-8, scaled (x+4)/4). Feed the result to the audio encoder. */
+Tensor* cml_whisper_log_mel(const float* audio, int num_samples, int n_mels);
+
 #ifdef __cplusplus
 }
 #endif

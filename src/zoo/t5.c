@@ -1,10 +1,83 @@
 #include "zoo/t5.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
+#include "ops/uops.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <math.h>
 #include "alloc/cml_allocator.h"
+
+/* T5 relative-position bucketing (Raffel et al.; mirrors the HF reference). */
+static int t5_rel_bucket(int rel, bool bidirectional, int num_buckets, int max_distance) {
+    int bucket = 0;
+    int n;
+    if (bidirectional) {
+        num_buckets /= 2;
+        if (rel > 0) bucket += num_buckets;
+        n = abs(rel);
+    } else {
+        n = rel < 0 ? -rel : 0;
+    }
+    int max_exact = num_buckets / 2;
+    if (n < max_exact) {
+        bucket += n;
+    } else {
+        int v = max_exact +
+                (int)(logf((float)n / (float)max_exact) /
+                      logf((float)max_distance / (float)max_exact) *
+                      (float)(num_buckets - max_exact));
+        if (v > num_buckets - 1) v = num_buckets - 1;
+        bucket += v;
+    }
+    return bucket;
+}
+
+/* Build the [1, H, Sq, Sk] additive attention bias by gathering from the
+ * flattened [H*num_buckets] parameter with precomputed bucket indices — the
+ * gather keeps the graph differentiable so rel_bias trains. */
+static Tensor* t5_build_rel_bias(Parameter* rel_bias, int n_head, int num_buckets,
+                                 int seq_q, int seq_k, bool bidirectional) {
+    if (!rel_bias || !rel_bias->tensor) return NULL;
+
+    int flat_n = n_head * seq_q * seq_k;
+    int idx_shape[1] = {flat_n};
+    TensorConfig icfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                         .has_dtype = true, .has_device = true};
+    Tensor* idx = tensor_empty(idx_shape, 1, &icfg);
+    if (!idx) return NULL;
+    float* idx_data = (float*)tensor_data_ptr(idx);
+    if (!idx_data) return NULL;
+    for (int h = 0; h < n_head; h++) {
+        for (int i = 0; i < seq_q; i++) {
+            for (int j = 0; j < seq_k; j++) {
+                int b = t5_rel_bucket(j - i, bidirectional, num_buckets, 128);
+                idx_data[((size_t)h * seq_q + i) * seq_k + j] =
+                    (float)(h * num_buckets + b);
+            }
+        }
+    }
+    idx->is_executed = true;
+
+    int flat_shape[1] = {n_head * num_buckets};
+    ReshapeParams frp = {flat_shape, 1};
+    Tensor* flat_bias = uop_reshape(rel_bias->tensor, &frp);
+    if (!flat_bias) return NULL;
+
+    Tensor* gathered = uop_gather(flat_bias, idx, 0);
+    if (!gathered) return NULL;
+
+    int out_shape[4] = {1, n_head, seq_q, seq_k};
+    ReshapeParams orp = {out_shape, 4};
+    return uop_reshape(gathered, &orp);
+}
+
+/* Expand the [1, H, Sq, Sk] bias across the batch to match score shape. */
+static Tensor* t5_batch_bias(Tensor* bias, int batch) {
+    if (!bias || batch <= 1) return bias;
+    int shape[4] = {batch, bias->shape[1], bias->shape[2], bias->shape[3]};
+    ExpandParams ep = {shape, 4};
+    return uop_expand(bias, &ep);
+}
 
 T5Config cml_zoo_t5_config_small(void) {
     return (T5Config){
@@ -62,8 +135,14 @@ static Tensor* t5_enc_block_forward(Module* module, Tensor* input) {
     Tensor* normed = module_forward((Module*)block->norm1, input);
     if (!normed) return NULL;
 
-    Tensor* attn_out = multihead_attention_forward(
-        block->self_attn, normed, normed, normed, NULL);
+    int seq = input->ndim == 3 ? input->shape[1] : input->shape[0];
+    Tensor* bias = t5_build_rel_bias(block->rel_bias, block->n_head,
+                                     block->num_buckets, seq, seq, true);
+    if (bias && input->ndim == 3)
+        bias = t5_batch_bias(bias, input->shape[0]);
+
+    Tensor* attn_out = multihead_attention_forward_bias(
+        block->self_attn, normed, normed, normed, NULL, bias);
     if (!attn_out) return NULL;
 
     Tensor* x = tensor_add(input, attn_out);
@@ -158,38 +237,39 @@ typedef struct {
     int num_buckets;
 } T5DecoderBlock;
 
+static Tensor* t5_dec_self_attn(T5DecoderBlock* block, Tensor* input) {
+    Tensor* normed = module_forward((Module*)block->norm1, input);
+    if (!normed) return NULL;
+
+    /* Causal (unidirectional) buckets for decoder self-attention. */
+    int seq = input->ndim == 3 ? input->shape[1] : input->shape[0];
+    Tensor* bias = t5_build_rel_bias(block->self_rel_bias, block->n_head,
+                                     block->num_buckets, seq, seq, false);
+    if (bias && input->ndim == 3)
+        bias = t5_batch_bias(bias, input->shape[0]);
+
+    Tensor* self_out = multihead_attention_forward_bias(
+        block->self_attn, normed, normed, normed, NULL, bias);
+    if (!self_out) return NULL;
+
+    return tensor_add(input, self_out);
+}
+
 static Tensor* t5_dec_block_forward(Module* module, Tensor* input) {
     T5DecoderBlock* block = (T5DecoderBlock*)module;
     if (!block || !input) return NULL;
 
-    Tensor* normed = module_forward((Module*)block->norm1, input);
-    if (!normed) return NULL;
-
-    Tensor* self_out = multihead_attention_forward(
-        block->self_attn, normed, normed, normed, NULL);
-    if (!self_out) return NULL;
-
-    Tensor* x = tensor_add(input, self_out);
-    if (!x) return NULL;
-
-    return x;
+    return t5_dec_self_attn(block, input);
 }
 
 static Tensor* t5_dec_block_forward_with_memory(T5DecoderBlock* block, Tensor* input,
                                                   Tensor* memory) {
     if (!block || !input) return NULL;
 
-    Tensor* normed = module_forward((Module*)block->norm1, input);
-    if (!normed) return NULL;
-
-    Tensor* self_out = multihead_attention_forward(
-        block->self_attn, normed, normed, normed, NULL);
-    if (!self_out) return NULL;
-
-    Tensor* x = tensor_add(input, self_out);
+    Tensor* x = t5_dec_self_attn(block, input);
     if (!x) return NULL;
 
-    normed = module_forward((Module*)block->norm2, x);
+    Tensor* normed = module_forward((Module*)block->norm2, x);
     if (!normed) return NULL;
 
     Tensor* cross_out = multihead_attention_forward(

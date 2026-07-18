@@ -647,6 +647,10 @@ Tensor* uop_one_hot(Tensor* a, int num_classes);
 
 /* softmax(Q*K^T / sqrt(d)) * V */
 Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask);
+/* SDPA with an additive attention bias (e.g. T5 relative position bias) added
+ * to the scaled logits before masking/softmax; bias shape must match scores. */
+Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, Tensor* mask,
+                                              Tensor* attn_bias);
 
 typedef struct {
     int* repeats;   // Number of repeats per dimension

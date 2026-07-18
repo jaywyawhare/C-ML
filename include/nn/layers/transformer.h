@@ -37,6 +37,10 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
                                             DType dtype, DeviceType device);
 Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                      Tensor* value, Tensor* mask);
+/* Like multihead_attention_forward, plus an additive attention bias
+ * broadcastable to the per-head score shape [B, H, S_q, S_k] (T5-style). */
+Tensor* multihead_attention_forward_bias(MultiHeadAttention* mha, Tensor* query, Tensor* key,
+                                         Tensor* value, Tensor* mask, Tensor* attn_bias);
 
 typedef struct TransformerEncoderLayer {
     Module base;
