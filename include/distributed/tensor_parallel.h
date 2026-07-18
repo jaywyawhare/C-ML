@@ -56,6 +56,11 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input);
  * in-process partials (single-process simulation of tensor parallelism). */
 Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts);
 
+/* All-gather for column-parallel outputs: concatenates each rank's partial
+ * [batch, out_features/tp] along `dim` (-1 = feature dim) into the full
+ * [batch, out_features] result. Rank order = array order. */
+Tensor* cml_tp_all_gather(Tensor** partials, int num_parts, int dim);
+
 /* Sum a row-parallel forward partial across ranks IN PLACE via the default
  * process group (real distributed collective; no-op at world_size==1). Because
  * all-reduce-sum has an identity gradient, the in-place reduction preserves

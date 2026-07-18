@@ -50,6 +50,7 @@ MemoryPool* memory_pool_create(size_t block_size, int num_blocks, DType dtype) {
     pool->capacity   = num_blocks;
     pool->block_size = block_size;
     pool->dtype      = dtype;
+    pthread_mutex_init(&pool->lock, NULL);
 
     return pool;
 }
@@ -71,6 +72,7 @@ void memory_pool_free(MemoryPool* pool) {
         cml_free(pool->block_sizes);
     if (pool->used)
         cml_free(pool->used);
+    pthread_mutex_destroy(&pool->lock);
     cml_free(pool);
 }
 
@@ -78,12 +80,15 @@ void* memory_pool_alloc(MemoryPool* pool) {
     if (!pool)
         return NULL;
 
+    pthread_mutex_lock(&pool->lock);
     for (int i = 0; i < pool->num_blocks; i++) {
         if (!pool->used[i]) {
             pool->used[i] = 1;
+            pthread_mutex_unlock(&pool->lock);
             return pool->blocks[i];
         }
     }
+    pthread_mutex_unlock(&pool->lock);
 
     return NULL;
 }
@@ -92,12 +97,15 @@ int memory_pool_free_block(MemoryPool* pool, void* block) {
     if (!pool || !block)
         return -1;
 
+    pthread_mutex_lock(&pool->lock);
     for (int i = 0; i < pool->num_blocks; i++) {
         if (pool->blocks[i] == block) {
             pool->used[i] = 0;
+            pthread_mutex_unlock(&pool->lock);
             return 0;
         }
     }
+    pthread_mutex_unlock(&pool->lock);
 
     LOG_WARNING("Block not found in pool");
     return -1;

@@ -88,6 +88,42 @@ static int build_flat_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
+/* Binomial tree: reduce up to rank 0 (log2(n) rounds), then broadcast back
+ * down. 2*(n-1) full-buffer transfers; latency-optimal for small buffers. */
+static int build_tree_steps(ScheduleAllReduce* ar) {
+    int n = ar->num_devices;
+    int ns = 2 * (n - 1);
+    ar->steps = cml_calloc((size_t)(ns > 0 ? ns : 1), sizeof(AllReduceStep));
+    if (!ar->steps) return -1;
+
+    int s = 0;
+    for (int stride = 1; stride < n; stride <<= 1) {
+        for (int rank = 0; rank + stride < n; rank += 2 * stride) {
+            ar->steps[s].src_rank     = rank + stride;
+            ar->steps[s].dst_rank     = rank;
+            ar->steps[s].chunk_offset = 0;
+            ar->steps[s].chunk_bytes  = ar->buffer_bytes;
+            ar->steps[s].is_reduce    = true;
+            ++s;
+        }
+    }
+    int top = 1;
+    while (top < n) top <<= 1;
+    for (int stride = top >> 1; stride >= 1; stride >>= 1) {
+        for (int rank = 0; rank + stride < n; rank += 2 * stride) {
+            ar->steps[s].src_rank     = rank;
+            ar->steps[s].dst_rank     = rank + stride;
+            ar->steps[s].chunk_offset = 0;
+            ar->steps[s].chunk_bytes  = ar->buffer_bytes;
+            ar->steps[s].is_reduce    = false;
+            ++s;
+        }
+    }
+    ar->num_steps   = s;
+    ar->chunk_count = 1;
+    return 0;
+}
+
 static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
     
     int n = ar->num_devices;
@@ -165,7 +201,7 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
         case AR_ALGO_RING:              rc = build_ring_steps(ar);               break;
         case AR_ALGO_FLAT:              rc = build_flat_steps(ar);               break;
         case AR_ALGO_RECURSIVE_HALVING: rc = build_recursive_halving_steps(ar);  break;
-        case AR_ALGO_TREE:              rc = build_ring_steps(ar); break; 
+        case AR_ALGO_TREE:              rc = build_tree_steps(ar);               break;
         default:                         rc = build_ring_steps(ar); break;
     }
     if (rc != 0) { schedule_allreduce_free(ar); return NULL; }

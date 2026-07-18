@@ -1,6 +1,7 @@
 #include "distributed/tensor_parallel.h"
 #include "distributed/distributed.h"
 #include "ops/uops.h"
+#include "tensor/tensor_manipulation.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
@@ -429,6 +430,24 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts)
     cml_free(sum_data);
     cml_free(out_shape);
     return result;
+}
+
+Tensor* cml_tp_all_gather(Tensor** partials, int num_parts, int dim)
+{
+    if (!partials || num_parts <= 0) {
+        LOG_ERROR("cml_tp_all_gather: invalid arguments");
+        return NULL;
+    }
+    for (int p = 0; p < num_parts; p++) {
+        if (!partials[p]) {
+            LOG_ERROR("cml_tp_all_gather: partials[%d] is NULL", p);
+            return NULL;
+        }
+        tensor_ensure_executed(partials[p]);
+    }
+    /* Column-parallel: each rank holds [batch, out_features/tp]; the full
+     * output is the rank-order concatenation along the feature dim. */
+    return tensor_concat(partials, num_parts, dim);
 }
 
 int cml_row_parallel_all_reduce(Tensor* partial)

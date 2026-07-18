@@ -4,6 +4,7 @@
 #include "tensor/tensor.h"
 #include <stddef.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,7 @@ typedef struct MemoryPool {
     int capacity;        // Capacity of pool
     size_t block_size;   // Size of each block
     DType dtype;         // Data type for pool
+    pthread_mutex_t lock; // Guards used[] for concurrent alloc/free
 } MemoryPool;
 
 typedef struct TensorPool {

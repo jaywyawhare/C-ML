@@ -394,6 +394,15 @@ static int nccl_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     return nccl->ncclGroupEnd();
 }
 
+/* Deferred completion state for a truly-async collective: wait() syncs the
+ * stream and applies any AVG post-scale, allowing compute/comm overlap
+ * between the async launch and the wait. */
+typedef struct NCCLPendingWork {
+    NCCLContext* nccl;
+    Tensor* tensor;
+    DistReduceOp op;
+} NCCLPendingWork;
+
 static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl) nccl = g_nccl_ctx;
@@ -417,22 +426,28 @@ static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
         return work;
     }
 
-    /* Wait for the collective on the stream to actually finish before reporting
-     * completion, so a subsequent wait()/read sees final data rather than a
-     * still-in-flight buffer. (A true event-based async would record an event
-     * into work->internal; with only stream-sync available we complete here.) */
-    nccl_stream_sync(nccl);
-    work->internal = NULL;
-    work->completed = true;
-    work->error_code = 0;
-
-    /* Handle AVG post-scaling (safe now that the stream is synced) */
-    if (op == DIST_REDUCE_AVG) {
-        float scale = 1.0f / (float)cml_dist_get_world_size();
-        float* data = (float*)tensor->data;
-        for (size_t i = 0; i < tensor->numel; i++)
-            data[i] *= scale;
+    /* Leave the collective in flight; nccl_wait() syncs the stream. The
+     * caller must not read the buffer until wait() returns. */
+    NCCLPendingWork* pending = (NCCLPendingWork*)cml_calloc(1, sizeof(NCCLPendingWork));
+    if (!pending) {
+        /* Can't track completion: fall back to synchronous behavior. */
+        nccl_stream_sync(nccl);
+        if (op == DIST_REDUCE_AVG) {
+            float scale = 1.0f / (float)cml_dist_get_world_size();
+            float* data = (float*)tensor->data;
+            for (size_t i = 0; i < tensor->numel; i++)
+                data[i] *= scale;
+        }
+        work->completed = true;
+        work->error_code = 0;
+        return work;
     }
+    pending->nccl   = nccl;
+    pending->tensor = tensor;
+    pending->op     = op;
+    work->internal   = pending;
+    work->completed  = false;
+    work->error_code = 0;
 
     return work;
 }
@@ -444,11 +459,18 @@ static int nccl_wait(DistWork* work) {
     if (work->completed)
         return work->error_code;
 
-    /*
-     * If work->internal held a CUDA event, we would synchronize on
-     * it here (e.g., cudaEventSynchronize). Since we currently mark
-     * operations as completed immediately, just return.
-     */
+    NCCLPendingWork* pending = (NCCLPendingWork*)work->internal;
+    if (pending) {
+        nccl_stream_sync(pending->nccl);
+        if (pending->op == DIST_REDUCE_AVG && pending->tensor && pending->tensor->data) {
+            float scale = 1.0f / (float)cml_dist_get_world_size();
+            float* data = (float*)pending->tensor->data;
+            for (size_t i = 0; i < pending->tensor->numel; i++)
+                data[i] *= scale;
+        }
+        cml_free(pending);
+        work->internal = NULL;
+    }
     work->completed = true;
     return work->error_code;
 }
