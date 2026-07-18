@@ -10,6 +10,7 @@
 
 #include "core/export.h"
 #include "ops/ir/dispatch.h"
+#include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "nn.h"
 #include <stdbool.h>
@@ -114,6 +115,10 @@ CML_API void         torch_pte_free(CMLPTEModel* model);
 CML_API int  torch_pte_execute(CMLPTEModel* model, Tensor** inputs, int num_inputs,
                                Tensor** outputs, int num_outputs);
 CML_API size_t torch_pte_get_required_arena_size(const CMLPTEModel* model);
+
+/* True if the PTE linear interpreter has a kernel for this op. Export refuses
+ * programs containing unsupported ops so failures surface at export time. */
+CML_API bool torch_pte_runtime_supports(UOpType op);
 
 #ifdef __cplusplus
 }

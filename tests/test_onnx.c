@@ -2,13 +2,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
 
 #include "core/onnx.h"
 
 int main(void) {
     printf("ONNX Runtime Tests\n");
 
-#ifdef CML_HAS_ONNX
+    /* Loader robustness (unconditional): invalid inputs must be rejected
+     * cleanly, never crash or return a half-parsed model. */
+    printf("  test_onnx_load_invalid...");
+    assert(cml_onnx_load(NULL) == NULL);
+    assert(cml_onnx_load("/nonexistent/definitely_missing.onnx") == NULL);
+    assert(cml_onnx_load_buffer(NULL, 0) == NULL);
+    const uint8_t garbage[] = {0xde, 0xad, 0xbe, 0xef, 0x00, 0x11, 0x22, 0x33};
+    assert(cml_onnx_load_buffer(garbage, sizeof(garbage)) == NULL);
+    assert(cml_onnx_load_buffer(garbage, 1) == NULL);
+    printf(" PASS\n");
 
     /* Test 1: Supported operators return true */
     printf("  test_onnx_op_supported_true...");
@@ -61,10 +71,6 @@ int main(void) {
     printf("PASS\n");
 
     printf("All ONNX runtime tests passed.\n");
-
-#else
-    printf("ONNX support not available (CML_HAS_ONNX not defined), skipping tests.\n");
-#endif
 
     return 0;
 }

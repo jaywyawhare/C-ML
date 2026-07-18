@@ -4,6 +4,7 @@
 #include "ops/ir/internal.h"
 #include "core/logging.h"
 #include "core/cml_flags.h"
+#include "ops/ir/z3_verify.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -769,6 +770,26 @@ int cml_ir_optimize(CMLGraph_t ir) {
                 build_dependency_graph(ir);
             }
             cml_rewrite_registry_free(builtin);
+        }
+    }
+
+    /* CML_Z3_VERIFY=1: formally check index bounds on the optimized graph.
+     * Requires libz3 at runtime; without it the verifier reports UNSUPPORTED
+     * and this is a no-op. Failures log loudly but don't abort execution. */
+    {
+        const char* z3_env = getenv("CML_Z3_VERIFY");
+        if (z3_env && z3_env[0] == '1') {
+            CMLZ3Verifier* v = cml_z3_verifier_create(2000);
+            if (v) {
+                CMLVerifyResult r = cml_z3_verify_bounds(v, ir);
+                if (r == CML_VERIFY_FAIL)
+                    LOG_ERROR("Z3 bounds verification FAILED on optimized graph");
+                else if (r == CML_VERIFY_PASS)
+                    LOG_INFO("Z3 bounds verification passed");
+                else
+                    LOG_DEBUG("Z3 verification unavailable (libz3 not loaded)");
+                cml_z3_verifier_free(v);
+            }
         }
     }
 

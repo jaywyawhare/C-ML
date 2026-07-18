@@ -9,16 +9,18 @@
 static void test_select_config_basic(void) {
     printf("  test_select_config_basic...");
 
-    if (!cml_wmma_available()) {
-        printf(" SKIPPED (no WMMA device)\n");
-        return;
-    }
-
     WMMAConfig config;
     memset(&config, 0, sizeof(config));
 
     /* Standard matmul dimensions */
     int ret = cml_wmma_select_config(256, 256, 256, &config);
+    if (!cml_wmma_available()) {
+        /* Stub contract: without a Tensor Core device the API must fail
+         * loudly, not fake a config. */
+        assert(ret == -1);
+        printf(" PASS (stub contract: select_config == -1)\n");
+        return;
+    }
     assert(ret == 0);
 
     /* Config should have valid fragment dimensions */
@@ -37,16 +39,16 @@ static void test_select_config_basic(void) {
 static void test_select_config_small(void) {
     printf("  test_select_config_small...");
 
-    if (!cml_wmma_available()) {
-        printf(" SKIPPED (no WMMA device)\n");
-        return;
-    }
-
     WMMAConfig config;
     memset(&config, 0, sizeof(config));
 
     /* Small matmul that fits in a single fragment */
     int ret = cml_wmma_select_config(16, 16, 16, &config);
+    if (!cml_wmma_available()) {
+        assert(ret == -1);
+        printf(" PASS (stub contract: select_config == -1)\n");
+        return;
+    }
     assert(ret == 0);
     assert(config.fragment == WMMA_M16N16K16);
     assert(config.M == 16);
@@ -59,16 +61,16 @@ static void test_select_config_small(void) {
 static void test_select_config_rectangular(void) {
     printf("  test_select_config_rectangular...");
 
-    if (!cml_wmma_available()) {
-        printf(" SKIPPED (no WMMA device)\n");
-        return;
-    }
-
     WMMAConfig config;
     memset(&config, 0, sizeof(config));
 
     /* Rectangular matrix dimensions */
     int ret = cml_wmma_select_config(512, 128, 256, &config);
+    if (!cml_wmma_available()) {
+        assert(ret == -1);
+        printf(" PASS (stub contract: select_config == -1)\n");
+        return;
+    }
     assert(ret == 0);
     assert(config.M > 0);
     assert(config.N > 0);
@@ -80,13 +82,15 @@ static void test_select_config_rectangular(void) {
 static void test_generate_kernel(void) {
     printf("  test_generate_kernel...");
 
-    if (!cml_wmma_available()) {
-        printf(" SKIPPED (no WMMA device)\n");
-        return;
-    }
-
     WMMAConfig config;
     memset(&config, 0, sizeof(config));
+
+    if (!cml_wmma_available()) {
+        char* stub_src = cml_wmma_generate_kernel(&config, 256, 256, 256);
+        assert(stub_src == NULL);  /* stub contract: no fake kernel source */
+        printf(" PASS (stub contract: generate_kernel == NULL)\n");
+        return;
+    }
 
     int ret = cml_wmma_select_config(256, 256, 256, &config);
     assert(ret == 0);
@@ -107,7 +111,10 @@ static void test_generate_kernel_various_sizes(void) {
     printf("  test_generate_kernel_various_sizes...");
 
     if (!cml_wmma_available()) {
-        printf(" SKIPPED (no WMMA device)\n");
+        WMMAConfig stub_cfg;
+        memset(&stub_cfg, 0, sizeof(stub_cfg));
+        assert(cml_wmma_generate_kernel(&stub_cfg, 128, 128, 128) == NULL);
+        printf(" PASS (stub contract: generate_kernel == NULL)\n");
         return;
     }
 
@@ -151,7 +158,10 @@ static void test_wmma_matmul_if_available(void) {
     printf("  test_wmma_matmul_if_available...");
 
     if (!cml_wmma_available()) {
-        printf(" SKIPPED (no WMMA device)\n");
+        /* Stub contract: matmul must refuse rather than fake success. */
+        float a[4] = {0}, b[4] = {0}, c[4] = {0};
+        assert(cml_wmma_matmul(a, b, c, 2, 2, 2) == -1);
+        printf(" PASS (stub contract: matmul == -1)\n");
         return;
     }
 

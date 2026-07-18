@@ -5,6 +5,7 @@
 #include "ops/ir/tiny_jit.h"
 #include "ops/ir/graph_cache.h"
 #include "ops/ir/schedule.h"
+#include "ops/ir/beam_search.h"
 #include "core/logging.h"
 #include "core/cml_flags.h"
 #ifdef CML_HAS_LLVM_BACKEND
@@ -1767,7 +1768,26 @@ int cpu_execute_node(struct IRNode* node) {
 
         // Naive matmul fallback with cache-friendly access pattern
         memset(out_data, 0, out->numel * sizeof(float));
-        const int BLOCK = 32;
+        /* BEAM=1: consult the beam-search autotuner for the block size of this
+         * matmul shape (cached per-shape). Default remains the fixed 32. */
+        int BLOCK = 32;
+        if (cml_beam_search_enabled()) {
+            static CMLBeamSearchCtx* g_beam_ctx = NULL;
+            if (!g_beam_ctx) g_beam_ctx = cml_beam_search_create();
+            if (g_beam_ctx) {
+                uint64_t h = 0x9E3779B97F4A7C15ULL;
+                h ^= (uint64_t)M * 0x100000001B3ULL;
+                h ^= (uint64_t)N * 0x1000193ULL;
+                h ^= (uint64_t)K;
+                CMLBeamConfig best;
+                int dims[3] = {M, N, K};
+                if (cml_beam_search_tune(g_beam_ctx, h, (size_t)M * (size_t)N,
+                                         3, dims, &best) == 0 &&
+                    best.block_size_x >= 8 && best.block_size_x <= 256) {
+                    BLOCK = best.block_size_x;
+                }
+            }
+        }
         for (int m0 = 0; m0 < M; m0 += BLOCK) {
             for (int n0 = 0; n0 < N; n0 += BLOCK) {
                 for (int k0 = 0; k0 < K; k0 += BLOCK) {

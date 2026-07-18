@@ -108,6 +108,16 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
             if (sd) nn_state_dict_free(sd);
             return -1;
         }
+        /* Fail at export rather than shipping a program the runtime can't run. */
+        int node_out_ndim = node->output ? node->output->ndim : node->output_ndim;
+        if (!torch_pte_runtime_supports((UOpType)node->type) ||
+            ((UOpType)node->type == UOP_PERMUTE && node_out_ndim > 2)) {
+            LOG_ERROR("PTE export: op %d (%s) has no PTE runtime kernel — refusing export",
+                      node->type, uop_type_to_string(node->type));
+            free(instrs);
+            if (sd) nn_state_dict_free(sd);
+            return -1;
+        }
         int out_ndim = node->output ? node->output->ndim : node->output_ndim;
         if (out_ndim > CML_PTE_MAX_SHAPE_DIMS) {
             LOG_ERROR("PTE export: output has %d dims (max %d)", out_ndim, CML_PTE_MAX_SHAPE_DIMS);
@@ -608,9 +618,57 @@ static Tensor* pte_exec_kernel(UOpType op, Tensor** args, int num_args,
         return num_args >= 3 ? uop_linear(args[0], args[1], args[2])
                : num_args >= 2 ? uop_linear(args[0], args[1], NULL)
                                : NULL;
+    case UOP_POW:
+        return num_args >= 2 ? uop_pow(args[0], args[1]) : NULL;
+    case UOP_MAX:
+        return num_args >= 2 ? uop_max(args[0], args[1]) : NULL;
+    case UOP_NEG:
+        return num_args >= 1 ? uop_neg(args[0]) : NULL;
+    case UOP_EXP:
+        return num_args >= 1 ? uop_exp(args[0]) : NULL;
+    case UOP_LOG:
+        return num_args >= 1 ? uop_log(args[0]) : NULL;
+    case UOP_SQRT:
+        return num_args >= 1 ? uop_sqrt(args[0]) : NULL;
+    case UOP_ABS:
+        return num_args >= 1 ? uop_abs(args[0]) : NULL;
+    case UOP_PERMUTE: {
+        /* The instruction doesn't carry the permutation; recover the common
+         * 2-D transpose from shapes and reject anything higher-rank. */
+        if (num_args < 1 || !args[0])
+            return NULL;
+        if (args[0]->ndim == 2 && ins->output_ndim == 2)
+            return tensor_transpose(args[0], 0, 1);
+        LOG_WARNING("PTE execute: PERMUTE beyond 2-D transpose not encodable");
+        return NULL;
+    }
+    case UOP_EXPAND: {
+        if (num_args < 1 || ins->output_ndim <= 0)
+            return NULL;
+        int shape[CML_PTE_MAX_SHAPE_DIMS];
+        for (int d = 0; d < ins->output_ndim; d++)
+            shape[d] = ins->output_shape[d];
+        ExpandParams ep = { .new_shape = shape, .new_ndim = ins->output_ndim };
+        return uop_expand(args[0], &ep);
+    }
     default:
         LOG_WARNING("PTE execute: unsupported kernel %d", (int)op);
         return NULL;
+    }
+}
+
+/* Ops the linear interpreter above can run. Export uses this to fail fast
+ * instead of writing a .cpte that only errors at execution time. */
+bool torch_pte_runtime_supports(UOpType op) {
+    switch (op) {
+    case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: case UOP_MATMUL:
+    case UOP_RELU: case UOP_SIGMOID: case UOP_TANH: case UOP_SUM: case UOP_MEAN:
+    case UOP_RESHAPE: case UOP_LINEAR: case UOP_POW: case UOP_MAX: case UOP_NEG:
+    case UOP_EXP: case UOP_LOG: case UOP_SQRT: case UOP_ABS: case UOP_PERMUTE:
+    case UOP_EXPAND:
+        return true;
+    default:
+        return false;
     }
 }
 
