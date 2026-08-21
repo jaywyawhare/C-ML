@@ -24,6 +24,51 @@ concurrency:
 
 jobs:
   build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+        exclude:
+          # /usr/bin/gcc on macOS is just an alias for clang
+          - os: macos-latest
+            compiler: gcc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+        if: runner.os == 'Linux'
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ hashFiles('src/**', 'include/**') }}
+          restore-keys: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_EXAMPLES=OFF \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache
+        env:
+          CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Run tests
+        run: cd build && ctest --output-on-failure
+
+  examples:
+    # The ~60 example targets are part of the public API surface; a compile
+    # regression there should fail CI even though we don't run them.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,23 +80,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ hashFiles('src/**', 'include/**') }}
-          restore-keys: ccache-${{ runner.os }}-
+          key: ccache-examples-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'examples/**') }}
+          restore-keys: ccache-examples-${{ runner.os }}-
 
-      - name: Configure CMake
+      - name: Configure CMake (Release + examples)
         run: |
           cmake -B build \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTS=ON \
-            -DBUILD_EXAMPLES=OFF \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
-      - name: Build
+      - name: Build examples
         run: cmake --build build -j$(nproc)
-
-      - name: Run tests
-        run: cd build && ctest --output-on-failure
 
   sanitizers:
     # AddressSanitizer + UndefinedBehaviorSanitizer build — catches heap
@@ -78,8 +119,7 @@ jobs:
             -DBUILD_TESTS=ON \
             -DBUILD_EXAMPLES=OFF \
             -DENABLE_SANITIZERS=ON \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
       - name: Build
         run: cmake --build build-asan -j$(nproc)
