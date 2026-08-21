@@ -4,16 +4,7 @@
 #include <stdbool.h>
 
 #include "ops/ir/gpu/hexagon_sim.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { printf("PASS\n"); tests_passed++; } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#include "test_harness.h"
 
 /* Instruction encoding helpers */
 static uint32_t encode_nop(void) { return 0; }
@@ -398,6 +389,5 @@ int main(void) {
     TEST(run_max_cycles);
     TEST(r0_is_zero);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

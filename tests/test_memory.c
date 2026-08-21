@@ -7,20 +7,7 @@
 #include "alloc/memory_pools.h"
 #include "alloc/graph_allocator.h"
 #include "core/cleanup.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static int test_memory_pool_create(void) {
     MemoryPool* pool = memory_pool_create(1024, 8, DTYPE_FLOAT32);

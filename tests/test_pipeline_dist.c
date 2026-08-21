@@ -122,7 +122,13 @@ static int run_rank(int rank) {
 
 int main(void) {
     setenv("MASTER_ADDR", "127.0.0.1", 1);
-    setenv("GLOO_PORT", "39561", 1);
+    /* Below the ephemeral range (/proc/sys/net/ipv4/ip_local_port_range, from
+     * 32768 here): the ranks bind port_base+rank as fixed listeners, so a base
+     * inside that range can be taken at any moment by some unrelated outgoing
+     * connection on the machine, and the run fails with "Address already in
+     * use". Kept distinct from the other distributed tests so a parallel ctest
+     * doesn't make them collide with each other. */
+    setenv("GLOO_PORT", "29761", 1);
 
     pid_t pids[WS];
     for (int r = 1; r < WS; r++) {

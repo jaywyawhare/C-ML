@@ -4,16 +4,7 @@
 #include <stdbool.h>
 
 #include "distributed/ib_transport.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { printf("PASS\n"); tests_passed++; } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#include "test_harness.h"
 
 static bool test_availability_check(void) {
     bool a = cml_ib_available();
@@ -93,6 +84,5 @@ int main(void) {
     TEST(deregister_null);
     TEST(connect_invalid);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

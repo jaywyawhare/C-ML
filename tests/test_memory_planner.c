@@ -3,21 +3,7 @@
 #include <string.h>
 
 #include "ops/ir/memory_planner.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-50s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 /* Two buffers with non-overlapping lifetimes should share a slot. */
 static int test_basic_reuse(void) {
@@ -212,6 +198,5 @@ int main(void) {
     TEST(null_inputs);
     TEST(interleaved);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

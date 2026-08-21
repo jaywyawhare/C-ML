@@ -15,6 +15,7 @@
 #include "cml.h"
 #include "ops/ir/schedule.h"
 #include "ops/ir/schedule_allreduce.h"
+#include "test_harness.h"
 
 #define EPS 1e-4f
 
@@ -78,7 +79,7 @@ static int test_inject_appends_copy_items(void) {
     return ok;
 }
 
-static int tests_run = 0, tests_passed = 0;
+#undef TEST
 #define TEST(fn) do { \
     tests_run++; printf("  %-50s ", #fn); fflush(stdout); \
     if (fn()) { tests_passed++; printf("[PASS]\n"); } else printf("[FAIL]\n"); \
@@ -88,6 +89,5 @@ int main(void) {
     printf("Schedule all-reduce planner tests:\n");
     TEST(test_run_sum_scales_by_device_count);
     TEST(test_inject_appends_copy_items);
-    printf("%d/%d passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }

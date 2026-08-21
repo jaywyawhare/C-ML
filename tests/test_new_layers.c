@@ -8,21 +8,7 @@
 #include "autograd/loss_functions.h"
 #include "autograd/amp.h"
 #include "tensor/sparse_tensor.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-40s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static int test_rnn_multi_layer(void) {
     RNN* rnn = nn_rnn(10, 20, 2, false, false, 0.0f, true, DTYPE_FLOAT32, DEVICE_CPU);
@@ -386,6 +372,5 @@ int main(void) {
 
     cml_reset_ir_context();
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

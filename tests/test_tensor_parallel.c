@@ -6,21 +6,7 @@
 
 #include "cml.h"
 #include "distributed/tensor_parallel.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-55s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 #define EPSILON 1e-4f
 
@@ -641,6 +627,5 @@ int main(void) {
     printf("\nFull TP simulation:\n");
     TEST(full_tp_simulation);
 
-    printf("\nResults: %d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

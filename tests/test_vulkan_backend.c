@@ -7,21 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 static int test_spirv_codegen_create(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();

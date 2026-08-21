@@ -14,6 +14,7 @@
 #include "optim.h"
 #include "autograd/autograd.h"
 #include "autograd/loss_functions.h"
+#include "test_harness.h"
 
 #ifdef CML_HAS_DISTRIBUTED
 #include "distributed/distributed.h"
@@ -23,20 +24,6 @@
 #endif
 
 /* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
-
 #define ASSERT(cond) do { \
     if (!(cond)) { \
         printf("(ASSERT failed: %s, line %d) ", #cond, __LINE__); \
@@ -891,7 +878,5 @@ int main(void) {
     printf("\n  [SKIPPED] Distributed tests - build with ENABLE_DISTRIBUTED=ON\n");
 #endif
 
-    printf("\nTests passed: %d/%d\n", tests_passed, tests_run);
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

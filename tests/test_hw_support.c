@@ -10,21 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
-static int tests_run    = 0;
-static int tests_passed = 0;
-
-#define TEST(name) \
-    do { \
-        printf("  Testing: %s... ", #name); \
-        tests_run++; \
-        if (test_##name()) { \
-            printf("PASS\n"); \
-            tests_passed++; \
-        } else { \
-            printf("FAIL\n"); \
-        } \
-    } while(0)
+#include "test_harness.h"
 
 static int test_blackwell_defines(void) {
     if (NV_GPU_ARCH_BLACKWELL != 0x1D0) return 0;
@@ -217,6 +203,5 @@ int main(void) {
     TEST(tc_available);
     TEST(tc_config_roundtrip);
 
-    printf("\n=== Results: %d/%d passed ===\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

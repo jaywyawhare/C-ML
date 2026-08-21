@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include "test_require.h"
 #include <time.h>
 
 #include "ops/ir/tree_automaton.h"
@@ -85,7 +85,7 @@ static void test_compile_empty(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_registry_create();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut == NULL);
+    REQUIRE(aut == NULL);
     cml_rewrite_registry_free(reg);
 
     printf(" PASS\n");
@@ -95,13 +95,13 @@ static void test_compile_builtin(void) {
     printf("  test_compile_builtin...");
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
-    assert(reg != NULL);
-    assert(reg->num_rules > 0);
+    REQUIRE(reg != NULL);
+    REQUIRE(reg->num_rules > 0);
 
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
-    assert(cml_automaton_num_states(aut) > 2);
-    assert(cml_automaton_num_transitions(aut) > 0);
+    REQUIRE(aut != NULL);
+    REQUIRE(cml_automaton_num_states(aut) > 2);
+    REQUIRE(cml_automaton_num_transitions(aut) > 0);
 
     printf(" states=%d transitions=%d",
            cml_automaton_num_states(aut),
@@ -118,7 +118,7 @@ static void test_mul_by_one(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
+    REQUIRE(aut != NULL);
 
     struct CMLGraph graph;
     memset(&graph, 0, sizeof(graph));
@@ -133,7 +133,7 @@ static void test_mul_by_one(void) {
     graph_append(&graph, mul);
 
     int rewrites = cml_automaton_rewrite(aut, &graph);
-    assert(rewrites > 0);
+    REQUIRE(rewrites > 0);
 
     free_graph_nodes(&graph);
     cml_automaton_free(aut);
@@ -147,7 +147,7 @@ static void test_add_zero(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
+    REQUIRE(aut != NULL);
 
     struct CMLGraph graph;
     memset(&graph, 0, sizeof(graph));
@@ -162,7 +162,7 @@ static void test_add_zero(void) {
     graph_append(&graph, add);
 
     int rewrites = cml_automaton_rewrite(aut, &graph);
-    assert(rewrites > 0);
+    REQUIRE(rewrites > 0);
 
     free_graph_nodes(&graph);
     cml_automaton_free(aut);
@@ -176,7 +176,7 @@ static void test_constant_fold(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
+    REQUIRE(aut != NULL);
 
     struct CMLGraph graph;
     memset(&graph, 0, sizeof(graph));
@@ -191,7 +191,7 @@ static void test_constant_fold(void) {
     graph_append(&graph, add);
 
     int rewrites = cml_automaton_rewrite(aut, &graph);
-    assert(rewrites > 0);
+    REQUIRE(rewrites > 0);
 
     /* After constant folding, the ADD should be replaced by FILL(7) */
     struct IRNode* n = graph.head;
@@ -206,7 +206,7 @@ static void test_constant_fold(void) {
         }
         n = n->next;
     }
-    assert(found_folded);
+    REQUIRE(found_folded);
 
     free_graph_nodes(&graph);
     cml_automaton_free(aut);
@@ -220,7 +220,7 @@ static void test_neg_neg(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
+    REQUIRE(aut != NULL);
 
     struct CMLGraph graph;
     memset(&graph, 0, sizeof(graph));
@@ -236,7 +236,7 @@ static void test_neg_neg(void) {
     graph_append(&graph, neg2);
 
     int rewrites = cml_automaton_rewrite(aut, &graph);
-    assert(rewrites > 0);
+    REQUIRE(rewrites > 0);
 
     free_graph_nodes(&graph);
     cml_automaton_free(aut);
@@ -250,7 +250,7 @@ static void test_fixpoint_convergence(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
+    REQUIRE(aut != NULL);
 
     struct CMLGraph graph;
     memset(&graph, 0, sizeof(graph));
@@ -272,7 +272,7 @@ static void test_fixpoint_convergence(void) {
     graph_append(&graph, add);
 
     int rewrites = cml_automaton_rewrite(aut, &graph);
-    assert(rewrites >= 2);
+    REQUIRE(rewrites >= 2);
 
     free_graph_nodes(&graph);
     cml_automaton_free(aut);
@@ -284,13 +284,13 @@ static void test_fixpoint_convergence(void) {
 static void test_stats(void) {
     printf("  test_stats...");
 
-    assert(cml_automaton_num_states(NULL) == 0);
-    assert(cml_automaton_num_transitions(NULL) == 0);
+    REQUIRE(cml_automaton_num_states(NULL) == 0);
+    REQUIRE(cml_automaton_num_transitions(NULL) == 0);
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(cml_automaton_num_states(aut) >= 2);
-    assert(cml_automaton_num_transitions(aut) >= 1);
+    REQUIRE(cml_automaton_num_states(aut) >= 2);
+    REQUIRE(cml_automaton_num_transitions(aut) >= 1);
 
     cml_automaton_free(aut);
     cml_rewrite_registry_free(reg);
@@ -303,7 +303,7 @@ static void bench_automaton_vs_linear(void) {
 
     CMLRewriteRegistry* reg = cml_rewrite_builtin_rules();
     CMLAutomaton* aut = cml_automaton_compile(reg);
-    assert(aut != NULL);
+    REQUIRE(aut != NULL);
 
     /* Build a graph with many nodes that won't match (worst case for linear) */
     int graph_size = 500;

@@ -7,22 +7,7 @@
 #include "cml.h"
 #include "nn/llm_ops.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-45s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 static int test_kv_cache_create_free(void) {
     CMLKVCache* cache = cml_kv_cache_create(128, 4, 32);
@@ -753,6 +738,5 @@ int main(void) {
     TEST(tokenizer_unknown_token);
     TEST(tokenizer_bpe_merge);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

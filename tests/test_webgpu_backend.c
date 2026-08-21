@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include "test_require.h"
 
 #include "ops/ir/gpu/webgpu_backend.h"
 #include "ops/ir/internal.h"
@@ -17,15 +17,15 @@ static void test_wgsl_generate_add(void) {
     node.type = UOP_ADD;
 
     char* wgsl = cml_wgsl_generate(&node);
-    assert(wgsl != NULL);
+    REQUIRE(wgsl != NULL);
 
     /* Verify the generated WGSL contains expected tokens */
-    assert(strstr(wgsl, "@compute") != NULL);
-    assert(strstr(wgsl, "@workgroup_size") != NULL);
-    assert(strstr(wgsl, "var<storage") != NULL);
-    assert(strstr(wgsl, "@binding(0)") != NULL);
-    assert(strstr(wgsl, "@binding(1)") != NULL);
-    assert(strstr(wgsl, "result") != NULL);
+    REQUIRE(strstr(wgsl, "@compute") != NULL);
+    REQUIRE(strstr(wgsl, "@workgroup_size") != NULL);
+    REQUIRE(strstr(wgsl, "var<storage") != NULL);
+    REQUIRE(strstr(wgsl, "@binding(0)") != NULL);
+    REQUIRE(strstr(wgsl, "@binding(1)") != NULL);
+    REQUIRE(strstr(wgsl, "result") != NULL);
 
     printf(" (generated %zu bytes) ", strlen(wgsl));
     cml_free(wgsl);
@@ -40,11 +40,11 @@ static void test_wgsl_generate_mul(void) {
     node.type = UOP_MUL;
 
     char* wgsl = cml_wgsl_generate(&node);
-    assert(wgsl != NULL);
+    REQUIRE(wgsl != NULL);
 
     /* Should still produce valid WGSL with compute shader structure */
-    assert(strstr(wgsl, "@compute") != NULL);
-    assert(strstr(wgsl, "@workgroup_size") != NULL);
+    REQUIRE(strstr(wgsl, "@compute") != NULL);
+    REQUIRE(strstr(wgsl, "@workgroup_size") != NULL);
 
     cml_free(wgsl);
     printf(" PASS\n");
@@ -58,11 +58,11 @@ static void test_wgsl_generate_exp(void) {
     node.type = UOP_EXP;
 
     char* wgsl = cml_wgsl_generate(&node);
-    assert(wgsl != NULL);
+    REQUIRE(wgsl != NULL);
 
     /* Unary op should still produce valid WGSL */
-    assert(strstr(wgsl, "@compute") != NULL);
-    assert(strstr(wgsl, "@workgroup_size") != NULL);
+    REQUIRE(strstr(wgsl, "@compute") != NULL);
+    REQUIRE(strstr(wgsl, "@workgroup_size") != NULL);
 
     cml_free(wgsl);
     printf(" PASS\n");
@@ -81,18 +81,18 @@ static void test_webgpu_backend_lifecycle(void) {
     printf("  test_webgpu_backend_lifecycle...");
 
     CMLWebGPUBackend* backend = cml_webgpu_backend_create();
-    assert(backend != NULL);
-    assert(backend->initialized == false);
+    REQUIRE(backend != NULL);
+    REQUIRE(backend->initialized == false);
 
     int ret = cml_webgpu_backend_init(backend);
     if (ret == 0) {
-        assert(backend->initialized == true);
-        assert(backend->device != NULL);
-        assert(backend->queue != NULL);
+        REQUIRE(backend->initialized == true);
+        REQUIRE(backend->device != NULL);
+        REQUIRE(backend->queue != NULL);
 
         /* Test buffer alloc/free */
         void* buf = cml_webgpu_alloc(backend, 256 * sizeof(float));
-        assert(buf != NULL);
+        REQUIRE(buf != NULL);
         cml_webgpu_free(backend, buf);
     } else {
         printf(" (init failed, no WebGPU device) ");

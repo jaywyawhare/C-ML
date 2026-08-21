@@ -93,12 +93,39 @@ static bool numerical_grad_check(const char* name, Tensor* param,
     return true;
 }
 
-typedef struct { Linear* layer; Tensor* input; } LinearCtx;
+/* The loss every layer check drives: the sum of the forward output. */
+typedef struct { Module* layer; Tensor* input; } LayerCtx;
 
-static float linear_loss(void* vctx) {
-    LinearCtx* c = (LinearCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
+static float layer_loss(void* vctx) {
+    LayerCtx* c = (LayerCtx*)vctx;
+    return tensor_sum_all(module_forward(c->layer, c->input));
+}
+
+/* Forward `layer` over `x`, backpropagate, then finite-difference `weight` and
+ * `bias` (either may be absent). Frees the forward output; the layer and input
+ * stay the caller's to free, including when this returns false. */
+static bool check_layer_grads(const char* label, Module* layer, Tensor* x,
+                              Parameter* weight, Parameter* bias) {
+    module_set_training(layer, true);
+
+    Tensor* out = module_forward(layer, x);
+    if (!out) return false;
+    tensor_ensure_executed(out);
+    cml_backward(out, NULL, false, false);
+
+    LayerCtx ctx = { layer, x };
+    char name[128];
+    bool ok = true;
+    if (weight && weight->tensor) {
+        snprintf(name, sizeof(name), "%s.weight", label);
+        ok = ok && numerical_grad_check(name, weight->tensor, layer_loss, &ctx, EPS, TOL);
+    }
+    if (bias && bias->tensor) {
+        snprintf(name, sizeof(name), "%s.bias", label);
+        ok = ok && numerical_grad_check(name, bias->tensor, layer_loss, &ctx, EPS, TOL);
+    }
+    tensor_free(out);
+    return ok;
 }
 
 static bool check_linear(void) {
@@ -111,38 +138,12 @@ static bool check_linear(void) {
         if (layer) module_free((Module*)layer);
         return false;
     }
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    LinearCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("Linear.weight", layer->weight->tensor,
-                                         linear_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("Linear.bias", layer->bias->tensor,
-                                         linear_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("Linear", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
-}
-
-typedef struct { Conv1d* layer; Tensor* input; } Conv1dCtx;
-
-static float conv1d_loss(void* vctx) {
-    Conv1dCtx* c = (Conv1dCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
 }
 
 static bool check_conv1d(void) {
@@ -154,38 +155,12 @@ static bool check_conv1d(void) {
         if (layer) module_free((Module*)layer);
         return false;
     }
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    Conv1dCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("Conv1d.weight", layer->weight->tensor,
-                                         conv1d_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("Conv1d.bias", layer->bias->tensor,
-                                         conv1d_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("Conv1d", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
-}
-
-typedef struct { Conv2d* layer; Tensor* input; } Conv2dCtx;
-
-static float conv2d_loss(void* vctx) {
-    Conv2dCtx* c = (Conv2dCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
 }
 
 static bool check_conv2d(void) {
@@ -197,38 +172,12 @@ static bool check_conv2d(void) {
         if (layer) module_free((Module*)layer);
         return false;
     }
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    Conv2dCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("Conv2d.weight", layer->weight->tensor,
-                                         conv2d_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("Conv2d.bias", layer->bias->tensor,
-                                         conv2d_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("Conv2d", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
-}
-
-typedef struct { Conv3d* layer; Tensor* input; } Conv3dCtx;
-
-static float conv3d_loss(void* vctx) {
-    Conv3dCtx* c = (Conv3dCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
 }
 
 static bool check_conv3d(void) {
@@ -240,38 +189,12 @@ static bool check_conv3d(void) {
         if (layer) module_free((Module*)layer);
         return false;
     }
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    Conv3dCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("Conv3d.weight", layer->weight->tensor,
-                                         conv3d_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("Conv3d.bias", layer->bias->tensor,
-                                         conv3d_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("Conv3d", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
-}
-
-typedef struct { BatchNorm2d* layer; Tensor* input; } BN2dCtx;
-
-static float bn2d_loss(void* vctx) {
-    BN2dCtx* c = (BN2dCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
 }
 
 static bool check_batchnorm2d(void) {
@@ -280,38 +203,12 @@ static bool check_batchnorm2d(void) {
     BatchNorm2d* layer = nn_batchnorm2d(3, 1e-5f, 0.1f, true, true,
                                          DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer || !x) return false;
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    BN2dCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("BatchNorm2d.weight", layer->weight->tensor,
-                                         bn2d_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("BatchNorm2d.bias", layer->bias->tensor,
-                                         bn2d_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("BatchNorm2d", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
-}
-
-typedef struct { LayerNorm* layer; Tensor* input; } LNCtx;
-
-static float ln_loss(void* vctx) {
-    LNCtx* c = (LNCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
 }
 
 static bool check_layernorm(void) {
@@ -323,38 +220,12 @@ static bool check_layernorm(void) {
         if (layer) module_free((Module*)layer);
         return false;
     }
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    LNCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("LayerNorm.weight", layer->weight->tensor,
-                                         ln_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("LayerNorm.bias", layer->bias->tensor,
-                                         ln_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("LayerNorm", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
-}
-
-typedef struct { GroupNorm* layer; Tensor* input; } GNCtx;
-
-static float gn_loss(void* vctx) {
-    GNCtx* c = (GNCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
-    return tensor_sum_all(out);
 }
 
 static bool check_groupnorm(void) {
@@ -366,27 +237,9 @@ static bool check_groupnorm(void) {
         if (layer) module_free((Module*)layer);
         return false;
     }
-    module_set_training((Module*)layer, true);
-
-    Tensor* out = module_forward((Module*)layer, x);
-    if (!out) {
-        tensor_free(x);
-        module_free((Module*)layer);
-        return false;
-    }
-    tensor_ensure_executed(out);
-    cml_backward(out, NULL, false, false);
-
-    GNCtx ctx = { layer, x };
-    bool ok = true;
-    if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("GroupNorm.weight", layer->weight->tensor,
-                                         gn_loss, &ctx, EPS, TOL);
-    if (layer->bias && layer->bias->tensor)
-        ok = ok && numerical_grad_check("GroupNorm.bias", layer->bias->tensor,
-                                         gn_loss, &ctx, EPS, TOL);
+    bool ok = check_layer_grads("GroupNorm", (Module*)layer, x,
+                                layer->weight, layer->bias);
     module_free((Module*)layer);
-    tensor_free(out);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;

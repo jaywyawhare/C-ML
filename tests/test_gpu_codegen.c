@@ -9,24 +9,11 @@
 #include "ops/ir/gpu/cuda_backend.h"
 #include "ops/ir/gpu/rocm_backend.h"
 #include "core/logging.h"
+#include "test_harness.h"
 
 #ifdef CML_HAS_LLVM_BACKEND
 #include "ops/ir/gpu/gpu_codegen.h"
 #endif
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
 
 #define EXPECT_NEAR(a, b, eps) (fabsf((a) - (b)) < (eps))
 
@@ -333,6 +320,5 @@ int main(void) {
     TEST(gpu_reduction_sum);
     TEST(gpu_matmul);
 
-    printf("\nResults: %d/%d passed\n\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

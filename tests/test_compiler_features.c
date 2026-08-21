@@ -9,9 +9,7 @@
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run    = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -376,6 +374,5 @@ int main(void) {
     RUN_TEST(test_bfs_empty_graph);
     RUN_TEST(test_schedule_options_defaults);
 
-    printf("\n  Results: %d/%d passed\n\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

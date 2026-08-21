@@ -14,6 +14,7 @@
 #include "cml.h"
 #include "ops/ir/gpu/spirv_codegen.h"
 #include "alloc/cml_allocator.h"
+#include "test_harness.h"
 
 #define SPIRV_MAGIC 0x07230203u
 #define OP_EXECUTION_MODE 16u
@@ -43,7 +44,7 @@ static int validate_spirv(const uint32_t* w, size_t nbytes) {
     return 1;
 }
 
-static int tests_run = 0, tests_passed = 0;
+#undef TEST
 #define TEST(label, cond) do { \
     tests_run++; printf("  %-40s ", label); \
     if (cond) { tests_passed++; printf("[PASS]\n"); } else printf("[FAIL]\n"); \
@@ -74,6 +75,5 @@ int main(void) {
     if (w) cml_free(w);
 
     cml_spirv_codegen_destroy(cg);
-    printf("%d/%d passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }

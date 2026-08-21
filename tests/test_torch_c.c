@@ -1,22 +1,22 @@
 #include "torch/torch_c.h"
-#include <assert.h>
+#include "test_require.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static float* realize(Tensor* t) {
     float* p = torch_tensor_data_ptr_f32(t);
-    assert(p != NULL);
+    REQUIRE(p != NULL);
     return p;
 }
 
 static void test_lifecycle(void) {
     printf("  test_lifecycle...");
-    assert(torch_init() == 0);
+    REQUIRE(torch_init() == 0);
     int major = 0, minor = 0, patch = 0;
     const char* ver = NULL;
     torch_get_version(&major, &minor, &patch, &ver);
-    assert(ver != NULL);
+    REQUIRE(ver != NULL);
     printf(" PASSED\n");
 }
 
@@ -30,18 +30,18 @@ static void test_tensor_options(void) {
 
     int shape[] = {2, 2};
     Tensor* t = torch_zeros(shape, 2, &opts);
-    assert(t != NULL);
-    assert(torch_tensor_ndim(t) == 2);
-    assert(torch_tensor_numel(t) == 4);
-    assert(torch_tensor_dtype(t) == DTYPE_FLOAT32);
-    assert(torch_tensor_device(t) == DEVICE_CPU);
-    assert(torch_tensor_requires_grad(t));
-    assert(torch_tensor_sizes(t)[0] == 2);
-    assert(torch_tensor_sizes(t)[1] == 2);
+    REQUIRE(t != NULL);
+    REQUIRE(torch_tensor_ndim(t) == 2);
+    REQUIRE(torch_tensor_numel(t) == 4);
+    REQUIRE(torch_tensor_dtype(t) == DTYPE_FLOAT32);
+    REQUIRE(torch_tensor_device(t) == DEVICE_CPU);
+    REQUIRE(torch_tensor_requires_grad(t));
+    REQUIRE(torch_tensor_sizes(t)[0] == 2);
+    REQUIRE(torch_tensor_sizes(t)[1] == 2);
 
     float* data = realize(t);
     for (int i = 0; i < 4; i++)
-        assert(data[i] == 0.0f);
+        REQUIRE(data[i] == 0.0f);
 
     torch_tensor_free(t);
     printf(" PASSED\n");
@@ -59,19 +59,19 @@ static void test_tensor_ops(void) {
     Tensor* b = torch_ones(shape, 2, &opts);
 
     Tensor* c = torch_add(a, b);
-    assert(c != NULL);
+    REQUIRE(c != NULL);
     float* cd = realize(c);
     for (int i = 0; i < 4; i++)
-        assert(cd[i] == 2.0f);
+        REQUIRE(cd[i] == 2.0f);
 
     Tensor* m = torch_matmul(a, b);
-    assert(m != NULL);
+    REQUIRE(m != NULL);
 
     Tensor* r = torch_relu(a);
-    assert(r != NULL);
+    REQUIRE(r != NULL);
 
     Tensor* s = torch_softmax(a, 0);
-    assert(s != NULL);
+    REQUIRE(s != NULL);
 
     torch_tensor_free(a);
     torch_tensor_free(b);
@@ -98,7 +98,7 @@ static void test_autograd(void) {
     torch_backward(loss, NULL, false, false);
 
     Tensor* grad = torch_get_grad(x);
-    assert(grad != NULL);
+    REQUIRE(grad != NULL);
 
     torch_tensor_free(x);
     torch_tensor_free(y);
@@ -115,7 +115,7 @@ static void test_module_api(void) {
     torch_nn_sequential_add(model, (Module*)torch_nn_relu());
 
     torch_module_train((Module*)model);
-    assert(torch_module_is_training((Module*)model));
+    REQUIRE(torch_module_is_training((Module*)model));
 
     TorchTensorOptions opts = torch_options();
     opts = torch_options_dtype(opts, DTYPE_FLOAT32);
@@ -124,23 +124,23 @@ static void test_module_api(void) {
     int shape[] = {3, 4};
     Tensor* input = torch_randn(shape, 2, &opts);
     Tensor* output = torch_module_forward((Module*)model, input);
-    assert(output != NULL);
-    assert(torch_tensor_numel(output) == 3);
+    REQUIRE(output != NULL);
+    REQUIRE(torch_tensor_numel(output) == 3);
 
     StateDict* sd = torch_module_state_dict((Module*)model, "");
-    assert(sd != NULL);
-    assert(sd->count > 0);
+    REQUIRE(sd != NULL);
+    REQUIRE(sd->count > 0);
     torch_state_dict_free(sd);
 
     TorchRuntimeModule* rt = torch_runtime_from_module((Module*)model);
-    assert(rt != NULL);
+    REQUIRE(rt != NULL);
     Tensor* rt_out = torch_runtime_forward(rt, input);
-    assert(rt_out != NULL);
+    REQUIRE(rt_out != NULL);
     torch_tensor_free(rt_out);
     torch_runtime_free(rt);
 
     torch_module_eval((Module*)model);
-    assert(!torch_module_is_training((Module*)model));
+    REQUIRE(!torch_module_is_training((Module*)model));
 
     torch_tensor_free(input);
     torch_tensor_free(output);
@@ -155,11 +155,11 @@ static void test_retain(void) {
     TorchTensorOptions opts = torch_options();
     int shape[] = {1};
     Tensor* t = torch_ones(shape, 1, &opts);
-    assert(torch_tensor_ref_count(t) == 1);
+    REQUIRE(torch_tensor_ref_count(t) == 1);
     torch_tensor_retain(t);
-    assert(torch_tensor_ref_count(t) == 2);
+    REQUIRE(torch_tensor_ref_count(t) == 2);
     torch_tensor_free(t);
-    assert(torch_tensor_ref_count(t) == 1);
+    REQUIRE(torch_tensor_ref_count(t) == 1);
     torch_tensor_free(t);
     printf(" PASSED\n");
 }

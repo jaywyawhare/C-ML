@@ -4,16 +4,7 @@
 #include <stdbool.h>
 
 #include "ops/ir/gpu/amd_profiling.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { printf("PASS\n"); tests_passed++; } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#include "test_harness.h"
 
 static bool test_profile_create_free(void) {
     CMLAMDProfile* prof = cml_amd_profile_create();
@@ -116,6 +107,5 @@ int main(void) {
     TEST(profile_print_empty);
     TEST(profile_print_with_data);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

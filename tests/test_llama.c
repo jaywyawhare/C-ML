@@ -7,22 +7,7 @@
 #include "cml.h"
 #include "nn/llama.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-50s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 static CMLLLaMAConfig tiny_test_config(void) {
     CMLLLaMAConfig config = {
@@ -473,6 +458,5 @@ int main(void) {
     TEST(model_reset);
     TEST(print_config);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

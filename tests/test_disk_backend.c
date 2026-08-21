@@ -4,9 +4,7 @@
 #include <sys/stat.h>
 #include "backend/disk_backend.h"
 #include "tensor/tensor.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -182,6 +180,5 @@ int main(void) {
     RUN_TEST(test_print_no_crash);
     RUN_TEST(test_free_null);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }

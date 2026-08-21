@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include "test_require.h"
 
 #include "ops/ir/gpu/wmma.h"
 #include "alloc/cml_allocator.h"
@@ -17,21 +17,21 @@ static void test_select_config_basic(void) {
     if (!cml_wmma_available()) {
         /* Stub contract: without a Tensor Core device the API must fail
          * loudly, not fake a config. */
-        assert(ret == -1);
+        REQUIRE(ret == -1);
         printf(" PASS (stub contract: select_config == -1)\n");
         return;
     }
-    assert(ret == 0);
+    REQUIRE(ret == 0);
 
     /* Config should have valid fragment dimensions */
-    assert(config.M > 0);
-    assert(config.N > 0);
-    assert(config.K > 0);
+    REQUIRE(config.M > 0);
+    REQUIRE(config.N > 0);
+    REQUIRE(config.K > 0);
 
     /* Block dimensions should be positive */
-    assert(config.block_m > 0);
-    assert(config.block_n > 0);
-    assert(config.block_k > 0);
+    REQUIRE(config.block_m > 0);
+    REQUIRE(config.block_n > 0);
+    REQUIRE(config.block_k > 0);
 
     printf(" PASS\n");
 }
@@ -45,15 +45,15 @@ static void test_select_config_small(void) {
     /* Small matmul that fits in a single fragment */
     int ret = cml_wmma_select_config(16, 16, 16, &config);
     if (!cml_wmma_available()) {
-        assert(ret == -1);
+        REQUIRE(ret == -1);
         printf(" PASS (stub contract: select_config == -1)\n");
         return;
     }
-    assert(ret == 0);
-    assert(config.fragment == WMMA_M16N16K16);
-    assert(config.M == 16);
-    assert(config.N == 16);
-    assert(config.K == 16);
+    REQUIRE(ret == 0);
+    REQUIRE(config.fragment == WMMA_M16N16K16);
+    REQUIRE(config.M == 16);
+    REQUIRE(config.N == 16);
+    REQUIRE(config.K == 16);
 
     printf(" PASS\n");
 }
@@ -67,14 +67,14 @@ static void test_select_config_rectangular(void) {
     /* Rectangular matrix dimensions */
     int ret = cml_wmma_select_config(512, 128, 256, &config);
     if (!cml_wmma_available()) {
-        assert(ret == -1);
+        REQUIRE(ret == -1);
         printf(" PASS (stub contract: select_config == -1)\n");
         return;
     }
-    assert(ret == 0);
-    assert(config.M > 0);
-    assert(config.N > 0);
-    assert(config.K > 0);
+    REQUIRE(ret == 0);
+    REQUIRE(config.M > 0);
+    REQUIRE(config.N > 0);
+    REQUIRE(config.K > 0);
 
     printf(" PASS\n");
 }
@@ -87,20 +87,20 @@ static void test_generate_kernel(void) {
 
     if (!cml_wmma_available()) {
         char* stub_src = cml_wmma_generate_kernel(&config, 256, 256, 256);
-        assert(stub_src == NULL);  /* stub contract: no fake kernel source */
+        REQUIRE(stub_src == NULL);  /* stub contract: no fake kernel source */
         printf(" PASS (stub contract: generate_kernel == NULL)\n");
         return;
     }
 
     int ret = cml_wmma_select_config(256, 256, 256, &config);
-    assert(ret == 0);
+    REQUIRE(ret == 0);
 
     char* kernel_src = cml_wmma_generate_kernel(&config, 256, 256, 256);
-    assert(kernel_src != NULL);
-    assert(strlen(kernel_src) > 0);
+    REQUIRE(kernel_src != NULL);
+    REQUIRE(strlen(kernel_src) > 0);
 
     /* The kernel source should contain "wmma" references */
-    assert(strstr(kernel_src, "wmma") != NULL);
+    REQUIRE(strstr(kernel_src, "wmma") != NULL);
 
     printf(" (generated %zu bytes) ", strlen(kernel_src));
     cml_free(kernel_src);
@@ -113,7 +113,7 @@ static void test_generate_kernel_various_sizes(void) {
     if (!cml_wmma_available()) {
         WMMAConfig stub_cfg;
         memset(&stub_cfg, 0, sizeof(stub_cfg));
-        assert(cml_wmma_generate_kernel(&stub_cfg, 128, 128, 128) == NULL);
+        REQUIRE(cml_wmma_generate_kernel(&stub_cfg, 128, 128, 128) == NULL);
         printf(" PASS (stub contract: generate_kernel == NULL)\n");
         return;
     }
@@ -130,11 +130,11 @@ static void test_generate_kernel_various_sizes(void) {
         memset(&config, 0, sizeof(config));
 
         int ret = cml_wmma_select_config(M, N, K, &config);
-        assert(ret == 0);
+        REQUIRE(ret == 0);
 
         char* src = cml_wmma_generate_kernel(&config, M, N, K);
-        assert(src != NULL);
-        assert(strstr(src, "wmma") != NULL);
+        REQUIRE(src != NULL);
+        REQUIRE(strstr(src, "wmma") != NULL);
         cml_free(src);
     }
 
@@ -160,7 +160,7 @@ static void test_wmma_matmul_if_available(void) {
     if (!cml_wmma_available()) {
         /* Stub contract: matmul must refuse rather than fake success. */
         float a[4] = {0}, b[4] = {0}, c[4] = {0};
-        assert(cml_wmma_matmul(a, b, c, 2, 2, 2) == -1);
+        REQUIRE(cml_wmma_matmul(a, b, c, 2, 2, 2) == -1);
         printf(" PASS (stub contract: matmul == -1)\n");
         return;
     }
@@ -177,15 +177,15 @@ static void test_wmma_matmul_if_available(void) {
     void* A = cml_calloc(1, fp16_size);
     void* B = cml_calloc(1, fp16_size);
     void* C = cml_calloc(1, fp32_size);
-    assert(A != NULL && B != NULL && C != NULL);
+    REQUIRE(A != NULL && B != NULL && C != NULL);
 
     int ret = cml_wmma_matmul(A, B, C, M, N, K);
     /* Zero matrices multiplied should give zero result */
-    assert(ret == 0);
+    REQUIRE(ret == 0);
 
     float* C_fp32 = (float*)C;
     for (int i = 0; i < M * N; i++) {
-        assert(C_fp32[i] == 0.0f);
+        REQUIRE(C_fp32[i] == 0.0f);
     }
 
     cml_free(A);

@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "backend/usb3_gpu.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -118,6 +116,5 @@ int main(void) {
     RUN_TEST(test_struct_layout);
     RUN_TEST(test_scsi_cmd_invalid_cdb_len);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

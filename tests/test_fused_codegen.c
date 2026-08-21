@@ -7,17 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
-
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define ASSERT(cond, msg) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", msg, __LINE__); \
-        tests_failed++; \
-        return; \
-    } \
-} while(0)
+#include "test_assert.h"
 
 /* Helper: create a minimal LinearProgram manually */
 static CMLLinearProgram* make_test_program(void) {

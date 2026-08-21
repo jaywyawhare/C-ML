@@ -45,12 +45,20 @@ static void test_partial_exec_stops_early(void) {
 
     CMLGraph_t ir = c->ir_context;
     struct IRNode* c_node = (struct IRNode*)c->ir_node;
-    struct IRNode* d_node = (struct IRNode*)d->ir_node;
-    struct IRNode* e_node = (struct IRNode*)e->ir_node;
 
     /* Execute only up to c */
     int rc = cml_ir_execute_up_to(ir, c_node);
     CHECK("execute_up_to returns 0", rc == 0);
+
+    /* Re-read the node pointers rather than caching them across the call:
+     * executing runs the decompose pass, which rewrites relu into a chain and
+     * frees the original node. The tensor is repointed at the replacement
+     * (orig_output->ir_node = chain_tail), so the tensor is the stable handle
+     * and a cached IRNode* is dangling. */
+    c_node = (struct IRNode*)c->ir_node;
+    struct IRNode* d_node = (struct IRNode*)d->ir_node;
+    struct IRNode* e_node = (struct IRNode*)e->ir_node;
+
     CHECK("target node c is executed", c_node && c_node->is_executed);
     CHECK("downstream d is NOT executed", d_node && !d_node->is_executed);
     CHECK("downstream e is NOT executed", e_node && !e_node->is_executed);
@@ -305,7 +313,9 @@ static void test_reset_does_not_materialize_pending_rand(void) {
     float baseline[8];
     int ok = 1;
 
-    srand(1234);
+    /* Seed through the library's API: the random ops draw from the global
+     * CMLRNGState, not libc rand(), so srand() controls nothing here. */
+    cml_manual_seed(1234);
     Tensor* pending = tensor_rand(shape, 1, &cfg);
     CHECK("pending rand tensor created", pending != NULL);
     if (pending) {
@@ -326,7 +336,7 @@ static void test_reset_does_not_materialize_pending_rand(void) {
     tensor_free(a);
     cml_reset_ir_context();
 
-    srand(1234);
+    cml_manual_seed(1234);
     Tensor* b = tensor_rand(shape, 1, &cfg);
     float* bd = b ? (float*)tensor_data_ptr(b) : NULL;
     if (!bd) {

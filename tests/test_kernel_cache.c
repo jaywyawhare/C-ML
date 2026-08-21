@@ -10,21 +10,7 @@
 #include "tensor/tensor.h"
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 static int test_cache_create(void) {
     CMLKernelCache* cache = cml_kernel_cache_create(100);

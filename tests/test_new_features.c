@@ -13,24 +13,11 @@
 #include "core/safetensors.h"
 #include "core/serialization.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_passed = 0;
-static int tests_total  = 0;
+#include "test_harness.h"
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  TEST: %s ... ", #name);              \
-        if (test_##name()) {                           \
-            tests_passed++;                            \
-            printf("PASSED\n");                        \
-        } else {                                       \
-            printf("FAILED\n");                        \
-        }                                              \
-    } while (0)
 
 #define APPROX(a, b) (fabsf((a) - (b)) < 1e-4f)
 
@@ -1013,7 +1000,7 @@ int main(void) {
     TEST(safetensors_serialization);
     TEST(tensor_from_url_api);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_total);
+    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     cml_ir_reset_global_context();
-    return (tests_passed == tests_total) ? 0 : 1;
+    return (tests_passed == tests_run) ? 0 : 1;
 }

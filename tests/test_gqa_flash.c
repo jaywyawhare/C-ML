@@ -5,17 +5,7 @@
 #include <math.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
-
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define ASSERT(cond, msg) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", msg, __LINE__); \
-        tests_failed++; \
-        return; \
-    } \
-} while(0)
+#include "test_assert.h"
 
 #define ASSERT_NEAR(a, b, tol, msg) do { \
     float _a = (a), _b = (b); \

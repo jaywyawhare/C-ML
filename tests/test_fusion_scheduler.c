@@ -6,9 +6,7 @@
 #include "ops/ir/ir.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
-
-static int tests_run    = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -407,6 +405,5 @@ int main(void) {
     RUN_TEST(test_fusion_print);
     RUN_TEST(test_fusion_group_colors);
 
-    printf("\n  Results: %d/%d passed\n\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

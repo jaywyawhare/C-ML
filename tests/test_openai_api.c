@@ -1,5 +1,5 @@
 #include "nn/openai_api.h"
-#include <assert.h>
+#include "test_require.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,13 +52,13 @@ static void test_create_free(void) {
     printf("  test_create_free...");
 
     CMLOpenAIServer* srv = cml_openai_server_create(8080);
-    assert(srv != NULL);
-    assert(srv->port == 8080);
-    assert(srv->max_tokens == 256);
+    REQUIRE(srv != NULL);
+    REQUIRE(srv->port == 8080);
+    REQUIRE(srv->max_tokens == 256);
 
     cml_openai_server_free(srv);
 
-    assert(cml_openai_server_create(0) == NULL);
+    REQUIRE(cml_openai_server_create(0) == NULL);
 
     printf(" PASSED\n");
 }
@@ -67,7 +67,7 @@ static void test_health_endpoint(void) {
     printf("  test_health_endpoint...");
 
     CMLOpenAIServer* srv = cml_openai_server_create(TEST_PORT);
-    assert(srv != NULL);
+    REQUIRE(srv != NULL);
 
     pthread_t tid;
     pthread_create(&tid, NULL, server_thread, srv);
@@ -75,9 +75,9 @@ static void test_health_endpoint(void) {
 
     char resp[4096];
     int n = http_get(TEST_PORT, "/health", resp, sizeof(resp));
-    assert(n > 0);
-    assert(strstr(resp, "200 OK") != NULL);
-    assert(strstr(resp, "\"status\":\"ok\"") != NULL);
+    REQUIRE(n > 0);
+    REQUIRE(strstr(resp, "200 OK") != NULL);
+    REQUIRE(strstr(resp, "\"status\":\"ok\"") != NULL);
 
     cml_openai_server_stop(srv);
     pthread_join(tid, NULL);
@@ -90,7 +90,7 @@ static void test_models_endpoint(void) {
     printf("  test_models_endpoint...");
 
     CMLOpenAIServer* srv = cml_openai_server_create(TEST_PORT + 1);
-    assert(srv != NULL);
+    REQUIRE(srv != NULL);
 
     pthread_t tid;
     pthread_create(&tid, NULL, server_thread, srv);
@@ -98,10 +98,10 @@ static void test_models_endpoint(void) {
 
     char resp[4096];
     int n = http_get(TEST_PORT + 1, "/v1/models", resp, sizeof(resp));
-    assert(n > 0);
-    assert(strstr(resp, "200 OK") != NULL);
-    assert(strstr(resp, "\"object\":\"list\"") != NULL);
-    assert(strstr(resp, "\"object\":\"model\"") != NULL);
+    REQUIRE(n > 0);
+    REQUIRE(strstr(resp, "200 OK") != NULL);
+    REQUIRE(strstr(resp, "\"object\":\"list\"") != NULL);
+    REQUIRE(strstr(resp, "\"object\":\"model\"") != NULL);
 
     cml_openai_server_stop(srv);
     pthread_join(tid, NULL);
@@ -114,7 +114,7 @@ static void test_404(void) {
     printf("  test_404...");
 
     CMLOpenAIServer* srv = cml_openai_server_create(TEST_PORT + 2);
-    assert(srv != NULL);
+    REQUIRE(srv != NULL);
 
     pthread_t tid;
     pthread_create(&tid, NULL, server_thread, srv);
@@ -122,8 +122,8 @@ static void test_404(void) {
 
     char resp[4096];
     int n = http_get(TEST_PORT + 2, "/nonexistent", resp, sizeof(resp));
-    assert(n > 0);
-    assert(strstr(resp, "404") != NULL);
+    REQUIRE(n > 0);
+    REQUIRE(strstr(resp, "404") != NULL);
 
     cml_openai_server_stop(srv);
     pthread_join(tid, NULL);

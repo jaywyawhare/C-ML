@@ -7,22 +7,8 @@
 #include <string.h>
 
 #include "alloc/cml_allocator.h"
+#include "test_harness.h"
 
-
-static int tests_run    = 0;
-static int tests_passed = 0;
-
-#define TEST(name) \
-    do { \
-        printf("  Testing: %s... ", #name); \
-        tests_run++; \
-        if (test_##name()) { \
-            printf("PASS\n"); \
-            tests_passed++; \
-        } else { \
-            printf("FAIL\n"); \
-        } \
-    } while(0)
 
 #define SKIP(reason) \
     do { \
@@ -838,6 +824,5 @@ int main(void) {
     TEST(mock_multi_launch);
 #endif
 
-    printf("\nResults: %d/%d passed\n\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

@@ -6,9 +6,7 @@
 
 #include "alloc/tlsf_alloc.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -581,7 +579,5 @@ int main(void)
     RUN_TEST(test_timeline_sequential);
     RUN_TEST(test_timeline_print);
 
-    printf("\nResults: %d/%d tests passed\n", tests_passed, tests_run);
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

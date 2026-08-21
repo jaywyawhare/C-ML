@@ -7,22 +7,7 @@
 #include "cml.h"
 #include "nn/paged_attention.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-55s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 /** Fill a float buffer with a constant value. */
 static void fill_float(float* buf, size_t n, float val) {
@@ -692,6 +677,5 @@ int main(void) {
     TEST(append_invalid_seq);
     TEST(gqa_null_args);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

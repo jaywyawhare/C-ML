@@ -4,9 +4,7 @@
 #include <math.h>
 #include "tensor/tensor.h"
 #include "ops/uops.h"
-
-static int tests_passed = 0;
-static int tests_total  = 0;
+#include "test_harness.h"
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
@@ -14,17 +12,6 @@ static const TensorConfig cpu_f32 = {
 static const TensorConfig cpu_i32 = {
     .dtype = DTYPE_INT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  TEST: %s ... ", #name);              \
-        if (test_##name()) {                           \
-            tests_passed++;                            \
-            printf("PASSED\n");                        \
-        } else {                                       \
-            printf("FAILED\n");                        \
-        }                                              \
-    } while (0)
 
 #define APPROX(a, b) (fabsf((a) - (b)) < 1e-4f)
 
@@ -378,6 +365,6 @@ int main(void) {
     TEST(einsum_sum_all);
     TEST(einsum_transpose);
 
-    printf("\n%d / %d tests passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    printf("\n%d / %d tests passed\n", tests_passed, tests_run);
+    return (tests_passed == tests_run) ? 0 : 1;
 }

@@ -5,27 +5,13 @@
 #include "tensor/tensor.h"
 #include "nn.h"
 #include "zoo/zoo.h"
-
-static int tests_passed = 0;
-static int tests_total  = 0;
+#include "test_harness.h"
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
     .has_dtype = true, .has_device = true
 };
 
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  TEST: %s ... ", #name);              \
-        fflush(stdout);                                \
-        if (test_##name()) {                           \
-            tests_passed++;                            \
-            printf("PASSED\n");                        \
-        } else {                                       \
-            printf("FAILED\n");                        \
-        }                                              \
-    } while (0)
 
 static int has_nonzero(Tensor* t) {
     if (!t) return 0;
@@ -338,6 +324,5 @@ int main(void) {
     TEST(module_double_free_safe);
     TEST(module_training_flag);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

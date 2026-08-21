@@ -8,20 +8,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/context.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static int test_hash_basic(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
@@ -265,6 +252,5 @@ int main(void) {
     TEST(keccak_large_tensor);
     TEST(keccak_known_empty);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

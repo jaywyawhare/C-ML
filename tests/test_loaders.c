@@ -6,20 +6,7 @@
 #include <unistd.h>
 #include "cml.h"
 #include "datasets/loaders.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static void mkdirs(const char* path) {
     char cmd[1024];
@@ -202,6 +189,5 @@ int main(void) {
 
     cleanup();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

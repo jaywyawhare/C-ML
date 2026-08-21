@@ -6,22 +6,7 @@
 
 #include "cml.h"
 #include "nn/speculative.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-50s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 #define MOCK_VOCAB_SIZE 32
 
@@ -634,6 +619,5 @@ int main(void) {
     TEST(set_model_null_decoder);
     TEST(acceptance_rate_null);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

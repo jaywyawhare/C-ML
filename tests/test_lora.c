@@ -6,22 +6,7 @@
 
 #include "cml.h"
 #include "nn/lora.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-45s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 static int test_lora_linear_forward(void) {
     TensorConfig cfg = {

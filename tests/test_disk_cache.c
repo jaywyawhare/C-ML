@@ -6,20 +6,7 @@
 
 #include "ops/ir/disk_cache.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static char tmp_path[256];
 
@@ -207,6 +194,5 @@ int main(void) {
     TEST(large_blob);
     TEST(enabled_env);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

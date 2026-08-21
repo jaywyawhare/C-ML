@@ -1,12 +1,12 @@
 #include "torch/torch_c.h"
-#include <assert.h>
+#include "test_require.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 static float* data(Tensor* t) {
     float* p = torch_tensor_data_ptr_f32(t);
-    assert(p != NULL);
+    REQUIRE(p != NULL);
     return p;
 }
 
@@ -32,16 +32,16 @@ static void test_eager_elementwise(void) {
 
     Tensor* s = torch_add(a, b);
     float* sd = data(s);
-    assert(sd[0] == 11 && sd[1] == 22 && sd[2] == 33 && sd[3] == 44);
-    assert(torch_tensor_is_materialized(s));
+    REQUIRE(sd[0] == 11 && sd[1] == 22 && sd[2] == 33 && sd[3] == 44);
+    REQUIRE(torch_tensor_is_materialized(s));
 
     Tensor* m = torch_mul(a, b);
     float* md = data(m);
-    assert(md[0] == 10 && md[3] == 160);
+    REQUIRE(md[0] == 10 && md[3] == 160);
 
     Tensor* d = torch_sub(b, a);
     float* dd = data(d);
-    assert(dd[0] == 9 && dd[3] == 36);
+    REQUIRE(dd[0] == 9 && dd[3] == 36);
 
     torch_tensor_free(a);
     torch_tensor_free(b);
@@ -67,8 +67,8 @@ static void test_eager_matmul(void) {
     Tensor* c = torch_matmul(a, b); /* [2,2] */
     float* cd = data(c);
     /* row0: [1*1+2*0+3*0, 1*0+2*1+3*1] = [1,5]; row1: [4,11] */
-    assert(cd[0] == 1 && cd[1] == 5 && cd[2] == 4 && cd[3] == 11);
-    assert(torch_tensor_numel(c) == 4 && torch_tensor_is_materialized(c));
+    REQUIRE(cd[0] == 1 && cd[1] == 5 && cd[2] == 4 && cd[3] == 11);
+    REQUIRE(torch_tensor_numel(c) == 4 && torch_tensor_is_materialized(c));
 
     torch_tensor_free(a);
     torch_tensor_free(b);
@@ -88,11 +88,11 @@ static void test_eager_activations(void) {
 
     Tensor* r = torch_relu(x);
     float* rd = data(r);
-    assert(rd[0] == 0 && rd[1] == 0 && rd[2] == 0 && rd[3] == 3);
+    REQUIRE(rd[0] == 0 && rd[1] == 0 && rd[2] == 0 && rd[3] == 3);
 
     Tensor* s = torch_sigmoid(x);
     float* sd = data(s);
-    assert(fabsf(sd[2] - 0.5f) < 1e-5f);
+    REQUIRE(fabsf(sd[2] - 0.5f) < 1e-5f);
 
     torch_tensor_free(x);
     torch_tensor_free(r);
@@ -120,13 +120,13 @@ static void test_fused_linear(void) {
     Tensor* y = torch_linear(x, w, bias); /* [2,2] */
     float* yd = data(y);
     /* row0: x@w^T=[1,2]; +bias=[101,202]. row1: [4,5]; +bias=[104,205] */
-    assert(yd[0] == 101 && yd[1] == 202 && yd[2] == 104 && yd[3] == 205);
+    REQUIRE(yd[0] == 101 && yd[1] == 202 && yd[2] == 104 && yd[3] == 205);
 
     float xneg[] = {-1, -2, -3, -4, -5, -6};
     Tensor* xn = make(xneg, xs, 2);
     Tensor* z = torch_linear_relu(xn, w, NULL); /* negatives -> relu 0 */
     float* zd = data(z);
-    assert(zd[0] == 0 && zd[1] == 0 && zd[2] == 0 && zd[3] == 0);
+    REQUIRE(zd[0] == 0 && zd[1] == 0 && zd[2] == 0 && zd[3] == 0);
 
     torch_tensor_free(x);
     torch_tensor_free(w);
@@ -151,10 +151,10 @@ static void test_grad_safe_fallback(void) {
 
     /* requires_grad input + grad enabled => must use lazy IR path (builds graph) */
     Tensor* c = torch_add(a, b);
-    assert(c != NULL);
-    assert(torch_tensor_has_lazy_ir(c));
+    REQUIRE(c != NULL);
+    REQUIRE(torch_tensor_has_lazy_ir(c));
     float* cd = data(c);
-    assert(cd[0] == 2 && cd[3] == 8);
+    REQUIRE(cd[0] == 2 && cd[3] == 8);
 
     torch_tensor_free(a);
     torch_tensor_free(b);
@@ -168,9 +168,9 @@ static void test_thread_control(void) {
     printf("  test_thread_control...");
     torch_set_num_threads(2);
     int n = torch_get_num_threads();
-    assert(n >= 1);
+    REQUIRE(n >= 1);
     torch_set_num_threads(4);
-    assert(torch_get_num_threads() >= 1);
+    REQUIRE(torch_get_num_threads() >= 1);
     printf(" PASSED\n");
 }
 

@@ -119,10 +119,12 @@ static int run_rank(int rank) {
 }
 
 int main(void) {
-    /* Use an uncommon, fixed port base so we don't collide with other services;
-     * SO_REUSEADDR on the listener lets us rebind across quick re-runs. */
+    /* Uncommon fixed port base, below the ephemeral range (from 32768 here) so
+     * an unrelated outgoing connection can't be holding it; SO_REUSEADDR on the
+     * listener lets us rebind across quick re-runs. Kept distinct from the other
+     * distributed tests so a parallel ctest doesn't make them collide. */
     setenv("MASTER_ADDR", "127.0.0.1", 1);
-    setenv("GLOO_PORT", "39531", 1);
+    setenv("GLOO_PORT", "29731", 1);
 
     pid_t pids[WS];
     for (int r = 1; r < WS; r++) {

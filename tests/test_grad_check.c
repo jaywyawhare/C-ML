@@ -6,26 +6,13 @@
 #include "tensor/tensor.h"
 #include "ops/uops.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_passed = 0;
-static int tests_total  = 0;
+#include "test_harness.h"
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
     .has_dtype = true, .has_device = true
 };
 
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  TEST: %s ... ", #name);              \
-        if (test_##name()) {                           \
-            tests_passed++;                            \
-            printf("PASSED\n");                        \
-        } else {                                       \
-            printf("FAILED\n");                        \
-        }                                              \
-    } while (0)
 
 #define GRAD_ATOL 1e-3f
 
@@ -268,6 +255,5 @@ int main(void) {
     TEST(grad_mul);
     TEST(grad_matmul);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

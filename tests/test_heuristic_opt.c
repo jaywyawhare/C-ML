@@ -5,79 +5,8 @@
 #include "ops/ir/heuristic_opt.h"
 #include "ops/ir/linearize.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-50s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
-
-static LinearProgram* make_prog(int num_axes, const int* extents,
-                                UOpType uop) {
-    LinearProgram* prog = linear_program_create();
-    if (!prog) return NULL;
-
-    for (int i = 0; i < num_axes; i++) {
-        if (prog->num_axes >= prog->axes_capacity) {
-            int nc = prog->axes_capacity * 2;
-            int* tmp = cml_realloc(prog->loop_axes, (size_t)nc * sizeof(int));
-            if (!tmp) { linear_program_free(prog); return NULL; }
-            prog->loop_axes = tmp;
-            prog->axes_capacity = nc;
-        }
-        prog->loop_axes[prog->num_axes++] = extents[i];
-    }
-
-    for (int i = 0; i < num_axes; i++) {
-        LinearOp loop;
-        memset(&loop, 0, sizeof(loop));
-        loop.kind = LINOP_LOOP;
-        loop.loop_axis = i;
-        loop.loop_extent = extents[i];
-        loop.loop_stride = 1;
-        linear_program_emit(prog, loop);
-    }
-
-    LinearOp load;
-    memset(&load, 0, sizeof(load));
-    load.kind = LINOP_LOAD;
-    load.dest_reg = alloc_vreg(prog);
-    linear_program_emit(prog, load);
-
-    LinearOp compute;
-    memset(&compute, 0, sizeof(compute));
-    compute.kind = LINOP_COMPUTE;
-    compute.uop = uop;
-    compute.dest_reg = alloc_vreg(prog);
-    compute.src_regs[0] = load.dest_reg;
-    compute.num_srcs = 1;
-    linear_program_emit(prog, compute);
-
-    LinearOp store;
-    memset(&store, 0, sizeof(store));
-    store.kind = LINOP_STORE;
-    store.dest_reg = compute.dest_reg;
-    linear_program_emit(prog, store);
-
-    for (int i = num_axes - 1; i >= 0; i--) {
-        LinearOp endloop;
-        memset(&endloop, 0, sizeof(endloop));
-        endloop.kind = LINOP_ENDLOOP;
-        endloop.loop_axis = i;
-        linear_program_emit(prog, endloop);
-    }
-
-    return prog;
-}
+#include "test_harness.h"
+#include "linear_program_fixture.h"
 
 static int test_config_defaults(void) {
     CMLHeuristicConfig cfg = cml_heuristic_get_config();
@@ -351,6 +280,5 @@ int main(void) {
     TEST(single_element_axis);
     TEST(power_of_two_amounts);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

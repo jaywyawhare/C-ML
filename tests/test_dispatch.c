@@ -11,21 +11,7 @@
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { \
-        printf("PASS\n"); \
-        tests_passed++; \
-    } else { \
-        printf("FAIL\n"); \
-    } \
-} while(0)
-
+#include "test_harness.h"
 
 static int test_dispatch_create(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();

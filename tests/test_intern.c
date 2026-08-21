@@ -5,21 +5,7 @@
 #include "cml.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/intern.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-50s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static int test_create_free(void) {
     CMLInternTable* table = cml_intern_table_create();
@@ -243,6 +229,5 @@ int main(void) {
     TEST(node_has_hash);
     TEST(ref_count_on_graph_free);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

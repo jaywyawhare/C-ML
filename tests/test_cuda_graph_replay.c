@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include "ops/ir/gpu/cuda_graph_replay.h"
 #include "ops/ir/graph_capture.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -126,6 +124,5 @@ int main(void) {
     RUN_TEST(test_capture_state_machine);
     RUN_TEST(test_backend_unavailable_contract);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }

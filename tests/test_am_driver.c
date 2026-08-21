@@ -7,21 +7,12 @@
 #include "ops/ir/gpu/amdgpu_kd.h"
 
 #include "alloc/cml_allocator.h"
+#include "test_harness.h"
 
 #ifdef CML_AM_MOCK_GPU
 #include "ops/ir/gpu/am_mock.h"
 #endif
 
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    printf("  Testing: %s... ", #name); \
-    tests_run++; \
-    if (test_##name()) { printf("PASS\n"); tests_passed++; } \
-    else { printf("FAIL\n"); } \
-} while(0)
 
 static bool g_hw_available = false;
 
@@ -943,6 +934,5 @@ int main(void) {
     cml_am_mock_shutdown();
 #endif
 
-    printf("\nResults: %d/%d passed\n\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

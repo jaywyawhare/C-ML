@@ -1,6 +1,6 @@
 #include "torch/torch_c.h"
 #include "torch/pte.h"
-#include <assert.h>
+#include "test_require.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,15 +46,15 @@ static int make_temp_pte_path(char* out, size_t out_cap) {
 static void test_memory_arena(void) {
     printf("  test_memory_arena...");
     TorchMemoryManager* mgr = torch_memory_create(1024 * 1024);
-    assert(mgr != NULL);
+    REQUIRE(mgr != NULL);
 
     void* a = torch_memory_alloc(mgr, 4096);
     void* b = torch_memory_alloc(mgr, 8192);
-    assert(a && b);
-    assert(torch_memory_used(mgr) >= 4096 + 8192);
+    REQUIRE(a && b);
+    REQUIRE(torch_memory_used(mgr) >= 4096 + 8192);
 
     torch_memory_reset(mgr);
-    assert(torch_memory_used(mgr) == 0);
+    REQUIRE(torch_memory_used(mgr) == 0);
 
     torch_memory_free(mgr);
     printf(" PASSED\n");
@@ -63,12 +63,12 @@ static void test_memory_arena(void) {
 static void test_memory_arena_exhausted(void) {
     printf("  test_memory_arena_exhausted...");
     TorchMemoryManager* mgr = torch_memory_create(128);
-    assert(mgr != NULL);
+    REQUIRE(mgr != NULL);
 
     void* a = torch_memory_alloc(mgr, 64);
-    assert(a != NULL);
-    assert(torch_memory_alloc(mgr, 128) == NULL);
-    assert(torch_memory_remaining(mgr) <= 64);
+    REQUIRE(a != NULL);
+    REQUIRE(torch_memory_alloc(mgr, 128) == NULL);
+    REQUIRE(torch_memory_remaining(mgr) <= 64);
 
     torch_memory_free(mgr);
     printf(" PASSED\n");
@@ -77,27 +77,27 @@ static void test_memory_arena_exhausted(void) {
 static void test_selective_build(void) {
     printf("  test_selective_build...");
     TorchSelectiveBuildConfig cfg;
-    assert(torch_selective_build_from_string("add,mul,matmul,relu", &cfg) == 0);
-    assert(cfg.enabled[UOP_ADD]);
-    assert(cfg.enabled[UOP_MATMUL]);
-    assert(!cfg.enabled[UOP_DIV]);
+    REQUIRE(torch_selective_build_from_string("add,mul,matmul,relu", &cfg) == 0);
+    REQUIRE(cfg.enabled[UOP_ADD]);
+    REQUIRE(cfg.enabled[UOP_MATMUL]);
+    REQUIRE(!cfg.enabled[UOP_DIV]);
 
     torch_selective_build_apply(&cfg);
-    assert(torch_selective_build_is_op_enabled(UOP_ADD));
-    assert(!torch_selective_build_is_op_enabled(UOP_DIV));
+    REQUIRE(torch_selective_build_is_op_enabled(UOP_ADD));
+    REQUIRE(!torch_selective_build_is_op_enabled(UOP_DIV));
 
     torch_selective_build_reset();
-    assert(torch_selective_build_is_op_enabled(UOP_DIV));
+    REQUIRE(torch_selective_build_is_op_enabled(UOP_DIV));
     printf(" PASSED\n");
 }
 
 static void test_delegate(void) {
     printf("  test_delegate...");
     TorchDelegate* cpu = torch_delegate_cpu();
-    assert(cpu != NULL);
-    assert(torch_delegate_find("cpu") != NULL);
-    assert(torch_delegate_supports_op(cpu, UOP_ADD));
-    assert(!torch_delegate_supports_op(NULL, UOP_ADD));
+    REQUIRE(cpu != NULL);
+    REQUIRE(torch_delegate_find("cpu") != NULL);
+    REQUIRE(torch_delegate_supports_op(cpu, UOP_ADD));
+    REQUIRE(!torch_delegate_supports_op(NULL, UOP_ADD));
     printf(" PASSED\n");
 }
 
@@ -105,7 +105,7 @@ static void test_pte_roundtrip(void) {
     printf("  test_pte_roundtrip...");
 
     char path[512];
-    assert(make_temp_pte_path(path, sizeof(path)) == 0);
+    REQUIRE(make_temp_pte_path(path, sizeof(path)) == 0);
 
     Sequential* model = torch_nn_sequential();
     torch_nn_sequential_add(model, (Module*)torch_nn_linear(4, 2, true));
@@ -118,16 +118,16 @@ static void test_pte_roundtrip(void) {
     Tensor* sample = torch_randn(shape, 2, &opts);
 
     TorchPTEExportOptions export_opts = torch_pte_default_export_options();
-    assert(torch_pte_export_module((Module*)model, sample, path, &export_opts) == 0);
+    REQUIRE(torch_pte_export_module((Module*)model, sample, path, &export_opts) == 0);
 
     TorchRuntimeModule* rt = torch_runtime_load_pte(path);
-    assert(rt != NULL);
-    assert(torch_runtime_get_kind(rt) == TORCH_RUNTIME_PTE);
-    assert(torch_runtime_has_memory(rt) || torch_runtime_pte_arena_size(rt) == 0);
+    REQUIRE(rt != NULL);
+    REQUIRE(torch_runtime_get_kind(rt) == TORCH_RUNTIME_PTE);
+    REQUIRE(torch_runtime_has_memory(rt) || torch_runtime_pte_arena_size(rt) == 0);
 
     Tensor* out = torch_runtime_forward(rt, sample);
-    assert(out != NULL);
-    assert(torch_tensor_numel(out) == 2);
+    REQUIRE(out != NULL);
+    REQUIRE(torch_tensor_numel(out) == 2);
 
     torch_tensor_free(out);
     torch_runtime_free(rt);
@@ -147,7 +147,7 @@ static void test_pte_export_without_weights(void) {
     printf("  test_pte_export_without_weights...");
 
     char path[512];
-    assert(make_temp_pte_path(path, sizeof(path)) == 0);
+    REQUIRE(make_temp_pte_path(path, sizeof(path)) == 0);
 
     Sequential* model = torch_nn_sequential();
     torch_nn_sequential_add(model, (Module*)torch_nn_linear(4, 2, true));
@@ -161,13 +161,13 @@ static void test_pte_export_without_weights(void) {
 
     TorchPTEExportOptions export_opts = torch_pte_default_export_options();
     export_opts.include_weights = false;
-    assert(torch_pte_export_module((Module*)model, sample, path, &export_opts) == 0);
+    REQUIRE(torch_pte_export_module((Module*)model, sample, path, &export_opts) == 0);
 
     CMLPTEModel* pte = torch_pte_load(path);
-    assert(pte != NULL);
-    assert(pte->meta.num_instructions > 0);
-    assert(pte->meta.num_constants == 0);
-    assert(strcmp(pte->meta.method_name, "forward") == 0);
+    REQUIRE(pte != NULL);
+    REQUIRE(pte->meta.num_instructions > 0);
+    REQUIRE(pte->meta.num_constants == 0);
+    REQUIRE(strcmp(pte->meta.method_name, "forward") == 0);
     torch_pte_free(pte);
 
     torch_tensor_free(sample);

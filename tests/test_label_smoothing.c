@@ -6,6 +6,7 @@
 #include "autograd/forward_ops.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
+#include "test_harness.h"
 
 static void tensor_free_executed(Tensor* t) {
     if (!t)
@@ -14,8 +15,28 @@ static void tensor_free_executed(Tensor* t) {
     tensor_free(t);
 }
 
-static int tests_run    = 0;
-static int tests_passed = 0;
+/* The logits/targets pair every case in this file works on: a batch of 2 over
+ * 3 classes, with the true class differing between rows. Returns 0 (having
+ * cleaned up) if either allocation fails. */
+static int make_logits_targets(Tensor** logits_out, Tensor** targets_out) {
+    TensorConfig cfg = {cml_get_default_dtype(), cml_get_default_device(), true, true};
+
+    float logits_data[] = {2.0f, 1.0f, 0.1f, 0.5f, 1.5f, 0.3f};
+    int logits_shape[]  = {2, 3};
+    float target_data[] = {0.0f, 2.0f};
+    int target_shape[]  = {2};
+
+    Tensor* logits  = tensor_from_data(logits_data, logits_shape, 2, &cfg);
+    Tensor* targets = tensor_from_data(target_data, target_shape, 1, &cfg);
+    if (!logits || !targets) {
+        if (logits) tensor_free(logits);
+        if (targets) tensor_free(targets);
+        return 0;
+    }
+    *logits_out = logits;
+    *targets_out = targets;
+    return 1;
+}
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -27,21 +48,8 @@ static int tests_passed = 0;
 static int test_smooth_zero_delegates(void) {
     cml_init();
 
-    DType dtype = cml_get_default_dtype();
-    DeviceType device = cml_get_default_device();
-    TensorConfig cfg = {dtype, device, true, true};
-
-    float logits_data[] = {2.0f, 1.0f, 0.1f, 0.5f, 1.5f, 0.3f};
-    int logits_shape[] = {2, 3};
-    Tensor* logits = tensor_from_data(logits_data, logits_shape, 2, &cfg);
-    
-    float target_data[] = {0.0f, 2.0f};
-    int target_shape[] = {2};
-    Tensor* targets = tensor_from_data(target_data, target_shape, 1, &cfg);
-
-    if (!logits || !targets) {
-        if (logits) tensor_free(logits);
-        if (targets) tensor_free(targets);
+    Tensor *logits, *targets;
+    if (!make_logits_targets(&logits, &targets)) {
         cml_reset_ir_context();
         cml_cleanup();
         return 0;
@@ -64,21 +72,8 @@ static int test_smooth_zero_delegates(void) {
 static int test_smooth_nonzero_returns(void) {
     cml_init();
 
-    DType dtype = cml_get_default_dtype();
-    DeviceType device = cml_get_default_device();
-    TensorConfig cfg = {dtype, device, true, true};
-
-    float logits_data[] = {2.0f, 1.0f, 0.1f, 0.5f, 1.5f, 0.3f};
-    int logits_shape[] = {2, 3};
-    Tensor* logits = tensor_from_data(logits_data, logits_shape, 2, &cfg);
-    
-    float target_data[] = {0.0f, 2.0f};
-    int target_shape[] = {2};
-    Tensor* targets = tensor_from_data(target_data, target_shape, 1, &cfg);
-
-    if (!logits || !targets) {
-        if (logits) tensor_free(logits);
-        if (targets) tensor_free(targets);
+    Tensor *logits, *targets;
+    if (!make_logits_targets(&logits, &targets)) {
         cml_reset_ir_context();
         cml_cleanup();
         return 0;
@@ -129,22 +124,9 @@ static int test_smooth_invalid_epsilon(void) {
 static int test_sparse_smooth_zero_delegates(void) {
     cml_init();
 
-    DType dtype = cml_get_default_dtype();
-    DeviceType device = cml_get_default_device();
-    TensorConfig cfg = {dtype, device, true, true};
-
-    float logits_data[] = {2.0f, 1.0f, 0.1f, 0.5f, 1.5f, 0.3f};
-    int logits_shape[] = {2, 3};
-    Tensor* logits = tensor_from_data(logits_data, logits_shape, 2, &cfg);
-    
-    float target_data[] = {0.0f, 2.0f};
-    int target_shape[] = {2};
-    Tensor* targets = tensor_from_data(target_data, target_shape, 1, &cfg);
-
-    if (!logits || !targets) {
+    Tensor *logits, *targets;
+    if (!make_logits_targets(&logits, &targets)) {
         printf("FAIL: logits or targets is NULL\n");
-        if (logits) tensor_free(logits);
-        if (targets) tensor_free(targets);
         cml_reset_ir_context();
         cml_cleanup();
         return 0;
@@ -165,21 +147,8 @@ static int test_sparse_smooth_zero_delegates(void) {
 static int test_sparse_smooth_nonzero(void) {
     cml_init();
 
-    DType dtype = cml_get_default_dtype();
-    DeviceType device = cml_get_default_device();
-    TensorConfig cfg = {dtype, device, true, true};
-
-    float logits_data[] = {2.0f, 1.0f, 0.1f, 0.5f, 1.5f, 0.3f};
-    int logits_shape[] = {2, 3};
-    Tensor* logits = tensor_from_data(logits_data, logits_shape, 2, &cfg);
-    
-    float target_data[] = {0.0f, 2.0f};
-    int target_shape[] = {2};
-    Tensor* targets = tensor_from_data(target_data, target_shape, 1, &cfg);
-
-    if (!logits || !targets) {
-        if (logits) tensor_free(logits);
-        if (targets) tensor_free(targets);
+    Tensor *logits, *targets;
+    if (!make_logits_targets(&logits, &targets)) {
         cml_reset_ir_context();
         cml_cleanup();
         return 0;
@@ -249,6 +218,5 @@ int main(void) {
     RUN_TEST(test_smooth_batch_mismatch);
     RUN_TEST(test_smooth_1d_target_required);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }

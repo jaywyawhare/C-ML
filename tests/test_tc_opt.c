@@ -7,21 +7,7 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/gpu/wmma.h"
 #include "alloc/cml_allocator.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-50s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { \
-        tests_passed++; \
-        printf("[PASS]\n"); \
-    } else { \
-        printf("[FAIL]\n"); \
-    } \
-} while(0)
+#include "test_harness.h"
 
 static struct CMLGraph* make_empty_graph(void) {
     struct CMLGraph* g = cml_calloc(1, sizeof(struct CMLGraph));
@@ -335,6 +321,5 @@ int main(void) {
     TEST(already_fused_skipped);
     TEST(padding_disabled);
 
-    printf("\n%d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

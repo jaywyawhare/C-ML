@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <assert.h>
+#include "test_require.h"
 
 #include "core/gguf_quant.h"
 #include "core/gguf.h"
@@ -27,44 +27,44 @@ static uint16_t float_to_fp16(float value) {
 
 static void test_type_is_quantized(void) {
     printf("  test_type_is_quantized...");
-    assert(gguf_type_is_quantized(GGUF_TENSOR_Q4_0) == true);
-    assert(gguf_type_is_quantized(GGUF_TENSOR_Q4_1) == true);
-    assert(gguf_type_is_quantized(GGUF_TENSOR_Q8_0) == true);
-    assert(gguf_type_is_quantized(GGUF_TENSOR_Q4_K) == true);
-    assert(gguf_type_is_quantized(GGUF_TENSOR_Q5_K) == true);
-    assert(gguf_type_is_quantized(GGUF_TENSOR_Q6_K) == true);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_Q4_0) == true);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_Q4_1) == true);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_Q8_0) == true);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_Q4_K) == true);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_Q5_K) == true);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_Q6_K) == true);
 
     /* Non-quantized types should return false */
-    assert(gguf_type_is_quantized(GGUF_TENSOR_F32) == false);
-    assert(gguf_type_is_quantized(GGUF_TENSOR_F16) == false);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_F32) == false);
+    REQUIRE(gguf_type_is_quantized(GGUF_TENSOR_F16) == false);
     printf(" PASS\n");
 }
 
 static void test_block_size(void) {
     printf("  test_block_size...");
-    assert(gguf_quant_block_size(GGUF_TENSOR_Q4_0) == 32);
-    assert(gguf_quant_block_size(GGUF_TENSOR_Q4_1) == 32);
-    assert(gguf_quant_block_size(GGUF_TENSOR_Q8_0) == 32);
-    assert(gguf_quant_block_size(GGUF_TENSOR_Q4_K) == 256);
-    assert(gguf_quant_block_size(GGUF_TENSOR_Q5_K) == 256);
-    assert(gguf_quant_block_size(GGUF_TENSOR_Q6_K) == 256);
+    REQUIRE(gguf_quant_block_size(GGUF_TENSOR_Q4_0) == 32);
+    REQUIRE(gguf_quant_block_size(GGUF_TENSOR_Q4_1) == 32);
+    REQUIRE(gguf_quant_block_size(GGUF_TENSOR_Q8_0) == 32);
+    REQUIRE(gguf_quant_block_size(GGUF_TENSOR_Q4_K) == 256);
+    REQUIRE(gguf_quant_block_size(GGUF_TENSOR_Q5_K) == 256);
+    REQUIRE(gguf_quant_block_size(GGUF_TENSOR_Q6_K) == 256);
     printf(" PASS\n");
 }
 
 static void test_type_size(void) {
     printf("  test_type_size...");
     /* Q4_0: 2 bytes d + 16 bytes qs = 18 */
-    assert(gguf_quant_type_size(GGUF_TENSOR_Q4_0) == sizeof(BlockQ4_0));
+    REQUIRE(gguf_quant_type_size(GGUF_TENSOR_Q4_0) == sizeof(BlockQ4_0));
     /* Q4_1: 2 bytes d + 2 bytes m + 16 bytes qs = 20 */
-    assert(gguf_quant_type_size(GGUF_TENSOR_Q4_1) == sizeof(BlockQ4_1));
+    REQUIRE(gguf_quant_type_size(GGUF_TENSOR_Q4_1) == sizeof(BlockQ4_1));
     /* Q8_0: 2 bytes d + 32 bytes qs = 34 */
-    assert(gguf_quant_type_size(GGUF_TENSOR_Q8_0) == sizeof(BlockQ8_0));
+    REQUIRE(gguf_quant_type_size(GGUF_TENSOR_Q8_0) == sizeof(BlockQ8_0));
     /* Q4_K: 2+2+12+128 = 144 */
-    assert(gguf_quant_type_size(GGUF_TENSOR_Q4_K) == sizeof(BlockQ4_K));
+    REQUIRE(gguf_quant_type_size(GGUF_TENSOR_Q4_K) == sizeof(BlockQ4_K));
     /* Q5_K: 2+2+12+32+128 = 176 */
-    assert(gguf_quant_type_size(GGUF_TENSOR_Q5_K) == sizeof(BlockQ5_K));
+    REQUIRE(gguf_quant_type_size(GGUF_TENSOR_Q5_K) == sizeof(BlockQ5_K));
     /* Q6_K: 128+64+16+2 = 210 */
-    assert(gguf_quant_type_size(GGUF_TENSOR_Q6_K) == sizeof(BlockQ6_K));
+    REQUIRE(gguf_quant_type_size(GGUF_TENSOR_Q6_K) == sizeof(BlockQ6_K));
     printf(" PASS\n");
 }
 
@@ -85,11 +85,11 @@ static void test_q8_0_dequantize(void) {
     memset(output, 0, sizeof(output));
 
     int ret = gguf_dequantize(GGUF_TENSOR_Q8_0, &block, output, QK8_0);
-    assert(ret == 0);
+    REQUIRE(ret == 0);
 
     /* Each output should be d * qs[i] = 1.0 * 1 = 1.0 */
     for (int i = 0; i < QK8_0; i++) {
-        assert(fabsf(output[i] - 1.0f) < 1e-2f);
+        REQUIRE(fabsf(output[i] - 1.0f) < 1e-2f);
     }
     printf(" PASS\n");
 }
@@ -116,11 +116,11 @@ static void test_q4_0_dequantize(void) {
     memset(output, 0, sizeof(output));
 
     int ret = gguf_dequantize(GGUF_TENSOR_Q4_0, &block, output, QK4_0);
-    assert(ret == 0);
+    REQUIRE(ret == 0);
 
     /* All values should be approximately 0.0 since (8-8)*delta = 0 */
     for (int i = 0; i < QK4_0; i++) {
-        assert(fabsf(output[i]) < 1e-1f);
+        REQUIRE(fabsf(output[i]) < 1e-1f);
     }
 
     /* Now set nibbles to 0x99 => low nibble = 9, high nibble = 9. */
@@ -130,11 +130,11 @@ static void test_q4_0_dequantize(void) {
     }
 
     ret = gguf_dequantize(GGUF_TENSOR_Q4_0, &block, output, QK4_0);
-    assert(ret == 0);
+    REQUIRE(ret == 0);
 
     /* All values should be approximately 2.0 since (9-8)*delta = 2.0 */
     for (int i = 0; i < QK4_0; i++) {
-        assert(fabsf(output[i] - 2.0f) < 1e-1f);
+        REQUIRE(fabsf(output[i] - 2.0f) < 1e-1f);
     }
     printf(" PASS\n");
 }

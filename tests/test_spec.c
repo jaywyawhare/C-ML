@@ -6,17 +6,7 @@
 #include "ops/ir/ir.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
-
-static int tests_run    = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-    tests_run++; \
-    printf("  %-55s ", #name); \
-    fflush(stdout); \
-    if (test_##name()) { tests_passed++; printf("[PASS]\n"); } \
-    else { printf("[FAIL]\n"); } \
-} while(0)
+#include "test_harness.h"
 
 static Tensor* make(int d0, int d1) {
     int shape[2] = { d0, d1 };
@@ -187,6 +177,5 @@ int main(void) {
     TEST(result_free_null);
     TEST(result_print);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_SUMMARY();
 }

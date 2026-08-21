@@ -4,26 +4,13 @@
 #include <math.h>
 #include "tensor/tensor.h"
 #include "ops/uops.h"
-
-static int tests_passed = 0;
-static int tests_total  = 0;
+#include "test_harness.h"
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
     .has_dtype = true, .has_device = true
 };
 
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  TEST: %s ... ", #name);              \
-        if (test_##name()) {                           \
-            tests_passed++;                            \
-            printf("PASSED\n");                        \
-        } else {                                       \
-            printf("FAILED\n");                        \
-        }                                              \
-    } while (0)
 
 #define APPROX(a, b)    (fabsf((a) - (b)) < 1e-4f)
 #define APPROX_REL(a,b) (fabsf((a)-(b)) <= 1e-3f * (0.5f*(fabsf(a)+fabsf(b)) + 1e-8f))
@@ -513,6 +500,5 @@ int main(void) {
     TEST(copysign);
     TEST(idiv);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

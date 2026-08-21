@@ -6,28 +6,23 @@
 #include "tensor/tensor.h"
 #include "ops/uops.h"
 #include "ops/ir/schedule.h"
+#include "test_harness.h"
 
-static int tests_passed = 0;
-static int tests_total  = 0;
+/* Every case here builds its own graph and asserts on the schedule produced for
+ * it, so the IR context must be empty at each start -- otherwise the previous
+ * case's nodes are still in the graph and get counted. */
+#undef TEST
+#define TEST(name)                                                                                 \
+    do {                                                                                           \
+        TEST_CASE(name);                                                                           \
+        cml_reset_ir_context();                                                                    \
+    } while (0)
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
     .has_dtype = true, .has_device = true
 };
 
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  TEST: %s ... ", #name);              \
-        fflush(stdout);                                \
-        if (test_##name()) {                           \
-            tests_passed++;                            \
-            printf("PASSED\n");                        \
-        } else {                                       \
-            printf("FAILED\n");                         \
-        }                                              \
-        cml_reset_ir_context();                        \
-    } while (0)
 
 static int kernel_count_for(Tensor* out) {
     if (!out) return -1;
@@ -306,6 +301,5 @@ int main(void) {
     
     TEST(schedule_item_access);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

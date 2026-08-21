@@ -3,9 +3,7 @@
 #include <string.h>
 #include "ops/ir/graph_capture.h"
 #include "ops/uops.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 #define RUN_TEST(test) do { \
     tests_run++; \
@@ -205,6 +203,5 @@ int main(void) {
     RUN_TEST(test_free_null);
     RUN_TEST(test_record_with_args);
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }
