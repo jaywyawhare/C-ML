@@ -98,7 +98,7 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
         int result = ops->init(ops->backend_ctx, world_size, rank);
         if (result != 0) {
             LOG_ERROR("Backend initialization failed");
-            cml_dist_free_backend(ops);
+            cml_dist_free_backend(ops, g_default_group->backend_ctx);
             cml_free(g_default_group);
             g_default_group = NULL;
             pthread_mutex_unlock(&g_dist_mutex);
@@ -141,11 +141,8 @@ void cml_dist_destroy(void) {
         return;
     }
 
-    if (g_default_group->ops) {
-        if (g_default_group->ops->destroy)
-            g_default_group->ops->destroy(g_default_group->backend_ctx);
-        cml_dist_free_backend(g_default_group->ops);
-    }
+    if (g_default_group->ops)
+        cml_dist_free_backend(g_default_group->ops, g_default_group->backend_ctx);
 
     cml_free(g_default_group);
     g_default_group = NULL;

@@ -159,9 +159,12 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
         return NULL;
     }
 
-    /* Clear any previously cached outputs */
+    /* Release the previous invocation's cached outputs (owned by the
+     * pipeline) before caching the new ones, or repeated forwards leak. */
     for (int s = 0; s < num_stages; s++) {
         for (int mb = 0; mb < num_mb; mb++) {
+            if (pipeline->micro_batch_outputs[s][mb])
+                tensor_free(pipeline->micro_batch_outputs[s][mb]);
             pipeline->micro_batch_outputs[s][mb] = NULL;
         }
     }

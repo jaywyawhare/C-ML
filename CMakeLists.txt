@@ -769,10 +769,18 @@ elseif(WIN32)
     set(VIZ_INSTALL_DIR bin/viz)
 endif()
 
-install(FILES scripts/viz.py scripts/fastapi_server.py
+install(FILES scripts/viz.py
     DESTINATION ${VIZ_INSTALL_DIR}
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 )
+# Optional server script: only installed when present so a missing file cannot
+# break `cmake --install`.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/fastapi_server.py")
+    install(FILES scripts/fastapi_server.py
+        DESTINATION ${VIZ_INSTALL_DIR}
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/viz-ui/dist")
     install(DIRECTORY viz-ui/dist DESTINATION ${VIZ_INSTALL_DIR}/viz-ui)

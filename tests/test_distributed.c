@@ -264,7 +264,7 @@ static bool test_gloo_backend_create(void) {
               ops->init != NULL &&
               ops->destroy != NULL;
 
-    cml_dist_free_backend(ops);
+    cml_dist_free_backend(ops, NULL);
     return ok;
 }
 

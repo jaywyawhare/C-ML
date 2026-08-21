@@ -11,6 +11,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <stdatomic.h>
 #include <stdarg.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -221,11 +222,12 @@ static void* worker_prefetch_batches(void* arg) {
     PrefetchQueue* queue = ctx->queue;
 
     int prefetch_count = loader->prefetch_factor;
-    int next_batch     = 0;
 
     while (!queue->shutdown) {
         for (int i = 0; i < prefetch_count; i++) {
-            int batch_idx = next_batch++;
+            /* Shared atomic cursor: workers partition the epoch instead of
+             * each duplicating the same head of the batch sequence. */
+            int batch_idx = atomic_fetch_add((_Atomic int*)&loader->prefetch_cursor, 1);
             if (batch_idx >= loader->total_batches) {
                 break; // No more batches
             }
@@ -235,7 +237,7 @@ static void* worker_prefetch_batches(void* arg) {
                 prefetch_queue_enqueue(queue, batch, batch_idx);
             }
         }
-        if (next_batch >= loader->total_batches) {
+        if (atomic_load((_Atomic int*)&loader->prefetch_cursor) >= loader->total_batches) {
             break;
         }
         struct timespec ts = {0, 1000000}; // 1ms
@@ -1149,6 +1151,7 @@ int dataloader_reset(DataLoader* loader) {
 
     loader->current_batch = 0;
     loader->current_epoch++;
+    atomic_store((_Atomic int*)&loader->prefetch_cursor, 0);
     if (loader->shuffle && loader->dataset) {
         dataset_shuffle(loader->dataset, (unsigned int)time(NULL));
         if (loader->dataset->indices) {
@@ -1291,6 +1294,7 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
     loader->worker_threads     = NULL;
     loader->worker_contexts    = NULL;
     loader->num_active_workers = 0;
+    atomic_init((_Atomic int*)&loader->prefetch_cursor, 0);
 
     if (num_workers > 0) {
         loader->num_workers = num_workers;

@@ -127,7 +127,15 @@ int module_save_stream(Module* module, FILE* file) {
         module_named_parameters_free(named_params, num_params);
         return -1;
     }
-    int32_t num_params_int = (int32_t)num_params;
+    /* The header must declare how many records actually follow, so invalid
+     * entries are excluded up front — skipping them mid-loop would desync the
+     * loader's declared-vs-actual record count. */
+    int num_valid_params = 0;
+    for (int i = 0; i < num_params; i++) {
+        if (named_params[i].parameter && named_params[i].parameter->tensor)
+            num_valid_params++;
+    }
+    int32_t num_params_int = (int32_t)num_valid_params;
     if (fwrite(&num_params_int, sizeof(int32_t), 1, file) != 1) {
         LOG_ERROR("Failed to write number of parameters");
         module_named_parameters_free(named_params, num_params);
@@ -709,82 +717,56 @@ int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
             }
             uint8_t state_type = OPTIMIZER_STATE_NONE;
             if (group->state) {
+                /* A typed marker must always be followed by its full payload,
+                 * or the loader's reads desync. Partial/absent state is saved
+                 * as NONE instead. */
                 if (strcmp(optimizer->name, "SGD") == 0) {
-                    state_type                = OPTIMIZER_STATE_SGD;
                     SGDMomentumState** states = (SGDMomentumState**)group->state;
                     if (states[i] && states[i]->momentum_buffer) {
+                        state_type = OPTIMIZER_STATE_SGD;
                         if (fwrite(&state_type, 1, 1, file) != 1 ||
                             tensor_write_stream(states[i]->momentum_buffer, file) != 0) {
                             LOG_ERROR("Failed to write SGD state for parameter %d", i);
                             return -1;
                         }
-                    } else {
-                        if (fwrite(&state_type, 1, 1, file) != 1) {
-                            LOG_ERROR("Failed to write state type");
-                            return -1;
-                        }
                     }
                 } else if (strcmp(optimizer->name, "Adam") == 0) {
-                    state_type         = OPTIMIZER_STATE_ADAM;
                     AdamState** states = (AdamState**)group->state;
-                    if (states[i]) {
-                        if (fwrite(&state_type, 1, 1, file) != 1) {
-                            LOG_ERROR("Failed to write state type");
-                            return -1;
-                        }
-                        if (states[i]->exp_avg &&
-                            tensor_write_stream(states[i]->exp_avg, file) != 0) {
-                            LOG_ERROR("Failed to write Adam exp_avg for parameter %d", i);
-                            return -1;
-                        }
-                        if (states[i]->exp_avg_sq &&
-                            tensor_write_stream(states[i]->exp_avg_sq, file) != 0) {
-                            LOG_ERROR("Failed to write Adam exp_avg_sq for parameter %d", i);
-                            return -1;
-                        }
-                        if (states[i]->max_exp_avg_sq &&
-                            tensor_write_stream(states[i]->max_exp_avg_sq, file) != 0) {
-                            LOG_ERROR("Failed to write Adam max_exp_avg_sq for parameter %d", i);
-                            return -1;
-                        }
-                    } else {
-                        if (fwrite(&state_type, 1, 1, file) != 1) {
-                            LOG_ERROR("Failed to write state type");
+                    if (states[i] && states[i]->exp_avg && states[i]->exp_avg_sq &&
+                        (!optimizer->amsgrad || states[i]->max_exp_avg_sq)) {
+                        state_type = OPTIMIZER_STATE_ADAM;
+                        if (fwrite(&state_type, 1, 1, file) != 1 ||
+                            tensor_write_stream(states[i]->exp_avg, file) != 0 ||
+                            tensor_write_stream(states[i]->exp_avg_sq, file) != 0 ||
+                            (optimizer->amsgrad &&
+                             tensor_write_stream(states[i]->max_exp_avg_sq, file) != 0)) {
+                            LOG_ERROR("Failed to write Adam state for parameter %d", i);
                             return -1;
                         }
                     }
                 } else if (strcmp(optimizer->name, "RMSprop") == 0) {
-                    state_type            = OPTIMIZER_STATE_RMSPROP;
                     RMSpropState** states = (RMSpropState**)group->state;
                     if (states[i] && states[i]->square_avg) {
+                        state_type = OPTIMIZER_STATE_RMSPROP;
                         if (fwrite(&state_type, 1, 1, file) != 1 ||
                             tensor_write_stream(states[i]->square_avg, file) != 0) {
                             LOG_ERROR("Failed to write RMSprop state for parameter %d", i);
                             return -1;
                         }
-                    } else {
-                        if (fwrite(&state_type, 1, 1, file) != 1) {
-                            LOG_ERROR("Failed to write state type");
-                            return -1;
-                        }
                     }
                 } else if (strcmp(optimizer->name, "Adagrad") == 0) {
-                    state_type            = OPTIMIZER_STATE_ADAGRAD;
                     AdagradState** states = (AdagradState**)group->state;
                     if (states[i] && states[i]->sum_sq_grad) {
+                        state_type = OPTIMIZER_STATE_ADAGRAD;
                         if (fwrite(&state_type, 1, 1, file) != 1 ||
                             tensor_write_stream(states[i]->sum_sq_grad, file) != 0) {
                             LOG_ERROR("Failed to write Adagrad state for parameter %d", i);
                             return -1;
                         }
-                    } else {
-                        if (fwrite(&state_type, 1, 1, file) != 1) {
-                            LOG_ERROR("Failed to write state type");
-                            return -1;
-                        }
                     }
                 }
-            } else {
+            }
+            if (state_type == OPTIMIZER_STATE_NONE) {
                 if (fwrite(&state_type, 1, 1, file) != 1) {
                     LOG_ERROR("Failed to write state type");
                     return -1;

@@ -72,6 +72,7 @@ typedef struct DataLoader {
     void* worker_threads;   // pthread_t* array for workers
     void* worker_contexts;  // WorkerContext* array
     int num_active_workers; // Number of active worker threads
+    int prefetch_cursor;    // Shared atomic cursor: next batch index to enqueue
 } DataLoader;
 
 typedef struct Batch {

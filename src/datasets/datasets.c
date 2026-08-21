@@ -81,7 +81,9 @@ const char* cml_dataset_download(const char* url, const char* filename) {
     const char* dir = cml_dataset_cache_dir();
     ensure_dir(dir);
 
-    static char path[1024];
+    /* Thread-local so concurrent downloads don't overwrite each other's
+     * return buffer; each caller must copy before the next call. */
+    static __thread char path[1024];
     snprintf(path, sizeof(path), "%s/%s", dir, filename);
 
     /* Check cache */
@@ -119,15 +121,15 @@ const char* cml_dataset_download(const char* url, const char* filename) {
 }
 
 /* Helper: decompress .gz file */
-static const char* download_and_gunzip(const char* url, const char* gz_name, const char* final_name) {
+static const char* download_and_gunzip(const char* url, const char* gz_name,
+                                       const char* final_name, char* out, size_t outsz) {
     const char* dir = cml_dataset_cache_dir();
-    static char final_path[1024];
-    snprintf(final_path, sizeof(final_path), "%s/%s", dir, final_name);
+    snprintf(out, outsz, "%s/%s", dir, final_name);
 
     /* Check if already decompressed */
     struct stat st;
-    if (stat(final_path, &st) == 0 && st.st_size > 0)
-        return final_path;
+    if (stat(out, &st) == 0 && st.st_size > 0)
+        return out;
 
     /* Download .gz */
     const char* gz_path = cml_dataset_download(url, gz_name);
@@ -138,8 +140,8 @@ static const char* download_and_gunzip(const char* url, const char* gz_name, con
     snprintf(cmd, sizeof(cmd), "gunzip -kf '%s' 2>/dev/null || gzip -dkf '%s' 2>/dev/null", gz_path, gz_path);
     system(cmd);
 
-    if (stat(final_path, &st) == 0 && st.st_size > 0)
-        return final_path;
+    if (stat(out, &st) == 0 && st.st_size > 0)
+        return out;
 
     LOG_ERROR("[datasets] Failed to decompress %s", gz_name);
     return NULL;
@@ -265,7 +267,7 @@ static Dataset* load_boston(void) {
 
 static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
     struct stat st;
-    static char local_paths[4][256];
+    static char local_paths[4][1024];
     const char* p_ti = NULL, *p_tl = NULL, *p_vi = NULL, *p_vl = NULL;
 
     /* First check local data/ directory (already present, no download needed) */
@@ -303,10 +305,16 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
         snprintf(fn_vi, sizeof(fn_vi), "%s-t10k-images-idx3-ubyte", name);
         snprintf(fn_vl, sizeof(fn_vl), "%s-t10k-labels-idx1-ubyte", name);
 
-        p_ti = download_and_gunzip(url_train_img, gz_ti, fn_ti);
-        p_tl = download_and_gunzip(url_train_lbl, gz_tl, fn_tl);
-        p_vi = download_and_gunzip(url_test_img, gz_vi, fn_vi);
-        p_vl = download_and_gunzip(url_test_lbl, gz_vl, fn_vl);
+        /* Write results into the same slots used by the local-data check;
+         * separate buffers per file, or all four pointers would alias. */
+        p_ti = download_and_gunzip(url_train_img, gz_ti, fn_ti,
+                                   local_paths[0], sizeof(local_paths[0]));
+        p_tl = download_and_gunzip(url_train_lbl, gz_tl, fn_tl,
+                                   local_paths[1], sizeof(local_paths[1]));
+        p_vi = download_and_gunzip(url_test_img, gz_vi, fn_vi,
+                                   local_paths[2], sizeof(local_paths[2]));
+        p_vl = download_and_gunzip(url_test_lbl, gz_vl, fn_vl,
+                                   local_paths[3], sizeof(local_paths[3]));
     }
 
     if (!p_ti || !p_tl) {

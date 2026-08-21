@@ -150,3 +150,45 @@ shape and dtype at the CFFI boundary. Fixed.
   storage metadata). This is the largest structural gap for numpy/torch parity.
 
 All original 21 audit items are addressed. Full suite: 108/108 C tests pass.
+
+---
+
+## Addendum — 2026-08-21 re-verification
+
+Re-audited the April session reports (`report-codex`, `codex-streaming-and-all`,
+`codex-report-ir-dispatch`, `report-opencode`) against the current tree.
+Findings already fixed in interim work: dataloader UAF (#1), ring-allreduce
+deadlock via parity ordering (#2), NCCL shared-ID bootstrap (#3), dist wait
+error propagation (#4), gloo broadcast/allgather stubs (#11), dispatch
+backend-selection rationale (#5/#6), and all listed dead-code items.
+
+Fixed in this pass (were still live):
+
+- **Static path-buffer aliasing** — `cml_dataset_download` /
+  `download_and_gunzip`: MNIST loader's four downloaded paths aliased one
+  static buffer; download results now go into distinct caller-owned slots,
+  and the shared return buffer is thread-local. (streaming #9)
+- **DataLoader worker prefetch duplicated batches** — workers each started at
+  batch 0 with private counters; now partition the epoch through a shared
+  atomic cursor on the loader. (streaming #5)
+- **Pipeline parallel leaked cached micro-batch outputs** across forward
+  invocations; previous outputs are now released before caching new ones.
+  (streaming #6)
+- **`module_save_stream` declared-count desync** — header now declares only
+  the records actually written. (streaming #7)
+- **Optimizer state serialization emitted typed markers without their full
+  tensor payload**, desyncing the loader; markers are now written only when
+  the complete payload exists, else NONE. (streaming #8)
+- **Distributed destroy double-invoked** the backend destroy callback;
+  ownership is now single-shot via `cml_dist_free_backend(ops, ctx)`.
+  (streaming #10)
+- **`cmake --install` broke on missing `scripts/fastapi_server.py`**; the
+  install rule is now conditional.
+
+Still open (feature-scale, not blind-fixable): #10 full GPU/HCQ unification
+(needs hardware), INT4/NF4 fused GEMM, multi-dtype executor. The website hook
+`useLossLandscape.js` flagged as dead by report-codex is now imported by
+`Hero.jsx` — no action.
+
+Full suite at time of writing: 152/152 C tests pass, zero compiler warnings
+(gcc + clang, `-Werror` enforced in CI).

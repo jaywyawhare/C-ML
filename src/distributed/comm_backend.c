@@ -4,12 +4,12 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-void cml_dist_free_backend(DistCommOps* ops) {
+void cml_dist_free_backend(DistCommOps* ops, void* backend_ctx) {
     if (!ops)
         return;
 
     if (ops->destroy)
-        ops->destroy(NULL);
+        ops->destroy(backend_ctx);
 
     cml_free(ops);
 }
