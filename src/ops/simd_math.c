@@ -221,76 +221,43 @@ static size_t g_parallel_threshold = 10000;
 void simd_set_parallel_threshold(size_t threshold) { g_parallel_threshold = threshold; }
 
 typedef struct { const float* a; const float* b; float* out; } ParallelBinaryData;
-
-static void parallel_add_task(void* data, size_t start, size_t end) {
-    ParallelBinaryData* d = (ParallelBinaryData*)data;
-    simd_add_f32(&d->a[start], &d->b[start], &d->out[start], end - start);
-}
-
-void simd_add_f32_parallel(const float* a, const float* b, float* out, size_t n) {
-    if (!a || !b || !out || n == 0) return;
-    if (n < g_parallel_threshold) { simd_add_f32(a, b, out, n); return; }
-    ThreadPool* pool = threadpool_get_global();
-    if (!pool) { simd_add_f32(a, b, out, n); return; }
-    ParallelBinaryData data = {a, b, out};
-    threadpool_parallel_for(pool, parallel_add_task, &data, n);
-}
-
-static void parallel_mul_task(void* data, size_t start, size_t end) {
-    ParallelBinaryData* d = (ParallelBinaryData*)data;
-    simd_mul_f32(&d->a[start], &d->b[start], &d->out[start], end - start);
-}
-
-void simd_mul_f32_parallel(const float* a, const float* b, float* out, size_t n) {
-    if (!a || !b || !out || n == 0) return;
-    if (n < g_parallel_threshold) { simd_mul_f32(a, b, out, n); return; }
-    ThreadPool* pool = threadpool_get_global();
-    if (!pool) { simd_mul_f32(a, b, out, n); return; }
-    ParallelBinaryData data = {a, b, out};
-    threadpool_parallel_for(pool, parallel_mul_task, &data, n);
-}
-
-static void parallel_sub_task(void* data, size_t start, size_t end) {
-    ParallelBinaryData* d = (ParallelBinaryData*)data;
-    simd_sub_f32(&d->a[start], &d->b[start], &d->out[start], end - start);
-}
-void simd_sub_f32_parallel(const float* a, const float* b, float* out, size_t n) {
-    if (!a || !b || !out || n == 0) return;
-    if (n < g_parallel_threshold) { simd_sub_f32(a, b, out, n); return; }
-    ThreadPool* pool = threadpool_get_global();
-    if (!pool) { simd_sub_f32(a, b, out, n); return; }
-    ParallelBinaryData data = {a, b, out};
-    threadpool_parallel_for(pool, parallel_sub_task, &data, n);
-}
-
-static void parallel_max_task(void* data, size_t start, size_t end) {
-    ParallelBinaryData* d = (ParallelBinaryData*)data;
-    simd_max_f32(&d->a[start], &d->b[start], &d->out[start], end - start);
-}
-void simd_max_f32_parallel(const float* a, const float* b, float* out, size_t n) {
-    if (!a || !b || !out || n == 0) return;
-    if (n < g_parallel_threshold) { simd_max_f32(a, b, out, n); return; }
-    ThreadPool* pool = threadpool_get_global();
-    if (!pool) { simd_max_f32(a, b, out, n); return; }
-    ParallelBinaryData data = {a, b, out};
-    threadpool_parallel_for(pool, parallel_max_task, &data, n);
-}
-
 typedef struct { const float* in; float* out; } ParallelUnaryData;
 
-static void parallel_exp_task(void* data, size_t start, size_t end) {
-    ParallelUnaryData* d = (ParallelUnaryData*)data;
-    simd_exp_f32(&d->in[start], &d->out[start], end - start);
-}
+/* The threadpool callback only knows (data, start, end), so each kernel
+ * needs a trampoline; the macros stamp out the identical plumbing. */
+#define DEFINE_PARALLEL_BINARY(name)                                                               \
+    static void parallel_##name##_task(void* data, size_t start, size_t end) {                     \
+        ParallelBinaryData* d = (ParallelBinaryData*)data;                                         \
+        simd_##name##_f32(&d->a[start], &d->b[start], &d->out[start], end - start);                \
+    }                                                                                              \
+    void simd_##name##_f32_parallel(const float* a, const float* b, float* out, size_t n) {        \
+        if (!a || !b || !out || n == 0) return;                                                    \
+        if (n < g_parallel_threshold) { simd_##name##_f32(a, b, out, n); return; }                 \
+        ThreadPool* pool = threadpool_get_global();                                                \
+        if (!pool) { simd_##name##_f32(a, b, out, n); return; }                                    \
+        ParallelBinaryData data = {a, b, out};                                                     \
+        threadpool_parallel_for(pool, parallel_##name##_task, &data, n);                           \
+    }
 
-void simd_exp_f32_parallel(const float* in, float* out, size_t n) {
-    if (!in || !out || n == 0) return;
-    if (n < g_parallel_threshold) { simd_exp_f32(in, out, n); return; }
-    ThreadPool* pool = threadpool_get_global();
-    if (!pool) { simd_exp_f32(in, out, n); return; }
-    ParallelUnaryData data = {in, out};
-    threadpool_parallel_for(pool, parallel_exp_task, &data, n);
-}
+#define DEFINE_PARALLEL_UNARY(name)                                                                \
+    static void parallel_##name##_task(void* data, size_t start, size_t end) {                     \
+        ParallelUnaryData* d = (ParallelUnaryData*)data;                                           \
+        simd_##name##_f32(&d->in[start], &d->out[start], end - start);                             \
+    }                                                                                              \
+    void simd_##name##_f32_parallel(const float* in, float* out, size_t n) {                       \
+        if (!in || !out || n == 0) return;                                                         \
+        if (n < g_parallel_threshold) { simd_##name##_f32(in, out, n); return; }                   \
+        ThreadPool* pool = threadpool_get_global();                                                \
+        if (!pool) { simd_##name##_f32(in, out, n); return; }                                      \
+        ParallelUnaryData data = {in, out};                                                        \
+        threadpool_parallel_for(pool, parallel_##name##_task, &data, n);                           \
+    }
+
+DEFINE_PARALLEL_BINARY(add)
+DEFINE_PARALLEL_BINARY(mul)
+DEFINE_PARALLEL_BINARY(sub)
+DEFINE_PARALLEL_BINARY(max)
+DEFINE_PARALLEL_UNARY(exp)
 
 typedef struct { const float* data; float* partial_sums; size_t num_threads; size_t chunk; } ParallelSumData;
 

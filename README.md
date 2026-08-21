@@ -122,4 +122,4 @@ hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, Adreno, Hexagon, CPU
 
 </details>
 
-[DBaJ-NC-CFL](LICENCE.md)
+[DBaJ-NC-CFL](LICENSE.md)
