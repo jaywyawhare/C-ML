@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-BIN_DIR="$(cd "$(dirname "$0")/build/bin" && pwd)"
+set -euo pipefail
+
+BUILD_DIR="${BUILD_DIR:-$(cd "$(dirname "$0")/build" && pwd)}"
+BIN_DIR="$BUILD_DIR/bin"
 TIMEOUT=5
 TMPDIR_RES=$(mktemp -d)
 SKIP_LIST="llama_inference mnist_example"
