@@ -8,11 +8,8 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/export.h"
 #include "alloc/cml_allocator.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 int main(void) {
     /* Enable scoping *after* cml_init: setting VIZ beforehand makes cml_init
@@ -64,6 +61,5 @@ int main(void) {
         cml_free(json); /* project allocator, not libc malloc */
     }
 
-    printf("\n%s\n", g_fail ? "GRAPH SCOPE FAILED" : "All graph scope tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

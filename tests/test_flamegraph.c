@@ -9,11 +9,8 @@
 #include "cml.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/flamegraph.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 /* Minimal node: the classifiers only read type, the fusion markers, the
  * forward_node link and the output shape. */
@@ -108,6 +105,5 @@ int main(void) {
     CHECK("reset after export", cml_flame_num_spans() == 0);
 
     free_node(mm); free_node(add); free_node(mm2);
-    printf("\n%s\n", g_fail ? "FLAMEGRAPH TESTS FAILED" : "All flamegraph tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

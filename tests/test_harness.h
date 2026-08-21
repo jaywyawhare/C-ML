@@ -31,6 +31,20 @@ static int tests_passed = 0;
 
 #define TEST(name) TEST_CASE(name)
 
+/* Inline-condition variant for suites written as straight-line code rather
+ * than test_ functions: CHECK("label", cond) tallies like TEST_CASE. */
+#define CHECK(name, cond)                                                                          \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  %-55s ", name);                                                                  \
+        if (cond) {                                                                                \
+            tests_passed++;                                                                        \
+            printf("[PASS]\n");                                                                    \
+        } else {                                                                                   \
+            printf("[FAIL]\n");                                                                    \
+        }                                                                                          \
+    } while (0)
+
 /* Print the tally and yield main()'s return value: 0 only if everything passed.
  * Usage: `return TEST_SUMMARY();` -- each suite already prints its own title on
  * the way in, so this only reports the count. */

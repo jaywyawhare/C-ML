@@ -14,16 +14,9 @@
 #ifdef CML_HAS_OPENCL
 #include "ops/ir/gpu/opencl_ir_backend.h"
 #include "alloc/cml_allocator.h"
+#include "test_harness.h"
 #endif
 
-static int tests_passed = 0;
-static int tests_total  = 0;
-
-#define CHECK(name, cond) do { \
-    tests_total++; \
-    if (cond) { tests_passed++; printf("  PASS: %s\n", name); } \
-    else { printf("  FAIL: %s\n", name); } \
-} while(0)
 
 static float max_abs_diff(float* a, float* b, int n) {
     float mx = 0;
@@ -220,8 +213,7 @@ int main(void) {
     test_elementwise();
     test_large_matmul_perf();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 #else
     printf("OpenCL not compiled — skipping\n");
     return 0;

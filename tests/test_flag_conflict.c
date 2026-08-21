@@ -4,13 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "cml.h"
+#include "test_harness.h"
 
 static const char* program_path(void);
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 static const char* g_argv0_fwd_unused;
 
@@ -56,6 +53,5 @@ int main(int argc, char** argv) {
     CHECK("VIZ=0 with NO_EXPORT: init succeeds",
           init_rc_with("VIZ=0", "NO_EXPORT=1") == 0);
 
-    printf("\n%s\n", g_fail ? "FLAG CONFLICT TESTS FAILED" : "All flag conflict tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

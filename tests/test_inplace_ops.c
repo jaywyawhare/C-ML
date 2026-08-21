@@ -3,11 +3,8 @@
 #include <stdio.h>
 #include <math.h>
 #include "cml.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 static int approx(const float* d, const float* want, int n) {
     for (int i = 0; i < n; i++) if (fabsf(d[i] - want[i]) > 1e-5f) return 0;
@@ -49,6 +46,5 @@ int main(void) {
       cml_add_(ta, tb);
       CHECK("add_ trailing broadcast [2,3]+=[3]", approx((float*)tensor_data_ptr(ta), w, 6)); }
 
-    printf("\n%s\n", g_fail ? "IN-PLACE OPS FAILED" : "All in-place op tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

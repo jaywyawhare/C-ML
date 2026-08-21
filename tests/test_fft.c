@@ -2,11 +2,8 @@
 #include <stdio.h>
 #include <math.h>
 #include "cml.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 int main(void) {
     cml_init();
@@ -60,6 +57,5 @@ int main(void) {
       int ok = X && xi; for (int i = 0; i < 32 && ok; i++) if (fabsf(d[i] - orig[i]) > 1e-3f) ok = 0;
       CHECK("cml_fft2 2-D round-trip [4,4,2]", ok); }
 
-    printf("\n%s\n", g_fail ? "FFT TESTS FAILED" : "All FFT tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

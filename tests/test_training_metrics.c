@@ -4,11 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cml.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 int main(void) {
     cml_init();
@@ -121,6 +118,5 @@ int main(void) {
     training_metrics_free(m);
     CHECK("training_metrics_free (no crash)", 1);
 
-    printf("\n%s\n", g_fail ? "TRAINING METRICS FAILED" : "All training_metrics tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

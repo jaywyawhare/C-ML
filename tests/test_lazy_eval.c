@@ -13,15 +13,8 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/execution.h"
 #include "nn.h"
+#include "test_harness.h"
 
-static int tests_passed = 0;
-static int tests_total  = 0;
-
-#define CHECK(name, cond) do { \
-    tests_total++; \
-    if (cond) { tests_passed++; printf("  PASS: %s\n", (name)); } \
-    else       { printf("  FAIL: %s\n", (name)); } \
-} while(0)
 
 #define APPROX_EQ(a, b) (fabsf((float)(a) - (float)(b)) < 1e-4f)
 
@@ -499,6 +492,5 @@ int main(void) {
     test_dropout_layer_stays_lazy();
     test_pool2d_layers_stay_lazy();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

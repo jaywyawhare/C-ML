@@ -4,11 +4,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "cml.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 int main(void) {
     cml_init();
@@ -30,6 +27,5 @@ int main(void) {
       CHECK("parallel mul correct", ok); }
 
     free(a); free(b);
-    printf("\n%s\n", g_fail ? "PARALLEL ELEMENTWISE FAILED" : "All parallel elementwise tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

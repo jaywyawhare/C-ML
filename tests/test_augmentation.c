@@ -4,11 +4,8 @@
 #include <math.h>
 #include "cml.h"
 #include "core/augmentation.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 int main(void) {
     cml_init();
@@ -54,6 +51,5 @@ int main(void) {
       CHECK("random crop output shape [1,1,2,2]",
             y && y->ndim == 4 && y->shape[2] == 2 && y->shape[3] == 2); }
 
-    printf("\n%s\n", g_fail ? "AUGMENTATION FAILED" : "All augmentation tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

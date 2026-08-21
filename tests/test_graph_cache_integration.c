@@ -14,15 +14,8 @@
 #include "ops/ir/execution.h"
 #include "ops/ir/graph_cache.h"
 #include "alloc/cml_allocator.h"
+#include "test_harness.h"
 
-static int tests_passed = 0;
-static int tests_total  = 0;
-
-#define CHECK(name, cond) do { \
-    tests_total++; \
-    if (cond) { tests_passed++; printf("  PASS: %s\n", name); } \
-    else { printf("  FAIL: %s\n", name); } \
-} while(0)
 
 static void test_cache_population(void) {
     printf("Test: cache population across reset cycles\n");
@@ -110,6 +103,5 @@ int main(void) {
     test_multi_node_cache();
     test_cache_stats();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

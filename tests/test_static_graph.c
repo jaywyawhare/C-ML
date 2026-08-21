@@ -15,11 +15,8 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/execution.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) { printf("  PASS  %s\n", name); } \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 static int node_count(CMLGraph_t ir) {
     int n = 0; for (struct IRNode* p = ir->head; p; p = p->next) n++; return n;
@@ -122,6 +119,5 @@ int main(void) {
     printf("=== Static graph (zero-rebuild) tests ===\n");
     test_static_inference();
     test_static_training();
-    printf("\n%s\n", g_fail ? "STATIC GRAPH TESTS FAILED" : "All static graph tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

@@ -9,11 +9,8 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/decompose.h"
 #include "ops/ir/context.h"
+#include "test_harness.h"
 
-static int g_fail = 0;
-#define CHECK(name, cond) do { \
-    if (cond) printf("  PASS  %s\n", name); \
-    else { printf("  FAIL  %s\n", name); g_fail = 1; } } while (0)
 
 /* Composite UOPs that MUST NOT survive decomposition. */
 static int is_composite(UOpType t) {
@@ -75,6 +72,5 @@ int main(void) {
     CHECK("sigmoid value correct through decomposed path", ok2);
 
     cml_reset_ir_context();
-    printf("\n%s\n", g_fail ? "DECOMPOSE TESTS FAILED" : "All decompose tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }
