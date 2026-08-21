@@ -60,8 +60,8 @@ bool cml_image_dtype_compatible(const int* shape, int ndim, CMLImageFormat forma
     if (last_dim % channels != 0) return false;
 
     /* Total elements must fit in 2D texture */
-    size_t total = 1;
-    for (int i = 0; i < ndim; i++) total *= (size_t)shape[i];
+    size_t total = 0;
+    if (!tensor_numel_checked(shape, ndim, &total)) return false;
     size_t pixels = total / (size_t)channels;
 
     /* Max texture dimensions (conservative GPU limit) */
@@ -89,8 +89,8 @@ void cml_image_dtype_dims(const int* shape, int ndim, CMLImageFormat format,
     int channels = cml_image_dtype_channels(format);
     if (channels == 0) { *out_width = 0; *out_height = 0; return; }
 
-    size_t total = 1;
-    for (int i = 0; i < ndim; i++) total *= (size_t)shape[i];
+    size_t total = 0;
+    if (!tensor_numel_checked(shape, ndim, &total)) return;
     size_t pixels = total / (size_t)channels;
 
     /* Find dimensions close to square root */

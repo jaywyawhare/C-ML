@@ -727,11 +727,11 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
     if (!ctx || !shape || ndim <= 0)
         return NULL;
 
-    size_t numel = 1;
-    for (int i = 0; i < ndim; i++) {
-        numel *= (size_t)shape[i];
-    }
-    size_t size = numel * cml_dtype_size(dtype);
+    size_t numel = 0;
+    size_t size = 0;
+    if (!tensor_numel_checked(shape, ndim, &numel) ||
+        !tensor_nbytes_checked(numel, dtype, &size))
+        return NULL;
 
     if (ctx->no_alloc) {
         // Just measure memory usage

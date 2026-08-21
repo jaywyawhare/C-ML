@@ -348,8 +348,9 @@ static Tensor* pipe_recv_tensor(int src, int mb) {
     int ndim = (int)meta[0];
     if (ndim < 1 || ndim > PIPE_MAX_NDIM) return NULL;
     int shape[PIPE_MAX_NDIM];
-    size_t numel = 1;
-    for (int i = 0; i < ndim; i++) { shape[i] = (int)meta[1 + i]; numel *= (size_t)shape[i]; }
+    size_t numel = 0;
+    for (int i = 0; i < ndim; i++) shape[i] = (int)meta[1 + i];
+    if (!tensor_numel_checked(shape, ndim, &numel)) return NULL;
 
     float* data = (float*)cml_malloc(numel * sizeof(float));
     if (!data) return NULL;

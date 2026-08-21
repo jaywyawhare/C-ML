@@ -41,6 +41,15 @@ static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType*
 
 Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape,
                       bool requires_grad) {
+    if (!shape || ndim < 0)
+        return NULL;
+
+    size_t numel = 0;
+    size_t total_size = 0;
+    if (!tensor_numel_checked(shape, ndim, &numel) ||
+        !tensor_nbytes_checked(numel, dtype, &total_size))
+        return NULL;
+
     Tensor* t = (Tensor*)cml_malloc(sizeof(Tensor));
     if (!t)
         return NULL;
@@ -54,13 +63,6 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
         return NULL;
     }
     memcpy(t->shape, shape, ndim * sizeof(int));
-
-    size_t total_size = 1;
-    for (int i = 0; i < ndim; i++) {
-        total_size *= shape[i];
-    }
-
-    total_size *= cml_dtype_size(dtype);
 
     t->data = cml_malloc(total_size);
     if (!t->data) {
@@ -96,10 +98,7 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->owns_data         = true;
     t->from_buffer_cache = false;
 
-    t->numel = 1;
-    for (int i = 0; i < ndim; i++) {
-        t->numel *= shape[i];
-    }
+    t->numel = numel;
 
     return t;
 }
@@ -249,12 +248,29 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
     return (rank1 > rank2) ? dtype1 : dtype2;
 }
 
-size_t tensor_numel(int* shape, int ndim) {
+bool tensor_numel_checked(const int* shape, int ndim, size_t* out) {
     size_t numel = 1;
     for (int i = 0; i < ndim; i++) {
+        if (shape[i] < 0 || numel > SIZE_MAX / (size_t)shape[i])
+            return false;
         numel *= (size_t)shape[i];
     }
+    *out = numel;
+    return true;
+}
+
+size_t tensor_numel(int* shape, int ndim) {
+    size_t numel = 1;
+    tensor_numel_checked(shape, ndim, &numel);
     return numel;
+}
+
+bool tensor_nbytes_checked(size_t numel, DType dtype, size_t* out) {
+    size_t elem_size = cml_dtype_size(dtype);
+    if (elem_size == 0 || numel > SIZE_MAX / elem_size)
+        return false;
+    *out = numel * elem_size;
+    return true;
 }
 
 size_t* compute_contiguous_strides(int* shape, int ndim) {

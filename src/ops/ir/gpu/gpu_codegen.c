@@ -1313,6 +1313,8 @@ static bool is_reduction(UOpType type) {
 }
 
 static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
+    if (numel > SIZE_MAX / sizeof(float))
+        return NULL;
     size_t size = numel * sizeof(float);
     if (cg->target == GPU_TARGET_CUDA) {
         CUdeviceptr dptr = cml_cuda_malloc(cg->cuda, size);

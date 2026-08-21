@@ -98,8 +98,18 @@ typedef struct Tensor {
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);
-size_t tensor_numel(int* shape, int ndim);
 DType cml_promote_dtype(DType dtype1, DType dtype2);
+
+/* Overflow-checked shape product: returns false if any dim is negative or
+ * the product exceeds SIZE_MAX (*out untouched then). */
+bool tensor_numel_checked(const int* shape, int ndim, size_t* out);
+
+/* Unchecked legacy wrapper: partial product if a dim is negative. Prefer
+ * tensor_numel_checked on unvalidated shapes. */
+size_t tensor_numel(int* shape, int ndim);
+
+/* numel * cml_dtype_size(dtype), checked against SIZE_MAX overflow. */
+bool tensor_nbytes_checked(size_t numel, DType dtype, size_t* out);
 
 /* Precision-preserving element-wise dtype conversion of a raw buffer of n
  * elements (int->int lossless via int64, else via double). Returns 0 on
