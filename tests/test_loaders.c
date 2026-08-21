@@ -28,13 +28,13 @@ static char tmpdir[512];
 
 static void setup_image_dir(void) {
     snprintf(tmpdir, sizeof(tmpdir), "/tmp/cml_test_loaders_%d", getpid());
-    char cls0[512], cls1[512];
+    char cls0[576], cls1[576];
     snprintf(cls0, sizeof(cls0), "%s/images/cat", tmpdir);
     snprintf(cls1, sizeof(cls1), "%s/images/dog", tmpdir);
     mkdirs(cls0);
     mkdirs(cls1);
 
-    char path[512];
+    char path[768];
     snprintf(path, sizeof(path), "%s/img0.ppm", cls0);
     write_ppm(path, 8, 8, 255, 0, 0);
     snprintf(path, sizeof(path), "%s/img1.ppm", cls0);
@@ -44,7 +44,7 @@ static void setup_image_dir(void) {
 }
 
 static void setup_squad_file(void) {
-    char path[512];
+    char path[768];
     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
     mkdirs(tmpdir);
     FILE* f = fopen(path, "w");
@@ -74,7 +74,7 @@ static void setup_librispeech_dir(void) {
     snprintf(dir, sizeof(dir), "%s/audio/1-2", tmpdir);
     mkdirs(dir);
 
-    char path[512];
+    char path[768];
     snprintf(path, sizeof(path), "%s/1-2-0001.flac", dir);
     FILE* f = fopen(path, "w");
     if (f) { fprintf(f, "fake_audio"); fclose(f); }
@@ -132,7 +132,7 @@ static int test_load_image_folder(void) {
 }
 
 static int test_squad_open(void) {
-    char path[512];
+    char path[768];
     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
 
     CMLSQuADLoader* loader = cml_squad_open(path);

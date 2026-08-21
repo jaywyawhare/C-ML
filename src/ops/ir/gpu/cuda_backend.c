@@ -337,7 +337,7 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
         return NULL;
     }
 
-    char arch_flag[32];
+    char arch_flag[64];
     if (backend->compute_capability_major >= 10) {
         snprintf(arch_flag, sizeof(arch_flag), "--gpu-architecture=sm_%d%d",
                  backend->compute_capability_major, backend->compute_capability_minor);

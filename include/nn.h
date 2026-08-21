@@ -60,7 +60,8 @@ Parameter* nn_add_bias_param(Module* module, int size, DType dtype, DeviceType d
 Parameter* nn_add_weight_param(Module* module, Tensor* weight);
 
 /* Create a normalisation layer's affine pair — gamma "weight" (ones) and beta
- * "bias" (zeros), both length `size`. Stores them into *weight_out/*bias_out.
+ * "bias" (zeros), both length `size`. Stores them into *weight_out and
+ * *bias_out.
  * On failure, frees `module` and returns -1; returns 0 on success. */
 int nn_add_affine_params(Module* module, int size, DType dtype, DeviceType device,
                          Parameter** weight_out, Parameter** bias_out);

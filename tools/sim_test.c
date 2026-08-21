@@ -70,7 +70,7 @@ typedef struct {
 } ShapeSpec;
 
 static ShapeSpec random_shape(Xorshift128* x) {
-    ShapeSpec s;
+    ShapeSpec s = {0};
     s.ndim = xs_range(x, 1, 4); /* 1-3 dims */
     for (int i = 0; i < s.ndim; i++)
         s.shape[i] = xs_range(x, 1, 9); /* 1-8 per dim */

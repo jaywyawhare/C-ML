@@ -1552,49 +1552,6 @@ static size_t nonzero_nd_f32(const float* in, const Tensor* inp, size_t out_nume
     return w;
 }
 
-static void reduce_variance(const float* data, size_t numel, Tensor* inp, int dim, float* out,
-                            bool take_sqrt) {
-    if (dim < 0 || dim >= inp->ndim) {
-        float mean_val = 0;
-        for (size_t i = 0; i < numel; i++)
-            mean_val += data[i];
-        mean_val /= (float)numel;
-        float var_val = 0;
-        for (size_t i = 0; i < numel; i++) {
-            float diff = data[i] - mean_val;
-            var_val += diff * diff;
-        }
-        var_val /= (float)numel;
-        out[0] = take_sqrt ? sqrtf(var_val) : var_val;
-        return;
-    }
-
-    if (inp->ndim == 1) {
-        reduce_variance(data, numel, inp, -1, out, take_sqrt);
-        return;
-    }
-    if (inp->ndim != 2)
-        return;
-
-    int rows = inp->shape[0], cols = inp->shape[1];
-    int groups = dim == 0 ? cols : rows;
-    int count  = dim == 0 ? rows : cols;
-
-    for (int g = 0; g < groups; g++) {
-        float mean_val = 0;
-        for (int i = 0; i < count; i++)
-            mean_val += data[dim == 0 ? i * cols + g : g * cols + i];
-        mean_val /= (float)count;
-
-        float var_val = 0;
-        for (int i = 0; i < count; i++) {
-            float diff = data[dim == 0 ? i * cols + g : g * cols + i] - mean_val;
-            var_val += diff * diff;
-        }
-        var_val /= (float)count;
-        out[g] = take_sqrt ? sqrtf(var_val) : var_val;
-    }
-}
 
 /* Elementwise unary cases of the CPU interpreter: `expr` computes one output
  * from the input element `x`, broadcast-cycled over a smaller input. */
@@ -1608,48 +1565,6 @@ static void reduce_variance(const float* data, size_t numel, Tensor* inp, int di
         }                                                                                          \
         break;
 
-/* Index of the extreme element along the reduced axis (or of the flat tensor
- * when no single axis is given). `want_max` selects argmax over argmin -- the
- * only difference between the two ops. */
-static void reduce_argextreme(const float* data, size_t numel, Tensor* inp, ReduceParams* rp,
-                              float* out, bool want_max) {
-    if (rp && rp->num_dims == 1 && inp->ndim == 2) {
-        int reduce_dim = rp->dims[0];
-        if (reduce_dim < 0)
-            reduce_dim += inp->ndim;
-        int rows = inp->shape[0];
-        int cols = inp->shape[1];
-
-        int groups = reduce_dim == 1 ? rows : cols;
-        int count  = reduce_dim == 1 ? cols : rows;
-        int stride = reduce_dim == 1 ? 1 : cols;
-
-        for (int g = 0; g < groups; g++) {
-            const float* base = data + (reduce_dim == 1 ? (size_t)g * cols : (size_t)g);
-            float best = base[0];
-            int idx = 0;
-            for (int i = 1; i < count; i++) {
-                float v = base[(size_t)i * stride];
-                if (want_max ? (v > best) : (v < best)) {
-                    best = v;
-                    idx  = i;
-                }
-            }
-            out[g] = (float)idx;
-        }
-        return;
-    }
-
-    float best = data[0];
-    int idx = 0;
-    for (size_t i = 1; i < numel; i++) {
-        if (want_max ? (data[i] > best) : (data[i] < best)) {
-            best = data[i];
-            idx  = (int)i;
-        }
-    }
-    out[0] = (float)idx;
-}
 
 static void direct_conv_task(void* vd, size_t start, size_t end) {
     /* Work is flattened over (batch, out_channel, out_row) — a fine enough

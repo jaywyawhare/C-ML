@@ -7,21 +7,7 @@
 #include "zoo/zoo.h"
 #include "test_harness.h"
 
-static const TensorConfig cpu_f32 = {
-    .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-    .has_dtype = true, .has_device = true
-};
 
-
-static int has_nonzero(Tensor* t) {
-    if (!t) return 0;
-    if (tensor_ensure_executed(t) != 0) return 0;
-    float* d = t->data;
-    if (!d) return 0;
-    for (size_t i = 0; i < t->numel; i++)
-        if (d[i] != 0.0f) return 1;
-    return 0;
-}
 
 static int test_resnet18(void) {
     Module* m = cml_zoo_resnet18_create(1000, DTYPE_FLOAT32, DEVICE_CPU);
@@ -209,14 +195,6 @@ static int test_clip_configs(void) {
     return 1;
 }
 
-static int test_t5_small(void) {
-    T5Config cfg = cml_zoo_t5_config_small();
-    Module* m = cml_zoo_t5_create(&cfg, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!m) return 0;
-    if (module_get_total_parameters(m) <= 0) { module_free(m); return 0; }
-    module_free(m);
-    return 1;
-}
 
 static int test_t5_configs(void) {
     T5Config sm = cml_zoo_t5_config_small();
@@ -227,35 +205,7 @@ static int test_t5_configs(void) {
     return 1;
 }
 
-static int test_resnet_param_count_reasonable(void) {
-    
-    Module* r18 = cml_zoo_resnet18_create(1000, DTYPE_FLOAT32, DEVICE_CPU);
-    Module* r50 = cml_zoo_resnet50_create(1000, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!r18 || !r50) { module_free(r18); module_free(r50); return 0; }
-    int p18 = module_get_total_parameters(r18);
-    int p50 = module_get_total_parameters(r50);
-    module_free(r18);
-    module_free(r50);
-    
-    if (p50 <= p18) return 0;
-    
-    if (p18 < 1000000) return 0;
-    return 1;
-}
 
-static int test_gpt2_param_count_reasonable(void) {
-    GPT2Config sm = cml_zoo_gpt2_config_small();
-    GPT2Config xl = cml_zoo_gpt2_config_xl();
-    Module* msm = cml_zoo_gpt2_create(&sm, DTYPE_FLOAT32, DEVICE_CPU);
-    Module* mxl = cml_zoo_gpt2_create(&xl, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!msm || !mxl) { module_free(msm); module_free(mxl); return 0; }
-    int psm = module_get_total_parameters(msm);
-    int pxl = module_get_total_parameters(mxl);
-    module_free(msm); module_free(mxl);
-    if (psm <= 0 || pxl <= 0) return 0;
-    if (pxl <= psm) return 0; 
-    return 1;
-}
 
 static int test_module_double_free_safe(void) {
     

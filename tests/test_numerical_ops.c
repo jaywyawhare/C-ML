@@ -171,7 +171,6 @@ static int test_rsqrt(void) {
 
 static int test_erf_bounds(void) {
     float in[]  = {-3.0f, 0.0f, 3.0f};
-    float exp[] = {-1.0f, 0.0f, 1.0f};  
     int n = 3;
     int shape[] = {n};
     Tensor* x   = tensor_from_data(in, shape, 1, &cpu_f32);

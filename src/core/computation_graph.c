@@ -540,7 +540,6 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
     if (!graph || graph->num_nodes < 2)
         return 0;
 
-    int fused_count = 0;
     bool* fused     = cml_calloc(graph->num_nodes, sizeof(bool));
     if (!fused)
         return -1;
@@ -611,7 +610,6 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
                         }
                     }
 
-                    fused_count++;
                 }
             }
         }

@@ -448,7 +448,7 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_CLAMP: {
             ClampParams* p = (ClampParams*)node->params;
             float lo = p ? p->min_val : 0.0f, hi = p ? p->max_val : 0.0f;
-            char expr[128];
+            char expr[192];
             char lb[40], hb[40];
             aot_f32(lb, sizeof lb, lo); aot_f32(hb, sizeof hb, hi);
             snprintf(expr, sizeof(expr), "x < %s ? %s : (x > %s ? %s : x)", lb, lb, hb, hb);

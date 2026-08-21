@@ -18,6 +18,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stdio.h>   /* only for optional stats print, remove if want zero dep */
 
 /* System backing allocator for internal slab/large acquisition only.
@@ -92,14 +93,14 @@ static const size_t SIZE_CLASSES[] = {
 static inline int size_to_class(size_t size) {
     if (size <= SIZE_CLASSES[0]) return 0;
     /* Linear scan is fine: NUM_SIZE_CLASSES ~ 65, called only on slow paths or first alloc per size. */
-    for (int i = 0; i < NUM_SIZE_CLASSES; ++i) {
+    for (size_t i = 0; i < NUM_SIZE_CLASSES; ++i) {
         if (size <= SIZE_CLASSES[i]) return i;
     }
     return -1; /* large */
 }
 
 static inline size_t class_to_size(int cls) {
-    if (cls < 0 || cls >= NUM_SIZE_CLASSES) return 0;
+    if (cls < 0 || (size_t)cls >= NUM_SIZE_CLASSES) return 0;
     return SIZE_CLASSES[cls];
 }
 
@@ -156,9 +157,9 @@ static bool         g_initialized = false;
 static __thread ThreadCache tl_cache = {0};
 
 /* Stats (best effort, not perfectly accurate under races) */
-static size_t g_total_allocated_bytes = 0;
-static size_t g_peak_allocated_bytes  = 0;
-static size_t g_alloc_count           = 0;
+static _Atomic size_t g_total_allocated_bytes = 0;
+static _Atomic size_t g_peak_allocated_bytes  = 0;
+static _Atomic size_t g_alloc_count           = 0;
 
 /* Fault injection: -1 = disabled, >=0 = fail after this many more allocs */
 static _Atomic long g_fault_countdown = -1;
@@ -178,7 +179,7 @@ static void   flush_local_to_central(int cls, int keep);
 /* ---------------- Initialization ---------------- */
 
 static void init_central_bins(void) {
-    for (int i = 0; i < NUM_SIZE_CLASSES; ++i) {
+    for (size_t i = 0; i < NUM_SIZE_CLASSES; ++i) {
         pthread_mutex_init(&g_central[i].lock, NULL);
         g_central[i].head = NULL;
         g_central[i].total_slabs = 0;
@@ -361,27 +362,27 @@ static void flush_local_to_central(int cls, int keep) {
  * then re-disables itself. The counters themselves are declared unconditionally
  * near the top of the file, so this branch reuses them rather than shadowing. */
 static int pt_fault_hit(void) {
-    long cd = __atomic_load_n(&g_fault_countdown, __ATOMIC_RELAXED);
+    long cd = atomic_load_explicit(&g_fault_countdown, memory_order_relaxed);
     if (cd >= 0) {
-        long prev = __atomic_fetch_sub(&g_fault_countdown, 1, __ATOMIC_RELAXED);
+        long prev = atomic_fetch_sub_explicit(&g_fault_countdown, 1, memory_order_relaxed);
         if (prev == 0) {
-            __atomic_store_n(&g_fault_countdown, -1, __ATOMIC_RELAXED);
+            atomic_store_explicit(&g_fault_countdown, -1, memory_order_relaxed);
             return 1;
         }
     }
-    __atomic_fetch_add(&g_alloc_index, 1, __ATOMIC_RELAXED);
+    atomic_fetch_add_explicit(&g_alloc_index, 1, memory_order_relaxed);
     return 0;
 }
 
 void cml_malloc_fault_after(int n) {
-    __atomic_store_n(&g_fault_countdown, (long)n, __ATOMIC_RELAXED);
-    __atomic_store_n(&g_alloc_index, 0, __ATOMIC_RELAXED);
+    atomic_store_explicit(&g_fault_countdown, (long)n, memory_order_relaxed);
+    atomic_store_explicit(&g_alloc_index, 0, memory_order_relaxed);
 }
 void cml_malloc_fault_reset(void) {
-    __atomic_store_n(&g_fault_countdown, -1L, __ATOMIC_RELAXED);
+    atomic_store_explicit(&g_fault_countdown, -1L, memory_order_relaxed);
 }
 long cml_malloc_alloc_index(void) {
-    return __atomic_load_n(&g_alloc_index, __ATOMIC_RELAXED);
+    return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
 }
 
 void* cml_malloc(size_t size)                    { if (pt_fault_hit()) return NULL;
@@ -419,12 +420,12 @@ static void* alloc_from_class(int cls, size_t user_size) {
         hdr->magic = ALLOC_MAGIC;
 
         /* update stats */
-        __atomic_add_fetch(&g_total_allocated_bytes, user_size, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&g_alloc_count, 1, __ATOMIC_RELAXED);
-        size_t cur = __atomic_load_n(&g_total_allocated_bytes, __ATOMIC_RELAXED);
-        size_t pk = __atomic_load_n(&g_peak_allocated_bytes, __ATOMIC_RELAXED);
+        atomic_fetch_add_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
+        atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
+        size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+        size_t pk = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
         if (cur > pk) {
-            __atomic_store_n(&g_peak_allocated_bytes, cur, __ATOMIC_RELAXED);
+            atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
         }
         return user_from_header(hdr);
     }
@@ -462,11 +463,11 @@ static void* alloc_from_class(int cls, size_t user_size) {
     hdr->class_idx = (uint16_t)cls;
     hdr->magic = ALLOC_MAGIC;
 
-    __atomic_add_fetch(&g_total_allocated_bytes, user_size, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&g_alloc_count, 1, __ATOMIC_RELAXED);
-    size_t cur = __atomic_load_n(&g_total_allocated_bytes, __ATOMIC_RELAXED);
-    size_t pk = __atomic_load_n(&g_peak_allocated_bytes, __ATOMIC_RELAXED);
-    if (cur > pk) __atomic_store_n(&g_peak_allocated_bytes, cur, __ATOMIC_RELAXED);
+    atomic_fetch_add_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
+    size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+    size_t pk = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (cur > pk) atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
 
     return user_from_header(hdr);
 }
@@ -486,11 +487,11 @@ static void* alloc_large(size_t size) {
     hdr->class_idx = 0xffff;
     hdr->magic = ALLOC_MAGIC;
 
-    __atomic_add_fetch(&g_total_allocated_bytes, size, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&g_alloc_count, 1, __ATOMIC_RELAXED);
-    size_t cur = __atomic_load_n(&g_total_allocated_bytes, __ATOMIC_RELAXED);
-    size_t pk = __atomic_load_n(&g_peak_allocated_bytes, __ATOMIC_RELAXED);
-    if (cur > pk) __atomic_store_n(&g_peak_allocated_bytes, cur, __ATOMIC_RELAXED);
+    atomic_fetch_add_explicit(&g_total_allocated_bytes, size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
+    size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+    size_t pk = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (cur > pk) atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
 
     return user_from_header(hdr);
 }
@@ -499,16 +500,16 @@ void* cml_malloc(size_t size) {
     if (size == 0) size = 1; /* classic */
 
     /* Fault injection: if a countdown is active, decrement it and fail when it hits 0. */
-    long cd = __atomic_load_n(&g_fault_countdown, __ATOMIC_RELAXED);
+    long cd = atomic_load_explicit(&g_fault_countdown, memory_order_relaxed);
     if (cd >= 0) {
-        long prev = __atomic_fetch_sub(&g_fault_countdown, 1, __ATOMIC_RELAXED);
+        long prev = atomic_fetch_sub_explicit(&g_fault_countdown, 1, memory_order_relaxed);
         if (prev == 0) {
             /* Reset to disabled so subsequent calls succeed, then return OOM. */
-            __atomic_store_n(&g_fault_countdown, -1, __ATOMIC_RELAXED);
+            atomic_store_explicit(&g_fault_countdown, -1, memory_order_relaxed);
             return NULL;
         }
     }
-    __atomic_fetch_add(&g_alloc_index, 1, __ATOMIC_RELAXED);
+    atomic_fetch_add_explicit(&g_alloc_index, 1, memory_order_relaxed);
 
     if (size >= CML_LARGE_THRESHOLD) {
         return alloc_large(size);
@@ -550,7 +551,7 @@ void* cml_realloc(void* ptr, size_t new_size) {
         /* Shrink: keep same block, just update header */
         hdr->size = new_size;
         /* Note: we do not give memory back to freelist for shrink here (common & fast) */
-        __atomic_sub_fetch(&g_total_allocated_bytes, (old_size - new_size), __ATOMIC_RELAXED);
+        atomic_fetch_sub_explicit(&g_total_allocated_bytes, (old_size - new_size), memory_order_relaxed);
         return ptr;
     }
 
@@ -577,7 +578,7 @@ static void free_to_class(int cls, void* user_ptr, size_t user_size) {
     tl_cache.heads[cls] = node;
     tl_cache.counts[cls]++;
 
-    __atomic_sub_fetch(&g_total_allocated_bytes, user_size, __ATOMIC_RELAXED);
+    atomic_fetch_sub_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
 
     /* If local cache is fat, flush some back to central (keeps memory bounded per thread) */
     if (tl_cache.counts[cls] > CML_MAX_LOCAL_CACHE) {
@@ -591,7 +592,7 @@ static void free_large(void* ptr) {
     size_t sz = hdr->size;
     hdr->magic = 0xdead;
 
-    __atomic_sub_fetch(&g_total_allocated_bytes, sz, __ATOMIC_RELAXED);
+    atomic_fetch_sub_explicit(&g_total_allocated_bytes, sz, memory_order_relaxed);
 
     /* Use system free on the raw header start (we used posix_memalign or system_malloc) */
     system_free(hdr);
@@ -672,14 +673,14 @@ void cml_aligned_free(void* ptr) {
 }
 
 void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count) {
-    if (bytes_allocated) *bytes_allocated = __atomic_load_n(&g_total_allocated_bytes, __ATOMIC_RELAXED);
-    if (peak_bytes)      *peak_bytes      = __atomic_load_n(&g_peak_allocated_bytes, __ATOMIC_RELAXED);
-    if (alloc_count)     *alloc_count     = __atomic_load_n(&g_alloc_count, __ATOMIC_RELAXED);
+    if (bytes_allocated) *bytes_allocated = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+    if (peak_bytes)      *peak_bytes      = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (alloc_count)     *alloc_count     = atomic_load_explicit(&g_alloc_count, memory_order_relaxed);
 }
 
 void cml_allocator_flush_thread_cache(void) {
     if (!tl_cache.initialized) return;
-    for (int c = 0; c < NUM_SIZE_CLASSES; ++c) {
+    for (size_t c = 0; c < NUM_SIZE_CLASSES; ++c) {
         if (tl_cache.counts[c] > 0) {
             flush_local_to_central(c, 0);
         }
@@ -689,16 +690,16 @@ void cml_allocator_flush_thread_cache(void) {
 /* --- Fault injection API --- */
 
 void cml_malloc_fault_after(int n) {
-    __atomic_store_n(&g_fault_countdown, (long)n, __ATOMIC_RELAXED);
-    __atomic_store_n(&g_alloc_index, 0, __ATOMIC_RELAXED);
+    atomic_store_explicit(&g_fault_countdown, (long)n, memory_order_relaxed);
+    atomic_store_explicit(&g_alloc_index, 0, memory_order_relaxed);
 }
 
 void cml_malloc_fault_reset(void) {
-    __atomic_store_n(&g_fault_countdown, -1L, __ATOMIC_RELAXED);
+    atomic_store_explicit(&g_fault_countdown, -1L, memory_order_relaxed);
 }
 
 long cml_malloc_alloc_index(void) {
-    return __atomic_load_n(&g_alloc_index, __ATOMIC_RELAXED);
+    return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
 }
 
 #endif /* CML_ALLOC_PASSTHROUGH */

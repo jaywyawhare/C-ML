@@ -9,9 +9,6 @@
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-static const TensorConfig cpu_i32 = {
-    .dtype = DTYPE_INT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
-
 
 #define APPROX(a, b) (fabsf((a) - (b)) < 1e-4f)
 

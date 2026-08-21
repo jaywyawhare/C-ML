@@ -482,7 +482,9 @@ static Tensor *op_unsqueeze(const CMLONNXNode *n, TensorMap *m)
 
     int acount = 0;
     const int64_t *axes = attr_ints(n, "axes", &acount);
-    int axes_buf[8];
+    /* Zero-filled: acount can exceed what the fallback paths below write when
+     * neither attribute nor input tensor is present. */
+    int axes_buf[8] = {0};
 
     if (!axes || acount == 0) {
         Tensor *axes_tensor = inp(n, m, 1);

@@ -45,8 +45,7 @@ static int record_capture(CMLMatchResult* result, const char* name, struct IRNod
     }
 
     CMLCaptureEntry* e = &result->captures[result->num_captures];
-    strncpy(e->name, name, sizeof(e->name) - 1);
-    e->name[sizeof(e->name) - 1] = '\0';
+    snprintf(e->name, sizeof(e->name), "%s", name);
     e->node = node;
     result->num_captures++;
     return 0;

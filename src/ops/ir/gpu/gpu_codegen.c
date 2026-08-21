@@ -664,9 +664,9 @@ static LLVMModuleRef gpu_build_reduction(LLVMContextRef ctx, UOpType type,
         LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, val, val, "isnan");
         LLVMBasicBlockRef cur   = LLVMGetInsertBlock(bld);
         LLVMValueRef      fn_cur = LLVMGetBasicBlockParent(cur);
-        LLVMBasicBlockRef bb_nan = LLVMAppendBasicBlock(fn_cur, "red.nan");
-        LLVMBasicBlockRef bb_ord = LLVMAppendBasicBlock(fn_cur, "red.ord");
-        LLVMBasicBlockRef bb_end = LLVMAppendBasicBlock(fn_cur, "red.end");
+        LLVMBasicBlockRef bb_nan = LLVMAppendBasicBlockInContext(ctx, fn_cur, "red.nan");
+        LLVMBasicBlockRef bb_ord = LLVMAppendBasicBlockInContext(ctx, fn_cur, "red.ord");
+        LLVMBasicBlockRef bb_end = LLVMAppendBasicBlockInContext(ctx, fn_cur, "red.end");
         LLVMBuildCondBr(bld, uno, bb_nan, bb_ord);
 
         LLVMPositionBuilderAtEnd(bld, bb_nan);

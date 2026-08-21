@@ -136,7 +136,7 @@ static void test_pte_roundtrip(void) {
     torch_reset_ir();
     remove(path);
 
-    char sb_path[512];
+    char sb_path[576];
     snprintf(sb_path, sizeof(sb_path), "%s.kernels", path);
     remove(sb_path);
 
@@ -175,7 +175,7 @@ static void test_pte_export_without_weights(void) {
     torch_reset_ir();
     remove(path);
 
-    char sb_path[512];
+    char sb_path[576];
     snprintf(sb_path, sizeof(sb_path), "%s.kernels", path);
     remove(sb_path);
 

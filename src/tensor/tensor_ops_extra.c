@@ -232,7 +232,6 @@ Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
 
     int out_ndim = output.num_labels;
     int out_shape[64];
-    size_t out_numel = 1;
     for (int i = 0; i < out_ndim; i++) {
         int found = -1;
         for (int k = 0; k < num_unique; k++) {
@@ -243,13 +242,11 @@ Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
             return NULL;
         }
         out_shape[i] = label_sizes[found];
-        out_numel *= (size_t)out_shape[i];
     }
 
     if (out_ndim == 0) {
         out_ndim = 1;
         out_shape[0] = 1;
-        out_numel = 1;
     }
 
     for (int i = 0; i < num_tensors; i++) {

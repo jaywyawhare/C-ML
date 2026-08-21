@@ -1887,7 +1887,6 @@ static Tensor* uop_pad_impl(Tensor* a, int* pad_widths, int num_dims, int mode, 
     if (add_pad_node(ir, a, pad_widths, num_dims, value, mode) != 0)
         return NULL;
 
-    struct IRNode* node = cml_ir_get_tail(ir);
     int* out_shape = cml_malloc((size_t)a->ndim * sizeof(int));
     if (!out_shape) return NULL;
     for (int i = 0; i < a->ndim; i++)
@@ -2386,7 +2385,6 @@ Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim) {
         cml_free(params); return NULL;
     }
 
-    struct IRNode* node = cml_ir_get_tail(ir);
     int out_ndim = a->ndim - (end_dim - start_dim);
     int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape) return NULL;
@@ -2429,7 +2427,6 @@ Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes) {
         cml_free(params->sizes); cml_free(params); return NULL;
     }
 
-    struct IRNode* node = cml_ir_get_tail(ir);
     int out_ndim = a->ndim - 1 + num_sizes;
     int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape) return NULL;
@@ -2580,7 +2577,6 @@ Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim) {
         cml_free(params); return NULL;
     }
 
-    struct IRNode* node = cml_ir_get_tail(ir);
     int* out_shape = tensor_shape_copy(a->shape, a->ndim);
     if (!out_shape) return NULL;
     out_shape[dim] *= repeats;
@@ -3114,7 +3110,6 @@ Tensor* uop_pad_reflect(Tensor* a, int* pad_widths, int num_dims) {
     if (add_pad_node(ir, a, pad_widths, num_dims, 0.0f, PAD_REFLECT) != 0)
         return NULL;
 
-    struct IRNode* node = cml_ir_get_tail(ir);
     int* out_shape = cml_malloc((size_t)a->ndim * sizeof(int));
     if (!out_shape) return NULL;
     for (int i = 0; i < a->ndim; i++) {

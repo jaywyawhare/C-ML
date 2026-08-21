@@ -500,7 +500,7 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
 
     VkPhysicalDeviceProperties_t props = {0};
     backend->vkGetPhysicalDeviceProperties(backend->physical_device, &props);
-    strncpy(backend->device_name, props.deviceName, sizeof(backend->device_name) - 1);
+    snprintf(backend->device_name, sizeof(backend->device_name), "%s", props.deviceName);
     backend->api_version = props.apiVersion;
 
     VkPhysicalDeviceMemoryProperties_t mem_props = {0};

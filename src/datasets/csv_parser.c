@@ -118,13 +118,8 @@ int cml_csv_parse(const char* filepath, int target_col,
     char delim = detect_delimiter(line);
 
     /* Detect if first line is a header (first field non-numeric) */
-    char first_line_copy[MAX_LINE];
-    strncpy(first_line_copy, line, MAX_LINE - 1);
-    first_line_copy[MAX_LINE - 1] = '\0';
-
     char header_check[MAX_LINE];
-    strncpy(header_check, line, MAX_LINE - 1);
-    header_check[MAX_LINE - 1] = '\0';
+    snprintf(header_check, sizeof(header_check), "%s", line);
     int hcount = split_line(header_check, delim, fields, MAX_COLS);
     int has_header = (hcount > 0 && !is_numeric(fields[0]));
 
@@ -137,12 +132,10 @@ int cml_csv_parse(const char* filepath, int target_col,
             return -1;
         }
         char count_buf[MAX_LINE];
-        strncpy(count_buf, data_line, MAX_LINE - 1);
-        count_buf[MAX_LINE - 1] = '\0';
+        snprintf(count_buf, sizeof(count_buf), "%s", data_line);
         total_cols = split_line(count_buf, delim, fields, MAX_COLS);
     } else {
-        strncpy(data_line, first_line_copy, MAX_LINE - 1);
-        data_line[MAX_LINE - 1] = '\0';
+        snprintf(data_line, sizeof(data_line), "%s", line);
         total_cols = hcount;
     }
 

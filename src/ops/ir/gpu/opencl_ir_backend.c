@@ -1167,7 +1167,6 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
     }
 
     struct IRNode* node = ir->head;
-    int executed = 0;
 
     while (node) {
         if (node->is_executed && node->output && node->output->is_executed) {
@@ -1211,7 +1210,6 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             node->is_executed = true;
             out->is_executed = true;
             node = node->next;
-            executed++;
             continue;
         }
 
@@ -1235,7 +1233,6 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             node->is_executed = true;
             out->is_executed = true;
             node = node->next;
-            executed++;
             continue;
         }
 
@@ -1281,7 +1278,6 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
                                 if (add_n->output) add_n->output->is_executed = true;
                                 relu_n->is_executed = final_out->is_executed = true;
                                 node = relu_n->next;
-                                executed += 3;
                                 continue;
                             }
                         }
@@ -1364,7 +1360,6 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
         node->is_executed = true;
         out->is_executed = true;
         node = node->next;
-        executed++;
         continue;
 
     cpu_fallback:
@@ -1387,7 +1382,6 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
         node->is_executed = true;
         out->is_executed = true;
         node = node->next;
-        executed++;
         continue;
     }
 

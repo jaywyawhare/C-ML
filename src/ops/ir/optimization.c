@@ -113,7 +113,6 @@ static int remove_dead_nodes(CMLGraph_t ir) {
 
     struct IRNode* prev = NULL;
     struct IRNode* node = ir->head;
-    int removed         = 0;
 
     while (node) {
         struct IRNode* next = node->next;
@@ -179,7 +178,6 @@ static int remove_dead_nodes(CMLGraph_t ir) {
             cml_free(node);
 
             ir->node_count--;
-            removed++;
         } else {
             prev = node;
         }

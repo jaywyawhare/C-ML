@@ -370,9 +370,7 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
         }
     }
 
-    // Factor depends on graph structure: deeper graphs have lower peak liveness
     size_t total_intermediate_memory = 0;
-    size_t max_depth                 = 0;
 
     for (size_t i = 0; i < node_count; i++) {
         CMLGraphNode_t node = cml_graph_get_node_by_index(graph, i);
@@ -383,7 +381,6 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
             } else {
                 total_intermediate_memory += 4 * 1024;
             }
-            max_depth++;
         }
     }
 

@@ -94,14 +94,14 @@ static int scan_usb_bus(char* path, size_t path_size) {
             if (dev_ent->d_name[0] == '.') continue;
 
             char dev_path[1024];
-            snprintf(dev_path, sizeof(dev_path), "%s/%s", bus_path, dev_ent->d_name);
+            snprintf(dev_path, sizeof(dev_path), "%s/%.200s", bus_path, dev_ent->d_name);
 
             int fd = open(dev_path, O_RDWR);
             if (fd < 0) continue;
 
             usb3_dev_desc_t desc;
             if (read_dev_descriptor(fd, &desc) == 0 && desc.idVendor == ASM2464PD_VENDOR) {
-                snprintf(path, path_size, "%s", dev_path);
+                snprintf(path, path_size, "%.*s", (int)path_size - 1, dev_path);
                 close(fd);
                 closedir(devs);
                 closedir(buses);

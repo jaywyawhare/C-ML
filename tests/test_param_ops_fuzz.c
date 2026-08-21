@@ -7,7 +7,7 @@
  * point carries an extra scalar or its own params struct -- uop_elu(x, alpha),
  * uop_sum_dim(a, dim, keepdim), uop_split(a, n, dim, &out) -- matches none of
  * those shapes, so it was invisible to all four by construction rather than by
- * oversight. Cross-checking uops.h against every tests/*.c found 36 public
+ * oversight. Cross-checking uops.h against every test in tests/ found 36 public
  * entry points that no test so much as named.
  *
  * That blind spot is why celu(NaN) still returned 0 after the NaN sweep fixed

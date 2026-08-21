@@ -246,7 +246,6 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
         }
 
         cml_llama_reset(model);
-        int total_generated = 0;
 
         for (int i = 0; i < max_tokens; i++) {
             int seq_len = (i == 0) ? num_prompt_tokens : 1;
@@ -288,7 +287,6 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
 
             send_sse_chunk(fd, chunk_json);
             cml_free(token_text);
-            total_generated++;
         }
 
         char done_json[512];

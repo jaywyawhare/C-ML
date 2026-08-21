@@ -55,10 +55,23 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DBUILD_TESTS=ON \
             -DBUILD_EXAMPLES=OFF \
+            -DCML_WARNINGS_AS_ERRORS=ON \
             -DCMAKE_C_COMPILER=$CC \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
         env:
           CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+        if: runner.os == 'Linux'
+
+      # macOS: warnings-as-errors stays off until a first green run confirms
+      # the AppleSDK headers don't add noise of their own; default clang is fine.
+      - name: Configure CMake (macOS)
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_EXAMPLES=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache
+        if: runner.os == 'macOS'
 
       - name: Build
         run: cmake --build build -j$(nproc)

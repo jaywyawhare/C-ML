@@ -1672,12 +1672,15 @@ static struct IRNode* build_variance(CMLGraph_t ir, struct IRNode* node,
     ReduceParams* sp1 = dup_reduce_params(rp, true);
     if (!sp1) return NULL;
     struct IRNode* sum1 = create_primitive_node(ir, UOP_SUM, &x, 1, sp1, keep_shape, xnd);
-    if (!sum1) return NULL; chain_append(head, tail, sum1);
+    if (!sum1) return NULL;
+    chain_append(head, tail, sum1);
     struct IRNode* invn1 = insert_fill_node(ir, keep_shape, xnd, inv_n);
-    if (!invn1) return NULL; chain_append(head, tail, invn1);
+    if (!invn1) return NULL;
+    chain_append(head, tail, invn1);
     Tensor* m1[] = {sum1->output, invn1->output};
     struct IRNode* mean1 = create_primitive_node(ir, UOP_MUL, m1, 2, NULL, keep_shape, xnd);
-    if (!mean1) return NULL; chain_append(head, tail, mean1);
+    if (!mean1) return NULL;
+    chain_append(head, tail, mean1);
 
     // broadcast mean1 to x's shape (binary ops don't broadcast on their own)
     ExpandParams* ep = cml_malloc(sizeof(ExpandParams));
@@ -1687,26 +1690,32 @@ static struct IRNode* build_variance(CMLGraph_t ir, struct IRNode* node,
     if (!ep->new_shape) { cml_free(ep); return NULL; }
     memcpy(ep->new_shape, full_shape, (size_t)xnd * sizeof(int));
     struct IRNode* meanx = create_primitive_node(ir, UOP_EXPAND, &mean1->output, 1, ep, full_shape, xnd);
-    if (!meanx) return NULL; chain_append(head, tail, meanx);
+    if (!meanx) return NULL;
+    chain_append(head, tail, meanx);
 
     // diff = x - meanx ; sq = diff * diff
     Tensor* din[] = {x, meanx->output};
     struct IRNode* diff = create_primitive_node(ir, UOP_SUB, din, 2, NULL, full_shape, xnd);
-    if (!diff) return NULL; chain_append(head, tail, diff);
+    if (!diff) return NULL;
+    chain_append(head, tail, diff);
     Tensor* sqin[] = {diff->output, diff->output};
     struct IRNode* sq = create_primitive_node(ir, UOP_MUL, sqin, 2, NULL, full_shape, xnd);
-    if (!sq) return NULL; chain_append(head, tail, sq);
+    if (!sq) return NULL;
+    chain_append(head, tail, sq);
 
     // var = sum(sq, dims, keepdim=node's) * (1/n)  -> node's output shape
     ReduceParams* sp2 = dup_reduce_params(rp, rp ? rp->keepdim : false);
     if (!sp2) return NULL;
     struct IRNode* sum2 = create_primitive_node(ir, UOP_SUM, &sq->output, 1, sp2, out_shape, out_ndim);
-    if (!sum2) return NULL; chain_append(head, tail, sum2);
+    if (!sum2) return NULL;
+    chain_append(head, tail, sum2);
     struct IRNode* invn2 = insert_fill_node(ir, out_shape, out_ndim, inv_n);
-    if (!invn2) return NULL; chain_append(head, tail, invn2);
+    if (!invn2) return NULL;
+    chain_append(head, tail, invn2);
     Tensor* vin[] = {sum2->output, invn2->output};
     struct IRNode* var = create_primitive_node(ir, UOP_MUL, vin, 2, NULL, out_shape, out_ndim);
-    if (!var) return NULL; chain_append(head, tail, var);
+    if (!var) return NULL;
+    chain_append(head, tail, var);
     return var;
 }
 

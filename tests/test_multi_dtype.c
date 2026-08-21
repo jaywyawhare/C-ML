@@ -339,11 +339,6 @@ static int test_conv2d(void) {
     return ok;
 }
 
-static const TensorConfig cfg_f16  = {.dtype = DTYPE_FLOAT16,  .device = DEVICE_CPU,
-                                      .has_dtype = true, .has_device = true};
-static const TensorConfig cfg_bf16 = {.dtype = DTYPE_BFLOAT16, .device = DEVICE_CPU,
-                                      .has_dtype = true, .has_device = true};
-
 /* f16/bf16 compute (in f32, stored as half). Values read back via
  * tensor_get_float; tolerances reflect half precision. */
 static int test_half(void) {

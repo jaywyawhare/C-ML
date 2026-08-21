@@ -136,11 +136,11 @@ static void read_git(char* out, size_t n) {
         char* nl = strchr(line, '\n'); if (nl) *nl = '\0';
         if (strncmp(line, "ref: ", 5) == 0) {
             char path[320];
-            snprintf(path, sizeof(path), ".git/%s", line + 5);
+            snprintf(path, sizeof(path), ".git/%.250s", line + 5);
             FILE* rf = fopen(path, "r");
             if (rf) { if (fgets(out, (int)n, rf)) { char* x = strchr(out, '\n'); if (x) *x = '\0'; } fclose(rf); }
         } else {
-            snprintf(out, n, "%s", line);
+            snprintf(out, n, "%.*s", (int)n - 1, line);
         }
     }
     fclose(h);
@@ -317,9 +317,9 @@ void cml_exp_log_image(CMLRun* run, const char* name, long step,
                        const unsigned char* rgb, int width, int height) {
     if (!run || !run->events || !rgb || width <= 0 || height <= 0) return;
     char fname[256];
-    snprintf(fname, sizeof(fname), "media/%s_%ld.rgb", name, step);
-    char full[1200];
-    snprintf(full, sizeof(full), "%s/%s", run->dir, fname);
+    snprintf(fname, sizeof(fname), "media/%.200s_%ld.rgb", name, step);
+    char full[1282]; /* dir(1024) + "/" + fname(256) */
+    snprintf(full, sizeof(full), "%.1000s/%.255s", run->dir, fname);
     FILE* img = fopen(full, "wb");
     if (img) {
         fwrite(rgb, 1, (size_t)width * (size_t)height * 3, img);

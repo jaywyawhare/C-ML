@@ -20,7 +20,7 @@
 static void test_cache_population(void) {
     printf("Test: cache population across reset cycles\n");
     CMLGraphCache* cache = cml_get_graph_cache();
-    size_t h0 = cache->hits, m0 = cache->misses;
+    size_t m0 = cache->misses;
     TensorConfig cfg = {0};
     int sa[] = {32, 64}, sb[] = {64, 32};
     float* a = cml_malloc(32*64*sizeof(float));
@@ -56,7 +56,6 @@ static void test_cache_population(void) {
 
 static void test_multi_node_cache(void) {
     printf("Test: multi-node graph cache (mm+add+relu)\n");
-    CMLGraphCache* cache = cml_get_graph_cache();
     TensorConfig cfg = {0};
     int sa[] = {16, 32}, sb[] = {32, 16}, sbi[] = {16};
     float* a = cml_malloc(16*32*sizeof(float));

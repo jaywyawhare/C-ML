@@ -342,7 +342,7 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
             if (tmp_p) *paths = tmp_p;
             char** tmp_t = cml_realloc(*transcripts, *cap * sizeof(char*));
             if (tmp_t) *transcripts = tmp_t;
-            if (!tmp_p || !tmp_t) return;   /* *paths/*transcripts freed by caller */
+            if (!tmp_p || !tmp_t) return;   /* *paths and *transcripts freed by caller */
         }
 
         (*paths)[*count] = cml_strdup(full);

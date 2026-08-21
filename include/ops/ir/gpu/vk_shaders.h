@@ -1,4 +1,4 @@
-/* Auto-generated from src/ops/ir/gpu/shaders/*.comp via glslc. */
+/* Auto-generated from the .comp files in src/ops/ir/gpu/shaders via glslc. */
 #ifndef CML_VK_SHADERS_H
 #define CML_VK_SHADERS_H
 #include <stdint.h>

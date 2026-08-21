@@ -343,13 +343,6 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
         ".target sm_50\n"
         ".address_size 64\n\n");
 
-    /* Count unique buffers */
-    int num_loads = 0, num_stores = 0;
-    for (int i = 0; i < prog->num_ops; i++) {
-        if (prog->ops[i].kind == LINOP_LOAD) num_loads++;
-        if (prog->ops[i].kind == LINOP_STORE) num_stores++;
-    }
-
     /* Entry point with parameters */
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
         ".visible .entry fused_kernel(\n");
@@ -680,10 +673,8 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
 
     /* Count buffers (loads + stores) */
     int num_buffers = 0;
-    int num_loads = 0, num_stores = 0;
     for (int i = 0; i < prog->num_ops; i++) {
-        if (prog->ops[i].kind == LINOP_LOAD) { num_buffers++; num_loads++; }
-        if (prog->ops[i].kind == LINOP_STORE) { num_buffers++; num_stores++; }
+        if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE) num_buffers++;
     }
 
     /* Allocate generous buffer for SPIR-V words */

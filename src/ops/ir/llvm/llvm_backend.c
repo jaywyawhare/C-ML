@@ -255,7 +255,7 @@ static bool jit_bcast_is_exact(const Tensor* in, const Tensor* out) {
  * Intrinsic helpers
  * ---------------------------------------------------------------------- */
 
-#define INTR1(mod, ctx, name, name_len, f32) \
+#define INTR1(mod, name, name_len, f32) \
     LLVMGetIntrinsicDeclaration(mod, LLVMLookupIntrinsicID(name, name_len), \
                                 (LLVMTypeRef[]){f32}, 1)
 
@@ -380,7 +380,7 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
     case UOP_POW: {
-        LLVMValueRef pow_fn = INTR1(mod, ctx, "llvm.pow", 8, f32);
+        LLVMValueRef pow_fn = INTR1(mod, "llvm.pow", 8, f32);
         LLVMTypeRef  ft     = LLVMFunctionType(f32, (LLVMTypeRef[]){f32,f32}, 2, 0);
         result = LLVMBuildCall2(bld, ft, pow_fn, (LLVMValueRef[]){v0,v1}, 2, "r");
         break;
@@ -463,15 +463,15 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
 
     case UOP_ABS:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.fabs", 9, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.fabs", 9, f32), val, "r");
         break;
 
     case UOP_SQRT:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.sqrt", 9, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.sqrt", 9, f32), val, "r");
         break;
 
     case UOP_RSQRT: {
-        LLVMValueRef sq  = call1(bld, f32, INTR1(mod, ctx, "llvm.sqrt", 9, f32), val, "sq");
+        LLVMValueRef sq  = call1(bld, f32, INTR1(mod, "llvm.sqrt", 9, f32), val, "sq");
         result = LLVMBuildFDiv(bld, one_f, sq, "r");
         break;
     }
@@ -481,32 +481,32 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
 
     case UOP_EXP:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.exp", 8, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), val, "r");
         break;
 
     case UOP_EXP2:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.exp2", 9, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.exp2", 9, f32), val, "r");
         break;
 
     case UOP_LOG:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.log", 8, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.log", 8, f32), val, "r");
         break;
 
     case UOP_LOG2:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.log2", 9, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.log2", 9, f32), val, "r");
         break;
 
     case UOP_SIN:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.sin", 8, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.sin", 8, f32), val, "r");
         break;
 
     case UOP_COS:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.cos", 8, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.cos", 8, f32), val, "r");
         break;
 
     case UOP_TAN: {
-        LLVMValueRef s  = call1(bld, f32, INTR1(mod, ctx, "llvm.sin", 8, f32), val, "s");
-        LLVMValueRef c  = call1(bld, f32, INTR1(mod, ctx, "llvm.cos", 8, f32), val, "c");
+        LLVMValueRef s  = call1(bld, f32, INTR1(mod, "llvm.sin", 8, f32), val, "s");
+        LLVMValueRef c  = call1(bld, f32, INTR1(mod, "llvm.cos", 8, f32), val, "c");
         result = LLVMBuildFDiv(bld, s, c, "r");
         break;
     }
@@ -540,17 +540,17 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
     case UOP_FLOOR:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.floor", 10, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.floor", 10, f32), val, "r");
         break;
 
     case UOP_CEIL:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.ceil", 9, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.ceil", 9, f32), val, "r");
         break;
 
     case UOP_ROUND:
         /* llvm.round rounds halves away from zero; llvm.roundeven is the
          * ties-to-even form numpy/PyTorch use. */
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.roundeven", 14, f32), val, "r");
+        result = call1(bld, f32, INTR1(mod, "llvm.roundeven", 14, f32), val, "r");
         break;
 
     case UOP_SIGN: {
@@ -593,7 +593,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     case UOP_SIGMOID: {
         /* 1 / (1 + exp(-x)) */
         LLVMValueRef neg  = LLVMBuildFNeg(bld, val, "nx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, ctx, "llvm.exp", 8, f32), neg, "e");
+        LLVMValueRef e    = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
         LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
         result = LLVMBuildFDiv(bld, one_f, denom, "r");
         break;
@@ -617,7 +617,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     case UOP_SILU: {
         /* x * sigmoid(x) */
         LLVMValueRef neg  = LLVMBuildFNeg(bld, val, "nx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, ctx, "llvm.exp", 8, f32), neg, "e");
+        LLVMValueRef e    = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
         LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
         LLVMValueRef sig  = LLVMBuildFDiv(bld, one_f, denom, "sig");
         result = LLVMBuildFMul(bld, val, sig, "r");
@@ -629,7 +629,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         LLVMValueRef c    = LLVMConstReal(f32, 1.702f);
         LLVMValueRef cx   = LLVMBuildFMul(bld, c, val, "cx");
         LLVMValueRef neg  = LLVMBuildFNeg(bld, cx, "ncx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, ctx, "llvm.exp", 8, f32), neg, "e");
+        LLVMValueRef e    = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
         LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
         LLVMValueRef sig  = LLVMBuildFDiv(bld, one_f, denom, "sig");
         result = LLVMBuildFMul(bld, val, sig, "r");
@@ -1311,7 +1311,7 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
 
 /* Emit the scalar result of one primitive elementwise op. Mirrors fused_eval_block
  * (execution.c) and the per-op emission in build_binary_op/build_unary_op. */
-static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMContextRef ctx,
+static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod,
                                LLVMTypeRef f32, UOpType op,
                                LLVMValueRef a, LLVMValueRef b, LLVMValueRef c, float konst) {
     LLVMValueRef zero = LLVMConstReal(f32, 0.0);
@@ -1331,19 +1331,19 @@ static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMContex
                         LLVMValueRef m=LLVMBuildSelect(bld,c1,a,b,"m");
                         LLVMValueRef u=LLVMBuildFCmp(bld,LLVMRealUNO,a,b,"uno");
                         return LLVMBuildSelect(bld,u,LLVMBuildFAdd(bld,a,b,"np"),m,"r"); }
-    case UOP_POW:     { LLVMValueRef f=INTR1(mod,ctx,"llvm.pow",8,f32);
+    case UOP_POW:     { LLVMValueRef f=INTR1(mod,"llvm.pow",8,f32);
                         LLVMTypeRef ft=LLVMFunctionType(f32,(LLVMTypeRef[]){f32,f32},2,0);
                         return LLVMBuildCall2(bld,ft,f,(LLVMValueRef[]){a,b},2,"r"); }
     case UOP_RELU:    { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,zero,"lt");
                         return LLVMBuildSelect(bld,c1,zero,a,"r"); }
     case UOP_NEG:     return LLVMBuildFNeg(bld, a, "r");
     case UOP_RECIP:   return LLVMBuildFDiv(bld, LLVMConstReal(f32,1.0), a, "r");
-    case UOP_EXP:     return call1(bld,f32,INTR1(mod,ctx,"llvm.exp",8,f32),a,"r");
-    case UOP_LOG:     return call1(bld,f32,INTR1(mod,ctx,"llvm.log",8,f32),a,"r");
-    case UOP_SQRT:    return call1(bld,f32,INTR1(mod,ctx,"llvm.sqrt",9,f32),a,"r");
-    case UOP_SIN:     return call1(bld,f32,INTR1(mod,ctx,"llvm.sin",8,f32),a,"r");
-    case UOP_COS:     return call1(bld,f32,INTR1(mod,ctx,"llvm.cos",8,f32),a,"r");
-    case UOP_ABS:     return call1(bld,f32,INTR1(mod,ctx,"llvm.fabs",9,f32),a,"r");
+    case UOP_EXP:     return call1(bld,f32,INTR1(mod,"llvm.exp",8,f32),a,"r");
+    case UOP_LOG:     return call1(bld,f32,INTR1(mod,"llvm.log",8,f32),a,"r");
+    case UOP_SQRT:    return call1(bld,f32,INTR1(mod,"llvm.sqrt",9,f32),a,"r");
+    case UOP_SIN:     return call1(bld,f32,INTR1(mod,"llvm.sin",8,f32),a,"r");
+    case UOP_COS:     return call1(bld,f32,INTR1(mod,"llvm.cos",8,f32),a,"r");
+    case UOP_ABS:     return call1(bld,f32,INTR1(mod,"llvm.fabs",9,f32),a,"r");
     case UOP_CMPLT:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"c"), f32, "r");
     case UOP_CMPLE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOLE,a,b,"c"), f32, "r");
     case UOP_CMPGT:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"c"), f32, "r");
@@ -1406,7 +1406,7 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
             LLVMValueRef gep = LLVMBuildGEP2(bld, f32, inptr[ref], &idx, 1, "pin");
             ops[t] = LLVMBuildLoad2(bld, f32, gep, "v");
         }
-        reg[s] = fe_emit_op(bld, mod, ctx, f32, fp->op[s], ops[0], ops[1], ops[2], fp->konst[s]);
+        reg[s] = fe_emit_op(bld, mod, f32, fp->op[s], ops[0], ops[1], ops[2], fp->konst[s]);
         if (!reg[s]) { /* op this backend can't emit -- abandon the kernel */
             LLVMDisposeBuilder(bld);
             LLVMDisposeModule(mod);

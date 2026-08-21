@@ -9,8 +9,6 @@
 static const char* program_path(void);
 
 
-static const char* g_argv0_fwd_unused;
-
 /* cml_init() latches process-global state, so each combination is exercised in
  * a fresh child rather than by re-initialising in place. */
 static int init_rc_with(const char* viz, const char* no_export) {

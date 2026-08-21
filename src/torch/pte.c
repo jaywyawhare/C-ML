@@ -47,12 +47,6 @@ typedef struct {
     uint64_t total_size;
 } PTEFileHeader;
 
-static int pte_write_u32(FILE* f, uint32_t v) { return fwrite(&v, 1, 4, f) == 4 ? 0 : -1; }
-static int pte_write_u64(FILE* f, uint64_t v) { return fwrite(&v, 1, 8, f) == 8 ? 0 : -1; }
-
-static int pte_read_u32(FILE* f, uint32_t* v) { return fread(v, 1, 4, f) == 4 ? 0 : -1; }
-static int pte_read_u64(FILE* f, uint64_t* v) { return fread(v, 1, 8, f) == 8 ? 0 : -1; }
-
 TorchPTEExportOptions torch_pte_default_export_options(void) {
     TorchPTEExportOptions opts = {0};
     opts.method_name           = "forward";
@@ -95,7 +89,6 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
 
     /* Map parameter tensors to constant indices (negative slot encoding) */
     StateDict* sd = module ? nn_get_state_dict(module, "") : NULL;
-    int num_consts = sd ? sd->count : 0;
 
     int idx = 0;
     uint64_t arena = 0;
