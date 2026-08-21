@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(C-ML VERSION 0.0.3 LANGUAGES C CXX)
+project(C-ML VERSION 0.0.3 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -9,16 +9,23 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 include(CheckCCompilerFlag)
-check_c_compiler_flag("-march=native" HAS_MARCH_NATIVE)
-if(HAS_MARCH_NATIVE)
-    set(NATIVE_FLAG "-march=native")
-else()
-    set(NATIVE_FLAG "")
+
+# Warnings in every build type (not just Debug); opt-in -Werror for CI.
+option(CML_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wall> $<$<COMPILE_LANGUAGE:C>:-Wextra>)
+if(CML_WARNINGS_AS_ERRORS)
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-Werror>)
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra ${NATIVE_FLAG}")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG ${NATIVE_FLAG}")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG ${NATIVE_FLAG}")
+# Host-native codegen is a local-build convenience, not something a
+# distributed binary should ship with — turn off for packaging/CI.
+option(CML_NATIVE_OPTIMIZATIONS "Optimize for the build host CPU (-march=native)" ON)
+if(CML_NATIVE_OPTIMIZATIONS)
+    check_c_compiler_flag("-march=native" HAS_MARCH_NATIVE)
+    if(HAS_MARCH_NATIVE)
+        add_compile_options(-march=native)
+    endif()
+endif()
 
 option(ENABLE_SANITIZERS "AddressSanitizer + LeakSanitizer (Linux) + UndefinedBehaviorSanitizer (GCC/Clang)" OFF)
 if(ENABLE_SANITIZERS)
