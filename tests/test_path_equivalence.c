@@ -18,7 +18,9 @@
  * account for a difference.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "cml.h"
 #include "test_require.h"
 #include <stdio.h>

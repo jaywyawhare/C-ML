@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static int checks = 0, failures = 0;
+#include "test_harness.h"
 
 static TensorConfig cfg_of(DType dt) {
     TensorConfig c = {.dtype = dt, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
@@ -72,7 +72,7 @@ typedef struct {
 } Case;
 
 static void run_case(const Case* c, DType dt) {
-    checks++;
+    tests_run++;
     double ref[256];
     size_t ref_n = 0;
 
@@ -81,19 +81,17 @@ static void run_case(const Case* c, DType dt) {
         Tensor* ins[3] = {0};
         for (int i = 0; i < c->n_in; i++) {
             ins[i] = make(use, c->shape, c->ndim, c->vals[i]);
-            if (!ins[i]) { printf("  %-22s %s: alloc failed\n", c->name, dtype_name(dt)); failures++; return; }
+            if (!ins[i]) { printf("  %-22s %s: alloc failed\n", c->name, dtype_name(dt)); return; }
         }
         Tensor* r = c->build(ins, c->n_in);
         if (!r) {
             printf("  %-22s %s: build returned NULL\n", c->name, dtype_name(use));
-            failures++;
             cml_reset_ir_context();
             return;
         }
         tensor_ensure_executed(r);
         if (!tensor_data_ptr(r)) {
             printf("  %-22s %s: no data after execute\n", c->name, dtype_name(use));
-            failures++;
             cml_reset_ir_context();
             return;
         }
@@ -104,7 +102,6 @@ static void run_case(const Case* c, DType dt) {
             if (r->numel != ref_n) {
                 printf("  %-22s %s: numel %zu != f32 numel %zu\n",
                        c->name, dtype_name(dt), r->numel, ref_n);
-                failures++;
                 cml_reset_ir_context();
                 return;
             }
@@ -132,7 +129,6 @@ static void run_case(const Case* c, DType dt) {
                 if (fabs(got - want) > tol) {
                     printf("  %-22s %s: [%zu] got %g, expected %g (f32 gives %g)\n",
                            c->name, dtype_name(dt), i, got, want, ref[i]);
-                    failures++;
                     cml_reset_ir_context();
                     return;
                 }
@@ -140,6 +136,7 @@ static void run_case(const Case* c, DType dt) {
         }
         cml_reset_ir_context();
     }
+    tests_passed++;
 }
 
 /* ------------------------------------------------------------ op builders */
@@ -516,68 +513,76 @@ static void run_int_cases(DType dt) {
     };
     int shape[1] = {4};
     for (size_t ci = 0; ci < sizeof(cases) / sizeof(cases[0]); ci++) {
-        checks++;
+        tests_run++;
         Tensor* ta = make(dt, shape, 1, A);
         Tensor* tb = make(dt, shape, 1, B);
         Tensor* r  = ta && tb ? cases[ci].fn(ta, tb) : NULL;
         if (!r) {
             printf("  %-22s %s: NULL\n", cases[ci].name, dtype_name(dt));
-            failures++; cml_reset_ir_context(); continue;
+            cml_reset_ir_context(); continue;
         }
         tensor_ensure_executed(r);
+        int ok = 1;
         for (int i = 0; i < 4; i++) {
             if (!dtype_holds(dt, cases[ci].want[i]) || !dtype_holds(dt, A[i])) continue;
             double got = (double)tensor_get_float(r, (size_t)i);
             if (fabs(got - cases[ci].want[i]) > 1e-6) {
                 printf("  %-22s %s: [%d] got %g, want %g\n",
                        cases[ci].name, dtype_name(dt), i, got, cases[ci].want[i]);
-                failures++;
+                ok = 0;
                 break;
             }
         }
+        if (ok) tests_passed++;
         cml_reset_ir_context();
     }
     /* shifts checked separately: the operand is a shift count, not a value */
-    checks++;
+    tests_run++;
     const double SA[4] = { 1, 2, 3, 4 }, SB[4] = { 1, 2, 3, 1 };
     const double want_shl[4] = { 2, 8, 24, 8 };
     Tensor* ta = make(dt, shape, 1, SA);
     Tensor* tb = make(dt, shape, 1, SB);
     Tensor* r  = ta && tb ? i_shl(ta, tb) : NULL;
-    if (!r) { printf("  lshift %s: NULL\n", dtype_name(dt)); failures++; }
+    int shl_ok = 0;
+    if (!r) { printf("  lshift %s: NULL\n", dtype_name(dt)); }
     else {
         tensor_ensure_executed(r);
+        shl_ok = 1;
         for (int i = 0; i < 4; i++) {
             if (!dtype_holds(dt, want_shl[i])) continue;
             double got = (double)tensor_get_float(r, (size_t)i);
             if (fabs(got - want_shl[i]) > 1e-6) {
                 printf("  %-22s %s: [%d] got %g, want %g\n",
                        "lshift", dtype_name(dt), i, got, want_shl[i]);
-                failures++;
+                shl_ok = 0;
                 break;
             }
         }
     }
+    if (shl_ok) tests_passed++;
     cml_reset_ir_context();
 
-    checks++;
+    tests_run++;
     const double want_shr[4] = { 0, 0, 0, 2 };
     Tensor* ua = make(dt, shape, 1, SA);
     Tensor* ub = make(dt, shape, 1, SB);
     Tensor* r2 = ua && ub ? i_shr(ua, ub) : NULL;
-    if (!r2) { printf("  rshift %s: NULL\n", dtype_name(dt)); failures++; }
+    int shr_ok = 0;
+    if (!r2) { printf("  rshift %s: NULL\n", dtype_name(dt)); }
     else {
         tensor_ensure_executed(r2);
+        shr_ok = 1;
         for (int i = 0; i < 4; i++) {
             double got = (double)tensor_get_float(r2, (size_t)i);
             if (fabs(got - want_shr[i]) > 1e-6) {
                 printf("  %-22s %s: [%d] got %g, want %g\n",
                        "rshift", dtype_name(dt), i, got, want_shr[i]);
-                failures++;
+                shr_ok = 0;
                 break;
             }
         }
     }
+    if (shr_ok) tests_passed++;
     cml_reset_ir_context();
 }
 
@@ -597,7 +602,6 @@ int main(void) {
     for (int d = 0; d < (int)(sizeof(INT_DTYPES) / sizeof(INT_DTYPES[0])); d++)
         run_int_cases(INT_DTYPES[d]);
 
-    printf("\n%d checks, %d failures\n", checks, failures);
     cml_cleanup();
-    return failures ? 1 : 0;
+    return TEST_SUMMARY();
 }

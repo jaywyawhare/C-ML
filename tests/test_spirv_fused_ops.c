@@ -14,10 +14,9 @@
 
 #include "cml.h"
 #include "ops/ir/fused_codegen.h"
+#include "test_harness.h"
 #include <stdio.h>
 #include <string.h>
-
-static int tests_run = 0, tests_passed = 0;
 
 #define SPIRV_MAGIC 0x07230203u
 #define OP_EXT_INST 12u
@@ -32,10 +31,8 @@ static int tests_run = 0, tests_passed = 0;
 #define GLSL_FABS   4u
 #define GLSL_FMAX   40u
 
-#define TEST(label, cond) do { \
-    tests_run++; printf("  %-46s ", label); \
-    if (cond) { tests_passed++; printf("[PASS]\n"); } else printf("[FAIL]\n"); \
-} while (0)
+#undef TEST
+#define TEST(label, cond) CHECK(label, cond)
 
 /* Walk the instruction stream; returns 1 if the module is well formed. */
 static int spirv_walk_ok(const uint32_t* w, int n) {
@@ -232,7 +229,6 @@ int main(void) {
         cml_free(p);
     }
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     cml_cleanup();
-    return tests_passed == tests_run ? 0 : 1;
+    return TEST_SUMMARY();
 }

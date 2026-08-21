@@ -70,7 +70,7 @@ static void setup_squad_file(void) {
 }
 
 static void setup_librispeech_dir(void) {
-    char dir[512];
+    char dir[576];
     snprintf(dir, sizeof(dir), "%s/audio/1-2", tmpdir);
     mkdirs(dir);
 
@@ -91,7 +91,7 @@ static void cleanup(void) {
 }
 
 static int test_imagenet_open(void) {
-    char dir[512];
+    char dir[576];
     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
 
     CMLImageNetLoader* loader = cml_imagenet_open(dir, 16);
@@ -104,7 +104,7 @@ static int test_imagenet_open(void) {
 }
 
 static int test_imagenet_load_batch(void) {
-    char dir[512];
+    char dir[576];
     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
 
     CMLImageNetLoader* loader = cml_imagenet_open(dir, 4);
@@ -121,7 +121,7 @@ static int test_imagenet_load_batch(void) {
 }
 
 static int test_load_image_folder(void) {
-    char dir[512];
+    char dir[576];
     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
 
     Dataset* ds = cml_load_image_folder(dir, 4);
@@ -146,7 +146,7 @@ static int test_squad_open(void) {
 }
 
 static int test_librispeech_open(void) {
-    char dir[512];
+    char dir[576];
     snprintf(dir, sizeof(dir), "%s/audio", tmpdir);
 
     CMLLibriSpeechLoader* loader = cml_librispeech_open(dir);

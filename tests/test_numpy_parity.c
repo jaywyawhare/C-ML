@@ -12,12 +12,12 @@
 #include <math.h>
 
 #include "tensor/tensor.h"
+#include "test_harness.h"
 #include "ops/uops.h"
 
-static int g_pass = 0, g_total = 0;
 static int check(const char* name, int ok) {
-    g_total++;
-    if (ok) { g_pass++; printf("  PASS: %s\n", name); }
+    tests_run++;
+    if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
     else    { printf("  FAIL: %s\n", name); }
     return ok;
 }
@@ -77,6 +77,5 @@ int main(void) {
     check("nan_eq_false",    ev2(uop_cmpeq, nan, nan) == 0.0f);
     check("nan_ne_true",     ev2(uop_cmpne, nan, nan) == 1.0f);
 
-    printf("\nResults: %d/%d passed\n", g_pass, g_total);
-    return (g_pass == g_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

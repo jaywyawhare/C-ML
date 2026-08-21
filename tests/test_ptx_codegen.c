@@ -4,17 +4,17 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-static int tests_passed = 0;
-static int tests_failed = 0;
+#include "test_harness.h"
 
+#undef TEST
 #define TEST(name) \
     do { printf("  TEST: %-50s ", #name); } while(0)
 
 #define PASS() \
-    do { printf("[PASS]\n"); tests_passed++; } while(0)
+    do { printf("[PASS]\n"); tests_run++; tests_passed++; } while(0)
 
 #define FAIL(msg) \
-    do { printf("[FAIL] %s\n", msg); tests_failed++; } while(0)
+    do { printf("[FAIL] %s\n", (msg)); tests_run++; } while(0)
 
 #define ASSERT_NOT_NULL(ptr) \
     do { if ((ptr) == NULL) { FAIL(#ptr " is NULL"); return; } } while(0)
@@ -410,6 +410,5 @@ int main(void) {
     test_register_declarations();
     test_bounds_check();
 
-    printf("\nResults: %d passed, %d failed\n\n", tests_passed, tests_failed);
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_SUMMARY();
 }

@@ -19,8 +19,7 @@
 #define EPS   1e-3f
 #define TOL   1e-2f
 
-static int tests_run    = 0;
-static int tests_passed = 0;
+#include "test_harness.h"
 
 static Tensor* make_rand(int* shape, int ndim, bool requires_grad) {
     TensorConfig cfg = {0};

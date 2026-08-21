@@ -10,8 +10,7 @@
 
 #include "cml.h"
 #include "ops/ir/gpu/vulkan_backend.h"
-
-static int g_fail = 0;
+#include "test_harness.h"
 
 static Tensor* mk(int r, int c, const float* vals) {
     Tensor* t = cml_zeros_2d(r, c);
@@ -29,8 +28,13 @@ static void check(const char* name, Tensor* out, const float* expect, int n) {
             if (ok) printf("  FAIL [%s] @%d: got %.5f want %.5f\n", name, i, d[i], expect[i]);
             ok = 0;
         }
-    printf("  %-20s %s\n", name, ok ? "PASS" : "FAIL");
-    if (!ok) g_fail = 1;
+    tests_run++;
+    if (ok) {
+        tests_passed++;
+        printf("  %-20s PASS\n", name);
+    } else {
+        printf("  %-20s FAIL\n", name);
+    }
 }
 
 int main(void) {
@@ -60,6 +64,5 @@ int main(void) {
       float e2[4] = {60, 0, 140, 0};
       check("matmul_add_relu", cml_relu(cml_add(mk(2,2,x), mk(2,2,y))), e2, 4); }
 
-    printf("\n%s\n", g_fail ? "GPU EXEC TESTS FAILED" : "All GPU exec tests passed");
-    return g_fail;
+    return TEST_SUMMARY();
 }

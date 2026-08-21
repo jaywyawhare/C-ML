@@ -11,11 +11,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include "cml.h"
+#include "test_harness.h"
 
 #define EPS 1e-3f
 #define TOL 2e-2f
 
-static int g_pass = 0, g_total = 0;
 static const TensorConfig F32 = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                                  .has_dtype = true, .has_device = true};
 
@@ -41,7 +41,7 @@ static Tensor* op_square(Tensor* x) { return uop_mul(x, x); }
 static Tensor* op_id(Tensor* x)     { return uop_add(x, x); }   /* 2x */
 
 static void check_unary(const char* name, unary_fn op, float lo, float hi) {
-    g_total++;
+    tests_run++;
     srand(1234);
     int shape[] = {6};
     float xd[6];
@@ -66,14 +66,14 @@ static void check_unary(const char* name, unary_fn op, float lo, float hi) {
         float num = (fp - fm) / (2 * EPS);
         if (fabsf(num - g[i]) > TOL) { ok = 0; printf("    [%s i=%d] analytic=%.4f num=%.4f\n", name, i, g[i], num); break; }
     }
-    if (ok) { g_pass++; printf("  PASS: %s\n", name); }
+    if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
     else    { printf("  FAIL: %s\n", name); }
     tensor_free(x); tensor_free(y); tensor_free(L);
 }
 
 /* matmul grad: L = sum(x @ W), check dL/dx */
 static void check_matmul(void) {
-    g_total++;
+    tests_run++;
     int xs[] = {2, 3}, ws[] = {3, 2};
     float xd[6] = {0.1f, -0.2f, 0.3f, 0.4f, -0.5f, 0.6f};
     float wd[6] = {1, 2, 3, 4, 5, 6};
@@ -97,7 +97,7 @@ static void check_matmul(void) {
             if (fabsf(num - g[i]) > TOL) ok = 0;
         }
     }
-    if (ok) { g_pass++; printf("  PASS: matmul\n"); } else printf("  FAIL: matmul\n");
+    if (ok) { tests_passed++; printf("  PASS: matmul\n"); } else printf("  FAIL: matmul\n");
     tensor_free(x); tensor_free(w); tensor_free(y); tensor_free(L);
 }
 
@@ -111,7 +111,6 @@ int main(void) {
     check_unary("square",  op_square,  -1.5f, 1.5f);
     check_unary("add_self",op_id,      -1.0f, 1.0f);
     check_matmul();
-    printf("\nResults: %d/%d passed\n", g_pass, g_total);
     cml_cleanup();
-    return (g_pass == g_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "cml.h"
+#include "test_harness.h"
 #include "tensor/realize.h"
 #include "alloc/cml_allocator.h"
 
@@ -274,26 +275,13 @@ int main(void) {
 
     printf("test_convergence\n\n");
 
-    int total   = 0;
-    int passed  = 0;
-
-    printf("[1/3] XOR MLP Convergence\n");
-    total++;
-    if (test_xor_mlp()) passed++;
+    CHECK("XOR MLP convergence", test_xor_mlp());
     printf("\n");
-
-    printf("[2/3] Linear Regression Convergence\n");
-    total++;
-    if (test_linear_regression()) passed++;
+    CHECK("Linear Regression convergence", test_linear_regression());
     printf("\n");
-
-    printf("[3/3] Conv2d Pattern Classification\n");
-    total++;
-    if (test_conv2d_pattern()) passed++;
+    CHECK("Conv2d pattern classification convergence", test_conv2d_pattern());
     printf("\n");
-
-    printf("%d/%d convergence tests passed\n", passed, total);
 
     cml_cleanup();
-    return (passed == total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

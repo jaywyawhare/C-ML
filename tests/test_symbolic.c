@@ -4,17 +4,17 @@
 #include <string.h>
 #include <assert.h>
 
-static int tests_passed = 0;
-static int tests_failed = 0;
+#include "test_harness.h"
 
+#undef TEST
 #define TEST(name) \
     do { printf("  TEST: %-50s ", #name); } while(0)
 
 #define PASS() \
-    do { printf("[PASS]\n"); tests_passed++; } while(0)
+    do { printf("[PASS]\n"); tests_run++; tests_passed++; } while(0)
 
 #define FAIL(msg) \
-    do { printf("[FAIL] %s\n", msg); tests_failed++; } while(0)
+    do { printf("[FAIL] %s\n", (msg)); tests_run++; } while(0)
 
 #define ASSERT_EQ(a, b) \
     do { if ((a) != (b)) { \
@@ -625,6 +625,5 @@ int main(void) {
     test_shape_broadcast_incompatible();
     test_div_by_zero_returns_null();
 
-    printf("\nResults: %d passed, %d failed\n\n", tests_passed, tests_failed);
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_SUMMARY();
 }

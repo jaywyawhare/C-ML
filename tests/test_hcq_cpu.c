@@ -9,12 +9,12 @@
 #include <string.h>
 
 #include "ops/ir/hcq.h"
+#include "test_harness.h"
 #include "ops/ir/hcq_backend.h"
 
-static int g_pass = 0, g_total = 0;
 static int check(const char* name, int ok) {
-    g_total++;
-    if (ok) { g_pass++; printf("  PASS: %s\n", name); }
+    tests_run++;
+    if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
     else    { printf("  FAIL: %s\n", name); }
     return ok;
 }
@@ -85,6 +85,5 @@ int main(void) {
     cml_hcq_queue_destroy(s2);
     cml_hcq_queue_destroy(q);
 
-    printf("\nResults: %d/%d passed\n", g_pass, g_total);
-    return (g_pass == g_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

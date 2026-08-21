@@ -21,11 +21,11 @@
 #include <string.h>
 
 #include "tensor/tensor.h"
+#include "test_harness.h"
 #include "ops/uops.h"
 #include "ops/simd_math.h"
 #include "ops/simd_utils.h"
 
-static int g_pass = 0, g_total = 0;
 
 static const TensorConfig cpu_f32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
@@ -58,7 +58,7 @@ typedef void    (*unary_simd_fn)(const float*, float*, size_t);
 static void check_unary(const char* name, unary_op_fn op, unary_ref_fn ref,
                         unary_simd_fn simd, float lo, float hi,
                         float atol, float rtol) {
-    g_total++;
+    tests_run++;
     int failures = 0;
     for (int si = 0; si < N_SIZES; si++) {
         int n = SIZES[si];
@@ -93,7 +93,7 @@ static void check_unary(const char* name, unary_op_fn op, unary_ref_fn ref,
         free(in); free(sim);
         tensor_free(x); tensor_free(y);
     }
-    if (failures == 0) { g_pass++; printf("  PASS: unary %-10s (%d sizes)\n", name, N_SIZES); }
+    if (failures == 0) { tests_passed++; printf("  PASS: unary %-10s (%d sizes)\n", name, N_SIZES); }
     else               { printf("  FAIL: unary %-10s (%d mismatches)\n", name, failures); }
 }
 
@@ -106,7 +106,7 @@ typedef void    (*binary_simd_fn)(const float*, const float*, float*, size_t);
 static void check_binary(const char* name, binary_op_fn op, binary_ref_fn ref,
                          binary_simd_fn simd, float lo, float hi,
                          float atol, float rtol) {
-    g_total++;
+    tests_run++;
     int failures = 0;
     for (int mode = 0; mode < 3; mode++) {
         for (int si = 0; si < N_SIZES; si++) {
@@ -149,14 +149,14 @@ static void check_binary(const char* name, binary_op_fn op, binary_ref_fn ref,
             tensor_free(ta); tensor_free(tb); tensor_free(tc);
         }
     }
-    if (failures == 0) { g_pass++; printf("  PASS: binary %-10s (3 modes x %d sizes)\n", name, N_SIZES); }
+    if (failures == 0) { tests_passed++; printf("  PASS: binary %-10s (3 modes x %d sizes)\n", name, N_SIZES); }
     else               { printf("  FAIL: binary %-10s (%d mismatches)\n", name, failures); }
 }
 
 /* ---- reductions ------------------------------------------------------- */
 static void check_reduction(const char* name, unary_op_fn op,
                             int is_max, int is_mean) {
-    g_total++;
+    tests_run++;
     int failures = 0;
     for (int si = 0; si < N_SIZES; si++) {
         int n = SIZES[si];
@@ -193,7 +193,7 @@ static void check_reduction(const char* name, unary_op_fn op,
         free(in);
         tensor_free(x); tensor_free(y);
     }
-    if (failures == 0) { g_pass++; printf("  PASS: reduce %-10s (%d sizes)\n", name, N_SIZES); }
+    if (failures == 0) { tests_passed++; printf("  PASS: reduce %-10s (%d sizes)\n", name, N_SIZES); }
     else               { printf("  FAIL: reduce %-10s (%d mismatches)\n", name, failures); }
 }
 
@@ -257,6 +257,5 @@ int main(void) {
     check_reduction("mean", red_mean, 0, 1);
     check_reduction("max",  red_max,  1, 0);
 
-    printf("\nResults: %d/%d checks passed\n", g_pass, g_total);
-    return (g_pass == g_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

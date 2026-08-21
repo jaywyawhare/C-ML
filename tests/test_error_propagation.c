@@ -10,14 +10,14 @@
 #include <string.h>
 
 #include "cml.h"
+#include "test_harness.h"
 #include "core/error_codes.h"
 #include "core/logging.h"
 #include "core/quantization.h"
 
-static int g_pass = 0, g_total = 0;
 static int check(const char* name, int ok) {
-    g_total++;
-    if (ok) { g_pass++; printf("  PASS: %s\n", name); }
+    tests_run++;
+    if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
     else    { printf("  FAIL: %s\n", name); }
     return ok;
 }
@@ -55,6 +55,5 @@ int main(void) {
           (cml_clear_last_error(), cml_get_last_error() == NULL &&
            cml_get_last_error_code() == CM_SUCCESS));
 
-    printf("\nResults: %d/%d passed\n", g_pass, g_total);
-    return (g_pass == g_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }

@@ -11,14 +11,16 @@
 #include <math.h>
 #include <stdlib.h>
 
-static int g_failures = 0;
+#include "test_harness.h"
 
 static void check_close(const char* what, float got, float want) {
     float tol = 1e-4f * (1.0f + fabsf(want));
-    if (fabsf(got - want) > tol) {
-        printf("  FAIL %s: got %.6f want %.6f\n", what, got, want);
-        g_failures++;
+    tests_run++;
+    if (fabsf(got - want) <= tol) {
+        tests_passed++;
+        return;
     }
+    printf("  FAIL %s: got %.6f want %.6f\n", what, got, want);
 }
 
 /* out = relu(x @ W), x:[M,K], W:[K,N] -> out:[M,N]  (two graph inputs) */
@@ -42,11 +44,11 @@ static void test_matmul_relu(void) {
     opts.format = AOT_FORMAT_SHARED_LIB;
     const char* so = "/tmp/cml_aot_test_mm.so";
     if (cml_aot_compile(ir, so, &opts) != 0) {
-        printf("  FAIL compile\n"); g_failures++; return;
+        printf("  FAIL compile\n"); tests_run++; return;
     }
 
     CMLAOTModel* model = cml_aot_load(so);
-    if (!model) { printf("  FAIL load\n"); g_failures++; return; }
+    if (!model) { printf("  FAIL load\n"); tests_run++; return; }
 
     float outbuf[4] = {0};
     int os[2] = {M, N};
@@ -54,7 +56,7 @@ static void test_matmul_relu(void) {
     Tensor* ins[2] = {x, w};
     Tensor* outs[1] = {ot};
     if (cml_aot_execute(model, ins, 2, outs, 1) != 0) {
-        printf("  FAIL execute\n"); g_failures++; cml_aot_free(model); return;
+        printf("  FAIL execute\n"); tests_run++; cml_aot_free(model); return;
     }
 
     /* Expected: relu(x @ w) */
@@ -96,10 +98,10 @@ static void test_elementwise_chain(void) {
     AOTCompileOptions opts = cml_aot_default_options();
     const char* so = "/tmp/cml_aot_test_ew.so";
     if (cml_aot_compile(ir, so, &opts) != 0) {
-        printf("  FAIL compile\n"); g_failures++; return;
+        printf("  FAIL compile\n"); tests_run++; return;
     }
     CMLAOTModel* model = cml_aot_load(so);
-    if (!model) { printf("  FAIL load\n"); g_failures++; return; }
+    if (!model) { printf("  FAIL load\n"); tests_run++; return; }
 
     float outbuf[5] = {0};
     Tensor* ot = tensor_from_data(outbuf, xs, 1, NULL);
@@ -107,7 +109,7 @@ static void test_elementwise_chain(void) {
     Tensor* ins[3] = {x, c2, c1};
     Tensor* outs[1] = {ot};
     if (cml_aot_execute(model, ins, 3, outs, 1) != 0) {
-        printf("  FAIL execute\n"); g_failures++; cml_aot_free(model); return;
+        printf("  FAIL execute\n"); tests_run++; cml_aot_free(model); return;
     }
     const float* got = (const float*)ot->data;
     for (int i = 0; i < N; i++) {
@@ -157,17 +159,17 @@ static void test_reductions(void) {
         char so[128];
         snprintf(so, sizeof(so), "/tmp/cml_aot_test_red_%zu.so", c);
         if (cml_aot_compile(ir, so, &opts) != 0) {
-            printf("  FAIL compile %s\n", cases[c].name); g_failures++; continue;
+            printf("  FAIL compile %s\n", cases[c].name); tests_run++; continue;
         }
         CMLAOTModel* model = cml_aot_load(so);
-        if (!model) { printf("  FAIL load %s\n", cases[c].name); g_failures++; continue; }
+        if (!model) { printf("  FAIL load %s\n", cases[c].name); tests_run++; continue; }
 
         float outbuf[1] = {0};
         Tensor* ot = tensor_from_data(outbuf, os, 1, NULL);
         Tensor* ins[1] = {x};
         Tensor* outs[1] = {ot};
         if (cml_aot_execute(model, ins, 1, outs, 1) != 0) {
-            printf("  FAIL execute %s\n", cases[c].name); g_failures++;
+            printf("  FAIL execute %s\n", cases[c].name); tests_run++;
             cml_aot_free(model); continue;
         }
         check_close(cases[c].name, ((const float*)ot->data)[0], cases[c].expected);
@@ -196,7 +198,7 @@ static void test_integral_constant(void) {
     opts.format = AOT_FORMAT_SHARED_LIB;
     const char* so = "/tmp/cml_aot_test_const.so";
     if (cml_aot_compile(ir, so, &opts) != 0) {
-        printf("  FAIL compile (integral float literal)\n"); g_failures++; return;
+        printf("  FAIL compile (integral float literal)\n"); tests_run++; return;
     }
     printf("  integral constants compile: PASS\n");
 }
@@ -220,26 +222,26 @@ static void test_nan_through_aot(void) {
     opts.format = AOT_FORMAT_SHARED_LIB;
     const char* so = "/tmp/cml_aot_test_nan.so";
     if (cml_aot_compile(ir, so, &opts) != 0) {
-        printf("  FAIL compile\n"); g_failures++; return;
+        printf("  FAIL compile\n"); tests_run++; return;
     }
     CMLAOTModel* model = cml_aot_load(so);
-    if (!model) { printf("  FAIL load\n"); g_failures++; return; }
+    if (!model) { printf("  FAIL load\n"); tests_run++; return; }
 
     float outbuf[4] = {0};
     Tensor* ot = tensor_from_data(outbuf, shape, 1, NULL);
     Tensor* ins[1] = {x};
     Tensor* outs[1] = {ot};
     if (cml_aot_execute(model, ins, 1, outs, 1) != 0) {
-        printf("  FAIL execute\n"); g_failures++; cml_aot_free(model); return;
+        printf("  FAIL execute\n"); tests_run++; cml_aot_free(model); return;
     }
     const float* got = (const float*)ot->data;
     if (!isnan(got[0])) {
         printf("  FAIL relu(nan) = %g, expected nan (AOT swallowed the NaN)\n", got[0]);
-        g_failures++;
+        tests_run++;
     } else if (got[1] != 0.0f || got[2] != 3.0f || got[3] != 1.0f) {
         printf("  FAIL relu finite values = [%g %g %g], expected [0 3 1]\n",
                got[1], got[2], got[3]);
-        g_failures++;
+        tests_run++;
     } else {
         printf("  relu propagates NaN: PASS\n");
     }
@@ -255,10 +257,5 @@ int main(void) {
     test_integral_constant();
     test_nan_through_aot();
 
-    if (g_failures == 0) {
-        printf("AOT round-trip: ALL PASSED\n");
-        return 0;
-    }
-    printf("AOT round-trip: %d failure(s)\n", g_failures);
-    return 1;
+    return TEST_SUMMARY();
 }
