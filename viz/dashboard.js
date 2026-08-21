@@ -11,8 +11,9 @@
     graph:       { frame: "viz", src: "viz.html?embed=1", vizTab: "graph" },
     training:    { frame: "viz", src: "viz.html?embed=1", vizTab: "training" },
     kernels:     { frame: "viz", src: "viz.html?embed=1", vizTab: "codegen" },
+    profile:     { frame: "viz", src: "viz.html?embed=1", vizTab: "flamegraph" },
   };
-  var ORDER = ["experiments", "graph", "training", "kernels"];
+  var ORDER = ["experiments", "graph", "training", "kernels", "profile"];
 
   var frameExp = document.getElementById("frame-experiments");
   var frameViz = document.getElementById("frame-viz");
@@ -41,9 +42,11 @@
 
     navItems.forEach(function (b) { b.classList.toggle("active", b.dataset.view === view); });
 
-    ensureLoaded(v.frame === "viz" ? "viz" : "experiments", v.vizTab);
+    /* Make the target frame visible BEFORE giving it a src: a frame that is
+     * still display:none when src lands can have its load deferred. */
     frameExp.classList.toggle("active", v.frame === "experiments");
     frameViz.classList.toggle("active", v.frame === "viz");
+    ensureLoaded(v.frame === "viz" ? "viz" : "experiments", v.vizTab);
 
     if (v.frame === "viz") {
       // pass the target internal tab via the hash (read on first load) AND postMessage

@@ -19,7 +19,19 @@ const State = {
   // Execution flamegraph (Kernel Studio)
   flamegraph: null,
   _flameZoom: null,   // id of the zoomed-in node, or null for the whole step
+  _flameSearch: "",   // highlight term (regex, falls back to substring)
+  /* Steady state by default: the first execution of every signature carries the
+   * JIT compile, which was 86% of a measured run and swamped every real kernel. */
+  _flameWarmup: false,
+  /* "aggregate" answers where the time went; "timeline" answers what ran when.
+   * They are different questions and neither substitutes for the other. */
+  _flameMode: "timeline",
+  _flameWin: null,       // [t0, t1] ms window when zoomed into the timeline
+
   // Training checkboxes
+  groupByScope: true,    // collapse graph nodes under their module path
+  lossSmoothing: 0,      // EMA weight, 0 = raw
+  lossLogScale: false,
   showTrainingLoss: true,
   showTestingLoss: false,
   showValidationLoss: false,
@@ -207,6 +219,8 @@ function switchTab(tabId) {
     tc.classList.toggle("active", tc.id === `tab-${tabId}`);
   });
 
+  if (typeof hideFlameTip === "function") hideFlameTip();
+
   // Manage SSE connections based on active tab
   connectDataForTab(tabId);
 
@@ -223,12 +237,16 @@ function renderActiveTab() {
   if (State.activeTab === "graph") renderGraphView();
   else if (State.activeTab === "training") renderTrainingView();
   else if (State.activeTab === "codegen") renderCodeGenView();
+  else if (State.activeTab === "flamegraph") renderFlamegraphView();
 }
 
 function connectDataForTab(tabId) {
   const needsGraph    = tabId === "graph";
   const needsTraining = tabId === "graph" || tabId === "training";
   const needsKernels  = tabId === "graph" || tabId === "codegen";
+  /* The flamegraph is a one-shot artifact written at process exit, so it is
+   * fetched on demand rather than streamed. */
+  if (tabId === "flamegraph") loadFlamegraph();
 
   // Start the loading-skeleton grace window for this tab, then re-render once
   // it lapses so a skeleton flips to the empty/marketing state if no data came.
@@ -300,6 +318,31 @@ function toCytoscapeElements(graph) {
     }
   }
 
+  /* Module-scope compound nodes. After decomposition a model is thousands of
+     primitives; grouping them under the layer that emitted them is the only way
+     the graph stays legible. Every prefix becomes its own box so nesting
+     (Sequential > Linear) renders as nested boxes. */
+  const scopeParents = new Set();
+  if (State.groupByScope) {
+    for (const node of Object.values(graph)) {
+      if (!node.scope) continue;
+      const parts = String(node.scope).split("/");
+      for (let i = 1; i <= parts.length; i++) scopeParents.add(parts.slice(0, i).join("/"));
+    }
+    for (const path of scopeParents) {
+      const parts = path.split("/");
+      elements.push({
+        data: {
+          id: "scope::" + path,
+          label: parts[parts.length - 1],
+          isScope: true,
+          parent: parts.length > 1 ? "scope::" + parts.slice(0, -1).join("/") : undefined,
+        },
+        classes: "scope-cluster",
+      });
+    }
+  }
+
   for (const [kernelId, nodeIds] of Object.entries(fusedGroups)) {
     const allDead = nodeIds.every(id => graph[id].is_dead);
     elements.push({
@@ -318,7 +361,12 @@ function toCytoscapeElements(graph) {
     elements.push({
       data: {
         id: String(id), label, color, isDead, isFused, width,
-        parent: (isFused && node.fusedKernelId) ? node.fusedKernelId : undefined
+        /* A node has one parent: the fused cluster wins when present, since
+           that grouping reflects what actually executes. */
+        parent: (isFused && node.fusedKernelId) ? node.fusedKernelId
+              : (State.groupByScope && node.scope) ? "scope::" + node.scope
+              : undefined,
+        scope: node.scope || ""
       },
       classes: (isDead ? "dead " : "") + (isFused ? "fused " : "") + (isUnknown ? "unknown" : "")
     });
@@ -548,6 +596,13 @@ function cytoscapeOpsStyle() {
       "border-width": 2, "border-style": "dashed", "label": "", "shape": "round-rectangle", "padding": 12,
       "width": "label", "height": "label"
     }},
+    { selector: "node.scope-cluster", style: {
+      "background-color": "#8b5cf6", "background-opacity": 0.06, "border-color": "#8b5cf6",
+      "border-width": 1, "border-style": "solid", "shape": "round-rectangle", "padding": 16,
+      "label": "data(label)", "text-valign": "top", "text-halign": "center",
+      "font-size": 10, "font-weight": 600, "color": "#a78bfa",
+      "text-margin-y": -4, "width": "label", "height": "label"
+    }},
     { selector: "node.dead", style: {
       "border-color": "#ef4444", "border-style": "dashed", "border-width": 2,
       "background-color": "#18181b", "color": "#a1a1aa"
@@ -641,6 +696,21 @@ function buildGraphControls() {
     return b;
   };
   const cy = () => State._cyOps;
+
+  /* Scope grouping changes the element set, so it re-renders rather than just
+     restyling. */
+  const scopeBtn = mk("Group by module scope",
+    '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/>',
+    () => {
+      State.groupByScope = !State.groupByScope;
+      scopeBtn.classList.toggle("active", State.groupByScope);
+      const tab = $("#tab-graph");
+      if (tab) tab.innerHTML = ""; // force the DOM rebuild guard to re-run
+      renderGraphView();
+    });
+  scopeBtn.classList.toggle("active", State.groupByScope);
+  wrap.appendChild(scopeBtn);
+
   wrap.appendChild(mk("Zoom in", '<line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
     () => { const c = cy(); if (c) c.zoom({ level: c.zoom() * 1.25, renderedPosition: { x: c.width() / 2, y: c.height() / 2 } }); }));
   wrap.appendChild(mk("Zoom out", '<line x1="8" y1="11" x2="14" y2="11"/><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
@@ -1127,16 +1197,26 @@ function generateKernelCode(kernel, backend) {
 
 // Color by kernel kind; fused chains get the accent so a collapsed hot chain
 // reads as one wide bar. Root/phase rows are neutral scaffolding.
+/* Kind colours, drawn from the instrument palette in theme.css rather than a
+ * generic chart ramp. The amber channel is reserved for the hot path (fused
+ * kernels are 55% of a steady-state step here), cyan is the secondary compute
+ * channel, and anything structural or uncategorised recedes into the graphite
+ * neutrals so it never competes with real work for attention. */
 const FLAME_COLORS = {
-  fused:    "#8b5cf6",
-  matmul:   "#06b6d4",
-  conv:     "#f59e0b",
-  elemwise: "#10b981",
-  reduce:   "#ef4444",
-  movement: "#6b7280",
-  other:    "#64748b",
-  phase:    "#3b4252",
-  root:     "#252b3b",
+  fused:    "#ffb454",   /* amber  — primary signal            */
+  matmul:   "#4ecdc4",   /* cyan   — secondary compute channel */
+  conv:     "#ffce5a",   /* gold                                */
+  elemwise: "#57d69a",   /* green                               */
+  reduce:   "#ff7a7a",   /* coral                               */
+  movement: "#8b93a7",   /* slate  — data motion, not compute   */
+  index:    "#9d8bc4",   /* violet — data-dependent access      */
+  init:     "#6f7c94",   /* steel  — buffer creation / fill     */
+  optim:    "#d98fb0",   /* rose   — optimizer update           */
+  other:    "#5c6577",   /* dim slate                           */
+  scope:    "#38414f",   /* module frames: structure, recessed  */
+  host:     "#2a3140",   /* not in a kernel: framework overhead */
+  phase:    "#2b323d",
+  root:     "#232932",
 };
 
 // The flamegraph.json is emitted at process exit, so fetch it on demand.
@@ -1145,22 +1225,54 @@ function loadFlamegraph() {
     .then(r => (r.ok ? r.json() : null))
     .then(d => {
       State.flamegraph = (d && Array.isArray(d.spans) && d.spans.length) ? d : null;
-      if (State.activeTab === "codegen") renderCodeGenView();
+      if (State.activeTab === "flamegraph") renderFlamegraphView();
     })
     .catch(() => {});
 }
 
 // Fold the flat span list into a phase → kind → kernel tree, summing ms. Each
 // node gets a stable id path so zoom survives a re-render.
-function buildFlameTree(fg) {
+/* `includeWarmup` keeps each signature's first execution -- the one that paid
+ * for compiling the kernel. Excluded, the widths describe a repeated training
+ * step, which is what a profile is normally read for. */
+function buildFlameTree(fg, includeWarmup) {
   const root = { id: "", name: "step", kind: "root", ms: 0, count: 0, children: {} };
   for (const s of fg.spans) {
-    const steps = [
-      { key: "ph:" + s.phase, label: s.phase, kind: "phase" },
-      { key: "kd:" + s.kind,  label: s.kind,  kind: s.kind  },
-      { key: "op:" + s.op + ":" + s.numel, label: s.op, kind: s.kind, numel: s.numel },
-    ];
-    let node = root; root.ms += s.ms; root.count++;
+    const first = s.first_ms || 0;
+    const ms    = includeWarmup ? s.ms : s.ms - first;
+    const calls = includeWarmup ? (s.count || 1) : Math.max(0, (s.count || 1) - 1);
+    if (ms <= 0 || calls <= 0) continue;   /* ran once: it is all warmup */
+    /* The stack. Capture records the C call path that BUILT each node --
+     * "main;module_forward;linear_forward;uop_linear" -- which is the only real
+     * stack a lazy graph has: by execution time every kernel is dispatched from
+     * one executor loop, so sampling there would give a single frame for the
+     * whole program. Falling back to the module path, then to the coarse kind,
+     * keeps older profiles and unattributed nodes rendering as something. */
+    const steps = [{ key: "ph:" + s.phase, label: s.phase, kind: "phase" }];
+    const frames = (s.stack || "").split(";").filter(Boolean);
+    if (frames.length) {
+      let path = "";
+      for (const f of frames) {
+        path += ";" + f;
+        steps.push({ key: "fr:" + path, label: f, kind: "scope" });
+      }
+    } else {
+      const scope = (s.scope || "").split("/").filter(Boolean);
+      if (scope.length) {
+        let path = "";
+        for (const seg of scope) { path += "/" + seg; steps.push({ key: "sc:" + path, label: seg, kind: "scope" }); }
+      } else {
+        steps.push({ key: "kd:" + s.kind, label: s.kind, kind: s.kind });
+      }
+    }
+    /* Kind sits between the call stack and the kernel. It is the one grouping a
+     * reader asks for that the stack cannot answer -- "how much of this call
+     * path is fusion vs matmul" -- so it earns its row. */
+    steps.push({ key: "kd:" + s.kind, label: s.kind, kind: s.kind });
+    steps.push({ key: "op:" + s.op + ":" + s.numel, label: s.op, kind: s.kind, numel: s.numel });
+
+    const occurrences = calls;
+    let node = root; root.ms += ms; root.count += occurrences;
     for (const st of steps) {
       let child = node.children[st.key];
       if (!child) {
@@ -1168,7 +1280,7 @@ function buildFlameTree(fg) {
                   numel: st.numel, ms: 0, count: 0, children: {} };
         node.children[st.key] = child;
       }
-      child.ms += s.ms; child.count++;
+      child.ms += ms; child.count += occurrences;
       node = child;
     }
   }
@@ -1185,11 +1297,221 @@ function findFlameNode(node, id) {
 }
 
 // Icicle layout: one row per depth, cell width proportional to ms.
-function layoutFlame(view) {
+
+/* Find the repeating unit of the run.
+ *
+ * A training loop is hundreds of near-identical iterations, so a full-run view
+ * spends ~38% of its width on one-time setup and squeezes the iteration you
+ * actually want to read into about three pixels. Detecting the period lets the
+ * chart open on one step instead.
+ *
+ * No op name is hardcoded: the marker is whichever kernel signature recurs most
+ * regularly -- lowest spread in its inter-arrival times -- which is the loop
+ * boundary by construction, whatever the model or optimizer happens to be. */
+function detectSteps(fg) {
+  const raw = (fg.timeline && fg.timeline.spans) || [];
+  if (raw.length < 20) return null;
+
+  const times = new Map();
+  for (const [ei, t0] of raw) {
+    if (!times.has(ei)) times.set(ei, []);
+    times.get(ei).push(t0);
+  }
+
+  const median = (a) => {
+    if (!a.length) return 0;
+    const b = a.slice().sort((x, y) => x - y);
+    return b[Math.floor(b.length / 2)];
+  };
+
+  /* Estimate the period from the median inter-arrival of every signature that
+   * recurs, then take the median of those. Mean and standard deviation are both
+   * useless here -- warm-up leaves a single gap hundreds of times the period,
+   * which drags the mean and explodes the variance while leaving the median
+   * untouched. Consensus across signatures makes it robust to any one of them
+   * firing more than once per iteration. */
+  const cands = [];
+  for (const [ei, ts] of times) {
+    if (ts.length < 8) continue;
+    ts.sort((a, b) => a - b);
+    const gaps = [];
+    for (let i = 1; i < ts.length; i++) gaps.push(ts[i] - ts[i - 1]);
+    cands.push({ ei, ts, med: median(gaps), n: ts.length });
+  }
+  if (cands.length < 3) return null;
+
+  const period = median(cands.map(c => c.med));
+  if (!(period > 0)) return null;
+
+  /* Boundaries come from the signature that fires closest to once per period
+   * and most often -- that is the loop marker, whatever it happens to be. */
+  const usable = cands.filter(c => Math.abs(c.med - period) <= 0.15 * period);
+  if (!usable.length) return null;
+  usable.sort((a, b) => b.n - a.n);
+  const marker = usable[0];
+
+  return { period, marks: marker.ts, count: marker.n, op: (fg.spans[marker.ei] || {}).op };
+}
+
+/* Fold the execution list into a flame chart: x is wall time, y is stack depth.
+ *
+ * The aggregate view sorts by total cost and answers "where did the time go".
+ * This one keeps the order things actually ran in, so it answers "what ran
+ * when" -- the gap between the two is why a training step's shape is invisible
+ * in the aggregate: 300 identical iterations collapse into one bar there, and
+ * here they are 300 bars in a row.
+ *
+ * Consecutive executions that share a stack prefix extend the same frame rather
+ * than drawing a new one per sample, which is what turns a flat list of 14k
+ * dispatches into a readable chart. */
+function buildFlameChart(fg) {
+  const raw = (fg.timeline && fg.timeline.spans) || [];
+  const out = [];
+  let open = [];
+
+  for (const [ei, t0, dur] of raw) {
+    const sp = fg.spans[ei];
+    if (!sp) continue;
+    const t1 = t0 + dur;
+    const frames = (sp.stack || "").split(";").filter(Boolean);
+    frames.push(sp.op);
+
+    /* How much of the currently-open stack this execution still shares. */
+    let i = 0;
+    while (i < open.length && i < frames.length && open[i].name === frames[i]) i++;
+
+    for (let d = open.length - 1; d >= i; d--) out.push(open[d]);
+    open.length = i;
+
+    for (let d = i; d < frames.length; d++) {
+      open.push({ name: frames[d], depth: d, t0, t1,
+                  kind: d === frames.length - 1 ? sp.kind : "scope",
+                  numel: d === frames.length - 1 ? sp.numel : 0, calls: 0 });
+    }
+    for (const f of open) { f.t1 = t1; f.calls++; }
+  }
+  out.push(...open);
+
+  /* Fill every interval where a frame is open but nothing below it is running.
+   *
+   * Only kernel dispatches are timed; the rest of the wall clock is graph
+   * construction, autodiff emission and allocation between them. Left blank
+   * those intervals read as an idle machine, which is the opposite of true --
+   * they are the framework's own overhead, and in this profile they are the
+   * majority of the run.
+   *
+   * Applied at every depth, not just below the root: a parent stays open across
+   * the gaps inside it, so each level has its own holes where the level beneath
+   * has stopped. Only the complement of the existing children is filled, so a
+   * frame's own internal gap-time is never double counted.
+   *
+   * The deepest level is left alone: a leaf has nothing below it, and a band
+   * under every kernel would claim structure the profile does not have. */
+  const maxDepth = out.reduce((m, f) => Math.max(m, f.depth), 0);
+  const byDepth = new Map();
+  for (const f of out) {
+    if (!byDepth.has(f.depth)) byDepth.set(f.depth, []);
+    byDepth.get(f.depth).push(f);
+  }
+
+  /* A gap has to be worth a frame. Below a microsecond it is the granularity of
+   * the clock rather than an interval anyone can act on -- and there are a lot
+   * of them: on a real profile this floor removes 88% of the gap frames while
+   * keeping 99.5% of the gap *time*, because the ones it drops are individually
+   * ~1ns and collectively under half a millisecond. The blocks that carry the
+   * finding (framework overhead between training steps, ~0.4ms each) all stay. */
+  const GAP_MIN_MS = 0.001;
+  const gapFrames = [];
+  for (let d = 0; d < maxDepth; d++) {
+    /* A host frame has nothing below it by definition -- nothing was running.
+     * Treating one as a parent would cascade an identical band down every
+     * remaining level, turning one honest "not in a kernel" block into a solid
+     * rectangle that looks like a deep stack. */
+    const parents = (byDepth.get(d) || []).filter(p => p.kind !== "host")
+                                          .sort((a, b) => a.t0 - b.t0);
+    const kids = (byDepth.get(d + 1) || []).slice().sort((a, b) => a.t0 - b.t0);
+    let ki = 0;
+    for (const p of parents) {
+      while (ki < kids.length && kids[ki].t1 <= p.t0 + 1e-9) ki++;
+
+      /* Only frames that actually have children get filled. Branches end at
+       * different depths, so a leaf kernel can sit above the deepest level in
+       * the chart -- filling under it would invent "time inside FILL not spent
+       * in FILL's children", which is meaningless: it has none. */
+      let hasKid = false;
+      for (let j = ki; j < kids.length && kids[j].t0 < p.t1 - 1e-9; j++) {
+        if (kids[j].t1 > p.t0 + 1e-9) { hasKid = true; break; }
+      }
+      if (!hasKid) continue;
+
+      let cursor = p.t0;
+      for (let j = ki; j < kids.length && kids[j].t0 < p.t1 - 1e-9; j++) {
+        const k = kids[j];
+        if (k.t0 - cursor >= GAP_MIN_MS)
+          gapFrames.push({ name: "host", depth: d + 1, t0: cursor, t1: Math.min(k.t0, p.t1),
+                           kind: "host", calls: 0, numel: 0 });
+        if (k.t1 > cursor) cursor = k.t1;
+      }
+      if (p.t1 - cursor >= GAP_MIN_MS)
+        gapFrames.push({ name: "host", depth: d + 1, t0: cursor, t1: p.t1,
+                         kind: "host", calls: 0, numel: 0 });
+    }
+  }
+  out.push(...gapFrames);
+
+  return out;
+}
+
+/* Lay out every frame, however thin.
+ *
+ * A flame graph's x-axis is proportional to cost, so a 2px frame is telling the
+ * truth: that op really did take 0.1% of the run. Earlier this folded sub-1.6%
+ * siblings into "+N more" to stop the deepest row looking like a picket fence,
+ * but that was papering over a weak zoom. The fix is the one the format already
+ * has -- click to zoom and the thin frames widen -- so nothing is hidden now.
+ * Labels are still width-gated, which is standard: the box is drawn, the name
+ * appears when there is room for it, and search finds what you cannot read. */
+/* Colour for one frame -- the classic flame palette.
+ *
+ * The reference implementation picks each frame's colour from a warm ramp
+ * (r 205-255, g 0-230, b 0-55) and that randomised red-through-yellow spread is
+ * most of what makes a flame graph legible: with one flat tone per level the eye
+ * has nothing to follow a call path by. The offset is hashed from the frame name
+ * rather than random, so a function keeps its colour between renders and across
+ * the levels it appears on.
+ *
+ * Kernel kind (fused / matmul / elemwise) is not encoded here any more -- it
+ * moved to the tooltip and the table below, where it can be read exactly rather
+ * than guessed from a swatch. */
+function flameColor(node) {
+  /* Not-in-a-kernel time is deliberately outside the warm ramp: it is a
+   * different category of thing from a frame that ran. */
+  if (node.kind === "host") return FLAME_COLORS.host;
+  let h = 2166136261;
+  const name = node.name || "";
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const v = ((h >>> 0) % 2048) / 2048;
+  const r = Math.round(205 + 50 * v);
+  const g = Math.round(20 + 210 * v);
+  const b = Math.round(20 + 45 * v);
+  return `rgb(${r} ${g} ${b})`;
+}
+
+/* Warm frames take dark text at every point on that ramp. */
+
+function layoutFlame(view, dropRoot) {
   const cells = [];
   const total = view.ms || 1;
+  /* `dropRoot` omits the view's own frame. It always spans the full width, so
+   * once the breadcrumb above the chart names it, drawing it again just costs a
+   * row -- and with only three informative levels here, a wasted row is a third
+   * of the chart. Kept when the view has no children to fall back on. */
+  const base = (dropRoot && Object.keys(view.children).length) ? -1 : 0;
   (function walk(node, depth, x) {
-    cells.push({ node, depth, x, w: node.ms / total });
+    if (depth + base >= 0) cells.push({ node, depth: depth + base, x, w: node.ms / total });
     let cx = x;
     Object.values(node.children)
       .sort((a, b) => b.ms - a.ms)
@@ -1197,6 +1519,349 @@ function layoutFlame(view) {
   })(view, 0, 0);
   return cells;
 }
+
+/* A floating tooltip rather than the native `title`: title waits ~1s and can
+ * only show plain text, and on a chart whose whole point is comparing widths
+ * that delay is the difference between reading the profile and fighting it. */
+function flameTip(e) {
+  const cell = e.target.closest(".flame-cell");
+  const info = cell && cell.__flame;
+  if (!info) return hideFlameTip();
+
+  let tip = document.getElementById("flame-tip");
+  if (!tip) {
+    tip = el("div", { id: "flame-tip", className: "flame-tip" });
+    document.body.appendChild(tip);
+  }
+  const n = info.node;
+  tip.innerHTML = "";
+  tip.appendChild(el("div", { className: "flame-tip-name" }, n.name));
+  const rows = [
+    ["time", fmtMs(n.ms)],
+    ["share", info.absPct + " of profile"],
+    ["calls", (n.count || 1).toLocaleString()],
+  ];
+  if (info.at !== undefined) rows.splice(1, 0, ["started", fmtMs(info.at) + " in"]);
+  if (n.numel) rows.push(["work", n.numel.toLocaleString() + " elems"]);
+  if (info.merged > 1) rows.push(["merged", info.merged.toLocaleString() + " blocks"]);
+  rows.forEach(([k, v]) => {
+    const r = el("div", { className: "flame-tip-row" });
+    r.appendChild(el("span", { className: "flame-tip-k" }, k));
+    r.appendChild(el("span", { className: "flame-tip-v" }, v));
+    tip.appendChild(r);
+  });
+  /* A merged block is several kernels at this zoom; list them rather than making
+   * the reader zoom in just to learn what they are hovering. */
+  if (info.breakdown && info.breakdown.length > 1) {
+    const total = info.breakdown.reduce((a, b) => a + b[1], 0);
+    tip.appendChild(el("div", { className: "flame-tip-sep" }, "contains"));
+    info.breakdown.slice(0, 5).forEach(([name, ms]) => {
+      const r = el("div", { className: "flame-tip-row" });
+      r.appendChild(el("span", { className: "flame-tip-k" }, name));
+      r.appendChild(el("span", { className: "flame-tip-v" }, pct(ms, total)));
+      tip.appendChild(r);
+    });
+    if (info.breakdown.length > 5)
+      tip.appendChild(el("div", { className: "flame-tip-more" },
+        `+${info.breakdown.length - 5} more`));
+  }
+  tip.style.display = "block";
+
+  /* Flip before the edge so the tooltip never pushes the page sideways. */
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = Math.max(8, y) + "px";
+}
+function hideFlameTip() {
+  const tip = document.getElementById("flame-tip");
+  if (tip) tip.style.display = "none";
+}
+
+/* Path from the root down to `id`, so a zoomed view can keep its ancestors on
+ * screen instead of stranding the reader inside a subtree. */
+function flameAncestors(root, id) {
+  const path = [];
+  (function walk(n, trail) {
+    const t = trail.concat(n);
+    if (n.id === id) { path.push(...t); return true; }
+    return Object.values(n.children).some(c => walk(c, t));
+  })(root, []);
+  return path;
+}
+
+/* Case-insensitive, falling back to a literal substring when the term is not a
+ * valid regex -- half-typed patterns like "FUSED(" should still match. */
+function flameMatcher(term) {
+  if (!term) return null;
+  try { const re = new RegExp(term, "i"); return (name) => re.test(name); }
+  catch (_) { const t = term.toLowerCase(); return (name) => name.toLowerCase().includes(t); }
+}
+
+/* Total time in frames whose name matches, counting each subtree once so a
+ * matched parent does not double-count its matched children. */
+function flameMatchedMs(node, match) {
+  if (!node) return 0;
+  if (match(node.name)) return node.ms;
+  return Object.values(node.children).reduce((n, c) => n + flameMatchedMs(c, match), 0);
+}
+
+/* The flamegraph gets its own tab rather than riding on top of Kernel Studio.
+ * It answers a different question -- where the time went, across the whole run
+ * -- from the code panes, which show what was generated for one accelerator.
+ * Sharing a tab also cost the code panes ~200px of vertical space on every
+ * view, for a chart most visits weren't there to read. */
+function renderFlamegraphView() {
+  const container = $("#tab-flamegraph");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const fg = State.flamegraph;
+  if (!fg) { container.appendChild(renderFlameSection()); return; }
+
+  /* Three tiers, coarse to fine: the four numbers you check first, then the
+   * shape of the run, then the ranked signatures behind that shape. Capture
+   * aggregates per kernel signature, so `spans` is a table of real rows -- it
+   * was the whole profile and only the strip was drawing any of it. */
+  container.appendChild(renderProfileReadout(fg));
+  container.appendChild(renderFlameSection());
+  container.appendChild(renderHotKernels(fg));
+}
+
+/* Headline readouts. Each is a number you would otherwise compute by eye. */
+function renderProfileReadout(fg) {
+  const spans = fg.spans || [];
+  const total = fg.total_ms || spans.reduce((n, s) => n + s.ms, 0);
+  const execs = fg.num_spans || spans.reduce((n, s) => n + (s.count || 1), 0);
+  const hottest = spans.reduce((a, b) => (b.ms > (a ? a.ms : -1) ? b : a), null);
+
+  const stats = [
+    { label: "Total time",   value: fmtMs(total),          note: "across the whole run" },
+    { label: "Executions",   value: execs.toLocaleString(), note: `${spans.length} distinct signatures` },
+    { label: "Hottest",      value: hottest ? hottest.op : "--",
+      note: hottest ? `${pct(hottest.ms, total)} of total · ${(hottest.count || 1).toLocaleString()} calls` : "",
+      hot: true },
+    { label: "Slowest call", value: hottest ? fmtMs(Math.max(...spans.map(s => s.max_ms || 0))) : "--",
+      note: "single worst dispatch" },
+  ];
+
+  const row = el("div", { className: "prof-readout" });
+  stats.forEach(s => {
+    const card = el("div", { className: "prof-stat" + (s.hot ? " hot" : "") });
+    card.appendChild(el("div", { className: "prof-stat-label" }, s.label));
+    card.appendChild(el("div", { className: "prof-stat-value" }, s.value));
+    if (s.note) card.appendChild(el("div", { className: "prof-stat-note" }, s.note));
+    row.appendChild(card);
+  });
+  return row;
+}
+
+/* Ranked signatures. The share column carries a bar as well as a number, so the
+ * distribution reads before any of the digits do. */
+function renderHotKernels(fg) {
+  const spans = (fg.spans || []).slice().sort((a, b) => b.ms - a.ms);
+  const total = fg.total_ms || spans.reduce((n, s) => n + s.ms, 0);
+
+  const sec = el("div", { className: "prof-table-section" });
+  const head = el("div", { className: "flame-head" });
+  head.appendChild(el("h2", { className: "flame-title" }, "Kernels by total time"));
+  head.appendChild(el("span", { className: "prof-table-count" },
+    `${spans.length} signature${spans.length === 1 ? "" : "s"}`));
+  sec.appendChild(head);
+
+  const wrap = el("div", { className: "prof-table-wrap" });
+  const table = el("table", { className: "prof-table" });
+  const thead = el("thead");
+  const hr = el("tr");
+  ["#", "Kernel", "Kind", "Calls", "Total", "Share", "Slowest"].forEach((h, i) =>
+    hr.appendChild(el("th", { className: i >= 3 ? "num" : "" }, h)));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = el("tbody");
+  spans.forEach((s, i) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", { className: "prof-rank" }, String(i + 1)));
+    tr.appendChild(el("td", { className: "prof-op" }, s.op));
+
+    const kindCell = el("td");
+    const chip = el("span", { className: "prof-kind" }, s.kind || "other");
+    chip.style.setProperty("--k", FLAME_COLORS[s.kind] || FLAME_COLORS.other || "#6b7280");
+    kindCell.appendChild(chip);
+    tr.appendChild(kindCell);
+
+    tr.appendChild(el("td", { className: "num" }, (s.count || 1).toLocaleString()));
+    tr.appendChild(el("td", { className: "num" }, fmtMs(s.ms)));
+
+    const shareCell = el("td", { className: "num" });
+    const bar = el("div", { className: "prof-bar" });
+    const fill = el("div", { className: "prof-bar-fill" });
+    fill.style.width = (total ? (s.ms / total) * 100 : 0).toFixed(2) + "%";
+    fill.style.background = FLAME_COLORS[s.kind] || FLAME_COLORS.other || "#6b7280";
+    bar.appendChild(fill);
+    shareCell.appendChild(el("span", { className: "prof-share-num" }, pct(s.ms, total)));
+    shareCell.appendChild(bar);
+    tr.appendChild(shareCell);
+
+    tr.appendChild(el("td", { className: "num dim" }, fmtMs(s.max_ms || 0)));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  sec.appendChild(wrap);
+  return sec;
+}
+
+/* Sub-millisecond dispatches are common, so keep a digit of precision there. */
+function fmtMs(ms) {
+  if (!isFinite(ms)) return "--";
+  if (ms >= 1000) return (ms / 1000).toFixed(2) + " s";
+  if (ms >= 10) return ms.toFixed(1) + " ms";
+  return ms.toFixed(2) + " ms";
+}
+function pct(v, total) { return total ? (100 * v / total).toFixed(1) + "%" : "--"; }
+
+/* Draw the flame chart: x is wall time, y is stack depth.
+ *
+ * Only frames at least a pixel wide in the current window are emitted -- at 25k
+ * frames over 1.8s most are far below that, and drawing them costs layout time
+ * to produce sub-pixel slivers nobody can see or hit. Zooming re-runs this, so
+ * narrowing the window is what reveals them. */
+function renderFlameTimeline(sec, chart, fg, match, ROW_MIN, ROW_MAX, ROW_GAP) {
+  const frames = buildFlameChart(fg);
+  if (!frames.length) {
+    sec.appendChild(el("div", { className: "flame-empty" },
+      "No timeline in this profile — re-run with FLAMEGRAPH=1 to capture one."));
+    return;
+  }
+
+  const runEnd = frames.reduce((m, f) => Math.max(m, f.t1), 0);
+  const [winT0, winT1] = State._flameWin || [0, runEnd];
+  const span = Math.max(winT1 - winT0, 1e-6);
+
+  const visible = frames.filter(f => f.t1 > winT0 && f.t0 < winT1);
+  const rows = visible.reduce((m, f) => Math.max(m, f.depth), 0) + 1;
+  const PX = chart.clientWidth || 1600;
+  const minW = 1 / PX;                       /* a pixel, as a fraction */
+
+  chart.style.height =
+    `clamp(${rows * ROW_MIN}px, ${(rows * 2.8).toFixed(1)}vh, ${rows * ROW_MAX}px)`;
+  const rowPct = `calc(${(100 / rows).toFixed(4)}% - ${ROW_GAP}px)`;
+
+  /* Time ruler: without it "x is time" is a claim rather than something the
+   * reader can measure. Drawn above and below -- the chart is as tall as the
+   * stack is deep, and a single ruler at the top means the bottom rows are read
+   * against an edge that is off in the corner of your eye. */
+  const makeAxis = (where) => {
+    const axis = el("div", { className: "flame-axis flame-axis-" + where });
+    for (let i = 0; i <= 8; i++) {
+      const t = winT0 + (span * i) / 8;
+      const tick = el("div", { className: "flame-tick", style: { left: (i * 12.5) + "%" } },
+        el("span", {}, (span >= 200 ? t.toFixed(0) : t.toFixed(1)) + "ms"));
+      axis.appendChild(tick);
+    }
+    return axis;
+  };
+  sec.appendChild(makeAxis("top"));
+
+  /* Sub-pixel frames are merged, not dropped.
+   *
+   * Dropping them was worse than useless: at full-run zoom a training iteration
+   * is ~0.1px wide, so all 300 of them vanished and the busiest stretch of the
+   * run rendered as blank space -- the chart said "idle" about the part that was
+   * doing the work. Runs of too-narrow frames at the same depth now collapse
+   * into one block covering the same interval, so the region reads as busy and
+   * says how many executions are inside it. */
+  const byDepth = new Map();
+  for (const f of visible) {
+    if (!byDepth.has(f.depth)) byDepth.set(f.depth, []);
+    byDepth.get(f.depth).push(f);
+  }
+
+  let drawn = 0, merged = 0, mergedInto = 0;
+  const emit = (f, x, w, isMerge) => {
+    const hit = match && !isMerge ? match(f.name) : false;
+    const cell = el("div", {
+      className: "flame-cell" + (f.kind === "scope" ? " is-stack" : "")
+               + (f.kind === "host" ? " is-hostgap" : "")
+               + (isMerge && f.kind !== "host" ? " is-merged" : "")
+               + (hit ? " is-match" : "") + (match && !hit && !isMerge ? " is-dim" : ""),
+      style: {
+        left: (Math.max(0, x) * 100) + "%",
+        width: (Math.min(1, x + w) - Math.max(0, x)) * 100 + "%",
+        top: `calc(${((100 * f.depth) / rows).toFixed(4)}%)`, height: rowPct,
+        background: hit ? "var(--flame-match)" : flameColor(f),
+      },
+    });
+    cell.__flame = { node: { name: f.name, ms: f.t1 - f.t0, count: f.calls, numel: f.numel },
+                     absPct: pct(f.t1 - f.t0, runEnd), viewPct: (w * 100).toFixed(1) + "%",
+                     at: f.t0, merged: isMerge ? f.n : 0, breakdown: f.breakdown };
+    if (w * PX >= 34) {
+      const label = isMerge && f.others
+        ? `${f.name} +${f.others}`
+        : (isMerge ? `${f.name} ×${f.n}` : f.name);
+      cell.appendChild(el("span", { className: "flame-label" }, label));
+    }
+    cell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      State._flameWin = [f.t0, f.t1];     /* zoom the time axis to this frame */
+      renderFlamegraphView();
+    });
+    chart.appendChild(cell);
+    drawn++;
+  };
+
+  for (const [, list] of byDepth) {
+    list.sort((a, b) => a.t0 - b.t0);
+    let bucket = null;
+    const flush = () => {
+      if (!bucket) return;
+      if (bucket.n > 1 && bucket.kind !== "host") {
+        /* Named for whatever holds most of the block's time, with the rest
+         * spelled out in the tooltip. */
+        const ranked = [...bucket.mix.entries()].sort((a, b) => b[1] - a[1]);
+        bucket.name = ranked[0][0];
+        bucket.others = ranked.length - 1;
+        bucket.breakdown = ranked;
+      }
+      emit(bucket, (bucket.t0 - winT0) / span, (bucket.t1 - bucket.t0) / span, bucket.n > 1);
+      if (bucket.n > 1) { merged++; mergedInto += bucket.n; }
+      bucket = null;
+    };
+    for (const f of list) {
+      const w = (f.t1 - f.t0) / span;
+      if (w >= minW) { flush(); emit(f, (f.t0 - winT0) / span, w, false); continue; }
+      if (bucket && (f.t0 - bucket.t1) / span < minW) {
+        /* Contiguous enough to be one block at this zoom. */
+        bucket.t1 = Math.max(bucket.t1, f.t1);
+        bucket.n++;
+        bucket.calls += f.calls;
+        /* Keep what is inside, weighted by time. Naming the block "12
+         * executions" told the reader the one thing they already knew from its
+         * hatching and threw away the only thing they were hovering to find. */
+        bucket.mix.set(f.name, (bucket.mix.get(f.name) || 0) + (f.t1 - f.t0));
+      } else {
+        flush();
+        bucket = { name: f.name, depth: f.depth, kind: f.kind, numel: 0,
+                   t0: f.t0, t1: f.t1, calls: f.calls, n: 1,
+                   mix: new Map([[f.name, f.t1 - f.t0]]) };
+      }
+      if ((bucket.t1 - bucket.t0) / span >= minW) flush();
+    }
+    flush();
+  }
+
+  sec.appendChild(chart);
+  sec.appendChild(makeAxis("bottom"));
+  sec.appendChild(el("div", { className: "flame-sub flame-tlnote" },
+    `${(winT1 - winT0).toFixed(1)} ms shown · ${drawn.toLocaleString()} blocks`
+    + (merged ? ` · ${mergedInto.toLocaleString()} sub-pixel executions merged into `
+              + `${merged.toLocaleString()} (zoom to separate them)` : "")
+    + " · click a block to zoom the time axis"));
+}
+
 
 function renderFlameSection() {
   const sec = el("div", { className: "flame-section" });
@@ -1208,61 +1873,224 @@ function renderFlameSection() {
   const fg = State.flamegraph;
   if (!fg) {
     const hint = el("div", { className: "flame-empty" });
-    hint.appendChild(document.createTextNode("No profile yet. Run a program with "));
-    hint.appendChild(el("code", {}, "VIZ=1 FLAMEGRAPH=1"));
-    hint.appendChild(document.createTextNode(" to time each fused kernel of a forward+backward step, then Refresh."));
+    hint.appendChild(document.createTextNode("No profile yet. "));
+    hint.appendChild(el("code", {}, "VIZ=1"));
+    hint.appendChild(document.createTextNode(" now captures kernel timings on its own; the file is written when the "
+      + "program exits, so finish the run and hit Refresh."));
     sec.appendChild(hint);
     return sec;
   }
 
-  sec.appendChild(el("div", { className: "flame-sub" },
-    `${fg.num_spans} kernels · ${(fg.total_ms || 0).toFixed(2)} ms total`));
+  const full = buildFlameTree(fg, State._flameWarmup);
 
-  const root = buildFlameTree(fg);
-  const view = (State._flameZoom && findFlameNode(root, State._flameZoom)) || root;
+  /* Skip past levels that carry no information. A frame with exactly one child
+   * spanning the whole width tells you nothing the frame above it did not --
+   * "step" and "forward" were two of five rows, both full-bleed, in a chart that
+   * only has three informative levels. They become a breadcrumb instead, which
+   * says the same thing in one line rather than a third of the chart. */
+  const skipped = [];
+  let root = full;
+  while (!State._flameZoom) {
+    const kids = Object.values(root.children);
+    if (kids.length !== 1 || kids[0].ms < root.ms * 0.999) break;
+    skipped.push(root.name);
+    root = kids[0];
+  }
+  const view = (State._flameZoom && findFlameNode(full, State._flameZoom)) || root;
+  const match = flameMatcher(State._flameSearch);
+  const matchedMs = match ? flameMatchedMs(full, match) : 0;
 
+  const warmMs = (fg.spans || []).reduce((n, x) => n + (x.first_ms || 0), 0);
+  const sub = el("div", { className: "flame-sub" },
+    State._flameWarmup
+      ? `${fg.num_spans} kernels · ${fmtMs(fg.total_ms || 0)} including warm-up`
+      : `${full.count.toLocaleString()} kernels · ${fmtMs(full.ms)} steady state`);
+  if (!State._flameWarmup && warmMs > 0) {
+    sub.appendChild(el("span", { className: "flame-warmnote" },
+      ` · ${fmtMs(warmMs)} of JIT warm-up excluded`));
+  }
+  if (match) {
+    sub.appendChild(el("span", { className: "flame-matched" },
+      ` · matched ${pct(matchedMs, full.ms)} of profile`));
+  }
+  sec.appendChild(sub);
+
+  /* Search: the flame graph's answer to "where is X", since a frame can be far
+   * too thin to read but still worth finding. */
+  const tools = el("div", { className: "flame-tools" });
+  if (skipped.length) {
+    tools.appendChild(el("span", { className: "flame-context" },
+      skipped.concat(root.name).join(" › ")));
+  }
+  const search = el("input", {
+    className: "flame-search", type: "search", value: State._flameSearch || "",
+    placeholder: "Search frames (regex)…", spellcheck: "false",
+    "aria-label": "Highlight matching frames",
+  });
+  search.addEventListener("input", (e) => {
+    State._flameSearch = e.target.value;
+    renderFlamegraphView();
+    const box = document.querySelector(".flame-search");
+    if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+  });
+  tools.appendChild(search);
+  const warmBtn = el("button", {
+    className: "flame-toggle" + (State._flameWarmup ? " on" : ""),
+    type: "button",
+    title: "Each signature's first run includes compiling its kernel, so it "
+         + "measures the compiler rather than the kernel.",
+  }, State._flameWarmup ? "Warm-up included" : "Warm-up excluded");
+  warmBtn.addEventListener("click", () => {
+    State._flameWarmup = !State._flameWarmup;
+    State._flameZoom = null;   /* ids differ between the two trees */
+    renderFlamegraphView();
+  });
+  tools.appendChild(warmBtn);
+  const modeBtn = el("button", {
+    className: "flame-toggle" + (State._flameMode === "timeline" ? " on" : ""),
+    type: "button",
+    title: "Timeline puts wall time on the x-axis (what ran when). Aggregate "
+         + "sums every execution of a signature (where the time went).",
+  }, State._flameMode === "timeline" ? "Timeline" : "Aggregate");
+  modeBtn.addEventListener("click", () => {
+    State._flameMode = State._flameMode === "timeline" ? "aggregate" : "timeline";
+    State._flameZoom = null;
+    State._flameWin = null;
+    renderFlamegraphView();
+  });
+  tools.appendChild(modeBtn);
+  if (State._flameMode === "timeline") {
+    /* Step navigation. A run is one setup phase then hundreds of near-identical
+     * iterations, so "the whole run" is almost never the view you want -- it
+     * spends most of its width on setup and renders the iteration you care
+     * about about three pixels wide. */
+    const steps = detectSteps(fg);
+    if (steps && steps.marks.length > 2) {
+      const marks = steps.marks;
+      const idxOf = (t) => {
+        let i = 0;
+        while (i < marks.length - 1 && marks[i + 1] <= t + 1e-6) i++;
+        return i;
+      };
+      const goto = (i) => {
+        i = Math.max(0, Math.min(marks.length - 2, i));
+        State._flameWin = [marks[i], marks[i + 1]];
+        renderFlamegraphView();
+      };
+      const cur = State._flameWin ? idxOf(State._flameWin[0]) : -1;
+      tools.appendChild(el("button", { className: "flame-crumb-btn", type: "button",
+        title: "Previous iteration", onClick: () => goto(cur < 0 ? 0 : cur - 1) }, "‹"));
+      tools.appendChild(el("span", { className: "flame-stepno" },
+        cur < 0 ? `${marks.length} steps · ${steps.period.toFixed(2)} ms each`
+                : `step ${cur + 1} / ${marks.length - 1}`));
+      tools.appendChild(el("button", { className: "flame-crumb-btn", type: "button",
+        title: "Next iteration", onClick: () => goto(cur < 0 ? 0 : cur + 1) }, "›"));
+      if (cur < 0) {
+        tools.appendChild(el("button", { className: "flame-crumb-btn", type: "button",
+          /* Middle of the run, not the first: the first iterations still carry
+           * JIT compilation and are not what steady state looks like. */
+          onClick: () => goto(Math.floor(marks.length / 2)) }, "One step"));
+      }
+    }
+    if (State._flameWin) {
+      tools.appendChild(el("button", {
+        className: "flame-crumb-btn",
+        onClick: () => { State._flameWin = null; renderFlamegraphView(); },
+      }, "⤺ Full run"));
+    }
+  }
   if (view !== root) {
-    const crumb = el("div", { className: "flame-crumb" });
-    crumb.appendChild(el("button",
-      { className: "flame-crumb-btn", onClick: () => { State._flameZoom = null; renderCodeGenView(); } },
-      "⤺ reset zoom"));
-    crumb.appendChild(el("span", { className: "flame-crumb-cur" }, view.name));
-    sec.appendChild(crumb);
+    tools.appendChild(el("button", {
+      className: "flame-crumb-btn",
+      onClick: () => { State._flameZoom = null; renderFlamegraphView(); },
+    }, "⤺ Reset zoom"));
+  }
+  sec.appendChild(tools);
+
+  /* Rows are sized as a fraction of the chart, and the chart's height is left to
+   * CSS, so the graph grows with the window instead of sitting at a fixed height
+   * with dead space under it. The clamp keeps a row readable at one end and
+   * stops a shallow stack from becoming a wall of colour at the other. */
+  /* Thin rows, the way a flame graph is normally drawn: the chart is read by
+   * scanning widths across a level, so height beyond what a label needs is
+   * spent on nothing. A 2px gap rather than 3 -- at this height a thicker one
+   * eats a visible share of the row. */
+  const ROW_MIN = 16, ROW_MAX = 32, ROW_GAP = 2;
+  const chart = el("div", { className: "flame-chart" });
+  const rowPct = (n) => `calc(${(100 / n).toFixed(4)}% - ${ROW_GAP}px)`;
+  const rowTop = (i, n) => `calc(${((100 * i) / n).toFixed(4)}%)`;
+
+  if (State._flameMode === "timeline") {
+    renderFlameTimeline(sec, chart, fg, match, ROW_MIN, ROW_MAX, ROW_GAP);
+    chart.addEventListener("mousemove", flameTip);
+    chart.addEventListener("mouseleave", () => hideFlameTip());
+    return sec;
   }
 
-  const cells = layoutFlame(view);
+  /* Ancestors of the zoomed frame stay on screen as full-width rows, the way a
+   * flame graph shows the stack you drilled through rather than discarding it. */
+  const trail = view === root ? [] : flameAncestors(full, view.id).slice(0, -1);
+  const cells = layoutFlame(view, view === root);
   const maxDepth = cells.reduce((m, c) => Math.max(m, c.depth), 0);
-  const ROW = 24;
-  const chart = el("div", { className: "flame-chart", style: { height: (maxDepth + 1) * ROW + "px" } });
+  const totalRows = trail.length + maxDepth + 1;
+
+  chart.style.height =
+    `clamp(${totalRows * ROW_MIN}px, ${(totalRows * 2.8).toFixed(1)}vh, ${totalRows * ROW_MAX}px)`;
+
+  trail.forEach((a, i) => {
+    const cell = el("div", {
+      className: "flame-cell is-ancestor is-stack",
+      style: { left: "0%", width: "100%", top: rowTop(i, totalRows), height: rowPct(totalRows),
+               background: flameColor(a) },
+      title: `${a.name}\n${a.ms.toFixed(3)} ms`,
+    }, el("span", { className: "flame-label" }, a.name));
+    cell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      State._flameZoom = a.id === full.id ? null : a.id;
+      renderFlamegraphView();
+    });
+    chart.appendChild(cell);
+  });
 
   for (const c of cells) {
     const n = c.node;
-    const pct = (c.w * 100);
+    const share = c.w * 100;
+    const hit = match ? match(n.name) : false;
     const cell = el("div", {
-      className: "flame-cell",
+      className: "flame-cell"
+        + (n.kind === "scope" || n.kind === "phase" || n.kind === "root" ? " is-stack" : "")
+        + (hit ? " is-match" : "") + (match && !hit ? " is-dim" : ""),
       style: {
-        left: (c.x * 100) + "%", width: pct + "%",
-        top: (c.depth * ROW) + "px", height: (ROW - 3) + "px",
-        background: FLAME_COLORS[n.kind] || FLAME_COLORS.other,
+        left: (c.x * 100) + "%", width: share + "%",
+        top: rowTop(c.depth + trail.length, totalRows), height: rowPct(totalRows),
+        background: hit ? "var(--flame-match)" : flameColor(n),
       },
-      title: `${n.name}\n${n.ms.toFixed(3)} ms · ${pct.toFixed(1)}% · ${n.count}×`
-             + (n.numel ? ` · ${n.numel} elems` : ""),
-    }, el("span", { className: "flame-label" }, n.name));
+    });
+    /* Absolute share of the whole profile, not of the zoomed view -- when you
+     * are three frames deep the number you want is still "of the run". */
+    cell.__flame = { node: n, absPct: pct(n.ms, full.ms), viewPct: share.toFixed(1) + "%" };
+    if (share >= 1.4) cell.appendChild(el("span", { className: "flame-label" }, n.name));
+    /* Any frame is zoomable, leaves included: zooming a leaf is how you read a
+     * name too thin to render. */
     cell.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (Object.keys(n.children).length) { State._flameZoom = n.id; renderCodeGenView(); }
+      State._flameZoom = n.id;
+      renderFlamegraphView();
     });
     chart.appendChild(cell);
   }
+
+  chart.addEventListener("mousemove", flameTip);
+  chart.addEventListener("mouseleave", () => hideFlameTip());
   sec.appendChild(chart);
 
-  const legend = el("div", { className: "flame-legend" });
-  ["fused", "matmul", "conv", "elemwise", "reduce", "movement", "other"].forEach(k => {
-    const item = el("span", { className: "flame-leg" });
-    item.appendChild(el("i", { style: { background: FLAME_COLORS[k] } }));
-    item.appendChild(document.createTextNode(k));
-    legend.appendChild(item);
-  });
+  /* No colour key any more: frames are tinted from their own name, not by
+   * category, so a swatch list would be describing something that is not there.
+   * Kind is on the tooltip and in the table below, where it is exact. */
+  const legend = el("div", { className: "flame-legend" },
+    el("span", { className: "flame-leg-title" }, "width = share of step"),
+    el("span", { className: "flame-leg-hint" },
+      "click a frame to zoom · hover for detail · search highlights"));
   sec.appendChild(legend);
   return sec;
 }
@@ -1274,10 +2102,6 @@ function renderCodeGenView() {
     ((data.unoptimized?.kernels?.length > 0) || (data.optimized?.kernels?.length > 0));
 
   container.innerHTML = "";
-
-  // Execution flamegraph sits at the top of Kernel Studio and is shown whether
-  // or not kernel-analysis data is present (it profiles a real execution).
-  container.appendChild(renderFlameSection());
 
   if (!hasKernelData && isLoading("codegen", hasKernelData)) {
     container.appendChild(codegenSkeleton());
@@ -1545,16 +2369,16 @@ function renderTrainingView() {
 
   container.innerHTML = "";
 
-  // Merged: the Training tab now hosts the full W&B-style experiment dashboard
-  // (multi-run tracking, sweeps, curves, lineage, …) served from this same server.
-  const dash = document.createElement("iframe");
-  dash.src = "/experiments";
-  dash.title = "Experiment Dashboard";
-  dash.style.cssText = "width:100%;height:calc(100vh - 108px);border:0;border-radius:10px;background:#0a0b0f;display:block;";
-  container.appendChild(dash);
-  return;
-  /* eslint-disable no-unreachable */
-
+  /* This view is the current run in detail, read from training.json: loss and
+   * accuracy curves, the LR schedule, and the gradient/weight distributions.
+   *
+   * It used to embed the experiment tracker in an iframe instead, which was
+   * reasonable when the tracker had no home of its own. The unified shell gave
+   * it one, so the embed became a second copy of Experiments -- identical
+   * content under a different name -- and it also left everything below here
+   * unreachable, including the distribution panels. The two views answer
+   * different questions now: Training is one run up close, Experiments compares
+   * many. */
   if ((!data || data.error) && isLoading("training", data && !data.error)) {
     container.appendChild(trainingSkeleton());
     return;
@@ -1753,6 +2577,9 @@ function renderTrainingView() {
   chartsRow.appendChild(makeChartCard("loss", "Loss Curve", "loss"));
   chartsRow.appendChild(makeChartCard("accuracy", "Accuracy Curve", "accuracy"));
   layout.appendChild(chartsRow);
+
+  layout.appendChild(makeCurveControls());
+  layout.appendChild(makeDistRow(d));
 
   // ── Bottom row: Metrics + Epoch Table ──────────────────────
   const bottomRow = el("div", { className: "bottom-row" });
@@ -1960,6 +2787,61 @@ function renderTrainingView() {
   requestAnimationFrame(() => renderCharts(chartData, hasTestingData, hasValidationData, showCheckboxes, d));
 }
 
+
+/* Smoothing / log-scale controls for the curve charts. Smoothing matters most
+   on per-step data, where run-to-run jitter buries the trend; log scale is what
+   makes the last order of magnitude of loss readable at all. */
+function makeCurveControls() {
+  const bar = el("div", { className: "curve-controls" });
+
+  const smoothWrap = el("label", { className: "curve-control" });
+  smoothWrap.appendChild(el("span", {}, "Smoothing"));
+  const slider = el("input", { type: "range", min: "0", max: "0.99", step: "0.01" });
+  slider.value = String(State.lossSmoothing);
+  const readout = el("span", { className: "curve-readout" }, State.lossSmoothing.toFixed(2));
+  slider.addEventListener("input", () => {
+    State.lossSmoothing = parseFloat(slider.value);
+    readout.textContent = State.lossSmoothing.toFixed(2);
+    if (State._rerenderCharts) State._rerenderCharts();
+  });
+  smoothWrap.appendChild(slider);
+  smoothWrap.appendChild(readout);
+  bar.appendChild(smoothWrap);
+
+  const logWrap = el("label", { className: "curve-control" });
+  const cb = el("input", { type: "checkbox" });
+  cb.checked = State.lossLogScale;
+  cb.addEventListener("change", () => {
+    State.lossLogScale = cb.checked;
+    if (State._rerenderCharts) State._rerenderCharts();
+  });
+  logWrap.appendChild(cb);
+  logWrap.appendChild(el("span", {}, "Log scale (loss)"));
+  bar.appendChild(logWrap);
+
+  return bar;
+}
+
+/* Weight / gradient distribution panels. Hidden by renderDistributions when the
+   export predates them, so old runs render exactly as before. */
+function makeDistRow(d) {
+  const row = el("div", { className: "charts-row dist-row" });
+  const mk = (id, title, sub) => {
+    const card = el("div", { className: "chart-card dist-panel" });
+    const hdr = el("div", { className: "chart-header" });
+    hdr.appendChild(el("h4", {}, title));
+    hdr.appendChild(el("span", { className: "chart-sub" }, sub));
+    card.appendChild(hdr);
+    card.appendChild(el("div", { className: "chart-area", id }));
+    return card;
+  };
+  row.appendChild(mk("chart-grad-dist", "Gradient Distribution",
+                     "min–max · IQR · median"));
+  row.appendChild(mk("chart-weight-dist", "Weight Distribution",
+                     "min–max · IQR · median"));
+  return row;
+}
+
 function renderCharts(chartData, hasTestingData, hasValidationData, showCheckboxes, d) {
   // Clean up old observers
   State._chartObservers.forEach(ro => ro.disconnect());
@@ -1972,6 +2854,8 @@ function renderCharts(chartData, hasTestingData, hasValidationData, showCheckbox
   function renderLoss() {
     VizCharts.createChart(lossArea, chartData, {
       type: "loss",
+      smoothing: State.lossSmoothing,
+      logScale: State.lossLogScale,
       visible: {
         training: State.showTrainingLoss,
         testing: State.showTestingLoss && hasTestingData,
@@ -1983,6 +2867,7 @@ function renderCharts(chartData, hasTestingData, hasValidationData, showCheckbox
   function renderAcc() {
     VizCharts.createChart(accArea, chartData, {
       type: "accuracy",
+      smoothing: State.lossSmoothing,
       visible: {
         training: State.showTrainingAcc,
         testing: State.showTestingAcc && hasTestingData,
@@ -1991,11 +2876,36 @@ function renderCharts(chartData, hasTestingData, hasValidationData, showCheckbox
     });
   }
 
+  State._rerenderCharts = () => { renderLoss(); renderAcc(); };
+
   renderLoss();
   renderAcc();
 
   State._chartObservers.push(VizCharts.observeResize(lossArea, renderLoss));
   State._chartObservers.push(VizCharts.observeResize(accArea, renderAcc));
+
+  renderDistributions(d);
+}
+
+/* Gradient/weight distribution panels. Absent from older training.json exports,
+   so the whole section stays hidden rather than drawing empty axes. */
+function renderDistributions(d) {
+  const specs = [
+    { id: "chart-grad-dist",   data: d && d.grad_distribution,   color: "#f59e0b" },
+    { id: "chart-weight-dist", data: d && d.weight_distribution, color: "#8b5cf6" },
+  ];
+  specs.forEach(spec => {
+    const el = document.getElementById(spec.id);
+    if (!el) return;
+    const section = el.closest(".dist-panel");
+    const has = spec.data && Array.isArray(spec.data.p50) && spec.data.p50.length > 0;
+    if (section) section.style.display = has ? "" : "none";
+    if (!has) return;
+
+    const render = () => VizCharts.createDistributionChart(el, spec.data, { color: spec.color });
+    render();
+    State._chartObservers.push(VizCharts.observeResize(el, render));
+  });
 }
 
 function renderTrainingEmpty(container, data) {
@@ -2092,7 +3002,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // and we announce readiness so it can (re)apply the pending tab after load.
   const _hashTab = () => {
     const h = (location.hash || "").replace(/^#/, "");
-    return (h === "graph" || h === "training" || h === "codegen") ? h : null;
+    return ["graph", "training", "codegen", "flamegraph"].includes(h) ? h : null;
   };
   const _t = _hashTab();
   if (_t) switchTab(_t);

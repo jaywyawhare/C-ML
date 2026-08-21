@@ -1,11 +1,20 @@
 :root {
   --bg: #0a0e14; --panel: #0f141d; --panel2: #151b26; --border: rgba(130,150,180,0.12);
   --text: #e7ebf2; --muted: #7b8698; --accent: #ffb454; --accent-2: #4ecdc4;
+  /* One source of truth for the header height: .body sizes itself against it,
+   * and the two drifting apart clips the last row of content. */
+  --exp-topbar-h: 46px;
+  --accent-ink: var(--accent);   /* accent used as INK; light theme deepens it */
   font-family: var(--font);
 }
 body[data-theme="light"] {
   --bg: #f6f7fb; --panel: #ffffff; --panel2: #eef0f6; --border: #d8dbe6;
   --text: #1a1d29; --muted: #666c82; --accent: #ffb454; --accent-2: #4ecdc4;
+  /* Carried over from the dark set so the nav doesn't drop a dark chip onto a
+   * light ground. Neutrals keep the faint blue bias of the chassis. */
+  --text-dim: #3d4358; --muted-2: #8b91a5; --bg-elev2: #e6e9f1;
+  /* Amber on white needs a deeper stop to hold contrast against the ground. */
+  --accent-ink: #8a5a00;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-size: 13px; transition: background .2s, color .2s; }
@@ -15,28 +24,75 @@ body { margin: 0; background: var(--bg); color: var(--text); font-size: 13px; tr
 
 /* embedded mode (inside the main viz Training tab): hide our own brand + conn */
 body.embed .brand, body.embed .conn, body.embed .theme-toggle { display: none; }
-body.embed .topbar { height: 44px; padding-left: 14px; }
-body.embed .body { height: calc(100vh - 44px); }
+body.embed { --exp-topbar-h: 42px; }
+body.embed .topbar { padding-left: 14px; }
 
 .topbar {
-  height: 52px; display: flex; align-items: center; gap: 20px; padding: 0 18px;
+  height: var(--exp-topbar-h); display: flex; align-items: center; gap: var(--sp-5);
+  padding: 0 18px;
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
 .brand { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 500; }
 .brand b { font-weight: 700; }
-.tabs { display: flex; gap: 4px; flex: 1; }
-.tab {
-  padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer; color: var(--muted);
-  font-weight: 500; border: 1px solid transparent; transition: all .15s; user-select: none;
+/* ── Navigation ───────────────────────────────────────────────────────────
+ * Two levels. The sections are the loud row (uppercase mono, instrument
+ * labelling, an amber underline on the live one); the views inside a section
+ * are deliberately quiet, because choosing a section is the decision and
+ * choosing a view within it is just a flick. Weight follows that order. */
+/* One row, two scales. The sections and the active section's views together
+ * run ~620px of ~1600px, so stacking them cost a whole row of chrome for
+ * nothing -- and with the shell's own bar above, that made three rows of
+ * navigation before any content. The hierarchy is carried by type weight
+ * instead of by a second line. */
+.tabs {
+  display: flex; align-items: baseline; gap: var(--sp-4);
+  flex: 1; min-width: 0; flex-wrap: wrap;
 }
-.tab:hover { color: var(--text); background: var(--panel2); border-color: var(--accent-line); }
-.tab.active { color: var(--text); background: var(--accent-soft); border-color: var(--accent-line);
-  border-bottom: 2px solid var(--accent); }
+
+.nav-sections { display: flex; gap: var(--sp-4); align-items: baseline; flex-shrink: 0; }
+.nav-section {
+  position: relative; appearance: none; background: none; border: 0; cursor: pointer;
+  padding: 0 0 5px; color: var(--muted);
+  font-family: var(--mono); font-size: var(--fs-100); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
+  transition: color var(--dur-1) var(--ease);
+}
+.nav-section::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--accent); border-radius: 1px;
+  transform: scaleX(0); transform-origin: left;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.nav-section:hover { color: var(--text-dim); }
+.nav-section.active { color: var(--text); }
+.nav-section.active::after { transform: scaleX(1); }
+.nav-section:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 3px; border-radius: 2px; }
+
+.nav-views {
+  display: flex; gap: var(--sp-1); align-items: baseline; flex-wrap: wrap;
+  min-width: 0;
+  /* A rule, not a gap: it says these belong to the section on its left. */
+  padding-left: var(--sp-4);
+  border-left: 1px solid var(--border);
+}
+.nav-view {
+  appearance: none; background: none; border: 0; cursor: pointer;
+  padding: 4px 9px; border-radius: var(--radius-sm);
+  color: var(--muted-2); font-family: var(--font); font-size: var(--fs-200); font-weight: 500;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.nav-view:hover { color: var(--text-dim); background: var(--bg-elev2); }
+.nav-view.active { color: var(--accent-ink); background: var(--accent-soft); }
+.nav-view:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-section::after { transition: none; }
+}
 .conn { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px;
   font-family: var(--mono); }
 .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px rgba(87,214,154,.5); }
 
-.body { display: flex; height: calc(100vh - 52px); }
+.body { display: flex; height: calc(100vh - var(--exp-topbar-h)); }
 .sidebar { width: 290px; border-right: 1px solid var(--border); background: var(--panel);
   display: flex; flex-direction: column; }
 .sidebar-head { display: flex; justify-content: space-between; align-items: center;

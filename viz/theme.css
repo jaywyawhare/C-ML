@@ -14,6 +14,12 @@
  * a graceful fallback stack so the tool still reads correctly fully offline.
  * ========================================================================== */
 
+/* The hidden attribute must beat component display rules. A component that sets
+ * `display: flex` on an element also marked `hidden` overrides the UA stylesheet
+ * and keeps it rendered -- and an absolutely-positioned overlay that stays
+ * rendered swallows every click beneath it while looking perfectly empty. */
+[hidden] { display: none !important; }
+
 :root {
   /* ── Signal channels (interactive / primary) ───────────────────────────── */
   --accent:      #ffb454;   /* amber trace — live, primary, selected           */

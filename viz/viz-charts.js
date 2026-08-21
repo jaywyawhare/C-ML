@@ -18,13 +18,138 @@ const VizCharts = (() => {
     axis:       "#6b7280",
   };
 
+
+  // ── Series utilities ───────────────────────────────────────
+
+  /* Exponential moving average with bias correction, matching TensorBoard's
+     smoothing so a familiar 0-1 weight behaves the way people expect. Without
+     the correction the first points sag toward zero and look like a dip that
+     is not in the data. */
+  function smoothSeries(values, weight) {
+    if (!weight || weight <= 0) return values.slice();
+    const out = new Array(values.length);
+    let last = 0, numAccum = 0;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (v == null || !isFinite(v)) { out[i] = v; continue; }
+      last = last * weight + (1 - weight) * v;
+      numAccum++;
+      out[i] = last / (1 - Math.pow(weight, numAccum));
+    }
+    return out;
+  }
+
+  /* Cap a series at `maxPoints` by uniform stride, always keeping the first and
+     last sample. Long runs otherwise push tens of thousands of SVG nodes into
+     the DOM and the tab stops responding. */
+  function downsample(data, maxPoints) {
+    const n = data.length;
+    if (!maxPoints || n <= maxPoints) return data;
+    const stride = Math.ceil(n / maxPoints);
+    const out = [];
+    for (let i = 0; i < n; i += stride) out.push(data[i]);
+    if (out[out.length - 1] !== data[n - 1]) out.push(data[n - 1]);
+    return out;
+  }
+
+  /* A log axis cannot show <= 0, which loss legitimately reaches. Clamp to the
+     smallest positive value present so the toggle degrades instead of blanking
+     the chart. */
+  function positiveFloor(values) {
+    const pos = values.filter(v => v != null && isFinite(v) && v > 0);
+    return pos.length ? Math.min(...pos) : 1e-6;
+  }
+
+  // ── Distribution chart (percentile bands over epochs) ──────
+
+  /* Renders min/max and p25/p75 as nested bands with the median on top. This is
+     the view a single gradient-norm scalar cannot give you: a handful of
+     exploding channels widen the max band while the quartiles stay flat, and a
+     layer that has stopped learning collapses the whole envelope toward zero. */
+  function createDistributionChart(container, dist, opts) {
+    const o = opts || {};
+    container.innerHTML = "";
+    if (!dist || !dist.p50 || dist.p50.length === 0) return;
+
+    const rect = container.getBoundingClientRect();
+    const W = rect.width || 400;
+    const H = rect.height || 260;
+    const w = W - MARGIN.left - MARGIN.right;
+    const h = H - MARGIN.top - MARGIN.bottom;
+    if (w <= 0 || h <= 0) return;
+
+    const n = dist.p50.length;
+    let idx = downsample(d3.range(n), o.maxPoints || 600);
+
+    const at = (arr, i) => (arr && arr[i] != null && isFinite(arr[i])) ? arr[i] : 0;
+    const lo = idx.map(i => at(dist.min, i));
+    const hi = idx.map(i => at(dist.max, i));
+
+    const svg = d3.select(container).append("svg").attr("width", W).attr("height", H);
+    const g = svg.append("g").attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
+
+    const x = d3.scaleLinear().domain([1, n]).range([0, w]);
+    const yMin = Math.min(...lo), yMax = Math.max(...hi);
+    const pad = (yMax - yMin) * 0.05 || 1e-6;
+    const y = d3.scaleLinear().domain([yMin - pad, yMax + pad]).range([h, 0]).nice();
+
+    g.append("g").attr("class", "grid").attr("transform", `translate(0,${h})`)
+      .call(d3.axisBottom(x).tickSize(-h).tickFormat(""));
+    g.append("g").attr("class", "grid")
+      .call(d3.axisLeft(y).tickSize(-w).tickFormat(""));
+    g.append("g").attr("class", "axis").attr("transform", `translate(0,${h})`)
+      .call(d3.axisBottom(x).ticks(Math.min(n, 10)).tickFormat(d3.format("d")));
+    g.append("g").attr("class", "axis")
+      .call(d3.axisLeft(y).ticks(6).tickFormat(d3.format(".2~e")));
+
+    const color = o.color || "#4a90e2";
+    const band = (loArr, hiArr, opacity) => {
+      const area = d3.area()
+        .x((d, k) => x(idx[k] + 1))
+        .y0((d, k) => y(loArr[k]))
+        .y1((d, k) => y(hiArr[k]))
+        .curve(d3.curveMonotoneX);
+      g.append("path").datum(idx).attr("fill", color).attr("opacity", opacity).attr("d", area);
+    };
+
+    band(lo, hi, 0.15);                                             // full range
+    band(idx.map(i => at(dist.p25, i)), idx.map(i => at(dist.p75, i)), 0.35); // IQR
+
+    const median = d3.line()
+      .x((d, k) => x(idx[k] + 1))
+      .y((d, k) => y(at(dist.p50, d)))
+      .curve(d3.curveMonotoneX);
+    g.append("path").datum(idx).attr("fill", "none").attr("stroke", color)
+      .attr("stroke-width", 2).attr("d", median);
+  }
+
   // ── createChart (loss or accuracy) ─────────────────────────
   function createChart(container, chartData, opts) {
     const { type, visible } = opts; // type: "loss" | "accuracy"
     const isAccuracy = type === "accuracy";
+    const smoothing = opts.smoothing || 0;
+    const logScale = !!opts.logScale && !isAccuracy; // accuracy is bounded, log adds nothing
 
     // Clear previous
     container.innerHTML = "";
+
+    // Cap the point count before anything touches the DOM.
+    chartData = downsample(chartData, opts.maxPoints || 1000);
+
+    // Smooth a copy: the raw series stays available to the tooltip so hovering
+    // still reports the measured value, not the filtered one.
+    if (smoothing > 0) {
+      const keys = isAccuracy
+        ? ["trainingAccuracy", "testingAccuracy", "validationAccuracy"]
+        : ["trainingLoss", "testingLoss", "validationLoss"];
+      const smoothed = {};
+      keys.forEach(k => { smoothed[k] = smoothSeries(chartData.map(d => d[k]), smoothing); });
+      chartData = chartData.map((d, i) => {
+        const c = Object.assign({}, d);
+        keys.forEach(k => { c["raw_" + k] = d[k]; c[k] = smoothed[k][i]; });
+        return c;
+      });
+    }
 
     const rect = container.getBoundingClientRect();
     const W = rect.width || 400;
@@ -63,10 +188,15 @@ const VizCharts = (() => {
       .domain([1, d3.max(chartData, d => d.epoch) || 1])
       .range([0, w]);
 
-    const y = d3.scaleLinear()
-      .domain([Math.max(0, yMin - yPad), yMax + yPad])
-      .range([h, 0])
-      .nice();
+    const y = logScale
+      ? d3.scaleLog()
+          .domain([positiveFloor(yVals), yMax * 1.1 || 1])
+          .range([h, 0])
+          .clamp(true)
+      : d3.scaleLinear()
+          .domain([Math.max(0, yMin - yPad), yMax + yPad])
+          .range([h, 0])
+          .nice();
 
     // Grid
     g.append("g")
@@ -86,7 +216,9 @@ const VizCharts = (() => {
 
     const yAxis = isAccuracy
       ? d3.axisLeft(y).ticks(6).tickFormat(v => `${v.toFixed(1)}%`)
-      : d3.axisLeft(y).ticks(6);
+      : logScale
+        ? d3.axisLeft(y).ticks(6, "~g")
+        : d3.axisLeft(y).ticks(6);
 
     g.append("g")
       .attr("class", "axis")
@@ -224,5 +356,6 @@ const VizCharts = (() => {
     return ro;
   }
 
-  return { createChart, observeResize };
+  return { createChart, createDistributionChart, smoothSeries, downsample,
+           positiveFloor, observeResize };
 })();

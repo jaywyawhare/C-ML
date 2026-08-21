@@ -39,6 +39,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
         <span>Kernel Studio</span>
       </button>
+      <button class="shell-nav-item" data-view="profile" role="tab">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="12" height="4" rx="1"/><rect x="3" y="16" width="7" height="4" rx="1"/>
+        </svg>
+        <span>Profile</span>
+      </button>
     </nav>
 
     <div class="shell-conn" id="shell-conn" title="Server status">
@@ -49,8 +55,12 @@
 
   <main class="shell-body">
     <!-- Views: the experiment tracker + the visualizer, isolated same-origin frames. -->
-    <iframe class="shell-frame" id="frame-experiments" title="Experiments" loading="lazy"></iframe>
-    <iframe class="shell-frame" id="frame-viz" title="Visualizer" loading="lazy"></iframe>
+    <!-- No loading="lazy": these start display:none and the router assigns src
+         while they are still hidden, so a lazy frame can be judged permanently
+         out-of-viewport and never load. Deferral is already handled by the
+         router, which leaves src empty until a view is first activated. -->
+    <iframe class="shell-frame" id="frame-experiments" title="Experiments"></iframe>
+    <iframe class="shell-frame" id="frame-viz" title="Visualizer"></iframe>
     <div class="shell-empty" id="shell-empty" hidden></div>
   </main>
 

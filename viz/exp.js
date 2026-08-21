@@ -2,7 +2,45 @@
 // C-ML Experiments — W&B-style tracker UI (prototype). Layers 3–10 live here.
 
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#38bdf8", "#a855f7", "#ec4899", "#14b8a6", "#eab308", "#f97316"];
-const TABS = ["Charts", "Dashboard", "Table", "Overview", "Config", "Diff", "Histograms", "Curves", "System", "Media", "Tables", "Sweep", "Lineage", "Registry", "Launch", "Weave", "Alerts", "Reports", "Logs"];
+
+/* Navigation is two levels, because nineteen equal-weight tabs in one row give
+ * the reader no hierarchy to scan by — everything looks equally important, so
+ * nothing is findable. Each section answers one question; the views inside it
+ * are the ways of answering it. `id` is the dispatch key (unchanged, so every
+ * renderer keeps working); `label` is what the reader sees. */
+const SECTIONS = [
+  { name: "Metrics",   hint: "How is training going?", views: [
+      { id: "Charts",     label: "Charts" },
+      { id: "Dashboard",  label: "Panels" },      /* builds custom panels; "Dashboard" collided with the shell */
+      { id: "Curves",     label: "Curves" },
+      { id: "Histograms", label: "Histograms" },
+      { id: "System",     label: "System" },
+  ]},
+  { name: "Runs",      hint: "What did I run, and how do they compare?", views: [
+      { id: "Table",      label: "Table" },
+      { id: "Overview",   label: "Overview" },
+      { id: "Config",     label: "Config" },
+      { id: "Diff",       label: "Diff" },
+      { id: "Sweep",      label: "Sweep" },
+  ]},
+  { name: "Artifacts", hint: "What did it produce?", views: [
+      { id: "Media",      label: "Media" },
+      { id: "Tables",     label: "Tables" },
+      { id: "Registry",   label: "Registry" },
+      { id: "Lineage",    label: "Lineage" },
+  ]},
+  { name: "Activity",  hint: "What happened?", views: [
+      { id: "Logs",       label: "Logs" },
+      { id: "Alerts",     label: "Alerts" },
+      { id: "Weave",      label: "Traces" },      /* "Weave" is vendor jargon; it shows traces */
+      { id: "Launch",     label: "Launch" },
+      { id: "Reports",    label: "Reports" },
+  ]},
+];
+
+const sectionOf = (id) => SECTIONS.find(s => s.views.some(v => v.id === id)) || SECTIONS[0];
+const viewLabel = (id) => (SECTIONS.flatMap(s => s.views).find(v => v.id === id) || {}).label || id;
+const ALL_VIEW_IDS = SECTIONS.flatMap(s => s.views.map(v => v.id));
 
 const S = {
   runs: [],
@@ -45,10 +83,27 @@ async function boot() {
   if (window.self !== window.top) document.body.classList.add("embed");
   const tabsEl = $("#tabs");
   tabsEl.innerHTML = "";
-  TABS.forEach((t, i) => tabsEl.append(el("div", {
-    class: "tab" + (t === S.tab ? " active" : ""), title: i < 9 ? `shortcut: ${i + 1}` : "",
-    onclick: () => { S.tab = t; boot(); }
-  }, t)));
+  const active = sectionOf(S.tab);
+
+  /* Level 1 — the four questions. */
+  const sectionRow = el("div", { class: "nav-sections" });
+  SECTIONS.forEach((sec, i) => sectionRow.append(el("button", {
+    class: "nav-section" + (sec === active ? " active" : ""),
+    type: "button", title: `${sec.hint}   (${i + 1})`,
+    "aria-current": sec === active ? "page" : null,
+    onclick: () => { S.tab = sec.views[0].id; boot(); },
+  }, sec.name)));
+
+  /* Level 2 — only the active section's views, so the reader is never asked to
+   * scan past destinations that belong to a question they aren't asking. */
+  const viewRow = el("div", { class: "nav-views", role: "tablist" });
+  active.views.forEach(v => viewRow.append(el("button", {
+    class: "nav-view" + (v.id === S.tab ? " active" : ""),
+    type: "button", role: "tab", "aria-selected": String(v.id === S.tab),
+    onclick: () => { S.tab = v.id; boot(); },
+  }, v.label)));
+
+  tabsEl.append(sectionRow, viewRow);
 
   if (!window._wired) {
     window._wired = true;
@@ -58,7 +113,15 @@ async function boot() {
     document.addEventListener("keydown", e => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
       const n = parseInt(e.key, 10);
-      if (n >= 1 && n <= 9 && TABS[n - 1]) { S.tab = TABS[n - 1]; boot(); }
+      /* 1-4 jump between sections; [ and ] step through the views inside one,
+       * which is the movement the reader actually repeats. */
+      if (n >= 1 && n <= SECTIONS.length) { S.tab = SECTIONS[n - 1].views[0].id; boot(); }
+      else if (e.key === "[" || e.key === "]") {
+        const vs = sectionOf(S.tab).views;
+        const i = vs.findIndex(v => v.id === S.tab);
+        S.tab = vs[(i + (e.key === "]" ? 1 : vs.length - 1)) % vs.length].id;
+        boot();
+      }
       else if (e.key === "t") { S.theme = S.theme === "dark" ? "light" : "dark"; boot(); }
     });
   }

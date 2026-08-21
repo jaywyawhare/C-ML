@@ -479,6 +479,11 @@ button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* A flex item defaults to min-width:auto, i.e. it refuses to shrink below the
+   * intrinsic width of its content. The code panes below hold long source
+   * lines, so without this the whole chain is forced as wide as the widest line
+   * and the second pane is pushed off-screen instead of sharing the row. */
+  min-width: 0;
 }
 
 .codegen-toolbar {
@@ -509,10 +514,14 @@ button { font-family: inherit; }
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-width: 0;   /* see .codegen-main */
 }
 
 .code-pane {
-  flex: 1;
+  /* basis 0 + equal grow = an exact half each, independent of how long the
+   * source lines are; min-width:0 is what lets that actually take effect. */
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-inset);
@@ -707,7 +716,10 @@ button { font-family: inherit; }
 .charts-row {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0,1fr), not 1fr: a bare 1fr track is minmax(auto,1fr) and so refuses
+   * to shrink below its content, which lets one wide chart push the other out
+   * of the row instead of the two sharing it evenly. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   flex: 1 1 auto;
   min-height: 320px;
@@ -827,7 +839,9 @@ button { font-family: inherit; }
 .bottom-row {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Holds the epoch table: without minmax(0,…) the track grows to the table's
+   * full width and .epoch-table-wrap's overflow:auto never gets to engage. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
@@ -1405,6 +1419,89 @@ button { font-family: inherit; }
 /* ═══════════════════════════════════════════════════════════════
    Execution flamegraph (Kernel Studio)
    ═══════════════════════════════════════════════════════════════ */
+/* Standalone Profile tab. The section used to be a block stacked above the
+ * Kernel Studio panes, which is where its bottom margin came from; as the whole
+ * view it needs the framing and the scroll container instead. */
+#tab-flamegraph {
+  padding: 18px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#tab-flamegraph .flame-section { margin: 0; }
+
+/* ── Profile: headline readouts ──────────────────────────────────────────── */
+.prof-readout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.prof-stat {
+  padding: 13px 15px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  /* A left rule instead of a filled card: the readouts should register as one
+   * instrument row, not four competing tiles. */
+  border-left: 2px solid var(--border-2);
+}
+.prof-stat.hot { border-left-color: var(--accent-primary); }
+.prof-stat-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .14em; color: var(--text-tertiary);
+}
+.prof-stat-value {
+  margin-top: 6px; font-family: var(--mono); font-size: 21px; font-weight: 600;
+  color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.prof-stat.hot .prof-stat-value { color: var(--accent-primary); }
+.prof-stat-note { margin-top: 3px; font-size: 11.5px; color: var(--text-tertiary); }
+
+/* ── Profile: ranked kernel table ────────────────────────────────────────── */
+.prof-table-section {
+  padding: 14px 16px 16px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+.prof-table-count {
+  margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.prof-table-wrap { margin-top: 10px; overflow-x: auto; }
+.prof-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.prof-table th {
+  text-align: left; padding: 7px 10px;
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-color); white-space: nowrap;
+}
+.prof-table th.num, .prof-table td.num { text-align: right; }
+.prof-table td {
+  padding: 7px 10px; border-bottom: 1px solid rgba(130,150,180,.06);
+  font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.prof-table tbody tr:hover td { background: var(--bg-card-hover); }
+.prof-rank { color: var(--text-tertiary); width: 1%; }
+.prof-op { font-weight: 600; color: var(--text-primary); }
+.prof-table td.dim { color: var(--text-tertiary); }
+.prof-kind {
+  display: inline-block; padding: 1px 8px; border-radius: var(--radius-pill);
+  font-size: 10px; text-transform: capitalize; letter-spacing: .02em;
+  color: var(--k); background: color-mix(in srgb, var(--k) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--k) 34%, transparent);
+}
+/* The share column reads as a distribution first and a number second. */
+.prof-share-num { display: block; }
+.prof-bar {
+  margin-top: 4px; margin-left: auto; width: 96px; height: 3px;
+  background: rgba(130,150,180,.14); border-radius: 2px; overflow: hidden;
+}
+.prof-bar-fill { height: 100%; border-radius: 2px; }
+
 .flame-section {
   margin: 0 0 18px 0;
   padding: 14px 16px 16px;
@@ -1432,23 +1529,149 @@ button { font-family: inherit; }
 .flame-crumb-btn:hover { background: color-mix(in srgb, var(--accent, #ffb454) 15%, transparent); }
 .flame-crumb-cur { font-family: var(--mono); font-size: 12px; color: var(--muted, #7b8698); }
 
-.flame-chart { position: relative; width: 100%; }
+.flame-chart {
+  position: relative;
+  /* Height is set inline as a clamp() over the row count, so it tracks the
+   * window without a resize listener and a re-render. */
+  transition: height var(--dur-2, 200ms) var(--ease-out, ease);
+  /* Full width: the cap left half the card empty, and the taller rows plus the
+   * extra stack level already carry the proportions. Wider also means the thin
+   * frames on the right of each row get enough pixels to hold a label. */
+  width: 100%;
+}
 .flame-cell {
   position: absolute;
   display: flex; align-items: center;
-  border-radius: 2px; padding: 0 5px;
-  font-size: 11px; color: #0b0d12;
+  border-radius: 2px; padding: 0 6px;
+  /* Rows are percentage-height now, so the label must stay centred at any size. */
+  align-items: center;
+  line-height: 1;
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: .01em; color: #17110a;
   cursor: pointer; overflow: hidden; white-space: nowrap;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.18);
+  /* A hairline of the page ground rather than black: the frames read as tiles
+   * on the chassis instead of a solid block with cracks in it. */
+  box-shadow: inset 0 0 0 1px rgba(10, 14, 20, .55);
   transition: filter .1s, outline .1s;
 }
+/* Stack frames are dark warm tones and carry pale text; kernel frames are the
+ * bright kind colours and carry dark text. */
+/* Every frame is a warm mid-tone now, so one dark ink serves the whole chart. */
+
+/* Not-in-a-kernel time: recessed, pale text, and it must not read as work. */
+.flame-cell.is-hostgap { color: #93a0b5; }
+
+/* A merged block stands for many executions too small to draw separately, so it
+ * is hatched -- it must not read as one long single call. */
+.flame-cell.is-merged {
+  background-image: repeating-linear-gradient(
+    90deg, rgba(0,0,0,.22) 0 1px, transparent 1px 4px);
+}
+
+/* Time ruler under the timeline chart. */
+.flame-axis { position: relative; height: 16px; }
+.flame-axis-top    { margin: 2px 0 4px; border-bottom: 1px solid var(--border-color); }
+.flame-axis-bottom { margin: 4px 0 0;   border-top:    1px solid var(--border-color); }
+.flame-tick { position: absolute; top: 0; width: 0; height: 100%; }
+/* Ticks grow inward from their own rule, so each ruler reads toward the chart. */
+.flame-axis-top .flame-tick::before {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 6px;
+  border-left: 1px solid var(--border-2);
+}
+.flame-axis-bottom .flame-tick::before {
+  content: ""; position: absolute; left: 0; top: 0; height: 6px;
+  border-left: 1px solid var(--border-2);
+}
+.flame-tick span {
+  position: absolute; left: 3px;
+  font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.flame-axis-top .flame-tick span    { top: 0; }
+.flame-axis-bottom .flame-tick span { bottom: 0; }
+/* The last tick would overflow the right edge; pull it back inside. */
+.flame-tick:last-child span { left: auto; right: 3px; }
+.flame-tlnote { margin: 8px 0 0; }
+
+.flame-context {
+  font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+  letter-spacing: .04em; white-space: nowrap;
+}
 .flame-cell:hover { filter: brightness(1.12); outline: 1px solid rgba(255,255,255,.55); z-index: 2; }
+/* Search highlight. Magenta is the flame-graph convention and it is deliberately
+ * outside this palette's amber/cyan channels, so a match can never be confused
+ * with a kind colour. */
+:root { --flame-match: #ff3fd0; }
+.flame-cell.is-match { box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); z-index: 1; }
+.flame-cell.is-dim { opacity: .32; }
+
+/* Ancestors of a zoomed frame: full width, recessed, still clickable to pop
+ * back up the stack. */
+.flame-cell.is-ancestor { opacity: .55; }
+.flame-cell.is-ancestor:hover { opacity: .8; }
+
+.flame-tools { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.flame-search {
+  flex: 0 1 280px; min-width: 0;
+  padding: 5px 10px;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--text-primary); background: var(--bg-inset);
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+}
+.flame-search::placeholder { color: var(--text-tertiary); }
+.flame-search:focus {
+  outline: none; border-color: var(--flame-match);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--flame-match) 18%, transparent);
+}
+.flame-matched { color: var(--flame-match); }
+.flame-stepno {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 2px;
+}
+.flame-warmnote { color: var(--text-tertiary); }
+.flame-toggle {
+  cursor: pointer; font-family: var(--mono); font-size: 11px;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  color: var(--text-tertiary); background: var(--bg-inset);
+  border: 1px solid var(--border-2);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.flame-toggle:hover { color: var(--text-primary); border-color: var(--accent-line); }
+.flame-toggle.on { color: var(--accent-primary); border-color: var(--accent-line); background: var(--accent-soft); }
+
+.flame-tip {
+  position: fixed; z-index: 999; display: none; pointer-events: none;
+  min-width: 168px; padding: 9px 11px;
+  background: var(--bg-elev2, #151b26);
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px -10px rgba(0,0,0,.85);
+  font-size: 12px;
+}
+.flame-tip-name {
+  font-family: var(--mono); font-weight: 600; color: var(--text-primary);
+  margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
+  word-break: break-all;
+}
+.flame-tip-sep {
+  margin: 7px 0 4px; padding-top: 6px; border-top: 1px solid var(--border-color);
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--text-tertiary);
+}
+.flame-tip-more { font-size: 11px; color: var(--text-tertiary); margin-top: 3px; }
+.flame-tip-row { display: flex; justify-content: space-between; gap: 18px; line-height: 1.7; }
+.flame-tip-k { color: var(--text-tertiary); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-family: var(--mono); }
+.flame-tip-v { font-family: var(--mono); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .flame-label {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 600; letter-spacing: .1px;
 }
 
-.flame-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.flame-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.flame-leg-title {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+.flame-leg-hint { font-size: 11.5px; color: var(--text-tertiary); }
 .flame-leg { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; color: var(--muted, #7b8698); text-transform: capitalize; }
 .flame-leg i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 
@@ -1460,4 +1683,56 @@ button { font-family: inherit; }
 .flame-empty code {
   font-family: var(--mono, monospace); font-size: 12px; color: var(--text, #e7ebf2);
   background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 4px;
+}
+
+
+/* ── Curve controls + distribution panels ────────────────────────────────── */
+
+.curve-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  background: var(--panel, #1a1f2b);
+  border: 1px solid var(--border, #2a3140);
+  border-radius: 6px;
+}
+
+.curve-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim, #9aa4b2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.curve-control input[type="range"] { width: 130px; accent-color: #4a90e2; }
+.curve-control input[type="checkbox"] { accent-color: #4a90e2; }
+
+.curve-readout {
+  min-width: 30px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e5e9f0);
+}
+
+.dist-row { margin-top: 4px; }
+
+.chart-card.dist-panel { border-left: 3px solid #8b5cf6; }
+.chart-card.dist-panel .chart-area { min-height: 200px; }
+
+.chart-sub {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-dim, #9aa4b2);
+  letter-spacing: 0.02em;
+}
+
+.graph-control-btn.active {
+  background: rgba(139, 92, 246, 0.18);
+  border-color: #8b5cf6;
+  color: #a78bfa;
 }
