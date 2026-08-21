@@ -78,8 +78,7 @@ int main(void) {
         printf("CML Sequential forward:  %8.3f ms\n", ms);
 
         /* Now test individual ops */
-        double t_transpose = 0, t_matmul1 = 0, t_biasadd1 = 0, t_relu = 0;
-        double t_matmul2 = 0, t_biasadd2 = 0, t_ir_reset = 0;
+        double t_matmul1 = 0, t_ir_reset = 0;
 
         /* Get weight tensors */
         Parameter* params_arr[10];

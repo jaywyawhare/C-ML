@@ -59,7 +59,8 @@ int main(void) {
             float loss = base + noise * (frand(&seed) - 0.5f);
             if (loss < 0.005f) loss = 0.005f + 0.002f * frand(&seed);
             float acc = 1.0f - loss * 0.9f - (lr >= 0.1f ? 0.05f * frand(&seed) : 0.0f);
-            if (acc < 0) acc = 0; if (acc > 1) acc = 1;
+            if (acc < 0) acc = 0;
+                if (acc > 1) acc = 1;
             if (acc > best_acc) best_acc = acc;
             float val_loss = loss * (1.1f + 0.2f * frand(&seed));
             float val_acc = acc * (0.9f + 0.05f * frand(&seed));

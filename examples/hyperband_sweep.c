@@ -40,7 +40,7 @@ int main(void) {
         /* simulated quality: closeness to an ideal (lr~0.01, dropout~0.2, hidden~48) */
         float dl = fabsf(log10f(lr) - log10f(0.01f)) / 2.0f;
         float dd = fabsf(dropout - 0.2f) / 0.5f;
-        float dh = fabsf(hidden - 48) / 48.0f;
+        float dh = fabsf((float)hidden - 48.0f) / 48.0f;
         float ceiling = 0.99f - 0.35f * (0.6f * dl + 0.2f * dd + 0.2f * dh);
         t[i] = (Trial){ run, lr, dropout, hidden, ceiling, 0.05f + 0.05f * rnd(&seed), 0.0f, 1, 0 };
     }
@@ -54,7 +54,8 @@ int main(void) {
             if (!t[i].alive) continue;
             for (int e = t[i].trained + 1; e <= budget; e++) {
                 float acc = t[i].ceiling * (1.0f - expf(-t[i].speed * e)) + 0.01f * (rnd(&seed) - 0.5f);
-                if (acc < 0) acc = 0; if (acc > 1) acc = 1;
+                if (acc < 0) acc = 0;
+                if (acc > 1) acc = 1;
                 cml_exp_log_scalar(t[i].run, "train/loss", e, (1.0f - acc) * 0.9f + 0.02f);
                 cml_exp_log_scalar(t[i].run, "val/accuracy", e, acc);
                 t[i].acc = acc;

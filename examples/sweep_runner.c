@@ -59,7 +59,8 @@ int main(void) {
                 if (unstable && frand(&seed) > 0.9f) loss += 0.3f; /* spikes */
                 if (loss < 0.004f) loss = 0.004f + 0.002f * frand(&seed);
                 float acc = 1.0f - loss * 0.9f - (unstable ? 0.06f * frand(&seed) : 0.0f);
-                if (acc < 0) acc = 0; if (acc > 1) acc = 1;
+                if (acc < 0) acc = 0;
+                if (acc > 1) acc = 1;
                 if (acc > best) best = acc;
                 final_loss = loss;
                 cml_exp_log_scalar(run, "train/loss", e, loss);
@@ -81,7 +82,7 @@ int main(void) {
             int is_best = best > best_acc;
             cml_exp_log_artifact(run, "iris-sweep", "model", "/dev/null", is_best ? "best,latest" : "latest");
             cml_exp_run_finish(run, "finished");
-            if (is_best) { best_acc = best; snprintf(best_name, sizeof(best_name), "%s", name); }
+            if (is_best) { best_acc = best; snprintf(best_name, sizeof(best_name), "%.63s", name); }
             printf("acc=%.3f%s\n", best, is_best ? "  <-- best" : "");
             free(w);
         }
