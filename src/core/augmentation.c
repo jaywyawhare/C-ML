@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
+#include "core/threefry.h"
 #include "alloc/cml_allocator.h"
 
 #ifndef M_PI
@@ -54,11 +54,12 @@ void augmentation_config_free(AugmentationConfig* config) {
     cml_free(config);
 }
 
-static unsigned int rng_seed = 1;
-static void set_seed(unsigned int seed) { rng_seed = seed; }
+/* Draws from the process-wide threefry RNG so cml_rng_set_global_seed()
+ * controls augmentation reproducibility like every other consumer. */
 static float rand_float(void) {
-    rng_seed = (rng_seed * 1103515245 + 12345) & 0x7fffffff;
-    return (float)rng_seed / 2147483648.0f;
+    float v = 0.0f;
+    cml_rng_uniform(cml_rng_get_global(), &v, 1);
+    return v;
 }
 
 Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
@@ -75,12 +76,6 @@ Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
     if (crop_height > height || crop_width > width) {
         LOG_ERROR("Crop size exceeds input size");
         return NULL;
-    }
-
-    static bool seed_set = false;
-    if (!seed_set) {
-        set_seed((unsigned int)time(NULL));
-        seed_set = true;
     }
 
     int h_offset = (int)(rand_float() * (float)(height - crop_height));
@@ -134,12 +129,6 @@ static Tensor* augment_flip(Tensor* input, float prob, bool horizontal, const ch
         return NULL;
     }
 
-    static bool seed_set = false;
-    if (!seed_set) {
-        set_seed((unsigned int)time(NULL));
-        seed_set = true;
-    }
-
     if (rand_float() >= prob)
         return tensor_clone(input);
 
@@ -182,12 +171,6 @@ Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max)
     if (!input || input->ndim != 4) {
         LOG_ERROR("Rotation requires 4D tensor [batch, channels, height, width]");
         return NULL;
-    }
-
-    static bool seed_set = false;
-    if (!seed_set) {
-        set_seed((unsigned int)time(NULL));
-        seed_set = true;
     }
 
     float angle_deg = angle_min + rand_float() * (angle_max - angle_min);
@@ -297,12 +280,6 @@ Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, fl
     if (!input || input->ndim != 4) {
         LOG_ERROR("Color jitter requires 4D tensor [batch, channels, height, width]");
         return NULL;
-    }
-
-    static bool seed_set = false;
-    if (!seed_set) {
-        set_seed((unsigned int)time(NULL));
-        seed_set = true;
     }
 
     float bright_factor   = 1.0f + (rand_float() * 2.0f - 1.0f) * brightness;

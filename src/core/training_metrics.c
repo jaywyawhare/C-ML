@@ -14,6 +14,11 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
+/* Single-training-loop state: one process tracks one active training run and
+ * every accessor here must be called from the thread running that loop (the
+ * loss/step hooks fire inside cml_backward/cml_optim_step on that thread).
+ * Concurrent training loops in one process need per-context state, not a
+ * mutex around these globals. */
 static TrainingMetrics* g_global_metrics = NULL;
 static size_t g_current_epoch            = 0;
 static int g_optimizer_step_count        = 0;

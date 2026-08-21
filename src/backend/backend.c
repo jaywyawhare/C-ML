@@ -15,13 +15,17 @@
 #include "core/dynlib.h"
 
 static pthread_mutex_t g_backend_lock;
-static bool g_backend_lock_initialized = false;
+static pthread_once_t g_backend_lock_once = PTHREAD_ONCE_INIT;
+
+static void backend_lock_init(void) { pthread_mutex_init(&g_backend_lock, NULL); }
 
 static inline void backend_lock(void) {
-    if (g_backend_lock_initialized) pthread_mutex_lock(&g_backend_lock);
+    pthread_once(&g_backend_lock_once, backend_lock_init);
+    pthread_mutex_lock(&g_backend_lock);
 }
 static inline void backend_unlock(void) {
-    if (g_backend_lock_initialized) pthread_mutex_unlock(&g_backend_lock);
+    pthread_once(&g_backend_lock_once, backend_lock_init);
+    pthread_mutex_unlock(&g_backend_lock);
 }
 
 static Backend* g_current_backend = NULL;
@@ -225,11 +229,6 @@ Backend* backend_get_current(void) {
 int backend_set(BackendType type) { return backend_init(type); }
 
 int backend_init(BackendType type) {
-    if (!g_backend_lock_initialized) {
-        pthread_mutex_init(&g_backend_lock, NULL);
-        g_backend_lock_initialized = true;
-    }
-
     backend_lock();
     if (g_current_backend && g_current_backend->type == type) {
         backend_unlock();
