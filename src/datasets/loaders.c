@@ -908,7 +908,7 @@ CMLOpenImagesLoader* cml_openimages_open(const char* images_dir, const char* ann
     for (int i = 0; i < count; i++) {
         const char* base = strrchr(files[i], '/');
         base = base ? base + 1 : files[i];
-        char* dot = strrchr(base, '.');
+        const char* dot = strrchr(base, '.');
         /* keep allocator family consistent: always use cml_* so cml_openimages_free is safe */
         if (dot) {
             size_t n = (size_t)(dot - base);

@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "ops/ir/gpu/am_driver.h"
 #include "ops/ir/gpu/amdgpu_kd.h"

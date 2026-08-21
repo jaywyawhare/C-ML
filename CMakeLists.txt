@@ -52,43 +52,36 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include(CheckCCompilerFlag)
 
 option(ENABLE_LLVM_BACKEND "Enable direct LLVM IR JIT backend" ON)
 
 if(ENABLE_LLVM_BACKEND)
-    find_program(LLVM_CONFIG_EXE NAMES llvm-config llvm-config-21 llvm-config-20 llvm-config-19)
-    if(LLVM_CONFIG_EXE)
-        execute_process(COMMAND ${LLVM_CONFIG_EXE} --cflags
-            OUTPUT_VARIABLE LLVM_BACKEND_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${LLVM_CONFIG_EXE} --ldflags
-            OUTPUT_VARIABLE LLVM_BACKEND_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${LLVM_CONFIG_EXE} --libs core orcjit native nvptx amdgpu
-            OUTPUT_VARIABLE LLVM_BACKEND_LIBS_RAW OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${LLVM_CONFIG_EXE} --system-libs
-            OUTPUT_VARIABLE LLVM_BACKEND_SYSLIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${LLVM_CONFIG_EXE} --includedir
-            OUTPUT_VARIABLE LLVM_BACKEND_INCDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-        execute_process(COMMAND ${LLVM_CONFIG_EXE} --version
-            OUTPUT_VARIABLE LLVM_BACKEND_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+    find_package(LLVM QUIET CONFIG)
+    if(LLVM_PACKAGE_VERSION)
         include(CheckIncludeFile)
-        set(CMAKE_REQUIRED_INCLUDES ${LLVM_BACKEND_INCDIR})
+        set(CMAKE_REQUIRED_INCLUDES "${LLVM_INCLUDE_DIRS}")
         check_include_file("llvm-c/LLJIT.h" HAS_LLVM_LLJIT)
 
         if(HAS_LLVM_LLJIT)
-            add_definitions(-DCML_HAS_LLVM_BACKEND)
-            include_directories(${LLVM_BACKEND_INCDIR})
-            separate_arguments(LLVM_BACKEND_LIBS_LIST UNIX_COMMAND
-                "${LLVM_BACKEND_LDFLAGS} ${LLVM_BACKEND_LIBS_RAW} ${LLVM_BACKEND_SYSLIBS}")
-            message(STATUS "LLVM backend enabled (LLVM ${LLVM_BACKEND_VERSION})")
+            add_definitions(-DCML_HAS_LLVM_BACKEND ${LLVM_DEFINITIONS})
+            # A monolithic libLLVM.so install exposes every component (incl.
+            # nvptx/amdgpu) through the single LLVM target; otherwise link the
+            # mapped static/shared components.
+            if(TARGET LLVM)
+                set(LLVM_BACKEND_LIBS_LIST LLVM)
+            else()
+                include(${LLVM_CMAKE_DIR}/LLVM-Config.cmake)
+                llvm_map_components_to_libnames(LLVM_BACKEND_LIBS_LIST core orcjit native nvptx amdgpu)
+            endif()
+            message(STATUS "LLVM backend enabled (LLVM ${LLVM_PACKAGE_VERSION})")
             set(LLVM_BACKEND_FOUND TRUE)
         else()
             message(STATUS "LLVM backend: LLJIT header not found, disabling")
             set(LLVM_BACKEND_FOUND FALSE)
         endif()
     else()
-        message(STATUS "llvm-config not found — LLVM backend disabled")
+        message(STATUS "LLVM CMake package not found — LLVM backend disabled")
         set(LLVM_BACKEND_FOUND FALSE)
     endif()
 else()
@@ -102,7 +95,6 @@ if(ENABLE_CUDA)
     if(CUDAToolkit_FOUND)
         message(STATUS "CUDA Toolkit found: ${CUDAToolkit_VERSION}")
         add_definitions(-DCML_HAS_CUDA)
-        include_directories(${CUDAToolkit_INCLUDE_DIRS})
         set(CUDA_LIBS "")
     else()
         message(STATUS "CUDA Toolkit not found - CUDA backend uses dynamic loading")
@@ -127,7 +119,6 @@ if(ENABLE_OPENCL)
     if(OpenCL_FOUND)
         message(STATUS "OpenCL found: ${OpenCL_VERSION_STRING}")
         add_definitions(-DCML_HAS_OPENCL)
-        include_directories(${OpenCL_INCLUDE_DIRS})
         set(OPENCL_LIBS ${OpenCL_LIBRARIES})
     else()
         message(STATUS "OpenCL not found - OpenCL backend disabled")
@@ -535,6 +526,20 @@ set(LIBRARY_SOURCES
 )
 
 function(cml_link_all target)
+    # Scoped instead of a global include_directories(): BUILD_INTERFACE keeps
+    # the source-tree path out of the installed CMLTargets export.
+    target_include_directories(${target} PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
+    # Third-party backend headers are SYSTEM so their warnings never trip our
+    # -Werror builds; only targets compiling library sources need them.
+    if(LLVM_INCLUDE_DIRS)
+        target_include_directories(${target} SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+    endif()
+    if(CUDAToolkit_INCLUDE_DIRS)
+        target_include_directories(${target} SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+    endif()
+    if(OpenCL_INCLUDE_DIRS)
+        target_include_directories(${target} SYSTEM PRIVATE ${OpenCL_INCLUDE_DIRS})
+    endif()
     target_link_libraries(${target} m dl pthread)
     if(LLVM_BACKEND_FOUND)
         target_link_libraries(${target} ${LLVM_BACKEND_LIBS_LIST})
