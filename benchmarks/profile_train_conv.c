@@ -1,25 +1,7 @@
 /**
  * Targeted profiling of MLP training step and Conv2d overhead.
  */
-#define _POSIX_C_SOURCE 199309L
-#include "cml.h"
-#include "backend/blas.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include "alloc/cml_allocator.h"
-
-static double now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
-}
-
-static void fill_random(float* buf, int n) {
-    for (int i = 0; i < n; i++)
-        buf[i] = (float)rand() / (float)RAND_MAX - 0.5f;
-}
+#include "profile_common.h"
 
 int main(void) {
     cml_init();
@@ -131,49 +113,15 @@ int main(void) {
         fill_random(bias, oc);
 
         /* Warmup */
-        for (int i = 0; i < 10; i++) {
-            for (int b = 0; b < cb; b++) {
-                for (int c = 0; c < ic; c++)
-                    for (int kr = 0; kr < kh; kr++)
-                        for (int kc = 0; kc < kw; kc++) {
-                            int row = (c * kh + kr) * kw + kc;
-                            const float* src = input + ((b * ic + c) * ih + kr) * iw + kc;
-                            float* dst = col + row * col_w;
-                            for (int r = 0; r < oh; r++)
-                                memcpy(dst + r * ow, src + r * iw, ow * sizeof(float));
-                        }
-                cml_blas_sgemm(blas, weight, col, output + (size_t)b * oc * oh * ow,
-                               oc, col_w, col_h, 1.0f, 0.0f);
-                for (int o = 0; o < oc; o++) {
-                    float bv = bias[o];
-                    float* row = output + ((size_t)b * oc + o) * (oh * ow);
-                    for (int j = 0; j < oh * ow; j++) row[j] += bv;
-                }
-            }
-        }
+        for (int i = 0; i < 10; i++)
+            raw_blas_conv2d_forward(blas, input, weight, bias, col, output,
+                                    cb, ic, ih, iw, oc, oh, ow, kh, kw);
 
         /* Time raw im2col+sgemm+bias (matching CML's work exactly) */
         double t0 = now();
-        for (int i = 0; i < iters; i++) {
-            for (int b = 0; b < cb; b++) {
-                for (int c = 0; c < ic; c++)
-                    for (int kr = 0; kr < kh; kr++)
-                        for (int kc = 0; kc < kw; kc++) {
-                            int row = (c * kh + kr) * kw + kc;
-                            const float* src = input + ((b * ic + c) * ih + kr) * iw + kc;
-                            float* dst = col + row * col_w;
-                            for (int r = 0; r < oh; r++)
-                                memcpy(dst + r * ow, src + r * iw, ow * sizeof(float));
-                        }
-                cml_blas_sgemm(blas, weight, col, output + (size_t)b * oc * oh * ow,
-                               oc, col_w, col_h, 1.0f, 0.0f);
-                for (int o = 0; o < oc; o++) {
-                    float bv = bias[o];
-                    float* row = output + ((size_t)b * oc + o) * (oh * ow);
-                    for (int j = 0; j < oh * ow; j++) row[j] += bv;
-                }
-            }
-        }
+        for (int i = 0; i < iters; i++)
+            raw_blas_conv2d_forward(blas, input, weight, bias, col, output,
+                                    cb, ic, ih, iw, oc, oh, ow, kh, kw);
         double raw_full = (now() - t0) / iters * 1e3;
 
         /* CML Conv2d */

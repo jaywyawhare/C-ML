@@ -12,7 +12,8 @@
  * Set BACKEND=opencl to benchmark OpenCL GPU path.
  * Set BACKEND=metal to benchmark Metal GPU path (macOS).
  */
-#define _POSIX_C_SOURCE 199309L
+#include "bench_timing.h"
+
 #include "cml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,31 +24,6 @@
 
 static DeviceType g_device = DEVICE_CPU;
 
-static void cooldown_ms(int ms) {
-    struct timespec ts = {.tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L};
-    nanosleep(&ts, NULL);
-}
-
-static double now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
-}
-
-static void fill_random(float* buf, int n) {
-    for (int i = 0; i < n; i++)
-        buf[i] = (float)rand() / (float)RAND_MAX - 0.5f;
-}
-
-static int cmp_double(const void* a, const void* b) {
-    double da = *(const double*)a, db = *(const double*)b;
-    return (da > db) - (da < db);
-}
-
-static double median(double* arr, int n) {
-    qsort(arr, (size_t)n, sizeof(double), cmp_double);
-    return (n % 2) ? arr[n / 2] : (arr[n / 2 - 1] + arr[n / 2]) / 2.0;
-}
 
 static double bench_gemm(int N) {
     int shape[]      = {N, N};
@@ -145,6 +121,7 @@ static double bench_mlp_forward(void) {
     cml_nn_sequential_add(model,
                           (Module*)cml_nn_linear(hid, out_f, DTYPE_FLOAT32, g_device, true));
     module_set_training((Module*)model, false);
+    cml_no_grad();  /* inference: match PyTorch's `with torch.no_grad()` */
 
     /* Warmup: populate the global graph cache (buffer pool) */
     for (int i = 0; i < 5; i++) {
@@ -165,6 +142,7 @@ static double bench_mlp_forward(void) {
         times[r] = (now() - t0) / iters * 1e3;
     }
     cml_reset_ir_context();
+    cml_enable_grad();
 
     cml_free(x_data);
     module_free((Module*)model);
@@ -242,6 +220,7 @@ static double bench_conv2d(void) {
     Conv2d* conv_layer = cml_nn_conv2d(ic, oc, ksize, 1, 0, 1, true, DTYPE_FLOAT32, g_device);
     Module* conv       = (Module*)conv_layer;
     module_set_training(conv, false);
+    cml_no_grad();  /* inference: match PyTorch's `with torch.no_grad()` */
 
     /* Warmup: populate the global graph cache (buffer pool) */
     for (int i = 0; i < 5; i++) {
@@ -262,6 +241,7 @@ static double bench_conv2d(void) {
         times[r] = (now() - t0) / iters * 1e3;
     }
     cml_reset_ir_context();
+    cml_enable_grad();
 
     cml_free(x_data);
     module_free(conv);
@@ -281,30 +261,33 @@ int main(void) {
     cml_init();
     srand(42);
 
+    /* Cool down before EVERY measured workload, not just the 2048 ones. On
+     * thermally-limited laptop CPUs a heavy bench leaves the next one running
+     * under throttle debt, which previously made fused_1024 (the 4th back-to-back
+     * heavy op) look ~2-3x slower than it is while the cooled-down 2048 case
+     * looked fine. Uniform cooldowns make the reported medians comparable. */
+    cooldown_ms(150);
     double gemm_512   = bench_gemm(512);
+    cooldown_ms(150);
     double fused_512  = bench_fused(512);
+    cooldown_ms(150);
     double gemm_1024  = bench_gemm(1024);
+    cooldown_ms(150);
     double fused_1024 = bench_fused(1024);
     cooldown_ms(200);
     double gemm_2048 = bench_gemm(2048);
     cooldown_ms(200);
     double fused_2048 = bench_fused(2048);
-    cooldown_ms(100);
+    cooldown_ms(150);
     double mlp_fwd    = bench_mlp_forward();
+    cooldown_ms(150);
     double mlp_train  = bench_mlp_train();
+    cooldown_ms(150);
     double conv2d_fwd = bench_conv2d();
 
-    printf("{\n");
-    printf("  \"gemm_512\": %.3f,\n", gemm_512);
-    printf("  \"gemm_1024\": %.3f,\n", gemm_1024);
-    printf("  \"gemm_2048\": %.3f,\n", gemm_2048);
-    printf("  \"fused_512\": %.3f,\n", fused_512);
-    printf("  \"fused_1024\": %.3f,\n", fused_1024);
-    printf("  \"fused_2048\": %.3f,\n", fused_2048);
-    printf("  \"mlp_forward\": %.3f,\n", mlp_fwd);
-    printf("  \"mlp_train_step\": %.3f,\n", mlp_train);
-    printf("  \"conv2d_forward\": %.3f\n", conv2d_fwd);
-    printf("}\n");
+    bench_print_json(gemm_512, gemm_1024, gemm_2048,
+                     fused_512, fused_1024, fused_2048,
+                     mlp_fwd, mlp_train, conv2d_fwd);
 
     cml_cleanup();
     return 0;

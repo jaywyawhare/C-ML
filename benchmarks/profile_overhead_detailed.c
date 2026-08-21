@@ -1,25 +1,7 @@
 /**
  * Detailed overhead profiler: isolate every source of CML overhead vs raw BLAS.
  */
-#define _POSIX_C_SOURCE 199309L
-#include "cml.h"
-#include "backend/blas.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include "alloc/cml_allocator.h"
-
-static double now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
-}
-
-static void fill_random(float* buf, int n) {
-    for (int i = 0; i < n; i++)
-        buf[i] = (float)rand() / (float)RAND_MAX - 0.5f;
-}
+#include "profile_common.h"
 
 int main(void) {
     cml_init();
@@ -189,30 +171,14 @@ int main(void) {
         fill_random(B2, out_f);
 
         for (int i = 0; i < 10; i++) {
-            cml_blas_sgemm_ex(blas, X, W1, H, batch, hid, in_f, 1.0f, 0.0f, false, true);
-            for (int r = 0; r < batch; r++)
-                for (int c = 0; c < hid; c++) {
-                    H[r*hid+c] += B1[c];
-                    if (H[r*hid+c] < 0) H[r*hid+c] = 0;
-                }
-            cml_blas_sgemm_ex(blas, H, W2, OUT, batch, out_f, hid, 1.0f, 0.0f, false, true);
-            for (int r = 0; r < batch; r++)
-                for (int c = 0; c < out_f; c++)
-                    OUT[r*out_f+c] += B2[c];
+            raw_blas_mlp_forward(blas, X, W1, B1, H, W2, B2, OUT,
+                                     batch, in_f, hid, out_f);
         }
 
         double t0 = now();
         for (int i = 0; i < iters; i++) {
-            cml_blas_sgemm_ex(blas, X, W1, H, batch, hid, in_f, 1.0f, 0.0f, false, true);
-            for (int r = 0; r < batch; r++)
-                for (int c = 0; c < hid; c++) {
-                    H[r*hid+c] += B1[c];
-                    if (H[r*hid+c] < 0) H[r*hid+c] = 0;
-                }
-            cml_blas_sgemm_ex(blas, H, W2, OUT, batch, out_f, hid, 1.0f, 0.0f, false, true);
-            for (int r = 0; r < batch; r++)
-                for (int c = 0; c < out_f; c++)
-                    OUT[r*out_f+c] += B2[c];
+            raw_blas_mlp_forward(blas, X, W1, B1, H, W2, B2, OUT,
+                                     batch, in_f, hid, out_f);
         }
         double raw_mlp = (now() - t0) / iters * 1e3;
 
@@ -318,37 +284,15 @@ int main(void) {
         fill_random(weight, oc * col_h);
 
         /* Warmup */
-        for (int i = 0; i < 5; i++) {
-            for (int b = 0; b < cb; b++) {
-                for (int c = 0; c < ic; c++)
-                    for (int kr = 0; kr < kh; kr++)
-                        for (int kc = 0; kc < kw; kc++) {
-                            int row = (c * kh + kr) * kw + kc;
-                            for (int r = 0; r < oh; r++)
-                                for (int cc = 0; cc < ow; cc++)
-                                    col[row * col_w + r * ow + cc] =
-                                        input[((b * ic + c) * ih + r + kr) * iw + cc + kc];
-                        }
-                cml_blas_sgemm(blas, weight, col, output + (size_t)b * oc * oh * ow,
-                               oc, col_w, col_h, 1.0f, 0.0f);
-            }
-        }
+        for (int i = 0; i < 5; i++)
+            raw_blas_conv2d_forward(blas, input, weight, NULL, col, output,
+                                    cb, ic, ih, iw, oc, oh, ow, kh, kw);
 
         /* Time im2col only */
         double t0 = now();
-        for (int i = 0; i < iters; i++) {
-            for (int b = 0; b < cb; b++) {
-                for (int c = 0; c < ic; c++)
-                    for (int kr = 0; kr < kh; kr++)
-                        for (int kc = 0; kc < kw; kc++) {
-                            int row = (c * kh + kr) * kw + kc;
-                            for (int r = 0; r < oh; r++)
-                                for (int cc = 0; cc < ow; cc++)
-                                    col[row * col_w + r * ow + cc] =
-                                        input[((b * ic + c) * ih + r + kr) * iw + cc + kc];
-                        }
-            }
-        }
+        for (int i = 0; i < iters; i++)
+            for (int b = 0; b < cb; b++)
+                raw_im2col(input, col, b, ic, ih, iw, oh, ow, kh, kw);
         double im2col_time = (now() - t0) / iters * 1e3;
 
         /* Time sgemm only */
@@ -363,21 +307,9 @@ int main(void) {
 
         /* Time full raw conv */
         t0 = now();
-        for (int i = 0; i < iters; i++) {
-            for (int b = 0; b < cb; b++) {
-                for (int c = 0; c < ic; c++)
-                    for (int kr = 0; kr < kh; kr++)
-                        for (int kc = 0; kc < kw; kc++) {
-                            int row = (c * kh + kr) * kw + kc;
-                            for (int r = 0; r < oh; r++)
-                                for (int cc = 0; cc < ow; cc++)
-                                    col[row * col_w + r * ow + cc] =
-                                        input[((b * ic + c) * ih + r + kr) * iw + cc + kc];
-                        }
-                cml_blas_sgemm(blas, weight, col, output + (size_t)b * oc * oh * ow,
-                               oc, col_w, col_h, 1.0f, 0.0f);
-            }
-        }
+        for (int i = 0; i < iters; i++)
+            raw_blas_conv2d_forward(blas, input, weight, NULL, col, output,
+                                    cb, ic, ih, iw, oc, oh, ow, kh, kw);
         double raw_conv = (now() - t0) / iters * 1e3;
 
         /* CML Conv2d */

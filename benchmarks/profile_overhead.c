@@ -1,25 +1,7 @@
 /**
  * Profile CML overhead: isolate IR graph creation vs actual computation.
  */
-#define _POSIX_C_SOURCE 199309L
-#include "cml.h"
-#include "backend/blas.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include "alloc/cml_allocator.h"
-
-static double now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
-}
-
-static void fill_random(float* buf, int n) {
-    for (int i = 0; i < n; i++)
-        buf[i] = (float)rand() / (float)RAND_MAX - 0.5f;
-}
+#include "profile_common.h"
 
 int main(void) {
     cml_init();
