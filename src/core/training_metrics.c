@@ -14,25 +14,26 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
-/* Single-training-loop state: one process tracks one active training run and
- * every accessor here must be called from the thread running that loop (the
- * loss/step hooks fire inside cml_backward/cml_optim_step on that thread).
- * Concurrent training loops in one process need per-context state, not a
- * mutex around these globals. */
-static TrainingMetrics* g_global_metrics = NULL;
-static size_t g_current_epoch            = 0;
-static int g_optimizer_step_count        = 0;
-static int g_last_epoch_step_count       = 0;
-static double g_epoch_start_time         = 0.0;
-static float g_last_loss                 = 0.0f;
-static bool g_epoch_in_progress          = false;
-static bool g_zero_grad_called           = false;
-static Module* g_current_model           = NULL; 
-static bool g_architecture_exported      = false;
-static bool g_manual_epoch_control       = false;
+/* Per-training-loop state. Thread-local rather than process-global: each
+ * thread running its own training loop gets an isolated metrics context, so
+ * concurrent loops cannot tear each other's epoch/step state (previously
+ * shared mutable globals with no synchronization). The auto-capture hooks all
+ * fire on the training thread itself, so a single-threaded program sees the
+ * exact same behavior as before. */
+static __thread TrainingMetrics* g_global_metrics = NULL;
+static __thread size_t g_current_epoch            = 0;
+static __thread int g_optimizer_step_count        = 0;
+static __thread int g_last_epoch_step_count       = 0;
+static __thread double g_epoch_start_time         = 0.0;
+static __thread float g_last_loss                 = 0.0f;
+static __thread bool g_epoch_in_progress          = false;
+static __thread bool g_zero_grad_called           = false;
+static __thread Module* g_current_model           = NULL;
+static __thread bool g_architecture_exported      = false;
+static __thread bool g_manual_epoch_control       = false;
 /* Set by classification losses; read once during the following loss capture. */
-static Tensor* g_acc_pred                 = NULL;
-static Tensor* g_acc_target               = NULL;
+static __thread Tensor* g_acc_pred                 = NULL;
+static __thread Tensor* g_acc_target               = NULL;
 
 void training_metrics_note_prediction(Tensor* prediction, Tensor* target) {
     g_acc_pred   = prediction;
@@ -238,7 +239,7 @@ void training_metrics_start_epoch(TrainingMetrics* metrics) {
  * recently ran a forward pass. Hand-written training loops never call
  * cml_train, so hooking the loop would have covered only the built-in one;
  * every loop does forward the model, which is what this keys off. */
-static size_t g_last_dist_epoch = (size_t)-1;
+static __thread size_t g_last_dist_epoch = (size_t)-1;
 
 static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epoch) {
     if (!metrics || !cml_ir_scope_enabled())

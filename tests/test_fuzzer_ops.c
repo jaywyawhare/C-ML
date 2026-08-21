@@ -33,21 +33,7 @@ static const TensorConfig cpu_f32 = {
     .has_dtype = true, .has_device = true
 };
 
-static int tests_passed = 0;
-static int tests_total  = 0;
-
-#define TEST(name)                                     \
-    do {                                               \
-        tests_total++;                                 \
-        printf("  FUZZ: %s ... ", #name);              \
-        fflush(stdout);                                \
-        if (fuzz_##name()) {                           \
-            tests_passed++;                            \
-            printf("OK\n");                            \
-        } else {                                       \
-            printf("FAIL\n");                          \
-        }                                              \
-    } while (0)
+#include "test_harness.h"
 
 static int has_nan_inf(Tensor* t) {
     if (!t || !t->data) return 0;
@@ -107,7 +93,7 @@ static Tensor* make_asin_safe_tensor(int* shape, int ndim) {
 }
 typedef Tensor* (*UnaryOp)(Tensor*);
 
-static int fuzz_unary_op_no_crash(UnaryOp op, const char* name,
+static int test_unary_op_no_crash(UnaryOp op, const char* name,
                                    int use_positive, int n_trials) {
     int failures = 0;
     for (int trial = 0; trial < n_trials; trial++) {
@@ -139,32 +125,32 @@ static int fuzz_unary_op_no_crash(UnaryOp op, const char* name,
 }
 
 #define FUZZ_UNARY(opfn, positive) \
-    fuzz_unary_op_no_crash(opfn, #opfn, positive, 20)
+    test_unary_op_no_crash(opfn, #opfn, positive, 20)
 
-static int fuzz_sin(void)         { return FUZZ_UNARY(uop_sin,  0); }
-static int fuzz_cos(void)         { return FUZZ_UNARY(uop_cos,  0); }
-static int fuzz_tanh(void)        { return FUZZ_UNARY(uop_tanh, 0); }
-static int fuzz_sigmoid(void)     { return FUZZ_UNARY(uop_sigmoid, 0); }
-static int fuzz_exp(void)         { return fuzz_unary_op_no_crash(uop_exp, "uop_exp", 0, 20); }
-static int fuzz_neg(void)         { return FUZZ_UNARY(uop_neg,  0); }
-static int fuzz_abs(void)         { return FUZZ_UNARY(uop_abs,  0); }
-static int fuzz_floor(void)       { return FUZZ_UNARY(uop_floor, 0); }
-static int fuzz_ceil(void)        { return FUZZ_UNARY(uop_ceil,  0); }
-static int fuzz_round(void)       { return FUZZ_UNARY(uop_round, 0); }
-static int fuzz_trunc(void)       { return FUZZ_UNARY(uop_trunc, 0); }
-static int fuzz_sign(void)        { return FUZZ_UNARY(uop_sign,  0); }
-static int fuzz_square(void)      { return FUZZ_UNARY(uop_square, 0); }
-static int fuzz_log(void)         { return FUZZ_UNARY(uop_log,   1); }
-static int fuzz_sqrt(void)        { return FUZZ_UNARY(uop_sqrt,  1); }
-static int fuzz_rsqrt(void)       { return FUZZ_UNARY(uop_rsqrt, 1); }
-static int fuzz_recip(void)       { return FUZZ_UNARY(uop_recip, 1); }
-static int fuzz_log2(void)        { return FUZZ_UNARY(uop_log2,  1); }
-static int fuzz_log10(void)       { return FUZZ_UNARY(uop_log10, 1); }
-static int fuzz_exp2(void)        { return FUZZ_UNARY(uop_exp2,  0); }
-static int fuzz_erf(void)         { return FUZZ_UNARY(uop_erf,   0); }
-static int fuzz_sinh(void)        { return fuzz_unary_op_no_crash(uop_sinh, "uop_sinh", 0, 20); }
-static int fuzz_cosh(void)        { return fuzz_unary_op_no_crash(uop_cosh, "uop_cosh", 0, 20); }
-static int fuzz_asin(void) {
+static int test_sin(void)         { return FUZZ_UNARY(uop_sin,  0); }
+static int test_cos(void)         { return FUZZ_UNARY(uop_cos,  0); }
+static int test_tanh(void)        { return FUZZ_UNARY(uop_tanh, 0); }
+static int test_sigmoid(void)     { return FUZZ_UNARY(uop_sigmoid, 0); }
+static int test_exp(void)         { return test_unary_op_no_crash(uop_exp, "uop_exp", 0, 20); }
+static int test_neg(void)         { return FUZZ_UNARY(uop_neg,  0); }
+static int test_abs(void)         { return FUZZ_UNARY(uop_abs,  0); }
+static int test_floor(void)       { return FUZZ_UNARY(uop_floor, 0); }
+static int test_ceil(void)        { return FUZZ_UNARY(uop_ceil,  0); }
+static int test_round(void)       { return FUZZ_UNARY(uop_round, 0); }
+static int test_trunc(void)       { return FUZZ_UNARY(uop_trunc, 0); }
+static int test_sign(void)        { return FUZZ_UNARY(uop_sign,  0); }
+static int test_square(void)      { return FUZZ_UNARY(uop_square, 0); }
+static int test_log(void)         { return FUZZ_UNARY(uop_log,   1); }
+static int test_sqrt(void)        { return FUZZ_UNARY(uop_sqrt,  1); }
+static int test_rsqrt(void)       { return FUZZ_UNARY(uop_rsqrt, 1); }
+static int test_recip(void)       { return FUZZ_UNARY(uop_recip, 1); }
+static int test_log2(void)        { return FUZZ_UNARY(uop_log2,  1); }
+static int test_log10(void)       { return FUZZ_UNARY(uop_log10, 1); }
+static int test_exp2(void)        { return FUZZ_UNARY(uop_exp2,  0); }
+static int test_erf(void)         { return FUZZ_UNARY(uop_erf,   0); }
+static int test_sinh(void)        { return test_unary_op_no_crash(uop_sinh, "uop_sinh", 0, 20); }
+static int test_cosh(void)        { return test_unary_op_no_crash(uop_cosh, "uop_cosh", 0, 20); }
+static int test_asin(void) {
     int failures = 0;
     for (int trial = 0; trial < 20; trial++) {
         int shape[8], ndim;
@@ -183,10 +169,10 @@ static int fuzz_asin(void) {
     }
     return (failures == 0);
 }
-static int fuzz_logical_not(void) { return FUZZ_UNARY(uop_logical_not, 0); }
+static int test_logical_not(void) { return FUZZ_UNARY(uop_logical_not, 0); }
 typedef Tensor* (*BinaryOp)(Tensor*, Tensor*);
 
-static int fuzz_binary_op_no_crash(BinaryOp op, const char* name,
+static int test_binary_op_no_crash(BinaryOp op, const char* name,
                                     int use_positive, int n_trials) {
     int failures = 0;
     for (int trial = 0; trial < n_trials; trial++) {
@@ -219,25 +205,25 @@ static int fuzz_binary_op_no_crash(BinaryOp op, const char* name,
 }
 
 #define FUZZ_BINARY(opfn, positive) \
-    fuzz_binary_op_no_crash(opfn, #opfn, positive, 20)
+    test_binary_op_no_crash(opfn, #opfn, positive, 20)
 
-static int fuzz_add(void)          { return FUZZ_BINARY(uop_add, 0); }
-static int fuzz_sub(void)          { return FUZZ_BINARY(uop_sub, 0); }
-static int fuzz_mul(void)          { return FUZZ_BINARY(uop_mul, 0); }
-static int fuzz_div(void)          { return fuzz_binary_op_no_crash(uop_div, "uop_div", 1, 20); }
-static int fuzz_maximum(void)      { return FUZZ_BINARY(uop_max, 0); }
-static int fuzz_minimum(void)      { return FUZZ_BINARY(uop_minimum, 0); }
-static int fuzz_cmplt(void)        { return FUZZ_BINARY(uop_cmplt, 0); }
-static int fuzz_cmpeq(void)        { return FUZZ_BINARY(uop_cmpeq, 0); }
-static int fuzz_cmpne(void)        { return FUZZ_BINARY(uop_cmpne, 0); }
-static int fuzz_cmple(void)        { return FUZZ_BINARY(uop_cmple, 0); }
-static int fuzz_cmpgt(void)        { return FUZZ_BINARY(uop_cmpgt, 0); }
-static int fuzz_cmpge(void)        { return FUZZ_BINARY(uop_cmpge, 0); }
-static int fuzz_logical_and(void)  { return FUZZ_BINARY(uop_logical_and, 0); }
-static int fuzz_logical_or(void)   { return FUZZ_BINARY(uop_logical_or, 0); }
-static int fuzz_logaddexp(void)    { return FUZZ_BINARY(uop_logaddexp, 0); }
-static int fuzz_copysign(void)     { return FUZZ_BINARY(uop_copysign, 0); }
-static int fuzz_reduce_shape(void) {
+static int test_add(void)          { return FUZZ_BINARY(uop_add, 0); }
+static int test_sub(void)          { return FUZZ_BINARY(uop_sub, 0); }
+static int test_mul(void)          { return FUZZ_BINARY(uop_mul, 0); }
+static int test_div(void)          { return test_binary_op_no_crash(uop_div, "uop_div", 1, 20); }
+static int test_maximum(void)      { return FUZZ_BINARY(uop_max, 0); }
+static int test_minimum(void)      { return FUZZ_BINARY(uop_minimum, 0); }
+static int test_cmplt(void)        { return FUZZ_BINARY(uop_cmplt, 0); }
+static int test_cmpeq(void)        { return FUZZ_BINARY(uop_cmpeq, 0); }
+static int test_cmpne(void)        { return FUZZ_BINARY(uop_cmpne, 0); }
+static int test_cmple(void)        { return FUZZ_BINARY(uop_cmple, 0); }
+static int test_cmpgt(void)        { return FUZZ_BINARY(uop_cmpgt, 0); }
+static int test_cmpge(void)        { return FUZZ_BINARY(uop_cmpge, 0); }
+static int test_logical_and(void)  { return FUZZ_BINARY(uop_logical_and, 0); }
+static int test_logical_or(void)   { return FUZZ_BINARY(uop_logical_or, 0); }
+static int test_logaddexp(void)    { return FUZZ_BINARY(uop_logaddexp, 0); }
+static int test_copysign(void)     { return FUZZ_BINARY(uop_copysign, 0); }
+static int test_reduce_shape(void) {
     int failures = 0;
     for (int trial = 0; trial < 30; trial++) {
         int shape[8], ndim;
@@ -264,7 +250,7 @@ static int fuzz_reduce_shape(void) {
     return (failures == 0);
 }
 
-static int fuzz_mean_shape(void) {
+static int test_mean_shape(void) {
     int failures = 0;
     for (int trial = 0; trial < 30; trial++) {
         int shape[8], ndim;
@@ -282,7 +268,7 @@ static int fuzz_mean_shape(void) {
     return (failures == 0);
 }
 
-static int fuzz_reshape_numel(void) {
+static int test_reshape_numel(void) {
     int failures = 0;
     for (int trial = 0; trial < 50; trial++) {
         
@@ -312,7 +298,7 @@ static int fuzz_reshape_numel(void) {
     return (failures == 0);
 }
 
-static int fuzz_random_op_chain(void) {
+static int test_random_op_chain(void) {
     
     int failures = 0;
     UnaryOp ops[] = {uop_sin, uop_cos, uop_tanh, uop_sigmoid, uop_abs,
@@ -349,7 +335,7 @@ static int fuzz_random_op_chain(void) {
     return (failures == 0);
 }
 
-static int fuzz_matmul_shapes(void) {
+static int test_matmul_shapes(void) {
     int failures = 0;
     for (int trial = 0; trial < 20; trial++) {
         int M = rng_int(1, 16);
@@ -382,7 +368,7 @@ static int fuzz_matmul_shapes(void) {
     return (failures == 0);
 }
 
-static int fuzz_empty_tensor_safety(void) {
+static int test_empty_tensor_safety(void) {
     
     int shape[] = {0};
     Tensor* x = tensor_empty(shape, 1, &cpu_f32);
@@ -393,7 +379,7 @@ static int fuzz_empty_tensor_safety(void) {
     return 1;
 }
 
-static int fuzz_where(void) {
+static int test_where(void) {
     int failures = 0;
     for (int trial = 0; trial < 20; trial++) {
         int n = rng_int(2, 64);
@@ -436,7 +422,7 @@ static int fuzz_where(void) {
     return (failures == 0);
 }
 
-static int fuzz_fill_value(void) {
+static int test_fill_value(void) {
     for (int trial = 0; trial < 20; trial++) {
         int n = rng_int(1, 128);
         int shape[] = {n};
@@ -453,7 +439,7 @@ static int fuzz_fill_value(void) {
     return 1;
 }
 
-static int fuzz_dtype_stress(void) {
+static int test_dtype_stress(void) {
     
     DType dtypes[] = {DTYPE_FLOAT32, DTYPE_INT32};
     int failures = 0;
@@ -517,6 +503,5 @@ int main(int argc, char* argv[]) {
 
     cml_reset_ir_context();
 
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_total);
-    return (tests_passed == tests_total) ? 0 : 1;
+    return TEST_SUMMARY();
 }
