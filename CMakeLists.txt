@@ -245,6 +245,7 @@ set(OPS_SOURCES
     src/ops/ir/intern.c
     src/ops/ir/context.c
     src/ops/ir/execution.c
+    src/ops/ir/execution_typed.c
     src/ops/ir/flamegraph.c
     src/ops/ir/cpu_lazy_materialize.c
     src/ops/ir/backward.c
@@ -384,7 +385,7 @@ set(NN_SOURCES
     src/nn/layers/activations.c
     src/nn/layers/dropout.c
     src/nn/layers/conv2d.c
-    src/nn/layers/batchnorm2d.c
+    src/nn/layers/norm.c
     src/nn/layers/layernorm.c
     src/nn/layers/pooling.c
     src/nn/layers/sequential.c
@@ -399,14 +400,12 @@ set(NN_SOURCES
     src/nn/layers/conv_transpose2d.c
     src/nn/layers/instancenorm.c
     src/nn/layers/conv_transpose1d.c
-    src/nn/layers/batchnorm3d.c
     src/nn/layers/layernorm2d.c
     src/nn/layers/conv_transpose3d.c
     src/nn/layers/upsample.c
     src/nn/layers/pixel_shuffle.c
     src/nn/layers/flatten.c
     src/nn/layers/identity.c
-    src/nn/layers/batchnorm1d.c
     src/nn/layers/prelu.c
     src/nn/llm_ops.c
     src/nn/llama.c
@@ -582,9 +581,22 @@ if(BUILD_SHARED_LIBS)
     cml_apply_torch_selective_ops(cml_shared)
 endif()
 
+# backtrace() can only name a function if its symbol is in the dynamic table.
+# Without this the flame graph's stacks resolve to bare addresses.
+if(NOT WIN32)
+    set(CMAKE_ENABLE_EXPORTS ON)
+    add_link_options(-rdynamic)
+endif()
+
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
     enable_testing()
+    # Release (the default build type) defines NDEBUG, which turns every
+    # assert() into a no-op -- 18 test files once relied on assert() as their
+    # only check and so verified nothing here. Those now use REQUIRE() from
+    # tests/test_require.h, which does not depend on NDEBUG; this flag is the
+    # backstop for any plain assert() added later.
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)
     file(GLOB TEST_SOURCES "tests/*.c")
     foreach(test_source ${TEST_SOURCES})
         get_filename_component(test_name ${test_source} NAME_WE)

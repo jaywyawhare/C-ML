@@ -220,6 +220,7 @@ int main(void) {
                        (double)best_loss);
                 printf("No improvement for %d epochs\n", patience);
 
+                training_metrics_complete_epoch();
                 training_metrics_mark_early_stop((size_t)epoch);
                 break;
             }
@@ -231,6 +232,11 @@ int main(void) {
                    epoch + 1, num_epochs, (double)epoch_loss, (double)(accuracy * 100.0f),
                    (double)current_lr, no_improve_epochs, patience);
         }
+
+        /* set_expected_epochs() puts metrics in manual epoch control, so the
+         * epoch index only moves when we say so. Without this every epoch
+         * overwrote slot 0 and the dashboard showed a single flat point. */
+        training_metrics_complete_epoch();
 
         cml_reset_ir_context();
     }

@@ -4,6 +4,43 @@
 
 The **Kernel Studio** is an interactive visualization tool for analyzing generated code kernels, dead code elimination, and optimization passes in C-ML. It provides insights into how the IR (Intermediate Representation) compiler optimizes your computation graphs.
 
+## Running the dashboard
+
+```bash
+VIZ=1 ./your_program        # exports the artifacts and launches the dashboard
+```
+
+`VIZ=1` writes these next to the working directory:
+
+| File | Contents |
+|------|----------|
+| `graph.json` | IR graph after optimization — dead/fused flags, module scopes |
+| `kernels.json` | Generated kernels, `unoptimized` and `optimized` side by side |
+| `training.json` | Per-epoch loss/accuracy/LR, plus weight & gradient distributions |
+| `model_architecture.json` | Layer summary and parameter counts |
+| `flamegraph.json` | Per-kernel execution timings (see below) |
+
+The graph and kernel exports are re-run only when the graph's structure changes,
+not on every step: a training loop rebuilds the same graph each iteration and the
+dashboard only ever shows the latest, so exporting per step rewrote identical
+files hundreds of times. A shape change re-triggers it automatically.
+
+### Turning everything off
+
+`NO_EXPORT=1` emits **no** files and skips the work behind them — use it for
+benchmarking (no I/O jitter in the numbers) and production training:
+
+```bash
+NO_EXPORT=1 ./your_program
+```
+
+Worth knowing: `training.json` is written even without `VIZ`, because the
+auto-capture metrics path is not VIZ-gated — a 57-epoch run rewrote it ~199
+times. `NO_EXPORT=1` is what silences that.
+
+`VIZ=1` and `NO_EXPORT=1` are **mutually exclusive**; setting both fails
+`cml_init()` with an explanatory error rather than silently picking a winner.
+
 ## Features
 
 ### 1. **Kernel Inspection**
@@ -95,6 +132,16 @@ Operations are reordered using topological sort to improve cache utilization:
 
 ## Using the Kernel Studio
 
+### Grouping the graph by module
+
+IR nodes carry a `scope` — the module path of the layer that emitted them, e.g.
+`Sequential/Linear` — so the graph view can collapse thousands of decomposed
+primitives back into the layers they came from. Toggle **Group by module scope**
+in the graph controls; nested containers render as nested boxes.
+
+Scopes are recorded in `module_forward`, so every layer gets them without opting
+in. They are only tracked under `VIZ` (the tagging costs a string copy per node).
+
 ### Viewing Kernels
 
 1. **Toggle View**: Switch between "Unoptimized" and "Optimized" views
@@ -118,6 +165,32 @@ Operations are reordered using topological sort to improve cache utilization:
 - **Total Nodes**: Operations after dead code elimination
 - **Kernels**: Optimized kernel count
 - **Fused**: Number of fused kernels created
+
+### Execution Flamegraph
+
+`VIZ=1` also times each executed kernel and writes `flamegraph.json`, shown at the
+top of Kernel Studio (width = time). It answers the question the kernel listing
+cannot: whether fusion actually collapsed a hot chain into one wide bar.
+
+Timings are **aggregated at capture time** by kernel signature
+`(phase, kind, op, work-size)` — the same key the view groups by — carrying total
+time, an occurrence count and the slowest single execution:
+
+| field | meaning |
+|-------|---------|
+| `ms` | total time across every execution of this signature |
+| `count` | how many executions folded into this entry |
+| `max_ms` | slowest single execution — catches an outlier step |
+
+Recording one entry per *execution* would be storing an O(steps × nodes) log to
+compute an O(distinct-kernels) view. Aggregation keeps the whole run bounded by
+graph shape instead: a 300-step run went from 1.2 MB to 4.2 KB, with no cap and
+no truncation. `max_ms` is often the most useful column — a signature with
+`count=5` but `max=200 ms` is a one-off allocation, not a hot loop.
+
+Capture is enabled by `VIZ=1`; set `FLAMEGRAPH=0` to decline it (the graph and
+metrics panels still work). The file is written when the process exits, so finish
+the run before hitting Refresh.
 
 ### Optimization Insights Tab
 

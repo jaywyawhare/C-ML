@@ -19,7 +19,7 @@ Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 |---|---|---|---|
 | `DEBUG` | `0`–`7` | `0` | Leveled debug output (see breakdown below) |
 | `NO_COLOR` | `0`/`1` | `0` | Disable ANSI color in log output |
-| `NOOPT` | `0`/`1` | `0` | Disable IR/kernel optimization passes (keeps structural passes) |
+| `NOOPT` | `0`/`1` | `0` | Disable IR/kernel optimization passes — rewrites, reordering, and operator fusion (keeps structural passes: decompose, DCE, dependency graph) |
 | `PROFILE` | `0`/`1` | `0` | Enable kernel/op profiling |
 | `NO_MEMORY_PLANNER` | `0`/`1` | `0` | Disable the graph memory planner |
 | `WINO` | `-1`/`0`/`1` | `-1` | Winograd conv override: `-1` auto (per-op), `0` force off, `1` force on |
@@ -39,7 +39,9 @@ Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 | `BEAM` | `#` | `0` | Number of beams in kernel beam search (`0` = disabled) |
 | `DISABLE_FUSION` | `0`/`1` | `0` | Disable operator fusion in the scheduler |
 | `DISABLE_JIT` | `0`/`1` | `0` | Disable JIT compilation (force interpreter/BLAS path) |
-| `VIZ` | `0`/`1` | `0` | Launch the graph/kernel visualizer |
+| `VIZ` | `0`/`1` | `0` | Launch the graph/kernel visualizer. Also records per-epoch weight/gradient distributions, tags IR nodes with their module scope, and enables `FLAMEGRAPH` capture. Mutually exclusive with `NO_EXPORT` |
+| `NO_EXPORT` | `0`/`1` | `0` | Emit no dashboard/metrics files at all and skip the work behind them. **Mutually exclusive with `VIZ`** — setting both fails `cml_init()`. Use for benchmarking and production training |
+| `FLAMEGRAPH` | `0`/`1` | `0` | Time each fused kernel and write `flamegraph.json` at exit. Implied by `VIZ` and by the `PROFILE` flag |
 | `DEFAULT_FLOAT` | `FLOAT32`, `HALF`/`FLOAT16`, `BFLOAT16`, `FLOAT64` | `FLOAT32` | Default float dtype |
 
 ### `DEBUG` breakdown
@@ -53,6 +55,23 @@ Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 | `>= 5` | Intermediate representation (UOps) |
 | `>= 6` | Linearized UOps |
 | `>= 7` | Target assembly |
+
+### `NOOPT` as a reference mode
+
+Optimizations must not change results, so `NOOPT=1` is the baseline to diff
+against when a number looks wrong:
+
+```bash
+./my_program > opt.txt
+NOOPT=1 ./my_program > ref.txt
+diff opt.txt ref.txt      # any difference is a bug in an optimization
+```
+
+The whole test suite can be run this way (`NOOPT=1 ctest --test-dir build`),
+which is the cheapest way to catch a miscompiled fused kernel. To narrow a
+difference further, `DISABLE_FUSION=1` turns off only operator fusion and
+`JIT=0` only the JIT, so the three flags together isolate which stage is at
+fault.
 
 ## Using flags from C
 

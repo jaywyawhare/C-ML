@@ -199,6 +199,59 @@ training_metrics_set_learning_rate(metrics, lr, "StepLR");
 training_metrics_register_model((Module*)model);
 ```
 
+### Advancing the epoch counter
+
+`training_metrics_set_expected_epochs()` switches metrics into **manual epoch
+control**. Nothing then advances the epoch index on its own, so a hand-written
+loop must close each epoch:
+
+```c
+training_metrics_set_expected_epochs(num_epochs);   /* -> manual epoch control */
+
+for (int epoch = 0; epoch < num_epochs; epoch++) {
+    /* ... forward / backward / step ... */
+    training_metrics_complete_epoch();              /* required, once per epoch */
+}
+```
+
+Omit it and every epoch overwrites slot 0, so the dashboard shows a single flat
+point no matter how long training ran. If you break out early (early stopping),
+close the epoch before breaking.
+
+Loops that do *not* call `set_expected_epochs()` use automatic epoch detection,
+which advances on `zero_grad`; there, call `training_metrics_complete_epoch()`
+once at the end of training so the final epoch is not missed.
+
+### Weight and gradient distributions
+
+Under `VIZ=1`, each epoch also records the *shape* of the weight and gradient
+populations, not just a single gradient-norm scalar:
+
+```c
+typedef struct {
+    float min, p25, p50, p75, max;
+    float mean, std;
+    float frac_zero;   /* share of exactly-zero entries: dead ReLUs, pruned weights */
+} DistributionSummary;
+```
+
+A norm averages away the failure modes that matter — a few exploding channels, a
+layer that stopped moving, units that died. The bands show them directly.
+Percentiles come from a fixed-bin histogram over `[min, max]` rather than a sort,
+which would mean ordering every parameter in the model once per epoch.
+
+Capture is automatic (it hangs off the optimizer step, where gradients are still
+attached) and exported to `training.json` as `grad_distribution` /
+`weight_distribution`. To summarise a parameter set yourself:
+
+```c
+training_metrics_record_distributions(metrics, epoch, (void**)params, num_params);
+```
+
+Validation curves (`epoch_validation_losses` / `epoch_validation_accuracies`) are
+exported alongside the training curves, so train-vs-validation divergence is
+visible in the dashboard.
+
 ## Cleanup Context
 
 ```c
@@ -218,6 +271,26 @@ cml_register_cleanup_context(cleanup);
 
 - Free tensors after each iteration: `tensor_free(loss); tensor_free(outputs);`
 - Call `cml_reset_ir_context()` after each batch to prevent IR node accumulation
+- **Free that batch's tensors *before* the reset, not after.** The reset reclaims
+  the execution pool their storage came from, so freeing afterwards touches memory
+  the pool has already taken back.
+- **Do not hold a tensor across `cml_reset_ir_context()`.** A tensor materialised
+  through the graph has its storage in that pool, so the reset frees it and any
+  pointer you kept is dangling. Keep long-lived data (a dataset, say) in plain
+  host memory and build tensors from it per iteration:
+
+```c
+/* Dataset owned by the caller — unaffected by graph resets. */
+float* inputs = malloc((size_t)n * dim * sizeof(float));
+
+for (int step = 0; step < steps; step++) {
+    Tensor* batch = tensor_zeros_2d(batch_size, dim);
+    memcpy(tensor_data_ptr(batch), inputs + offset, batch_bytes);
+    /* ... forward / backward / step ... */
+    tensor_free(batch);          /* before the reset */
+    cml_reset_ir_context();
+}
+```
 - Use `CleanupContext` for centralized resource management
 - Don't manually free a cleanup context registered with `cml_register_cleanup_context()`
 

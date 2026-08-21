@@ -5,7 +5,13 @@
 #include "alloc/cml_allocator.h"
 
 int main(void) {
-    cml_init();
+    if (cml_init() != 0) {
+        /* Refuses to start on a rejected configuration (e.g. VIZ=1 with
+         * NO_EXPORT=1); this demo writes dashboard files of its own, so
+         * continuing would emit exactly what the config forbade. */
+        fprintf(stderr, "Failed to initialize C-ML library\n");
+        return 1;
+    }
 
     printf("Comprehensive Fusion Example\n\n");
 

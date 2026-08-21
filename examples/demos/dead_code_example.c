@@ -1,4 +1,5 @@
 #include "cml.h"
+#include "core/cml_flags.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,13 @@
 int main(void) {
     printf("Dead Code & IR Optimization Demo\n\n");
 
-    cml_init();
+    if (cml_init() != 0) {
+        /* Refuses to start on a rejected configuration (e.g. VIZ=1 with
+         * NO_EXPORT=1); this demo writes dashboard files of its own, so
+         * continuing would emit exactly what the config forbade. */
+        fprintf(stderr, "Failed to initialize C-ML library\n");
+        return 1;
+    }
     cml_seed(42);
 
     int shape[]         = {64, 128};
@@ -64,7 +71,9 @@ int main(void) {
 
     printf("\nExporting IR Analysis\n");
 
-    if (output->ir_context) {
+    /* This demo writes its own dashboard files, so it has to honour NO_EXPORT
+     * itself -- the library guards only cover library-side emission. */
+    if (output->ir_context && !cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
         char* unopt = cml_ir_export_kernel_analysis(output->ir_context, false);
 
         printf("\nRunning optimization passes:\n");

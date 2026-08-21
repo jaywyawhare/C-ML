@@ -664,6 +664,14 @@ Tensor* output = cml_nn_module_forward((Module*)bn, input);
 
 **Note:** During training, statistics are computed from the current batch. During evaluation, running statistics are used if `track_running_stats` is enabled.
 
+**BatchNorm1d/2d/3d share one implementation.** The three public types are
+aliases of a common `BatchNormState`, and the forward pass differs only in the
+input rank it accepts — so the per-channel statistics are computed identically
+across the family. If you previously relied on `BatchNorm2d`/`3d` output with
+batch > 1, note that their statistics changed: the old path grouped elements in a
+way that only coincided with per-channel grouping when the batch size was 1.
+BatchNorm1d was already correct and is unchanged.
+
 ### BatchNorm2d
 
 Batch normalization over 4D input (batch, channels, height, width). Normalizes across the batch dimension per channel.

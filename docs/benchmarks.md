@@ -19,7 +19,7 @@ cmake --build build -j$(nproc)
 # Backend comparison benchmark
 ./build/bin/bench_backends
 
-# Cross-framework benchmark (CML vs PyTorch vs TinyGrad vs NumPy)
+# Cross-framework benchmark (CML vs PyTorch vs TensorFlow vs TinyGrad vs NumPy)
 python3 benchmarks/bench_all.py
 ```
 
@@ -82,10 +82,56 @@ BACKEND=opencl ./build/bin/bench_cross_framework
 ```
 
 **Python driver** (`benchmarks/bench_all.py`):
-- Runs CML (CPU), CML (GPU/OpenCL), PyTorch, TinyGrad, and NumPy in sequence
+- Runs CML (CPU), CML (GPU/OpenCL), PyTorch, TensorFlow, TinyGrad, and NumPy in sequence
 - All frameworks use all available cores by default; override with `OMP_NUM_THREADS=N`
 - TinyGrad benchmarks use `TinyJit` for compiled-kernel dispatch and `.numpy()` to force GPU sync
-- Results grouped by operation type (GEMM, Fused, MLP, Conv2d), median ms, lower is better
+- Results grouped by operation type (GEMM, Fused, MLP, Conv2d), lower ms is better
+
+**Best-of-N (`CML_BENCH_REPEAT`, default 3).** Engines run sequentially, so load
+on the machine skews them *asymmetrically* and a median does not remove it — the
+minimum across passes does, being the run least disturbed by other work. Measured
+noise on a loaded laptop: the same NumPy 512² GEMM spanned 14.2 / 8.0 / 5.7 ms
+across identical runs. Treat any single-pass number under ~50 ms as unreliable.
+
+```bash
+CML_BENCH_REPEAT=1 python3 benchmarks/bench_all.py   # single pass (fast, noisy)
+CML_BENCH_REPEAT=5 python3 benchmarks/bench_all.py   # steadier on a busy machine
+```
+
+**Reading the table — the engines are not all in the same execution mode:**
+
+| Engine | Mode |
+|--------|------|
+| NumPy | eager BLAS calls |
+| PyTorch | **eager** |
+| TensorFlow | **graph (`tf.function`)** |
+| TinyGrad | **compiled (`TinyJit`)** |
+| CML | its own lazy IR graph |
+
+TensorFlow is benchmarked in graph mode because eager TF measures Python dispatch
+rather than kernels — but that means part of any TF-over-PyTorch gap is
+graph-vs-eager, not kernel quality. TF's Conv2d also uses NHWC, its native CPU
+layout (the others use NCHW); identical FLOPs, and forcing NCHW on TF CPU would
+be an artificial handicap.
+
+**TensorFlow runs out-of-process.** TF ships no wheels for every Python the other
+frameworks run on (e.g. 3.14), so it may live in its own virtualenv. The driver
+re-invokes itself there via a single-engine mode:
+
+```bash
+# One engine, JSON on stdout — used internally, handy for debugging one framework
+python3 benchmarks/bench_all.py --engine tensorflow
+
+# Point the driver at a Python that has TF (default: /tmp/tfbench-venv/bin/python)
+CML_BENCH_TF_PYTHON=/path/to/venv/bin/python python3 benchmarks/bench_all.py
+```
+
+If neither an importable TensorFlow nor that interpreter exists, the TF column is
+skipped rather than failing the run.
+
+A `cml(Metal)` column only appears on macOS. On other platforms `DEVICE_METAL`
+falls through to plain host allocation, so the column would report CPU numbers
+under a GPU label.
 
 ```bash
 # Run all frameworks (all cores)

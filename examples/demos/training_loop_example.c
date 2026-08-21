@@ -4,9 +4,16 @@
 #include <math.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
+#include "core/experiment.h"
 
 static void training_example(void) {
-    cml_init();
+    if (cml_init() != 0) {
+        /* Refuses to start on a rejected configuration (e.g. VIZ=1 with
+         * NO_EXPORT=1); this demo writes dashboard files of its own, so
+         * continuing would emit exactly what the config forbade. */
+        fprintf(stderr, "Failed to initialize C-ML library\n");
+        return;
+    }
     cml_seed(42);
 
     int input_size  = 10;
@@ -35,8 +42,6 @@ static void training_example(void) {
     training_metrics_register_model(model);
 
     Optimizer* optimizer = NULL;
-    Tensor* inputs       = NULL;
-    Tensor* targets      = NULL;
 
     optimizer = optim_adam_for_model(model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 
@@ -50,21 +55,19 @@ static void training_example(void) {
     int batch_size  = 32;
     int num_samples = 100;
 
-    inputs = tensor_zeros_2d(num_samples, input_size);
-    if (!inputs) {
-        LOG_ERROR("Failed to create input tensor");
+    /* Keep the dataset in plain host memory. A tensor's storage is materialised
+     * out of the IR execution pool, and the cml_reset_ir_context() in the batch
+     * loop below reclaims that pool -- so a dataset tensor created here would be
+     * freed underneath us and every subsequent batch would read freed memory.
+     * Host arrays belong to this function and survive graph resets. */
+    float* input_data  = (float*)malloc((size_t)num_samples * input_size * sizeof(float));
+    float* target_data = (float*)malloc((size_t)num_samples * output_size * sizeof(float));
+    if (!input_data || !target_data) {
+        LOG_ERROR("Failed to allocate dataset");
+        free(input_data);
+        free(target_data);
         return;
     }
-
-    targets = tensor_zeros_2d(num_samples, output_size);
-    if (!targets) {
-        LOG_ERROR("Failed to create target tensor");
-        tensor_free(inputs);
-        return;
-    }
-
-    float* input_data  = (float*)tensor_data_ptr(inputs);
-    float* target_data = (float*)tensor_data_ptr(targets);
 
     for (int i = 0; i < num_samples; i++) {
         for (int j = 0; j < input_size; j++) {
@@ -87,6 +90,21 @@ static void training_example(void) {
     float lr_gamma        = 0.5f;
 
     training_metrics_set_expected_epochs((size_t)num_epochs);
+
+    /* Also record this as a tracked run. training.json drives the Training and
+     * Kernel Studio tabs, but the Experiments tab reads per-run event logs under
+     * .cml/experiments/runs/ — without a run there, every one of its sub-tabs
+     * renders "Select one or more runs" and looks inert. */
+    char exp_cfg[192];
+    snprintf(exp_cfg, sizeof(exp_cfg),
+             "{\"lr\":%.4f,\"batch_size\":%d,\"optimizer\":\"adam\",\"hidden\":%d}",
+             0.01, batch_size, hidden_size);
+    CMLRun* run = cml_exp_run_init("training-loop", "mlp-regression", exp_cfg);
+    if (run) {
+        cml_exp_config_set(run, "epochs", "100");
+        cml_exp_add_tag(run, "example");
+        cml_exp_set_notes(run, "MLP-10-20-1 regression demo with early stopping and LR decay.");
+    }
 
     printf("\nStarting training for %d epochs...\n\n", num_epochs);
 
@@ -111,14 +129,18 @@ static void training_example(void) {
 
             float* batch_in_data  = (float*)tensor_data_ptr(batch_inputs);
             float* batch_tgt_data = (float*)tensor_data_ptr(batch_targets);
-            float* all_in_data    = (float*)tensor_data_ptr(inputs);
-            float* all_tgt_data   = (float*)tensor_data_ptr(targets);
+            if (!batch_in_data || !batch_tgt_data) {
+                LOG_ERROR("Failed to materialise batch tensors");
+                tensor_free(batch_inputs);
+                tensor_free(batch_targets);
+                continue;
+            }
 
             for (int i = 0; i < current_batch_size; i++) {
                 int src_idx = batch_start + i;
-                memcpy(batch_in_data + i * input_size, all_in_data + src_idx * input_size,
+                memcpy(batch_in_data + i * input_size, input_data + src_idx * input_size,
                        (size_t)input_size * sizeof(float));
-                memcpy(batch_tgt_data + i * output_size, all_tgt_data + src_idx * output_size,
+                memcpy(batch_tgt_data + i * output_size, target_data + src_idx * output_size,
                        (size_t)output_size * sizeof(float));
             }
 
@@ -194,20 +216,33 @@ static void training_example(void) {
             }
 
             optimizer_step(optimizer);
-            cml_reset_ir_context();
 
+            /* Release every tensor from this step before resetting the graph.
+             * The reset reclaims the execution pool their storage came from, so
+             * freeing them afterwards would touch memory the pool already took
+             * back. */
             if (loss)
                 tensor_free(loss);
             if (outputs)
                 tensor_free(outputs);
             tensor_free(batch_inputs);
             tensor_free(batch_targets);
+
+            cml_reset_ir_context();
         }
 
         epoch_loss /= (float)num_batches;
         epoch_acc /= (float)num_batches;
 
         training_metrics_auto_capture_train_accuracy(epoch_acc);
+
+        if (run) {
+            cml_exp_log_scalar(run, "train/loss", epoch, (double)epoch_loss);
+            cml_exp_log_scalar(run, "train/accuracy", epoch, (double)epoch_acc);
+            cml_exp_log_scalar(run, "lr", epoch, (double)optimizer_get_group_lr(optimizer, 0));
+            if (epoch % 10 == 0)
+                cml_exp_log_system(run, epoch);
+        }
 
         if ((epoch + 1) % 10 == 0 || epoch == 0) {
             printf("Epoch %d/%d - Loss: %.4f - Acc: %.2f%%\n", epoch + 1, num_epochs,
@@ -222,6 +257,7 @@ static void training_example(void) {
             no_improve_epochs++;
             if (no_improve_epochs >= patience) {
                 printf("  Early stopping triggered (no improvement for %d epochs)\n", patience);
+                training_metrics_complete_epoch(); /* record the epoch we stop on */
                 break;
             }
         }
@@ -232,29 +268,48 @@ static void training_example(void) {
             optimizer_set_lr(optimizer, new_lr);
             printf("  LR decayed to %.6f\n", (double)new_lr);
         }
+
+        /* set_expected_epochs() puts metrics in manual epoch control, so the
+         * epoch index only moves when we say so. Without this every epoch
+         * overwrote slot 0 and the dashboard showed a single flat point. */
+        training_metrics_complete_epoch();
     }
 
     printf("\nTraining completed!\n");
 
-    training_metrics_complete_epoch();
-
-    Tensor* eval_out = module_forward(model, inputs);
-    if (eval_out) {
-        printf("\nEval snapshot (first 5):\n");
-        size_t limit = eval_out->numel;
-        if (limit > targets->numel)
-            limit = targets->numel;
-        if (limit > 5)
-            limit = 5;
-        for (size_t i = 0; i < limit; i++) {
-            printf("  Sample %zu: pred=%.4f  target=%.4f\n", i,
-                   (double)tensor_get_float(eval_out, i), (double)tensor_get_float(targets, i));
-        }
-        tensor_free(eval_out);
+    if (run) {
+        cml_exp_summary_set(run, "best_loss", (double)best_loss);
+        cml_exp_run_finish(run, "finished");
     }
 
-    tensor_free(targets);
-    tensor_free(inputs);
+    /* Build the eval batch fresh from the host dataset, for the same reason the
+     * dataset itself is not a tensor. */
+    Tensor* eval_in = tensor_zeros_2d(num_samples, input_size);
+    if (eval_in) {
+        float* eval_in_data = (float*)tensor_data_ptr(eval_in);
+        if (eval_in_data)
+            memcpy(eval_in_data, input_data,
+                   (size_t)num_samples * input_size * sizeof(float));
+
+        Tensor* eval_out = module_forward(model, eval_in);
+        if (eval_out) {
+            printf("\nEval snapshot (first 5):\n");
+            size_t limit = eval_out->numel;
+            if (limit > (size_t)(num_samples * output_size))
+                limit = (size_t)(num_samples * output_size);
+            if (limit > 5)
+                limit = 5;
+            for (size_t i = 0; i < limit; i++) {
+                printf("  Sample %zu: pred=%.4f  target=%.4f\n", i,
+                       (double)tensor_get_float(eval_out, i), (double)target_data[i]);
+            }
+            tensor_free(eval_out);
+        }
+        tensor_free(eval_in);
+    }
+
+    free(input_data);
+    free(target_data);
     cml_cleanup();
 }
 
