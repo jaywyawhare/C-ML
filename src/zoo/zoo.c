@@ -1,4 +1,7 @@
 #include "zoo/zoo.h"
+#include "autograd/forward_ops.h"
+#include <math.h>
+#include "ops/uops.h"
 #include "zoo/resnet.h"
 #include "zoo/gpt2.h"
 #include "zoo/bert.h"
@@ -677,4 +680,92 @@ Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config) {
         LOG_ERROR("Unknown zoo model: %d", model);
         return NULL;
     }
+}
+
+static Tensor* zoo_prenorm_block_forward(Module* module, Tensor* input) {
+    ZooPreNormBlock* block = (ZooPreNormBlock*)module;
+    if (!block || !input)
+        return NULL;
+
+    Tensor* normed = module_forward((Module*)block->norm1, input);
+    if (!normed)
+        return NULL;
+
+    Tensor* attn_out = multihead_attention_forward(block->attn, normed, normed, normed, NULL);
+    if (!attn_out)
+        return NULL;
+
+    Tensor* x = tensor_add(input, attn_out);
+    if (!x)
+        return NULL;
+
+    normed = module_forward((Module*)block->norm2, x);
+    if (!normed)
+        return NULL;
+
+    Tensor* mlp_out = module_forward((Module*)block->mlp, normed);
+    if (!mlp_out)
+        return NULL;
+
+    return tensor_add(x, mlp_out);
+}
+
+static void zoo_prenorm_block_free(Module* module) {
+    ZooPreNormBlock* block = (ZooPreNormBlock*)module;
+    if (!block)
+        return;
+    if (block->norm1) module_free((Module*)block->norm1);
+    if (block->attn)  module_free((Module*)block->attn);
+    if (block->norm2) module_free((Module*)block->norm2);
+    if (block->mlp)   module_free((Module*)block->mlp);
+    cml_free(block);
+}
+
+ZooPreNormBlock* zoo_prenorm_block(const char* name, int dim, int n_head, int mlp_dim,
+                                   float norm_eps, DType dtype, DeviceType device) {
+    ZooPreNormBlock* block = cml_malloc(sizeof(ZooPreNormBlock));
+    if (!block)
+        return NULL;
+
+    if (module_init((Module*)block, name, zoo_prenorm_block_forward,
+                    zoo_prenorm_block_free) != 0) {
+        cml_free(block);
+        return NULL;
+    }
+
+    block->norm1 = nn_layernorm(dim, norm_eps, true, dtype, device);
+    block->attn  = nn_multihead_attention(dim, n_head, 0.0f, dtype, device);
+    block->norm2 = nn_layernorm(dim, norm_eps, true, dtype, device);
+
+    block->mlp = nn_sequential();
+    sequential_add(block->mlp, (Module*)nn_linear(dim, mlp_dim, dtype, device, true));
+    sequential_add(block->mlp, (Module*)nn_gelu(false));
+    sequential_add(block->mlp, (Module*)nn_linear(mlp_dim, dim, dtype, device, true));
+
+    return block;
+}
+
+float zoo_residual_scale(int n_layer) {
+    return n_layer > 1 ? 1.0f / sqrtf(2.0f * (float)n_layer) : 1.0f;
+}
+
+void zoo_scale_param(Parameter* param, float scale) {
+    if (!param || !param->tensor || scale == 1.0f)
+        return;
+    float* w = (float*)tensor_data_ptr(param->tensor);
+    if (!w)
+        return;
+    for (size_t i = 0; i < param->tensor->numel; i++)
+        w[i] *= scale;
+}
+
+Tensor* zoo_fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser) {
+    Tensor* lat = module_forward(lateral, c);
+    if (!lat)
+        return NULL;
+    int out_size[2] = {lat->shape[2], lat->shape[3]};
+    Tensor* up = f_interpolate(p_coarser, out_size, 2, UPSAMPLE_NEAREST, false);
+    if (!up)
+        return NULL;
+    return uop_add(lat, up);
 }

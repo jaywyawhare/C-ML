@@ -100,36 +100,16 @@ ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kern
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 5, &config);
-    if (!weight) {
-        module_free((Module*)layer);
+    if (weight)
+        kaiming_init_transpose3d(weight, in_channels, kernel_size, kernel_size, kernel_size);
+    layer->weight = nn_add_weight_param((Module*)layer, weight);
+    if (!layer->weight)
         return NULL;
-    }
-
-    kaiming_init_transpose3d(weight, in_channels, kernel_size, kernel_size, kernel_size);
-
-    if (module_add_parameter((Module*)layer, weight, "weight", true) != 0) {
-        tensor_free(weight);
-        module_free((Module*)layer);
-        return NULL;
-    }
-
-    layer->weight = module_get_parameter((Module*)layer, "weight");
 
     if (use_bias) {
-        int bias_shape[] = {out_channels};
-        Tensor* bias = tensor_zeros(bias_shape, 1, &config);
-        if (!bias) {
-            module_free((Module*)layer);
+        layer->bias = nn_add_bias_param((Module*)layer, out_channels, dtype, device, NULL);
+        if (!layer->bias)
             return NULL;
-        }
-
-        if (module_add_parameter((Module*)layer, bias, "bias", true) != 0) {
-            tensor_free(bias);
-            module_free((Module*)layer);
-            return NULL;
-        }
-
-        layer->bias = module_get_parameter((Module*)layer, "bias");
     } else {
         layer->bias = NULL;
     }

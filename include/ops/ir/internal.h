@@ -45,6 +45,13 @@ struct IRNode {
     char** input_names;
     int num_inputs;
     char* output_name;
+    char* scope; /* "Sequential/Linear" module path; NULL unless VIZ is on */
+    /* Folded C call stack at the moment this node was built, root-first and
+     * ';'-separated, e.g. "main;training_example;module_forward;nn_linear_forward".
+     * A lazy graph has no stack to sample at execution time -- by then everything
+     * runs from one executor loop -- so the meaningful stack is the one that
+     * *created* the node. Captured only under FLAMEGRAPH; NULL otherwise. */
+    char* build_stack;
     void* params;
     struct IRNode* next;
 
@@ -111,6 +118,43 @@ struct CMLGraph {
 
     CMLInternTable* intern_table;
 };
+
+/* FNV-1a, shared by the graph hash and the node intern table. */
+#define CML_FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
+#define CML_FNV_PRIME        0x100000001b3ULL
+
+uint64_t cml_fnv1a_bytes(uint64_t hash, const void* data, size_t len);
+
+/* Structural hash of `ir`'s forward graph: op type, output shape and input
+ * count of every node. Two graphs with the same hash replay interchangeably. */
+uint64_t cml_ir_graph_hash(CMLGraph_t ir);
+
+/* Collect the output data pointers of `ir`'s forward nodes into `ptrs` (at most
+ * `max`), one slot per node, NULL where a node has no realized output. Returns
+ * how many slots were written -- the tensor binding a trace replay expects. */
+int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max);
+
+/* Graph-editing primitives shared by the IR rewrite passes (pattern matcher,
+ * tree automaton, tensor-core opt, peephole optimizer). */
+struct IRNode* cml_ir_find_by_output(CMLGraph_t ir, const char* output_name);
+void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node);
+
+/* Repoint every input reference to `old_name` at `new_name`. */
+void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_name);
+
+/* Splice `new_node` in just before `before`, or at the tail when `before` is
+ * NULL or not in the graph. */
+void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode* before);
+
+/* Module scope tracking for the graph view. Without it graph.json is a flat
+ * list of primitives -- after decomposition a real model is thousands of nodes
+ * and no one can find anything. module_forward pushes/pops around every layer,
+ * so nesting (Sequential/Linear) falls out for free. Only records under VIZ:
+ * outside the dashboard the strdup per node is pure overhead. */
+void cml_ir_scope_push(const char* name);
+void cml_ir_scope_pop(void);
+const char* cml_ir_scope_current(void);
+bool cml_ir_scope_enabled(void);
 
 const char* uop_type_to_string(UOpType type);
 void free_fused_kernel(FusedKernel* kernel);

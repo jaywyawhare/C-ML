@@ -169,6 +169,36 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
     return shard;
 }
 
+/* Copy bucket `b`'s gradients between the parameter tensors and the flat bucket
+ * buffer: `pack` gathers into the bucket, otherwise it scatters back. Gradients
+ * may still be lazy (graph autodiff), so each is materialised before its data
+ * pointer is touched -- otherwise the sync silently skips it. */
+static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
+    size_t offset = 0;
+    for (int i = 0; i < ddp->num_params; i++) {
+        if (ddp->param_to_bucket[i] != b)
+            continue;
+
+        Parameter* p = ddp->all_params[i];
+        if (!p || !p->tensor || !p->tensor->grad)
+            continue;
+        tensor_ensure_executed(p->tensor->grad);
+        if (!p->tensor->grad->data)
+            continue;
+
+        float* grad_data = (float*)p->tensor->grad->data;
+        size_t numel = p->tensor->numel;
+        if (ddp->buckets[b]) {
+            if (pack)
+                memcpy(ddp->buckets[b] + offset, grad_data, numel * sizeof(float));
+            else
+                memcpy(grad_data, ddp->buckets[b] + offset, numel * sizeof(float));
+        }
+        offset += numel;
+    }
+    return offset;
+}
+
 int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
     if (!ddp || !ddp->initialized) {
         LOG_ERROR("DDP not initialized");
@@ -188,29 +218,7 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
         if (ddp->bucket_sizes[b] == 0)
             continue;
 
-        /* Pack gradients into bucket */
-        size_t offset = 0;
-        for (int i = 0; i < ddp->num_params; i++) {
-            if (ddp->param_to_bucket[i] != b)
-                continue;
-
-            Parameter* p = ddp->all_params[i];
-            if (!p || !p->tensor || !p->tensor->grad)
-                continue;
-            /* Gradients may be lazy (graph autodiff) — materialize before the
-             * pack/unpack reads/writes ->data, else sync silently skips them. */
-            tensor_ensure_executed(p->tensor->grad);
-            if (!p->tensor->grad->data)
-                continue;
-
-            float* grad_data = (float*)p->tensor->grad->data;
-            size_t numel = p->tensor->numel;
-
-            if (ddp->buckets[b]) {
-                memcpy(ddp->buckets[b] + offset, grad_data, numel * sizeof(float));
-            }
-            offset += numel;
-        }
+        size_t offset = ddp_bucket_copy(ddp, b, true);
 
         /* All-reduce the bucket */
         if (ddp->buckets[b] && offset > 0) {
@@ -234,29 +242,7 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
                 ddp->buckets[b][j] *= scale;
         }
 
-        /* Unpack gradients from bucket */
-        offset = 0;
-        for (int i = 0; i < ddp->num_params; i++) {
-            if (ddp->param_to_bucket[i] != b)
-                continue;
-
-            Parameter* p = ddp->all_params[i];
-            if (!p || !p->tensor || !p->tensor->grad)
-                continue;
-            /* Gradients may be lazy (graph autodiff) — materialize before the
-             * pack/unpack reads/writes ->data, else sync silently skips them. */
-            tensor_ensure_executed(p->tensor->grad);
-            if (!p->tensor->grad->data)
-                continue;
-
-            float* grad_data = (float*)p->tensor->grad->data;
-            size_t numel = p->tensor->numel;
-
-            if (ddp->buckets[b]) {
-                memcpy(grad_data, ddp->buckets[b] + offset, numel * sizeof(float));
-            }
-            offset += numel;
-        }
+        ddp_bucket_copy(ddp, b, false);
     }
 
     LOG_DEBUG("DDP: gradient sync complete");

@@ -63,6 +63,9 @@ static void gm_accum(GradMap* m, Tensor* v, Tensor* contrib) {
 }
 
 /* ── param'd movement builders ────────────────────────────────────────── */
+/* A constant shaped like `t`, for gradient expressions that need one. */
+static Tensor* ad_k(Tensor* t, float v) { return uop_fill(t->shape, t->ndim, v); }
+
 static Tensor* ad_reshape(Tensor* x, const int* shape, int ndim) {
     ReshapeParams p;
     int buf[16]; memcpy(buf, shape, (size_t)ndim * sizeof(int));
@@ -75,6 +78,23 @@ static Tensor* ad_expand(Tensor* x, const int* shape, int ndim) {
     p.new_shape = buf; p.new_ndim = ndim;
     return uop_expand(x, &p);
 }
+/* Reverse cumulative sum along `dim`: revcum(x)[i] = sum over j >= i of x[j].
+ *
+ * The cumulative ops all need it and there is no flip primitive, so it is built
+ * from the identity revcum = total - cumsum + x, which needs only a reduction
+ * and a forward cumsum. */
+static Tensor* ad_revcumsum(Tensor* x, int dim) {
+    if (!x) return NULL;
+    int d[1] = { dim };
+    ReduceParams rp = { d, 1, true };
+    Tensor* total = uop_sum(x, &rp);                     /* keepdim, broadcasts back */
+    if (!total) return NULL;
+    Tensor* tot_b = ad_expand(total, x->shape, x->ndim);
+    Tensor* cum   = uop_cumsum(x, dim);
+    if (!tot_b || !cum) return NULL;
+    return uop_add(uop_sub(tot_b, cum), x);
+}
+
 static Tensor* ad_permute(Tensor* x, const int* perm, int ndim) {
     PermuteParams p;
     int buf[16]; memcpy(buf, perm, (size_t)ndim * sizeof(int));
@@ -90,6 +110,26 @@ static Tensor* ad_sum(Tensor* x, const int* dims, int ndims, bool keepdim) {
     return uop_sum(x, &p);
 }
 /* transpose the last two axes of an ndim tensor */
+/* Sum over several axes.
+ *
+ * The reduce kernels only implement num_dims == 1 -- a ReduceParams naming two
+ * axes does not reduce both -- so this peels them one at a time. Highest axis
+ * first, because dropping an axis shifts every index above it. */
+static Tensor* ad_sum_axes(Tensor* x, int* axes, int n) {
+    if (!x || n <= 0) return x;
+    int a[16];
+    memcpy(a, axes, (size_t)n * sizeof(int));
+    for (int i = 0; i < n; i++)                       /* descending */
+        for (int j = i + 1; j < n; j++)
+            if (a[j] > a[i]) { int t = a[i]; a[i] = a[j]; a[j] = t; }
+    Tensor* r = x;
+    for (int i = 0; i < n && r; i++) {
+        int d[1] = { a[i] };
+        r = ad_sum(r, d, 1, false);
+    }
+    return r;
+}
+
 static Tensor* ad_transpose(Tensor* x, int ndim) {
     int perm[16];
     for (int i = 0; i < ndim; i++) perm[i] = i;
@@ -238,6 +278,23 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
             if (fp) gm_accum(&map, a, uop_unfold(g, fp->kernel_size, fp->stride));
             break;
         }
+        case UOP_IM2COL: {                    /* dX = col2im(g) — scatter windows back */
+            Im2colParams* ip = (Im2colParams*)nd->params;
+            if (ip && a->ndim == 4) {
+                Col2imParams cp = {ip->kh, ip->kw, ip->sh, ip->sw, ip->ph, ip->pw, ip->dh,
+                                   ip->dw, a->shape[1], a->shape[2], a->shape[3]};
+                gm_accum(&map, a, uop_col2im(g, &cp));
+            }
+            break;
+        }
+        case UOP_COL2IM: {                    /* dX = im2col(g) — the adjoint */
+            Col2imParams* cp = (Col2imParams*)nd->params;
+            if (cp) {
+                Im2colParams ip = {cp->kh, cp->kw, cp->sh, cp->sw, cp->ph, cp->pw, cp->dh, cp->dw};
+                gm_accum(&map, a, uop_im2col(g, &ip));
+            }
+            break;
+        }
         case UOP_GATHER: {                    /* dInput = scatter_add(idx, g); idx no grad */
             GatherParams* gp = (GatherParams*)nd->params;
             int dim = gp ? gp->dim : -1;
@@ -328,6 +385,307 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
         case UOP_SQRT:                                    /* 0.5/sqrt(x) = 0.5/out */
             gm_accum(&map, a, uop_mul(g, uop_mul(uop_fill(out->shape, out->ndim, 0.5f), uop_recip(out))));
             break;
+        /* ── Inverse trig / hyperbolic, erf, saturating activations ────────
+         * These had rules in the eager backward but not here, and this is the
+         * path tensor_backward takes -- so a model using any of them trained
+         * with no gradient and no error at all.
+         *
+         * The radicand is floored before the reciprocal square root, matching
+         * the eager versions: asin/acos at |x|=1 and acosh at x=1 have an
+         * infinite derivative, and clamping after would already have produced
+         * an inf to propagate. */
+        case UOP_ASIN:                        /* 1/sqrt(1-x²) */
+            gm_accum(&map, a, uop_mul(g, uop_rsqrt(uop_max(uop_sub(ad_k(a, 1.0f), uop_square(a)),
+                                                           ad_k(a, 1e-12f)))));
+            break;
+        case UOP_ACOS:                        /* -1/sqrt(1-x²) */
+            gm_accum(&map, a, uop_neg(uop_mul(g, uop_rsqrt(uop_max(uop_sub(ad_k(a, 1.0f), uop_square(a)),
+                                                                   ad_k(a, 1e-12f))))));
+            break;
+        case UOP_ATAN:                        /* 1/(1+x²) */
+            gm_accum(&map, a, uop_mul(g, uop_recip(uop_add(ad_k(a, 1.0f), uop_square(a)))));
+            break;
+        case UOP_ASINH:                       /* 1/sqrt(x²+1) */
+            gm_accum(&map, a, uop_mul(g, uop_rsqrt(uop_add(uop_square(a), ad_k(a, 1.0f)))));
+            break;
+        case UOP_ACOSH:                       /* 1/sqrt(x²-1) */
+            gm_accum(&map, a, uop_mul(g, uop_rsqrt(uop_max(uop_sub(uop_square(a), ad_k(a, 1.0f)),
+                                                           ad_k(a, 1e-12f)))));
+            break;
+        case UOP_ATANH:                       /* 1/(1-x²) */
+            gm_accum(&map, a, uop_mul(g, uop_recip(uop_max(uop_sub(ad_k(a, 1.0f), uop_square(a)),
+                                                           ad_k(a, 1e-12f)))));
+            break;
+        case UOP_ERF:                         /* 2/sqrt(pi) · e^(-x²) */
+            gm_accum(&map, a, uop_mul(g, uop_mul(ad_k(a, 1.1283791670955126f),
+                                                 uop_exp(uop_neg(uop_square(a))))));
+            break;
+        case UOP_SINH:                        /* cosh(x) */
+            gm_accum(&map, a, uop_mul(g, uop_cosh(a)));
+            break;
+        case UOP_COSH:                        /* sinh(x) */
+            gm_accum(&map, a, uop_mul(g, uop_sinh(a)));
+            break;
+        case UOP_LOG2:                        /* 1/(x·ln2) */
+            gm_accum(&map, a, uop_mul(g, uop_recip(uop_mul(a, ad_k(a, 0.6931471805599453f)))));
+            break;
+        case UOP_LOG10:                       /* 1/(x·ln10) */
+            gm_accum(&map, a, uop_mul(g, uop_recip(uop_mul(a, ad_k(a, 2.302585092994046f)))));
+            break;
+        case UOP_EXP2:                        /* 2^x·ln2 = out·ln2 */
+            gm_accum(&map, a, uop_mul(g, uop_mul(out, ad_k(a, 0.6931471805599453f))));
+            break;
+        /* Saturating activations: the derivative is a constant inside the
+         * linear band and zero outside it, so the mask is built from the
+         * comparisons rather than from the (already clamped) output. */
+        case UOP_HARD_SIGMOID:                /* 1/6 on (-3, 3), else 0 */
+            gm_accum(&map, a, uop_mul(uop_mul(g, ad_k(a, 1.0f / 6.0f)),
+                                      uop_mul(uop_cmpgt(a, ad_k(a, -3.0f)),
+                                              uop_cmplt(a, ad_k(a,  3.0f)))));
+            break;
+        case UOP_HARD_TANH:                   /* 1 on (-1, 1), else 0 */
+            gm_accum(&map, a, uop_mul(g, uop_mul(uop_cmpgt(a, ad_k(a, -1.0f)),
+                                                 uop_cmplt(a, ad_k(a,  1.0f)))));
+            break;
+        case UOP_RELU6:                       /* 1 on (0, 6), else 0 */
+            gm_accum(&map, a, uop_mul(g, uop_mul(uop_cmpgt(a, ad_k(a, 0.0f)),
+                                                 uop_cmplt(a, ad_k(a, 6.0f)))));
+            break;
+        case UOP_QUICK_GELU: {                /* x·s(1.702x): s + 1.702·x·s·(1-s) */
+            Tensor* sg = uop_sigmoid(uop_mul(a, ad_k(a, 1.702f)));
+            Tensor* d  = uop_add(sg, uop_mul(uop_mul(ad_k(a, 1.702f), a),
+                                             uop_mul(sg, uop_sub(ad_k(a, 1.0f), sg))));
+            gm_accum(&map, a, uop_mul(g, d));
+            break;
+        }
+        case UOP_SOFTPLUS:                    /* sigmoid(x) */
+            gm_accum(&map, a, uop_mul(g, uop_sigmoid(a)));
+            break;
+        case UOP_SOFTSIGN:                    /* 1/(1+|x|)² */
+            gm_accum(&map, a, uop_mul(g, uop_recip(uop_square(uop_add(ad_k(a, 1.0f), uop_abs(a))))));
+            break;
+        case UOP_LOGSIGMOID:                  /* 1 - sigmoid(x) = sigmoid(-x) */
+            gm_accum(&map, a, uop_mul(g, uop_sigmoid(uop_neg(a))));
+            break;
+        /* Derivative is zero almost everywhere. Emitting *zeros* rather than
+         * nothing matters: returning no gradient leaves the upstream chain
+         * unwritten, so every parameter feeding a rounded value silently stops
+         * training. This terminates the chain instead of breaking it. */
+        case UOP_FLOOR:
+        case UOP_CEIL:
+        case UOP_ROUND:
+        case UOP_SIGN:
+            gm_accum(&map, a, ad_k(a, 0.0f));
+            break;
+        /* ── Structural / masking ops ─────────────────────────────────── */
+        case UOP_TRIU: case UOP_TRIL: {       /* masked entries contributed nothing */
+            TriParams* tp = (TriParams*)nd->params;
+            int k = tp ? tp->diagonal : 0;
+            gm_accum(&map, a, nd->type == UOP_TRIU ? uop_triu(g, k) : uop_tril(g, k));
+            break;
+        }
+        case UOP_ROLL: {                      /* shift the gradient back */
+            RollParams* rp = (RollParams*)nd->params;
+            gm_accum(&map, a, uop_roll(g, rp ? -rp->shift : 0, rp ? rp->dim : 0));
+            break;
+        }
+        case UOP_UNFLATTEN:                   /* pure relayout */
+        case UOP_FLATTEN:
+            gm_accum(&map, a, ad_reshape(g, a->shape, a->ndim));
+            break;
+        case UOP_MASKED_FILL:                 /* filled positions are constants */
+            if (nd->num_inputs >= 2 && b)
+                gm_accum(&map, a, uop_mul(g, uop_sub(ad_k(g, 1.0f), b)));
+            else
+                gm_accum(&map, a, g);
+            break;
+        /* ── Reductions ───────────────────────────────────────────────── */
+        case UOP_PROD: {                      /* d/dx_i prod = prod / x_i */
+            Tensor* ob = ad_expand(out, a->shape, a->ndim);
+            Tensor* gb = ad_expand(g, a->shape, a->ndim);
+            if (ob && gb) gm_accum(&map, a, uop_mul(gb, uop_div(ob, a)));
+            break;
+        }
+        case UOP_LOGSUMEXP: {                 /* softmax(x) = e^(x - out) */
+            Tensor* ob = ad_expand(out, a->shape, a->ndim);
+            Tensor* gb = ad_expand(g, a->shape, a->ndim);
+            if (ob && gb) gm_accum(&map, a, uop_mul(gb, uop_exp(uop_sub(a, ob))));
+            break;
+        }
+        case UOP_TRACE: {                     /* only the diagonal contributes */
+            Tensor* eye = uop_eye_op(a->shape[a->ndim - 2], a->dtype, a->device);
+            Tensor* gb  = ad_expand(g, a->shape, a->ndim);
+            if (eye && gb) gm_accum(&map, a, uop_mul(gb, eye));
+            break;
+        }
+        /* ── Cumulative ops ───────────────────────────────────────────── */
+        case UOP_CUMSUM: {                    /* each x_i feeds every later output */
+            CumsumParams* cp = (CumsumParams*)nd->params;
+            gm_accum(&map, a, ad_revcumsum(g, cp ? cp->dim : 0));
+            break;
+        }
+        case UOP_CUMPROD: {                   /* revcum(g·out)/x */
+            CumsumParams* cp = (CumsumParams*)nd->params;
+            Tensor* r = ad_revcumsum(uop_mul(g, out), cp ? cp->dim : 0);
+            if (r) gm_accum(&map, a, uop_div(r, a));
+            break;
+        }
+        case UOP_LOGCUMSUMEXP: {              /* e^x_i · revcum(g·e^-out) */
+            CumsumParams* cp = (CumsumParams*)nd->params;
+            Tensor* r = ad_revcumsum(uop_mul(g, uop_exp(uop_neg(out))), cp ? cp->dim : 0);
+            if (r) gm_accum(&map, a, uop_mul(uop_exp(a), r));
+            break;
+        }
+        case UOP_CUMMAX: case UOP_CUMMIN: {
+            /* The running extremum is carried by whichever element set it, so
+             * the gradient goes to the positions where input equals output.
+             * On a tie this spreads across the tied positions instead of
+             * picking the first, because the op does not surface its indices. */
+            CumsumParams* cp = (CumsumParams*)nd->params;
+            (void)cp;
+            gm_accum(&map, a, uop_mul(g, uop_cmpeq(a, out)));
+            break;
+        }
+        /* ── Repetition: fold the copies back together ────────────────── */
+        case UOP_TILE: {
+            /* Exact rather than the eager rule's flat `i % numel` fold, which
+             * only lands correctly when the repeats sit on the leading axis.
+             * out[i0,i1,..] = in[i0 % s0, i1 % s1, ..], so viewing the gradient
+             * as [r0,s0,r1,s1,..] puts every copy of an element on the even
+             * axes; summing those is the fold, whatever the layout. */
+            TileParams* tp = (TileParams*)nd->params;
+            if (tp && tp->repeats && a->ndim <= 8 && a->ndim == out->ndim) {
+                int vs[16], sd[8], nsd = 0;
+                for (int d = 0; d < a->ndim; d++) {
+                    vs[2*d]     = tp->repeats[d];
+                    vs[2*d + 1] = a->shape[d];
+                    if (tp->repeats[d] > 1) sd[nsd++] = 2*d;
+                }
+                Tensor* v = ad_reshape(g, vs, a->ndim * 2);
+                Tensor* r = nsd ? ad_sum_axes(v, sd, nsd) : v;
+                if (r) gm_accum(&map, a, ad_reshape(r, a->shape, a->ndim));
+            }
+            break;
+        }
+        case UOP_REPEAT_INTERLEAVE: {
+            /* Each element became `reps` adjacent copies along `dim`, so that
+             * axis views as [size, reps] and the gradient sums over reps. */
+            RepeatInterleaveParams* rp = (RepeatInterleaveParams*)nd->params;
+            int reps = rp && rp->repeats > 0 ? rp->repeats : 1;
+            int dim  = rp ? rp->dim : 0; if (dim < 0) dim += a->ndim;
+            if (reps > 1 && dim >= 0 && dim < a->ndim && a->ndim < 8) {
+                int vs[16], k = 0;
+                for (int d = 0; d < a->ndim; d++) {
+                    vs[k++] = a->shape[d];
+                    if (d == dim) vs[k++] = reps;
+                }
+                int sd[1] = { dim + 1 };
+                Tensor* v = ad_reshape(g, vs, k);
+                Tensor* r = ad_sum_axes(v, sd, 1);
+                if (r) gm_accum(&map, a, ad_reshape(r, a->shape, a->ndim));
+            } else {
+                gm_accum(&map, a, ad_reshape(g, a->shape, a->ndim));
+            }
+            break;
+        }
+        /* ── Diagonals: diag and diagonal are each other's gradient ────── */
+        case UOP_DIAG: {
+            DiagParams* dp = (DiagParams*)nd->params;
+            int off = dp ? dp->offset : 0;
+            if (a->ndim == 1) gm_accum(&map, a, uop_diagonal(g, off, 0, 1));  /* 1-D -> matrix */
+            else              gm_accum(&map, a, uop_diag(g, off));            /* matrix -> 1-D */
+            break;
+        }
+        case UOP_DIAGONAL: {
+            DiagParams* dp = (DiagParams*)nd->params;
+            int off = dp ? dp->offset : 0;
+            if (a->ndim == 2) gm_accum(&map, a, uop_diag(g, off));
+            break;
+        }
+        /* ── Interpolation ────────────────────────────────────────────── */
+        case UOP_LERP: {                      /* a + t·(b-a) */
+            Tensor* t = (nd->num_inputs >= 3) ? nd->inputs[2] : NULL;
+            if (t) {
+                gm_accum(&map, a, unbroadcast(uop_mul(g, uop_sub(ad_k(g, 1.0f), t)), a->shape, a->ndim));
+                if (b) gm_accum(&map, b, unbroadcast(uop_mul(g, t), b->shape, b->ndim));
+                if (b) gm_accum(&map, t, unbroadcast(uop_mul(g, uop_sub(b, a)), t->shape, t->ndim));
+            }
+            break;
+        }
+        /* ── Scatter: the destination keeps everything it was not overwritten
+         * at, and the source picks up the gradient at the positions it wrote. */
+        case UOP_SCATTER: {
+            if (nd->num_inputs >= 3) {
+                Tensor* idx = nd->inputs[1];
+                Tensor* src = nd->inputs[2];
+                ScatterParams* sp = (ScatterParams*)nd->params;
+                int dim = sp ? sp->dim : 0; if (dim < 0) dim += a->ndim;
+                if (idx && src) {
+                    gm_accum(&map, src, uop_gather(g, idx, dim));
+                    gm_accum(&map, a, uop_scatter(g, dim, idx, ad_k(src, 0.0f)));
+                }
+            }
+            break;
+        }
+        /* ── Permutations: send each output back where it came from ───── */
+        case UOP_SORT: {
+            /* sorted[i] = a[perm[i]], so the gradient of a[perm[i]] is g[i].
+             * The node keeps only (dim, descending), not the permutation, so it
+             * is recomputed -- sorting is deterministic, so recomputing gives
+             * the same perm the forward used. */
+            SortParams* sp = (SortParams*)nd->params;
+            int dim = sp ? sp->dim : 0; if (dim < 0) dim += a->ndim;
+            if (dim >= 0 && dim < a->ndim) {
+                Tensor* perm = uop_argsort(a, dim, sp ? sp->descending : false);
+                if (perm) gm_accum(&map, a, uop_scatter_add(perm, g, dim, a->shape[dim]));
+            }
+            break;
+        }
+        case UOP_TOPK: {
+            /* Same idea, restricted to the k winners: the first k of the full
+             * ordering are exactly the indices topk returned. */
+            TopkParams* tp = (TopkParams*)nd->params;
+            int dim = tp ? tp->dim : 0; if (dim < 0) dim += a->ndim;
+            int k   = tp ? tp->k : 0;
+            if (tp && dim >= 0 && dim < a->ndim && k > 0 && k <= a->shape[dim] && a->ndim <= 16) {
+                Tensor* order = uop_argsort(a, dim, tp->largest);
+                if (order) {
+                    int st[16], en[16];
+                    for (int d = 0; d < a->ndim; d++) { st[d] = 0; en[d] = a->shape[d]; }
+                    en[dim] = k;
+                    Tensor* idx = uop_shrink(order, st, en, a->ndim);
+                    if (idx) gm_accum(&map, a, uop_scatter_add(idx, g, dim, a->shape[dim]));
+                }
+            }
+            break;
+        }
+        case UOP_SCATTER_ADD: {
+            /* out[index[i]] += src[i]; index carries no gradient. */
+            if (nd->num_inputs >= 2) {
+                Tensor* idx = nd->inputs[0];
+                Tensor* src = nd->inputs[1];
+                ScatterAddParams* sp = (ScatterAddParams*)nd->params;
+                int dim = sp ? sp->dim : 0; if (dim < 0 && src) dim += src->ndim;
+                if (idx && src) gm_accum(&map, src, uop_gather(g, idx, dim));
+            }
+            break;
+        }
+        case UOP_MASKED_SELECT: {
+            /* out is the selected elements in order, so the j-th selected
+             * element of `a` takes g[j]. cumsum(mask)-1 is exactly that j for
+             * every selected position; multiplying by the mask discards what
+             * the unselected positions gathered. */
+            if (nd->num_inputs >= 2 && b) {
+                Tensor* pos = uop_sub(uop_cumsum(b, 0), ad_k(b, 1.0f));
+                Tensor* gg  = uop_gather(g, pos, 0);
+                if (gg) gm_accum(&map, a, uop_mul(gg, b));
+            }
+            break;
+        }
+        case UOP_STRIDE:
+            /* A restride is a relayout of the same elements. */
+            if (a->numel == out->numel) gm_accum(&map, a, ad_reshape(g, a->shape, a->ndim));
+            break;
         case UOP_SIN:
             gm_accum(&map, a, uop_mul(g, uop_cos(a)));
             break;
@@ -382,6 +740,16 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
         case UOP_FILL: case UOP_CONST:
         case UOP_CMPLT: case UOP_CMPGE:
         case UOP_CMPLE: case UOP_CMPGT: case UOP_CMPEQ: case UOP_CMPNE:
+            /* A comparison is flat wherever it is differentiable, so no
+             * gradient flows through it.
+             *
+             * Emitting an explicit zero here instead would be closer to what
+             * other frameworks report, and would give sign() -- which lowers to
+             * (x>0)-(x<0) -- zeros rather than nothing. It is not done because
+             * feeding a fresh constant back into the gradient map from inside
+             * the backward walk expands the graph without bound and hangs. The
+             * ops that need zero-terminating do it directly (see FLOOR/CEIL/
+             * ROUND below). */
             break;
         default:
             /* uncovered primitive: gradient does not flow (yet) */

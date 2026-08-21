@@ -113,9 +113,24 @@ Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
     return output;
 }
 
-Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
+/* Random 4D [N,C,H,W] flip with probability `prob`; `horizontal` mirrors width,
+ * else height. Returns a clone when the flip doesn't fire. */
+/* Allocate an output matching `input`'s shape/dtype and hand back both data
+ * pointers -- the opening move of every augmentation. */
+static Tensor* aug_alloc_like(Tensor* input, float** in_data, float** out_data) {
+    TensorConfig config = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty(input->shape, input->ndim, &config);
+    if (!output)
+        return NULL;
+    *in_data  = (float*)tensor_data_ptr(input);
+    *out_data = (float*)tensor_data_ptr(output);
+    return output;
+}
+
+static Tensor* augment_flip(Tensor* input, float prob, bool horizontal, const char* what) {
     if (!input || input->ndim != 4) {
-        LOG_ERROR("Horizontal flip requires 4D tensor [batch, channels, height, width]");
+        LOG_ERROR("%s requires 4D tensor [batch, channels, height, width]", what);
         return NULL;
     }
 
@@ -125,33 +140,27 @@ Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
         seed_set = true;
     }
 
-    bool should_flip = rand_float() < prob;
-
-    if (!should_flip) {
+    if (rand_float() >= prob)
         return tensor_clone(input);
-    }
 
     int batch    = input->shape[0];
     int channels = input->shape[1];
     int height   = input->shape[2];
     int width    = input->shape[3];
 
-    TensorConfig config = {
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(input->shape, 4, &config);
+    float *in_data, *out_data;
+    Tensor* output = aug_alloc_like(input, &in_data, &out_data);
     if (!output)
         return NULL;
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* out_data = (float*)tensor_data_ptr(output);
 
     for (int b = 0; b < batch; b++) {
         for (int c = 0; c < channels; c++) {
             for (int h = 0; h < height; h++) {
                 for (int w = 0; w < width; w++) {
-                    int in_idx = b * channels * height * width + c * height * width + h * width + w;
-                    int out_idx = b * channels * height * width + c * height * width + h * width +
-                                  (width - 1 - w);
+                    int in_idx  = ((b * channels + c) * height + h) * width + w;
+                    int oh      = horizontal ? h : (height - 1 - h);
+                    int ow      = horizontal ? (width - 1 - w) : w;
+                    int out_idx = ((b * channels + c) * height + oh) * width + ow;
                     out_data[out_idx] = in_data[in_idx];
                 }
             }
@@ -161,52 +170,12 @@ Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
     return output;
 }
 
+Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
+    return augment_flip(input, prob, true, "Horizontal flip");
+}
+
 Tensor* augment_random_vertical_flip(Tensor* input, float prob) {
-    if (!input || input->ndim != 4) {
-        LOG_ERROR("Vertical flip requires 4D tensor [batch, channels, height, width]");
-        return NULL;
-    }
-
-    static bool seed_set = false;
-    if (!seed_set) {
-        set_seed((unsigned int)time(NULL));
-        seed_set = true;
-    }
-
-    bool should_flip = rand_float() < prob;
-
-    if (!should_flip) {
-        return tensor_clone(input);
-    }
-
-    int batch    = input->shape[0];
-    int channels = input->shape[1];
-    int height   = input->shape[2];
-    int width    = input->shape[3];
-
-    TensorConfig config = {
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(input->shape, 4, &config);
-    if (!output)
-        return NULL;
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* out_data = (float*)tensor_data_ptr(output);
-
-    for (int b = 0; b < batch; b++) {
-        for (int c = 0; c < channels; c++) {
-            for (int h = 0; h < height; h++) {
-                for (int w = 0; w < width; w++) {
-                    int in_idx = b * channels * height * width + c * height * width + h * width + w;
-                    int out_idx = b * channels * height * width + c * height * width +
-                                  (height - 1 - h) * width + w;
-                    out_data[out_idx] = in_data[in_idx];
-                }
-            }
-        }
-    }
-
-    return output;
+    return augment_flip(input, prob, false, "Vertical flip");
 }
 
 Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max) {
@@ -235,14 +204,10 @@ Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max)
     int height   = input->shape[2];
     int width    = input->shape[3];
 
-    TensorConfig config = {
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(input->shape, 4, &config);
+    float *in_data, *out_data;
+    Tensor* output = aug_alloc_like(input, &in_data, &out_data);
     if (!output)
         return NULL;
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* out_data = (float*)tensor_data_ptr(output);
 
     float center_x = (float)(width - 1) / 2.0f;
     float center_y = (float)(height - 1) / 2.0f;
@@ -345,14 +310,10 @@ Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, fl
     float sat_factor      = 1.0f + (rand_float() * 2.0f - 1.0f) * saturation;
     float hue_factor      = (rand_float() * 2.0f - 1.0f) * hue; // Hue shift in [-hue, +hue]
 
-    TensorConfig config = {
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(input->shape, 4, &config);
+    float *in_data, *out_data;
+    Tensor* output = aug_alloc_like(input, &in_data, &out_data);
     if (!output)
         return NULL;
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* out_data = (float*)tensor_data_ptr(output);
 
     int batch    = input->shape[0];
     int channels = input->shape[1];
@@ -480,14 +441,10 @@ Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channe
         return NULL;
     }
 
-    TensorConfig config = {
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(input->shape, 4, &config);
+    float *in_data, *out_data;
+    Tensor* output = aug_alloc_like(input, &in_data, &out_data);
     if (!output)
         return NULL;
-
-    float* in_data  = (float*)tensor_data_ptr(input);
-    float* out_data = (float*)tensor_data_ptr(output);
 
     for (int b = 0; b < batch; b++) {
         for (int c = 0; c < channels; c++) {

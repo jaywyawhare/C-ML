@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 #include <dlfcn.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -109,6 +110,32 @@ static void aot_ptr_expr(AotBufMap* m, Tensor* t, char* buf, size_t n) {
 }
 
 /* Emit `for (i) { float x = A[i]; O[i] = <expr>; }` */
+/* Format a float as a valid C literal.
+ *
+ * "%.9gf" is wrong for any value that %g renders without a decimal point or
+ * exponent: 0 becomes "0f" and 1 becomes "1f", neither of which is a C
+ * constant, so the generated file failed to compile. Non-finite values are
+ * worse -- "inff"/"nanf" are bare identifiers, not literals.
+ *
+ * Returns buf so the result can be used directly as a printf argument. */
+static const char* aot_f32(char* buf, size_t cap, float v) {
+    if (isnan(v)) {
+        snprintf(buf, cap, "(0.0f/0.0f)");
+    } else if (isinf(v)) {
+        snprintf(buf, cap, v > 0 ? "(1.0f/0.0f)" : "(-1.0f/0.0f)");
+    } else {
+        snprintf(buf, cap, "%.9g", (double)v);
+        /* Needs a decimal point or exponent before the f suffix is legal. */
+        if (!strpbrk(buf, ".eE")) {
+            size_t len = strlen(buf);
+            if (len + 3 < cap) { buf[len] = '.'; buf[len+1] = '0'; buf[len+2] = '\0'; }
+        }
+        size_t len = strlen(buf);
+        if (len + 2 < cap) { buf[len] = 'f'; buf[len+1] = '\0'; }
+    }
+    return buf;
+}
+
 static void aot_emit_unary(FILE* cf, const char* name, const char* O,
                            const char* A, int64_t n, const char* expr) {
     fprintf(cf, "    /* %s */\n", name);
@@ -146,6 +173,29 @@ static void aot_emit_reduce(FILE* cf, const char* name, const char* O, const cha
 }
 
 #endif /* CML_HAS_LLVM_BACKEND */
+
+/* Run `cmd`, echoing its output under `tool`, then delete `cleanup_path`.
+ * Returns 0 on success, -1 when the tool could not run or exited non-zero. */
+static int aot_run_tool(const char* tool, const char* cmd, const char* cleanup_path) {
+    FILE* proc = popen(cmd, "r");
+    if (!proc) {
+        LOG_ERROR("Failed to invoke %s: %s", tool, cmd);
+        remove(cleanup_path);
+        return -1;
+    }
+
+    char proc_buf[256];
+    while (fgets(proc_buf, sizeof(proc_buf), proc))
+        LOG_INFO("%s: %s", tool, proc_buf);
+
+    int status = pclose(proc);
+    remove(cleanup_path);
+    if (status != 0) {
+        LOG_ERROR("%s failed with status %d", tool, status);
+        return -1;
+    }
+    return 0;
+}
 
 int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOptions* options) {
 #ifdef CML_HAS_LLVM_BACKEND
@@ -246,7 +296,12 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     fprintf(cf, "} MemRef;\n\n");
 
     fprintf(cf, "static inline float _cml_sigmoid(float x){ return 1.0f/(1.0f+expf(-x)); }\n");
-    fprintf(cf, "static inline float _cml_softplus(float x){ return log1pf(expf(x)); }\n\n");
+    fprintf(cf,
+            "/* max(x,0) + log1p(exp(-|x|)): log1pf(expf(x)) alone overflows to inf\n"
+            "   for x beyond ~88, where softplus(x) is simply x. */\n"
+            "static inline float _cml_softplus(float x){\n"
+            "    return fmaxf(x, 0.0f) + log1pf(expf(-fabsf(x)));\n"
+            "}\n\n");
 
     /* --- Function signature --------------------------------------------- */
     fprintf(cf, "void %s(MemRef** inputs, MemRef** outputs) {\n", func_name);
@@ -312,8 +367,12 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_SUB:      aot_emit_binary(cf, "SUB",      o, a, b, na, nb, n, "a - b"); break;
         case UOP_MUL:      aot_emit_binary(cf, "MUL",      o, a, b, na, nb, n, "a * b"); break;
         case UOP_DIV:      aot_emit_binary(cf, "DIV",      o, a, b, na, nb, n, "a / b"); break;
-        case UOP_MAX:      aot_emit_binary(cf, "MAX",      o, a, b, na, nb, n, "a > b ? a : b"); break;
-        case UOP_MINIMUM:  aot_emit_binary(cf, "MINIMUM",  o, a, b, na, nb, n, "a < b ? a : b"); break;
+        case UOP_MAX:      aot_emit_binary(cf, "MAX",      o, a, b, na, nb, n,
+                                           /* NaN propagates: an ordered compare is false on NaN,
+                                            * so `a > b ? a : b` returns the other operand. */
+                                           "((a != a) || (b != b)) ? (a + b) : (a > b ? a : b)"); break;
+        case UOP_MINIMUM:  aot_emit_binary(cf, "MINIMUM",  o, a, b, na, nb, n,
+                                           "((a != a) || (b != b)) ? (a + b) : (a < b ? a : b)"); break;
         case UOP_POW:      aot_emit_binary(cf, "POW",      o, a, b, na, nb, n, "powf(a, b)"); break;
         case UOP_MOD:      aot_emit_binary(cf, "MOD",      o, a, b, na, nb, n, "fmodf(a, b)"); break;
         case UOP_IDIV:     aot_emit_binary(cf, "IDIV",     o, a, b, na, nb, n, "floorf(a / b)"); break;
@@ -346,7 +405,7 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_SIGN:   aot_emit_unary(cf, "SIGN",   o, a, n, "(float)((x > 0.0f) - (x < 0.0f))"); break;
         case UOP_FLOOR:  aot_emit_unary(cf, "FLOOR",  o, a, n, "floorf(x)"); break;
         case UOP_CEIL:   aot_emit_unary(cf, "CEIL",   o, a, n, "ceilf(x)"); break;
-        case UOP_ROUND:  aot_emit_unary(cf, "ROUND",  o, a, n, "roundf(x)"); break;
+        case UOP_ROUND:  aot_emit_unary(cf, "ROUND",  o, a, n, "rintf(x)")  /* ties-to-even */; break;
         case UOP_LOG2:   aot_emit_unary(cf, "LOG2",   o, a, n, "log2f(x)"); break;
         case UOP_EXP2:   aot_emit_unary(cf, "EXP2",   o, a, n, "exp2f(x)"); break;
         case UOP_ASIN:   aot_emit_unary(cf, "ASIN",   o, a, n, "asinf(x)"); break;
@@ -369,7 +428,10 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_LOGICAL_NOT: aot_emit_unary(cf, "LOGICAL_NOT", o, a, n, "x == 0.0f ? 1.0f : 0.0f"); break;
 
         /* ---- Activations ---- */
-        case UOP_RELU:       aot_emit_unary(cf, "RELU",       o, a, n, "x > 0.0f ? x : 0.0f"); break;
+        case UOP_RELU:       aot_emit_unary(cf, "RELU",       o, a, n,
+                                          /* `x < 0 ? 0 : x`, not `x > 0 ? x : 0`: NaN fails both
+                                           * comparisons, so the latter silently returns 0. */
+                                          "x < 0.0f ? 0.0f : x"); break;
         case UOP_RELU6:      aot_emit_unary(cf, "RELU6",      o, a, n, "x < 0.0f ? 0.0f : (x > 6.0f ? 6.0f : x)"); break;
         case UOP_HARD_SIGMOID:aot_emit_unary(cf,"HARD_SIGMOID",o,a, n, "x < -3.0f ? 0.0f : (x > 3.0f ? 1.0f : (x + 3.0f) / 6.0f)"); break;
         case UOP_HARD_TANH:  aot_emit_unary(cf, "HARD_TANH",  o, a, n, "x < -1.0f ? -1.0f : (x > 1.0f ? 1.0f : x)"); break;
@@ -387,7 +449,9 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             ClampParams* p = (ClampParams*)node->params;
             float lo = p ? p->min_val : 0.0f, hi = p ? p->max_val : 0.0f;
             char expr[128];
-            snprintf(expr, sizeof(expr), "x < %.9gf ? %.9gf : (x > %.9gf ? %.9gf : x)", lo, lo, hi, hi);
+            char lb[40], hb[40];
+            aot_f32(lb, sizeof lb, lo); aot_f32(hb, sizeof hb, hi);
+            snprintf(expr, sizeof(expr), "x < %s ? %s : (x > %s ? %s : x)", lb, lb, hb, hb);
             aot_emit_unary(cf, "CLAMP", o, a, n, expr);
             break;
         }
@@ -396,7 +460,9 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             ClampParams* p = (ClampParams*)node->params;
             float alpha = p ? p->min_val : 1.0f;
             char expr[128];
-            snprintf(expr, sizeof(expr), "x > 0.0f ? x : %.9gf * (expf(x) - 1.0f)", alpha);
+            char ab[40];
+            snprintf(expr, sizeof(expr), "x > 0.0f ? x : %s * (expf(x) - 1.0f)",
+                     aot_f32(ab, sizeof ab, alpha));
             aot_emit_unary(cf, "ELU", o, a, n, expr);
             break;
         }
@@ -404,9 +470,10 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             /* alpha stored in ClampParams.min_val (see uop_celu) */
             ClampParams* p = (ClampParams*)node->params;
             float alpha = p ? p->min_val : 1.0f;
-            char expr[160];
+            char expr[160], ab1[40], ab2[40];
             snprintf(expr, sizeof(expr),
-                     "fmaxf(0.0f, x) + fminf(0.0f, %.9gf * (expf(x / %.9gf) - 1.0f))", alpha, alpha);
+                     "x > 0.0f ? x : %s * (expf(x / %s) - 1.0f)",
+                     aot_f32(ab1, sizeof ab1, alpha), aot_f32(ab2, sizeof ab2, alpha));
             aot_emit_unary(cf, "CELU", o, a, n, expr);
             break;
         }
@@ -416,8 +483,9 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             FillParams* p = (FillParams*)node->params;
             float v = p ? p->value : 0.0f;
             fprintf(cf, "    /* FILL */\n");
-            fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %.9gf;\n",
-                    (long long)n, o, v);
+            char vb[40];
+            fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s;\n",
+                    (long long)n, o, aot_f32(vb, sizeof vb, v));
             break;
         }
         case UOP_CONST: {
@@ -433,7 +501,10 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             fprintf(cf, "    /* CONST */\n");
             fprintf(cf, "    {\n        static const float _c[%lld] = {", (long long)(cn > 0 ? cn : 1));
             for (int64_t i = 0; i < cn; i++)
-                fprintf(cf, "%s%.9gf", i ? ", " : "", cd[i]);
+            {
+                char eb[40];
+                fprintf(cf, "%s%s", i ? ", " : "", aot_f32(eb, sizeof eb, cd[i]));
+            }
             fprintf(cf, "};\n        memcpy(%s, _c, %lld * sizeof(float));\n    }\n",
                     o, (long long)copy_n);
             break;
@@ -521,8 +592,16 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             case UOP_SUM:        name = "SUM";        init = "0.0f";      acc = "acc + v"; break;
             case UOP_MEAN:       name = "MEAN";       init = "0.0f";      acc = "acc + v"; break;
             case UOP_PROD:       name = "PROD";       init = "1.0f";      acc = "acc * v"; break;
-            case UOP_MAX_REDUCE: name = "MAX_REDUCE"; init = "-INFINITY"; acc = "v > acc ? v : acc"; break;
-            default:             name = "MIN_REDUCE"; init = "INFINITY";  acc = "v < acc ? v : acc"; break;
+            case UOP_MAX_REDUCE: name = "MAX_REDUCE"; init = "-INFINITY"; acc = "(v != v || v > acc) ? v : acc"   /* NaN propagates */; break;
+            case UOP_MIN_REDUCE: name = "MIN_REDUCE"; init = "INFINITY";  acc = "(v != v || v < acc) ? v : acc"   /* NaN propagates */; break;
+            default:
+                /* Spelling MIN_REDUCE as the default was correct only while it
+                 * was the last unhandled member of the label group above; adding
+                 * another reduction there would have silently emitted a min. */
+                LOG_ERROR("AOT: unhandled reduction %s", uop_type_to_string(node->type));
+                emit_ok = false;
+                name = "SUM"; init = "0.0f"; acc = "acc + v";
+                break;
             }
             if (node->type == UOP_MEAN) {
                 char finbuf[64];
@@ -629,22 +708,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     if (opts.format == AOT_FORMAT_OBJECT) {
         char cmd[1024];
         snprintf(cmd, sizeof(cmd), "cc -O2 -c -o %s %s", output_path, tmp_c_path);
-        FILE* proc = popen(cmd, "r");
-        if (!proc) {
-            LOG_ERROR("Failed to invoke compiler: %s", cmd);
-            remove(tmp_c_path);
+        if (aot_run_tool("cc", cmd, tmp_c_path) != 0)
             return -1;
-        }
-        char proc_buf[256];
-        while (fgets(proc_buf, sizeof(proc_buf), proc)) {
-            LOG_INFO("cc: %s", proc_buf);
-        }
-        int status = pclose(proc);
-        remove(tmp_c_path);
-        if (status != 0) {
-            LOG_ERROR("Compiler failed with status %d", status);
-            return -1;
-        }
         LOG_INFO("AOT: compiled object file %s", output_path);
         return 0;
     }
@@ -653,22 +718,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         char cmd[1024];
         snprintf(cmd, sizeof(cmd), "cc -O2 -fPIC -shared -o %s %s -lm",
                  output_path, tmp_c_path);
-        FILE* proc = popen(cmd, "r");
-        if (!proc) {
-            LOG_ERROR("Failed to invoke compiler: %s", cmd);
-            remove(tmp_c_path);
+        if (aot_run_tool("cc", cmd, tmp_c_path) != 0)
             return -1;
-        }
-        char proc_buf[256];
-        while (fgets(proc_buf, sizeof(proc_buf), proc)) {
-            LOG_INFO("cc: %s", proc_buf);
-        }
-        int status = pclose(proc);
-        remove(tmp_c_path);
-        if (status != 0) {
-            LOG_ERROR("Compiler failed with status %d", status);
-            return -1;
-        }
         LOG_INFO("AOT: compiled shared library %s", output_path);
         return 0;
     }
@@ -680,22 +731,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 
         char cmd[2048];
         snprintf(cmd, sizeof(cmd), "cc -O2 -c -o %s %s", tmp_o_path, tmp_c_path);
-        FILE* proc = popen(cmd, "r");
-        if (!proc) {
-            LOG_ERROR("Failed to invoke compiler: %s", cmd);
-            remove(tmp_c_path);
+        if (aot_run_tool("cc", cmd, tmp_c_path) != 0)
             return -1;
-        }
-        char proc_buf[256];
-        while (fgets(proc_buf, sizeof(proc_buf), proc)) {
-            LOG_INFO("cc: %s", proc_buf);
-        }
-        int status = pclose(proc);
-        remove(tmp_c_path);
-        if (status != 0) {
-            LOG_ERROR("Compiler failed with status %d", status);
-            return -1;
-        }
 
         /* Then archive into static lib */
         if (!aot_validate_path(tmp_o_path)) {
@@ -704,21 +741,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             return -1;
         }
         snprintf(cmd, sizeof(cmd), "ar rcs %s %s", output_path, tmp_o_path);
-        proc = popen(cmd, "r");
-        if (!proc) {
-            LOG_ERROR("Failed to invoke ar: %s", cmd);
-            remove(tmp_o_path);
+        if (aot_run_tool("ar", cmd, tmp_o_path) != 0)
             return -1;
-        }
-        while (fgets(proc_buf, sizeof(proc_buf), proc)) {
-            LOG_INFO("ar: %s", proc_buf);
-        }
-        status = pclose(proc);
-        remove(tmp_o_path);
-        if (status != 0) {
-            LOG_ERROR("ar failed with status %d", status);
-            return -1;
-        }
         LOG_INFO("AOT: created static library %s", output_path);
         return 0;
     }

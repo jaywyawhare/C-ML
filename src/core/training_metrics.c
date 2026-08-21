@@ -1,7 +1,9 @@
 #include "core/training_metrics.h"
 #include "core/model_architecture.h"
 #include "core/dataset.h"
+#include "core/cml_flags.h"
 #include "nn.h"
+#include "ops/ir/internal.h"
 #include "autograd/autograd.h"
 #include "optim.h"
 #include "core/logging.h"
@@ -119,6 +121,20 @@ static int training_metrics_ensure_capacity(TrainingMetrics* metrics, size_t num
         metrics->epoch_testing_accuracies =
             cml_realloc(metrics->epoch_testing_accuracies, (size_t)new_capacity * sizeof(float));
     }
+    /* The distribution arrays are indexed by epoch like every array above, so
+     * they have to grow in step or a longer-than-declared run writes past them. */
+    if (metrics->epoch_grad_dist) {
+        metrics->epoch_grad_dist = cml_realloc(
+            metrics->epoch_grad_dist, (size_t)new_capacity * sizeof(DistributionSummary));
+        metrics->epoch_weight_dist = cml_realloc(
+            metrics->epoch_weight_dist, (size_t)new_capacity * sizeof(DistributionSummary));
+        if (metrics->epoch_grad_dist && metrics->epoch_weight_dist) {
+            for (size_t i = old_capacity; i < new_capacity; i++) {
+                memset(&metrics->epoch_grad_dist[i], 0, sizeof(DistributionSummary));
+                memset(&metrics->epoch_weight_dist[i], 0, sizeof(DistributionSummary));
+            }
+        }
+    }
 
     if (!metrics->epoch_training_losses || !metrics->epoch_training_accuracies ||
         !metrics->epoch_times || !metrics->epoch_learning_rates) {
@@ -173,6 +189,9 @@ TrainingMetrics* training_metrics_create(size_t num_epochs) {
     metrics->lr_schedule        = NULL;
     metrics->lr_schedule_params = NULL;
     metrics->gradient_norm      = 0.0f;
+    metrics->epoch_grad_dist    = cml_calloc(num_epochs, sizeof(DistributionSummary));
+    metrics->epoch_weight_dist  = cml_calloc(num_epochs, sizeof(DistributionSummary));
+    metrics->has_distributions  = false;
     metrics->loss_reduction_rate = 0.0f;
     metrics->loss_stability      = 0.0f;
     metrics->early_stopped   = false;
@@ -209,6 +228,33 @@ void training_metrics_start_epoch(TrainingMetrics* metrics) {
     metrics->epoch_start_time = clock();
 }
 
+
+/* Summarise the model's parameters for `epoch` using whatever model most
+ * recently ran a forward pass. Hand-written training loops never call
+ * cml_train, so hooking the loop would have covered only the built-in one;
+ * every loop does forward the model, which is what this keys off. */
+static size_t g_last_dist_epoch = (size_t)-1;
+
+static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epoch) {
+    if (!metrics || !cml_ir_scope_enabled())
+        return;
+    /* Once per epoch: this runs off the optimizer step, which fires per batch. */
+    if (g_last_dist_epoch == epoch)
+        return;
+
+    Module* model = g_current_model ? g_current_model : nn_viz_root_module();
+    if (!model)
+        return;
+
+    Parameter** params = NULL;
+    int num_params = 0;
+    if (module_collect_parameters(model, &params, &num_params, true) != 0 || !params)
+        return;
+    training_metrics_record_distributions(metrics, epoch, (void**)params, num_params);
+    g_last_dist_epoch = epoch;
+    cml_free(params);
+}
+
 void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float loss,
                                    float accuracy) {
     if (!metrics || epoch >= metrics->num_epochs)
@@ -228,6 +274,7 @@ void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float
     if (epoch == 0 || accuracy > metrics->best_accuracy) {
         metrics->best_accuracy = accuracy;
     }
+
 }
 
 void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, float train_loss,
@@ -280,6 +327,7 @@ void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, 
     if (epoch == 0 || train_accuracy > metrics->best_accuracy) {
         metrics->best_accuracy = train_accuracy;
     }
+
 }
 
 void training_metrics_set_summary(TrainingMetrics* metrics, const char* summary) {
@@ -408,26 +456,189 @@ float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** 
     return grad_norm;
 }
 
-static void write_json_escaped(FILE* f, const char* s) {
-    if (!s) {
-        fputs("null", f);
+
+
+float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements) {
+    float* data = (float*)tensor_data_ptr(t);
+    if (!data)
+        return NULL;
+
+    *num_elements = t->numel;
+    if (*num_elements == 0 && t->shape && t->ndim > 0) {
+        *num_elements = 1;
+        for (int d = 0; d < t->ndim; d++)
+            *num_elements *= (size_t)t->shape[d];
+    }
+    return data;
+}
+
+/* Number of buckets used to approximate quartiles. 512 keeps the quartile
+ * estimate within ~0.2% of the value range while costing one int array. */
+#define DIST_BINS 512
+
+/* One pass over every parameter's data, applied by `visit`. Shared by the
+ * weight and gradient summaries, which differ only in which tensor they read. */
+static void dist_accumulate(void** parameters, int num_parameters, bool want_grad,
+                            void (*visit)(const float*, size_t, void*), void* ctx) {
+    for (int i = 0; i < num_parameters; i++) {
+        Parameter* param = (Parameter*)parameters[i];
+        if (!param || !param->tensor)
+            continue;
+
+        Tensor* t = want_grad ? tensor_get_grad(param->tensor) : param->tensor;
+        if (!t)
+            continue;
+
+        size_t n = 0;
+        const float* data = cml_tensor_float_buffer(t, &n);
+        if (data && n)
+            visit(data, n, ctx);
+    }
+}
+
+typedef struct {
+    float min, max;
+    double sum, sumsq;
+    size_t count, zeros;
+} DistPass1;
+
+static void dist_pass1(const float* data, size_t n, void* ctx) {
+    DistPass1* a = (DistPass1*)ctx;
+    for (size_t i = 0; i < n; i++) {
+        float v = data[i];
+        if (v < a->min) a->min = v;
+        if (v > a->max) a->max = v;
+        a->sum += (double)v;
+        a->sumsq += (double)v * (double)v;
+        if (v == 0.0f) a->zeros++;
+    }
+    a->count += n;
+}
+
+typedef struct {
+    int* bins;
+    float lo, scale; /* bin index = (v - lo) * scale */
+} DistPass2;
+
+static void dist_pass2(const float* data, size_t n, void* ctx) {
+    DistPass2* h = (DistPass2*)ctx;
+    for (size_t i = 0; i < n; i++) {
+        int b = (int)((data[i] - h->lo) * h->scale);
+        if (b < 0) b = 0;
+        if (b >= DIST_BINS) b = DIST_BINS - 1;
+        h->bins[b]++;
+    }
+}
+
+/* Value at the bin where the running count first crosses `target`. */
+static float dist_quantile(const int* bins, size_t total, double q, float lo, float bin_width) {
+    size_t target = (size_t)(q * (double)total);
+    size_t seen = 0;
+    for (int b = 0; b < DIST_BINS; b++) {
+        seen += (size_t)bins[b];
+        if (seen >= target)
+            return lo + ((float)b + 0.5f) * bin_width;
+    }
+    return lo + (float)DIST_BINS * bin_width;
+}
+
+static void summarize_population(void** parameters, int num_parameters, bool want_grad,
+                                 DistributionSummary* out) {
+    DistPass1 a = {.min = INFINITY, .max = -INFINITY, .sum = 0, .sumsq = 0, .count = 0, .zeros = 0};
+    dist_accumulate(parameters, num_parameters, want_grad, dist_pass1, &a);
+    if (a.count == 0)
+        return;
+
+    double mean = a.sum / (double)a.count;
+    double var  = a.sumsq / (double)a.count - mean * mean;
+    out->mean      = (float)mean;
+    out->std       = (float)sqrt(var > 0.0 ? var : 0.0);
+    out->min       = a.min;
+    out->max       = a.max;
+    out->frac_zero = (float)((double)a.zeros / (double)a.count);
+
+    float range = a.max - a.min;
+    if (range <= 0.0f) { /* constant population: every quantile is that value */
+        out->p25 = out->p50 = out->p75 = a.min;
         return;
     }
-    fputc('"', f);
-    for (const char* p = s; *p; p++) {
-        if (*p == '"' || *p == '\\') {
-            fputc('\\', f);
-            fputc(*p, f);
-        } else if ((unsigned char)*p < 0x20) {
-            fprintf(f, "\\u%04x", (unsigned char)*p);
-        } else
-            fputc(*p, f);
+
+    int* bins = cml_calloc(DIST_BINS, sizeof(int));
+    if (!bins) {
+        out->p25 = out->p50 = out->p75 = out->mean;
+        return;
     }
-    fputc('"', f);
+    DistPass2 h = {.bins = bins, .lo = a.min, .scale = (float)DIST_BINS / range};
+    dist_accumulate(parameters, num_parameters, want_grad, dist_pass2, &h);
+
+    float bin_width = range / (float)DIST_BINS;
+    out->p25 = dist_quantile(bins, a.count, 0.25, a.min, bin_width);
+    out->p50 = dist_quantile(bins, a.count, 0.50, a.min, bin_width);
+    out->p75 = dist_quantile(bins, a.count, 0.75, a.min, bin_width);
+    cml_free(bins);
+}
+
+void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoch,
+                                           void** parameters, int num_parameters) {
+    if (!metrics || !parameters || num_parameters <= 0 || epoch >= metrics->num_epochs)
+        return;
+    if (!metrics->epoch_grad_dist || !metrics->epoch_weight_dist)
+        return;
+
+    summarize_population(parameters, num_parameters, true,  &metrics->epoch_grad_dist[epoch]);
+    summarize_population(parameters, num_parameters, false, &metrics->epoch_weight_dist[epoch]);
+    metrics->has_distributions = true;
+}
+
+/* Emit `"name": [...]` for an optional per-epoch series; absent arrays export
+ * as [] so the dashboard can tell "not tracked" from "tracked and zero". */
+static void export_epoch_series(FILE* f, const char* name, const float* series, size_t n) {
+    fprintf(f, "  \"%s\": [", name);
+    if (series) {
+        for (size_t i = 0; i < n; i++) {
+            if (i > 0)
+                fputs(", ", f);
+            float v = series[i];
+            fprintf(f, "%.6f", (isinf(v) || isnan(v)) ? 0.0 : (double)v);
+        }
+    }
+    fputs("],\n", f);
+}
+
+/* Emit the percentile bands as parallel arrays -- one array per band rather
+ * than an array of objects, so the chart can bind a band directly without
+ * re-walking the epochs. */
+static void export_distribution_series(FILE* f, const char* name,
+                                       const DistributionSummary* dist, size_t n) {
+    static const char* fields[] = {"min", "p25", "p50", "p75", "max", "mean", "std", "frac_zero"};
+    fprintf(f, "  \"%s\": {", name);
+    for (int k = 0; k < 8; k++) {
+        if (k > 0)
+            fputs(", ", f);
+        fprintf(f, "\"%s\": [", fields[k]);
+        for (size_t i = 0; i < n && dist; i++) {
+            const DistributionSummary* d = &dist[i];
+            const float vals[] = {d->min, d->p25, d->p50, d->p75,
+                                  d->max, d->mean, d->std, d->frac_zero};
+            float v = vals[k];
+            if (i > 0)
+                fputs(", ", f);
+            fprintf(f, "%.8f", (isinf(v) || isnan(v)) ? 0.0 : (double)v);
+        }
+        fputs("]", f);
+    }
+    fputs("},\n", f);
 }
 
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
                                  bool incremental) {
+    /* NO_EXPORT: every metrics file goes through here, so one guard covers the
+     * lot. This path is NOT VIZ-gated -- auto_capture_loss/optimizer rewrite
+     * training.json on every step, so an ordinary training run pays for a
+     * dashboard it never opens. */
+    if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
+        return 0;
+
     if (!metrics || !path)
         return -1;
     char tmp_path[1024];
@@ -439,7 +650,7 @@ int training_metrics_export_json(const TrainingMetrics* metrics, const char* pat
 
     fputs("{\n", f);
     fputs("  \"model_summary\": ", f);
-    write_json_escaped(f, metrics->model_summary);
+    cml_json_write_escaped(f, metrics->model_summary);
     fputs(",\n", f);
 
     fprintf(f, "  \"total_params\": %d,\n", metrics->total_params);
@@ -553,18 +764,18 @@ int training_metrics_export_json(const TrainingMetrics* metrics, const char* pat
     fputs("],\n", f);
     if (metrics->lr_schedule) {
         fputs("  \"lr_schedule\": ", f);
-        write_json_escaped(f, metrics->lr_schedule);
+        cml_json_write_escaped(f, metrics->lr_schedule);
         fputs(",\n", f);
         fputs("  \"learning_rate_schedule\": ", f);
-        write_json_escaped(f, metrics->lr_schedule);
+        cml_json_write_escaped(f, metrics->lr_schedule);
         fputs(",\n", f);
         fputs("  \"scheduler\": ", f);
-        write_json_escaped(f, metrics->lr_schedule);
+        cml_json_write_escaped(f, metrics->lr_schedule);
         fputs(",\n", f);
     }
     if (metrics->lr_schedule_params) {
         fputs("  \"lr_schedule_params\": ", f);
-        write_json_escaped(f, metrics->lr_schedule_params);
+        cml_json_write_escaped(f, metrics->lr_schedule_params);
         fputs(",\n", f);
     }
     fprintf(f, "  \"gradient_norm\": %.8f,\n",
@@ -590,6 +801,18 @@ int training_metrics_export_json(const TrainingMetrics* metrics, const char* pat
         fprintf(f, "%.6f", (double)metrics->epoch_training_accuracies[i]);
     }
     fputs("],\n", f);
+
+    /* Validation curves were tracked but never exported, so the dashboard could
+     * only ever plot the training split and overfitting was invisible. */
+    export_epoch_series(f, "epoch_validation_losses", metrics->epoch_validation_losses,
+                        num_epochs_to_export);
+    export_epoch_series(f, "epoch_validation_accuracies", metrics->epoch_validation_accuracies,
+                        num_epochs_to_export);
+
+    export_distribution_series(f, "grad_distribution", metrics->epoch_grad_dist,
+                               metrics->has_distributions ? num_epochs_to_export : 0);
+    export_distribution_series(f, "weight_distribution", metrics->epoch_weight_dist,
+                               metrics->has_distributions ? num_epochs_to_export : 0);
     // Find the last non-INFINITY test values (test is typically evaluated once at the end)
     float test_loss     = INFINITY;
     float test_accuracy = INFINITY;
@@ -684,7 +907,7 @@ int training_metrics_export_json(const TrainingMetrics* metrics, const char* pat
     }
     if (metrics->model_summary && strstr(metrics->model_summary, "\"layers\"")) {
         fputs("  \"architecture\": ", f);
-        write_json_escaped(f, metrics->model_summary);
+        cml_json_write_escaped(f, metrics->model_summary);
         fputs("\n", f);
     } else {
     }
@@ -843,6 +1066,13 @@ void training_metrics_free(TrainingMetrics* metrics) {
         cml_free(metrics->lr_schedule);
     if (metrics->lr_schedule_params)
         cml_free(metrics->lr_schedule_params);
+    /* Allocated by training_metrics_create alongside the per-epoch arrays but
+     * omitted here, so the global metrics object cml_init creates leaked its
+     * two distribution arrays on every run. */
+    if (metrics->epoch_grad_dist)
+        cml_free(metrics->epoch_grad_dist);
+    if (metrics->epoch_weight_dist)
+        cml_free(metrics->epoch_weight_dist);
     cml_free(metrics);
 }
 
@@ -923,6 +1153,8 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
     return 0;
 }
 bool cml_viz_enabled(void) {
+    if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
+        return false;
     const char* v = getenv("VIZ");
     return v && v[0] != '\0' && strcmp(v, "0") != 0 && strcmp(v, "false") != 0;
 }
@@ -991,6 +1223,30 @@ void training_metrics_register_model(Module* model) {
     if (!model)
         return;
     g_current_model = model;
+
+    /* Fill in the parameter counts the dashboard shows. These have their own
+     * setters, but nothing called them, so every run reported "0 parameters"
+     * beside a correctly-exported architecture. Registering a model is the
+     * point at which they are knowable, so derive them here rather than making
+     * each training loop remember two more calls. */
+    if (g_global_metrics) {
+        Parameter** params = NULL;
+        int num_params     = 0;
+        int total = 0, trainable = 0;
+        if (module_collect_parameters(model, &params, &num_params, true) == 0 && params) {
+            for (int i = 0; i < num_params; i++) {
+                if (!params[i] || !params[i]->tensor)
+                    continue;
+                int n = (int)params[i]->tensor->numel;
+                total += n;
+                if (params[i]->requires_grad)
+                    trainable += n;
+            }
+            cml_free(params);
+        }
+        training_metrics_set_params(g_global_metrics, total, trainable);
+    }
+
     if (!g_architecture_exported) {
         training_metrics_auto_export_architecture(model);
     }
@@ -998,6 +1254,12 @@ void training_metrics_register_model(Module* model) {
 void training_metrics_auto_export_architecture(Module* model) {
     if (!model)
         return;
+    /* Keep tracking the model (other paths need it) but write nothing. */
+    if (cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
+        if (!g_current_model)
+            g_current_model = model;
+        return;
+    }
     if (!g_current_model) {
         g_current_model = model;
     }
@@ -1077,6 +1339,10 @@ void training_metrics_auto_capture_loss(Tensor* loss_tensor) {
 void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
     if (!g_global_metrics || !optimizer)
         return;
+    /* Gradients are still attached here (zero_grad is a separate call), which is
+     * why the distribution snapshot is taken from this hook rather than at the
+     * epoch boundary where they have already been cleared. */
+    capture_distributions_for_epoch(g_global_metrics, g_current_epoch);
     if (g_current_model && !g_architecture_exported) {
         training_metrics_auto_export_architecture(g_current_model);
     }

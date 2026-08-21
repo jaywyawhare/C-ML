@@ -120,6 +120,13 @@ typedef enum {
 
     // Additional Binary Ops
     UOP_IDIV,        // integer division: floor(a / b)
+    /* NOTE: fmod semantics (sign follows the dividend), pinned by an explicit
+     * expectation table in tests/test_numerical_ops.c. This does NOT pair with
+     * UOP_IDIV's floor division: a == b*idiv(a,b) + mod(a,b) fails whenever the
+     * operand signs differ (e.g. a=-7, b=2 gives -4 and -1, reconstructing -9).
+     * numpy resolves this by pairing floor_divide with remainder and keeping
+     * fmod separate; this op set has only one of each, so the two conventions
+     * are mixed. Changing either is a user-visible semantic decision. */
     UOP_MOD,         // modulo: a % b (fmodf)
     UOP_MINIMUM,     // min(a, b)
     UOP_COPYSIGN,    // copysign(a, b)
@@ -228,6 +235,9 @@ typedef enum {
     UOP_SCATTER_ADD,     // index_add: adjoint of GATHER (scatter-ADD rows)  (ScatterAddParams)
     UOP_FUSED_ELEMENTWISE, // one fused kernel for an elementwise chain (FusedElementwiseParams)
 
+    UOP_IM2COL,          // fused 2D im2col: [N,C,H,W] -> [N*OH*OW, C*kh*kw] (Im2colParams)
+    UOP_COL2IM,          // adjoint of IM2COL: scatter-add cols back to [N,C,H,W] (Col2imParams)
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -269,20 +279,20 @@ Tensor* uop_sum(Tensor* a, ReduceParams* params);
 Tensor* uop_max_reduce(Tensor* a, ReduceParams* params);
 Tensor* uop_mean(Tensor* a, ReduceParams* params);
 
+/* Reshape and expand carry the same payload; one struct under two names keeps
+ * both call-site spellings working and lets them share a builder. */
 typedef struct {
     int* new_shape;
     int new_ndim;
-} ReshapeParams;
+} ShapeParams;
+
+typedef ShapeParams ReshapeParams;
+typedef ShapeParams ExpandParams;
 
 typedef struct {
     int* perm;
     int num_dims;
 } PermuteParams;
-
-typedef struct {
-    int* new_shape;
-    int new_ndim;
-} ExpandParams;
 
 typedef struct {
     size_t* new_strides;
@@ -303,6 +313,15 @@ Tensor* uop_stride(Tensor* a, StrideParams* params);
 Tensor* uop_slice(Tensor* a, SliceParams* params);
 Tensor* uop_matmul(Tensor* a, Tensor* b);
 Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias);
+
+/* Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
+ * by hand at every call site. Each is a NULL-propagating pass-through, so a
+ * chain of them only needs one check at the end. */
+Tensor* uop_reshape_to(Tensor* a, const int* new_shape, int new_ndim);
+Tensor* uop_expand_to(Tensor* a, const int* new_shape, int new_ndim);
+Tensor* uop_mean_dim(Tensor* a, int dim, bool keepdim);
+Tensor* uop_sum_dim(Tensor* a, int dim, bool keepdim);
+Tensor* uop_max_reduce_dim(Tensor* a, int dim, bool keepdim);
 
 typedef struct {
     int* kernel_size;
@@ -628,6 +647,8 @@ typedef struct {
 
 typedef struct {
     int offset;    // Diagonal offset (0=main, positive=above, negative=below)
+    int dim1;      // First axis of the plane the diagonal is taken from
+    int dim2;      // Second axis; dropped from the output, dim1's slot holds the diagonal
 } DiagParams;
 
 typedef struct {
@@ -721,10 +742,31 @@ typedef struct {
     int dim_size;  // size of the output along `dim`
 } ScatterAddParams;
 
+/* Fused 2D im2col: input [N,C,H,W] -> [N*OH*OW, C*kh*kw]. Folds padding in via
+ * bounds-checked gather (out-of-range positions contribute 0), so no separate
+ * PAD op is needed. Column order is (c, kh_i, kw_i) with kw_i fastest, matching
+ * the weight reshape [Cout, C*kh*kw]. */
+typedef struct {
+    int kh, kw;   // kernel height, width
+    int sh, sw;   // stride height, width
+    int ph, pw;   // padding height, width
+    int dh, dw;   // dilation height, width
+} Im2colParams;
+
+/* Adjoint of IM2COL (col2im): [N*OH*OW, C*kh*kw] -> [N,C,H,W] by scatter-add of
+ * overlapping windows. C/H/W give the reconstructed input dims (N is inferred
+ * from the row count / (OH*OW)). */
+typedef struct {
+    int kh, kw, sh, sw, ph, pw, dh, dw;
+    int C, H, W;
+} Col2imParams;
+
 /* One fused elementwise kernel: a straight-line sequence of primitive
  * elementwise ops evaluated per output element with register intermediates.
  * Operand refs: >=0 -> external input index (node->inputs[ref]);
- *               <0  -> prior step result (step index = -ref-1). Unused = INT_MIN. */
+ *               <0  -> prior step result (step index = -ref-1);
+ *               FUSED_UNUSED_REF -> slot not used by this op. */
+#define FUSED_UNUSED_REF (-1000000)
 typedef struct {
     int      num_steps;
     UOpType* op;      // op[s]
@@ -749,6 +791,9 @@ Tensor* uop_fold(Tensor* a, int kernel_size, int stride, int output_len);
 /* index_add (adjoint of gather): out[index[i], ..] += src[i, ..] along `dim`;
  * out has `src` shape with axis `dim` resized to `dim_size`. */
 Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size);
+/* Fused 2D im2col / its adjoint col2im (see Im2colParams / Col2imParams). */
+Tensor* uop_im2col(Tensor* x, Im2colParams* params);
+Tensor* uop_col2im(Tensor* g, Col2imParams* params);
 void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** out_mean);
 void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean);
 

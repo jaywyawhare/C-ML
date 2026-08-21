@@ -425,6 +425,12 @@ void dataset_free(Dataset* dataset) {
     if (!dataset)
         return;
 
+    /* Drop out of the at-exit tracking table first, mirroring module_free and
+     * optimizer_free. Without this a caller-freed dataset is freed a second
+     * time by cml_auto_cleanup. */
+    extern void cml_untrack_dataset(Dataset*);
+    cml_untrack_dataset(dataset);
+
     if (dataset->X)
         tensor_free(dataset->X);
     if (dataset->y)
@@ -832,6 +838,19 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
     return 0;
 }
 
+/* Materialised feature matrix of `dataset`, or NULL (already logged) when the
+ * tensor is missing or cannot be realised. */
+static float* dataset_feature_data(const Dataset* dataset) {
+    if (!dataset->X) {
+        LOG_ERROR("Dataset tensor X is not available");
+        return NULL;
+    }
+    float* data = (float*)tensor_data_ptr(dataset->X);
+    if (!data)
+        LOG_ERROR("Failed to access tensor data");
+    return data;
+}
+
 int dataset_normalize(Dataset* dataset, const char* method) {
     if (!dataset || !method) {
         LOG_ERROR("Invalid parameters for dataset_normalize");
@@ -846,16 +865,9 @@ int dataset_normalize(Dataset* dataset, const char* method) {
             return -1;
         }
 
-        if (!dataset->X) {
-            LOG_ERROR("Dataset tensor X is not available");
+        float* X_data = dataset_feature_data(dataset);
+        if (!X_data)
             return -1;
-        }
-
-        float* X_data = (float*)tensor_data_ptr(dataset->X);
-        if (!X_data) {
-            LOG_ERROR("Failed to access tensor data");
-            return -1;
-        }
         for (int i = 0; i < dataset->num_samples; i++) {
             for (int j = 0; j < dataset->input_size; j++) {
                 float mean = dataset->feature_means[j];
@@ -877,16 +889,9 @@ int dataset_normalize(Dataset* dataset, const char* method) {
             return -1;
         }
 
-        if (!dataset->X) {
-            LOG_ERROR("Dataset tensor X is not available");
+        float* X_data = dataset_feature_data(dataset);
+        if (!X_data)
             return -1;
-        }
-
-        float* X_data = (float*)tensor_data_ptr(dataset->X);
-        if (!X_data) {
-            LOG_ERROR("Failed to access tensor data");
-            return -1;
-        }
         for (int i = 0; i < dataset->num_samples; i++) {
             for (int j = 0; j < dataset->input_size; j++) {
                 float min_val = dataset->feature_mins[j];

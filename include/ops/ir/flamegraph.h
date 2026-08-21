@@ -10,9 +10,10 @@
  * renders it as a flamegraph (width = time), which makes it visible at a glance
  * whether fusion actually collapsed a hot chain into one wide bar.
  *
- * Opt-in via the FLAMEGRAPH env var (truthy) so there is ZERO timing overhead
- * on the normal path. When on, span capture wraps the per-node dispatch in the
- * CPU execution loop at fused-kernel granularity. */
+ * Opt-in via the FLAMEGRAPH env var (truthy), or implied by VIZ / the PROFILE
+ * flag, so there is ZERO timing overhead when none of them is set. When on,
+ * span capture wraps the per-node dispatch in the CPU execution loop at
+ * fused-kernel granularity. */
 
 #include "ops/ir/ir.h"
 

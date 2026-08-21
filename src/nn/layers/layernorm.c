@@ -143,35 +143,9 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
     ln->weight           = NULL;
     ln->bias             = NULL;
     if (affine) {
-        int weight_shape[] = {normalized_shape};
-
-        TensorConfig config =
-            (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-        Tensor* weight = tensor_ones(weight_shape, 1, &config);
-        if (!weight) {
-            module_free((Module*)ln);
+        if (nn_add_affine_params((Module*)ln, normalized_shape, dtype, device,
+                                 &ln->weight, &ln->bias) != 0)
             return NULL;
-        }
-        if (module_add_parameter((Module*)ln, weight, "weight", true) != 0) {
-            tensor_free(weight);
-            module_free((Module*)ln);
-            return NULL;
-        }
-
-        ln->weight = module_get_parameter((Module*)ln, "weight");
-
-        Tensor* bias = tensor_zeros(weight_shape, 1, &config);
-        if (!bias) {
-            module_free((Module*)ln);
-            return NULL;
-        }
-        if (module_add_parameter((Module*)ln, bias, "bias", true) != 0) {
-            tensor_free(bias);
-            module_free((Module*)ln);
-            return NULL;
-        }
-
-        ln->bias = module_get_parameter((Module*)ln, "bias");
     } else {
         ln->weight = NULL;
         ln->bias   = NULL;

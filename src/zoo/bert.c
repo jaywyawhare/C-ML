@@ -1,4 +1,5 @@
 #include "zoo/bert.h"
+#include "zoo/zoo.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
@@ -135,27 +136,10 @@ static Module* create_bert_block(int hidden_size, int n_head, int intermediate_s
 
     block->mlp_norm = nn_layernorm(hidden_size, 1e-12f, true, dtype, device);
 
-    /* Scale residual path weights by 1/sqrt(2*n_layer) to prevent
-       activation explosion through deep residual connections (GPT-2 style). */
-    if (n_layer > 1) {
-        float scale = 1.0f / sqrtf(2.0f * (float)n_layer);
-        /* Scale MLP output projection */
-        if (mlp_proj && mlp_proj->weight) {
-            float* w = (float*)tensor_data_ptr(mlp_proj->weight->tensor);
-            if (w) {
-                for (size_t i = 0; i < mlp_proj->weight->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-        /* Scale attention output projection (W_o) */
-        if (block->attn && block->attn->W_o) {
-            float* w = (float*)tensor_data_ptr(block->attn->W_o->tensor);
-            if (w) {
-                for (size_t i = 0; i < block->attn->W_o->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-    }
+    /* GPT-2-style residual init keeps deep stacks from exploding. */
+    float scale = zoo_residual_scale(n_layer);
+    zoo_scale_param(mlp_proj ? mlp_proj->weight : NULL, scale);
+    zoo_scale_param(block->attn ? block->attn->W_o : NULL, scale);
 
     return (Module*)block;
 }

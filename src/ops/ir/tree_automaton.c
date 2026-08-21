@@ -317,16 +317,6 @@ void cml_automaton_free(CMLAutomaton* automaton) {
     cml_free(automaton);
 }
 
-static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* name) {
-    if (!ir || !name) return NULL;
-    struct IRNode* n = ir->head;
-    while (n) {
-        if (n->output_name && strcmp(n->output_name, name) == 0)
-            return n;
-        n = n->next;
-    }
-    return NULL;
-}
 
 /*
  * Compute the automaton state for a single IR node given its children's
@@ -373,79 +363,8 @@ static char* rewrite_unique_name(void) {
     return name;
 }
 
-static void replace_output_references(CMLGraph_t ir,
-                                      const char* old_name,
-                                      const char* new_name) {
-    if (!ir || !old_name || !new_name) return;
-    struct IRNode* n = ir->head;
-    while (n) {
-        for (int i = 0; i < n->num_inputs; i++) {
-            if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
-                cml_free(n->input_names[i]);
-                n->input_names[i] = cml_strdup(new_name);
-            }
-        }
-        n = n->next;
-    }
-}
 
-static void insert_node_before(CMLGraph_t ir, struct IRNode* new_node,
-                               struct IRNode* before) {
-    if (!ir || !new_node) return;
-    new_node->next = NULL;
 
-    if (!before || !ir->head) {
-        if (ir->tail) {
-            ir->tail->next = new_node;
-        } else {
-            ir->head = new_node;
-        }
-        ir->tail = new_node;
-        ir->node_count++;
-        return;
-    }
-
-    if (ir->head == before) {
-        new_node->next = before;
-        ir->head = new_node;
-        ir->node_count++;
-        return;
-    }
-
-    struct IRNode* prev = ir->head;
-    while (prev && prev->next != before)
-        prev = prev->next;
-
-    if (prev) {
-        new_node->next = before;
-        prev->next = new_node;
-        ir->node_count++;
-    } else {
-        ir->tail->next = new_node;
-        ir->tail = new_node;
-        ir->node_count++;
-    }
-}
-
-static void unlink_node(CMLGraph_t ir, struct IRNode* node) {
-    if (!ir || !node) return;
-
-    if (ir->head == node) {
-        ir->head = node->next;
-        if (ir->tail == node) ir->tail = NULL;
-        ir->node_count--;
-        return;
-    }
-
-    struct IRNode* prev = ir->head;
-    while (prev && prev->next != node)
-        prev = prev->next;
-    if (prev) {
-        prev->next = node->next;
-        if (ir->tail == node) ir->tail = prev;
-        ir->node_count--;
-    }
-}
 
 static void free_unlinked_node(struct IRNode* node) {
     if (!node) return;
@@ -492,7 +411,7 @@ static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern,
         if (pattern->num_inputs != node->num_inputs) return false;
         for (int i = 0; i < pattern->num_inputs; i++) {
             if (!pattern->inputs[i]) return false;
-            struct IRNode* producer = find_node_by_output(ir, node->input_names[i]);
+            struct IRNode* producer = cml_ir_find_by_output(ir, node->input_names[i]);
             if (!producer) return false;
             if (!match_node_recursive(ir, pattern->inputs[i], producer, result))
                 return false;
@@ -545,7 +464,7 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
 
             for (int c = 0; c < arity; c++) {
                 if (!node->input_names[c]) continue;
-                struct IRNode* producer = find_node_by_output(graph, node->input_names[c]);
+                struct IRNode* producer = cml_ir_find_by_output(graph, node->input_names[c]);
                 if (!producer) continue;
 
                 /* Find producer's index to get its state */
@@ -603,10 +522,10 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                     }
                 }
                 if (!already_in_graph)
-                    insert_node_before(graph, replacement, node);
+                    cml_ir_insert_before(graph, replacement, node);
 
                 if (node->output_name && replacement->output_name)
-                    replace_output_references(graph, node->output_name,
+                    cml_ir_replace_refs(graph, node->output_name,
                                               replacement->output_name);
 
                 if (node->output && replacement->output) {
@@ -614,7 +533,7 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                     node->output->ir_context = graph;
                 }
 
-                unlink_node(graph, node);
+                cml_ir_unlink_node(graph, node);
                 free_unlinked_node(node);
                 topo[i] = NULL;
 

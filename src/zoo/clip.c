@@ -1,4 +1,5 @@
 #include "zoo/clip.h"
+#include "zoo/zoo.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor_manipulation.h"
@@ -57,134 +58,18 @@ CMLCLIPConfig cml_zoo_clip_config_vit_l14(void) {
 
 /* Vision encoder block */
 
-typedef struct {
-    Module base;
-    LayerNorm* norm1;
-    MultiHeadAttention* attn;
-    LayerNorm* norm2;
-    Sequential* mlp;
-} CLIPVisionBlock;
-
-static Tensor* clip_vision_block_forward(Module* module, Tensor* input) {
-    CLIPVisionBlock* block = (CLIPVisionBlock*)module;
-    if (!block || !input)
-        return NULL;
-
-    Tensor* normed = module_forward((Module*)block->norm1, input);
-    if (!normed) return NULL;
-
-    Tensor* attn_out = multihead_attention_forward(block->attn, normed, normed, normed, NULL);
-    if (!attn_out) return NULL;
-
-    Tensor* x = tensor_add(input, attn_out);
-    if (!x) return NULL;
-
-    normed = module_forward((Module*)block->norm2, x);
-    if (!normed) return NULL;
-
-    Tensor* mlp_out = module_forward((Module*)block->mlp, normed);
-    if (!mlp_out) return NULL;
-
-    return tensor_add(x, mlp_out);
-}
-
-static void clip_vision_block_free(Module* module) {
-    CLIPVisionBlock* block = (CLIPVisionBlock*)module;
-    if (!block) return;
-    if (block->norm1) module_free((Module*)block->norm1);
-    if (block->attn) module_free((Module*)block->attn);
-    if (block->norm2) module_free((Module*)block->norm2);
-    if (block->mlp) module_free((Module*)block->mlp);
-    cml_free(block);
-}
-
 static Module* create_vision_block(int dim, int n_head, DType dtype, DeviceType device) {
-    CLIPVisionBlock* block = cml_malloc(sizeof(CLIPVisionBlock));
-    if (!block) return NULL;
-
-    if (module_init((Module*)block, "CLIPVisionBlock",
-                    clip_vision_block_forward, clip_vision_block_free) != 0) {
-        cml_free(block);
-        return NULL;
-    }
-
-    int mlp_dim = dim * 4;
-    block->norm1 = nn_layernorm(dim, 1e-5f, true, dtype, device);
-    block->attn = nn_multihead_attention(dim, n_head, 0.0f, dtype, device);
-    block->norm2 = nn_layernorm(dim, 1e-5f, true, dtype, device);
-
-    block->mlp = nn_sequential();
-    sequential_add(block->mlp, (Module*)nn_linear(dim, mlp_dim, dtype, device, true));
-    sequential_add(block->mlp, (Module*)nn_gelu(false));
-    sequential_add(block->mlp, (Module*)nn_linear(mlp_dim, dim, dtype, device, true));
-
-    return (Module*)block;
+    return (Module*)zoo_prenorm_block("CLIPVisionBlock", dim, n_head, dim * 4, 1e-5f,
+                                      dtype, device);
 }
 
 /* Text encoder block (causal) */
 
-typedef struct {
-    Module base;
-    LayerNorm* norm1;
-    MultiHeadAttention* attn;
-    LayerNorm* norm2;
-    Sequential* mlp;
-} CLIPTextBlock;
-
-static Tensor* clip_text_block_forward(Module* module, Tensor* input) {
-    CLIPTextBlock* block = (CLIPTextBlock*)module;
-    if (!block || !input)
-        return NULL;
-
-    Tensor* normed = module_forward((Module*)block->norm1, input);
-    if (!normed) return NULL;
-
-    Tensor* attn_out = multihead_attention_forward(block->attn, normed, normed, normed, NULL);
-    if (!attn_out) return NULL;
-
-    Tensor* x = tensor_add(input, attn_out);
-    if (!x) return NULL;
-
-    normed = module_forward((Module*)block->norm2, x);
-    if (!normed) return NULL;
-
-    Tensor* mlp_out = module_forward((Module*)block->mlp, normed);
-    if (!mlp_out) return NULL;
-
-    return tensor_add(x, mlp_out);
-}
-
-static void clip_text_block_free(Module* module) {
-    CLIPTextBlock* block = (CLIPTextBlock*)module;
-    if (!block) return;
-    if (block->norm1) module_free((Module*)block->norm1);
-    if (block->attn) module_free((Module*)block->attn);
-    if (block->norm2) module_free((Module*)block->norm2);
-    if (block->mlp) module_free((Module*)block->mlp);
-    cml_free(block);
-}
-
 static Module* create_text_block(int dim, int n_head, DType dtype, DeviceType device) {
-    CLIPTextBlock* block = cml_malloc(sizeof(CLIPTextBlock));
-    if (!block) return NULL;
-
-    if (module_init((Module*)block, "CLIPTextBlock",
-                    clip_text_block_forward, clip_text_block_free) != 0) {
-        cml_free(block);
-        return NULL;
-    }
-
-    int mlp_dim = dim * 4;
-    block->norm1 = nn_layernorm(dim, 1e-5f, true, dtype, device);
-    block->attn = nn_multihead_attention(dim, n_head, 0.0f, dtype, device);
-    multihead_attention_set_flash(block->attn, false, true);
-    block->norm2 = nn_layernorm(dim, 1e-5f, true, dtype, device);
-
-    block->mlp = nn_sequential();
-    sequential_add(block->mlp, (Module*)nn_linear(dim, mlp_dim, dtype, device, true));
-    sequential_add(block->mlp, (Module*)nn_gelu(false));
-    sequential_add(block->mlp, (Module*)nn_linear(mlp_dim, dim, dtype, device, true));
-
+    ZooPreNormBlock* block =
+        zoo_prenorm_block("CLIPTextBlock", dim, n_head, dim * 4, 1e-5f, dtype, device);
+    if (block)
+        multihead_attention_set_flash(block->attn, false, true);
     return (Module*)block;
 }
 

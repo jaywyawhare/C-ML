@@ -265,6 +265,59 @@ static void encoder_layer_free(Module* module) {
     cml_free(layer);
 }
 
+/* Register a named parameter created by `make` and hand back the stored
+ * Parameter. Frees `module` and returns NULL on failure, so callers can
+ * `return NULL` directly. */
+static Parameter* add_named_param(Module* module, Tensor* tensor, const char* name) {
+    if (!tensor) {
+        module_free(module);
+        return NULL;
+    }
+    if (module_add_parameter(module, tensor, name, true) != 0) {
+        tensor_free(tensor);
+        module_free(module);
+        return NULL;
+    }
+    return module_get_parameter(module, name);
+}
+
+/* Register the position-wise feed-forward pair shared by the encoder and
+ * decoder layers: linear1 (d_model -> d_ff) and linear2 (d_ff -> d_model). */
+static int add_ffn_params(Module* module, int d_model, int dim_feedforward, TensorConfig* config,
+                          Parameter** l1w, Parameter** l1b, Parameter** l2w, Parameter** l2b) {
+    int l1_w_shape[] = {dim_feedforward, d_model};
+    int l1_b_shape[] = {dim_feedforward};
+    int l2_w_shape[] = {d_model, dim_feedforward};
+    int l2_b_shape[] = {d_model};
+
+    Tensor* t = tensor_empty(l1_w_shape, 2, config);
+    if (t) nn_init_xavier(t, d_model, dim_feedforward);
+    *l1w = add_named_param(module, t, "linear1_weight");
+    if (!*l1w) return -1;
+
+    *l1b = add_named_param(module, tensor_zeros(l1_b_shape, 1, config), "linear1_bias");
+    if (!*l1b) return -1;
+
+    t = tensor_empty(l2_w_shape, 2, config);
+    if (t) nn_init_xavier(t, dim_feedforward, d_model);
+    *l2w = add_named_param(module, t, "linear2_weight");
+    if (!*l2w) return -1;
+
+    *l2b = add_named_param(module, tensor_zeros(l2_b_shape, 1, config), "linear2_bias");
+    return *l2b ? 0 : -1;
+}
+
+/* Register one layer-norm gamma/beta pair under `weight_name`/`bias_name`. */
+static int add_norm_pair(Module* module, int d_model, TensorConfig* config,
+                         const char* weight_name, const char* bias_name,
+                         Parameter** weight, Parameter** bias) {
+    int norm_shape[] = {d_model};
+    *weight = add_named_param(module, tensor_ones(norm_shape, 1, config), weight_name);
+    if (!*weight) return -1;
+    *bias = add_named_param(module, tensor_zeros(norm_shape, 1, config), bias_name);
+    return *bias ? 0 : -1;
+}
+
 TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, int dim_feedforward,
                                                        float dropout, DType dtype, DeviceType device) {
     TransformerEncoderLayer* layer = cml_malloc(sizeof(TransformerEncoderLayer));
@@ -289,69 +342,16 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
 
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
-    int l1_w_shape[] = {dim_feedforward, d_model};
-    int l1_b_shape[] = {dim_feedforward};
-    int l2_w_shape[] = {d_model, dim_feedforward};
-    int l2_b_shape[] = {d_model};
-    int norm_shape[] = {d_model};
+    if (add_ffn_params((Module*)layer, d_model, dim_feedforward, &config,
+                       &layer->linear1_weight, &layer->linear1_bias,
+                       &layer->linear2_weight, &layer->linear2_bias) != 0)
+        return NULL;
 
-    Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
-    if (!l1w) { module_free((Module*)layer); return NULL; }
-    nn_init_xavier(l1w, d_model, dim_feedforward);
-    if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
-        tensor_free(l1w); module_free((Module*)layer); return NULL;
-    }
-    layer->linear1_weight = module_get_parameter((Module*)layer, "linear1_weight");
-
-    Tensor* l1b = tensor_zeros(l1_b_shape, 1, &config);
-    if (!l1b) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, l1b, "linear1_bias", true) != 0) {
-        tensor_free(l1b); module_free((Module*)layer); return NULL;
-    }
-    layer->linear1_bias = module_get_parameter((Module*)layer, "linear1_bias");
-
-    Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
-    if (!l2w) { module_free((Module*)layer); return NULL; }
-    nn_init_xavier(l2w, dim_feedforward, d_model);
-    if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
-        tensor_free(l2w); module_free((Module*)layer); return NULL;
-    }
-    layer->linear2_weight = module_get_parameter((Module*)layer, "linear2_weight");
-
-    Tensor* l2b = tensor_zeros(l2_b_shape, 1, &config);
-    if (!l2b) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, l2b, "linear2_bias", true) != 0) {
-        tensor_free(l2b); module_free((Module*)layer); return NULL;
-    }
-    layer->linear2_bias = module_get_parameter((Module*)layer, "linear2_bias");
-
-    Tensor* n1w = tensor_ones(norm_shape, 1, &config);
-    if (!n1w) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, n1w, "norm1_weight", true) != 0) {
-        tensor_free(n1w); module_free((Module*)layer); return NULL;
-    }
-    layer->norm1_weight = module_get_parameter((Module*)layer, "norm1_weight");
-
-    Tensor* n1b = tensor_zeros(norm_shape, 1, &config);
-    if (!n1b) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, n1b, "norm1_bias", true) != 0) {
-        tensor_free(n1b); module_free((Module*)layer); return NULL;
-    }
-    layer->norm1_bias = module_get_parameter((Module*)layer, "norm1_bias");
-
-    Tensor* n2w = tensor_ones(norm_shape, 1, &config);
-    if (!n2w) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, n2w, "norm2_weight", true) != 0) {
-        tensor_free(n2w); module_free((Module*)layer); return NULL;
-    }
-    layer->norm2_weight = module_get_parameter((Module*)layer, "norm2_weight");
-
-    Tensor* n2b = tensor_zeros(norm_shape, 1, &config);
-    if (!n2b) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, n2b, "norm2_bias", true) != 0) {
-        tensor_free(n2b); module_free((Module*)layer); return NULL;
-    }
-    layer->norm2_bias = module_get_parameter((Module*)layer, "norm2_bias");
+    if (add_norm_pair((Module*)layer, d_model, &config, "norm1_weight", "norm1_bias",
+                      &layer->norm1_weight, &layer->norm1_bias) != 0 ||
+        add_norm_pair((Module*)layer, d_model, &config, "norm2_weight", "norm2_bias",
+                      &layer->norm2_weight, &layer->norm2_bias) != 0)
+        return NULL;
 
     return layer;
 }
@@ -517,62 +517,18 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
 
     TensorConfig config = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
 
-    int l1_w_shape[] = {dim_feedforward, d_model};
-    int l1_b_shape[] = {dim_feedforward};
-    int l2_w_shape[] = {d_model, dim_feedforward};
-    int l2_b_shape[] = {d_model};
-    int norm_shape[] = {d_model};
+    if (add_ffn_params((Module*)layer, d_model, dim_feedforward, &config,
+                       &layer->linear1_weight, &layer->linear1_bias,
+                       &layer->linear2_weight, &layer->linear2_bias) != 0)
+        return NULL;
 
-    Tensor* l1w = tensor_empty(l1_w_shape, 2, &config);
-    if (!l1w) { module_free((Module*)layer); return NULL; }
-    nn_init_xavier(l1w, d_model, dim_feedforward);
-    if (module_add_parameter((Module*)layer, l1w, "linear1_weight", true) != 0) {
-        tensor_free(l1w); module_free((Module*)layer); return NULL;
-    }
-    layer->linear1_weight = module_get_parameter((Module*)layer, "linear1_weight");
-
-    Tensor* l1b = tensor_zeros(l1_b_shape, 1, &config);
-    if (!l1b) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, l1b, "linear1_bias", true) != 0) {
-        tensor_free(l1b); module_free((Module*)layer); return NULL;
-    }
-    layer->linear1_bias = module_get_parameter((Module*)layer, "linear1_bias");
-
-    Tensor* l2w = tensor_empty(l2_w_shape, 2, &config);
-    if (!l2w) { module_free((Module*)layer); return NULL; }
-    nn_init_xavier(l2w, dim_feedforward, d_model);
-    if (module_add_parameter((Module*)layer, l2w, "linear2_weight", true) != 0) {
-        tensor_free(l2w); module_free((Module*)layer); return NULL;
-    }
-    layer->linear2_weight = module_get_parameter((Module*)layer, "linear2_weight");
-
-    Tensor* l2b = tensor_zeros(l2_b_shape, 1, &config);
-    if (!l2b) { module_free((Module*)layer); return NULL; }
-    if (module_add_parameter((Module*)layer, l2b, "linear2_bias", true) != 0) {
-        tensor_free(l2b); module_free((Module*)layer); return NULL;
-    }
-    layer->linear2_bias = module_get_parameter((Module*)layer, "linear2_bias");
-
-    struct { const char* wn; const char* bn; Parameter** wp; Parameter** bp; } norms[] = {
-        {"norm1_weight", "norm1_bias", &layer->norm1_weight, &layer->norm1_bias},
-        {"norm2_weight", "norm2_bias", &layer->norm2_weight, &layer->norm2_bias},
-        {"norm3_weight", "norm3_bias", &layer->norm3_weight, &layer->norm3_bias},
-    };
-    for (int i = 0; i < 3; i++) {
-        Tensor* nw = tensor_ones(norm_shape, 1, &config);
-        if (!nw) { module_free((Module*)layer); return NULL; }
-        if (module_add_parameter((Module*)layer, nw, norms[i].wn, true) != 0) {
-            tensor_free(nw); module_free((Module*)layer); return NULL;
-        }
-        *norms[i].wp = module_get_parameter((Module*)layer, norms[i].wn);
-
-        Tensor* nb = tensor_zeros(norm_shape, 1, &config);
-        if (!nb) { module_free((Module*)layer); return NULL; }
-        if (module_add_parameter((Module*)layer, nb, norms[i].bn, true) != 0) {
-            tensor_free(nb); module_free((Module*)layer); return NULL;
-        }
-        *norms[i].bp = module_get_parameter((Module*)layer, norms[i].bn);
-    }
+    if (add_norm_pair((Module*)layer, d_model, &config, "norm1_weight", "norm1_bias",
+                      &layer->norm1_weight, &layer->norm1_bias) != 0 ||
+        add_norm_pair((Module*)layer, d_model, &config, "norm2_weight", "norm2_bias",
+                      &layer->norm2_weight, &layer->norm2_bias) != 0 ||
+        add_norm_pair((Module*)layer, d_model, &config, "norm3_weight", "norm3_bias",
+                      &layer->norm3_weight, &layer->norm3_bias) != 0)
+        return NULL;
 
     return layer;
 }

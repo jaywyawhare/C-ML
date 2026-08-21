@@ -1,4 +1,5 @@
 #include "zoo/gpt2.h"
+#include "zoo/zoo.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "core/logging.h"
@@ -128,25 +129,10 @@ static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtyp
     sequential_add(block->mlp, (Module*)mlp_proj);
 
     
-    if (n_layer > 1) {
-        float scale = 1.0f / sqrtf(2.0f * (float)n_layer);
-        
-        if (mlp_proj && mlp_proj->weight) {
-            float* w = (float*)tensor_data_ptr(mlp_proj->weight->tensor);
-            if (w) {
-                for (size_t i = 0; i < mlp_proj->weight->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-        
-        if (block->attn && block->attn->W_o) {
-            float* w = (float*)tensor_data_ptr(block->attn->W_o->tensor);
-            if (w) {
-                for (size_t i = 0; i < block->attn->W_o->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-    }
+    /* GPT-2-style residual init keeps deep stacks from exploding. */
+    float scale = zoo_residual_scale(n_layer);
+    zoo_scale_param(mlp_proj ? mlp_proj->weight : NULL, scale);
+    zoo_scale_param(block->attn ? block->attn->W_o : NULL, scale);
 
     return (Module*)block;
 }

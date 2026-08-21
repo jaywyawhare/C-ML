@@ -327,7 +327,9 @@ int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
         case SYM_ADD: op = "+"; break;
         case SYM_MUL: op = "*"; break;
         case SYM_DIV: op = "/"; break;
-        case SYM_MOD: op = "%%"; break;
+        /* Single %: `op` is inserted through a "%s" conversion below, so it is
+         * not format-processed. Written "%%" it rendered as "(a %% b)". */
+        case SYM_MOD: op = "%"; break;
         case SYM_MIN: op = "min"; break;
         case SYM_MAX: op = "max"; break;
         default: op = "?"; break;

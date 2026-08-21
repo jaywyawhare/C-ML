@@ -2,6 +2,7 @@
 #define CML_BACKEND_REMOTE_DEVICE_H
 
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -43,7 +44,9 @@ int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source,
 typedef struct CMLRemoteServer {
     int listen_fd;
     int port;
-    bool running;
+    /* Cross-thread stop flag: set by the stopper, polled by the accept loop.
+     * Must be atomic -- a plain bool is a data race and hoistable. */
+    _Atomic bool running;
 } CMLRemoteServer;
 
 CMLRemoteServer* cml_remote_server_create(int port);

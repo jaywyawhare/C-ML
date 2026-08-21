@@ -44,9 +44,15 @@ int cml_ir_execute_traced(CMLGraph_t ir);
 /* Fused CPU scheduler entrypoint. */
 int cml_ir_execute_fusion(CMLGraph_t ir);
 
+/* Whether operator fusion should run: off under NOOPT=1, DISABLE_FUSION=1 or
+ * FUSION_SCHEDULER=0. The fusers below check this themselves, so callers only
+ * need it to skip work they would otherwise do on fusion's behalf. */
+int cml_ir_fusion_enabled(void);
+
 /* Real elementwise kernel fusion: collapse maximal single-use elementwise
- * chains into UOP_FUSED_ELEMENTWISE nodes. Returns the number of chains fused.
- * Mutates the graph in place; safe to run after decompose + autodiff. */
+ * chains into UOP_FUSED_ELEMENTWISE nodes. Returns the number of chains fused
+ * (0 when fusion is disabled). Mutates the graph in place; safe to run after
+ * decompose + autodiff. */
 int cml_ir_fuse_elementwise(CMLGraph_t ir);
 
 /* Allow the fuser to fuse requires_grad (forward) chains too — only safe when

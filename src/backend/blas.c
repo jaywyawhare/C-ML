@@ -1,5 +1,6 @@
 #include "backend/blas.h"
 #include "core/logging.h"
+#include "ops/simd_math.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -170,14 +171,6 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
         ctx->fn_set_threads = blis_set;
         ctx->is_blis = true;
     }
-}
-
-/* Intentionally not switching per-call — OpenBLAS thread pool switching
- * is expensive (~50µs per openblas_set_num_threads call) and the global
- * thread count set at init time works well for large-matrix benchmarks.
- * Per-call adaptive threading made conv2d 6× slower in testing. */
-static inline void blas_set_threads_for_size(CMLBlasContext* ctx, long long flops) {
-    (void)ctx; (void)flops; /* no-op: use init-time thread count */
 }
 
 CMLBlasContext* cml_blas_init(void) {
@@ -645,6 +638,53 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
         ctx = cml_blas_get_context();
     if (!ctx || !ctx->initialized || !A || !B || !C || M <= 0 || N <= 0 || K <= 0)
         return -1;
+
+#if defined(__AVX2__) || defined(__AVX__)
+    /* Small/thin-GEMM fast path (mirrors cml_blas_sgemm). Threaded BLAS pays a
+     * fork-join barrier per call that dwarfs the compute for small matrices —
+     * most painfully the im2col conv GEMM A[M,K] @ B[N,K]^T (e.g.
+     * [7200,27] @ [27,16]^T), which spends ~25ms in OpenBLAS exec_blas thread
+     * barriers versus microseconds single-threaded. cml_blas_sgemm has the
+     * single-threaded AVX/packed micro-kernels but only accepts row-major NN,
+     * so materialise any transposed operand into scratch and delegate. The
+     * transposed operand is bounded by the flops threshold, so the reorg is
+     * cheap relative to the barrier it avoids. */
+    {
+#ifdef __FMA__
+        const long long ex_fast_thresh = MEDIUM_GEMM_THRESHOLD;
+#else
+        const long long ex_fast_thresh = SMALL_GEMM_THRESHOLD;
+#endif
+        long long flops = (long long)M * N * K;
+        if (flops < ex_fast_thresh) {
+            const float* Anp = A;
+            const float* Bnp = B;
+            float* a_scratch = NULL;
+            float* b_scratch = NULL;
+            bool ok = true;
+            if (transA) {  /* A is [K,M] row-major -> want [M,K] */
+                a_scratch = (float*)cml_aligned_alloc((size_t)M * K * sizeof(float), 32);
+                if (a_scratch) { simd_transpose_f32(A, a_scratch, K, M); Anp = a_scratch; }
+                else ok = false;
+            }
+            if (ok && transB) {  /* B is [N,K] row-major -> want [K,N] */
+                b_scratch = (float*)cml_aligned_alloc((size_t)K * N * sizeof(float), 32);
+                if (b_scratch) { simd_transpose_f32(B, b_scratch, N, K); Bnp = b_scratch; }
+                else ok = false;
+            }
+            if (ok) {
+                int rc = cml_blas_sgemm(ctx, Anp, Bnp, C, M, N, K, alpha, beta);
+                cml_aligned_free(a_scratch);
+                cml_aligned_free(b_scratch);
+                if (rc == 0)
+                    return 0;
+            } else {
+                cml_aligned_free(a_scratch);
+                cml_aligned_free(b_scratch);
+            }
+        }
+    }
+#endif /* __AVX2__ || __AVX__ */
 
     int ta  = transA ? CML_BLAS_TRANS : CML_BLAS_NO_TRANS;
     int tb  = transB ? CML_BLAS_TRANS : CML_BLAS_NO_TRANS;

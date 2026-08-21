@@ -315,6 +315,31 @@ static void estimate_item_cost(CMLScheduleItem* item) {
         : 0.0f;
 }
 
+/* Append `item` to the schedule, growing the array as needed. A failed grow
+ * silently drops the item rather than overrunning, matching the previous
+ * inline behaviour. */
+static void sched_push(CMLSchedule* sched, CMLScheduleItem* item) {
+    if (sched->num_items >= sched->item_capacity) {
+        int nc = sched->item_capacity * 2;
+        CMLScheduleItem** tmp =
+            cml_realloc(sched->items, (size_t)nc * sizeof(CMLScheduleItem*));
+        if (!tmp)
+            return;
+        sched->items = tmp;
+        sched->item_capacity = nc;
+    }
+    sched->items[sched->num_items++] = item;
+}
+
+/* Schedule `node` on its own as a `kind` item. */
+static void sched_push_single(CMLSchedule* sched, CMLScheduleItemType kind, struct IRNode* node) {
+    CMLScheduleItem* item = sched_item_create(kind);
+    if (!item)
+        return;
+    sched_item_add_op(item, node);
+    sched_push(sched, item);
+}
+
 static void build_dependencies(CMLSchedule* sched) {
     if (!sched || sched->num_items == 0) return;
 
@@ -413,13 +438,7 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
                 if (mv) {
                     sched_item_add_op(mv, node);
                     
-                    if (sched->num_items >= sched->item_capacity) {
-                        int nc = sched->item_capacity * 2;
-                        CMLScheduleItem** tmp = cml_realloc(
-                            sched->items, (size_t)nc * sizeof(CMLScheduleItem*));
-                        if (tmp) { sched->items = tmp; sched->item_capacity = nc; }
-                    }
-                    sched->items[sched->num_items++] = mv;
+                    sched_push(sched, mv);
                 }
             }
             node = node->next;
@@ -439,13 +458,7 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
             
             if (cur) {
                 
-                if (sched->num_items >= sched->item_capacity) {
-                    int nc = sched->item_capacity * 2;
-                    CMLScheduleItem** tmp = cml_realloc(
-                        sched->items, (size_t)nc * sizeof(CMLScheduleItem*));
-                    if (tmp) { sched->items = tmp; sched->item_capacity = nc; }
-                }
-                sched->items[sched->num_items++] = cur;
+                sched_push(sched, cur);
             }
             cur = sched_item_create(SCHED_ELEMENTWISE);
             if (cur) sched_item_add_op(cur, node);
@@ -469,67 +482,19 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
                         sched_item_add_op(red, node);
                         sched_item_free(cur);
                         cur = NULL;
-                        if (sched->num_items >= sched->item_capacity) {
-                            int nc = sched->item_capacity * 2;
-                            CMLScheduleItem** tmp = cml_realloc(
-                                sched->items,
-                                (size_t)nc * sizeof(CMLScheduleItem*));
-                            if (tmp) {
-                                sched->items = tmp;
-                                sched->item_capacity = nc;
-                            }
-                        }
-                        sched->items[sched->num_items++] = red;
+                        sched_push(sched, red);
                     }
                 } else {
                     
-                    if (sched->num_items >= sched->item_capacity) {
-                        int nc = sched->item_capacity * 2;
-                        CMLScheduleItem** tmp = cml_realloc(
-                            sched->items,
-                            (size_t)nc * sizeof(CMLScheduleItem*));
-                        if (tmp) {
-                            sched->items = tmp;
-                            sched->item_capacity = nc;
-                        }
-                    }
-                    sched->items[sched->num_items++] = cur;
+                    sched_push(sched, cur);
                     cur = NULL;
 
                     
-                    CMLScheduleItem* red = sched_item_create(SCHED_REDUCE);
-                    if (red) {
-                        sched_item_add_op(red, node);
-                        if (sched->num_items >= sched->item_capacity) {
-                            int nc = sched->item_capacity * 2;
-                            CMLScheduleItem** tmp = cml_realloc(
-                                sched->items,
-                                (size_t)nc * sizeof(CMLScheduleItem*));
-                            if (tmp) {
-                                sched->items = tmp;
-                                sched->item_capacity = nc;
-                            }
-                        }
-                        sched->items[sched->num_items++] = red;
-                    }
+                    sched_push_single(sched, SCHED_REDUCE, node);
                 }
             } else {
                 
-                CMLScheduleItem* red = sched_item_create(SCHED_REDUCE);
-                if (red) {
-                    sched_item_add_op(red, node);
-                    if (sched->num_items >= sched->item_capacity) {
-                        int nc = sched->item_capacity * 2;
-                        CMLScheduleItem** tmp = cml_realloc(
-                            sched->items,
-                            (size_t)nc * sizeof(CMLScheduleItem*));
-                        if (tmp) {
-                            sched->items = tmp;
-                            sched->item_capacity = nc;
-                        }
-                    }
-                    sched->items[sched->num_items++] = red;
-                }
+                sched_push_single(sched, SCHED_REDUCE, node);
             }
             node = node->next;
             continue;
@@ -537,14 +502,7 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
 
         if (kind == SCHED_MATMUL || kind == SCHED_CONV) {
             if (cur) {
-                if (sched->num_items >= sched->item_capacity) {
-                    int nc = sched->item_capacity * 2;
-                    CMLScheduleItem** tmp = cml_realloc(
-                        sched->items,
-                        (size_t)nc * sizeof(CMLScheduleItem*));
-                    if (tmp) { sched->items = tmp; sched->item_capacity = nc; }
-                }
-                sched->items[sched->num_items++] = cur;
+                sched_push(sched, cur);
             }
             cur = sched_item_create(kind);
             if (cur) sched_item_add_op(cur, node);
@@ -553,28 +511,14 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
         }
 
         if (cur) {
-            if (sched->num_items >= sched->item_capacity) {
-                int nc = sched->item_capacity * 2;
-                CMLScheduleItem** tmp = cml_realloc(
-                    sched->items,
-                    (size_t)nc * sizeof(CMLScheduleItem*));
-                if (tmp) { sched->items = tmp; sched->item_capacity = nc; }
-            }
-            sched->items[sched->num_items++] = cur;
+            sched_push(sched, cur);
             cur = NULL;
         }
         {
             CMLScheduleItem* cust = sched_item_create(SCHED_CUSTOM);
             if (cust) {
                 sched_item_add_op(cust, node);
-                if (sched->num_items >= sched->item_capacity) {
-                    int nc = sched->item_capacity * 2;
-                    CMLScheduleItem** tmp = cml_realloc(
-                        sched->items,
-                        (size_t)nc * sizeof(CMLScheduleItem*));
-                    if (tmp) { sched->items = tmp; sched->item_capacity = nc; }
-                }
-                sched->items[sched->num_items++] = cust;
+                sched_push(sched, cust);
             }
         }
         node = node->next;
@@ -582,13 +526,7 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
 
     
     if (cur) {
-        if (sched->num_items >= sched->item_capacity) {
-            int nc = sched->item_capacity * 2;
-            CMLScheduleItem** tmp = cml_realloc(
-                sched->items, (size_t)nc * sizeof(CMLScheduleItem*));
-            if (tmp) { sched->items = tmp; sched->item_capacity = nc; }
-        }
-        sched->items[sched->num_items++] = cur;
+        sched_push(sched, cur);
         cur = NULL;
     }
 

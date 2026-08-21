@@ -140,6 +140,21 @@ void cml_track_dataset(Dataset* dataset) {
     g_tracked_datasets[g_num_datasets++] = dataset;
 }
 
+/* Counterpart to cml_track_dataset, called from dataset_free. Without it a
+ * dataset the caller frees itself stays in the tracking table, and the
+ * at-exit sweep frees it a second time. */
+void cml_untrack_dataset(Dataset* dataset) {
+    if (!dataset || !g_tracked_datasets)
+        return;
+
+    for (size_t i = 0; i < g_num_datasets; i++) {
+        if (g_tracked_datasets[i] == dataset) {
+            g_tracked_datasets[i] = NULL;
+            return;
+        }
+    }
+}
+
 static void cml_auto_cleanup(void) {
     if (!g_cml_initialized) {
         return;
@@ -413,6 +428,24 @@ int cml_init(void) {
      * so DEBUG/NOOPT/etc. take effect for the rest of initialization. */
     cml_flags_init();
 
+    /* VIZ and NO_EXPORT ask for opposite things: one wants the dashboard files,
+     * the other guarantees none are written. Honouring a precedence rule would
+     * mean a run started with VIZ=1 silently producing nothing, with no hint
+     * why -- so reject the combination instead of quietly picking a winner. */
+    {
+        const char* viz = getenv("VIZ");
+        bool viz_on = viz && viz[0] != '\0' && strcmp(viz, "0") != 0 &&
+                      strcmp(viz, "false") != 0;
+        if (viz_on && cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
+            LOG_ERROR("VIZ=1 and NO_EXPORT=1 are mutually exclusive: VIZ asks for the "
+                      "dashboard exports, NO_EXPORT guarantees no files are written. "
+                      "Set exactly one.");
+            error_stack_push(CM_INVALID_ARGUMENT, "VIZ and NO_EXPORT are mutually exclusive",
+                             __FILE__, __LINE__, __func__);
+            return -1;
+        }
+    }
+
     /* DEBUG=n raises the log verbosity (default is ERROR-only):
      *   0 -> ERROR (quiet), 1-2 -> INFO, >=3 -> DEBUG (everything). */
     int debug = cml_flag(CML_FLAG_DEBUG);
@@ -677,8 +710,10 @@ void cml_summary(Module* module) {
         ModelArchitecture* arch = model_architecture_create();
         if (arch) {
             if (model_architecture_extract(module, arch) == 0) {
-                model_architecture_export_json(arch, "model_architecture.json");
-                LOG_INFO("Exported model architecture to model_architecture.json");
+                if (!cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
+                    model_architecture_export_json(arch, "model_architecture.json");
+                    LOG_INFO("Exported model architecture to model_architecture.json");
+                }
             }
             model_architecture_free(arch);
         }

@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>   /* only for optional stats print, remove if want zero dep */
@@ -114,8 +115,18 @@ typedef struct Slab {
     uint32_t       class_idx;
     uint32_t       num_blocks;
     uint32_t       used_blocks;
+    /* Without this pad the fields above total 28 bytes, so data[] -- and hence
+     * every AllocHeader and every user pointer carved from the slab -- landed
+     * on a 4-mod-8 address. That is undefined behaviour on the header's size_t
+     * and silently broke the alignment guarantee callers expect for double and
+     * for SIMD loads. Every size class is a multiple of 16, so a 32-byte slab
+     * header keeps every block 16-aligned. */
+    uint32_t       _pad;
     char           data[];   /* flexible: the carved blocks start here */
 } Slab;
+
+_Static_assert(offsetof(Slab, data) % 16 == 0,
+               "slab payload must start 16-byte aligned");
 
 /* Track live slabs so we can eventually system_free their original base.
  * Currently slabs are process-lifetime (standard for this style of allocator),
@@ -326,6 +337,71 @@ static void flush_local_to_central(int cls, int keep) {
         pthread_mutex_unlock(&g_central[cls].lock);
     }
 }
+
+
+/* ---------------- Pool bypass (diagnostics) ----------------
+ *
+ * Build with -DCML_ALLOC_PASSTHROUGH=1 to route every allocation straight to
+ * the system allocator. The pool hands out blocks from its own arenas, so a
+ * heap tool sees one giant valid mapping and cannot tell a use-after-free or an
+ * overflow from ordinary traffic -- corruption only surfaces later as a crash
+ * inside alloc_from_class, walking a free list some earlier write clobbered.
+ * With this on, AddressSanitizer sees each allocation individually and reports
+ * the write that actually caused it. Diagnostics only: the pool is what makes
+ * per-node allocation cheap. */
+#if defined(CML_ALLOC_PASSTHROUGH) && CML_ALLOC_PASSTHROUGH
+#include <stdlib.h>
+#include <string.h>
+
+/* Fault injection is mirrored here, not just in the pooled allocator. Omitting
+ * it made sim_test fail to link under CML_ALLOC_PASSTHROUGH, which is exactly
+ * the configuration ASAN needs -- so the one suite that exercises
+ * allocation-failure paths was also the one suite ASAN never covered. Semantics
+ * match the pooled path: -1 disables, >=0 fails after that many more allocs and
+ * then re-disables itself. The counters themselves are declared unconditionally
+ * near the top of the file, so this branch reuses them rather than shadowing. */
+static int pt_fault_hit(void) {
+    long cd = __atomic_load_n(&g_fault_countdown, __ATOMIC_RELAXED);
+    if (cd >= 0) {
+        long prev = __atomic_fetch_sub(&g_fault_countdown, 1, __ATOMIC_RELAXED);
+        if (prev == 0) {
+            __atomic_store_n(&g_fault_countdown, -1, __ATOMIC_RELAXED);
+            return 1;
+        }
+    }
+    __atomic_fetch_add(&g_alloc_index, 1, __ATOMIC_RELAXED);
+    return 0;
+}
+
+void cml_malloc_fault_after(int n) {
+    __atomic_store_n(&g_fault_countdown, (long)n, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_alloc_index, 0, __ATOMIC_RELAXED);
+}
+void cml_malloc_fault_reset(void) {
+    __atomic_store_n(&g_fault_countdown, -1L, __ATOMIC_RELAXED);
+}
+long cml_malloc_alloc_index(void) {
+    return __atomic_load_n(&g_alloc_index, __ATOMIC_RELAXED);
+}
+
+void* cml_malloc(size_t size)                    { if (pt_fault_hit()) return NULL;
+                                                   return malloc(size ? size : 1); }
+void* cml_calloc(size_t n, size_t sz)            { if (pt_fault_hit()) return NULL;
+                                                   return calloc(n ? n : 1, sz ? sz : 1); }
+void* cml_realloc(void* p, size_t n)             { if (pt_fault_hit()) return NULL;
+                                                   return realloc(p, n ? n : 1); }
+void  cml_free(void* p)                          { free(p); }
+char* cml_strdup(const char* s)                  { if (!s) return NULL;
+                                                   if (pt_fault_hit()) return NULL;
+                                                   return strdup(s); }
+void* cml_aligned_alloc(size_t size, size_t al)  {
+    void* p = NULL;
+    if (al < sizeof(void*)) al = sizeof(void*);
+    if (posix_memalign(&p, al, size ? size : 1) != 0) return NULL;
+    return p;
+}
+void  cml_aligned_free(void* p)                  { free(p); }
+#else
 
 /* ---------------- Allocation paths ---------------- */
 
@@ -624,3 +700,5 @@ void cml_malloc_fault_reset(void) {
 long cml_malloc_alloc_index(void) {
     return __atomic_load_n(&g_alloc_index, __ATOMIC_RELAXED);
 }
+
+#endif /* CML_ALLOC_PASSTHROUGH */

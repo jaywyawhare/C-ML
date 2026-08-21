@@ -22,6 +22,28 @@ struct CMLGraphAllocator {
     bool use_pooling;          // Enable memory pooling
 };
 
+/* Allocate the parallel per-buffer arrays. On failure everything allocated so
+ * far, including `galloc` itself, is released and -1 returned. */
+static int galloc_alloc_slots(CMLGraphAllocator_t galloc, int n_bufs) {
+    galloc->buffer_types    = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBufferType_t));
+    galloc->buffers         = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBuffer_t));
+    galloc->buffer_sizes    = cml_malloc((size_t)n_bufs * sizeof(size_t));
+    galloc->buffer_reserved = cml_malloc((size_t)n_bufs * sizeof(bool));
+    galloc->memory_pools    = cml_malloc((size_t)n_bufs * sizeof(MemoryPool*));
+
+    if (galloc->buffer_types && galloc->buffers && galloc->buffer_sizes &&
+        galloc->buffer_reserved && galloc->memory_pools)
+        return 0;
+
+    cml_free(galloc->buffer_types);
+    cml_free(galloc->buffers);
+    cml_free(galloc->buffer_sizes);
+    cml_free(galloc->buffer_reserved);
+    cml_free(galloc->memory_pools);
+    cml_free(galloc);
+    return -1;
+}
+
 CMLGraphAllocator_t cml_graph_allocator_new(CMLBackendBufferType_t buft) {
     if (!buft) {
         LOG_ERROR("Invalid buffer type");
@@ -32,27 +54,8 @@ CMLGraphAllocator_t cml_graph_allocator_new(CMLBackendBufferType_t buft) {
     if (!galloc)
         return NULL;
 
-    galloc->buffer_types    = cml_malloc(sizeof(CMLBackendBufferType_t));
-    galloc->buffers         = cml_malloc(sizeof(CMLBackendBuffer_t));
-    galloc->buffer_sizes    = cml_malloc(sizeof(size_t));
-    galloc->buffer_reserved = cml_malloc(sizeof(bool));
-    galloc->memory_pools    = cml_malloc(sizeof(MemoryPool*));
-
-    if (!galloc->buffer_types || !galloc->buffers || !galloc->buffer_sizes ||
-        !galloc->buffer_reserved || !galloc->memory_pools) {
-        if (galloc->buffer_types)
-            cml_free(galloc->buffer_types);
-        if (galloc->buffers)
-            cml_free(galloc->buffers);
-        if (galloc->buffer_sizes)
-            cml_free(galloc->buffer_sizes);
-        if (galloc->buffer_reserved)
-            cml_free(galloc->buffer_reserved);
-        if (galloc->memory_pools)
-            cml_free(galloc->memory_pools);
-        cml_free(galloc);
+    if (galloc_alloc_slots(galloc, 1) != 0)
         return NULL;
-    }
 
     galloc->buffer_types[0]    = buft;
     galloc->buffers[0]         = NULL;
@@ -75,27 +78,8 @@ CMLGraphAllocator_t cml_graph_allocator_new_n(CMLBackendBufferType_t* bufts, int
     if (!galloc)
         return NULL;
 
-    galloc->buffer_types    = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBufferType_t));
-    galloc->buffers         = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBuffer_t));
-    galloc->buffer_sizes    = cml_malloc((size_t)n_bufs * sizeof(size_t));
-    galloc->buffer_reserved = cml_malloc((size_t)n_bufs * sizeof(bool));
-    galloc->memory_pools    = cml_malloc((size_t)n_bufs * sizeof(MemoryPool*));
-
-    if (!galloc->buffer_types || !galloc->buffers || !galloc->buffer_sizes ||
-        !galloc->buffer_reserved || !galloc->memory_pools) {
-        if (galloc->buffer_types)
-            cml_free(galloc->buffer_types);
-        if (galloc->buffers)
-            cml_free(galloc->buffers);
-        if (galloc->buffer_sizes)
-            cml_free(galloc->buffer_sizes);
-        if (galloc->buffer_reserved)
-            cml_free(galloc->buffer_reserved);
-        if (galloc->memory_pools)
-            cml_free(galloc->memory_pools);
-        cml_free(galloc);
+    if (galloc_alloc_slots(galloc, n_bufs) != 0)
         return NULL;
-    }
 
     for (int i = 0; i < n_bufs; i++) {
         galloc->buffer_types[i]    = bufts[i];

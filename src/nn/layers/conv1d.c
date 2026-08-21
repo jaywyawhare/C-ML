@@ -139,22 +139,9 @@ Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride
 
     conv->weight = module_get_parameter((Module*)conv, "weight");
     if (use_bias) {
-        int bias_shape[] = {out_channels};
-        TensorConfig bias_config =
-            (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-        Tensor* bias = tensor_zeros(bias_shape, 1, &bias_config);
-        if (!bias) {
-            module_free((Module*)conv);
+        conv->bias = nn_add_bias_param((Module*)conv, out_channels, dtype, device, NULL);
+        if (!conv->bias)
             return NULL;
-        }
-
-        if (module_add_parameter((Module*)conv, bias, "bias", true) != 0) {
-            tensor_free(bias);
-            module_free((Module*)conv);
-            return NULL;
-        }
-
-        conv->bias = module_get_parameter((Module*)conv, "bias");
     } else {
         conv->bias = NULL;
     }

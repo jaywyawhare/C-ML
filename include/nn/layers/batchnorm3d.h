@@ -7,24 +7,7 @@
 extern "C" {
 #endif
 
-typedef struct BatchNorm3d {
-    Module base;
-
-    int num_features;
-    float eps;
-    float momentum;
-    bool affine;
-    bool track_running_stats;
-
-    Parameter* weight;
-    Parameter* bias;
-
-    Tensor* running_mean;
-    Tensor* running_var;
-
-    Tensor* current_mean;
-    Tensor* current_var;
-} BatchNorm3d;
+typedef BatchNormState BatchNorm3d;
 
 BatchNorm3d* nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
                              bool track_running_stats, DType dtype, DeviceType device);

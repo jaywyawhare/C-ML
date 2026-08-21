@@ -200,6 +200,40 @@ static int cmp_beam_result(const void* a, const void* b) {
     return 0;
 }
 
+/* Enumerate the block-size x unroll x vector-width search space into `out`,
+ * seeding each candidate's time with its heuristic score so the caller can
+ * rank them before (optionally) measuring for real. Returns the count. */
+static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
+    int num = 0;
+    for (int bi = 0; bi < NUM_BLOCK_SIZES && num < CML_BEAM_MAX_CANDIDATES; bi++) {
+        for (int ui = 0; ui < NUM_UNROLL_FACTORS && num < CML_BEAM_MAX_CANDIDATES; ui++) {
+            for (int vi = 0; vi < NUM_VEC_WIDTHS && num < CML_BEAM_MAX_CANDIDATES; vi++) {
+                CMLBeamResult* r = &out[num++];
+                memset(r, 0, sizeof(*r));
+
+                r->config.block_size_x  = BLOCK_SIZES[bi];
+                r->config.block_size_y  = 1;
+                r->config.block_size_z  = 1;
+                r->config.unroll_factor = UNROLL_FACTORS[ui];
+                r->config.vec_width     = VEC_WIDTHS[vi];
+                r->config.shared_mem    = 0;
+
+                size_t threads = (size_t)r->config.block_size_x;
+                r->config.block[0] = threads;
+                r->config.block[1] = 1;
+                r->config.block[2] = 1;
+                r->config.grid[0]  = (total_elements + threads - 1) / threads;
+                r->config.grid[1]  = 1;
+                r->config.grid[2]  = 1;
+
+                r->valid   = true;
+                r->time_us = heuristic_score(&r->config, total_elements);
+            }
+        }
+    }
+    return num;
+}
+
 int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                          size_t total_elements, int ndim, const int* shape,
                          CMLBeamConfig* best_out) {
@@ -223,37 +257,7 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     /* 2. Generate all candidate configurations. */
     CMLBeamResult all_candidates[CML_BEAM_MAX_CANDIDATES];
-    int num_all = 0;
-
-    for (int bi = 0; bi < NUM_BLOCK_SIZES && num_all < CML_BEAM_MAX_CANDIDATES; bi++) {
-        for (int ui = 0; ui < NUM_UNROLL_FACTORS && num_all < CML_BEAM_MAX_CANDIDATES; ui++) {
-            for (int vi = 0; vi < NUM_VEC_WIDTHS && num_all < CML_BEAM_MAX_CANDIDATES; vi++) {
-                CMLBeamResult* r = &all_candidates[num_all];
-                memset(r, 0, sizeof(*r));
-
-                r->config.block_size_x  = BLOCK_SIZES[bi];
-                r->config.block_size_y  = 1;
-                r->config.block_size_z  = 1;
-                r->config.unroll_factor = UNROLL_FACTORS[ui];
-                r->config.vec_width     = VEC_WIDTHS[vi];
-                r->config.shared_mem    = 0;
-
-                /* Derive grid from total_elements and block_size. */
-                size_t threads = (size_t)r->config.block_size_x;
-                r->config.block[0] = threads;
-                r->config.block[1] = 1;
-                r->config.block[2] = 1;
-                r->config.grid[0]  = (total_elements + threads - 1) / threads;
-                r->config.grid[1]  = 1;
-                r->config.grid[2]  = 1;
-
-                r->valid   = true;
-                /* Use heuristic score as an initial "time" for sorting. */
-                r->time_us = heuristic_score(&r->config, total_elements);
-                num_all++;
-            }
-        }
-    }
+    int num_all = generate_candidates(all_candidates, total_elements);
 
     if (num_all == 0) {
         LOG_ERROR("BEAM tune: no candidates generated");
@@ -327,35 +331,7 @@ int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     /* 2. Generate candidate configs (same as heuristic path). */
     CMLBeamResult all_candidates[CML_BEAM_MAX_CANDIDATES];
-    int num_all = 0;
-
-    for (int bi = 0; bi < NUM_BLOCK_SIZES && num_all < CML_BEAM_MAX_CANDIDATES; bi++) {
-        for (int ui = 0; ui < NUM_UNROLL_FACTORS && num_all < CML_BEAM_MAX_CANDIDATES; ui++) {
-            for (int vi = 0; vi < NUM_VEC_WIDTHS && num_all < CML_BEAM_MAX_CANDIDATES; vi++) {
-                CMLBeamResult* r = &all_candidates[num_all];
-                memset(r, 0, sizeof(*r));
-
-                r->config.block_size_x  = BLOCK_SIZES[bi];
-                r->config.block_size_y  = 1;
-                r->config.block_size_z  = 1;
-                r->config.unroll_factor = UNROLL_FACTORS[ui];
-                r->config.vec_width     = VEC_WIDTHS[vi];
-                r->config.shared_mem    = 0;
-
-                size_t threads = (size_t)r->config.block_size_x;
-                r->config.block[0] = threads;
-                r->config.block[1] = 1;
-                r->config.block[2] = 1;
-                r->config.grid[0]  = (total_elements + threads - 1) / threads;
-                r->config.grid[1]  = 1;
-                r->config.grid[2]  = 1;
-
-                r->valid   = true;
-                r->time_us = heuristic_score(&r->config, total_elements);
-                num_all++;
-            }
-        }
-    }
+    int num_all = generate_candidates(all_candidates, total_elements);
 
     if (num_all == 0) return -1;
 

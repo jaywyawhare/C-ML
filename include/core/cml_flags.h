@@ -31,6 +31,9 @@ extern "C" {
     X(PROFILE, "PROFILE", 0, "Enable kernel/op profiling")                                          \
     X(NO_MEMORY_PLANNER, "NO_MEMORY_PLANNER", 0,                                                    \
       "Disable the graph memory planner (allocate each buffer independently)")                      \
+    X(NO_EXPORT, "NO_EXPORT", 0,                                                                    \
+      "Emit no dashboard/metrics files at all (training.json, graph.json, kernels.json, "           \
+      "flamegraph.json) and skip the work that builds them. Mutually exclusive with VIZ")           \
     X(WINO, "WINO", -1, "Winograd conv override: -1 auto, 0 force off, 1 force on")                 \
     X(CHECK_OOB, "CHECK_OOB", 0, "Enable out-of-bounds index checking in kernels")                  \
     X(VALIDATE_WITH_CPU, "VALIDATE_WITH_CPU", 0,                                                    \

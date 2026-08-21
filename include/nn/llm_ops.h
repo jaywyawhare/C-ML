@@ -19,6 +19,10 @@ typedef struct CMLKVCache {
     int head_dim;
 } CMLKVCache;
 
+/* In-place row-wise softmax over a [rows, cols] float matrix, max-shifted for
+ * numerical stability. Shared by the attention kernels in this family. */
+void cml_softmax_rows_inplace(float* data, int rows, int cols);
+
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim);
 
 void cml_kv_cache_free(CMLKVCache* cache);

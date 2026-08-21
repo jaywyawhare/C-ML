@@ -16,8 +16,6 @@ void cml_trace_set_active(CMLTrace* trace) {
     g_active_trace = trace;
 }
 
-#define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define FNV_PRIME        0x100000001b3ULL
 
 CMLTrace *cml_trace_create(void)
 {
@@ -236,40 +234,6 @@ int cml_trace_cache_insert(CMLTraceCache *cache, uint64_t graph_hash,
     return -2; /* should not reach here if count < size */
 }
 
-static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len)
-{
-    const uint8_t *bytes = (const uint8_t *)data;
-    for (size_t i = 0; i < len; i++) {
-        hash ^= (uint64_t)bytes[i];
-        hash *= FNV_PRIME;
-    }
-    return hash;
-}
-
-static uint64_t compute_graph_hash(CMLGraph_t ir)
-{
-    if (!ir) return 0;
-
-    uint64_t hash = FNV_OFFSET_BASIS;
-
-    struct IRNode *node = ir->head;
-    while (node) {
-        int type_val = (int)node->type;
-        hash = fnv1a_bytes(hash, &type_val, sizeof(type_val));
-
-        if (node->output_shape && node->output_ndim > 0) {
-            hash = fnv1a_bytes(hash, node->output_shape,
-                               sizeof(int) * (size_t)node->output_ndim);
-        }
-
-        hash = fnv1a_bytes(hash, &node->num_inputs, sizeof(node->num_inputs));
-
-        node = node->next;
-    }
-
-    return hash;
-}
-
 static CMLTraceCache *g_trace_cache = NULL;
 
 int cml_ir_execute_traced(CMLGraph_t ir)
@@ -281,23 +245,14 @@ int cml_ir_execute_traced(CMLGraph_t ir)
         if (!g_trace_cache) return -2;
     }
 
-    uint64_t hash = compute_graph_hash(ir);
+    uint64_t hash = cml_ir_graph_hash(ir);
 
     CMLTrace *trace = cml_trace_cache_lookup(g_trace_cache, hash);
 
     if (trace && trace->is_complete) {
 
         void *tensor_ptrs[CML_TRACE_MAX_ENTRIES];
-        int n = 0;
-        struct IRNode *node = ir->head;
-        while (node && n < CML_TRACE_MAX_ENTRIES) {
-            if (node->output && node->output->data) {
-                tensor_ptrs[n++] = node->output->data;
-            } else {
-                tensor_ptrs[n++] = NULL;
-            }
-            node = node->next;
-        }
+        int n = cml_ir_output_slots(ir, tensor_ptrs, CML_TRACE_MAX_ENTRIES);
 
         return cml_trace_replay(trace, tensor_ptrs, n);
     }
@@ -320,18 +275,8 @@ int cml_ir_execute_traced(CMLGraph_t ir)
 
     cml_trace_end(trace);
 
-    {
-        int n = 0;
-        struct IRNode *node = ir->head;
-        while (node && n < CML_TRACE_MAX_ENTRIES) {
-            if (node->output && node->output->data) {
-                trace->tensor_slots[n] = node->output->data;
-            }
-            n++;
-            node = node->next;
-        }
-        trace->num_slots = n;
-    }
+    trace->num_slots =
+        cml_ir_output_slots(ir, trace->tensor_slots, CML_TRACE_MAX_ENTRIES);
 
     cml_trace_cache_insert(g_trace_cache, hash, trace);
 

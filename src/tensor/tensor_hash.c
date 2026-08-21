@@ -55,7 +55,10 @@ static const int keccak_pi[25] = {
 };
 
 static inline uint64_t rotl64(uint64_t x, int n) {
-    return (x << n) | (x >> (64 - n));
+    /* Keccak's rotation table starts with 0, and `x >> 64` is undefined. Mask
+     * both shift counts so a zero rotation is the identity instead of UB. */
+    n &= 63;
+    return (x << n) | (x >> ((64 - n) & 63));
 }
 
 static void keccak_f1600(uint64_t state[25]) {

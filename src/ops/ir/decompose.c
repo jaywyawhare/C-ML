@@ -2,8 +2,10 @@
 
 #include "ops/ir/decompose.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/intern.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
+#include "autograd/autograd.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +17,13 @@
 static atomic_int g_decompose_counter = 0;
 
 static char* decompose_unique_name(void);
+/* The node currently being lowered. A lowered node inherits provenance from its
+ * inputs, but a source op -- FILL emitting the zero that RELU compares against,
+ * a constant, a random init -- has no inputs to inherit from, so it would come
+ * out unattributed and render as a second root in the flame graph. This is the
+ * node that asked for it, which is the honest answer for the whole lowering. */
+static const struct IRNode* g_lowering_src = NULL;
+
 static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
                                             Tensor** inputs, int num_inputs,
                                             void* params, int* out_shape,
@@ -68,6 +77,28 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
     } else {
         node->input_names = NULL;
         node->inputs = NULL;
+    }
+
+    /* Carry provenance across the lowering. These nodes are built here, inside
+     * the compiler, so they have no creation stack or module scope of their own
+     * -- and lowering is not a boundary the reader cares about: a MAX emitted
+     * for a RELU still belongs to the layer that asked for the RELU. Without
+     * this the whole lowered subgraph is unattributable, and since the fuser
+     * then collapses those nodes, the single hottest kernel in the profile ends
+     * up as one flat unlabelled slab. */
+    for (int i = 0; i < num_inputs && inputs; i++) {
+        struct IRNode* in = (inputs[i] && inputs[i]->ir_node)
+                                ? (struct IRNode*)inputs[i]->ir_node : NULL;
+        if (!in) continue;
+        if (!node->build_stack && in->build_stack) node->build_stack = cml_strdup(in->build_stack);
+        if (!node->scope && in->scope)             node->scope       = cml_strdup(in->scope);
+    }
+    /* Source ops have no inputs; fall back to whatever is being lowered. */
+    if (g_lowering_src) {
+        if (!node->build_stack && g_lowering_src->build_stack)
+            node->build_stack = cml_strdup(g_lowering_src->build_stack);
+        if (!node->scope && g_lowering_src->scope)
+            node->scope = cml_strdup(g_lowering_src->scope);
     }
 
     node->output_name = decompose_unique_name();
@@ -232,6 +263,12 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
 
     ir->node_count += (chain_len - 1);
 
+    /* Drop the node from the CSE table before freeing it. The table keys on
+     * node identity, so a freed node left behind is dereferenced by the next
+     * lookup that probes its slot -- a use-after-free that surfaced as a
+     * mis-compare in entries_match_ex rather than as a crash. */
+    cml_intern_remove(ir->intern_table, original);
+
     // Free the original node (but NOT its output tensor — we kept it)
     original->output = NULL; // Prevent double-free
     if (original->input_names) {
@@ -265,6 +302,28 @@ static struct IRNode* chain_append(struct IRNode** head, struct IRNode** tail,
     return node;
 }
 
+/* Create a primitive node and append it to the chain being built, in one step.
+ * Returns NULL (leaving the chain untouched) when the node cannot be created,
+ * so callers keep a single failure check per emitted node. */
+static struct IRNode* chain_emit(CMLGraph_t ir, struct IRNode** head, struct IRNode** tail,
+                                 UOpType type, Tensor** inputs, int num_inputs, void* params,
+                                 int* out_shape, int out_ndim) {
+    struct IRNode* node =
+        create_primitive_node(ir, type, inputs, num_inputs, params, out_shape, out_ndim);
+    if (node)
+        chain_append(head, tail, node);
+    return node;
+}
+
+/* chain_emit for a constant broadcast to `shape`. */
+static struct IRNode* chain_fill(CMLGraph_t ir, struct IRNode** head, struct IRNode** tail,
+                                 int* shape, int ndim, float value) {
+    struct IRNode* node = insert_fill_node(ir, shape, ndim, value);
+    if (node)
+        chain_append(head, tail, node);
+    return node;
+}
+
 // Decomposition Rules
 
 // SIGMOID: recip(1 + exp(-x))
@@ -276,34 +335,31 @@ static int decompose_sigmoid(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     // neg_x = neg(x)
-    struct IRNode* neg_node = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, shape, ndim);
+    struct IRNode* neg_node = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, shape, ndim);
     if (!neg_node) return -1;
-    chain_append(&head, &tail, neg_node);
 
     // exp_neg = exp(neg_x)
     Tensor* neg_x = neg_node->output;
-    struct IRNode* exp_node = create_primitive_node(ir, UOP_EXP, &neg_x, 1, NULL, shape, ndim);
+    struct IRNode* exp_node = chain_emit(ir, &head, &tail, UOP_EXP, &neg_x, 1, NULL, shape, ndim);
     if (!exp_node) return -1;
-    chain_append(&head, &tail, exp_node);
 
     // one = fill(1.0)
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     // sum_ = one + exp_neg
     Tensor* one = one_node->output;
     Tensor* exp_neg = exp_node->output;
     Tensor* add_inputs[] = {one, exp_neg};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
     // result = recip(sum_)
     Tensor* sum_ = add_node->output;
-    struct IRNode* recip_node = create_primitive_node(ir, UOP_RECIP, &sum_, 1, NULL, shape, ndim);
+    struct IRNode* recip_node =
+        chain_emit(ir, &head, &tail, UOP_RECIP, &sum_, 1, NULL, shape, ndim);
     if (!recip_node) return -1;
-    chain_append(&head, &tail, recip_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -318,60 +374,54 @@ static int decompose_tanh(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     // two = fill(2.0)
-    struct IRNode* two_node = insert_fill_node(ir, shape, ndim, 2.0f);
+    struct IRNode* two_node = chain_fill(ir, &head, &tail, shape, ndim, 2.0f);
     if (!two_node) return -1;
-    chain_append(&head, &tail, two_node);
 
     // two_x = 2 * x
     Tensor* two = two_node->output;
     Tensor* mul_inputs[] = {two, x};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     // sigmoid(2x) = recip(1 + exp(-2x))
     Tensor* two_x = mul_node->output;
-    struct IRNode* neg_node = create_primitive_node(ir, UOP_NEG, &two_x, 1, NULL, shape, ndim);
+    struct IRNode* neg_node = chain_emit(ir, &head, &tail, UOP_NEG, &two_x, 1, NULL, shape, ndim);
     if (!neg_node) return -1;
-    chain_append(&head, &tail, neg_node);
 
     Tensor* neg_2x = neg_node->output;
-    struct IRNode* exp_node = create_primitive_node(ir, UOP_EXP, &neg_2x, 1, NULL, shape, ndim);
+    struct IRNode* exp_node = chain_emit(ir, &head, &tail, UOP_EXP, &neg_2x, 1, NULL, shape, ndim);
     if (!exp_node) return -1;
-    chain_append(&head, &tail, exp_node);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* add_inputs[] = {one_node->output, exp_node->output};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* sig_node = create_primitive_node(ir, UOP_RECIP, &add_node->output, 1, NULL, shape, ndim);
+    struct IRNode* sig_node =
+        chain_emit(ir, &head, &tail, UOP_RECIP, &add_node->output, 1, NULL, shape, ndim);
     if (!sig_node) return -1;
-    chain_append(&head, &tail, sig_node);
 
     // 2 * sigmoid(2x)
-    struct IRNode* two2_node = insert_fill_node(ir, shape, ndim, 2.0f);
+    struct IRNode* two2_node = chain_fill(ir, &head, &tail, shape, ndim, 2.0f);
     if (!two2_node) return -1;
-    chain_append(&head, &tail, two2_node);
 
     Tensor* mul2_inputs[] = {two2_node->output, sig_node->output};
-    struct IRNode* mul2_node = create_primitive_node(ir, UOP_MUL, mul2_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul2_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul2_inputs, 2, NULL, shape, ndim);
     if (!mul2_node) return -1;
-    chain_append(&head, &tail, mul2_node);
 
     // 2 * sigmoid(2x) - 1
-    struct IRNode* one2_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one2_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one2_node) return -1;
-    chain_append(&head, &tail, one2_node);
 
     Tensor* sub_inputs[] = {mul2_node->output, one2_node->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -386,26 +436,24 @@ static int decompose_abs(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     // zero = fill(0)
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     // cond = x < 0
     Tensor* cmplt_inputs[] = {x, zero_node->output};
-    struct IRNode* cmplt_node = create_primitive_node(ir, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* cmplt_node =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
     if (!cmplt_node) return -1;
-    chain_append(&head, &tail, cmplt_node);
 
     // neg_x = -x
-    struct IRNode* neg_node = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, shape, ndim);
+    struct IRNode* neg_node = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, shape, ndim);
     if (!neg_node) return -1;
-    chain_append(&head, &tail, neg_node);
 
     // result = where(cond, neg_x, x)
     Tensor* where_inputs[] = {cmplt_node->output, neg_node->output, x};
-    struct IRNode* where_node = create_primitive_node(ir, UOP_WHERE, where_inputs, 3, NULL, shape, ndim);
+    struct IRNode* where_node =
+        chain_emit(ir, &head, &tail, UOP_WHERE, where_inputs, 3, NULL, shape, ndim);
     if (!where_node) return -1;
-    chain_append(&head, &tail, where_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -419,14 +467,13 @@ static int decompose_relu(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     Tensor* max_inputs[] = {x, zero_node->output};
-    struct IRNode* max_node = create_primitive_node(ir, UOP_MAX, max_inputs, 2, NULL, shape, ndim);
+    struct IRNode* max_node =
+        chain_emit(ir, &head, &tail, UOP_MAX, max_inputs, 2, NULL, shape, ndim);
     if (!max_node) return -1;
-    chain_append(&head, &tail, max_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -439,31 +486,26 @@ static int decompose_silu(CMLGraph_t ir, struct IRNode* node) {
     int ndim = x->ndim;
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* neg = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, shape, ndim);
+    struct IRNode* neg = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, shape, ndim);
     if (!neg) return -1;
-    chain_append(&head, &tail, neg);
 
-    struct IRNode* e = create_primitive_node(ir, UOP_EXP, &neg->output, 1, NULL, shape, ndim);
+    struct IRNode* e = chain_emit(ir, &head, &tail, UOP_EXP, &neg->output, 1, NULL, shape, ndim);
     if (!e) return -1;
-    chain_append(&head, &tail, e);
 
-    struct IRNode* one = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one) return -1;
-    chain_append(&head, &tail, one);
 
     Tensor* add_in[] = {one->output, e->output};
-    struct IRNode* denom = create_primitive_node(ir, UOP_ADD, add_in, 2, NULL, shape, ndim);
+    struct IRNode* denom = chain_emit(ir, &head, &tail, UOP_ADD, add_in, 2, NULL, shape, ndim);
     if (!denom) return -1;
-    chain_append(&head, &tail, denom);
 
-    struct IRNode* sig = create_primitive_node(ir, UOP_RECIP, &denom->output, 1, NULL, shape, ndim);
+    struct IRNode* sig =
+        chain_emit(ir, &head, &tail, UOP_RECIP, &denom->output, 1, NULL, shape, ndim);
     if (!sig) return -1;
-    chain_append(&head, &tail, sig);
 
     Tensor* mul_in[] = {x, sig->output};
-    struct IRNode* result = create_primitive_node(ir, UOP_MUL, mul_in, 2, NULL, shape, ndim);
+    struct IRNode* result = chain_emit(ir, &head, &tail, UOP_MUL, mul_in, 2, NULL, shape, ndim);
     if (!result) return -1;
-    chain_append(&head, &tail, result);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -476,28 +518,23 @@ static int decompose_relu6(CMLGraph_t ir, struct IRNode* node) {
     int ndim = x->ndim;
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* zero = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero) return -1;
-    chain_append(&head, &tail, zero);
 
     Tensor* max_in[] = {x, zero->output};
-    struct IRNode* relu = create_primitive_node(ir, UOP_MAX, max_in, 2, NULL, shape, ndim);
+    struct IRNode* relu = chain_emit(ir, &head, &tail, UOP_MAX, max_in, 2, NULL, shape, ndim);
     if (!relu) return -1;
-    chain_append(&head, &tail, relu);
 
-    struct IRNode* six = insert_fill_node(ir, shape, ndim, 6.0f);
+    struct IRNode* six = chain_fill(ir, &head, &tail, shape, ndim, 6.0f);
     if (!six) return -1;
-    chain_append(&head, &tail, six);
 
     Tensor* cmp_in[] = {relu->output, six->output};
-    struct IRNode* cond = create_primitive_node(ir, UOP_CMPLT, cmp_in, 2, NULL, shape, ndim);
+    struct IRNode* cond = chain_emit(ir, &head, &tail, UOP_CMPLT, cmp_in, 2, NULL, shape, ndim);
     if (!cond) return -1;
-    chain_append(&head, &tail, cond);
 
     Tensor* where_in[] = {cond->output, relu->output, six->output};
-    struct IRNode* result = create_primitive_node(ir, UOP_WHERE, where_in, 3, NULL, shape, ndim);
+    struct IRNode* result = chain_emit(ir, &head, &tail, UOP_WHERE, where_in, 3, NULL, shape, ndim);
     if (!result) return -1;
-    chain_append(&head, &tail, result);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -569,9 +606,9 @@ static int decompose_square(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     Tensor* mul_inputs[] = {x, x};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -585,13 +622,12 @@ static int decompose_rsqrt(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* sqrt_node = create_primitive_node(ir, UOP_SQRT, &x, 1, NULL, shape, ndim);
+    struct IRNode* sqrt_node = chain_emit(ir, &head, &tail, UOP_SQRT, &x, 1, NULL, shape, ndim);
     if (!sqrt_node) return -1;
-    chain_append(&head, &tail, sqrt_node);
 
-    struct IRNode* recip_node = create_primitive_node(ir, UOP_RECIP, &sqrt_node->output, 1, NULL, shape, ndim);
+    struct IRNode* recip_node =
+        chain_emit(ir, &head, &tail, UOP_RECIP, &sqrt_node->output, 1, NULL, shape, ndim);
     if (!recip_node) return -1;
-    chain_append(&head, &tail, recip_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -605,18 +641,17 @@ static int decompose_cos(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* halfpi_node = insert_fill_node(ir, shape, ndim, (float)(M_PI / 2.0));
+    struct IRNode* halfpi_node = chain_fill(ir, &head, &tail, shape, ndim, (float)(M_PI / 2.0));
     if (!halfpi_node) return -1;
-    chain_append(&head, &tail, halfpi_node);
 
     Tensor* add_inputs[] = {x, halfpi_node->output};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* sin_node = create_primitive_node(ir, UOP_SIN, &add_node->output, 1, NULL, shape, ndim);
+    struct IRNode* sin_node =
+        chain_emit(ir, &head, &tail, UOP_SIN, &add_node->output, 1, NULL, shape, ndim);
     if (!sin_node) return -1;
-    chain_append(&head, &tail, sin_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -631,29 +666,27 @@ static int decompose_tan(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     // sin(x)
-    struct IRNode* sin_node = create_primitive_node(ir, UOP_SIN, &x, 1, NULL, shape, ndim);
+    struct IRNode* sin_node = chain_emit(ir, &head, &tail, UOP_SIN, &x, 1, NULL, shape, ndim);
     if (!sin_node) return -1;
-    chain_append(&head, &tail, sin_node);
 
     // cos(x) = sin(x + pi/2)
-    struct IRNode* halfpi_node = insert_fill_node(ir, shape, ndim, (float)(M_PI / 2.0));
+    struct IRNode* halfpi_node = chain_fill(ir, &head, &tail, shape, ndim, (float)(M_PI / 2.0));
     if (!halfpi_node) return -1;
-    chain_append(&head, &tail, halfpi_node);
 
     Tensor* add_inputs[] = {x, halfpi_node->output};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* cos_node = create_primitive_node(ir, UOP_SIN, &add_node->output, 1, NULL, shape, ndim);
+    struct IRNode* cos_node =
+        chain_emit(ir, &head, &tail, UOP_SIN, &add_node->output, 1, NULL, shape, ndim);
     if (!cos_node) return -1;
-    chain_append(&head, &tail, cos_node);
 
     // sin(x) / cos(x)
     Tensor* div_inputs[] = {sin_node->output, cos_node->output};
-    struct IRNode* div_node = create_primitive_node(ir, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
+    struct IRNode* div_node =
+        chain_emit(ir, &head, &tail, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
     if (!div_node) return -1;
-    chain_append(&head, &tail, div_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -667,19 +700,18 @@ static int decompose_log2(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* log_node = create_primitive_node(ir, UOP_LOG, &x, 1, NULL, shape, ndim);
+    struct IRNode* log_node = chain_emit(ir, &head, &tail, UOP_LOG, &x, 1, NULL, shape, ndim);
     if (!log_node) return -1;
-    chain_append(&head, &tail, log_node);
 
     // 1/log(2) as constant multiplier is more efficient
-    struct IRNode* inv_ln2_node = insert_fill_node(ir, shape, ndim, (float)(1.0 / log(2.0)));
+    struct IRNode* inv_ln2_node =
+        chain_fill(ir, &head, &tail, shape, ndim, (float)(1.0 / log(2.0)));
     if (!inv_ln2_node) return -1;
-    chain_append(&head, &tail, inv_ln2_node);
 
     Tensor* mul_inputs[] = {log_node->output, inv_ln2_node->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -693,18 +725,17 @@ static int decompose_exp2(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* ln2_node = insert_fill_node(ir, shape, ndim, (float)log(2.0));
+    struct IRNode* ln2_node = chain_fill(ir, &head, &tail, shape, ndim, (float)log(2.0));
     if (!ln2_node) return -1;
-    chain_append(&head, &tail, ln2_node);
 
     Tensor* mul_inputs[] = {x, ln2_node->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
-    struct IRNode* exp_node = create_primitive_node(ir, UOP_EXP, &mul_node->output, 1, NULL, shape, ndim);
+    struct IRNode* exp_node =
+        chain_emit(ir, &head, &tail, UOP_EXP, &mul_node->output, 1, NULL, shape, ndim);
     if (!exp_node) return -1;
-    chain_append(&head, &tail, exp_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -718,94 +749,75 @@ static int decompose_sign(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     // x < 0
     Tensor* cmplt_inputs[] = {x, zero_node->output};
-    struct IRNode* cmplt_neg = create_primitive_node(ir, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* cmplt_neg =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
     if (!cmplt_neg) return -1;
-    chain_append(&head, &tail, cmplt_neg);
 
     // 0 < x  (i.e., x > 0)
     Tensor* cmpgt_inputs[] = {zero_node->output, x};
-    struct IRNode* cmplt_pos = create_primitive_node(ir, UOP_CMPLT, cmpgt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* cmplt_pos =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmpgt_inputs, 2, NULL, shape, ndim);
     if (!cmplt_pos) return -1;
-    chain_append(&head, &tail, cmplt_pos);
 
-    struct IRNode* neg1_node = insert_fill_node(ir, shape, ndim, -1.0f);
+    struct IRNode* neg1_node = chain_fill(ir, &head, &tail, shape, ndim, -1.0f);
     if (!neg1_node) return -1;
-    chain_append(&head, &tail, neg1_node);
 
-    struct IRNode* zero2_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero2_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero2_node) return -1;
-    chain_append(&head, &tail, zero2_node);
 
     // inner_where = where(x < 0, -1, 0)
     Tensor* inner_inputs[] = {cmplt_neg->output, neg1_node->output, zero2_node->output};
-    struct IRNode* inner_where = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
+    struct IRNode* inner_where =
+        chain_emit(ir, &head, &tail, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
     if (!inner_where) return -1;
-    chain_append(&head, &tail, inner_where);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     // result = where(x > 0, 1, inner_where)
     Tensor* outer_inputs[] = {cmplt_pos->output, one_node->output, inner_where->output};
-    struct IRNode* outer_where = create_primitive_node(ir, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
+    struct IRNode* outer_where =
+        chain_emit(ir, &head, &tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
     if (!outer_where) return -1;
-    chain_append(&head, &tail, outer_where);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
 }
 
 // CMPEQ: where(a < b, 0, where(b < a, 0, 1))
+/* a == b  ==>  where(a < b, 0, where(b < a, 0, 1)). Returns the node holding
+ * the result, already appended to the chain. */
+static struct IRNode* chain_cmpeq(CMLGraph_t ir, struct IRNode** head, struct IRNode** tail,
+                                  Tensor* a, Tensor* b, int* shape, int ndim) {
+    Tensor* ab_inputs[] = {a, b};
+    struct IRNode* lt_ab = chain_emit(ir, head, tail, UOP_CMPLT, ab_inputs, 2, NULL, shape, ndim);
+    Tensor* ba_inputs[] = {b, a};
+    struct IRNode* lt_ba = chain_emit(ir, head, tail, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
+    struct IRNode* zero  = chain_fill(ir, head, tail, shape, ndim, 0.0f);
+    struct IRNode* one   = chain_fill(ir, head, tail, shape, ndim, 1.0f);
+    if (!lt_ab || !lt_ba || !zero || !one) return NULL;
+
+    Tensor* inner_inputs[] = {lt_ba->output, zero->output, one->output};
+    struct IRNode* inner = chain_emit(ir, head, tail, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
+    struct IRNode* zero2 = chain_fill(ir, head, tail, shape, ndim, 0.0f);
+    if (!inner || !zero2) return NULL;
+
+    Tensor* outer_inputs[] = {lt_ab->output, zero2->output, inner->output};
+    return chain_emit(ir, head, tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
+}
+
 static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
-    Tensor* a = node->inputs[0];
-    Tensor* b = node->inputs[1];
     int* shape = node->output ? node->output->shape : node->output_shape;
     int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
-
-    // a < b
-    Tensor* ab_inputs[] = {a, b};
-    struct IRNode* lt_ab = create_primitive_node(ir, UOP_CMPLT, ab_inputs, 2, NULL, shape, ndim);
-    if (!lt_ab) return -1;
-    chain_append(&head, &tail, lt_ab);
-
-    // b < a
-    Tensor* ba_inputs[] = {b, a};
-    struct IRNode* lt_ba = create_primitive_node(ir, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
-    if (!lt_ba) return -1;
-    chain_append(&head, &tail, lt_ba);
-
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
-    if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
-
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
-    if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
-
-    // inner = where(b < a, 0, 1)
-    Tensor* inner_inputs[] = {lt_ba->output, zero_node->output, one_node->output};
-    struct IRNode* inner = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
-    if (!inner) return -1;
-    chain_append(&head, &tail, inner);
-
-    struct IRNode* zero2_node = insert_fill_node(ir, shape, ndim, 0.0f);
-    if (!zero2_node) return -1;
-    chain_append(&head, &tail, zero2_node);
-
-    // result = where(a < b, 0, inner)
-    Tensor* outer_inputs[] = {lt_ab->output, zero2_node->output, inner->output};
-    struct IRNode* outer = create_primitive_node(ir, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
-    if (!outer) return -1;
-    chain_append(&head, &tail, outer);
+    if (!chain_cmpeq(ir, &head, &tail, node->inputs[0], node->inputs[1], shape, ndim))
+        return -1;
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -813,58 +825,18 @@ static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
 
 // CMPNE: 1 - cmpeq(a, b)  => decompose to primitives directly
 static int decompose_cmpne(CMLGraph_t ir, struct IRNode* node) {
-    Tensor* a = node->inputs[0];
-    Tensor* b = node->inputs[1];
     int* shape = node->output ? node->output->shape : node->output_shape;
     int ndim = node->output ? node->output->ndim : node->output_ndim;
 
     struct IRNode *head = NULL, *tail = NULL;
+    struct IRNode* cmpeq =
+        chain_cmpeq(ir, &head, &tail, node->inputs[0], node->inputs[1], shape, ndim);
+    struct IRNode* one = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
+    if (!cmpeq || !one) return -1;
 
-    // a < b
-    Tensor* ab_inputs[] = {a, b};
-    struct IRNode* lt_ab = create_primitive_node(ir, UOP_CMPLT, ab_inputs, 2, NULL, shape, ndim);
-    if (!lt_ab) return -1;
-    chain_append(&head, &tail, lt_ab);
-
-    // b < a
-    Tensor* ba_inputs[] = {b, a};
-    struct IRNode* lt_ba = create_primitive_node(ir, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
-    if (!lt_ba) return -1;
-    chain_append(&head, &tail, lt_ba);
-
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
-    if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
-
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
-    if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
-
-    // inner = where(b < a, 0, 1)  -- this is cmpeq
-    Tensor* inner_inputs[] = {lt_ba->output, zero_node->output, one_node->output};
-    struct IRNode* inner = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
-    if (!inner) return -1;
-    chain_append(&head, &tail, inner);
-
-    struct IRNode* zero2_node = insert_fill_node(ir, shape, ndim, 0.0f);
-    if (!zero2_node) return -1;
-    chain_append(&head, &tail, zero2_node);
-
-    // cmpeq = where(a < b, 0, inner)
-    Tensor* cmpeq_inputs[] = {lt_ab->output, zero2_node->output, inner->output};
-    struct IRNode* cmpeq = create_primitive_node(ir, UOP_WHERE, cmpeq_inputs, 3, NULL, shape, ndim);
-    if (!cmpeq) return -1;
-    chain_append(&head, &tail, cmpeq);
-
-    // result = 1 - cmpeq
-    struct IRNode* one2_node = insert_fill_node(ir, shape, ndim, 1.0f);
-    if (!one2_node) return -1;
-    chain_append(&head, &tail, one2_node);
-
-    Tensor* sub_inputs[] = {one2_node->output, cmpeq->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
-    if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
+    Tensor* sub_inputs[] = {one->output, cmpeq->output};
+    if (!chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim))
+        return -1;
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -881,19 +853,17 @@ static int decompose_cmple(CMLGraph_t ir, struct IRNode* node) {
 
     // b < a
     Tensor* ba_inputs[] = {b, a};
-    struct IRNode* lt_ba = create_primitive_node(ir, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
+    struct IRNode* lt_ba = chain_emit(ir, &head, &tail, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
     if (!lt_ba) return -1;
-    chain_append(&head, &tail, lt_ba);
 
     // 1 - (b < a)
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* sub_inputs[] = {one_node->output, lt_ba->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -909,9 +879,8 @@ static int decompose_cmpgt(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     Tensor* ba_inputs[] = {b, a};
-    struct IRNode* lt_ba = create_primitive_node(ir, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
+    struct IRNode* lt_ba = chain_emit(ir, &head, &tail, UOP_CMPLT, ba_inputs, 2, NULL, shape, ndim);
     if (!lt_ba) return -1;
-    chain_append(&head, &tail, lt_ba);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -927,18 +896,16 @@ static int decompose_cmpge(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     Tensor* ab_inputs[] = {a, b};
-    struct IRNode* lt_ab = create_primitive_node(ir, UOP_CMPLT, ab_inputs, 2, NULL, shape, ndim);
+    struct IRNode* lt_ab = chain_emit(ir, &head, &tail, UOP_CMPLT, ab_inputs, 2, NULL, shape, ndim);
     if (!lt_ab) return -1;
-    chain_append(&head, &tail, lt_ab);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* sub_inputs[] = {one_node->output, lt_ab->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -954,14 +921,14 @@ static int decompose_minimum(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     Tensor* cmplt_inputs[] = {a, b};
-    struct IRNode* cmplt_node = create_primitive_node(ir, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* cmplt_node =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
     if (!cmplt_node) return -1;
-    chain_append(&head, &tail, cmplt_node);
 
     Tensor* where_inputs[] = {cmplt_node->output, a, b};
-    struct IRNode* where_node = create_primitive_node(ir, UOP_WHERE, where_inputs, 3, NULL, shape, ndim);
+    struct IRNode* where_node =
+        chain_emit(ir, &head, &tail, UOP_WHERE, where_inputs, 3, NULL, shape, ndim);
     if (!where_node) return -1;
-    chain_append(&head, &tail, where_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -976,18 +943,16 @@ static int decompose_log10(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* log_node = create_primitive_node(ir, UOP_LOG, &x, 1, NULL, shape, ndim);
+    struct IRNode* log_node = chain_emit(ir, &head, &tail, UOP_LOG, &x, 1, NULL, shape, ndim);
     if (!log_node) return -1;
-    chain_append(&head, &tail, log_node);
 
-    struct IRNode* inv_ln10 = insert_fill_node(ir, shape, ndim, (float)(1.0 / log(10.0)));
+    struct IRNode* inv_ln10 = chain_fill(ir, &head, &tail, shape, ndim, (float)(1.0 / log(10.0)));
     if (!inv_ln10) return -1;
-    chain_append(&head, &tail, inv_ln10);
 
     Tensor* mul_inputs[] = {log_node->output, inv_ln10->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1004,65 +969,63 @@ static int decompose_logaddexp(CMLGraph_t ir, struct IRNode* node) {
 
     // max(a, b)
     Tensor* max_inputs[] = {a, b};
-    struct IRNode* max_node = create_primitive_node(ir, UOP_MAX, max_inputs, 2, NULL, shape, ndim);
+    struct IRNode* max_node =
+        chain_emit(ir, &head, &tail, UOP_MAX, max_inputs, 2, NULL, shape, ndim);
     if (!max_node) return -1;
-    chain_append(&head, &tail, max_node);
 
     // a - b
     Tensor* sub_inputs[] = {a, b};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     // |a - b| via where(diff < 0, -diff, diff)
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     Tensor* cmplt_inputs[] = {sub_node->output, zero_node->output};
-    struct IRNode* cmplt_node = create_primitive_node(ir, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* cmplt_node =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
     if (!cmplt_node) return -1;
-    chain_append(&head, &tail, cmplt_node);
 
-    struct IRNode* neg_diff = create_primitive_node(ir, UOP_NEG, &sub_node->output, 1, NULL, shape, ndim);
+    struct IRNode* neg_diff =
+        chain_emit(ir, &head, &tail, UOP_NEG, &sub_node->output, 1, NULL, shape, ndim);
     if (!neg_diff) return -1;
-    chain_append(&head, &tail, neg_diff);
 
     Tensor* abs_inputs[] = {cmplt_node->output, neg_diff->output, sub_node->output};
-    struct IRNode* abs_node = create_primitive_node(ir, UOP_WHERE, abs_inputs, 3, NULL, shape, ndim);
+    struct IRNode* abs_node =
+        chain_emit(ir, &head, &tail, UOP_WHERE, abs_inputs, 3, NULL, shape, ndim);
     if (!abs_node) return -1;
-    chain_append(&head, &tail, abs_node);
 
     // -|a-b|
-    struct IRNode* neg_abs = create_primitive_node(ir, UOP_NEG, &abs_node->output, 1, NULL, shape, ndim);
+    struct IRNode* neg_abs =
+        chain_emit(ir, &head, &tail, UOP_NEG, &abs_node->output, 1, NULL, shape, ndim);
     if (!neg_abs) return -1;
-    chain_append(&head, &tail, neg_abs);
 
     // exp(-|a-b|)
-    struct IRNode* exp_node = create_primitive_node(ir, UOP_EXP, &neg_abs->output, 1, NULL, shape, ndim);
+    struct IRNode* exp_node =
+        chain_emit(ir, &head, &tail, UOP_EXP, &neg_abs->output, 1, NULL, shape, ndim);
     if (!exp_node) return -1;
-    chain_append(&head, &tail, exp_node);
 
     // 1 + exp(-|a-b|)
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* add1_inputs[] = {one_node->output, exp_node->output};
-    struct IRNode* add1_node = create_primitive_node(ir, UOP_ADD, add1_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add1_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add1_inputs, 2, NULL, shape, ndim);
     if (!add1_node) return -1;
-    chain_append(&head, &tail, add1_node);
 
     // log(1 + exp(-|a-b|))
-    struct IRNode* log_node = create_primitive_node(ir, UOP_LOG, &add1_node->output, 1, NULL, shape, ndim);
+    struct IRNode* log_node =
+        chain_emit(ir, &head, &tail, UOP_LOG, &add1_node->output, 1, NULL, shape, ndim);
     if (!log_node) return -1;
-    chain_append(&head, &tail, log_node);
 
     // max(a,b) + log(...)
     Tensor* add2_inputs[] = {max_node->output, log_node->output};
-    struct IRNode* add2_node = create_primitive_node(ir, UOP_ADD, add2_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add2_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add2_inputs, 2, NULL, shape, ndim);
     if (!add2_node) return -1;
-    chain_append(&head, &tail, add2_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1079,26 +1042,26 @@ static int decompose_mod(CMLGraph_t ir, struct IRNode* node) {
 
     // a / b
     Tensor* div_inputs[] = {a, b};
-    struct IRNode* div_node = create_primitive_node(ir, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
+    struct IRNode* div_node =
+        chain_emit(ir, &head, &tail, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
     if (!div_node) return -1;
-    chain_append(&head, &tail, div_node);
 
     // floor(a / b)
-    struct IRNode* floor_node = create_primitive_node(ir, UOP_FLOOR, &div_node->output, 1, NULL, shape, ndim);
+    struct IRNode* floor_node =
+        chain_emit(ir, &head, &tail, UOP_FLOOR, &div_node->output, 1, NULL, shape, ndim);
     if (!floor_node) return -1;
-    chain_append(&head, &tail, floor_node);
 
     // floor(a/b) * b
     Tensor* mul_inputs[] = {floor_node->output, b};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     // a - floor(a/b) * b
     Tensor* sub_inputs[] = {a, mul_node->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1114,13 +1077,13 @@ static int decompose_idiv(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     Tensor* div_inputs[] = {a, b};
-    struct IRNode* div_node = create_primitive_node(ir, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
+    struct IRNode* div_node =
+        chain_emit(ir, &head, &tail, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
     if (!div_node) return -1;
-    chain_append(&head, &tail, div_node);
 
-    struct IRNode* floor_node = create_primitive_node(ir, UOP_FLOOR, &div_node->output, 1, NULL, shape, ndim);
+    struct IRNode* floor_node =
+        chain_emit(ir, &head, &tail, UOP_FLOOR, &div_node->output, 1, NULL, shape, ndim);
     if (!floor_node) return -1;
-    chain_append(&head, &tail, floor_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1137,44 +1100,39 @@ static int decompose_copysign(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     // abs(a): where(a < 0, -a, a)
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     Tensor* cmplt_a[] = {a, zero_node->output};
-    struct IRNode* lt_a = create_primitive_node(ir, UOP_CMPLT, cmplt_a, 2, NULL, shape, ndim);
+    struct IRNode* lt_a = chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_a, 2, NULL, shape, ndim);
     if (!lt_a) return -1;
-    chain_append(&head, &tail, lt_a);
 
-    struct IRNode* neg_a = create_primitive_node(ir, UOP_NEG, &a, 1, NULL, shape, ndim);
+    struct IRNode* neg_a = chain_emit(ir, &head, &tail, UOP_NEG, &a, 1, NULL, shape, ndim);
     if (!neg_a) return -1;
-    chain_append(&head, &tail, neg_a);
 
     Tensor* abs_inputs[] = {lt_a->output, neg_a->output, a};
-    struct IRNode* abs_a = create_primitive_node(ir, UOP_WHERE, abs_inputs, 3, NULL, shape, ndim);
+    struct IRNode* abs_a =
+        chain_emit(ir, &head, &tail, UOP_WHERE, abs_inputs, 3, NULL, shape, ndim);
     if (!abs_a) return -1;
-    chain_append(&head, &tail, abs_a);
 
     // neg_abs = -abs(a)
-    struct IRNode* neg_abs = create_primitive_node(ir, UOP_NEG, &abs_a->output, 1, NULL, shape, ndim);
+    struct IRNode* neg_abs =
+        chain_emit(ir, &head, &tail, UOP_NEG, &abs_a->output, 1, NULL, shape, ndim);
     if (!neg_abs) return -1;
-    chain_append(&head, &tail, neg_abs);
 
     // b < 0
-    struct IRNode* zero2 = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero2 = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero2) return -1;
-    chain_append(&head, &tail, zero2);
 
     Tensor* cmplt_b[] = {b, zero2->output};
-    struct IRNode* lt_b = create_primitive_node(ir, UOP_CMPLT, cmplt_b, 2, NULL, shape, ndim);
+    struct IRNode* lt_b = chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_b, 2, NULL, shape, ndim);
     if (!lt_b) return -1;
-    chain_append(&head, &tail, lt_b);
 
     // result = where(b < 0, -abs(a), abs(a))
     Tensor* where_inputs[] = {lt_b->output, neg_abs->output, abs_a->output};
-    struct IRNode* result = create_primitive_node(ir, UOP_WHERE, where_inputs, 3, NULL, shape, ndim);
+    struct IRNode* result =
+        chain_emit(ir, &head, &tail, UOP_WHERE, where_inputs, 3, NULL, shape, ndim);
     if (!result) return -1;
-    chain_append(&head, &tail, result);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1231,15 +1189,14 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
     }
 
     // 1/n constant
-    struct IRNode* inv_n = insert_fill_node(ir, out_shape, out_ndim, 1.0f / n);
+    struct IRNode* inv_n = chain_fill(ir, &head, &tail, out_shape, out_ndim, 1.0f / n);
     if (!inv_n) return -1;
-    chain_append(&head, &tail, inv_n);
 
     // sum / n
     Tensor* mul_inputs[] = {sum_node->output, inv_n->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, out_shape, out_ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, out_shape, out_ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1255,9 +1212,8 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
 
     // neg(x)
-    struct IRNode* neg_node = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, x->shape, x->ndim);
+    struct IRNode* neg_node = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, x->shape, x->ndim);
     if (!neg_node) return -1;
-    chain_append(&head, &tail, neg_node);
 
     // Deep copy reduce params
     ReduceParams* orig_params = (ReduceParams*)node->params;
@@ -1286,9 +1242,9 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
     chain_append(&head, &tail, max_node);
 
     // neg(max_reduce(neg(x)))
-    struct IRNode* neg2_node = create_primitive_node(ir, UOP_NEG, &max_node->output, 1, NULL, out_shape, out_ndim);
+    struct IRNode* neg2_node =
+        chain_emit(ir, &head, &tail, UOP_NEG, &max_node->output, 1, NULL, out_shape, out_ndim);
     if (!neg2_node) return -1;
-    chain_append(&head, &tail, neg2_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1306,45 +1262,41 @@ static int decompose_logical_not(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     // x < 0
     Tensor* cmplt1_inputs[] = {x, zero_node->output};
-    struct IRNode* lt_neg = create_primitive_node(ir, UOP_CMPLT, cmplt1_inputs, 2, NULL, shape, ndim);
+    struct IRNode* lt_neg =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt1_inputs, 2, NULL, shape, ndim);
     if (!lt_neg) return -1;
-    chain_append(&head, &tail, lt_neg);
 
     // 0 < x
     Tensor* cmplt2_inputs[] = {zero_node->output, x};
-    struct IRNode* lt_pos = create_primitive_node(ir, UOP_CMPLT, cmplt2_inputs, 2, NULL, shape, ndim);
+    struct IRNode* lt_pos =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt2_inputs, 2, NULL, shape, ndim);
     if (!lt_pos) return -1;
-    chain_append(&head, &tail, lt_pos);
 
-    struct IRNode* zero2 = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero2 = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero2) return -1;
-    chain_append(&head, &tail, zero2);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     // inner = where(0 < x, 0, 1)
     Tensor* inner_inputs[] = {lt_pos->output, zero2->output, one_node->output};
-    struct IRNode* inner = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
+    struct IRNode* inner =
+        chain_emit(ir, &head, &tail, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
     if (!inner) return -1;
-    chain_append(&head, &tail, inner);
 
-    struct IRNode* zero3 = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero3 = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero3) return -1;
-    chain_append(&head, &tail, zero3);
 
     // result = where(x < 0, 0, inner)
     Tensor* outer_inputs[] = {lt_neg->output, zero3->output, inner->output};
-    struct IRNode* outer = create_primitive_node(ir, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
+    struct IRNode* outer =
+        chain_emit(ir, &head, &tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
     if (!outer) return -1;
-    chain_append(&head, &tail, outer);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1363,29 +1315,26 @@ static int decompose_logical_and(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     // inner = where(b, 1, 0)
     Tensor* inner_inputs[] = {b, one_node->output, zero_node->output};
-    struct IRNode* inner = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
+    struct IRNode* inner =
+        chain_emit(ir, &head, &tail, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
     if (!inner) return -1;
-    chain_append(&head, &tail, inner);
 
-    struct IRNode* zero2 = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero2 = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero2) return -1;
-    chain_append(&head, &tail, zero2);
 
     // result = where(a, inner, 0)
     Tensor* outer_inputs[] = {a, inner->output, zero2->output};
-    struct IRNode* outer = create_primitive_node(ir, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
+    struct IRNode* outer =
+        chain_emit(ir, &head, &tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
     if (!outer) return -1;
-    chain_append(&head, &tail, outer);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1400,29 +1349,26 @@ static int decompose_logical_or(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
-    struct IRNode* zero_node = insert_fill_node(ir, shape, ndim, 0.0f);
+    struct IRNode* zero_node = chain_fill(ir, &head, &tail, shape, ndim, 0.0f);
     if (!zero_node) return -1;
-    chain_append(&head, &tail, zero_node);
 
     // inner = where(b, 1, 0)
     Tensor* inner_inputs[] = {b, one_node->output, zero_node->output};
-    struct IRNode* inner = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
+    struct IRNode* inner =
+        chain_emit(ir, &head, &tail, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
     if (!inner) return -1;
-    chain_append(&head, &tail, inner);
 
-    struct IRNode* one2 = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one2 = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one2) return -1;
-    chain_append(&head, &tail, one2);
 
     // result = where(a, 1, inner)
     Tensor* outer_inputs[] = {a, one2->output, inner->output};
-    struct IRNode* outer = create_primitive_node(ir, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
+    struct IRNode* outer =
+        chain_emit(ir, &head, &tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
     if (!outer) return -1;
-    chain_append(&head, &tail, outer);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1441,37 +1387,35 @@ static int decompose_clamp(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* max_const = insert_fill_node(ir, shape, ndim, max_val);
+    struct IRNode* max_const = chain_fill(ir, &head, &tail, shape, ndim, max_val);
     if (!max_const) return -1;
-    chain_append(&head, &tail, max_const);
 
     // max < x  (i.e., x > max)
     Tensor* cmpgt_inputs[] = {max_const->output, x};
-    struct IRNode* gt_max = create_primitive_node(ir, UOP_CMPLT, cmpgt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* gt_max =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmpgt_inputs, 2, NULL, shape, ndim);
     if (!gt_max) return -1;
-    chain_append(&head, &tail, gt_max);
 
     // inner = where(x > max, max, x)
     Tensor* inner_inputs[] = {gt_max->output, max_const->output, x};
-    struct IRNode* inner = create_primitive_node(ir, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
+    struct IRNode* inner =
+        chain_emit(ir, &head, &tail, UOP_WHERE, inner_inputs, 3, NULL, shape, ndim);
     if (!inner) return -1;
-    chain_append(&head, &tail, inner);
 
-    struct IRNode* min_const = insert_fill_node(ir, shape, ndim, min_val);
+    struct IRNode* min_const = chain_fill(ir, &head, &tail, shape, ndim, min_val);
     if (!min_const) return -1;
-    chain_append(&head, &tail, min_const);
 
     // x < min
     Tensor* cmplt_inputs[] = {x, min_const->output};
-    struct IRNode* lt_min = create_primitive_node(ir, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
+    struct IRNode* lt_min =
+        chain_emit(ir, &head, &tail, UOP_CMPLT, cmplt_inputs, 2, NULL, shape, ndim);
     if (!lt_min) return -1;
-    chain_append(&head, &tail, lt_min);
 
     // result = where(x < min, min, inner)
     Tensor* outer_inputs[] = {lt_min->output, min_const->output, inner->output};
-    struct IRNode* outer = create_primitive_node(ir, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
+    struct IRNode* outer =
+        chain_emit(ir, &head, &tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
     if (!outer) return -1;
-    chain_append(&head, &tail, outer);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1485,31 +1429,28 @@ static int decompose_sinh(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* exp_x = create_primitive_node(ir, UOP_EXP, &x, 1, NULL, shape, ndim);
+    struct IRNode* exp_x = chain_emit(ir, &head, &tail, UOP_EXP, &x, 1, NULL, shape, ndim);
     if (!exp_x) return -1;
-    chain_append(&head, &tail, exp_x);
 
-    struct IRNode* neg_x = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, shape, ndim);
+    struct IRNode* neg_x = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, shape, ndim);
     if (!neg_x) return -1;
-    chain_append(&head, &tail, neg_x);
 
-    struct IRNode* exp_neg_x = create_primitive_node(ir, UOP_EXP, &neg_x->output, 1, NULL, shape, ndim);
+    struct IRNode* exp_neg_x =
+        chain_emit(ir, &head, &tail, UOP_EXP, &neg_x->output, 1, NULL, shape, ndim);
     if (!exp_neg_x) return -1;
-    chain_append(&head, &tail, exp_neg_x);
 
     Tensor* sub_inputs[] = {exp_x->output, exp_neg_x->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
-    struct IRNode* half_node = insert_fill_node(ir, shape, ndim, 0.5f);
+    struct IRNode* half_node = chain_fill(ir, &head, &tail, shape, ndim, 0.5f);
     if (!half_node) return -1;
-    chain_append(&head, &tail, half_node);
 
     Tensor* mul_inputs[] = {sub_node->output, half_node->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1523,31 +1464,28 @@ static int decompose_cosh(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* exp_x = create_primitive_node(ir, UOP_EXP, &x, 1, NULL, shape, ndim);
+    struct IRNode* exp_x = chain_emit(ir, &head, &tail, UOP_EXP, &x, 1, NULL, shape, ndim);
     if (!exp_x) return -1;
-    chain_append(&head, &tail, exp_x);
 
-    struct IRNode* neg_x = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, shape, ndim);
+    struct IRNode* neg_x = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, shape, ndim);
     if (!neg_x) return -1;
-    chain_append(&head, &tail, neg_x);
 
-    struct IRNode* exp_neg_x = create_primitive_node(ir, UOP_EXP, &neg_x->output, 1, NULL, shape, ndim);
+    struct IRNode* exp_neg_x =
+        chain_emit(ir, &head, &tail, UOP_EXP, &neg_x->output, 1, NULL, shape, ndim);
     if (!exp_neg_x) return -1;
-    chain_append(&head, &tail, exp_neg_x);
 
     Tensor* add_inputs[] = {exp_x->output, exp_neg_x->output};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* half_node = insert_fill_node(ir, shape, ndim, 0.5f);
+    struct IRNode* half_node = chain_fill(ir, &head, &tail, shape, ndim, 0.5f);
     if (!half_node) return -1;
-    chain_append(&head, &tail, half_node);
 
     Tensor* mul_inputs[] = {add_node->output, half_node->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1561,46 +1499,43 @@ static int decompose_atanh(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     // 1 + x
     Tensor* add_inputs[] = {one_node->output, x};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* one2 = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one2 = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one2) return -1;
-    chain_append(&head, &tail, one2);
 
     // 1 - x
     Tensor* sub_inputs[] = {one2->output, x};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     // (1+x) / (1-x)
     Tensor* div_inputs[] = {add_node->output, sub_node->output};
-    struct IRNode* div_node = create_primitive_node(ir, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
+    struct IRNode* div_node =
+        chain_emit(ir, &head, &tail, UOP_DIV, div_inputs, 2, NULL, shape, ndim);
     if (!div_node) return -1;
-    chain_append(&head, &tail, div_node);
 
     // log((1+x)/(1-x))
-    struct IRNode* log_node = create_primitive_node(ir, UOP_LOG, &div_node->output, 1, NULL, shape, ndim);
+    struct IRNode* log_node =
+        chain_emit(ir, &head, &tail, UOP_LOG, &div_node->output, 1, NULL, shape, ndim);
     if (!log_node) return -1;
-    chain_append(&head, &tail, log_node);
 
     // 0.5 * log(...)
-    struct IRNode* half = insert_fill_node(ir, shape, ndim, 0.5f);
+    struct IRNode* half = chain_fill(ir, &head, &tail, shape, ndim, 0.5f);
     if (!half) return -1;
-    chain_append(&head, &tail, half);
 
     Tensor* mul_inputs[] = {half->output, log_node->output};
-    struct IRNode* mul_node = create_primitive_node(ir, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
+    struct IRNode* mul_node =
+        chain_emit(ir, &head, &tail, UOP_MUL, mul_inputs, 2, NULL, shape, ndim);
     if (!mul_node) return -1;
-    chain_append(&head, &tail, mul_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1614,22 +1549,20 @@ static int decompose_softplus(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* exp_node = create_primitive_node(ir, UOP_EXP, &x, 1, NULL, shape, ndim);
+    struct IRNode* exp_node = chain_emit(ir, &head, &tail, UOP_EXP, &x, 1, NULL, shape, ndim);
     if (!exp_node) return -1;
-    chain_append(&head, &tail, exp_node);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* add_inputs[] = {one_node->output, exp_node->output};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* log_node = create_primitive_node(ir, UOP_LOG, &add_node->output, 1, NULL, shape, ndim);
+    struct IRNode* log_node =
+        chain_emit(ir, &head, &tail, UOP_LOG, &add_node->output, 1, NULL, shape, ndim);
     if (!log_node) return -1;
-    chain_append(&head, &tail, log_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1643,30 +1576,28 @@ static int decompose_logsigmoid(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* neg_x = create_primitive_node(ir, UOP_NEG, &x, 1, NULL, shape, ndim);
+    struct IRNode* neg_x = chain_emit(ir, &head, &tail, UOP_NEG, &x, 1, NULL, shape, ndim);
     if (!neg_x) return -1;
-    chain_append(&head, &tail, neg_x);
 
-    struct IRNode* exp_node = create_primitive_node(ir, UOP_EXP, &neg_x->output, 1, NULL, shape, ndim);
+    struct IRNode* exp_node =
+        chain_emit(ir, &head, &tail, UOP_EXP, &neg_x->output, 1, NULL, shape, ndim);
     if (!exp_node) return -1;
-    chain_append(&head, &tail, exp_node);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* add_inputs[] = {one_node->output, exp_node->output};
-    struct IRNode* add_node = create_primitive_node(ir, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
+    struct IRNode* add_node =
+        chain_emit(ir, &head, &tail, UOP_ADD, add_inputs, 2, NULL, shape, ndim);
     if (!add_node) return -1;
-    chain_append(&head, &tail, add_node);
 
-    struct IRNode* log_node = create_primitive_node(ir, UOP_LOG, &add_node->output, 1, NULL, shape, ndim);
+    struct IRNode* log_node =
+        chain_emit(ir, &head, &tail, UOP_LOG, &add_node->output, 1, NULL, shape, ndim);
     if (!log_node) return -1;
-    chain_append(&head, &tail, log_node);
 
-    struct IRNode* neg_result = create_primitive_node(ir, UOP_NEG, &log_node->output, 1, NULL, shape, ndim);
+    struct IRNode* neg_result =
+        chain_emit(ir, &head, &tail, UOP_NEG, &log_node->output, 1, NULL, shape, ndim);
     if (!neg_result) return -1;
-    chain_append(&head, &tail, neg_result);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1680,18 +1611,16 @@ static int decompose_erfc(CMLGraph_t ir, struct IRNode* node) {
 
     struct IRNode *head = NULL, *tail = NULL;
 
-    struct IRNode* erf_node = create_primitive_node(ir, UOP_ERF, &x, 1, NULL, shape, ndim);
+    struct IRNode* erf_node = chain_emit(ir, &head, &tail, UOP_ERF, &x, 1, NULL, shape, ndim);
     if (!erf_node) return -1;
-    chain_append(&head, &tail, erf_node);
 
-    struct IRNode* one_node = insert_fill_node(ir, shape, ndim, 1.0f);
+    struct IRNode* one_node = chain_fill(ir, &head, &tail, shape, ndim, 1.0f);
     if (!one_node) return -1;
-    chain_append(&head, &tail, one_node);
 
     Tensor* sub_inputs[] = {one_node->output, erf_node->output};
-    struct IRNode* sub_node = create_primitive_node(ir, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
+    struct IRNode* sub_node =
+        chain_emit(ir, &head, &tail, UOP_SUB, sub_inputs, 2, NULL, shape, ndim);
     if (!sub_node) return -1;
-    chain_append(&head, &tail, sub_node);
 
     replace_node_with_chain(ir, node, head, tail);
     return 0;
@@ -1797,9 +1726,8 @@ static int decompose_std(CMLGraph_t ir, struct IRNode* node) {
     if (!var) return -1;
     int* os = node->output ? node->output->shape : node->output_shape;
     int on = node->output ? node->output->ndim : node->output_ndim;
-    struct IRNode* std = create_primitive_node(ir, UOP_SQRT, &var->output, 1, NULL, os, on);
+    struct IRNode* std = chain_emit(ir, &head, &tail, UOP_SQRT, &var->output, 1, NULL, os, on);
     if (!std) return -1;
-    chain_append(&head, &tail, std);
     replace_node_with_chain(ir, node, head, tail);
     return 0;
 }
@@ -2111,13 +2039,11 @@ static int decompose_pool2d(CMLGraph_t ir, struct IRNode* node, bool is_max) {
     if (!is_max) {
         int os[4] = {N, C, OH, OW};
         float inv = (kh * kw > 0) ? 1.0f / (float)(kh * kw) : 0.0f;
-        struct IRNode* filln = insert_fill_node(ir, os, 4, inv);
+        struct IRNode* filln = chain_fill(ir, &head, &tail, os, 4, inv);
         if (!filln) return -1;
-        chain_append(&head, &tail, filln);
         Tensor* mi[] = {result->output, filln->output};
-        struct IRNode* mul = create_primitive_node(ir, UOP_MUL, mi, 2, NULL, os, 4);
+        struct IRNode* mul = chain_emit(ir, &head, &tail, UOP_MUL, mi, 2, NULL, os, 4);
         if (!mul) return -1;
-        chain_append(&head, &tail, mul);
         result = mul;
     }
 
@@ -2168,6 +2094,11 @@ static struct IRNode* insert_expand(CMLGraph_t ir, Tensor* in, const int* new_sh
 // MATMUL is kept as the one hardware-GEMM primitive. Clean case only
 // (dilation=1, groups=1); otherwise leaves the node for the executor.
 static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
+    /* Inference (no_grad): keep CONV2D whole so the executor runs a direct /
+     * Winograd / im2col kernel — far faster than the im2col+matmul primitive
+     * chain and no backward graph is needed. Under grad, lower to primitives so
+     * graph-autodiff (which has no CONV2D VJP) can differentiate it. */
+    if (!autograd_is_grad_enabled()) return 0;
     Tensor* x = node->inputs[0];
     Tensor* w = node->inputs[1];
     Tensor* bias = (node->num_inputs >= 3) ? node->inputs[2] : NULL;
@@ -2183,43 +2114,25 @@ static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
     if (x->shape[1] != Cin) return 0;
 
     int N = x->shape[0];
-    int Hp = x->shape[2], Wp = x->shape[3];
     struct IRNode *head = NULL, *tail = NULL;
     Tensor* cur = x;
 
-    if (ph > 0 || pw > 0) {
-        PadParams* pd = cml_malloc(sizeof(PadParams));
-        if (!pd) return -1;
-        pd->num_dims = 4; pd->mode = PAD_CONSTANT; pd->value = 0.0f;
-        pd->pad_widths = cml_malloc(8 * sizeof(int));
-        if (!pd->pad_widths) { cml_free(pd); return -1; }
-        int pw_arr[8] = {0,0, 0,0, ph,ph, pw,pw};
-        memcpy(pd->pad_widths, pw_arr, 8 * sizeof(int));
-        Hp = x->shape[2] + 2 * ph; Wp = x->shape[3] + 2 * pw;
-        int ps[4] = {N, Cin, Hp, Wp};
-        struct IRNode* padn = create_primitive_node(ir, UOP_PAD, &cur, 1, pd, ps, 4);
-        if (!padn) { cml_free(pd->pad_widths); cml_free(pd); return -1; }
-        chain_append(&head, &tail, padn);
-        cur = padn->output;
-    }
-
-    int OH = (Hp - kh) / sh + 1, OW = (Wp - kw) / sw + 1;
+    int OH = (x->shape[2] + 2 * ph - kh) / sh + 1;   /* dilation==1 guaranteed above */
+    int OW = (x->shape[3] + 2 * pw - kw) / sw + 1;
     int K = Cin * kh * kw, M = OH * OW;
 
-    // im2col: [N,Cin,Hp,Wp] -> ... -> [N*M, K] with K ordered (Cin,kh,kw)
-    struct IRNode* uW = insert_unfold_last(ir, cur, 4, kw, sw, &head, &tail);      // [N,Cin,Hp,OW,kw]
-    if (!uW) return -1;
-    int pA[5] = {0,1,3,4,2};
-    struct IRNode* pmA = insert_permute(ir, uW->output, 5, pA, &head, &tail);      // [N,Cin,OW,kw,Hp]
-    if (!pmA) return -1;
-    struct IRNode* uH = insert_unfold_last(ir, pmA->output, 5, kh, sh, &head, &tail); // [N,Cin,OW,kw,OH,kh]
-    if (!uH) return -1;
-    int pB[6] = {0,4,2,1,5,3};
-    struct IRNode* pmB = insert_permute(ir, uH->output, 6, pB, &head, &tail);      // [N,OH,OW,Cin,kh,kw]
-    if (!pmB) return -1;
+    /* Fused im2col: [N,Cin,H,W] -> [N*M, K] in a single pass, with K ordered
+     * (Cin,kh,kw) and zero-padding folded in via bounds checks. Replaces the
+     * former pad + unfold×2 + permute×2 + reshape chain (5 materialised
+     * intermediates over ~M·K elements each) that dominated conv forward time. */
+    Im2colParams* icp = cml_malloc(sizeof(Im2colParams));
+    if (!icp) return -1;
+    icp->kh = kh; icp->kw = kw; icp->sh = sh; icp->sw = sw;
+    icp->ph = ph; icp->pw = pw; icp->dh = 1; icp->dw = 1;
     int im_shape[2] = {N * M, K};
-    struct IRNode* im = insert_reshape(ir, pmB->output, im_shape, 2, &head, &tail); // [N*M, K]
-    if (!im) return -1;
+    struct IRNode* im = create_primitive_node(ir, UOP_IM2COL, &cur, 1, icp, im_shape, 2);
+    if (!im) { cml_free(icp); return -1; }
+    chain_append(&head, &tail, im);
 
     // weight [Cout,Cin,kh,kw] -> [Cout,K] -> transpose [K,Cout]
     int wr_shape[2] = {Cout, K};
@@ -2232,9 +2145,8 @@ static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
     // matmul [N*M,K] @ [K,Cout] -> [N*M,Cout]
     Tensor* mm_in[] = {im->output, wt->output};
     int mm_shape[2] = {N * M, Cout};
-    struct IRNode* mm = create_primitive_node(ir, UOP_MATMUL, mm_in, 2, NULL, mm_shape, 2);
+    struct IRNode* mm = chain_emit(ir, &head, &tail, UOP_MATMUL, mm_in, 2, NULL, mm_shape, 2);
     if (!mm) return -1;
-    chain_append(&head, &tail, mm);
 
     // reshape [N,OH,OW,Cout] then permute -> [N,Cout,OH,OW]
     int r4_shape[4] = {N, OH, OW, Cout};
@@ -2253,9 +2165,8 @@ static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
         struct IRNode* be = insert_expand(ir, br->output, be_shape, 4, &head, &tail);
         if (!be) return -1;
         Tensor* ain[] = {result->output, be->output};
-        struct IRNode* add = create_primitive_node(ir, UOP_ADD, ain, 2, NULL, be_shape, 4);
+        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, be_shape, 4);
         if (!add) return -1;
-        chain_append(&head, &tail, add);
         result = add;
     }
 
@@ -2334,9 +2245,8 @@ static int decompose_conv3d(CMLGraph_t ir, struct IRNode* node) {
 
     Tensor* mm_in[] = {im->output, wt->output};
     int mm_shape[2] = {N * M, Cout};
-    struct IRNode* mm = create_primitive_node(ir, UOP_MATMUL, mm_in, 2, NULL, mm_shape, 2);
+    struct IRNode* mm = chain_emit(ir, &head, &tail, UOP_MATMUL, mm_in, 2, NULL, mm_shape, 2);
     if (!mm) return -1;
-    chain_append(&head, &tail, mm);
 
     int r5_shape[5] = {N, OD, OH, OW, Cout};
     struct IRNode* r5 = insert_reshape(ir, mm->output, r5_shape, 5, &head, &tail);
@@ -2354,9 +2264,8 @@ static int decompose_conv3d(CMLGraph_t ir, struct IRNode* node) {
         struct IRNode* be = insert_expand(ir, br->output, be_shape, 5, &head, &tail);
         if (!be) return -1;
         Tensor* ain[] = {result->output, be->output};
-        struct IRNode* add = create_primitive_node(ir, UOP_ADD, ain, 2, NULL, be_shape, 5);
+        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, be_shape, 5);
         if (!add) return -1;
-        chain_append(&head, &tail, add);
         result = add;
     }
 
@@ -2402,9 +2311,8 @@ static int decompose_conv_transpose2d(CMLGraph_t ir, struct IRNode* node) {
     if (!wr) return -1;
     Tensor* mmin[] = {xr->output, wr->output};
     int mm_s[2] = {N * H * W, Cout * kh * kw};
-    struct IRNode* mm = create_primitive_node(ir, UOP_MATMUL, mmin, 2, NULL, mm_s, 2);
+    struct IRNode* mm = chain_emit(ir, &head, &tail, UOP_MATMUL, mmin, 2, NULL, mm_s, 2);
     if (!mm) return -1;
-    chain_append(&head, &tail, mm);
     int c6_s[6] = {N, H, W, Cout, kh, kw};
     struct IRNode* c6 = insert_reshape(ir, mm->output, c6_s, 6, &head, &tail);
     if (!c6) return -1;
@@ -2453,9 +2361,8 @@ static int decompose_conv_transpose2d(CMLGraph_t ir, struct IRNode* node) {
         struct IRNode* be = insert_expand(ir, br->output, be_s, 4, &head, &tail);
         if (!be) return -1;
         Tensor* ain[] = {result->output, be->output};
-        struct IRNode* add = create_primitive_node(ir, UOP_ADD, ain, 2, NULL, be_s, 4);
+        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, be_s, 4);
         if (!add) return -1;
-        chain_append(&head, &tail, add);
         result = add;
     }
 
@@ -2497,9 +2404,8 @@ static int decompose_conv_transpose3d(CMLGraph_t ir, struct IRNode* node) {
     if (!wr) return -1;
     Tensor* mmin[] = {xr->output, wr->output};
     int mm_s[2] = {N * D * H * W, Cout * kd * kh * kw};
-    struct IRNode* mm = create_primitive_node(ir, UOP_MATMUL, mmin, 2, NULL, mm_s, 2);
+    struct IRNode* mm = chain_emit(ir, &head, &tail, UOP_MATMUL, mmin, 2, NULL, mm_s, 2);
     if (!mm) return -1;
-    chain_append(&head, &tail, mm);
     int c8_s[8] = {N, D, H, W, Cout, kd, kh, kw};
     struct IRNode* c8 = insert_reshape(ir, mm->output, c8_s, 8, &head, &tail);
     if (!c8) return -1;
@@ -2552,9 +2458,8 @@ static int decompose_conv_transpose3d(CMLGraph_t ir, struct IRNode* node) {
         struct IRNode* be = insert_expand(ir, br->output, be_s, 5, &head, &tail);
         if (!be) return -1;
         Tensor* ain[] = {result->output, be->output};
-        struct IRNode* add = create_primitive_node(ir, UOP_ADD, ain, 2, NULL, be_s, 5);
+        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, be_s, 5);
         if (!add) return -1;
-        chain_append(&head, &tail, add);
         result = add;
     }
 
@@ -2584,6 +2489,8 @@ int cml_ir_decompose(CMLGraph_t ir) {
         struct IRNode* next = node->next;
         int result = 0;
         bool decomposed = false;
+
+        g_lowering_src = node;
 
         switch (node->type) {
         case UOP_NEG:      result = decompose_neg(ir, node);      decomposed = true; break;
@@ -2617,7 +2524,15 @@ int cml_ir_decompose(CMLGraph_t ir) {
         case UOP_MOD:      result = decompose_mod(ir, node);      decomposed = true; break;
         case UOP_IDIV:     result = decompose_idiv(ir, node);     decomposed = true; break;
         case UOP_COPYSIGN: result = decompose_copysign(ir, node); decomposed = true; break;
-        case UOP_SIGN:     result = decompose_sign(ir, node);     decomposed = true; break;
+        case UOP_SIGN:
+            /* Keep sign() intact when a gradient is wanted. Lowered, it becomes
+             * (x>0)-(x<0), and comparisons carry no gradient -- so the chain
+             * ends there and everything upstream of a sign() silently stops
+             * training. Left whole, the autodiff rule emits the zeros that its
+             * derivative (zero almost everywhere) actually is. The executor has
+             * a direct SIGN kernel, so nothing is lost by not lowering it. */
+            if (node->requires_grad) { decomposed = false; break; }
+            result = decompose_sign(ir, node);     decomposed = true; break;
         case UOP_SINH:     result = decompose_sinh(ir, node);     decomposed = true; break;
         case UOP_COSH:     result = decompose_cosh(ir, node);     decomposed = true; break;
         case UOP_ATANH:    result = decompose_atanh(ir, node);    decomposed = true; break;
@@ -2652,6 +2567,7 @@ int cml_ir_decompose(CMLGraph_t ir) {
         if (result != 0 && decomposed)
             LOG_WARNING("Failed to decompose op type %d", node->type);
 
+        g_lowering_src = NULL;
         node = next;
     }
 

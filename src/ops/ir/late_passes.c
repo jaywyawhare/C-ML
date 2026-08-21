@@ -24,6 +24,45 @@ static void remap_srcs(LinearOp* op, int old_reg, int new_reg) {
     }
 }
 
+/* Split op `i` into `lanes` scalar copies, one fresh vreg per lane, and point
+ * later references to the original destination at the first lane's register.
+ * `remap_store_dest` also rewrites stores that wrote to it. */
+static int scalarize_op(struct LinearProgram* prog, int i, int lanes, bool remap_store_dest) {
+    if (ensure_capacity(prog, lanes - 1) != 0) return -1;
+
+    int orig_reg  = prog->ops[i].dest_reg;
+    int first_reg = alloc_vreg(prog);
+    if (first_reg < 0) return -1;
+
+    LinearOp scalar0  = prog->ops[i];
+    scalar0.vec_width = 1;
+    scalar0.dest_reg  = first_reg;
+    prog->ops[i]      = scalar0;
+
+    for (int lane = 1; lane < lanes; lane++) {
+        memmove(&prog->ops[i + lane + 1], &prog->ops[i + lane],
+                (size_t)(prog->num_ops - i - lane) * sizeof(LinearOp));
+        prog->num_ops++;
+
+        int r = alloc_vreg(prog);
+        if (r < 0) return -1;
+
+        LinearOp lane_op = scalar0;
+        lane_op.dest_reg = r;
+        prog->ops[i + lane] = lane_op;
+    }
+
+    for (int j = i + lanes; j < prog->num_ops; j++) {
+        remap_srcs(&prog->ops[j], orig_reg, first_reg);
+        if (remap_store_dest && prog->ops[j].kind == LINOP_STORE &&
+            prog->ops[j].dest_reg == orig_reg) {
+            prog->ops[j].dest_reg = first_reg;
+        }
+    }
+
+    return 0;
+}
+
 int cml_devectorize(struct LinearProgram* prog) {
     if (!prog) return -1;
 
@@ -35,72 +74,10 @@ int cml_devectorize(struct LinearProgram* prog) {
 
         int expanded = vw;
 
-        if (op->kind == LINOP_LOAD) {
-            if (ensure_capacity(prog, expanded - 1) != 0) return -1;
-
-            int orig_reg = op->dest_reg;
-            int first_reg = alloc_vreg(prog);
-            if (first_reg < 0) return -1;
-
-            LinearOp scalar0 = *op;
-            scalar0.vec_width = 1;
-            scalar0.dest_reg = first_reg;
-            prog->ops[i] = scalar0;
-
-            for (int lane = 1; lane < expanded; lane++) {
-                memmove(&prog->ops[i + lane + 1],
-                        &prog->ops[i + lane],
-                        (size_t)(prog->num_ops - i - lane) * sizeof(LinearOp));
-                prog->num_ops++;
-
-                int r = alloc_vreg(prog);
-                if (r < 0) return -1;
-
-                LinearOp scalar_load = scalar0;
-                scalar_load.dest_reg = r;
-                prog->ops[i + lane] = scalar_load;
-            }
-
-            for (int j = i + expanded; j < prog->num_ops; j++) {
-                remap_srcs(&prog->ops[j], orig_reg, first_reg);
-            }
-
-            i += expanded;
-
-        } else if (op->kind == LINOP_COMPUTE) {
-            if (ensure_capacity(prog, expanded - 1) != 0) return -1;
-
-            int orig_reg = op->dest_reg;
-            int first_reg = alloc_vreg(prog);
-            if (first_reg < 0) return -1;
-
-            LinearOp scalar0 = *op;
-            scalar0.vec_width = 1;
-            scalar0.dest_reg = first_reg;
-            prog->ops[i] = scalar0;
-
-            for (int lane = 1; lane < expanded; lane++) {
-                memmove(&prog->ops[i + lane + 1],
-                        &prog->ops[i + lane],
-                        (size_t)(prog->num_ops - i - lane) * sizeof(LinearOp));
-                prog->num_ops++;
-
-                int r = alloc_vreg(prog);
-                if (r < 0) return -1;
-
-                LinearOp scalar_comp = scalar0;
-                scalar_comp.dest_reg = r;
-                prog->ops[i + lane] = scalar_comp;
-            }
-
-            for (int j = i + expanded; j < prog->num_ops; j++) {
-                remap_srcs(&prog->ops[j], orig_reg, first_reg);
-                if (prog->ops[j].kind == LINOP_STORE &&
-                    prog->ops[j].dest_reg == orig_reg) {
-                    prog->ops[j].dest_reg = first_reg;
-                }
-            }
-
+        if (op->kind == LINOP_LOAD || op->kind == LINOP_COMPUTE) {
+            /* A compute result may also be the destination of a later store,
+               which a load's result never is. */
+            if (scalarize_op(prog, i, expanded, op->kind == LINOP_COMPUTE) != 0) return -1;
             i += expanded;
 
         } else if (op->kind == LINOP_STORE) {

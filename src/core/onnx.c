@@ -508,12 +508,18 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
     PBReader reader;
     pb_reader_init(&reader, data, length);
 
+    /* A ModelProto always carries at least one of these. Without the check the
+     * loader returns a zero-initialised model for input it could not parse at
+     * all -- a caller then sees a non-NULL "model" with no graph. */
+    int saw_model_field = 0;
+
     PBField f;
     while (pb_read_field(&reader, &f)) {
         switch (f.field_number) {
 
         case 1: /* ir_version */
             model->ir_version = (int64_t)f.value.varint;
+            saw_model_field   = 1;
             break;
 
         case 2: /* producer_name */
@@ -532,6 +538,7 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
                     cml_onnx_free(model);
                     return NULL;
                 }
+                saw_model_field = 1;
             }
             break;
 
@@ -542,6 +549,7 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
                 if (v > model->opset_version) {
                     model->opset_version = v;
                 }
+                saw_model_field = 1;
             }
             break;
 
@@ -549,6 +557,15 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
             pb_skip_field(&reader, &f);
             break;
         }
+    }
+
+    /* Stopping before the end means pb_read_field hit a malformed tag or an
+     * out-of-range length, not a clean end of message. */
+    if (reader.pos < reader.length || !saw_model_field) {
+        LOG_ERROR("onnx: buffer is not a ModelProto (parsed %zu of %zu bytes)",
+                  reader.pos, reader.length);
+        cml_onnx_free(model);
+        return NULL;
     }
 
     LOG_INFO("onnx: loaded model ir=%lld opset=%lld producer=%s nodes=%d inits=%d",

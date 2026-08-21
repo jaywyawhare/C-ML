@@ -8,40 +8,6 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-#define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define FNV_PRIME        0x100000001b3ULL
-
-static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len)
-{
-    const uint8_t *bytes = (const uint8_t *)data;
-    for (size_t i = 0; i < len; i++) {
-        hash ^= (uint64_t)bytes[i];
-        hash *= FNV_PRIME;
-    }
-    return hash;
-}
-
-static uint64_t jit_compute_hash(CMLGraph_t ir)
-{
-    if (!ir) return 0;
-
-    uint64_t hash = FNV_OFFSET_BASIS;
-    struct IRNode *node = ir->head;
-    while (node) {
-        int type_val = (int)node->type;
-        hash = fnv1a_bytes(hash, &type_val, sizeof(type_val));
-
-        if (node->output_shape && node->output_ndim > 0) {
-            hash = fnv1a_bytes(hash, node->output_shape,
-                               sizeof(int) * (size_t)node->output_ndim);
-        }
-
-        hash = fnv1a_bytes(hash, &node->num_inputs, sizeof(node->num_inputs));
-        node = node->next;
-    }
-    return hash;
-}
-
 static void compute_shape_sig(CMLGraph_t ir, int *sig, int *sig_len, int max_len)
 {
     *sig_len = 0;
@@ -81,7 +47,7 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
 {
     if (!jit || !ir) return -1;
 
-    uint64_t hash = jit_compute_hash(ir);
+    uint64_t hash = cml_ir_graph_hash(ir);
     int sig[32];
     int sig_len = 0;
     compute_shape_sig(ir, sig, &sig_len, 32);
@@ -114,13 +80,7 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
             if (entry->trace && entry->trace->is_complete &&
                 entry->trace->num_entries > 0) {
                 void *tensor_ptrs[CML_TRACE_MAX_ENTRIES];
-                int n = 0;
-                struct IRNode *node = ir->head;
-                while (node && n < CML_TRACE_MAX_ENTRIES) {
-                    tensor_ptrs[n++] = (node->output && node->output->data)
-                                           ? node->output->data : NULL;
-                    node = node->next;
-                }
+                int n = cml_ir_output_slots(ir, tensor_ptrs, CML_TRACE_MAX_ENTRIES);
 
                 int rc = cml_trace_replay(entry->trace, tensor_ptrs, n);
                 if (rc == 0) {
@@ -151,18 +111,8 @@ int cml_tinyjit_execute(CMLTinyJit *jit, CMLGraph_t ir)
 
     cml_trace_end(trace);
 
-    {
-        int n = 0;
-        struct IRNode *node = ir->head;
-        while (node && n < CML_TRACE_MAX_ENTRIES) {
-            if (node->output && node->output->data) {
-                trace->tensor_slots[n] = node->output->data;
-            }
-            n++;
-            node = node->next;
-        }
-        trace->num_slots = n;
-    }
+    trace->num_slots =
+        cml_ir_output_slots(ir, trace->tensor_slots, CML_TRACE_MAX_ENTRIES);
 
     /* Don't cache an empty trace (no kernels were recorded): a cached empty
      * trace would be "replayed" as a no-op on the next same-hash call, returning

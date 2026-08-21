@@ -20,32 +20,6 @@
 #define MOCK_INITIAL_ALLOC_CAP 64
 
 typedef struct {
-    uint32_t hRoot;
-    uint32_t hObjectParent;
-    uint32_t hObjectNew;
-    uint32_t hClass;
-    void*    pAllocParms;
-    uint32_t status;
-} NV_RM_ALLOC_PARAMS;
-
-typedef struct {
-    uint32_t hClient;
-    uint32_t hObject;
-    uint32_t cmd;
-    uint32_t flags;
-    void*    params;
-    uint32_t paramsSize;
-    uint32_t status;
-} NV_RM_CONTROL_PARAMS;
-
-typedef struct {
-    uint32_t hRoot;
-    uint32_t hObjectParent;
-    uint32_t hObjectOld;
-    uint32_t status;
-} NV_RM_FREE_PARAMS;
-
-typedef struct {
     uint32_t type;
     uint32_t data;
 } NV_GPU_INFO_ENTRY;

@@ -333,30 +333,33 @@ Tensor* f_gelu(Tensor* input) {
     return output;
 }
 
-static Tensor* elu_forward(Module* module, Tensor* input) {
-    ELU* elu = (ELU*)module;
-
-    if (!elu || !input)
-        return NULL;
-
-    TensorConfig config = (TensorConfig){
+/* The ELU curve: x where x >= 0, alpha * (exp(x) - 1) below. SELU is this
+ * same curve rescaled, so both share it. */
+static Tensor* elu_curve(Tensor* input, float alpha) {
+    TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
 
     Tensor* zeros = tensor_zeros(input->shape, input->ndim, &config);
     if (!zeros)
         return NULL;
 
-    Tensor* cond = uop_cmplt(input, zeros);
-
-    Tensor* exp_x         = uop_exp(input);
+    Tensor* cond          = uop_cmplt(input, zeros);
     Tensor* ones          = tensor_ones(input->shape, input->ndim, &config);
-    Tensor* exp_minus_one = uop_sub(exp_x, ones);
-
-    Tensor* alpha_tensor = tensor_full(input->shape, input->ndim, &config, elu->alpha);
-    Tensor* neg_part     = uop_mul(alpha_tensor, exp_minus_one);
+    Tensor* exp_minus_one = uop_sub(uop_exp(input), ones);
+    Tensor* alpha_tensor  = tensor_full(input->shape, input->ndim, &config, alpha);
+    Tensor* neg_part      = uop_mul(alpha_tensor, exp_minus_one);
 
     WhereParams wp = {.cond = cond, .a = neg_part, .b = input};
     return uop_where(&wp);
+}
+
+static Tensor* elu_forward(Module* module, Tensor* input) {
+    ELU* elu = (ELU*)module;
+
+    if (!elu || !input)
+        return NULL;
+
+    return elu_curve(input, elu->alpha);
 }
 
 static void elu_free(Module* module) { cml_free(module); }
@@ -390,25 +393,10 @@ static Tensor* selu_forward(Module* module, Tensor* input) {
     const float selu_lambda = 1.0507009873554804934f;
     const float selu_alpha  = 1.6732632423543772848f;
 
-    TensorConfig config = (TensorConfig){
+    Tensor* elu_result = elu_curve(input, selu_alpha);
+
+    TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-
-    Tensor* zeros = tensor_zeros(input->shape, input->ndim, &config);
-    if (!zeros)
-        return NULL;
-
-    Tensor* cond = uop_cmplt(input, zeros);
-
-    Tensor* exp_x         = uop_exp(input);
-    Tensor* ones          = tensor_ones(input->shape, input->ndim, &config);
-    Tensor* exp_minus_one = uop_sub(exp_x, ones);
-
-    Tensor* alpha_tensor = tensor_full(input->shape, input->ndim, &config, selu_alpha);
-    Tensor* neg_part     = uop_mul(alpha_tensor, exp_minus_one);
-
-    WhereParams wp     = {.cond = cond, .a = neg_part, .b = input};
-    Tensor* elu_result = uop_where(&wp);
-
     Tensor* lambda_tensor = tensor_full(input->shape, input->ndim, &config, selu_lambda);
     return uop_mul(lambda_tensor, elu_result);
 }

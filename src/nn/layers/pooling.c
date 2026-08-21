@@ -149,6 +149,18 @@ AvgPool2d* nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode
     return pool;
 }
 
+/* Allocate a materialised output tensor of `shape`/`ndim` matching `input`'s
+ * dtype and device, handing back its data pointer. */
+static Tensor* pool_alloc_output(Tensor* input, const int* shape, int ndim, float** out_data) {
+    TensorConfig config = {.dtype = input->dtype, .device = input->device,
+                           .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty((int*)shape, ndim, &config);
+    if (!output) return NULL;
+    tensor_ensure_executed(output);
+    *out_data = (float*)output->data;
+    return output;
+}
+
 static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     MaxPool3d* pool = (MaxPool3d*)module;
     if (!input || input->ndim != 5) return NULL;  // [N, C, D, H, W]
@@ -206,11 +218,9 @@ static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     }
 
     int out_shape[] = {N, C, out_d, out_h, out_w};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 5, &config);
+    float* out_data;
+    Tensor* output = pool_alloc_output(input, out_shape, 5, &out_data);
     if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
 
     for (int n = 0; n < N; n++) {
         for (int c = 0; c < C; c++) {
@@ -281,11 +291,9 @@ static Tensor* avgpool3d_forward(Module* module, Tensor* input) {
     }
 
     int out_shape[] = {N, C, out_d, out_h, out_w};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 5, &config);
+    float* out_data;
+    Tensor* output = pool_alloc_output(input, out_shape, 5, &out_data);
     if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
 
     for (int n = 0; n < N; n++) {
         for (int c = 0; c < C; c++) {
@@ -371,11 +379,9 @@ static Tensor* maxpool1d_forward(Module* module, Tensor* input) {
         out_l = (L + 2 * pool->padding - pool->dilation * (pool->kernel_size - 1) - 1) / pool->stride + 1;
 
     int out_shape[] = {N, C, out_l};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 3, &config);
+    float* out_data;
+    Tensor* output = pool_alloc_output(input, out_shape, 3, &out_data);
     if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
 
     for (int n = 0; n < N; n++) {
         for (int c = 0; c < C; c++) {
@@ -450,9 +456,11 @@ AvgPool1d* nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode
     return pool;
 }
 
-static Tensor* adaptive_avgpool2d_forward(Module* module, Tensor* input) {
-    AdaptiveAvgPool2d* pool = (AdaptiveAvgPool2d*)module;
-    if (!input || input->ndim != 4) return NULL;  // [N, C, H, W]
+/* Adaptive 2-D pooling over [N, C, H, W]: output cell `o` reduces the input
+ * window [floor(o*in/out), ceil((o+1)*in/out)). `take_max` selects max-pooling
+ * over average-pooling -- the only difference between the two layers. */
+static Tensor* adaptive_pool2d(Tensor* input, const int* output_size, bool take_max) {
+    if (!input || input->ndim != 4) return NULL;
 
     tensor_ensure_executed(input);
     float* in_data = (float*)input->data;
@@ -460,10 +468,11 @@ static Tensor* adaptive_avgpool2d_forward(Module* module, Tensor* input) {
 
     int N = input->shape[0], C = input->shape[1];
     int in_h = input->shape[2], in_w = input->shape[3];
-    int out_h = pool->output_size[0], out_w = pool->output_size[1];
+    int out_h = output_size[0], out_w = output_size[1];
 
     int out_shape[] = {N, C, out_h, out_w};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    TensorConfig config = {.dtype = input->dtype, .device = input->device,
+                           .has_dtype = true, .has_device = true};
     Tensor* output = tensor_empty(out_shape, 4, &config);
     if (!output) return NULL;
     tensor_ensure_executed(output);
@@ -471,27 +480,39 @@ static Tensor* adaptive_avgpool2d_forward(Module* module, Tensor* input) {
 
     for (int n = 0; n < N; n++) {
         for (int c = 0; c < C; c++) {
+            const float* plane = in_data + (size_t)(n * C + c) * in_h * in_w;
+            float* out_plane   = out_data + (size_t)(n * C + c) * out_h * out_w;
             for (int oh = 0; oh < out_h; oh++) {
                 int h_start = (int)floorf((float)oh * in_h / out_h);
-                int h_end = (int)ceilf((float)(oh + 1) * in_h / out_h);
+                int h_end   = (int)ceilf((float)(oh + 1) * in_h / out_h);
                 for (int ow = 0; ow < out_w; ow++) {
                     int w_start = (int)floorf((float)ow * in_w / out_w);
-                    int w_end = (int)ceilf((float)(ow + 1) * in_w / out_w);
-                    float sum = 0.0f;
+                    int w_end   = (int)ceilf((float)(ow + 1) * in_w / out_w);
+
+                    float acc = take_max ? -FLT_MAX : 0.0f;
                     int count = 0;
                     for (int h = h_start; h < h_end; h++) {
                         for (int w = w_start; w < w_end; w++) {
-                            sum += in_data[n * C * in_h * in_w + c * in_h * in_w + h * in_w + w];
+                            float v = plane[h * in_w + w];
+                            if (take_max) {
+                                if (v > acc) acc = v;
+                            } else {
+                                acc += v;
+                            }
                             count++;
                         }
                     }
-                    out_data[n * C * out_h * out_w + c * out_h * out_w + oh * out_w + ow] =
-                        count > 0 ? sum / count : 0.0f;
+                    out_plane[oh * out_w + ow] =
+                        take_max ? (count > 0 ? acc : 0.0f) : (count > 0 ? acc / count : 0.0f);
                 }
             }
         }
     }
     return output;
+}
+
+static Tensor* adaptive_avgpool2d_forward(Module* module, Tensor* input) {
+    return adaptive_pool2d(input, ((AdaptiveAvgPool2d*)module)->output_size, false);
 }
 
 static void adaptive_avgpool2d_free(Module* module) { cml_free(module); }
@@ -507,37 +528,45 @@ AdaptiveAvgPool2d* nn_adaptive_avgpool2d(int output_h, int output_w) {
     return pool;
 }
 
-static Tensor* adaptive_avgpool1d_forward(Module* module, Tensor* input) {
-    AdaptiveAvgPool1d* pool = (AdaptiveAvgPool1d*)module;
-    if (!input || input->ndim != 3) return NULL;  // [N, C, L]
+/* Adaptive 1-D pooling over [N, C, L]: output cell `o` reduces the input window
+ * [floor(o*L/out), ceil((o+1)*L/out)). `take_max` selects max over average. */
+static Tensor* adaptive_pool1d(Tensor* input, int out_l, bool take_max) {
+    if (!input || input->ndim != 3) return NULL;
 
     tensor_ensure_executed(input);
     float* in_data = (float*)input->data;
     if (!in_data) return NULL;
 
     int N = input->shape[0], C = input->shape[1], L = input->shape[2];
-    int out_l = pool->output_size;
-
     int out_shape[] = {N, C, out_l};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 3, &config);
+    float* out_data;
+    Tensor* output = pool_alloc_output(input, out_shape, 3, &out_data);
     if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
 
     for (int n = 0; n < N; n++) {
         for (int c = 0; c < C; c++) {
+            const float* row = in_data + (size_t)(n * C + c) * L;
+            float* out_row   = out_data + (size_t)(n * C + c) * out_l;
             for (int ol = 0; ol < out_l; ol++) {
                 int start = (int)floorf((float)ol * L / out_l);
-                int end = (int)ceilf((float)(ol + 1) * L / out_l);
-                float sum = 0.0f;
-                for (int i = start; i < end; i++)
-                    sum += in_data[n * C * L + c * L + i];
-                out_data[n * C * out_l + c * out_l + ol] = sum / (end - start);
+                int end   = (int)ceilf((float)(ol + 1) * L / out_l);
+                float acc = take_max ? -FLT_MAX : 0.0f;
+                for (int i = start; i < end; i++) {
+                    if (take_max) {
+                        if (row[i] > acc) acc = row[i];
+                    } else {
+                        acc += row[i];
+                    }
+                }
+                out_row[ol] = take_max ? acc : acc / (float)(end - start);
             }
         }
     }
     return output;
+}
+
+static Tensor* adaptive_avgpool1d_forward(Module* module, Tensor* input) {
+    return adaptive_pool1d(input, ((AdaptiveAvgPool1d*)module)->output_size, false);
 }
 
 static void adaptive_avgpool1d_free(Module* module) { cml_free(module); }
@@ -553,45 +582,7 @@ AdaptiveAvgPool1d* nn_adaptive_avgpool1d(int output_size) {
 }
 
 static Tensor* adaptive_maxpool2d_forward(Module* module, Tensor* input) {
-    AdaptiveMaxPool2d* pool = (AdaptiveMaxPool2d*)module;
-    if (!input || input->ndim != 4) return NULL;  // [N, C, H, W]
-
-    tensor_ensure_executed(input);
-    float* in_data = (float*)input->data;
-    if (!in_data) return NULL;
-
-    int N = input->shape[0], C = input->shape[1];
-    int in_h = input->shape[2], in_w = input->shape[3];
-    int out_h = pool->output_size[0], out_w = pool->output_size[1];
-
-    int out_shape[] = {N, C, out_h, out_w};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 4, &config);
-    if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
-
-    for (int n = 0; n < N; n++) {
-        for (int c = 0; c < C; c++) {
-            for (int oh = 0; oh < out_h; oh++) {
-                int h_start = (int)floorf((float)oh * in_h / out_h);
-                int h_end = (int)ceilf((float)(oh + 1) * in_h / out_h);
-                for (int ow = 0; ow < out_w; ow++) {
-                    int w_start = (int)floorf((float)ow * in_w / out_w);
-                    int w_end = (int)ceilf((float)(ow + 1) * in_w / out_w);
-                    float max_val = -FLT_MAX;
-                    for (int h = h_start; h < h_end; h++) {
-                        for (int w = w_start; w < w_end; w++) {
-                            float v = in_data[n*C*in_h*in_w + c*in_h*in_w + h*in_w + w];
-                            if (v > max_val) max_val = v;
-                        }
-                    }
-                    out_data[n*C*out_h*out_w + c*out_h*out_w + oh*out_w + ow] = max_val;
-                }
-            }
-        }
-    }
-    return output;
+    return adaptive_pool2d(input, ((AdaptiveMaxPool2d*)module)->output_size, true);
 }
 
 static void adaptive_maxpool2d_free(Module* module) { cml_free(module); }
@@ -608,38 +599,7 @@ AdaptiveMaxPool2d* nn_adaptive_maxpool2d(int output_h, int output_w) {
 }
 
 static Tensor* adaptive_maxpool1d_forward(Module* module, Tensor* input) {
-    AdaptiveMaxPool1d* pool = (AdaptiveMaxPool1d*)module;
-    if (!input || input->ndim != 3) return NULL;  // [N, C, L]
-
-    tensor_ensure_executed(input);
-    float* in_data = (float*)input->data;
-    if (!in_data) return NULL;
-
-    int N = input->shape[0], C = input->shape[1], L = input->shape[2];
-    int out_l = pool->output_size;
-
-    int out_shape[] = {N, C, out_l};
-    TensorConfig config = {.dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_empty(out_shape, 3, &config);
-    if (!output) return NULL;
-    tensor_ensure_executed(output);
-    float* out_data = (float*)output->data;
-
-    for (int n = 0; n < N; n++) {
-        for (int c = 0; c < C; c++) {
-            for (int ol = 0; ol < out_l; ol++) {
-                int start = (int)floorf((float)ol * L / out_l);
-                int end = (int)ceilf((float)(ol + 1) * L / out_l);
-                float max_val = -FLT_MAX;
-                for (int i = start; i < end; i++) {
-                    float v = in_data[n*C*L + c*L + i];
-                    if (v > max_val) max_val = v;
-                }
-                out_data[n*C*out_l + c*out_l + ol] = max_val;
-            }
-        }
-    }
-    return output;
+    return adaptive_pool1d(input, ((AdaptiveMaxPool1d*)module)->output_size, true);
 }
 
 static void adaptive_maxpool1d_free(Module* module) { cml_free(module); }

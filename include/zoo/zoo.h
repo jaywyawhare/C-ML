@@ -2,6 +2,7 @@
 #define CML_ZOO_H
 
 #include "nn.h"
+#include "nn/layers.h"
 #include "tensor/tensor.h"
 #include "zoo/resnet.h"
 #include "zoo/gpt2.h"
@@ -147,6 +148,34 @@ Module* cml_zoo_mask_rcnn(const CMLZooConfig* config);
 Module* cml_zoo_unet3d(const CMLZooConfig* config);
 
 Module* cml_zoo_rnnt(const CMLZooConfig* config);
+
+
+/* Pre-norm transformer block: x + attn(norm1(x)), then + mlp(norm2(x)).
+ * ViT and both CLIP towers are this same shape. */
+typedef struct {
+    Module base;
+    LayerNorm* norm1;
+    MultiHeadAttention* attn;
+    LayerNorm* norm2;
+    Sequential* mlp;
+} ZooPreNormBlock;
+
+/* Build a pre-norm block named `name` with a GELU MLP of width `mlp_dim` and
+ * layer norms at `norm_eps`. Returns NULL on allocation failure. */
+ZooPreNormBlock* zoo_prenorm_block(const char* name, int dim, int n_head, int mlp_dim,
+                                   float norm_eps, DType dtype, DeviceType device);
+
+/* GPT-2-style residual init scale, 1/sqrt(2 * n_layer); 1.0 for a single
+ * layer. Applied to the output projections on a block's residual paths so
+ * activations don't explode through a deep residual stack. */
+float zoo_residual_scale(int n_layer);
+
+/* Multiply `param`'s float data in place by `scale`; a NULL param is a no-op. */
+void zoo_scale_param(Parameter* param, float scale);
+
+/* One FPN top-down step: the lateral 1x1 conv of this level's backbone feature
+ * plus the coarser pyramid level, nearest-upsampled to this level's size. */
+Tensor* zoo_fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser);
 
 Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config);
 

@@ -5,14 +5,17 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
+/* Residual block: y = relu(conv(x) + (downsample ? downsample(x) : x)).
+ * Both the basic and bottleneck variants are this shape; only the conv stack
+ * inside differs. */
 typedef struct {
     Module base;
     Sequential* conv;
     Sequential* downsample;
-} BottleneckBlock;
+} ResidualBlock;
 
-static Tensor* bottleneck_forward(Module* module, Tensor* input) {
-    BottleneckBlock* block = (BottleneckBlock*)module;
+static Tensor* residual_block_forward(Module* module, Tensor* input) {
+    ResidualBlock* block = (ResidualBlock*)module;
     if (!block || !input)
         return NULL;
 
@@ -31,8 +34,8 @@ static Tensor* bottleneck_forward(Module* module, Tensor* input) {
     return f_relu(result);
 }
 
-static void bottleneck_free(Module* module) {
-    BottleneckBlock* block = (BottleneckBlock*)module;
+static void residual_block_free(Module* module) {
+    ResidualBlock* block = (ResidualBlock*)module;
     if (!block)
         return;
     if (block->conv)
@@ -42,13 +45,15 @@ static void bottleneck_free(Module* module) {
     cml_free(block);
 }
 
-static Module* create_bottleneck(int in_channels, int mid_channels, int out_channels,
-                                  int stride, DType dtype, DeviceType device) {
-    BottleneckBlock* block = cml_malloc(sizeof(BottleneckBlock));
+/* Allocate a residual block named `name` with an empty conv stack, plus the
+ * 1x1 projection shortcut when the shape changes. */
+static ResidualBlock* residual_block_new(const char* name, int in_channels, int out_channels,
+                                         int stride, DType dtype, DeviceType device) {
+    ResidualBlock* block = cml_malloc(sizeof(ResidualBlock));
     if (!block)
         return NULL;
 
-    if (module_init((Module*)block, "Bottleneck", bottleneck_forward, bottleneck_free) != 0) {
+    if (module_init((Module*)block, name, residual_block_forward, residual_block_free) != 0) {
         cml_free(block);
         return NULL;
     }
@@ -58,6 +63,27 @@ static Module* create_bottleneck(int in_channels, int mid_channels, int out_chan
         cml_free(block);
         return NULL;
     }
+
+    block->downsample = NULL;
+    if (in_channels != out_channels || stride != 1) {
+        block->downsample = nn_sequential();
+        sequential_add(block->downsample,
+                       (Module*)nn_conv2d(in_channels, out_channels, 1, stride, 0, 1, false,
+                                          dtype, device));
+        sequential_add(block->downsample,
+                       (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype,
+                                               device));
+    }
+
+    return block;
+}
+
+static Module* create_bottleneck(int in_channels, int mid_channels, int out_channels,
+                                  int stride, DType dtype, DeviceType device) {
+    ResidualBlock* block =
+        residual_block_new("Bottleneck", in_channels, out_channels, stride, dtype, device);
+    if (!block)
+        return NULL;
 
     sequential_add(block->conv, (Module*)nn_conv2d(in_channels, mid_channels, 1, 1, 0, 1, false, dtype, device));
     sequential_add(block->conv, (Module*)nn_batchnorm2d(mid_channels, 1e-5f, 0.1f, true, true, dtype, device));
@@ -70,69 +96,16 @@ static Module* create_bottleneck(int in_channels, int mid_channels, int out_chan
     sequential_add(block->conv, (Module*)nn_conv2d(mid_channels, out_channels, 1, 1, 0, 1, false, dtype, device));
     sequential_add(block->conv, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
 
-    block->downsample = NULL;
-    if (in_channels != out_channels || stride != 1) {
-        block->downsample = nn_sequential();
-        sequential_add(block->downsample, (Module*)nn_conv2d(in_channels, out_channels, 1, stride, 0, 1, false, dtype, device));
-        sequential_add(block->downsample, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
-    }
 
     return (Module*)block;
 }
 
-typedef struct {
-    Module base;
-    Sequential* conv;
-    Sequential* downsample;
-} BasicBlock;
-
-static Tensor* basic_block_forward(Module* module, Tensor* input) {
-    BasicBlock* block = (BasicBlock*)module;
-    if (!block || !input)
-        return NULL;
-
-    Tensor* out = module_forward((Module*)block->conv, input);
-    if (!out)
-        return NULL;
-
-    Tensor* skip = input;
-    if (block->downsample)
-        skip = module_forward((Module*)block->downsample, input);
-
-    Tensor* result = tensor_add(out, skip);
-    if (!result)
-        return NULL;
-
-    return f_relu(result);
-}
-
-static void basic_block_free(Module* module) {
-    BasicBlock* block = (BasicBlock*)module;
-    if (!block)
-        return;
-    if (block->conv)
-        module_free((Module*)block->conv);
-    if (block->downsample)
-        module_free((Module*)block->downsample);
-    cml_free(block);
-}
-
 static Module* create_basic_block(int in_channels, int out_channels, int stride,
                                    DType dtype, DeviceType device) {
-    BasicBlock* block = cml_malloc(sizeof(BasicBlock));
+    ResidualBlock* block =
+        residual_block_new("BasicBlock", in_channels, out_channels, stride, dtype, device);
     if (!block)
         return NULL;
-
-    if (module_init((Module*)block, "BasicBlock", basic_block_forward, basic_block_free) != 0) {
-        cml_free(block);
-        return NULL;
-    }
-
-    block->conv = nn_sequential();
-    if (!block->conv) {
-        cml_free(block);
-        return NULL;
-    }
 
     sequential_add(block->conv, (Module*)nn_conv2d(in_channels, out_channels, 3, stride, 1, 1, false, dtype, device));
     sequential_add(block->conv, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
@@ -140,12 +113,6 @@ static Module* create_basic_block(int in_channels, int out_channels, int stride,
     sequential_add(block->conv, (Module*)nn_conv2d(out_channels, out_channels, 3, 1, 1, 1, false, dtype, device));
     sequential_add(block->conv, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
 
-    block->downsample = NULL;
-    if (in_channels != out_channels || stride != 1) {
-        block->downsample = nn_sequential();
-        sequential_add(block->downsample, (Module*)nn_conv2d(in_channels, out_channels, 1, stride, 0, 1, false, dtype, device));
-        sequential_add(block->downsample, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
-    }
 
     return (Module*)block;
 }

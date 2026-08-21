@@ -9,7 +9,7 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-static void llm_softmax_inplace(float* data, int rows, int cols) {
+void cml_softmax_rows_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
         float* row = data + (size_t)r * cols;
         float max_val = row[0];
@@ -339,7 +339,7 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
             }
 
             /* Softmax over kv_len dimension */
-            llm_softmax_inplace(scores, seq_q, kv_len);
+            cml_softmax_rows_inplace(scores, seq_q, kv_len);
 
             /* Compute weighted sum: scores @ V[b, :, kv_h, :] */
             for (int sq = 0; sq < seq_q; sq++) {
@@ -373,6 +373,25 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
     return result;
 }
 
+/* Append this step's K/V rows -- laid out [seq_new, kv_heads, head_dim] -- to
+ * `kv_cache`. Returns the new cache length, or -1 on failure. */
+static int kv_cache_append_step(CMLKVCache* kv_cache, float* k_data, float* v_data, int seq_new,
+                                int kv_heads, int head_dim) {
+    int kv_shape[] = {seq_new, kv_heads, head_dim};
+    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
+                        .has_dtype = true, .has_device = true};
+
+    Tensor* k_append = tensor_from_data(k_data, kv_shape, 3, &cfg);
+    Tensor* v_append = tensor_from_data(v_data, kv_shape, 3, &cfg);
+    int new_len = -1;
+    if (k_append && v_append)
+        new_len = cml_kv_cache_append(kv_cache, k_append, v_append);
+
+    if (k_append) tensor_free(k_append);
+    if (v_append) tensor_free(v_append);
+    return new_len;
+}
+
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
                                 CMLKVCache* kv_cache,
                                 const CMLGQAConfig* config) {
@@ -398,27 +417,11 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
         return NULL;
     }
 
-    /* Create temporary tensors for cache append: [seq_new, kv_heads, head_dim] */
-    int kv_shape[] = {seq_new, kv_heads, head_dim};
+    if (kv_cache_append_step(kv_cache, k_data, v_data, seq_new, kv_heads, head_dim) < 0)
+        return NULL;
+
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
-
-    Tensor* k_append = tensor_from_data(k_data, kv_shape, 3, &cfg);
-    Tensor* v_append = tensor_from_data(v_data, kv_shape, 3, &cfg);
-
-    if (!k_append || !v_append) {
-        if (k_append) tensor_free(k_append);
-        if (v_append) tensor_free(v_append);
-        return NULL;
-    }
-
-    int new_len = cml_kv_cache_append(kv_cache, k_append, v_append);
-    tensor_free(k_append);
-    tensor_free(v_append);
-
-    if (new_len < 0) {
-        return NULL;
-    }
 
     /* Get full cached K, V */
     Tensor* cached_k = cml_kv_cache_get_keys(kv_cache);
@@ -669,22 +672,11 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     float* v_data = (float*)tensor_data_ptr(V);
     if (!k_data || !v_data) return NULL;
 
-    int kv_shape[] = {seq_new, kv_heads, head_dim};
+    if (kv_cache_append_step(kv_cache, k_data, v_data, seq_new, kv_heads, head_dim) < 0)
+        return NULL;
+
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                         .has_dtype = true, .has_device = true};
-
-    Tensor* k_append = tensor_from_data(k_data, kv_shape, 3, &cfg);
-    Tensor* v_append = tensor_from_data(v_data, kv_shape, 3, &cfg);
-    if (!k_append || !v_append) {
-        if (k_append) tensor_free(k_append);
-        if (v_append) tensor_free(v_append);
-        return NULL;
-    }
-
-    int new_len = cml_kv_cache_append(kv_cache, k_append, v_append);
-    tensor_free(k_append);
-    tensor_free(v_append);
-    if (new_len < 0) return NULL;
 
     Tensor* cached_k = cml_kv_cache_get_keys(kv_cache);
     Tensor* cached_v = cml_kv_cache_get_values(kv_cache);
@@ -964,7 +956,7 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     }
 
     /* Step 2: Softmax to get routing probabilities */
-    llm_softmax_inplace(gate_scores, total_tokens, num_experts);
+    cml_softmax_rows_inplace(gate_scores, total_tokens, num_experts);
 
     /* Step 3: Find top-k experts per token */
     int* top_k_indices = (int*)cml_malloc((size_t)total_tokens * top_k * sizeof(int));
@@ -1141,7 +1133,7 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     }
 
     /* Softmax */
-    llm_softmax_inplace(routing, total_tokens, num_experts);
+    cml_softmax_rows_inplace(routing, total_tokens, num_experts);
 
     int out_shape[] = {total_tokens, num_experts};
     TensorConfig out_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,

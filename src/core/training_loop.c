@@ -378,6 +378,73 @@ void cml_print_progress_bar(float percent, const char* message) {
     }
 }
 
+/* Default hyperparameters for the training-loop entry points. */
+static TrainingConfig default_training_config(void) {
+    return (TrainingConfig){.epochs                    = 10,
+                            .verbose                   = true,
+                            .use_progress_bar          = true,
+                            .scheduler                 = NULL,
+                            .callbacks                 = (TrainingCallbacks){0},
+                            .grad_clip_norm            = 0.0f,
+                            .early_stopping            = false,
+                            .early_stopping_patience   = 5,
+                            .early_stopping_min_delta  = 0.0f,
+                            .use_checkpointing         = false,
+                            .checkpoint_every_n_layers = 0};
+}
+
+/* Clip `model`'s gradients in place so their global L2 norm ≤ max_norm. No-op
+ * when max_norm ≤ 0 or the norm is already within bounds. */
+
+static void clip_gradients_by_norm(Module* model, float max_norm) {
+    if (max_norm <= 0.0f)
+        return;
+    Parameter** params = NULL;
+    int num_params     = 0;
+    if (module_collect_parameters(model, &params, &num_params, true) != 0 || !params)
+        return;
+
+    float grad_norm_squared = 0.0f;
+    int params_with_grad    = 0;
+    for (int i = 0; i < num_params; i++) {
+        if (!params[i] || !params[i]->tensor)
+            continue;
+        Tensor* grad = tensor_get_grad(params[i]->tensor);
+        if (!grad)
+            continue;
+        size_t num_elements;
+        float* grad_data = cml_tensor_float_buffer(grad, &num_elements);
+        if (!grad_data)
+            continue;
+        for (size_t j = 0; j < num_elements; j++)
+            grad_norm_squared += grad_data[j] * grad_data[j];
+        params_with_grad++;
+    }
+
+    if (params_with_grad > 0) {
+        float grad_norm = sqrtf(grad_norm_squared);
+        if (grad_norm > max_norm) {
+            float clip_factor = max_norm / grad_norm;
+            for (int i = 0; i < num_params; i++) {
+                if (!params[i] || !params[i]->tensor)
+                    continue;
+                Tensor* grad = tensor_get_grad(params[i]->tensor);
+                if (!grad)
+                    continue;
+                size_t num_elements;
+                float* grad_data = cml_tensor_float_buffer(grad, &num_elements);
+                if (!grad_data)
+                    continue;
+                for (size_t j = 0; j < num_elements; j++)
+                    grad_data[j] *= clip_factor;
+            }
+            LOG_DEBUG("Gradient clipped: norm=%.6f, threshold=%.6f, factor=%.6f",
+                      (double)grad_norm, (double)max_norm, (double)clip_factor);
+        }
+    }
+    cml_free(params);
+}
+
 int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
               Tensor* (*loss_fn)(Tensor*, Tensor*), TrainingConfig* config) {
     if (!model || !train_loader || !optimizer || !loss_fn) {
@@ -385,17 +452,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
         return -1;
     }
     training_metrics_register_model(model);
-    TrainingConfig default_config = {.epochs                    = 10,
-                                     .verbose                   = true,
-                                     .use_progress_bar          = true,
-                                     .scheduler                 = NULL,
-                                     .callbacks                 = (TrainingCallbacks){0},
-                                     .grad_clip_norm            = 0.0f,
-                                     .early_stopping            = false,
-                                     .early_stopping_patience   = 5,
-                                     .early_stopping_min_delta  = 0.0f,
-                                     .use_checkpointing         = false,
-                                     .checkpoint_every_n_layers = 0};
+    TrainingConfig default_config = default_training_config();
     if (!config) {
         config = &default_config;
     }
@@ -498,78 +555,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             num_batches++;
             optimizer->zero_grad(optimizer);
             tensor_backward(loss, NULL, false, false);
-            if (grad_clip_norm > 0.0f) {
-                Parameter** params = NULL;
-                int num_params     = 0;
-                if (module_collect_parameters(model, &params, &num_params, true) == 0 && params) {
-                    float grad_norm_squared = 0.0f;
-                    int params_with_grad    = 0;
-
-                    for (int i = 0; i < num_params; i++) {
-                        if (!params[i] || !params[i]->tensor)
-                            continue;
-
-                        Tensor* grad = tensor_get_grad(params[i]->tensor);
-                        if (!grad)
-                            continue;
-
-                        float* grad_data = (float*)tensor_data_ptr(grad);
-                        if (!grad_data)
-                            continue;
-
-                        size_t num_elements = grad->numel;
-                        if (num_elements == 0 && grad->shape && grad->ndim > 0) {
-                            num_elements = 1;
-                            for (int d = 0; d < grad->ndim; d++) {
-                                num_elements *= (size_t)grad->shape[d];
-                            }
-                        }
-
-                        for (size_t j = 0; j < num_elements; j++) {
-                            float g = grad_data[j];
-                            grad_norm_squared += g * g;
-                        }
-                        params_with_grad++;
-                    }
-
-                    if (params_with_grad > 0) {
-                        float grad_norm = sqrtf(grad_norm_squared);
-                        if (grad_norm > grad_clip_norm) {
-                            float clip_factor = grad_clip_norm / grad_norm;
-
-                            for (int i = 0; i < num_params; i++) {
-                                if (!params[i] || !params[i]->tensor)
-                                    continue;
-
-                                Tensor* grad = tensor_get_grad(params[i]->tensor);
-                                if (!grad)
-                                    continue;
-
-                                float* grad_data = (float*)tensor_data_ptr(grad);
-                                if (!grad_data)
-                                    continue;
-
-                                size_t num_elements = grad->numel;
-                                if (num_elements == 0 && grad->shape && grad->ndim > 0) {
-                                    num_elements = 1;
-                                    for (int d = 0; d < grad->ndim; d++) {
-                                        num_elements *= (size_t)grad->shape[d];
-                                    }
-                                }
-                                for (size_t j = 0; j < num_elements; j++) {
-                                    grad_data[j] *= clip_factor;
-                                }
-                            }
-
-                            LOG_DEBUG("Gradient clipped: norm=%.6f, threshold=%.6f, factor=%.6f",
-                                      (double)grad_norm, (double)grad_clip_norm,
-                                      (double)clip_factor);
-                        }
-                    }
-
-                    cml_free(params);
-                }
-            }
+            clip_gradients_by_norm(model, grad_clip_norm);
             /* static mode: in-place SGD (no IR nodes), then CAPTURE the graph so
              * every later batch reuses it. The optimizer's normal step would emit
              * uop_sgd_step nodes into this graph — breaking the static reuse — so
@@ -656,17 +642,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
         return -1;
     }
     training_metrics_register_model(model);
-    TrainingConfig default_config = {.epochs                    = 10,
-                                     .verbose                   = true,
-                                     .use_progress_bar          = true,
-                                     .scheduler                 = NULL,
-                                     .callbacks                 = (TrainingCallbacks){0},
-                                     .grad_clip_norm            = 0.0f,
-                                     .early_stopping            = false,
-                                     .early_stopping_patience   = 5,
-                                     .early_stopping_min_delta  = 0.0f,
-                                     .use_checkpointing         = false,
-                                     .checkpoint_every_n_layers = 0};
+    TrainingConfig default_config = default_training_config();
     if (!config) {
         config = &default_config;
     }
@@ -725,78 +701,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
             num_train_batches++;
             optimizer->zero_grad(optimizer);
             tensor_backward(loss, NULL, false, false);
-            if (grad_clip_norm > 0.0f) {
-                Parameter** params = NULL;
-                int num_params     = 0;
-                if (module_collect_parameters(model, &params, &num_params, true) == 0 && params) {
-                    float grad_norm_squared = 0.0f;
-                    int params_with_grad    = 0;
-
-                    for (int i = 0; i < num_params; i++) {
-                        if (!params[i] || !params[i]->tensor)
-                            continue;
-
-                        Tensor* grad = tensor_get_grad(params[i]->tensor);
-                        if (!grad)
-                            continue;
-
-                        float* grad_data = (float*)tensor_data_ptr(grad);
-                        if (!grad_data)
-                            continue;
-
-                        size_t num_elements = grad->numel;
-                        if (num_elements == 0 && grad->shape && grad->ndim > 0) {
-                            num_elements = 1;
-                            for (int d = 0; d < grad->ndim; d++) {
-                                num_elements *= (size_t)grad->shape[d];
-                            }
-                        }
-
-                        for (size_t j = 0; j < num_elements; j++) {
-                            float g = grad_data[j];
-                            grad_norm_squared += g * g;
-                        }
-                        params_with_grad++;
-                    }
-
-                    if (params_with_grad > 0) {
-                        float grad_norm = sqrtf(grad_norm_squared);
-                        if (grad_norm > grad_clip_norm) {
-                            float clip_factor = grad_clip_norm / grad_norm;
-
-                            for (int i = 0; i < num_params; i++) {
-                                if (!params[i] || !params[i]->tensor)
-                                    continue;
-
-                                Tensor* grad = tensor_get_grad(params[i]->tensor);
-                                if (!grad)
-                                    continue;
-
-                                float* grad_data = (float*)tensor_data_ptr(grad);
-                                if (!grad_data)
-                                    continue;
-
-                                size_t num_elements = grad->numel;
-                                if (num_elements == 0 && grad->shape && grad->ndim > 0) {
-                                    num_elements = 1;
-                                    for (int d = 0; d < grad->ndim; d++) {
-                                        num_elements *= (size_t)grad->shape[d];
-                                    }
-                                }
-                                for (size_t j = 0; j < num_elements; j++) {
-                                    grad_data[j] *= clip_factor;
-                                }
-                            }
-
-                            LOG_DEBUG("Gradient clipped: norm=%.6f, threshold=%.6f, factor=%.6f",
-                                      (double)grad_norm, (double)grad_clip_norm,
-                                      (double)clip_factor);
-                        }
-                    }
-
-                    cml_free(params);
-                }
-            }
+            clip_gradients_by_norm(model, grad_clip_norm);
             optimizer->step(optimizer);
             if (callbacks.on_batch_end) {
                 callbacks.on_batch_end(epoch, batch->batch_index, loss_value, callbacks.user_data);

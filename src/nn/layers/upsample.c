@@ -78,6 +78,33 @@ static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
     return output;
 }
 
+/* Per-axis interpolation scale: align_corners maps corner pixels exactly. */
+static inline float interp_scale(int in, int out, bool align_corners) {
+    return (align_corners && out > 1) ? (float)(in - 1) / (float)(out - 1)
+                                      : (float)in / (float)out;
+}
+
+/* Source coordinate for output index `o`: align_corners maps corner pixels
+ * exactly, otherwise pixel centres are aligned. */
+static inline float interp_src_coord(int o, float scale, int out, bool align_corners) {
+    return (align_corners && out > 1) ? (float)o * scale : ((float)o + 0.5f) * scale - 0.5f;
+}
+
+/* Allocate the [N, C, out_h, out_w] destination an interpolation writes into,
+ * handing back both data pointers. */
+static Tensor* interp_alloc_output(Tensor* input, int out_h, int out_w, float** in_data,
+                                   float** out_data) {
+    int out_shape[] = {input->shape[0], input->shape[1], out_h, out_w};
+    TensorConfig config = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_zeros(out_shape, 4, &config);
+    if (!output)
+        return NULL;
+    *in_data  = (float*)input->data;
+    *out_data = (float*)output->data;
+    return output;
+}
+
 static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w,
                                         bool align_corners) {
     int batch    = input->shape[0];
@@ -85,37 +112,18 @@ static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w,
     int in_h     = input->shape[2];
     int in_w     = input->shape[3];
 
-    int out_shape[] = {batch, channels, out_h, out_w};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_zeros(out_shape, 4, &config);
+    float *in_data, *out_data;
+    Tensor* output = interp_alloc_output(input, out_h, out_w, &in_data, &out_data);
     if (!output)
         return NULL;
 
-    float* in_data  = (float*)input->data;
-    float* out_data = (float*)output->data;
-
-    float scale_h, scale_w;
-    if (align_corners && out_h > 1) {
-        scale_h = (float)(in_h - 1) / (float)(out_h - 1);
-    } else {
-        scale_h = (float)in_h / (float)out_h;
-    }
-    if (align_corners && out_w > 1) {
-        scale_w = (float)(in_w - 1) / (float)(out_w - 1);
-    } else {
-        scale_w = (float)in_w / (float)out_w;
-    }
+    float scale_h = interp_scale(in_h, out_h, align_corners);
+    float scale_w = interp_scale(in_w, out_w, align_corners);
 
     for (int b = 0; b < batch; b++) {
         for (int c = 0; c < channels; c++) {
             for (int oh = 0; oh < out_h; oh++) {
-                float src_h;
-                if (align_corners && out_h > 1) {
-                    src_h = oh * scale_h;
-                } else {
-                    src_h = (oh + 0.5f) * scale_h - 0.5f;
-                }
+                float src_h = interp_src_coord(oh, scale_h, out_h, align_corners);
 
                 int h0 = (int)floorf(src_h);
                 int h1 = h0 + 1;
@@ -125,12 +133,7 @@ static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w,
                 if (h1 >= in_h) h1 = in_h - 1;
 
                 for (int ow = 0; ow < out_w; ow++) {
-                    float src_w;
-                    if (align_corners && out_w > 1) {
-                        src_w = ow * scale_w;
-                    } else {
-                        src_w = (ow + 0.5f) * scale_w - 0.5f;
-                    }
+                    float src_w = interp_src_coord(ow, scale_w, out_w, align_corners);
 
                     int w0 = (int)floorf(src_w);
                     int w1 = w0 + 1;
@@ -172,50 +175,26 @@ static Tensor* interpolate_bicubic_4d(Tensor* input, int out_h, int out_w,
     int in_h     = input->shape[2];
     int in_w     = input->shape[3];
 
-    int out_shape[] = {batch, channels, out_h, out_w};
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_zeros(out_shape, 4, &config);
+    float *in_data, *out_data;
+    Tensor* output = interp_alloc_output(input, out_h, out_w, &in_data, &out_data);
     if (!output)
         return NULL;
 
-    float* in_data  = (float*)input->data;
-    float* out_data = (float*)output->data;
-
-    float scale_h, scale_w;
-    if (align_corners && out_h > 1) {
-        scale_h = (float)(in_h - 1) / (float)(out_h - 1);
-    } else {
-        scale_h = (float)in_h / (float)out_h;
-    }
-    if (align_corners && out_w > 1) {
-        scale_w = (float)(in_w - 1) / (float)(out_w - 1);
-    } else {
-        scale_w = (float)in_w / (float)out_w;
-    }
+    float scale_h = interp_scale(in_h, out_h, align_corners);
+    float scale_w = interp_scale(in_w, out_w, align_corners);
 
     for (int b = 0; b < batch; b++) {
         for (int c = 0; c < channels; c++) {
             int base = (b * channels + c) * in_h;
 
             for (int oh = 0; oh < out_h; oh++) {
-                float src_h;
-                if (align_corners && out_h > 1) {
-                    src_h = oh * scale_h;
-                } else {
-                    src_h = (oh + 0.5f) * scale_h - 0.5f;
-                }
+                float src_h = interp_src_coord(oh, scale_h, out_h, align_corners);
 
                 int h_floor = (int)floorf(src_h);
                 float fh    = src_h - h_floor;
 
                 for (int ow = 0; ow < out_w; ow++) {
-                    float src_w;
-                    if (align_corners && out_w > 1) {
-                        src_w = ow * scale_w;
-                    } else {
-                        src_w = (ow + 0.5f) * scale_w - 0.5f;
-                    }
+                    float src_w = interp_src_coord(ow, scale_w, out_w, align_corners);
 
                     int w_floor = (int)floorf(src_w);
                     float fw    = src_w - w_floor;

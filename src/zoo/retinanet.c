@@ -1,4 +1,5 @@
 #include "zoo/retinanet.h"
+#include "zoo/zoo.h"
 #include "zoo/resnet.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
@@ -64,17 +65,6 @@ typedef struct {
     Module* extra_p6;
     Module* extra_p7;
 } FPN;
-
-/* Lateral 1x1 conv on this level's backbone feature, plus the coarser pyramid
- * level upsampled (nearest) to this level's spatial size. */
-static Tensor* fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser) {
-    Tensor* lat = module_forward(lateral, c);
-    if (!lat) return NULL;
-    int out_size[2] = {lat->shape[2], lat->shape[3]};
-    Tensor* up = f_interpolate(p_coarser, out_size, 2, UPSAMPLE_NEAREST, false);
-    if (!up) return NULL;
-    return uop_add(lat, up);
-}
 
 /* Standalone module interface takes a single tensor, so it maps C5 -> P5.
  * The full top-down pyramid runs in retinanet_forward, which can see the
@@ -172,9 +162,9 @@ static Tensor* retinanet_forward(Module* module, Tensor* input) {
      * level P3; per-level heads would need multi-output support. */
     Tensor* p5 = module_forward(fpn->lateral5, c5);
     if (!p5) return NULL;
-    Tensor* p4 = fpn_topdown_add(fpn->lateral4, c4, p5);
+    Tensor* p4 = zoo_fpn_topdown_add(fpn->lateral4, c4, p5);
     if (!p4) return NULL;
-    Tensor* p3 = fpn_topdown_add(fpn->lateral3, c3, p4);
+    Tensor* p3 = zoo_fpn_topdown_add(fpn->lateral3, c3, p4);
     if (!p3) return NULL;
     p3 = module_forward(fpn->smooth3, p3);
     if (!p3) return NULL;

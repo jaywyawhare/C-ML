@@ -2,6 +2,7 @@
 #include "ops/ir/optimization.h"
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/intern.h"
 #include "core/logging.h"
 #include "core/cml_flags.h"
 #include "ops/ir/z3_verify.h"
@@ -11,19 +12,6 @@
 #include <stdbool.h>
 #include "alloc/cml_allocator.h"
 
-static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* output_name) {
-    if (!ir || !output_name)
-        return NULL;
-
-    struct IRNode* node = ir->head;
-    while (node) {
-        if (node->output_name && strcmp(node->output_name, output_name) == 0) {
-            return node;
-        }
-        node = node->next;
-    }
-    return NULL;
-}
 
 static int build_dependency_graph(CMLGraph_t ir) {
     if (!ir)
@@ -43,7 +31,7 @@ static int build_dependency_graph(CMLGraph_t ir) {
     node = ir->head;
     while (node) {
         for (int i = 0; i < node->num_inputs; i++) {
-            struct IRNode* producer = find_node_by_output(ir, node->input_names[i]);
+            struct IRNode* producer = cml_ir_find_by_output(ir, node->input_names[i]);
             if (producer) {
                 if (producer->use_count >= producer->users_capacity) {
                     int new_capacity =
@@ -96,7 +84,7 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
         struct IRNode* current = stack[--stack_top];
 
         for (int i = 0; i < current->num_inputs; i++) {
-            struct IRNode* producer = find_node_by_output(ir, current->input_names[i]);
+            struct IRNode* producer = cml_ir_find_by_output(ir, current->input_names[i]);
             if (producer && !producer->is_used) {
                 producer->is_used = true;
                 if (stack_top >= stack_capacity) {
@@ -185,6 +173,9 @@ static int remove_dead_nodes(CMLGraph_t ir) {
             if (node->saved_for_backward) {
                 cml_free(node->saved_for_backward);
             }
+            /* Same reason as decompose: a dead node must leave the CSE table
+             * before its memory goes, or a later lookup probes a freed node. */
+            cml_intern_remove(ir->intern_table, node);
             cml_free(node);
 
             ir->node_count--;
@@ -373,6 +364,14 @@ static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) 
     return NULL;
 }
 
+/* Bind a fused kernel onto both nodes of a fused pair. */
+static void mark_fused_pair(struct IRNode* n1, struct IRNode* n2, FusedKernel* kernel,
+                            FusionType fusion_type) {
+    n1->fused_kernel = n2->fused_kernel = kernel;
+    n1->is_fused     = n2->is_fused     = true;
+    n1->fusion_type  = n2->fusion_type  = fusion_type;
+}
+
 static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType fusion_type) {
     if (!node1 || !node2)
         return -1;
@@ -388,12 +387,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
             struct IRNode* ops[] = {node1, node2};
             FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_FMA);
             if (kernel) {
-                node1->fused_kernel = kernel;
-                node2->fused_kernel = kernel;
-                node1->is_fused     = true;
-                node2->is_fused     = true;
-                node1->fusion_type  = fusion_type;
-                node2->fusion_type  = fusion_type;
+                mark_fused_pair(node1, node2, kernel, fusion_type);
             }
         }
         break;
@@ -427,12 +421,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
             struct IRNode* ops[] = {node1, node2};
             FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_NEG_ADD);
             if (kernel) {
-                node1->fused_kernel = kernel;
-                node2->fused_kernel = kernel;
-                node1->is_fused     = true;
-                node2->is_fused     = true;
-                node1->fusion_type  = fusion_type;
-                node2->fusion_type  = fusion_type;
+                mark_fused_pair(node1, node2, kernel, fusion_type);
             }
         }
         break;
@@ -442,12 +431,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_EXP_LOG);
         if (kernel) {
-            node1->fused_kernel = kernel;
-            node2->fused_kernel = kernel;
-            node1->is_fused     = true;
-            node2->is_fused     = true;
-            node1->fusion_type  = fusion_type;
-            node2->fusion_type  = fusion_type;
+            mark_fused_pair(node1, node2, kernel, fusion_type);
         }
         break;
     }
@@ -456,12 +440,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_MUL_DIV);
         if (kernel) {
-            node1->fused_kernel = kernel;
-            node2->fused_kernel = kernel;
-            node1->is_fused     = true;
-            node2->is_fused     = true;
-            node1->fusion_type  = fusion_type;
-            node2->fusion_type  = fusion_type;
+            mark_fused_pair(node1, node2, kernel, fusion_type);
         }
         break;
     }
@@ -470,12 +449,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_SQRT_MUL);
         if (kernel) {
-            node1->fused_kernel = kernel;
-            node2->fused_kernel = kernel;
-            node1->is_fused     = true;
-            node2->is_fused     = true;
-            node1->fusion_type  = fusion_type;
-            node2->fusion_type  = fusion_type;
+            mark_fused_pair(node1, node2, kernel, fusion_type);
         }
         break;
     }
@@ -484,12 +458,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_EXP_RECIP);
         if (kernel) {
-            node1->fused_kernel = kernel;
-            node2->fused_kernel = kernel;
-            node1->is_fused     = true;
-            node2->is_fused     = true;
-            node1->fusion_type  = fusion_type;
-            node2->fusion_type  = fusion_type;
+            mark_fused_pair(node1, node2, kernel, fusion_type);
         }
         break;
     }
@@ -499,12 +468,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         struct IRNode* ops[] = {node1, node2};
         FusedKernel* kernel  = create_fused_kernel(ops, 2, fusion_type);
         if (kernel) {
-            node1->fused_kernel = kernel;
-            node2->fused_kernel = kernel;
-            node1->is_fused     = true;
-            node2->is_fused     = true;
-            node1->fusion_type  = fusion_type;
-            node2->fusion_type  = fusion_type;
+            mark_fused_pair(node1, node2, kernel, fusion_type);
         }
         break;
     }
@@ -653,7 +617,7 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
     for (int i = 0; i < ir->node_count; i++) {
         in_degree[i] = 0;
         for (int j = 0; j < all_nodes[i]->num_inputs; j++) {
-            struct IRNode* producer = find_node_by_output(ir, all_nodes[i]->input_names[j]);
+            struct IRNode* producer = cml_ir_find_by_output(ir, all_nodes[i]->input_names[j]);
             if (producer) {
                 in_degree[i]++;
             }

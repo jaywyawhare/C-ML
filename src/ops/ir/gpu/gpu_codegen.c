@@ -223,8 +223,14 @@ static LLVMModuleRef gpu_build_binary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
     case UOP_MAX: {
+        /* NaN propagates (torch.maximum), so an ordered select is not enough --
+         * it is false for NaN and would return the other operand. v0+v1 is NaN
+         * whenever either operand is. */
         LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, v0, v1, "gt");
-        result = LLVMBuildSelect(bld, cmp, v0, v1, "max");
+        LLVMValueRef m   = LLVMBuildSelect(bld, cmp, v0, v1, "max");
+        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, v0, v1, "uno");
+        LLVMValueRef sum = LLVMBuildFAdd(bld, v0, v1, "nanprop");
+        result = LLVMBuildSelect(bld, uno, sum, m, "maxn");
         break;
     }
     case UOP_CMPLT: {
@@ -282,15 +288,30 @@ static LLVMModuleRef gpu_build_binary_op(LLVMContextRef ctx, UOpType type,
 }
 
 // Unary: void kernel(ptr(1) in, ptr(1) out, i32 n, i32 in_n)
+/* The scalar and address-space-1 pointer types every generated GPU kernel
+ * declares. */
+typedef struct {
+    LLVMTypeRef f32, i32, i64, ptr1, void_t;
+} GPUTypes;
+
+static GPUTypes gpu_types(LLVMContextRef ctx) {
+    return (GPUTypes){
+        .f32    = LLVMFloatTypeInContext(ctx),
+        .i32    = LLVMInt32TypeInContext(ctx),
+        .i64    = LLVMInt64TypeInContext(ctx),
+        .ptr1   = LLVMPointerTypeInContext(ctx, 1),
+        .void_t = LLVMVoidTypeInContext(ctx),
+    };
+}
+
 static LLVMModuleRef gpu_build_unary_op(LLVMContextRef ctx, UOpType type,
                                          const char* fn_name, CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, i32, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 4, 0);
@@ -500,11 +521,10 @@ static LLVMModuleRef gpu_build_fill_op(LLVMContextRef ctx, const char* fn_name,
                                         float fill_value, CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 2, 0);
@@ -537,11 +557,10 @@ static LLVMModuleRef gpu_build_where_op(LLVMContextRef ctx, const char* fn_name,
                                          CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, ptr1, ptr1, i32, i32, i32, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 8, 0);
@@ -599,11 +618,10 @@ static LLVMModuleRef gpu_build_reduction(LLVMContextRef ctx, UOpType type,
                                           const char* fn_name, CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 3, 0);
@@ -638,12 +656,32 @@ static LLVMModuleRef gpu_build_reduction(LLVMContextRef ctx, UOpType type,
     if (type == UOP_SUM || type == UOP_MEAN) {
         LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpFAdd, out_gep, val,
                            LLVMAtomicOrderingMonotonic, 0);
-    } else if (type == UOP_MAX_REDUCE) {
-        LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpFMax, out_gep, val,
+    } else if (type == UOP_MAX_REDUCE || type == UOP_MIN_REDUCE) {
+        /* atomicrmw fmax/fmin use IEEE maxnum/minnum: a NaN element is simply
+         * dropped, so the reduction would report the largest finite value for a
+         * tensor that contains NaN. Store NaN outright when one appears, and
+         * otherwise take the ordinary atomic path. */
+        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, val, val, "isnan");
+        LLVMBasicBlockRef cur   = LLVMGetInsertBlock(bld);
+        LLVMValueRef      fn_cur = LLVMGetBasicBlockParent(cur);
+        LLVMBasicBlockRef bb_nan = LLVMAppendBasicBlock(fn_cur, "red.nan");
+        LLVMBasicBlockRef bb_ord = LLVMAppendBasicBlock(fn_cur, "red.ord");
+        LLVMBasicBlockRef bb_end = LLVMAppendBasicBlock(fn_cur, "red.end");
+        LLVMBuildCondBr(bld, uno, bb_nan, bb_ord);
+
+        LLVMPositionBuilderAtEnd(bld, bb_nan);
+        LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpXchg, out_gep, val,
                            LLVMAtomicOrderingMonotonic, 0);
-    } else if (type == UOP_MIN_REDUCE) {
-        LLVMBuildAtomicRMW(bld, LLVMAtomicRMWBinOpFMin, out_gep, val,
-                           LLVMAtomicOrderingMonotonic, 0);
+        LLVMBuildBr(bld, bb_end);
+
+        LLVMPositionBuilderAtEnd(bld, bb_ord);
+        LLVMBuildAtomicRMW(bld,
+                           type == UOP_MAX_REDUCE ? LLVMAtomicRMWBinOpFMax
+                                                  : LLVMAtomicRMWBinOpFMin,
+                           out_gep, val, LLVMAtomicOrderingMonotonic, 0);
+        LLVMBuildBr(bld, bb_end);
+
+        LLVMPositionBuilderAtEnd(bld, bb_end);
     } else if (type == UOP_PROD) {
         /* LLVM has no atomic float multiply, so accumulate the product with a
          * compare-and-swap loop:  do { cur = out[0]; } while(!cas(out,cur,cur*val)).
@@ -682,11 +720,10 @@ static LLVMModuleRef gpu_build_matmul(LLVMContextRef ctx, const char* fn_name,
                                        CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, ptr1, i32, i32, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 6, 0);
@@ -781,11 +818,10 @@ static LLVMModuleRef gpu_build_conv2d(LLVMContextRef ctx, const char* fn_name,
                                        CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     // 17 params: 4 pointers + 13 i32s
     LLVMTypeRef params[] = {
@@ -1021,11 +1057,10 @@ static LLVMModuleRef gpu_build_gather_op(LLVMContextRef ctx, const char* fn_name
                                           CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, ptr1, i32, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 5, 0);
@@ -1074,11 +1109,10 @@ static LLVMModuleRef gpu_build_permute_2d(LLVMContextRef ctx, const char* fn_nam
                                            CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, i32, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 4, 0);
@@ -1121,11 +1155,10 @@ static LLVMModuleRef gpu_build_expand_op(LLVMContextRef ctx, const char* fn_name
                                           CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, i32, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 4, 0);
@@ -1164,11 +1197,10 @@ static LLVMModuleRef gpu_build_reshape_op(LLVMContextRef ctx, const char* fn_nam
                                            CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
 
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef i32    = LLVMInt32TypeInContext(ctx);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef ptr1   = LLVMPointerTypeInContext(ctx, 1);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
+    GPUTypes t = gpu_types(ctx);
+    LLVMTypeRef f32 = t.f32, i32 = t.i32, i64 = t.i64, ptr1 = t.ptr1,
+                void_t = t.void_t;
+    (void)f32; (void)i64;
 
     LLVMTypeRef params[] = { ptr1, ptr1, i32 };
     LLVMTypeRef fn_type = LLVMFunctionType(void_t, params, 3, 0);

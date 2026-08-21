@@ -231,6 +231,26 @@ static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx,
     return LLVMBuildURem(bld, i, LLVMConstInt(i64, (unsigned long long)in_n, 0), "bidx");
 }
 
+/* Is `urem` by the operand's element count the correct broadcast mapping?
+ *
+ * These kernels are shape-blind -- they receive element counts, not shapes -- so
+ * the only broadcast they can express is "the operand tiles the output". That is
+ * exact when the operand is a scalar, is already output-sized, or its shape is a
+ * right-aligned suffix of the output's shape ([2,3] + [3]). It is WRONG whenever
+ * a dimension has to stretch: for [2,3] + [2,1] the modulo walks the operand
+ * 0,1,0,1,0,1 when it must be 0,0,0,1,1,1, so `x - mean(x, dim=1, keepdim=True)`
+ * -- the shape at the centre of layernorm and softmax -- silently mixed rows.
+ * Those nodes go to the interpreter, whose _broadcast_idx is shape-aware. */
+static bool jit_bcast_is_exact(const Tensor* in, const Tensor* out) {
+    if (!in || !out) return false;
+    if (in->numel == out->numel || in->numel == 1) return true;
+    if (in->ndim > out->ndim) return false;
+    for (int k = 1; k <= in->ndim; k++) {
+        if (in->shape[in->ndim - k] != out->shape[out->ndim - k]) return false;
+    }
+    return true;
+}
+
 /* -------------------------------------------------------------------------
  * Intrinsic helpers
  * ---------------------------------------------------------------------- */
@@ -247,12 +267,21 @@ static LLVMValueRef call1(LLVMBuilderRef bld, LLVMTypeRef f32,
 }
 
 /* Declare an external C libm function: float name(float) */
-static LLVMValueRef extern_f32(LLVMModuleRef mod, LLVMContextRef ctx,
-                                const char* name) {
+/* Declare a libm scalar function matching the kernel's element type: `erff` for
+ * float32, `erf` for float64. Declaring the float form while the call site types
+ * the argument as double is an ABI mismatch -- the callee reads a garbage float
+ * and the caller reads a garbage double back, which is how f64 erf/asin/acos/
+ * atan returned zeros. `base` is the double-precision name. */
+static LLVMValueRef extern_libm(LLVMModuleRef mod, LLVMContextRef ctx,
+                                const char* base, DType dt) {
+    char name[32];
+    int  is_f32 = (dt != DTYPE_FLOAT64);
+    snprintf(name, sizeof(name), "%s%s", base, is_f32 ? "f" : "");
+
     LLVMValueRef fn = LLVMGetNamedFunction(mod, name);
     if (fn) return fn;
-    LLVMTypeRef f32 = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef ft  = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+    LLVMTypeRef ety = is_f32 ? LLVMFloatTypeInContext(ctx) : LLVMDoubleTypeInContext(ctx);
+    LLVMTypeRef ft  = LLVMFunctionType(ety, (LLVMTypeRef[]){ety}, 1, 0);
     fn = LLVMAddFunction(mod, name, ft);
     LLVMSetLinkage(fn, LLVMExternalLinkage);
     return fn;
@@ -320,7 +349,12 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
             result = LLVMBuildSelect(bld, cmp, v0, v1, "r");
             break;
         }
-        default: result = LLVMBuildAdd(bld, v0, v1, "r"); break;
+        default:
+            /* Emitting an add for an op with no case would silently replace it.
+             * Abandon the kernel; the caller falls back to the interpreter. */
+            LLVMDisposeBuilder(bld);
+            LLVMDisposeModule(mod);
+            return NULL;
         }
     } else
     switch (type) {
@@ -331,8 +365,13 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         result = LLVMBuildFDiv(bld, v0, v1, "r");   /* IEEE: /0 = inf */
         break;
     case UOP_MAX: {
+        /* NaN propagates (torch.maximum), so an ordered select is not enough:
+         * v0+v1 is NaN whenever either operand is. */
         LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, v0, v1, "gt");
-        result = LLVMBuildSelect(bld, cmp, v0, v1, "r");
+        LLVMValueRef m   = LLVMBuildSelect(bld, cmp, v0, v1, "m");
+        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, v0, v1, "uno");
+        LLVMValueRef sum = LLVMBuildFAdd(bld, v0, v1, "nanprop");
+        result = LLVMBuildSelect(bld, uno, sum, m, "r");
         break;
     }
     case UOP_CMPLT: {
@@ -347,8 +386,9 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         break;
     }
     default:
-        result = LLVMBuildFAdd(bld, v0, v1, "r");
-        break;
+        LLVMDisposeBuilder(bld);
+        LLVMDisposeModule(mod);
+        return NULL;
     }
 
     LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
@@ -406,7 +446,10 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
             result = LLVMBuildSelect(bld, isn, neg, val, "r");
             break;
         }
-        default: result = val; break;
+        default:
+            LLVMDisposeBuilder(bld);
+            LLVMDisposeModule(mod);
+            return NULL;
         }
         goto store_result;
     }
@@ -469,28 +512,28 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
     case UOP_ASIN: {
-        LLVMValueRef f = extern_f32(mod, ctx, "asinf");
+        LLVMValueRef f = extern_libm(mod, ctx, "asin", dt);
         LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
         result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_ACOS: {
-        LLVMValueRef f = extern_f32(mod, ctx, "acosf");
+        LLVMValueRef f = extern_libm(mod, ctx, "acos", dt);
         LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
         result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_ATAN: {
-        LLVMValueRef f = extern_f32(mod, ctx, "atanf");
+        LLVMValueRef f = extern_libm(mod, ctx, "atan", dt);
         LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
         result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_ERF: {
-        LLVMValueRef f = extern_f32(mod, ctx, "erff");
+        LLVMValueRef f = extern_libm(mod, ctx, "erf", dt);
         LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
         result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
@@ -505,7 +548,9 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
 
     case UOP_ROUND:
-        result = call1(bld, f32, INTR1(mod, ctx, "llvm.round", 10, f32), val, "r");
+        /* llvm.round rounds halves away from zero; llvm.roundeven is the
+         * ties-to-even form numpy/PyTorch use. */
+        result = call1(bld, f32, INTR1(mod, ctx, "llvm.roundeven", 14, f32), val, "r");
         break;
 
     case UOP_SIGN: {
@@ -524,18 +569,24 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
     case UOP_RELU: {
-        /* max(x, 0) — LLVM recognises this and emits vmaxps */
-        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, val, zero_f, "gt");
-        result = LLVMBuildSelect(bld, cmp, val, zero_f, "r");
+        /* `x < 0 ? 0 : x`. The obvious `x > 0 ? x : 0` selects 0 for NaN, since
+         * an ordered compare is false on NaN -- that silently erases NaN, which
+         * is how a diverged tensor turns back into zeros. Identical for every
+         * finite value and still lowers to vmaxps-class code. */
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLT, val, zero_f, "lt");
+        result = LLVMBuildSelect(bld, cmp, zero_f, val, "r");
         break;
     }
 
     case UOP_RELU6: {
         LLVMValueRef six = LLVMConstReal(f32, 6.0f);
-        LLVMValueRef g0  = LLVMBuildFCmp(bld, LLVMRealOGT, val, zero_f, "g0");
-        LLVMValueRef cl  = LLVMBuildSelect(bld, g0, val, zero_f, "cl");
+        LLVMValueRef g0  = LLVMBuildFCmp(bld, LLVMRealOLT, val, zero_f, "l0");
+        LLVMValueRef cl  = LLVMBuildSelect(bld, g0, zero_f, val, "cl");
         LLVMValueRef l6  = LLVMBuildFCmp(bld, LLVMRealOLT, cl, six, "l6");
-        result = LLVMBuildSelect(bld, l6, cl, six, "r");
+        LLVMValueRef c6  = LLVMBuildSelect(bld, l6, cl, six, "c6");
+        /* NaN survived the lower clamp above but would be pinned to 6 here. */
+        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, val, val, "isnan");
+        result = LLVMBuildSelect(bld, uno, val, c6, "r");
         break;
     }
 
@@ -549,15 +600,17 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
     case UOP_TANH: {
-        /* 2*sigmoid(2x) - 1 */
-        LLVMValueRef two  = LLVMConstReal(f32, 2.0f);
-        LLVMValueRef tx   = LLVMBuildFMul(bld, two, val, "tx");
-        LLVMValueRef neg  = LLVMBuildFNeg(bld, tx, "ntx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, ctx, "llvm.exp", 8, f32), neg, "e");
-        LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
-        LLVMValueRef sig  = LLVMBuildFDiv(bld, one_f, denom, "sig");
-        LLVMValueRef sc   = LLVMBuildFMul(bld, two, sig, "sc");
-        result = LLVMBuildFSub(bld, sc, one_f, "r");
+        /* Call libm rather than composing 2*sigmoid(2x)-1.
+         *
+         * That identity cancels catastrophically for small x: it evaluates
+         * 1 - 1, so tanh(1e-8) returned exactly 0 (100% relative error) and
+         * tanh(1e-6) was off by 7%, while the interpreter -- which calls tanhf
+         * -- was accurate to 2.7e-8. It also lost the sign of -0 and flushed
+         * denormals. Calling the same function the interpreter does keeps the
+         * two paths bit-comparable. */
+        LLVMValueRef f = extern_libm(mod, ctx, "tanh", dt);
+        LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+        result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
@@ -584,8 +637,14 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
     default:
-        result = val; /* passthrough */
-        break;
+        /* No emission for this op. Abandon the kernel so the caller falls back
+         * to the interpreter, which has a kernel for every op and every dtype.
+         * Passing the input through would silently turn the op into an identity
+         * -- and because this path is also taken for f64, that is how an op the
+         * JIT cannot emit returned wrong values for non-f32 tensors. */
+        LLVMDisposeBuilder(bld);
+        LLVMDisposeModule(mod);
+        return NULL;
     }
 
 store_result:;
@@ -603,21 +662,44 @@ store_result:;
  * Reduction: out[0] = reduce(in[0..n])
  * Signature: void(ptr in, ptr out, i64 n)
  * ---------------------------------------------------------------------- */
+/* The `void(ptr in, ptr out, i64 n)` kernel skeleton every generated module
+ * starts from, together with the scalar types its body needs. */
+typedef struct {
+    LLVMModuleRef mod;
+    LLVMValueRef fn;
+    LLVMValueRef in_p, out_p;
+    LLVMTypeRef f32, ptr, i64, void_t;
+} LLVMKernel;
+
+static LLVMKernel begin_unary_kernel(LLVMContextRef ctx, const char* fn_name) {
+    LLVMKernel k;
+    k.mod    = LLVMModuleCreateWithNameInContext(fn_name, ctx);
+    k.f32    = LLVMFloatTypeInContext(ctx);
+    k.ptr    = LLVMPointerTypeInContext(ctx, 0);
+    k.i64    = LLVMInt64TypeInContext(ctx);
+    k.void_t = LLVMVoidTypeInContext(ctx);
+
+    LLVMTypeRef params[] = { k.ptr, k.ptr, k.i64 };
+    k.fn = LLVMAddFunction(k.mod, fn_name, LLVMFunctionType(k.void_t, params, 3, 0));
+    add_noalias(ctx, k.fn, 2);
+
+    k.in_p  = LLVMGetParam(k.fn, 0);
+    k.out_p = LLVMGetParam(k.fn, 1);
+    return k;
+}
+
 static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
                                      const char* fn_name, int64_t n_elems) {
-    LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
-
-    LLVMTypeRef params[] = { ptr, ptr, i64 };
-    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 3, 0);
-    LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
-    add_noalias(ctx, fn, 2);
-
-    LLVMValueRef in_p  = LLVMGetParam(fn, 0);
-    LLVMValueRef out_p = LLVMGetParam(fn, 1);
+    LLVMKernel k = begin_unary_kernel(ctx, fn_name);
+    LLVMModuleRef mod  = k.mod;
+    LLVMTypeRef f32    = k.f32;
+    LLVMTypeRef ptr    = k.ptr;
+    LLVMTypeRef i64    = k.i64;
+    LLVMTypeRef void_t = k.void_t;
+    LLVMValueRef fn    = k.fn;
+    LLVMValueRef in_p  = k.in_p;
+    LLVMValueRef out_p = k.out_p;
+    (void)ptr; (void)void_t;
     LLVMValueRef n     = LLVMConstInt(i64, (unsigned long long)n_elems, 0);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
@@ -646,7 +728,12 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     switch (type) {
     case UOP_MAX_REDUCE: {
         LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, val, acc, "gt");
-        new_acc = LLVMBuildSelect(bld, cmp, val, acc, "mx");
+        LLVMValueRef m   = LLVMBuildSelect(bld, cmp, val, acc, "mx");
+        /* An ordered compare is false for NaN, so a NaN element would simply be
+         * skipped and the reduction would report the largest finite value. */
+        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, val, acc, "uno");
+        LLVMValueRef sum = LLVMBuildFAdd(bld, val, acc, "nanprop");
+        new_acc = LLVMBuildSelect(bld, uno, sum, m, "mxn");
         break;
     }
     default: /* SUM, MEAN */
@@ -690,18 +777,16 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
 static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
                                           const char* fn_name, int64_t outer,
                                           int64_t inner, int64_t count) {
-    LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
-    LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
-    LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
-    LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
-    LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
-
-    LLVMTypeRef params[] = { ptr, ptr, i64 };
-    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 3, 0);
-    LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
-    add_noalias(ctx, fn, 2);
-    LLVMValueRef in_p  = LLVMGetParam(fn, 0);
-    LLVMValueRef out_p = LLVMGetParam(fn, 1);
+    LLVMKernel k = begin_unary_kernel(ctx, fn_name);
+    LLVMModuleRef mod  = k.mod;
+    LLVMTypeRef f32    = k.f32;
+    LLVMTypeRef ptr    = k.ptr;
+    LLVMTypeRef i64    = k.i64;
+    LLVMTypeRef void_t = k.void_t;
+    LLVMValueRef fn    = k.fn;
+    LLVMValueRef in_p  = k.in_p;
+    LLVMValueRef out_p = k.out_p;
+    (void)ptr; (void)void_t;
 
     LLVMValueRef c_nout   = LLVMConstInt(i64, (unsigned long long)(outer * inner), 0);
     LLVMValueRef c_inner  = LLVMConstInt(i64, (unsigned long long)inner, 0);
@@ -1222,7 +1307,7 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
  *   out_numel and each input's numel are baked in as compile-time constants, so
  *   broadcasting resolves at codegen time exactly like the other kernels.
  * ---------------------------------------------------------------------- */
-#define FE_UNUSED_REF (-1000000)   /* matches FUSED_UNUSED_REF in execution.c */
+#define FE_UNUSED_REF FUSED_UNUSED_REF
 
 /* Emit the scalar result of one primitive elementwise op. Mirrors fused_eval_block
  * (execution.c) and the per-op emission in build_binary_op/build_unary_op. */
@@ -1235,11 +1320,22 @@ static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMContex
     case UOP_SUB:     return LLVMBuildFSub(bld, a, b, "r");
     case UOP_MUL:     return LLVMBuildFMul(bld, a, b, "r");
     case UOP_DIV:     return LLVMBuildFDiv(bld, a, b, "r");
-    case UOP_MAX:     { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"gt"); return LLVMBuildSelect(bld,c1,a,b,"r"); }
-    case UOP_MINIMUM: { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"lt"); return LLVMBuildSelect(bld,c1,a,b,"r"); }
+    /* The fused-chain emitter needs the same NaN rule as the standalone kernels
+     * above: an ordered compare is false for NaN, so a plain select returns the
+     * other operand and the NaN disappears mid-chain. */
+    case UOP_MAX:     { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"gt");
+                        LLVMValueRef m=LLVMBuildSelect(bld,c1,a,b,"m");
+                        LLVMValueRef u=LLVMBuildFCmp(bld,LLVMRealUNO,a,b,"uno");
+                        return LLVMBuildSelect(bld,u,LLVMBuildFAdd(bld,a,b,"np"),m,"r"); }
+    case UOP_MINIMUM: { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"lt");
+                        LLVMValueRef m=LLVMBuildSelect(bld,c1,a,b,"m");
+                        LLVMValueRef u=LLVMBuildFCmp(bld,LLVMRealUNO,a,b,"uno");
+                        return LLVMBuildSelect(bld,u,LLVMBuildFAdd(bld,a,b,"np"),m,"r"); }
     case UOP_POW:     { LLVMValueRef f=INTR1(mod,ctx,"llvm.pow",8,f32);
                         LLVMTypeRef ft=LLVMFunctionType(f32,(LLVMTypeRef[]){f32,f32},2,0);
                         return LLVMBuildCall2(bld,ft,f,(LLVMValueRef[]){a,b},2,"r"); }
+    case UOP_RELU:    { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,zero,"lt");
+                        return LLVMBuildSelect(bld,c1,zero,a,"r"); }
     case UOP_NEG:     return LLVMBuildFNeg(bld, a, "r");
     case UOP_RECIP:   return LLVMBuildFDiv(bld, LLVMConstReal(f32,1.0), a, "r");
     case UOP_EXP:     return call1(bld,f32,INTR1(mod,ctx,"llvm.exp",8,f32),a,"r");
@@ -1256,7 +1352,12 @@ static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMContex
     case UOP_CMPNE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealUNE,a,b,"c"), f32, "r");
     case UOP_WHERE:   { LLVMValueRef nz=LLVMBuildFCmp(bld,LLVMRealONE,a,zero,"nz"); return LLVMBuildSelect(bld,nz,b,c,"r"); }
     case UOP_FILL:    return LLVMConstReal(f32, (double)konst);
-    default:          return zero;
+    /* Unknown op: refuse to emit rather than folding it to a constant. Returning
+     * zero here silently produced an all-zero result for any op the fuser admits
+     * but this switch has not learned yet (UOP_RELU did exactly that), and the
+     * node was still marked executed, so nothing downstream could notice. The
+     * caller drops the whole kernel and lets the interpreter run the chain. */
+    default:          return NULL;
     }
 }
 
@@ -1306,6 +1407,11 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
             ops[t] = LLVMBuildLoad2(bld, f32, gep, "v");
         }
         reg[s] = fe_emit_op(bld, mod, ctx, f32, fp->op[s], ops[0], ops[1], ops[2], fp->konst[s]);
+        if (!reg[s]) { /* op this backend can't emit -- abandon the kernel */
+            LLVMDisposeBuilder(bld);
+            LLVMDisposeModule(mod);
+            return NULL;
+        }
     }
 
     LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
@@ -1389,6 +1495,14 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         return cpu_execute_node(node);
     for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
         if (node->inputs[_i] && node->inputs[_i]->dtype != edt)
+            return cpu_execute_node(node);
+    }
+
+    /* Any operand needing a real (stretching) broadcast: these kernels index
+     * with urem over the element count and cannot express it. See
+     * jit_bcast_is_exact. */
+    for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
+        if (node->inputs[_i] && !jit_bcast_is_exact(node->inputs[_i], out))
             return cpu_execute_node(node);
     }
 

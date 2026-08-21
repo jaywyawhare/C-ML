@@ -10,6 +10,18 @@ typedef struct Optimizer Optimizer;
 typedef struct Tensor Tensor;
 typedef struct Dataset Dataset;
 
+/* Per-epoch shape of a parameter population (all weights, or all gradients).
+ * A single gradient-norm scalar hides the failure modes that matter -- dead
+ * units, a few exploding channels, a layer that stopped moving -- because they
+ * all average out. Percentiles come from a fixed-bin histogram over [min,max]
+ * rather than a sort, which would mean ordering every parameter in the model
+ * once per epoch for a chart that only needs quartiles. */
+typedef struct {
+    float min, p25, p50, p75, max;
+    float mean, std;
+    float frac_zero; /* share of exactly-zero entries: dead ReLUs, pruned weights */
+} DistributionSummary;
+
 typedef struct {
     float* epoch_training_losses;     // Array of training loss values per epoch
     float* epoch_training_accuracies; // Array of training accuracy values per epoch
@@ -37,6 +49,9 @@ typedef struct {
     char* lr_schedule;           // Learning rate scheduler name (e.g., "StepLR", "CosineAnnealing")
     char* lr_schedule_params;    // LR scheduler parameters (e.g., "step_size=30,gamma=0.5")
     float gradient_norm;         // Current gradient norm (for gradient health)
+    DistributionSummary* epoch_grad_dist;   // Per-epoch gradient distribution
+    DistributionSummary* epoch_weight_dist; // Per-epoch weight distribution
+    bool has_distributions;                 // Set once distributions are recorded
 
     float loss_reduction_rate; // Percentage reduction in loss
     float loss_stability;      // Standard deviation of recent losses
@@ -45,6 +60,10 @@ typedef struct {
     size_t expected_epochs; // Original expected number of epochs (before early stopping)
     size_t actual_epochs;   // Actual number of epochs completed (after early stopping)
 } TrainingMetrics;
+
+/* Materialised float data of `t` plus its element count; `numel` is recomputed
+ * from the shape when the tensor has not cached it. NULL when unavailable. */
+float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements);
 
 TrainingMetrics* training_metrics_create(size_t num_epochs);
 void training_metrics_start_epoch(TrainingMetrics* metrics);
@@ -64,6 +83,11 @@ void training_metrics_set_lr_schedule_params(TrainingMetrics* metrics, const cha
 void training_metrics_set_gradient_norm(TrainingMetrics* metrics, float grad_norm);
 float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** parameters,
                                                int num_parameters);
+
+/* Summarise the weight and gradient populations for `epoch`. Call once per
+ * epoch, after backward; skipped cheaply when the arrays were never allocated. */
+void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoch,
+                                           void** parameters, int num_parameters);
 
 /* incremental=true exports only completed epochs (for real-time updates) */
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
@@ -111,8 +135,12 @@ int training_metrics_evaluate_dataset(Module* model, Dataset* dataset,
 void training_metrics_mark_early_stop(size_t actual_epochs);
 
 /*
- * Call at end of training to ensure final epoch data is captured.
- * Needed because epoch tracking increments on the NEXT zero_grad call.
+ * Close the current epoch: records it as completed, advances the epoch index and
+ * exports. Call at the end of every epoch when using manual epoch control
+ * (which training_metrics_set_expected_epochs turns on) -- otherwise the index
+ * never moves and every epoch overwrites the first slot. Under automatic epoch
+ * detection, call it once at the end of training, since tracking there
+ * increments on the NEXT zero_grad call and the final epoch would be missed.
  */
 void training_metrics_complete_epoch(void);
 

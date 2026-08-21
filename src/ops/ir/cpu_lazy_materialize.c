@@ -1,4 +1,6 @@
 #include "ops/ir/cpu_lazy_materialize.h"
+#include "core/threefry.h"
+#include "alloc/cml_allocator.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -156,36 +158,37 @@ int cml_cpu_lazy_const(Tensor* out, const void* data, size_t data_size) {
     return 0;
 }
 
+/* These draw from the library's own counter-based RNG, not libc rand().
+ *
+ * cml_manual_seed() seeds the global CMLRNGState; rand() is never seeded by it,
+ * so seeding silently had no effect on any of these ops and a "fixed seed" run
+ * was not reproducible. Layer init already used this RNG, which is why only the
+ * uop_rand_* paths were affected. */
 int cml_cpu_lazy_rand_uniform(Tensor* out) {
     if (!out || !out->data)
         return -1;
-    for (size_t i = 0; i < out->numel; i++) {
-        float u = (float)rand() / ((float)RAND_MAX + 1.0f);
-        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, u);
-    }
+    CMLRNGState* rng = cml_rng_get_global();
+    if (!rng) return -1;
+    float* tmp = (float*)cml_malloc(out->numel * sizeof(float));
+    if (!tmp) return -1;
+    cml_rng_uniform(rng, tmp, out->numel);
+    for (size_t i = 0; i < out->numel; i++)
+        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, tmp[i]);
+    cml_free(tmp);
     return 0;
 }
 
 int cml_cpu_lazy_rand_normal(Tensor* out) {
     if (!out || !out->data)
         return -1;
-    size_t i = 0;
-    for (; i + 1 < out->numel; i += 2) {
-        float u1 = (float)(rand() + 1) / ((float)RAND_MAX + 2.0f);
-        float u2 = (float)rand() / ((float)RAND_MAX + 1.0f);
-        float r  = sqrtf(-2.0f * logf(u1));
-        float th = 2.0f * 3.14159265358979323846f * u2;
-        float z0 = r * cosf(th);
-        float z1 = r * sinf(th);
-        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, z0);
-        cml_cpu_lazy_store_float_elem(out->data, i + 1, out->dtype, z1);
-    }
-    if (i < out->numel) {
-        float u1 = (float)(rand() + 1) / ((float)RAND_MAX + 2.0f);
-        float u2 = (float)rand() / ((float)RAND_MAX + 1.0f);
-        float z  = sqrtf(-2.0f * logf(u1)) * cosf(2.0f * 3.14159265358979323846f * u2);
-        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, z);
-    }
+    CMLRNGState* rng = cml_rng_get_global();
+    if (!rng) return -1;
+    float* tmp = (float*)cml_malloc(out->numel * sizeof(float));
+    if (!tmp) return -1;
+    cml_rng_normal(rng, tmp, out->numel);
+    for (size_t i = 0; i < out->numel; i++)
+        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, tmp[i]);
+    cml_free(tmp);
     return 0;
 }
 
@@ -211,10 +214,15 @@ int cml_cpu_lazy_eye(Tensor* out, int n) {
 int cml_cpu_lazy_rand_int(Tensor* out, int low, int high) {
     if (!out || !out->data || high <= low)
         return -1;
-    int range = high - low;
-    for (size_t i = 0; i < out->numel; i++) {
-        int k = low + (int)(rand() % range);
-        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, (float)k);
-    }
+    CMLRNGState* rng = cml_rng_get_global();
+    if (!rng) return -1;
+    uint32_t range = (uint32_t)(high - low);
+    uint32_t* tmp = (uint32_t*)cml_malloc(out->numel * sizeof(uint32_t));
+    if (!tmp) return -1;
+    cml_rng_uint32(rng, tmp, out->numel);
+    for (size_t i = 0; i < out->numel; i++)
+        cml_cpu_lazy_store_float_elem(out->data, i, out->dtype,
+                                      (float)(low + (int)(tmp[i] % range)));
+    cml_free(tmp);
     return 0;
 }

@@ -161,85 +161,9 @@ static struct IRNode* create_wmma_node(const char* a_name, const char* b_name,
     return wmma;
 }
 
-static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* name) {
-    if (!ir || !name) return NULL;
-    struct IRNode* n = ir->head;
-    while (n) {
-        if (n->output_name && strcmp(n->output_name, name) == 0)
-            return n;
-        n = n->next;
-    }
-    return NULL;
-}
 
-static void replace_refs(CMLGraph_t ir, const char* old_name, const char* new_name) {
-    if (!ir || !old_name || !new_name) return;
-    struct IRNode* n = ir->head;
-    while (n) {
-        for (int i = 0; i < n->num_inputs; i++) {
-            if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
-                cml_free(n->input_names[i]);
-                n->input_names[i] = cml_strdup(new_name);
-            }
-        }
-        n = n->next;
-    }
-}
 
-static void insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode* before) {
-    if (!ir || !new_node) return;
-    new_node->next = NULL;
 
-    if (!before || !ir->head) {
-        if (ir->tail)
-            ir->tail->next = new_node;
-        else
-            ir->head = new_node;
-        ir->tail = new_node;
-        ir->node_count++;
-        return;
-    }
-
-    if (ir->head == before) {
-        new_node->next = before;
-        ir->head = new_node;
-        ir->node_count++;
-        return;
-    }
-
-    struct IRNode* prev = ir->head;
-    while (prev && prev->next != before)
-        prev = prev->next;
-
-    if (prev) {
-        new_node->next = before;
-        prev->next = new_node;
-    } else {
-        ir->tail->next = new_node;
-        ir->tail = new_node;
-    }
-    ir->node_count++;
-}
-
-static void unlink_node(CMLGraph_t ir, struct IRNode* node) {
-    if (!ir || !node) return;
-
-    if (ir->head == node) {
-        ir->head = node->next;
-        if (ir->tail == node) ir->tail = NULL;
-        ir->node_count--;
-        return;
-    }
-
-    struct IRNode* prev = ir->head;
-    while (prev && prev->next != node)
-        prev = prev->next;
-    if (prev) {
-        prev->next = node->next;
-        if (ir->tail == node) ir->tail = prev;
-        ir->node_count--;
-    }
-}
 
 static void free_node(struct IRNode* node) {
     if (!node) return;
@@ -294,7 +218,7 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
                 struct IRNode* pad_a = create_pad_node(NULL, a_name, padded_a, ndim_a);
                 cml_free(padded_a);
                 if (pad_a) {
-                    insert_before(ir, pad_a, node);
+                    cml_ir_insert_before(ir, pad_a, node);
                     final_a = pad_a->output_name;
                 }
             }
@@ -309,7 +233,7 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
                 struct IRNode* pad_b = create_pad_node(NULL, b_name, padded_b, ndim_b);
                 cml_free(padded_b);
                 if (pad_b) {
-                    insert_before(ir, pad_b, node);
+                    cml_ir_insert_before(ir, pad_b, node);
                     final_b = pad_b->output_name;
                 }
             }
@@ -334,7 +258,7 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     cml_free(out_shape);
     if (!wmma) return 0;
 
-    insert_before(ir, wmma, node);
+    cml_ir_insert_before(ir, wmma, node);
 
     if (needs_pad && node->output_shape) {
         int* slice_shape = cml_malloc((size_t)out_ndim * sizeof(int));
@@ -350,10 +274,10 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
                     slice->output_name = tc_unique_name();
                     slice->output_ndim = out_ndim;
                     slice->output_shape = slice_shape;
-                    insert_before(ir, slice, node);
+                    cml_ir_insert_before(ir, slice, node);
 
                     if (node->output_name)
-                        replace_refs(ir, node->output_name, slice->output_name);
+                        cml_ir_replace_refs(ir, node->output_name, slice->output_name);
                     if (node->output && slice->output_name) {
                         node->output->ir_node = slice;
                         node->output->ir_context = ir;
@@ -368,14 +292,14 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
         }
     } else {
         if (node->output_name)
-            replace_refs(ir, node->output_name, wmma->output_name);
+            cml_ir_replace_refs(ir, node->output_name, wmma->output_name);
         if (node->output) {
             node->output->ir_node = wmma;
             node->output->ir_context = ir;
         }
     }
 
-    unlink_node(ir, node);
+    cml_ir_unlink_node(ir, node);
     free_node(node);
 
     LOG_DEBUG("TC opt: rewrote MATMUL [%d,%d,%d] -> WMMA [%d,%d,%d]", m, n, k, pm, pn, pk);
@@ -387,20 +311,20 @@ static bool is_fused_matmul_pattern(CMLGraph_t ir, struct IRNode* reduce_node,
     if (!reduce_node || reduce_node->type != UOP_SUM || reduce_node->num_inputs != 1)
         return false;
 
-    struct IRNode* mul = find_node_by_output(ir, reduce_node->input_names[0]);
+    struct IRNode* mul = cml_ir_find_by_output(ir, reduce_node->input_names[0]);
     if (!mul || mul->type != UOP_MUL || mul->num_inputs != 2)
         return false;
 
-    struct IRNode* expand_a = find_node_by_output(ir, mul->input_names[0]);
-    struct IRNode* expand_b = find_node_by_output(ir, mul->input_names[1]);
+    struct IRNode* expand_a = cml_ir_find_by_output(ir, mul->input_names[0]);
+    struct IRNode* expand_b = cml_ir_find_by_output(ir, mul->input_names[1]);
 
     if (!expand_a || expand_a->type != UOP_EXPAND || expand_a->num_inputs != 1)
         return false;
     if (!expand_b || expand_b->type != UOP_EXPAND || expand_b->num_inputs != 1)
         return false;
 
-    *out_a = find_node_by_output(ir, expand_a->input_names[0]);
-    *out_b = find_node_by_output(ir, expand_b->input_names[0]);
+    *out_a = cml_ir_find_by_output(ir, expand_a->input_names[0]);
+    *out_b = cml_ir_find_by_output(ir, expand_b->input_names[0]);
 
     if (!*out_a || !*out_b) return false;
 
@@ -442,10 +366,10 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node,
     cml_free(out_shape);
     if (!wmma) return 0;
 
-    insert_before(ir, wmma, reduce_node);
+    cml_ir_insert_before(ir, wmma, reduce_node);
 
     if (reduce_node->output_name)
-        replace_refs(ir, reduce_node->output_name, wmma->output_name);
+        cml_ir_replace_refs(ir, reduce_node->output_name, wmma->output_name);
     if (reduce_node->output) {
         reduce_node->output->ir_node = wmma;
         reduce_node->output->ir_context = ir;

@@ -441,6 +441,29 @@ Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
     return uop_sum(diff, &reduce_params);
 }
 
+/* Per-sample sparse cross-entropy over the last axis:
+ * -input[target] + log(sum(exp(input))). When `log_sum_exp_out` is non-NULL the
+ * log-sum-exp term is returned through it (the smoothing variant reuses it). */
+static Tensor* ce_loss_per_sample(Tensor* input, Tensor* target, Tensor** log_sum_exp_out) {
+    Tensor* target_logits = uop_gather(input, target, -1);
+    if (!target_logits) return NULL;
+
+    Tensor* exp_logits = uop_exp(input);
+    if (!exp_logits) return NULL;
+
+    int sum_dims[] = {input->ndim - 1};
+    ReduceParams sum_params = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
+
+    Tensor* sum_exp = uop_sum(exp_logits, &sum_params);
+    if (!sum_exp) return NULL;
+
+    Tensor* log_sum_exp = uop_log(sum_exp);
+    if (!log_sum_exp) return NULL;
+    if (log_sum_exp_out) *log_sum_exp_out = log_sum_exp;
+
+    return uop_add(uop_neg(target_logits), log_sum_exp);
+}
+
 Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("Sparse Cross Entropy Loss: input or target is NULL");
@@ -466,23 +489,7 @@ Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
         return NULL;
     }
 
-    Tensor* target_logits = uop_gather(input, target, -1);
-    if (!target_logits) return NULL;
-
-    Tensor* exp_logits = uop_exp(input);
-    if (!exp_logits) return NULL;
-
-    int sum_dim = input->ndim - 1;
-    int sum_dims[] = {sum_dim};
-    ReduceParams sum_params = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
-
-    Tensor* sum_exp = uop_sum(exp_logits, &sum_params);
-    if (!sum_exp) return NULL;
-
-    Tensor* log_sum_exp = uop_log(sum_exp);
-    if (!log_sum_exp) return NULL;
-
-    Tensor* loss_per_sample = uop_add(uop_neg(target_logits), log_sum_exp);
+    Tensor* loss_per_sample = ce_loss_per_sample(input, target, NULL);
     if (!loss_per_sample) return NULL;
 
     ReduceParams mean_params = {0};
@@ -587,6 +594,17 @@ Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, flo
     return uop_add(uop_mul(weight_pos, pos_loss), uop_mul(weight_neg, neg_loss));
 }
 
+/* Blend the plain cross-entropy against its uniform-target counterpart:
+ * (1 - eps) * ce + eps * uniform. */
+static Tensor* blend_label_smoothing(Tensor* ce_loss, Tensor* uniform_loss, float eps) {
+    int scalar_shape[] = {1};
+    Tensor* one_minus_eps = uop_fill(scalar_shape, 1, 1.0f - eps);
+    Tensor* eps_t         = uop_fill(scalar_shape, 1, eps);
+    if (!one_minus_eps || !eps_t)
+        return NULL;
+    return uop_add(uop_mul(one_minus_eps, ce_loss), uop_mul(eps_t, uniform_loss));
+}
+
 Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
                                           float label_smoothing) {
     if (!input || !target) {
@@ -654,20 +672,7 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     Tensor* uniform_loss = uop_mul(sum_neg_log, inv_k_t);
     if (!uniform_loss) return NULL;
 
-    float eps = label_smoothing;
-    Tensor* one_minus_eps_t = uop_fill(scalar_shape, 1, 1.0f - eps);
-    if (!one_minus_eps_t) return NULL;
-
-    Tensor* eps_t = uop_fill(scalar_shape, 1, eps);
-    if (!eps_t) return NULL;
-
-    Tensor* weighted_ce = uop_mul(one_minus_eps_t, ce_loss);
-    if (!weighted_ce) return NULL;
-
-    Tensor* weighted_uniform = uop_mul(eps_t, uniform_loss);
-    if (!weighted_uniform) return NULL;
-
-    return uop_add(weighted_ce, weighted_uniform);
+    return blend_label_smoothing(ce_loss, uniform_loss, label_smoothing);
 }
 
 Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
@@ -705,29 +710,15 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
 
     int num_classes = input->shape[input->ndim - 1];
 
-    Tensor* target_logits = uop_gather(input, target, -1);
-    if (!target_logits) return NULL;
-
-    Tensor* exp_logits = uop_exp(input);
-    if (!exp_logits) return NULL;
-
-    int sum_dim = input->ndim - 1;
-    int sum_dims[] = {sum_dim};
-    ReduceParams sum_params = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
-
-    Tensor* sum_exp = uop_sum(exp_logits, &sum_params);
-    if (!sum_exp) return NULL;
-
-    Tensor* log_sum_exp = uop_log(sum_exp);
-    if (!log_sum_exp) return NULL;
-
-    Tensor* loss_per_sample = uop_add(uop_neg(target_logits), log_sum_exp);
+    Tensor* log_sum_exp = NULL;
+    Tensor* loss_per_sample = ce_loss_per_sample(input, target, &log_sum_exp);
     if (!loss_per_sample) return NULL;
 
     ReduceParams mean_params = {0};
     Tensor* ce_loss = uop_mean(loss_per_sample, &mean_params);
     if (!ce_loss) return NULL;
 
+    int sum_dims[] = {input->ndim - 1};
     ReduceParams class_reduce = { .dims = sum_dims, .num_dims = 1, .keepdim = false };
     Tensor* input_sum = uop_sum(input, &class_reduce);
     if (!input_sum) return NULL;
@@ -754,20 +745,7 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     Tensor* uniform_loss = uop_mean(uniform_scaled, &uniform_mean);
     if (!uniform_loss) return NULL;
 
-    float eps = label_smoothing;
-    Tensor* one_minus_eps_t = uop_fill(scalar_shape, 1, 1.0f - eps);
-    if (!one_minus_eps_t) return NULL;
-
-    Tensor* eps_t = uop_fill(scalar_shape, 1, eps);
-    if (!eps_t) return NULL;
-
-    Tensor* weighted_ce = uop_mul(one_minus_eps_t, ce_loss);
-    if (!weighted_ce) return NULL;
-
-    Tensor* weighted_uniform = uop_mul(eps_t, uniform_loss);
-    if (!weighted_uniform) return NULL;
-
-    return uop_add(weighted_ce, weighted_uniform);
+    return blend_label_smoothing(ce_loss, uniform_loss, label_smoothing);
 }
 
 Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets) {

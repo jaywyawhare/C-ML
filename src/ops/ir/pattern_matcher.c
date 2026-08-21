@@ -1,6 +1,7 @@
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/tree_automaton.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/intern.h"
 #include "ops/uops.h"
 #include "core/logging.h"
 
@@ -27,16 +28,6 @@ static char* rewrite_unique_name(void) {
  * Find the IR node whose output_name matches @p name.
  * Linear scan over the graph's linked list.
  */
-static struct IRNode* find_node_by_output(CMLGraph_t ir, const char* name) {
-    if (!ir || !name) return NULL;
-    struct IRNode* n = ir->head;
-    while (n) {
-        if (n->output_name && strcmp(n->output_name, name) == 0)
-            return n;
-        n = n->next;
-    }
-    return NULL;
-}
 
 /**
  * Record a capture in a CMLMatchResult.
@@ -108,7 +99,7 @@ static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern,
                 return false;
 
             /* Find the producer node for this input. */
-            struct IRNode* producer = find_node_by_output(ir, node->input_names[i]);
+            struct IRNode* producer = cml_ir_find_by_output(ir, node->input_names[i]);
             if (!producer)
                 return false;
 
@@ -123,104 +114,21 @@ static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern,
     }
 }
 
-/**
- * After a rewrite produces a replacement node, rewire all downstream
- * nodes that referenced the old output_name to use the new output_name.
- */
-static void replace_output_references(CMLGraph_t ir,
-                                      const char* old_name,
-                                      const char* new_name) {
-    if (!ir || !old_name || !new_name) return;
 
-    struct IRNode* n = ir->head;
-    while (n) {
-        for (int i = 0; i < n->num_inputs; i++) {
-            if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
-                cml_free(n->input_names[i]);
-                n->input_names[i] = cml_strdup(new_name);
-            }
-        }
-        n = n->next;
-    }
-}
-
-/**
- * Insert @p new_node into the graph immediately before @p before.
- * If @p before is NULL the node is appended at the tail.
- */
-static void insert_node_before(CMLGraph_t ir, struct IRNode* new_node,
-                               struct IRNode* before) {
-    if (!ir || !new_node) return;
-
-    new_node->next = NULL;
-
-    if (!before || !ir->head) {
-        /* Append at tail. */
-        if (ir->tail) {
-            ir->tail->next = new_node;
-        } else {
-            ir->head = new_node;
-        }
-        ir->tail = new_node;
-        ir->node_count++;
-        return;
-    }
-
-    /* Find predecessor of 'before'. */
-    if (ir->head == before) {
-        new_node->next = before;
-        ir->head = new_node;
-        ir->node_count++;
-        return;
-    }
-
-    struct IRNode* prev = ir->head;
-    while (prev && prev->next != before) {
-        prev = prev->next;
-    }
-
-    if (prev) {
-        new_node->next = before;
-        prev->next = new_node;
-        ir->node_count++;
-    } else {
-        /* 'before' not found in list -- append at tail. */
-        ir->tail->next = new_node;
-        ir->tail = new_node;
-        ir->node_count++;
-    }
-}
 
 /**
  * Remove @p node from the linked list (does NOT free it).
  */
-static void unlink_node(CMLGraph_t ir, struct IRNode* node) {
-    if (!ir || !node) return;
-
-    if (ir->head == node) {
-        ir->head = node->next;
-        if (ir->tail == node) ir->tail = NULL;
-        ir->node_count--;
-        return;
-    }
-
-    struct IRNode* prev = ir->head;
-    while (prev && prev->next != node) {
-        prev = prev->next;
-    }
-    if (prev) {
-        prev->next = node->next;
-        if (ir->tail == node) ir->tail = prev;
-        ir->node_count--;
-    }
-}
 
 /**
  * Free an IRNode that has been unlinked from the graph.
  * Only frees the node-level bookkeeping (names, etc.), not
  * deep resources like tensor data or broadcast info.
  */
-static void free_unlinked_node(struct IRNode* node) {
+/* `ir` is needed only to drop the node from the CSE table: the table keys on
+ * node identity, so freeing a node that is still interned leaves a dangling
+ * entry for the next lookup to dereference. */
+static void free_unlinked_node(CMLGraph_t ir, struct IRNode* node) {
     if (!node) return;
 
     if (node->input_names) {
@@ -238,6 +146,7 @@ static void free_unlinked_node(struct IRNode* node) {
         node->output->ir_context = NULL;
     }
 
+    cml_intern_remove(ir->intern_table, node);
     cml_free(node);
 }
 
@@ -389,13 +298,13 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
                             }
                         }
                         if (!already_in_graph) {
-                            insert_node_before(ir, replacement, node);
+                            cml_ir_insert_before(ir, replacement, node);
                         }
 
                         /* Rewire all downstream references from the old
                          * node's output to the replacement's output. */
                         if (node->output_name && replacement->output_name) {
-                            replace_output_references(ir, node->output_name,
+                            cml_ir_replace_refs(ir, node->output_name,
                                                       replacement->output_name);
                         }
 
@@ -407,8 +316,8 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
                         }
 
                         /* Unlink and free the old node. */
-                        unlink_node(ir, node);
-                        free_unlinked_node(node);
+                        cml_ir_unlink_node(ir, node);
+                        free_unlinked_node(ir, node);
 
                         rewrites_this_pass++;
                         matched = true;
@@ -496,8 +405,8 @@ static struct IRNode* emit_mul_one(CMLGraph_t ir, const CMLMatchResult* m) {
     if (!root || root->type != UOP_MUL || root->num_inputs != 2) return NULL;
 
     /* Find producer of each operand. */
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     if (!lhs || !rhs) return NULL;
 
     if (is_fill_const(rhs, 1.0f)) return lhs;
@@ -510,8 +419,8 @@ static struct IRNode* emit_add_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_ADD || root->num_inputs != 2) return NULL;
 
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     if (!lhs || !rhs) return NULL;
 
     if (is_fill_const(rhs, 0.0f)) return lhs;
@@ -534,11 +443,11 @@ static struct IRNode* emit_exp_log(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_EXP || root->num_inputs != 1) return NULL;
 
-    struct IRNode* inner = find_node_by_output(ir, root->input_names[0]);
+    struct IRNode* inner = cml_ir_find_by_output(ir, root->input_names[0]);
     if (!inner || inner->type != UOP_LOG || inner->num_inputs != 1) return NULL;
 
     /* Return the input to LOG -- that is, x. */
-    struct IRNode* x = find_node_by_output(ir, inner->input_names[0]);
+    struct IRNode* x = cml_ir_find_by_output(ir, inner->input_names[0]);
     return x;
 }
 
@@ -546,10 +455,10 @@ static struct IRNode* emit_neg_neg(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_NEG || root->num_inputs != 1) return NULL;
 
-    struct IRNode* inner = find_node_by_output(ir, root->input_names[0]);
+    struct IRNode* inner = cml_ir_find_by_output(ir, root->input_names[0]);
     if (!inner || inner->type != UOP_NEG || inner->num_inputs != 1) return NULL;
 
-    struct IRNode* x = find_node_by_output(ir, inner->input_names[0]);
+    struct IRNode* x = cml_ir_find_by_output(ir, inner->input_names[0]);
     return x;
 }
 
@@ -563,7 +472,7 @@ static struct IRNode* emit_relu6_relu6(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_RELU6 || root->num_inputs != 1) return NULL;
 
-    struct IRNode* inner = find_node_by_output(ir, root->input_names[0]);
+    struct IRNode* inner = cml_ir_find_by_output(ir, root->input_names[0]);
     if (!inner || inner->type != UOP_RELU6) return NULL;
 
     /* relu6(relu6(x)) == relu6(x) -- return the inner node directly. */
@@ -581,8 +490,8 @@ static bool get_fill_value(struct IRNode* node, float* out) {
 static struct IRNode* emit_fold_add(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_ADD || root->num_inputs != 2) return NULL;
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     float a, b;
     if (!get_fill_value(lhs, &a) || !get_fill_value(rhs, &b)) return NULL;
     return make_fill_node(ir, a + b, root);
@@ -591,8 +500,8 @@ static struct IRNode* emit_fold_add(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_fold_sub(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_SUB || root->num_inputs != 2) return NULL;
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     float a, b;
     if (!get_fill_value(lhs, &a) || !get_fill_value(rhs, &b)) return NULL;
     return make_fill_node(ir, a - b, root);
@@ -601,8 +510,8 @@ static struct IRNode* emit_fold_sub(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_fold_mul(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_MUL || root->num_inputs != 2) return NULL;
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     float a, b;
     if (!get_fill_value(lhs, &a) || !get_fill_value(rhs, &b)) return NULL;
     return make_fill_node(ir, a * b, root);
@@ -611,8 +520,8 @@ static struct IRNode* emit_fold_mul(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_fold_div(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_DIV || root->num_inputs != 2) return NULL;
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     float a, b;
     if (!get_fill_value(lhs, &a) || !get_fill_value(rhs, &b)) return NULL;
     if (b == 0.0f) return NULL; /* avoid div-by-zero */
@@ -622,7 +531,7 @@ static struct IRNode* emit_fold_div(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_fold_neg(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_NEG || root->num_inputs != 1) return NULL;
-    struct IRNode* inner = find_node_by_output(ir, root->input_names[0]);
+    struct IRNode* inner = cml_ir_find_by_output(ir, root->input_names[0]);
     float a;
     if (!get_fill_value(inner, &a)) return NULL;
     return make_fill_node(ir, -a, root);
@@ -631,8 +540,8 @@ static struct IRNode* emit_fold_neg(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_mul_two(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_MUL || root->num_inputs != 2) return NULL;
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     if (!lhs || !rhs) return NULL;
 
     /* Check if either operand is FILL(2) */
@@ -665,8 +574,8 @@ static struct IRNode* emit_mul_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     (void)ir;
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_MUL || root->num_inputs != 2) return NULL;
-    struct IRNode* lhs = find_node_by_output(ir, root->input_names[0]);
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* lhs = cml_ir_find_by_output(ir, root->input_names[0]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     if (!lhs || !rhs) return NULL;
     if (!is_fill_const(rhs, 0.0f) && !is_fill_const(lhs, 0.0f)) return NULL;
     return make_fill_node(ir, 0.0f, root);
@@ -675,7 +584,7 @@ static struct IRNode* emit_mul_zero(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_DIV || root->num_inputs != 2) return NULL;
-    struct IRNode* rhs = find_node_by_output(ir, root->input_names[1]);
+    struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     float b;
     if (!get_fill_value(rhs, &b)) return NULL;
     if (b == 0.0f || b == 1.0f) return NULL; /* skip trivial or unsafe */
@@ -685,7 +594,7 @@ static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
     if (!recip_node) return NULL;
 
     /* Create MUL(x, recip) node */
-    insert_node_before(ir, recip_node, root);
+    cml_ir_insert_before(ir, recip_node, root);
 
     struct IRNode* mul_node = cml_calloc(1, sizeof(struct IRNode));
     if (!mul_node) return NULL;
@@ -709,9 +618,9 @@ static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
 static struct IRNode* emit_log_exp(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_LOG || root->num_inputs != 1) return NULL;
-    struct IRNode* inner = find_node_by_output(ir, root->input_names[0]);
+    struct IRNode* inner = cml_ir_find_by_output(ir, root->input_names[0]);
     if (!inner || inner->type != UOP_EXP || inner->num_inputs != 1) return NULL;
-    return find_node_by_output(ir, inner->input_names[0]);
+    return cml_ir_find_by_output(ir, inner->input_names[0]);
 }
 
 static struct IRNode* emit_sqrt_sq(CMLGraph_t ir, const CMLMatchResult* m) {
@@ -720,9 +629,9 @@ static struct IRNode* emit_sqrt_sq(CMLGraph_t ir, const CMLMatchResult* m) {
     /* Both operands must be the same SQRT node */
     if (!root->input_names[0] || !root->input_names[1]) return NULL;
     if (strcmp(root->input_names[0], root->input_names[1]) != 0) return NULL;
-    struct IRNode* sq = find_node_by_output(ir, root->input_names[0]);
+    struct IRNode* sq = cml_ir_find_by_output(ir, root->input_names[0]);
     if (!sq || sq->type != UOP_SQRT || sq->num_inputs != 1) return NULL;
-    return find_node_by_output(ir, sq->input_names[0]);
+    return cml_ir_find_by_output(ir, sq->input_names[0]);
 }
 
 /**
@@ -920,8 +829,8 @@ int cml_rewrite_dce(CMLGraph_t ir) {
     int removed = 0;
     for (int i = 0; i < count; i++) {
         if (!marked[i]) {
-            unlink_node(ir, nodes[i]);
-            free_unlinked_node(nodes[i]);
+            cml_ir_unlink_node(ir, nodes[i]);
+            free_unlinked_node(ir, nodes[i]);
             removed++;
         }
     }

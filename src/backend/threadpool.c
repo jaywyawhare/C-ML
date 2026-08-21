@@ -7,221 +7,249 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <time.h>
+#include <stdatomic.h>
+#include <stdint.h>
 #include "alloc/cml_allocator.h"
 
-typedef struct TaskNode {
-    Task task;
-    struct TaskNode* next;
-    volatile int completed_chunks; // Atomic counter for completed chunks
-    int total_chunks;
-    bool completed;
-} TaskNode;
+/*
+ * Fork/join thread pool built around a single "generation" broadcast plus
+ * atomic chunk claiming. The previous implementation had two independent,
+ * mutually-inconsistent code paths (a task queue the workers serviced, and a
+ * parallel_for that signalled a condition the workers never waited on) — its
+ * fork path deadlocked and its queue path could double-process a chunk. It only
+ * ever appeared to work because callers fell back to running serially.
+ *
+ * Contract (relied on by simd_sum_f32_parallel's slot math): parallel_for splits
+ * [0,n) into exactly `num_threads` contiguous chunks of size
+ * chunk = ceil(n / num_threads); chunk i covers [i*chunk, min(n,(i+1)*chunk)).
+ * So a chunk's start is always i*chunk, and start/chunk recovers i.
+ *
+ * A claim carries the generation it belongs to. When a batch finished, a worker
+ * did not leave `drain_chunks` at the same instant the submitter stopped waiting
+ * -- it kept probing the claim counter. Since the counters were reset in place,
+ * those stragglers consumed the *next* batch's chunk indices and counted them
+ * against the old batch, so the next batch was claimed but never completed:
+ * every worker slept while the submitter waited forever on a batch whose
+ * done_chunks stayed 0 (observed: next_chunk=26, done_chunks=0, num_chunks=12).
+ * Packing the generation into the claim word makes a straggler's claim fail its
+ * generation test and stop, so it cannot consume work it will not account for.
+ */
 
-typedef struct {
-    Task task;
-    pthread_t thread;
-    bool active;
-    bool completed;
-    size_t id;
-    ThreadPool* pool;
-} Worker;
+/* claim word: high 32 bits = generation, low 32 bits = next chunk index */
+#define CLAIM_MAKE(gen, idx) (((uint64_t)(uint32_t)(gen) << 32) | (uint32_t)(idx))
+#define CLAIM_GEN(c)         ((uint32_t)((c) >> 32))
+#define CLAIM_IDX(c)         ((uint32_t)((c) & 0xffffffffu))
 
 struct ThreadPool {
-    Worker* workers;
-    size_t num_threads;
+    pthread_t*      threads;
+    size_t          num_threads;
     pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    pthread_cond_t task_cond; // Condition for task availability
-    TaskNode* task_queue_head;
-    TaskNode* task_queue_tail;
-    size_t queue_size;
-    size_t active_tasks;
-    bool shutdown;
+    pthread_cond_t  work_ready;   /* workers wait here for a new batch     */
+    pthread_cond_t  work_done;    /* the submitter waits here for the batch */
+
+    /* Current batch (published under mutex, then read lock-free). */
+    TaskFunc          func;
+    void*             data;
+    size_t            total;      /* number of items                        */
+    size_t            chunk;      /* ceil(total / num_threads)              */
+    size_t            num_chunks; /* == num_threads for a live batch        */
+    _Atomic uint64_t  claim;      /* (generation << 32) | next chunk index  */
+    _Atomic size_t    done_chunks;/* chunks finished this batch             */
+    uint64_t          generation; /* bumped per batch; workers track last   */
+    bool              shutdown;
 };
 
 static pthread_mutex_t g_pool_lock;
-static bool g_pool_lock_initialized = false;
+static bool            g_pool_lock_initialized = false;
+static ThreadPool*     g_global_pool           = NULL;
 
-static inline void pool_lock(void) {
-    if (g_pool_lock_initialized) pthread_mutex_lock(&g_pool_lock);
-}
-static inline void pool_unlock(void) {
-    if (g_pool_lock_initialized) pthread_mutex_unlock(&g_pool_lock);
+static inline void pool_lock(void)   { if (g_pool_lock_initialized) pthread_mutex_lock(&g_pool_lock); }
+static inline void pool_unlock(void) { if (g_pool_lock_initialized) pthread_mutex_unlock(&g_pool_lock); }
+
+/* A thread's private copy of the batch descriptor, taken while it holds the
+ * mutex. The pool's own fields are recycled by the next submit, and a thread can
+ * still be inside a chunk when that happens, so reading them lock-free is a data
+ * race on every one of them. Copying once per batch costs a few words. */
+typedef struct {
+    TaskFunc func;
+    void*    data;
+    size_t   total;
+    size_t   chunk;
+    size_t   num_chunks;
+    uint32_t gen;
+} Batch;
+
+/* Snapshot the live batch. Caller must hold pool->mutex. */
+static Batch batch_snapshot(const ThreadPool* pool) {
+    Batch b;
+    b.func       = pool->func;
+    b.data       = pool->data;
+    b.total      = pool->total;
+    b.chunk      = pool->chunk;
+    b.num_chunks = pool->num_chunks;
+    b.gen        = (uint32_t)pool->generation;
+    return b;
 }
 
-static ThreadPool* g_global_pool = NULL;
+/* Run one chunk index against `b` (no-op for empty tail chunks). Returns after
+ * bumping done_chunks and, if it completed the batch, signalling. */
+static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
+    size_t start = c * b->chunk;
+    size_t end   = start + b->chunk;
+    if (end > b->total) end = b->total;
+    if (start < end)
+        b->func(b->data, start, end);
+    size_t done = atomic_fetch_add(&pool->done_chunks, 1) + 1;
+    if (done == b->num_chunks) {
+        pthread_mutex_lock(&pool->mutex);
+        pthread_cond_signal(&pool->work_done);
+        pthread_mutex_unlock(&pool->mutex);
+    }
+}
+
+/* Claim and run chunks of batch `b` until it is exhausted.
+ *
+ * The generation test is what keeps a straggler from eating the next batch's
+ * work: once the pool has moved on, this thread's claims no longer match and it
+ * leaves without consuming an index. Every index it does claim is one it runs
+ * and accounts for, so done_chunks always reaches num_chunks. */
+static void drain_chunks(ThreadPool* pool, const Batch* b) {
+    uint64_t cur = atomic_load(&pool->claim);
+    for (;;) {
+        if (CLAIM_GEN(cur) != b->gen) return;           /* batch moved on */
+        uint32_t idx = CLAIM_IDX(cur);
+        if (idx >= (uint32_t)b->num_chunks) return;     /* batch exhausted */
+        if (atomic_compare_exchange_weak(&pool->claim, &cur,
+                                         CLAIM_MAKE(b->gen, idx + 1))) {
+            run_chunk(pool, b, idx);
+            cur = atomic_load(&pool->claim);
+        }
+        /* CAS failure refreshes `cur`; retry against the new value. */
+    }
+}
 
 static void* worker_thread(void* arg) {
-    Worker* worker   = (Worker*)arg;
-    ThreadPool* pool = worker->pool;
-
-    while (1) {
+    ThreadPool* pool = (ThreadPool*)arg;
+    uint64_t last_gen = 0;
+    for (;;) {
         pthread_mutex_lock(&pool->mutex);
-
-        while (!pool->shutdown && pool->task_queue_head == NULL) {
-            pthread_cond_wait(&pool->task_cond, &pool->mutex);
-        }
-
+        while (!pool->shutdown && pool->generation == last_gen)
+            pthread_cond_wait(&pool->work_ready, &pool->mutex);
         if (pool->shutdown) {
             pthread_mutex_unlock(&pool->mutex);
             break;
         }
+        /* Advance one batch at a time rather than jumping to the current
+         * generation. A batch cannot complete without this worker's chunk, so
+         * the submitter cannot publish the next one until we have run this one;
+         * stepping by one makes that invariant explicit. */
+        last_gen++;
+        Batch b = batch_snapshot(pool);
+        b.gen   = (uint32_t)last_gen;
+        pthread_mutex_unlock(&pool->mutex);
 
-        // Get current task (all workers work on same task)
-        TaskNode* task_node = pool->task_queue_head;
-        if (task_node && !task_node->completed) {
-            Task task = task_node->task;
-            pool->active_tasks++;
-            pthread_mutex_unlock(&pool->mutex);
-
-            size_t chunk_size = task.total_size / pool->num_threads;
-            size_t start      = worker->id * chunk_size;
-            size_t end =
-                (worker->id == pool->num_threads - 1) ? task.total_size : start + chunk_size;
-
-            task.func(task.data, start, end);
-
-            pthread_mutex_lock(&pool->mutex);
-            task_node->completed_chunks++;
-            pool->active_tasks--;
-
-            // If all chunks completed, mark task as done and notify waiters
-            if (task_node->completed_chunks >= task_node->total_chunks) {
-                task_node->completed = true;
-                pool->task_queue_head = task_node->next;
-                if (!pool->task_queue_head) {
-                    pool->task_queue_tail = NULL;
-                }
-                pool->queue_size--;
-                cml_free(task_node);
-                pthread_cond_broadcast(&pool->cond);
-            }
-            pthread_mutex_unlock(&pool->mutex);
-        } else {
-            pthread_mutex_unlock(&pool->mutex);
-        }
+        drain_chunks(pool, &b);
     }
-
     return NULL;
 }
 
 ThreadPool* threadpool_create(size_t num_threads) {
     if (num_threads == 0) {
-        num_threads = (size_t)sysconf(_SC_NPROCESSORS_ONLN);
-        if (num_threads == 0) {
-            num_threads = 1;
-        }
+        long n = sysconf(_SC_NPROCESSORS_ONLN);
+        num_threads = (n > 0) ? (size_t)n : 1;
     }
 
-    ThreadPool* pool = cml_malloc(sizeof(ThreadPool));
+    ThreadPool* pool = cml_calloc(1, sizeof(ThreadPool));
     if (!pool) {
         LOG_ERROR("Failed to allocate thread pool");
         return NULL;
     }
-
     pool->num_threads = num_threads;
-    pool->workers     = cml_calloc(num_threads, sizeof(Worker));
-    if (!pool->workers) {
+    pool->generation  = 0;
+    pool->shutdown    = false;
+    atomic_store(&pool->claim, CLAIM_MAKE(0, 0));
+    atomic_store(&pool->done_chunks, 0);
+    pthread_mutex_init(&pool->mutex, NULL);
+    pthread_cond_init(&pool->work_ready, NULL);
+    pthread_cond_init(&pool->work_done, NULL);
+
+    /* One fewer OS thread than num_threads: the submitting thread participates
+     * in every batch, so `num_threads` total workers execute chunks. */
+    size_t spawn = num_threads > 0 ? num_threads - 1 : 0;
+    pool->threads = spawn ? cml_calloc(spawn, sizeof(pthread_t)) : NULL;
+    if (spawn && !pool->threads) {
         cml_free(pool);
         return NULL;
     }
-
-    pthread_mutex_init(&pool->mutex, NULL);
-    pthread_cond_init(&pool->cond, NULL);
-    pthread_cond_init(&pool->task_cond, NULL);
-    pool->task_queue_head = NULL;
-    pool->task_queue_tail = NULL;
-    pool->queue_size      = 0;
-    pool->active_tasks    = 0;
-    pool->shutdown        = false;
-
-    for (size_t i = 0; i < num_threads; i++) {
-        pool->workers[i].pool      = pool;
-        pool->workers[i].id        = i;
-        pool->workers[i].active    = false;
-        pool->workers[i].completed = false;
-        pthread_create(&pool->workers[i].thread, NULL, worker_thread, &pool->workers[i]);
+    for (size_t i = 0; i < spawn; i++) {
+        if (pthread_create(&pool->threads[i], NULL, worker_thread, pool) != 0) {
+            /* Shrink to the threads we actually created; still correct. */
+            pool->num_threads = i + 1;  /* +1 for the submitter */
+            break;
+        }
     }
-
-    LOG_DEBUG("Created thread pool with %zu threads", num_threads);
+    LOG_DEBUG("Created thread pool with %zu workers", pool->num_threads);
     return pool;
 }
 
 void threadpool_destroy(ThreadPool* pool) {
-    if (!pool) {
-        return;
-    }
+    if (!pool) return;
 
     pthread_mutex_lock(&pool->mutex);
     pool->shutdown = true;
-    pthread_cond_broadcast(&pool->cond);
+    pool->generation++;
+    pthread_cond_broadcast(&pool->work_ready);
     pthread_mutex_unlock(&pool->mutex);
 
-    for (size_t i = 0; i < pool->num_threads; i++) {
-        pthread_join(pool->workers[i].thread, NULL);
-    }
-
-    TaskNode* node = pool->task_queue_head;
-    while (node) {
-        TaskNode* next = node->next;
-        cml_free(node);
-        node = next;
-    }
+    size_t spawn = pool->num_threads > 0 ? pool->num_threads - 1 : 0;
+    for (size_t i = 0; i < spawn && pool->threads; i++)
+        pthread_join(pool->threads[i], NULL);
 
     pthread_mutex_destroy(&pool->mutex);
-    pthread_cond_destroy(&pool->cond);
-    pthread_cond_destroy(&pool->task_cond);
-    cml_free(pool->workers);
+    pthread_cond_destroy(&pool->work_ready);
+    pthread_cond_destroy(&pool->work_done);
+    cml_free(pool->threads);
     cml_free(pool);
 }
 
-int threadpool_submit(ThreadPool* pool, Task* task) {
-    if (!pool || !task) {
-        return -1;
-    }
-
-    TaskNode* task_node = cml_malloc(sizeof(TaskNode));
-    if (!task_node) {
-        LOG_ERROR("Failed to allocate task node");
-        return -1;
-    }
-
-    task_node->task             = *task;
-    task_node->next             = NULL;
-    task_node->completed_chunks = 0;
-    task_node->total_chunks     = (int)pool->num_threads;
-    task_node->completed        = false;
-
-    pthread_mutex_lock(&pool->mutex);
-
-    if (pool->task_queue_tail) {
-        pool->task_queue_tail->next = task_node;
-    } else {
-        pool->task_queue_head = task_node;
-    }
-    pool->task_queue_tail = task_node;
-    pool->queue_size++;
-
-    pthread_cond_broadcast(&pool->task_cond);
-    pthread_mutex_unlock(&pool->mutex);
-
-    return 0;
-}
-
-void threadpool_wait(ThreadPool* pool) {
-    if (!pool) {
+void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n) {
+    if (!pool) pool = threadpool_get_global();
+    if (n == 0 || !func) return;
+    if (!pool || pool->num_threads <= 1) {
+        func(data, 0, n);   /* single chunk == slot 0; matches sum's slot math */
         return;
     }
 
     pthread_mutex_lock(&pool->mutex);
+    pool->func       = func;
+    pool->data       = data;
+    pool->total      = n;
+    pool->chunk      = (n + pool->num_threads - 1) / pool->num_threads;  /* ceil */
+    pool->num_chunks = pool->num_threads;
+    pool->generation++;
+    atomic_store(&pool->done_chunks, 0);
+    atomic_store(&pool->claim, CLAIM_MAKE(pool->generation, 0));
+    Batch b = batch_snapshot(pool);
+    pthread_cond_broadcast(&pool->work_ready);
+    pthread_mutex_unlock(&pool->mutex);
 
-    while (pool->queue_size > 0 || pool->active_tasks > 0) {
-        pthread_cond_wait(&pool->cond, &pool->mutex);
-    }
+    /* The submitting thread is one of the workers. */
+    drain_chunks(pool, &b);
 
+    pthread_mutex_lock(&pool->mutex);
+    while (atomic_load(&pool->done_chunks) < pool->num_chunks)
+        pthread_cond_wait(&pool->work_done, &pool->mutex);
     pthread_mutex_unlock(&pool->mutex);
 }
+
+/* Legacy API kept for source compatibility (no current external caller). submit
+ * runs the task synchronously via the parallel machinery; wait is then a no-op. */
+int threadpool_submit(ThreadPool* pool, Task* task) {
+    if (!task) return -1;
+    threadpool_parallel_for(pool, task->func, task->data, task->total_size);
+    return 0;
+}
+void threadpool_wait(ThreadPool* pool) { (void)pool; }
 
 size_t threadpool_get_num_threads(ThreadPool* pool) { return pool ? pool->num_threads : 0; }
 
@@ -231,9 +259,8 @@ ThreadPool* threadpool_get_global(void) {
         g_pool_lock_initialized = true;
     }
     pool_lock();
-    if (!g_global_pool) {
+    if (!g_global_pool)
         g_global_pool = threadpool_create(0);
-    }
     ThreadPool* result = g_global_pool;
     pool_unlock();
     return result;
@@ -245,45 +272,8 @@ void threadpool_set_global(ThreadPool* pool) {
         g_pool_lock_initialized = true;
     }
     pool_lock();
-    if (g_global_pool && g_global_pool != pool) {
+    if (g_global_pool && g_global_pool != pool)
         threadpool_destroy(g_global_pool);
-    }
     g_global_pool = pool;
     pool_unlock();
-}
-
-void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n) {
-    if (!pool) {
-        pool = threadpool_get_global();
-    }
-
-    if (pool->num_threads == 1 || n < 1000) {
-        func(data, 0, n);
-        return;
-    }
-
-    for (size_t i = 0; i < pool->num_threads; i++) {
-        Task task               = {.func = func, .data = data, .total_size = n};
-        pool->workers[i].task   = task;
-        pool->workers[i].active = true;
-    }
-
-    pthread_cond_broadcast(&pool->cond);
-
-    pthread_mutex_lock(&pool->mutex);
-    bool all_completed = false;
-    while (!all_completed) {
-        all_completed = true;
-        for (size_t i = 0; i < pool->num_threads; i++) {
-            if (pool->workers[i].active && !pool->workers[i].completed) {
-                all_completed = false;
-                break;
-            }
-        }
-
-        if (!all_completed) {
-            pthread_cond_wait(&pool->cond, &pool->mutex);
-        }
-    }
-    pthread_mutex_unlock(&pool->mutex);
 }

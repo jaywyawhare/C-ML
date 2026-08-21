@@ -182,37 +182,9 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine
     gn->affine       = affine;
 
     if (affine) {
-        int param_shape[] = {num_channels};
-        TensorConfig config = (TensorConfig){
-            .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-
-        Tensor* weight = tensor_ones(param_shape, 1, &config);
-        if (!weight) {
-            module_free((Module*)gn);
+        if (nn_add_affine_params((Module*)gn, num_channels, dtype, device,
+                                 &gn->weight, &gn->bias) != 0)
             return NULL;
-        }
-
-        if (module_add_parameter((Module*)gn, weight, "weight", true) != 0) {
-            tensor_free(weight);
-            module_free((Module*)gn);
-            return NULL;
-        }
-
-        gn->weight = module_get_parameter((Module*)gn, "weight");
-
-        Tensor* bias = tensor_zeros(param_shape, 1, &config);
-        if (!bias) {
-            module_free((Module*)gn);
-            return NULL;
-        }
-
-        if (module_add_parameter((Module*)gn, bias, "bias", true) != 0) {
-            tensor_free(bias);
-            module_free((Module*)gn);
-            return NULL;
-        }
-
-        gn->bias = module_get_parameter((Module*)gn, "bias");
     } else {
         gn->weight = NULL;
         gn->bias   = NULL;

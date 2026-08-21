@@ -40,32 +40,6 @@
 
 static uint32_t g_nv_next_handle = 0x10000;
 
-typedef struct {
-    uint32_t hRoot;
-    uint32_t hObjectParent;
-    uint32_t hObjectNew;
-    uint32_t hClass;
-    void*    pAllocParms;
-    uint32_t status;
-} NV_RM_ALLOC_PARAMS;
-
-typedef struct {
-    uint32_t hClient;
-    uint32_t hObject;
-    uint32_t cmd;
-    uint32_t flags;
-    void*    params;
-    uint32_t paramsSize;
-    uint32_t status;
-} NV_RM_CONTROL_PARAMS;
-
-typedef struct {
-    uint32_t hRoot;
-    uint32_t hObjectParent;
-    uint32_t hObjectOld;
-    uint32_t status;
-} NV_RM_FREE_PARAMS;
-
 #define NV_IOCTL_RM_ALLOC    _IOWR('F', NV_ESC_RM_ALLOC,   NV_RM_ALLOC_PARAMS)
 #define NV_IOCTL_RM_CONTROL  _IOWR('F', NV_ESC_RM_CONTROL,  NV_RM_CONTROL_PARAMS)
 #define NV_IOCTL_RM_FREE     _IOWR('F', NV_ESC_RM_FREE,     NV_RM_FREE_PARAMS)
@@ -1231,7 +1205,7 @@ int cml_nv_synchronize(CMLNVDriver *drv) {
 }
 
 
-static char* nv_gen_ptx_for_node(struct IRNode *node, int sm) {
+char* cml_nv_gen_ptx_for_node(struct IRNode *node, int sm) {
     char *ptx = NULL;
     const char *kname = "nv_auto_kernel";
     size_t buf_size = 4096;
@@ -1242,17 +1216,53 @@ static char* nv_gen_ptx_for_node(struct IRNode *node, int sm) {
     case UOP_SIGMOID: case UOP_RECIP: case UOP_SILU: {
         ptx = (char *)cml_malloc(buf_size);
         if (!ptx) return NULL;
+        /* Single %, not %%: these strings are inserted through a "%s" argument,
+         * so they are NOT format-processed. Written with %% they reached the
+         * assembler as "%%f1", which is not valid PTX -- every kernel this
+         * generator emitted was malformed. The surrounding template is the
+         * format string, so it correctly keeps %%.
+         *
+         * Scratch registers %f2/%f3 are available (.reg .f32 %f<4> below); the
+         * result must end up in %f1. */
         const char *op_ptx;
         switch (node->type) {
-            case UOP_NEG:   op_ptx = "neg.f32 %%f1, %%f0;"; break;
-            case UOP_EXP:   op_ptx = "ex2.approx.f32 %%f1, %%f0;"; break;
-            case UOP_LOG:   op_ptx = "lg2.approx.f32 %%f1, %%f0;"; break;
-            case UOP_SQRT:  op_ptx = "sqrt.approx.f32 %%f1, %%f0;"; break;
-            case UOP_ABS:   op_ptx = "abs.f32 %%f1, %%f0;"; break;
-            case UOP_SIN:   op_ptx = "sin.approx.f32 %%f1, %%f0;"; break;
-            case UOP_COS:   op_ptx = "cos.approx.f32 %%f1, %%f0;"; break;
-            case UOP_RECIP: op_ptx = "rcp.approx.f32 %%f1, %%f0;"; break;
-            default:        op_ptx = "mov.f32 %%f1, %%f0;"; break;
+            case UOP_NEG:   op_ptx = "neg.f32 %f1, %f0;"; break;
+            /* ex2 is 2**x, so e**x needs the log2(e) scale first. */
+            case UOP_EXP:   op_ptx = "mul.f32 %f2, %f0, 0f3FB8AA3B;\n"
+                                     "    ex2.approx.f32 %f1, %f2;"; break;
+            /* lg2 is log2, so ln(x) = log2(x) * ln(2). */
+            case UOP_LOG:   op_ptx = "lg2.approx.f32 %f2, %f0;\n"
+                                     "    mul.f32 %f1, %f2, 0f3F317218;"; break;
+            case UOP_SQRT:  op_ptx = "sqrt.approx.f32 %f1, %f0;"; break;
+            case UOP_ABS:   op_ptx = "abs.f32 %f1, %f0;"; break;
+            case UOP_SIN:   op_ptx = "sin.approx.f32 %f1, %f0;"; break;
+            case UOP_COS:   op_ptx = "cos.approx.f32 %f1, %f0;"; break;
+            case UOP_RECIP: op_ptx = "rcp.approx.f32 %f1, %f0;"; break;
+            /* sigmoid(x) = 1/(1+exp(-x)); exp(-x) = ex2(-x*log2(e)) */
+            case UOP_SIGMOID: op_ptx =
+                "mul.f32 %f2, %f0, 0fBFB8AA3B;\n"
+                "    ex2.approx.f32 %f3, %f2;\n"
+                "    add.f32 %f2, %f3, 0f3F800000;\n"
+                "    rcp.approx.f32 %f1, %f2;"; break;
+            case UOP_SILU: op_ptx =
+                "mul.f32 %f2, %f0, 0fBFB8AA3B;\n"
+                "    ex2.approx.f32 %f3, %f2;\n"
+                "    add.f32 %f2, %f3, 0f3F800000;\n"
+                "    rcp.approx.f32 %f3, %f2;\n"
+                "    mul.f32 %f1, %f0, %f3;"; break;
+            /* tanh(x) = 2*sigmoid(2x) - 1; sm_50 has no tanh.approx. */
+            case UOP_TANH: op_ptx =
+                "add.f32 %f2, %f0, %f0;\n"
+                "    mul.f32 %f3, %f2, 0fBFB8AA3B;\n"
+                "    ex2.approx.f32 %f2, %f3;\n"
+                "    add.f32 %f3, %f2, 0f3F800000;\n"
+                "    rcp.approx.f32 %f2, %f3;\n"
+                "    add.f32 %f3, %f2, %f2;\n"
+                "    sub.f32 %f1, %f3, 0f3F800000;"; break;
+            default:
+                /* TANH/SIGMOID/SILU used to land here and compile to a copy. */
+                cml_free(ptx);
+                return NULL;
         }
         snprintf(ptx, buf_size,
             ".version 7.0\n.target sm_%d\n.address_size 64\n\n"
@@ -1289,13 +1299,17 @@ static char* nv_gen_ptx_for_node(struct IRNode *node, int sm) {
     case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: {
         ptx = (char *)cml_malloc(buf_size);
         if (!ptx) return NULL;
+        /* Single %: inserted via "%s", not format-processed. See the unary case. */
         const char *op_ptx;
         switch (node->type) {
-            case UOP_ADD: op_ptx = "add.f32 %%f2, %%f0, %%f1;"; break;
-            case UOP_SUB: op_ptx = "sub.f32 %%f2, %%f0, %%f1;"; break;
-            case UOP_MUL: op_ptx = "mul.f32 %%f2, %%f0, %%f1;"; break;
-            case UOP_DIV: op_ptx = "div.approx.f32 %%f2, %%f0, %%f1;"; break;
-            default:      op_ptx = "add.f32 %%f2, %%f0, %%f1;"; break;
+            case UOP_ADD: op_ptx = "add.f32 %f2, %f0, %f1;"; break;
+            case UOP_SUB: op_ptx = "sub.f32 %f2, %f0, %f1;"; break;
+            case UOP_MUL: op_ptx = "mul.f32 %f2, %f0, %f1;"; break;
+            case UOP_DIV: op_ptx = "div.approx.f32 %f2, %f0, %f1;"; break;
+            default:
+                /* Emitting an add for an unhandled op would silently replace it. */
+                cml_free(ptx);
+                return NULL;
         }
         snprintf(ptx, buf_size,
             ".version 7.0\n.target sm_%d\n.address_size 64\n\n"
@@ -1430,7 +1444,7 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
         }
 
         bool gpu_ok = false;
-        char *ptx = nv_gen_ptx_for_node(node, sm);
+        char *ptx = cml_nv_gen_ptx_for_node(node, sm);
 
         if (ptx) {
             CMLNVKernel *kernel = cml_nv_kernel_compile_ptx(drv, ptx, "nv_auto_kernel");

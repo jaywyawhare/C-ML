@@ -220,10 +220,49 @@ int          cml_nv_kernel_launch(CMLNVDriver* drv, CMLNVKernel* kernel,
                                    uint32_t grid[3], uint32_t block[3],
                                    void** args, int num_args);
 
+
+/* Layout of the nvidia RM ioctl payloads. The real driver path and the mock
+ * must agree byte-for-byte, so both read this one definition. */
+typedef struct {
+    uint32_t hRoot;
+    uint32_t hObjectParent;
+    uint32_t hObjectNew;
+    uint32_t hClass;
+    void*    pAllocParms;
+    uint32_t status;
+} NV_RM_ALLOC_PARAMS;
+
+typedef struct {
+    uint32_t hClient;
+    uint32_t hObject;
+    uint32_t cmd;
+    uint32_t flags;
+    void*    params;
+    uint32_t paramsSize;
+    uint32_t status;
+} NV_RM_CONTROL_PARAMS;
+
+typedef struct {
+    uint32_t hRoot;
+    uint32_t hObjectParent;
+    uint32_t hObjectOld;
+    uint32_t status;
+} NV_RM_FREE_PARAMS;
+
 int cml_nv_synchronize(CMLNVDriver* drv);
 int cml_nv_gpu_wait_semaphore(CMLNVDriver* drv, uint64_t sem_va, uint32_t value);
 
 int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir);
+
+struct IRNode;
+
+/* PTX text for a single node, or NULL if this generator cannot emit that op.
+ * Exposed so the emitted assembly can be checked without a GPU: it is otherwise
+ * reachable only through cml_nv_execute_graph, which needs real hardware, and
+ * that is how three separate bugs survived in it (doubled %% in the register
+ * names, tanh/sigmoid/silu silently compiling to a copy, and exp/log emitting
+ * ex2/lg2 -- i.e. 2**x and log2 -- instead of e**x and ln). Caller frees. */
+char* cml_nv_gen_ptx_for_node(struct IRNode* node, int sm);
 
 #ifdef __cplusplus
 }

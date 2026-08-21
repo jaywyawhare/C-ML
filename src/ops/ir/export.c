@@ -202,6 +202,8 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
         if (node->num_inputs >= 2) {
             offset += snprintf(code + offset, buffer_size - (size_t)offset,
                                "max(%s, %s)\nfor (int i = 0; i < n; i++) {\n    outputs[0][i] = "
+                               "((inputs[0][i] != inputs[0][i]) || (inputs[1][i] != inputs[1][i])) ? "
+                               "(inputs[0][i] + inputs[1][i]) : "
                                "fmaxf(inputs[0][i], inputs[1][i]);\n}",
                                node->input_names[0], node->input_names[1]);
         }
@@ -211,7 +213,7 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
             offset +=
                 snprintf(code + offset, buffer_size - (size_t)offset,
                          "max_reduce(%s)\nfloat m = inputs[0][0];\nfor (int i = 1; i < n; i++) {\n "
-                         "   if (inputs[0][i] > m) m = inputs[0][i];\n}\noutputs[0][0] = m;",
+                         "   if (inputs[0][i] != inputs[0][i] || inputs[0][i] > m) m = inputs[0][i];\n}\noutputs[0][0] = m;",
                          node->input_names[0]);
         }
         break;
@@ -725,6 +727,11 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
 
         append_format(&buffer, &offset, &capacity, ",\"is_dead\":%s,\"is_fused\":%s",
                       is_dead ? "true" : "false", is_fused ? "true" : "false");
+
+        if (node->scope) {
+            append_format(&buffer, &offset, &capacity, ",\"scope\":");
+            append_json_string(&buffer, &offset, &capacity, node->scope);
+        }
 
         // Fused ID
         if (node->fused_kernel) {

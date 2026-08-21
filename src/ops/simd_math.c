@@ -94,8 +94,11 @@ UNARY(simd_neg_f32,     -x)
 BINARY(simd_pow_f32,   powf(x, y))
 BINARY(simd_cmplt_f32, (x <  y) ? 1.0f : 0.0f)
 BINARY(simd_cmpgt_f32, (x >  y) ? 1.0f : 0.0f)
-BINARY(simd_min_f32,   (x <  y) ? x : y)
-BINARY(simd_max_f32,   (x >  y) ? x : y)
+/* NaN propagates (torch.minimum / np.minimum semantics): `x < y ? x : y`
+ * silently returns the non-NaN operand, which hides divergence. `x + y` is a
+ * branchless NaN when either input is NaN. */
+BINARY(simd_min_f32,   ((x != x) || (y != y)) ? (x + y) : ((x <  y) ? x : y))
+BINARY(simd_max_f32,   ((x != x) || (y != y)) ? (x + y) : ((x >  y) ? x : y))
 BINARY(simd_add_f32,   x + y)
 BINARY(simd_sub_f32,   x - y)
 BINARY(simd_mul_f32,   x * y)
@@ -289,16 +292,16 @@ void simd_exp_f32_parallel(const float* in, float* out, size_t n) {
     threadpool_parallel_for(pool, parallel_exp_task, &data, n);
 }
 
-typedef struct { const float* data; float* partial_sums; size_t num_threads; } ParallelSumData;
+typedef struct { const float* data; float* partial_sums; size_t num_threads; size_t chunk; } ParallelSumData;
 
 static void parallel_sum_task(void* data, size_t start, size_t end) {
     ParallelSumData* d = (ParallelSumData*)data;
     float sum = simd_sum_float(&d->data[start], end - start);
-    size_t chunk_size = (end - start);
-    if (chunk_size > 0) {
-        size_t thread_idx = start / chunk_size;
-        if (thread_idx < d->num_threads) d->partial_sums[thread_idx] = sum;
-    }
+    /* Slot from the batch's uniform chunk size (start == i*chunk), matching
+     * threadpool_parallel_for's contract; the serial-fallback call has start==0
+     * and lands in slot 0. */
+    size_t idx = d->chunk ? start / d->chunk : 0;
+    if (idx < d->num_threads) d->partial_sums[idx] = sum;
 }
 
 float simd_sum_f32_parallel(const float* data, size_t n) {
@@ -310,7 +313,8 @@ float simd_sum_f32_parallel(const float* data, size_t n) {
     if (num_threads == 0) num_threads = 1;
     float* partial_sums = cml_calloc(num_threads, sizeof(float));
     if (!partial_sums) return simd_sum_float(data, n);
-    ParallelSumData pdata = {data, partial_sums, num_threads};
+    size_t chunk = (n + num_threads - 1) / num_threads;
+    ParallelSumData pdata = {data, partial_sums, num_threads, chunk};
     threadpool_parallel_for(pool, parallel_sum_task, &pdata, n);
     float total = 0.0f;
     for (size_t i = 0; i < num_threads; i++) total += partial_sums[i];

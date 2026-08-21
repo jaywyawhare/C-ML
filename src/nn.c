@@ -7,11 +7,17 @@
 #include "tensor/tensor.h"
 #include "tensor/realize.h"
 #include "autograd/autograd.h"
+#include "ops/ir/internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "alloc/cml_allocator.h"
+
+static Module* g_viz_root_module = NULL;
+
+void nn_viz_set_root_module(Module* module) { g_viz_root_module = module; }
+Module* nn_viz_root_module(void) { return g_viz_root_module; }
 
 void nn_tensor_param_alias(Tensor* t) {
     if (t)
@@ -192,6 +198,75 @@ Parameter* module_get_parameter(Module* module, const char* name) {
     return NULL;
 }
 
+Parameter* nn_add_bias_param(Module* module, int size, DType dtype, DeviceType device,
+                             void (*init)(Tensor*, int)) {
+    int shape[] = {size};
+    TensorConfig cfg = {
+        .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    Tensor* bias = tensor_zeros(shape, 1, &cfg);
+    if (!bias) {
+        module_free(module);
+        return NULL;
+    }
+    if (init)
+        init(bias, size);
+    if (module_add_parameter(module, bias, "bias", true) != 0) {
+        tensor_free(bias);
+        module_free(module);
+        return NULL;
+    }
+    return module_get_parameter(module, "bias");
+}
+
+Parameter* nn_add_weight_param(Module* module, Tensor* weight) {
+    if (!weight) {
+        module_free(module);
+        return NULL;
+    }
+    if (module_add_parameter(module, weight, "weight", true) != 0) {
+        tensor_free(weight);
+        module_free(module);
+        return NULL;
+    }
+    return module_get_parameter(module, "weight");
+}
+
+int nn_add_affine_params(Module* module, int size, DType dtype, DeviceType device,
+                         Parameter** weight_out, Parameter** bias_out) {
+    int shape[] = {size};
+    TensorConfig cfg = {
+        .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    Tensor* weight = tensor_ones(shape, 1, &cfg);
+    if (!weight) {
+        module_free(module);
+        return -1;
+    }
+    if (module_add_parameter(module, weight, "weight", true) != 0) {
+        tensor_free(weight);
+        module_free(module);
+        return -1;
+    }
+    *weight_out = module_get_parameter(module, "weight");
+    *bias_out = nn_add_bias_param(module, size, dtype, device, NULL);
+    return *bias_out ? 0 : -1;
+}
+
+int nn_add_running_stats(Module* module, int size, DType dtype, DeviceType device,
+                         Tensor** mean_out, Tensor** var_out) {
+    int shape[] = {size};
+    TensorConfig cfg = {
+        .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    *mean_out = tensor_zeros(shape, 1, &cfg);
+    *var_out  = tensor_ones(shape, 1, &cfg);
+    if (!*mean_out || !*var_out) {
+        if (*mean_out) tensor_free(*mean_out);
+        if (*var_out)  tensor_free(*var_out);
+        module_free(module);
+        return -1;
+    }
+    return 0;
+}
+
 int module_set_parameter(Module* module, const char* name, Tensor* tensor) {
     if (!module || !name || !tensor)
         return -1;
@@ -220,7 +295,20 @@ Tensor* module_forward(Module* module, Tensor* input) {
     if (!module->forward) {
         return NULL;
     }
-    return module->forward(module, input);
+    /* Tag every IR node this layer emits with the module path, so the graph
+     * view can collapse thousands of primitives back into the layers they came
+     * from. Nested containers nest naturally (Sequential/Linear). No-op unless
+     * VIZ is set. */
+    /* The outermost forward in a pass is the model itself. Remembering it lets
+     * the metrics layer summarise weights/gradients for any training loop,
+     * including hand-written ones that never call cml_train. */
+    if (cml_ir_scope_enabled() && cml_ir_scope_current() == NULL)
+        nn_viz_set_root_module(module);
+
+    cml_ir_scope_push(module->name);
+    Tensor* out = module->forward(module, input);
+    cml_ir_scope_pop();
+    return out;
 }
 
 void module_set_training(Module* module, bool training) {

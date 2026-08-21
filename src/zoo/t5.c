@@ -1,4 +1,5 @@
 #include "zoo/t5.h"
+#include "zoo/zoo.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "ops/uops.h"
@@ -197,27 +198,10 @@ static Module* create_t5_enc_block(int d_model, int n_head, int d_ff, int num_bu
     module_add_parameter((Module*)block, bias_t, "rel_pos_bias", true);
     block->rel_bias = module_get_parameter((Module*)block, "rel_pos_bias");
 
-    /* Scale residual path weights by 1/sqrt(2*n_layer) to prevent
-       activation explosion through deep residual connections (GPT-2 style). */
-    if (n_layer > 1) {
-        float scale = 1.0f / sqrtf(2.0f * (float)n_layer);
-        /* Scale MLP output projection */
-        if (mlp_proj && mlp_proj->weight) {
-            float* w = (float*)tensor_data_ptr(mlp_proj->weight->tensor);
-            if (w) {
-                for (size_t i = 0; i < mlp_proj->weight->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-        /* Scale self-attention output projection (W_o) */
-        if (block->self_attn && block->self_attn->W_o) {
-            float* w = (float*)tensor_data_ptr(block->self_attn->W_o->tensor);
-            if (w) {
-                for (size_t i = 0; i < block->self_attn->W_o->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-    }
+    /* GPT-2-style residual init keeps deep stacks from exploding. */
+    float scale = zoo_residual_scale(n_layer);
+    zoo_scale_param(mlp_proj ? mlp_proj->weight : NULL, scale);
+    zoo_scale_param(block->self_attn ? block->self_attn->W_o : NULL, scale);
 
     return (Module*)block;
 }
@@ -334,35 +318,11 @@ static Module* create_t5_dec_block(int d_model, int n_head, int d_ff, int num_bu
     module_add_parameter((Module*)block, bias_t, "self_rel_pos_bias", true);
     block->self_rel_bias = module_get_parameter((Module*)block, "self_rel_pos_bias");
 
-    /* Scale residual path weights by 1/sqrt(2*n_layer) to prevent
-       activation explosion through deep residual connections (GPT-2 style). */
-    if (n_layer > 1) {
-        float scale = 1.0f / sqrtf(2.0f * (float)n_layer);
-        /* Scale MLP output projection */
-        if (mlp_proj && mlp_proj->weight) {
-            float* w = (float*)tensor_data_ptr(mlp_proj->weight->tensor);
-            if (w) {
-                for (size_t i = 0; i < mlp_proj->weight->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-        /* Scale self-attention output projection (W_o) */
-        if (block->self_attn && block->self_attn->W_o) {
-            float* w = (float*)tensor_data_ptr(block->self_attn->W_o->tensor);
-            if (w) {
-                for (size_t i = 0; i < block->self_attn->W_o->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-        /* Scale cross-attention output projection (W_o) */
-        if (block->cross_attn && block->cross_attn->W_o) {
-            float* w = (float*)tensor_data_ptr(block->cross_attn->W_o->tensor);
-            if (w) {
-                for (size_t i = 0; i < block->cross_attn->W_o->tensor->numel; i++)
-                    w[i] *= scale;
-            }
-        }
-    }
+    /* GPT-2-style residual init keeps deep stacks from exploding. */
+    float scale = zoo_residual_scale(n_layer);
+    zoo_scale_param(mlp_proj ? mlp_proj->weight : NULL, scale);
+    zoo_scale_param(block->self_attn ? block->self_attn->W_o : NULL, scale);
+    zoo_scale_param(block->cross_attn ? block->cross_attn->W_o : NULL, scale);
 
     return (Module*)block;
 }

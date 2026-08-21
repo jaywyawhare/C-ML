@@ -2853,50 +2853,9 @@ static int cpu_backward_node(struct IRNode* node) {
 
     /* ── CUMMAX / CUMMIN: grad routes to first-occurrence argmax/min ── */
 
-    case UOP_CUMMAX: {
-        if (!in1 || !in1->requires_grad || !in1->data || !out->data)
-            break;
-        Tensor* g1 = ensure_grad(in1);
-        if (!g1 || !g1->data)
-            break;
-        float* g1d = (float*)g1->data;
-        float* x = (float*)in1->data;
-        float* cm = (float*)out->data;
-        CumsumParams* cp = (CumsumParams*)node->params;
-        int cdim = cp ? cp->dim : 0;
-
-        if (in1->ndim == 1) {
-            int n = (int)in1->numel;
-            /* For each output j, grad flows to the first i where x[i]==cm[j] and i<=j */
-            for (int j = n - 1; j >= 0; j--) {
-                int src = 0;
-                for (int i = 0; i <= j; i++)
-                    if (x[i] == cm[j]) { src = i; break; }
-                g1d[src] += out_grad[j];
-            }
-        } else if (in1->ndim == 2) {
-            int rows = in1->shape[0], cols = in1->shape[1];
-            if (cdim == 0) {
-                for (int c = 0; c < cols; c++)
-                    for (int j = rows - 1; j >= 0; j--) {
-                        int src = 0;
-                        for (int i = 0; i <= j; i++)
-                            if (x[i * cols + c] == cm[j * cols + c]) { src = i; break; }
-                        g1d[src * cols + c] += out_grad[j * cols + c];
-                    }
-            } else {
-                for (int r = 0; r < rows; r++)
-                    for (int j = cols - 1; j >= 0; j--) {
-                        int src = 0;
-                        for (int i = 0; i <= j; i++)
-                            if (x[r * cols + i] == cm[r * cols + j]) { src = i; break; }
-                        g1d[r * cols + src] += out_grad[r * cols + j];
-                    }
-            }
-        }
-        break;
-    }
-
+    /* CUMMAX and CUMMIN share the same adjoint: grad flows to the first index
+     * whose value equals the running extremum. */
+    case UOP_CUMMAX:
     case UOP_CUMMIN: {
         if (!in1 || !in1->requires_grad || !in1->data || !out->data)
             break;
@@ -2911,6 +2870,7 @@ static int cpu_backward_node(struct IRNode* node) {
 
         if (in1->ndim == 1) {
             int n = (int)in1->numel;
+            /* For each output j, grad flows to the first i where x[i]==cm[j] and i<=j */
             for (int j = n - 1; j >= 0; j--) {
                 int src = 0;
                 for (int i = 0; i <= j; i++)

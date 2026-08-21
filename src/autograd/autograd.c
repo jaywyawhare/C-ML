@@ -434,36 +434,69 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     }
 
     if (cml_viz_enabled()) {
-        if (tensor->ir_context) {
-            cml_ir_optimize(tensor->ir_context);
-        }
+        /* Hold the graph directly: cml_ir_optimize() below clears BOTH
+         * tensor->ir_context and tensor->ir_node (optimization rewrites and
+         * frees nodes, so the tensor's handles would dangle). Reading them
+         * afterwards is what silently disabled this whole export -- graph.json
+         * failed with "no IR node" and the kernel analysis was skipped, so a
+         * training run produced an empty Kernel Studio. */
+        CMLGraph_t viz_ir = tensor->ir_context;
 
-        const char* out_path = "graph.json";
-        int rc               = autograd_export_json(tensor, out_path);
-        if (rc != 0) {
-            LOG_WARNING("VIZ export failed rc=%d", rc);
-        } else {
-            LOG_INFO("VIZ exported graph to %s", out_path);
-        }
-        if (tensor->ir_context) {
-            char* kernel_json_raw = cml_ir_export_kernel_analysis(tensor->ir_context, false);
-            char* kernel_json_opt = cml_ir_export_kernel_analysis(tensor->ir_context, true);
+        if (viz_ir) {
+            /* The graph is structurally identical on every step of a training
+             * loop, and the dashboard only ever shows the latest. Exporting per
+             * step rewrote the same files hundreds of times; do it once per
+             * distinct graph shape instead. */
+            static uint64_t last_exported_hash = 0;
+            uint64_t graph_hash = cml_ir_graph_hash(viz_ir);
 
-            if (kernel_json_raw) {
-                FILE* f = fopen("kernels.json", "w");
-                if (f) {
-                    fprintf(f, "{\"unoptimized\":%s,\"optimized\":%s}", kernel_json_raw,
-                            kernel_json_opt ? kernel_json_opt : "{}");
-                    fclose(f);
-                    LOG_INFO("VIZ exported kernels to kernels.json");
+            if (graph_hash != last_exported_hash) {
+                last_exported_hash = graph_hash;
+
+                /* Unoptimized view first -- it must be captured before the
+                 * optimizer removes dead code and folds fusion groups. */
+                char* kernel_json_raw = cml_ir_export_kernel_analysis(viz_ir, false);
+
+                cml_ir_optimize(viz_ir);
+
+                /* Post-optimization: dead/fused flags are now populated, which
+                 * is what the graph view colours by. Exported from the graph
+                 * rather than the tensor, whose handles optimize just cleared. */
+                char* kernel_json_opt = cml_ir_export_kernel_analysis(viz_ir, true);
+                char* graph_json      = cml_ir_export_graph_json(viz_ir);
+
+                if (graph_json) {
+                    FILE* gf = fopen("graph.json", "w");
+                    if (gf) {
+                        fputs(graph_json, gf);
+                        fclose(gf);
+                        LOG_INFO("VIZ exported graph to graph.json");
+                    }
+                    cml_free(graph_json);
+                } else {
+                    LOG_WARNING("VIZ graph export produced no output");
                 }
-                cml_free(kernel_json_raw);
-            }
-            if (kernel_json_opt) {
+
+                if (kernel_json_raw) {
+                    FILE* f = fopen("kernels.json", "w");
+                    if (f) {
+                        fprintf(f, "{\"unoptimized\":%s,\"optimized\":%s}", kernel_json_raw,
+                                kernel_json_opt ? kernel_json_opt : "{}");
+                        fclose(f);
+                        LOG_INFO("VIZ exported kernels to kernels.json");
+                    }
+                    cml_free(kernel_json_raw);
+                }
                 cml_free(kernel_json_opt);
+            } else {
+                /* Same graph as last time: skip the export but keep the
+                 * optimization, so execution below behaves identically whether
+                 * or not this step happened to export. */
+                cml_ir_optimize(viz_ir);
             }
+
             tensor_ensure_executed(tensor);
-            cml_ir_ensure_gradients_executed(tensor->ir_context);
+            cml_ir_ensure_gradients_executed(viz_ir);
 
             tensor->ir_context = NULL;
         }
@@ -737,23 +770,6 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     return next_id;
 }
 
-static void write_json_escaped(FILE* f, const char* s) {
-    if (!s) {
-        fputs("null", f);
-        return;
-    }
-    fputc('"', f);
-    for (const char* p = s; *p; p++) {
-        if (*p == '"' || *p == '\\') {
-            fputc('\\', f);
-            fputc(*p, f);
-        } else if ((unsigned char)*p < 0x20) {
-            fprintf(f, "\\u%04x", (unsigned char)*p);
-        } else
-            fputc(*p, f);
-    }
-    fputc('"', f);
-}
 
 int autograd_export_json(Tensor* root, const char* path) {
     if (!root || !path)
@@ -836,7 +852,7 @@ int autograd_export_json(Tensor* root, const char* path) {
 
         fputs("\"label\": ", f);
         const char* name = uop_type_to_string(node->type);
-        write_json_escaped(f, name);
+        cml_json_write_escaped(f, name);
 
         bool is_dead;
         if (is_optimized) {

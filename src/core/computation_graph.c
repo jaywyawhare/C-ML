@@ -52,20 +52,23 @@ CMLComputationGraph_t cml_graph_new(void) {
     return graph;
 }
 
+/* Free every node and the node/leaf arrays, leaving the pointers dangling for
+ * the caller to either drop or reset. */
+static void graph_release_nodes(CMLComputationGraph_t graph) {
+    if (graph->nodes) {
+        for (size_t i = 0; i < graph->num_nodes; i++)
+            graph_node_free(graph->nodes[i]);
+        cml_free(graph->nodes);
+    }
+    if (graph->leaf_nodes)
+        cml_free(graph->leaf_nodes);
+}
+
 void cml_graph_free(CMLComputationGraph_t graph) {
     if (!graph)
         return;
 
-    if (graph->nodes) {
-        for (size_t i = 0; i < graph->num_nodes; i++) {
-            graph_node_free(graph->nodes[i]);
-        }
-        cml_free(graph->nodes);
-    }
-
-    if (graph->leaf_nodes) {
-        cml_free(graph->leaf_nodes);
-    }
+    graph_release_nodes(graph);
 
     cml_free(graph);
 }
@@ -74,16 +77,7 @@ void cml_graph_clear(CMLComputationGraph_t graph) {
     if (!graph)
         return;
 
-    if (graph->nodes) {
-        for (size_t i = 0; i < graph->num_nodes; i++) {
-            graph_node_free(graph->nodes[i]);
-        }
-        cml_free(graph->nodes);
-    }
-
-    if (graph->leaf_nodes) {
-        cml_free(graph->leaf_nodes);
-    }
+    graph_release_nodes(graph);
 
     graph->nodes         = NULL;
     graph->num_nodes     = 0;

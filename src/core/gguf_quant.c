@@ -147,6 +147,21 @@ static void dequantize_q8_0(const void *src, float *dst, size_t num_blocks) {
  *
  *   value = quant * (d * sc) - dmin * mn
  */
+/* Unpack the 6-bit per-sub-block scales and mins that the K-quant families
+ * pack into 12 bytes: the first four pairs sit in the low 6 bits, the last four
+ * are split between a nibble and the spare top bits of the first four. */
+static void unpack_k_scales(const uint8_t* sc_raw, uint8_t* sc, uint8_t* mn) {
+    for (int i = 0; i < 4; i++) {
+        sc[i] = sc_raw[i]     & 0x3Fu;
+        mn[i] = sc_raw[i + 4] & 0x3Fu;
+    }
+    for (int i = 4; i < 8; i++) {
+        const int j = i - 4;
+        sc[i] = (uint8_t)((sc_raw[j + 8] & 0x0Fu) | ((sc_raw[j]     >> 6) << 4));
+        mn[i] = (uint8_t)((sc_raw[j + 8] >> 4)     | ((sc_raw[j + 4] >> 6) << 4));
+    }
+}
+
 static void dequantize_q4_k(const void *src, float *dst, size_t num_blocks) {
     const BlockQ4_K *blocks = (const BlockQ4_K *)src;
 
@@ -159,16 +174,7 @@ static void dequantize_q4_k(const void *src, float *dst, size_t num_blocks) {
         /* Decode the 6-bit scales and mins for 8 sub-blocks */
         uint8_t sc[8];
         uint8_t mn[8];
-
-        for (int i = 0; i < 4; i++) {
-            sc[i] = sc_raw[i]     & 0x3Fu;
-            mn[i] = sc_raw[i + 4] & 0x3Fu;
-        }
-        for (int i = 4; i < 8; i++) {
-            const int j = i - 4;
-            sc[i] = (uint8_t)((sc_raw[j + 8] & 0x0Fu) | ((sc_raw[j]     >> 6) << 4));
-            mn[i] = (uint8_t)((sc_raw[j + 8] >> 4)     | ((sc_raw[j + 4] >> 6) << 4));
-        }
+        unpack_k_scales(sc_raw, sc, mn);
 
         /* Dequantize each of the 8 sub-blocks */
         for (int i = 0; i < 8; i++) {
@@ -219,16 +225,7 @@ static void dequantize_q5_k(const void *src, float *dst, size_t num_blocks) {
         /* Unpack sub-block scales and mins -- identical to Q4_K */
         uint8_t sc[8];
         uint8_t mn[8];
-
-        for (int i = 0; i < 4; i++) {
-            sc[i] = sc_raw[i]     & 0x3Fu;
-            mn[i] = sc_raw[i + 4] & 0x3Fu;
-        }
-        for (int i = 4; i < 8; i++) {
-            const int j = i - 4;
-            sc[i] = (uint8_t)((sc_raw[j + 8] & 0x0Fu) | ((sc_raw[j]     >> 6) << 4));
-            mn[i] = (uint8_t)((sc_raw[j + 8] >> 4)     | ((sc_raw[j + 4] >> 6) << 4));
-        }
+        unpack_k_scales(sc_raw, sc, mn);
 
         /* Dequantize each of the 8 sub-blocks */
         for (int i = 0; i < 8; i++) {

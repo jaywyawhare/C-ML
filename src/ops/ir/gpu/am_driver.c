@@ -1980,6 +1980,24 @@ int cml_am_synchronize(CMLAMDriver* drv) {
 
 /* Graph execution */
 
+/* Ops this CPU-side emulation genuinely implements. Anything else must not be
+ * claimed: reporting success for an op it did not perform is how relu became a
+ * copy on this path. */
+static bool am_emu_unary_supported(UOpType t) {
+    switch (t) {
+    case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT: case UOP_ABS:
+    case UOP_SIN: case UOP_COS: case UOP_TANH: case UOP_SIGMOID:
+    case UOP_RECIP: case UOP_SILU: case UOP_RELU6:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool am_emu_binary_supported(UOpType t) {
+    return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV;
+}
+
 int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
     if (!drv || !ir) return -1;
 
@@ -2042,7 +2060,15 @@ int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
                 if (!buf_out) alloc_ok = false;
             }
 
-            if (alloc_ok && buf_out->cpu_addr) {
+            /* Claim the node only if this emulation actually implements its op.
+             * The condition used to be just the input count, so ANY one-input
+             * node -- relu, gelu, a reduction, a reshape -- fell into the switch
+             * below, hit `default: out[i] = a[i]`, and was reported as a
+             * successful GPU execution of a plain copy. For a reduction the
+             * output is smaller than the input, so it also read past the buffer. */
+            if (alloc_ok && buf_out->cpu_addr &&
+                ((num_in == 1 && am_emu_unary_supported(node->type)) ||
+                 (num_in == 2 && am_emu_binary_supported(node->type)))) {
                 float* out_ptr = (float*)buf_out->cpu_addr;
                 if (num_in == 1 && bufs_in[0] && bufs_in[0]->cpu_addr) {
                     float* a = (float*)bufs_in[0]->cpu_addr;
@@ -2060,7 +2086,7 @@ int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
                         case UOP_RECIP:   out_ptr[i] = 1.0f / a[i]; break;
                         case UOP_SILU:    out_ptr[i] = a[i] / (1.0f + expf(-a[i])); break;
                         case UOP_RELU6: { float v = a[i] > 0 ? a[i] : 0; out_ptr[i] = v < 6.0f ? v : 6.0f; break; }
-                        default:          out_ptr[i] = a[i]; break;
+                        default:          gpu_ok = false; break;
                         }
                     }
                     gpu_ok = true;
@@ -2074,7 +2100,7 @@ int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
                         case UOP_SUB: out_ptr[i] = a[i] - b[i]; break;
                         case UOP_MUL: out_ptr[i] = a[i] * b[i]; break;
                         case UOP_DIV: out_ptr[i] = a[i] / b[i]; break;
-                        default:      out_ptr[i] = a[i]; break;
+                        default:      gpu_ok = false; break;
                         }
                     }
                     gpu_ok = true;

@@ -367,6 +367,11 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
 
     /* Registers */
     int num_vregs = prog->next_vreg;
+    /* Three scratch registers past the vregs, for ops that need more than one
+     * instruction (pow, log, sigmoid, silu, tanh). They live entirely within a
+     * single compute op, so all such ops can share them. The .reg declaration
+     * below reserves num_vregs + 4. */
+    const int t0 = num_vregs, t1 = num_vregs + 1, t2 = num_vregs + 2;
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
         "    .reg .pred %%p<4>;\n"
         "    .reg .b32 %%r<16>;\n"
@@ -442,11 +447,26 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                         "    div.approx.f32 %%f%d, %%f%d, %%f%d;\n",
                         op->dest_reg, op->src_regs[0], op->src_regs[1]);
                     break;
-                default:
+                case UOP_MAX:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    mov.f32 %%f%d, %%f%d; // unsupported binary\n",
-                        op->dest_reg, op->src_regs[0]);
+                        "    max.f32 %%f%d, %%f%d, %%f%d;\n",
+                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
                     break;
+                case UOP_POW:
+                    /* a**b = exp2(b * log2(a)) — PTX has no pow. */
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    lg2.approx.f32 %%f%d, %%f%d;\n"
+                        "    mul.f32 %%f%d, %%f%d, %%f%d;\n"
+                        "    ex2.approx.f32 %%f%d, %%f%d;\n",
+                        t0, op->src_regs[0],
+                        t1, t0, op->src_regs[1],
+                        op->dest_reg, t1);
+                    break;
+                default:
+                    /* Copying an operand would silently replace the op; leave
+                     * the kernel unbuilt so the caller falls back. */
+                    cml_free(buf);
+                    return NULL;
                 }
             } else if (uop_is_unary(op->uop) && op->num_srcs >= 1) {
                 int s = op->src_regs[0];
@@ -456,8 +476,73 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                         "    neg.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
                     break;
                 case UOP_EXP:
+                    /* ex2 is 2**x, so e**x needs the log2(e) scale first. This
+                     * emitted a bare ex2, i.e. it computed 2**x for exp(). */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    ex2.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                        "    mul.f32 %%f%d, %%f%d, 0f3FB8AA3B;\n"
+                        "    ex2.approx.f32 %%f%d, %%f%d;\n",
+                        t0, s, op->dest_reg, t0);
+                    break;
+                case UOP_LOG:
+                    /* ln(x) = log2(x) * ln(2) */
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    lg2.approx.f32 %%f%d, %%f%d;\n"
+                        "    mul.f32 %%f%d, %%f%d, 0f3F317218;\n",
+                        t0, s, op->dest_reg, t0);
+                    break;
+                case UOP_SIN:
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    sin.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                    break;
+                case UOP_COS:
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    cos.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                    break;
+                case UOP_SIGMOID:
+                    /* 1/(1+exp(-x)); exp(-x) = ex2(-x*log2(e)) */
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
+                        "    ex2.approx.f32 %%f%d, %%f%d;\n"
+                        "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                        "    rcp.approx.f32 %%f%d, %%f%d;\n",
+                        t0, s, t1, t0, t2, t1, op->dest_reg, t2);
+                    break;
+                case UOP_SILU:
+                    /* x * sigmoid(x) */
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
+                        "    ex2.approx.f32 %%f%d, %%f%d;\n"
+                        "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                        "    rcp.approx.f32 %%f%d, %%f%d;\n"
+                        "    mul.f32 %%f%d, %%f%d, %%f%d;\n",
+                        t0, s, t1, t0, t2, t1, t1, t2, op->dest_reg, s, t1);
+                    break;
+                case UOP_TANH:
+                    /* tanh(x) = 2*sigmoid(2x) - 1; sm_50 has no tanh.approx.
+                     *
+                     * That identity evaluates 1 - 1 for small x and loses every
+                     * significant bit -- the same form in the LLVM JIT returned
+                     * exactly 0 for tanh(1e-8) and was 7% off at 1e-6. Below
+                     * 1e-4, tanh(x) == x to within 3.3e-9 relative, comfortably
+                     * inside float32, so take x directly there. */
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                        "    add.f32 %%f%d, %%f%d, %%f%d;\n"
+                        "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
+                        "    ex2.approx.f32 %%f%d, %%f%d;\n"
+                        "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                        "    rcp.approx.f32 %%f%d, %%f%d;\n"
+                        "    add.f32 %%f%d, %%f%d, %%f%d;\n"
+                        "    sub.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                        "    abs.f32 %%f%d, %%f%d;\n"
+                        "    setp.lt.f32 %%p1, %%f%d, 0f38D1B717;\n"
+                        "    selp.f32 %%f%d, %%f%d, %%f%d, %%p1;\n",
+                        t0, s, s,
+                        t1, t0, t2, t1, t0, t2, t1, t0,
+                        t0, t1, t1,
+                        t1, t0,          /* composed result in t1 */
+                        t2, s,           /* |x| in t2 */
+                        t2,
+                        op->dest_reg, s, t1);
                     break;
                 case UOP_SQRT:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
@@ -472,10 +557,8 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                         "    rcp.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
                     break;
                 default:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    mov.f32 %%f%d, %%f%d; // unsupported unary\n",
-                        op->dest_reg, s);
-                    break;
+                    cml_free(buf);
+                    return NULL;
                 }
             } else {
                 pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
@@ -581,6 +664,8 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
 #define GLSL_STD_450_Sin    13
 #define GLSL_STD_450_Cos    14
 #define GLSL_STD_450_Tanh   21
+#define GLSL_STD_450_Pow    26
+#define GLSL_STD_450_FMax   40
 
 #define SpvOpExtInst 12
 
@@ -631,6 +716,8 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     uint32_t id_main         = next_id++;  /* 13 */
     uint32_t id_label        = next_id++;  /* 14 */
     uint32_t id_ext_glsl     = next_id++;  /* 15 */
+    uint32_t id_float_one    = next_id++;  /* 16 - 1.0f, for recip/sigmoid/silu */
+    uint32_t id_float_zero   = next_id++;  /* 17 - 0.0f, fallback for a missing vreg */
 
     /* Allocate IDs for buffer variables */
     uint32_t buf_var_ids[64];
@@ -643,15 +730,22 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     uint32_t gid_x_id    = next_id++;
     /* Virtual register IDs for each linear op */
     uint32_t vreg_base = next_id;
-    next_id += (uint32_t)(prog->next_vreg + prog->num_ops * 4 + 16);
+    /* 8 per op: the composed ops need more than one result id each (silu uses
+     * five: negate, exp, denominator, sigmoid, product). The bound written into
+     * the header is this value, so under-reserving produces an invalid module. */
+    next_id += (uint32_t)(prog->next_vreg + prog->num_ops * 8 + 16);
 
     emit(&w, SPIRV_OP(SpvOpCapability, 2));
     emit(&w, SpvCapabilityShader);
 
-    /* "GLSL.std.450" = 12 chars + null = 13 bytes = 4 words */
+    /* "GLSL.std.450" = 12 chars + null = 13 bytes = 4 words.
+     * Little-endian, so the first word is 'G' | 'L'<<8 | 'S'<<16 | 'L'<<24.
+     * This used to read 0x534C4C47, which spells "GLLS" -- every module the
+     * SPIR-V backend produced was rejected by any validator or driver with
+     * "Invalid extended instruction import". */
     emit(&w, SPIRV_OP(SpvOpExtInstImport, 6));
     emit(&w, id_ext_glsl);
-    emit(&w, 0x534C4C47); /* GLSL */
+    emit(&w, 0x4C534C47); /* GLSL */
     emit(&w, 0x6474732E); /* .std */
     emit(&w, 0x3035342E); /* .450 */
     emit(&w, 0x00000000); /* null terminator */
@@ -761,6 +855,16 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, id_uint_zero);
     emit(&w, 0);
 
+    emit(&w, SPIRV_OP(SpvOpConstant, 4));
+    emit(&w, id_float_type);
+    emit(&w, id_float_one);
+    emit(&w, 0x3F800000u);   /* 1.0f */
+
+    emit(&w, SPIRV_OP(SpvOpConstant, 4));
+    emit(&w, id_float_type);
+    emit(&w, id_float_zero);
+    emit(&w, 0x00000000u);   /* 0.0f */
+
     for (int i = 0; i < num_buffers && i < 64; i++) {
         emit(&w, SPIRV_OP(SpvOpVariable, 4));
         emit(&w, id_ptr_sb);
@@ -794,9 +898,20 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, load_gid_id);
     emit(&w, 0); /* component 0 = x */
 
-    /* Emit load/compute/store operations */
+    /* Emit load/compute/store operations.
+     *
+     * vreg_id maps a linear-program vreg to the SPIR-V id currently holding its
+     * value. The code used to assume id == vreg_base + vreg, but loads and the
+     * composed ops allocate ids from `vid` at their own pace, so the two
+     * numberings drifted apart and operands pointed at whatever id happened to
+     * sit there -- typically an OpAccessChain pointer rather than a float,
+     * which is why every generated module failed validation on operand types. */
     int buf_idx = 0;
     uint32_t vid = vreg_base;
+    uint32_t* vreg_id = cml_calloc((size_t)(prog->next_vreg > 0 ? prog->next_vreg : 1),
+                                   sizeof(uint32_t));
+    if (!vreg_id) { cml_free(words); return NULL; }
+#define VREG(r) (((r) >= 0 && (r) < prog->next_vreg && vreg_id[(r)]) ? vreg_id[(r)] : id_float_zero)
 
     for (int i = 0; i < prog->num_ops; i++) {
         const CMLLinearOp* op = &prog->ops[i];
@@ -819,8 +934,8 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
             emit(&w, load_id);
             emit(&w, chain_id);
 
-            /* Map dest_reg to this load_id */
-            /* We use a simple offset: vreg_base + dest_reg maps to load_id */
+            if (op->dest_reg >= 0 && op->dest_reg < prog->next_vreg)
+                vreg_id[op->dest_reg] = load_id;
             buf_idx++;
             break;
         }
@@ -828,28 +943,84 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
         case LINOP_COMPUTE: {
             uint32_t result_id = vid++;
             if (uop_is_binary(op->uop) && op->num_srcs >= 2) {
-                uint32_t src0 = vreg_base + (uint32_t)op->src_regs[0];
-                uint32_t src1 = vreg_base + (uint32_t)op->src_regs[1];
-                uint32_t spirv_op;
-                switch (op->uop) {
-                    case UOP_ADD: spirv_op = SpvOpFAdd; break;
-                    case UOP_SUB: spirv_op = SpvOpFSub; break;
-                    case UOP_MUL: spirv_op = SpvOpFMul; break;
-                    case UOP_DIV: spirv_op = SpvOpFDiv; break;
-                    default:      spirv_op = SpvOpFAdd; break;
+                uint32_t src0 = VREG(op->src_regs[0]);
+                uint32_t src1 = VREG(op->src_regs[1]);
+                /* MAX and POW are GLSL.std.450 extended instructions, not core
+                 * SPIR-V opcodes, so they emit in a different shape. They used
+                 * to fall into the default below and silently compile to an
+                 * addition. */
+                uint32_t glsl_bin = 0;
+                if (op->uop == UOP_MAX)      glsl_bin = GLSL_STD_450_FMax;
+                else if (op->uop == UOP_POW) glsl_bin = GLSL_STD_450_Pow;
+
+                if (glsl_bin) {
+                    emit(&w, SPIRV_OP(SpvOpExtInst, 7));
+                    emit(&w, id_float_type);
+                    emit(&w, result_id);
+                    emit(&w, id_ext_glsl);
+                    emit(&w, glsl_bin);
+                    emit(&w, src0);
+                    emit(&w, src1);
+                } else {
+                    uint32_t spirv_op;
+                    switch (op->uop) {
+                        case UOP_ADD: spirv_op = SpvOpFAdd; break;
+                        case UOP_SUB: spirv_op = SpvOpFSub; break;
+                        case UOP_MUL: spirv_op = SpvOpFMul; break;
+                        case UOP_DIV: spirv_op = SpvOpFDiv; break;
+                        default:
+                            /* Emitting an add for an op with no case would
+                             * silently replace it. Abandon the module so the
+                             * caller falls back to a backend that can run it. */
+                            cml_free(vreg_id);
+                            cml_free(words);
+                            return NULL;
+                    }
+                    emit(&w, SPIRV_OP(spirv_op, 5));
+                    emit(&w, id_float_type);
+                    emit(&w, result_id);
+                    emit(&w, src0);
+                    emit(&w, src1);
                 }
-                emit(&w, SPIRV_OP(spirv_op, 5));
-                emit(&w, id_float_type);
-                emit(&w, result_id);
-                emit(&w, src0);
-                emit(&w, src1);
             } else if (uop_is_unary(op->uop) && op->num_srcs >= 1) {
-                uint32_t src = vreg_base + (uint32_t)op->src_regs[0];
+                uint32_t src = VREG(op->src_regs[0]);
                 if (op->uop == UOP_NEG) {
                     emit(&w, SPIRV_OP(SpvOpFNegate, 4));
                     emit(&w, id_float_type);
                     emit(&w, result_id);
                     emit(&w, src);
+                } else if (op->uop == UOP_RECIP) {
+                    emit(&w, SPIRV_OP(SpvOpFDiv, 5));
+                    emit(&w, id_float_type);
+                    emit(&w, result_id);
+                    emit(&w, id_float_one);
+                    emit(&w, src);
+                } else if (op->uop == UOP_SIGMOID || op->uop == UOP_SILU) {
+                    /* GLSL.std.450 has no sigmoid; compose 1/(1+exp(-x)), and
+                     * silu as x*sigmoid(x). Both previously compiled to fabs. */
+                    uint32_t id_neg = vid++, id_exp = vid++, id_den = vid++;
+                    uint32_t id_sig = (op->uop == UOP_SILU) ? vid++ : result_id;
+
+                    emit(&w, SPIRV_OP(SpvOpFNegate, 4));
+                    emit(&w, id_float_type); emit(&w, id_neg); emit(&w, src);
+
+                    emit(&w, SPIRV_OP(SpvOpExtInst, 6));
+                    emit(&w, id_float_type); emit(&w, id_exp);
+                    emit(&w, id_ext_glsl); emit(&w, GLSL_STD_450_Exp); emit(&w, id_neg);
+
+                    emit(&w, SPIRV_OP(SpvOpFAdd, 5));
+                    emit(&w, id_float_type); emit(&w, id_den);
+                    emit(&w, id_float_one); emit(&w, id_exp);
+
+                    emit(&w, SPIRV_OP(SpvOpFDiv, 5));
+                    emit(&w, id_float_type); emit(&w, id_sig);
+                    emit(&w, id_float_one); emit(&w, id_den);
+
+                    if (op->uop == UOP_SILU) {
+                        emit(&w, SPIRV_OP(SpvOpFMul, 5));
+                        emit(&w, id_float_type); emit(&w, result_id);
+                        emit(&w, src); emit(&w, id_sig);
+                    }
                 } else {
                     /* Use GLSL.std.450 extended instructions */
                     uint32_t glsl_op;
@@ -861,7 +1032,11 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
                         case UOP_SIN:  glsl_op = GLSL_STD_450_Sin; break;
                         case UOP_COS:  glsl_op = GLSL_STD_450_Cos; break;
                         case UOP_TANH: glsl_op = GLSL_STD_450_Tanh; break;
-                        default:       glsl_op = GLSL_STD_450_FAbs; break;
+                        default:
+                            /* Substituting fabs would silently change the op. */
+                            cml_free(vreg_id);
+                            cml_free(words);
+                            return NULL;
                     }
                     emit(&w, SPIRV_OP(SpvOpExtInst, 6));
                     emit(&w, id_float_type);
@@ -872,19 +1047,21 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
                 }
             } else {
                 /* No-op: just copy input */
-                uint32_t src = (op->num_srcs > 0) ? vreg_base + (uint32_t)op->src_regs[0] : id_uint_zero;
+                uint32_t src = (op->num_srcs > 0) ? VREG(op->src_regs[0]) : id_float_zero;
                 emit(&w, SPIRV_OP(SpvOpFAdd, 5));
                 emit(&w, id_float_type);
                 emit(&w, result_id);
                 emit(&w, src);
                 emit(&w, src);
             }
+            if (op->dest_reg >= 0 && op->dest_reg < prog->next_vreg)
+                vreg_id[op->dest_reg] = result_id;
             break;
         }
 
         case LINOP_STORE: {
             uint32_t chain_id = vid++;
-            uint32_t src = vreg_base + (uint32_t)op->dest_reg;
+            uint32_t src = VREG(op->dest_reg);
 
             emit(&w, SPIRV_OP(SpvOpAccessChain, 6));
             emit(&w, id_ptr_sb_float);
@@ -902,6 +1079,9 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
         }
         }
     }
+
+    cml_free(vreg_id);
+#undef VREG
 
     /* Return + FunctionEnd */
     emit(&w, SPIRV_OP(SpvOpReturn, 1));

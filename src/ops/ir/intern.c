@@ -8,24 +8,47 @@
 #define INTERN_LOAD_FACTOR_NUM  3
 #define INTERN_LOAD_FACTOR_DEN  4
 
-#define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define FNV_PRIME        0x100000001b3ULL
+#define FNV_OFFSET_BASIS CML_FNV_OFFSET_BASIS
 
-static uint64_t fnv1a_bytes(uint64_t h, const void* data, size_t len) {
+uint64_t cml_fnv1a_bytes(uint64_t h, const void* data, size_t len) {
     const uint8_t* p = (const uint8_t*)data;
     for (size_t i = 0; i < len; i++) {
         h ^= p[i];
-        h *= FNV_PRIME;
+        h *= CML_FNV_PRIME;
     }
     return h;
 }
 
+/* Structural graph hash and output-slot capture, shared by the trace cache and
+ * the tiny JIT: both key their caches on the same notion of "same graph". */
+uint64_t cml_ir_graph_hash(CMLGraph_t ir) {
+    if (!ir) return 0;
+
+    uint64_t hash = CML_FNV_OFFSET_BASIS;
+    for (struct IRNode* node = ir->head; node; node = node->next) {
+        int type_val = (int)node->type;
+        hash = cml_fnv1a_bytes(hash, &type_val, sizeof(type_val));
+        if (node->output_shape && node->output_ndim > 0)
+            hash = cml_fnv1a_bytes(hash, node->output_shape,
+                                   sizeof(int) * (size_t)node->output_ndim);
+        hash = cml_fnv1a_bytes(hash, &node->num_inputs, sizeof(node->num_inputs));
+    }
+    return hash;
+}
+
+int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max) {
+    int n = 0;
+    for (struct IRNode* node = ir ? ir->head : NULL; node && n < max; node = node->next)
+        ptrs[n++] = (node->output && node->output->data) ? node->output->data : NULL;
+    return n;
+}
+
 static uint64_t fnv1a_u64(uint64_t h, uint64_t v) {
-    return fnv1a_bytes(h, &v, sizeof(v));
+    return cml_fnv1a_bytes(h, &v, sizeof(v));
 }
 
 static uint64_t fnv1a_i32(uint64_t h, int v) {
-    return fnv1a_bytes(h, &v, sizeof(v));
+    return cml_fnv1a_bytes(h, &v, sizeof(v));
 }
 
 uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs,
@@ -39,7 +62,7 @@ uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs,
         h = fnv1a_u64(h, input_hash);
     }
     if (arg_bytes && arg_len > 0)
-        h = fnv1a_bytes(h, arg_bytes, arg_len);
+        h = cml_fnv1a_bytes(h, arg_bytes, arg_len);
     return h;
 }
 
@@ -64,7 +87,7 @@ uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
         }
     }
     if (arg_bytes && arg_len > 0)
-        h = fnv1a_bytes(h, arg_bytes, arg_len);
+        h = cml_fnv1a_bytes(h, arg_bytes, arg_len);
     return h;
 }
 

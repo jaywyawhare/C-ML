@@ -6,26 +6,6 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-static void paged_softmax_inplace(float* data, int rows, int cols) {
-    for (int r = 0; r < rows; r++) {
-        float* row = data + (size_t)r * cols;
-        float max_val = row[0];
-        for (int c = 1; c < cols; c++) {
-            if (row[c] > max_val) max_val = row[c];
-        }
-        float sum = 0.0f;
-        for (int c = 0; c < cols; c++) {
-            row[c] = expf(row[c] - max_val);
-            sum += row[c];
-        }
-        if (sum > 0.0f) {
-            float inv = 1.0f / sum;
-            for (int c = 0; c < cols; c++) {
-                row[c] *= inv;
-            }
-        }
-    }
-}
 
 static inline size_t token_kv_size(const CMLPagedKVCache* cache) {
     return (size_t)cache->num_kv_heads * cache->head_dim;
@@ -456,7 +436,7 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
         }
 
         /* Softmax over kv_len */
-        paged_softmax_inplace(scores, seq_q, kv_len);
+        cml_softmax_rows_inplace(scores, seq_q, kv_len);
 
         /* Weighted sum: gather V from paged blocks */
         for (int sq = 0; sq < seq_q; sq++) {

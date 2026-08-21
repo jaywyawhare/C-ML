@@ -136,6 +136,20 @@ static void fusion_group_add_eliminated(CMLFusionGroup* g, int buffer_idx) {
     g->eliminated_buffers[g->num_eliminated++] = buffer_idx;
 }
 
+/* Append `group` to the schedule, growing the array as needed. A failed grow
+ * drops the group rather than overrunning, as the inline version did. */
+static void fusion_push_group(CMLFusionSchedule* sched, CMLFusionGroup* group) {
+    if (sched->num_groups >= sched->group_capacity) {
+        int nc = sched->group_capacity * 2;
+        CMLFusionGroup** tmp = cml_realloc(sched->groups, (size_t)nc * sizeof(CMLFusionGroup*));
+        if (!tmp)
+            return;
+        sched->groups = tmp;
+        sched->group_capacity = nc;
+    }
+    sched->groups[sched->num_groups++] = group;
+}
+
 static void fusion_group_free(CMLFusionGroup* g) {
     if (!g) return;
     cml_free(g->nodes);
@@ -288,17 +302,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
 
         /* Cannot extend -- flush current group and start new one */
         if (cur) {
-            if (sched->num_groups >= sched->group_capacity) {
-                int nc = sched->group_capacity * 2;
-                CMLFusionGroup** tmp = cml_realloc(
-                    sched->groups,
-                    (size_t)nc * sizeof(CMLFusionGroup*));
-                if (tmp) {
-                    sched->groups = tmp;
-                    sched->group_capacity = nc;
-                }
-            }
-            sched->groups[sched->num_groups++] = cur;
+            fusion_push_group(sched, cur);
         }
 
         cur = fusion_group_create();
@@ -313,17 +317,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph,
 
     /* Flush last group */
     if (cur) {
-        if (sched->num_groups >= sched->group_capacity) {
-            int nc = sched->group_capacity * 2;
-            CMLFusionGroup** tmp = cml_realloc(
-                sched->groups,
-                (size_t)nc * sizeof(CMLFusionGroup*));
-            if (tmp) {
-                sched->groups = tmp;
-                sched->group_capacity = nc;
-            }
-        }
-        sched->groups[sched->num_groups++] = cur;
+        fusion_push_group(sched, cur);
     }
 
     /* Build execution order */

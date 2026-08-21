@@ -1,4 +1,5 @@
 #include "zoo/vit.h"
+#include "zoo/zoo.h"
 #include "nn/layers.h"
 #include "autograd/forward_ops.h"
 #include "tensor/tensor_manipulation.h"
@@ -54,78 +55,10 @@ ViTConfig cml_zoo_vit_config_large(void) {
     };
 }
 
-typedef struct {
-    Module base;
-    MultiHeadAttention* attn;
-    LayerNorm* norm1;
-    Sequential* mlp;
-    LayerNorm* norm2;
-} ViTBlock;
-
-static Tensor* vit_block_forward(Module* module, Tensor* input) {
-    ViTBlock* block = (ViTBlock*)module;
-    if (!block || !input)
-        return NULL;
-
-    Tensor* normed = module_forward((Module*)block->norm1, input);
-    if (!normed)
-        return NULL;
-
-    Tensor* attn_out = multihead_attention_forward(block->attn, normed, normed, normed, NULL);
-    if (!attn_out)
-        return NULL;
-
-    Tensor* x = tensor_add(input, attn_out);
-    if (!x)
-        return NULL;
-
-    normed = module_forward((Module*)block->norm2, x);
-    if (!normed)
-        return NULL;
-
-    Tensor* mlp_out = module_forward((Module*)block->mlp, normed);
-    if (!mlp_out)
-        return NULL;
-
-    return tensor_add(x, mlp_out);
-}
-
-static void vit_block_free(Module* module) {
-    ViTBlock* block = (ViTBlock*)module;
-    if (!block)
-        return;
-    if (block->attn)
-        module_free((Module*)block->attn);
-    if (block->norm1)
-        module_free((Module*)block->norm1);
-    if (block->mlp)
-        module_free((Module*)block->mlp);
-    if (block->norm2)
-        module_free((Module*)block->norm2);
-    cml_free(block);
-}
-
 static Module* create_vit_block(int hidden_size, int n_head, int mlp_dim,
                                  DType dtype, DeviceType device) {
-    ViTBlock* block = cml_malloc(sizeof(ViTBlock));
-    if (!block)
-        return NULL;
-
-    if (module_init((Module*)block, "ViTBlock", vit_block_forward, vit_block_free) != 0) {
-        cml_free(block);
-        return NULL;
-    }
-
-    block->norm1 = nn_layernorm(hidden_size, 1e-6f, true, dtype, device);
-    block->attn = nn_multihead_attention(hidden_size, n_head, 0.0f, dtype, device);
-    block->norm2 = nn_layernorm(hidden_size, 1e-6f, true, dtype, device);
-
-    block->mlp = nn_sequential();
-    sequential_add(block->mlp, (Module*)nn_linear(hidden_size, mlp_dim, dtype, device, true));
-    sequential_add(block->mlp, (Module*)nn_gelu(false));
-    sequential_add(block->mlp, (Module*)nn_linear(mlp_dim, hidden_size, dtype, device, true));
-
-    return (Module*)block;
+    return (Module*)zoo_prenorm_block("ViTBlock", hidden_size, n_head, mlp_dim, 1e-6f,
+                                      dtype, device);
 }
 
 typedef struct {

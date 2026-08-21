@@ -158,6 +158,36 @@ static int run_opt_passes(LLVMModuleRef mod, LLVMTargetMachineRef tm, int opt_le
     return 0;
 }
 
+/* Emit `mod` as an AMDGPU object into a fresh heap buffer, then dispose the
+ * module and target machine either way. `what` names the source for logging. */
+static int amd_emit_code_object(LLVMTargetMachineRef tm, LLVMModuleRef mod, const char* what,
+                                void** code_object, size_t* code_size) {
+    LLVMMemoryBufferRef obj_buf = NULL;
+    char* emit_err = NULL;
+    int rc = -1;
+
+    if (LLVMTargetMachineEmitToMemoryBuffer(tm, mod, LLVMObjectFile, &emit_err, &obj_buf) != 0) {
+        LOG_ERROR("AMD LLVM: %s codegen failed: %s", what, emit_err ? emit_err : "unknown");
+        LLVMDisposeMessage(emit_err);
+        goto done;
+    }
+
+    size_t obj_size = LLVMGetBufferSize(obj_buf);
+    void* result    = cml_malloc(obj_size);
+    if (result) {
+        memcpy(result, LLVMGetBufferStart(obj_buf), obj_size);
+        *code_object = result;
+        *code_size   = obj_size;
+        rc = 0;
+    }
+    LLVMDisposeMemoryBuffer(obj_buf);
+
+done:
+    LLVMDisposeModule(mod);
+    LLVMDisposeTargetMachine(tm);
+    return rc;
+}
+
 int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp,
                             const char* ir_source,
                             void** code_object, size_t* code_size) {
@@ -204,39 +234,15 @@ int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp,
     }
     LLVMDisposeMessage(verify_err);
 
-    LLVMMemoryBufferRef obj_buf = NULL;
-    char* emit_err = NULL;
-    if (LLVMTargetMachineEmitToMemoryBuffer(tm, mod, LLVMObjectFile, &emit_err, &obj_buf) != 0) {
-        LOG_ERROR("AMD LLVM: codegen failed: %s", emit_err ? emit_err : "unknown");
-        LLVMDisposeMessage(emit_err);
-        LLVMDisposeModule(mod);
-        LLVMDisposeTargetMachine(tm);
-        return -1;
-    }
-
-    size_t obj_size = LLVMGetBufferSize(obj_buf);
-    const char* obj_data = LLVMGetBufferStart(obj_buf);
-
-    void* result = cml_malloc(obj_size);
-    if (!result) {
-        LLVMDisposeMemoryBuffer(obj_buf);
-        LLVMDisposeModule(mod);
-        LLVMDisposeTargetMachine(tm);
-        return -1;
-    }
-    memcpy(result, obj_data, obj_size);
-
-    *code_object = result;
-    *code_size = obj_size;
+    int rc = amd_emit_code_object(tm, mod, "module", code_object, code_size);
+    if (rc != 0)
+        return rc;
 
     LOG_INFO("AMD LLVM: compiled %zu bytes of AMDGPU code object for %s",
-             obj_size, comp->target_cpu);
-
-    LLVMDisposeMemoryBuffer(obj_buf);
-    LLVMDisposeModule(mod);
-    LLVMDisposeTargetMachine(tm);
+             *code_size, comp->target_cpu);
     return 0;
 }
+
 
 int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
                                 const char* source,
@@ -311,36 +317,11 @@ int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
         return -1;
     }
 
-    LLVMMemoryBufferRef obj_buf = NULL;
-    char* emit_err = NULL;
-    if (LLVMTargetMachineEmitToMemoryBuffer(tm, mod, LLVMObjectFile, &emit_err, &obj_buf) != 0) {
-        LOG_ERROR("AMD LLVM: source codegen failed: %s", emit_err ? emit_err : "unknown");
-        LLVMDisposeMessage(emit_err);
-        LLVMDisposeModule(mod);
-        LLVMDisposeTargetMachine(tm);
-        return -1;
-    }
+    int rc = amd_emit_code_object(tm, mod, "source", code_object, code_size);
+    if (rc != 0)
+        return rc;
 
-    size_t obj_size = LLVMGetBufferSize(obj_buf);
-    const char* obj_data = LLVMGetBufferStart(obj_buf);
-
-    void* result = cml_malloc(obj_size);
-    if (!result) {
-        LLVMDisposeMemoryBuffer(obj_buf);
-        LLVMDisposeModule(mod);
-        LLVMDisposeTargetMachine(tm);
-        return -1;
-    }
-    memcpy(result, obj_data, obj_size);
-
-    *code_object = result;
-    *code_size = obj_size;
-
-    LOG_INFO("AMD LLVM: compiled source to %zu bytes for %s", obj_size, comp->target_cpu);
-
-    LLVMDisposeMemoryBuffer(obj_buf);
-    LLVMDisposeModule(mod);
-    LLVMDisposeTargetMachine(tm);
+    LOG_INFO("AMD LLVM: compiled source to %zu bytes for %s", *code_size, comp->target_cpu);
     return 0;
 }
 

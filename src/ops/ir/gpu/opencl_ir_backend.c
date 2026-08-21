@@ -152,7 +152,7 @@ static const char* g_ocl_kernel_src =
 "        for (int j = 0; j < 8; j++) {\n"
 "            int col = gidC + tidC * 8 + j;\n"
 "            float v = acc[i][j] + bias[col];\n"
-"            C[row * N + col] = v > 0.0f ? v : 0.0f;\n"
+"            C[row * N + col] = v < 0.0f ? 0.0f : v;\n"   /* NaN-propagating relu */
 "        }\n"
 "    }\n"
 "}\n"
@@ -198,7 +198,10 @@ static const char* g_ocl_kernel_src =
 "    int i = get_global_id(0); if (i < n) out[i] = -x[i];\n"
 "}\n"
 "__kernel void ew_relu(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = x[i] > 0.0f ? x[i] : 0.0f;\n"
+"    int i = get_global_id(0);\n"
+"    /* `x < 0 ? 0 : x`, not `x > 0 ? x : 0`: an ordered compare is false for\n"
+"       NaN, so the latter would quietly turn NaN into 0. */\n"
+"    if (i < n) { float v = x[i]; out[i] = v < 0.0f ? 0.0f : v; }\n"
 "}\n"
 "__kernel void ew_sigmoid(__global const float* x, __global float* out, int n) {\n"
 "    int i = get_global_id(0); if (i < n) out[i] = 1.0f / (1.0f + exp(-x[i]));\n"
@@ -239,7 +242,9 @@ static const char* g_ocl_kernel_src =
 "    scratch[lid] = (gid < n) ? x[gid] : -INFINITY;\n"
 "    barrier(CLK_LOCAL_MEM_FENCE);\n"
 "    for (int s = get_local_size(0) / 2; s > 0; s >>= 1) {\n"
-"        if (lid < s && scratch[lid + s] > scratch[lid])\n"
+"        /* `!(a <= b)` is true when either is NaN, so NaN wins the reduction\n"
+"           instead of being skipped by an ordered compare. */\n"
+"        if (lid < s && !(scratch[lid + s] <= scratch[lid]))\n"
 "            scratch[lid] = scratch[lid + s];\n"
 "        barrier(CLK_LOCAL_MEM_FENCE);\n"
 "    }\n"
@@ -583,7 +588,12 @@ static void ocl_beam_compile_variants(CMLOpenCLIRBackend* b) {
         cml_free(src);
         if (err != CL_SUCCESS) continue;
 
-        err = clBuildProgram(prog, 1, &b->device, "-cl-mad-enable -cl-fast-relaxed-math", NULL, NULL);
+        /* NOT -cl-fast-relaxed-math: it implies -cl-finite-math-only, which lets the
+         * compiler assume NaN and Inf never occur. Under that assumption it may fold
+         * a NaN-safe select straight back into fmax, so relu(NaN) returned 0 on the
+         * GPU while the CPU returned NaN -- the same tensor, two different answers.
+         * -cl-mad-enable keeps the fused multiply-add, which is the bulk of the win. */
+        err = clBuildProgram(prog, 1, &b->device, "-cl-mad-enable", NULL, NULL);
         if (err != CL_SUCCESS) {
             clReleaseProgram(prog);
             continue;
@@ -818,7 +828,7 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     b->program = clCreateProgramWithSource(b->context, 1, &src, &len, &err);
     if (err != CL_SUCCESS) { LOG_ERROR("clCreateProgramWithSource failed: %d", err); return -1; }
 
-    err = clBuildProgram(b->program, 1, &b->device, "-cl-fast-relaxed-math", NULL, NULL);
+    err = clBuildProgram(b->program, 1, &b->device, "-cl-mad-enable", NULL, NULL);
     if (err != CL_SUCCESS) {
         char log_buf[4096];
         clGetProgramBuildInfo(b->program, b->device, CL_PROGRAM_BUILD_LOG,

@@ -242,6 +242,182 @@ static void emit_member_decorate(SPIRVBuilder* b, uint32_t struct_id, uint32_t m
     spirv_builder_emit(b, value);
 }
 
+/* One-line spellings of the SPIR-V instructions this file emits by the dozen.
+ * Each writes the same word stream the hand-rolled emit_op/emit pairs did. */
+static void emit_pointer_type(SPIRVBuilder* b, uint32_t result, uint32_t storage_class,
+                              uint32_t pointee) {
+    emit_op(b, SpvOpTypePointer, 4);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, storage_class);
+    spirv_builder_emit(b, pointee);
+}
+
+static void emit_variable(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result,
+                          uint32_t storage_class) {
+    emit_op(b, SpvOpVariable, 4);
+    spirv_builder_emit(b, ptr_type);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, storage_class);
+}
+
+static void emit_struct(SPIRVBuilder* b, uint32_t result, uint32_t member_type) {
+    emit_op(b, SpvOpTypeStruct, 3);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, member_type);
+}
+
+static void emit_load(SPIRVBuilder* b, uint32_t type, uint32_t result, uint32_t pointer) {
+    emit_op(b, SpvOpLoad, 4);
+    spirv_builder_emit(b, type);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, pointer);
+}
+
+static void emit_store(SPIRVBuilder* b, uint32_t pointer, uint32_t value) {
+    emit_op(b, SpvOpStore, 3);
+    spirv_builder_emit(b, pointer);
+    spirv_builder_emit(b, value);
+}
+
+static void emit_composite_extract(SPIRVBuilder* b, uint32_t type, uint32_t result,
+                                   uint32_t composite, uint32_t index) {
+    emit_op(b, SpvOpCompositeExtract, 5);
+    spirv_builder_emit(b, type);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, composite);
+    spirv_builder_emit(b, index);
+}
+
+static void emit_runtime_array(SPIRVBuilder* b, uint32_t result, uint32_t element_type) {
+    emit_op(b, SpvOpTypeRuntimeArray, 3);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, element_type);
+}
+
+/* The void/bool/uint/float/uvec3/void() set every generated kernel declares. */
+static void emit_scalar_types(SPIRVBuilder* b, uint32_t id_void, uint32_t id_bool,
+                              uint32_t id_uint, uint32_t id_float, uint32_t id_uint3,
+                              uint32_t id_void_fn) {
+    emit_op(b, SpvOpTypeVoid, 2);
+    spirv_builder_emit(b, id_void);
+    emit_op(b, SpvOpTypeBool, 2);
+    spirv_builder_emit(b, id_bool);
+    emit_op(b, SpvOpTypeInt, 4);
+    spirv_builder_emit(b, id_uint);
+    spirv_builder_emit(b, 32);
+    spirv_builder_emit(b, 0); /* unsigned */
+    emit_op(b, SpvOpTypeFloat, 3);
+    spirv_builder_emit(b, id_float);
+    spirv_builder_emit(b, 32);
+    emit_op(b, SpvOpTypeVector, 4);
+    spirv_builder_emit(b, id_uint3);
+    spirv_builder_emit(b, id_uint);
+    spirv_builder_emit(b, 3);
+    emit_op(b, SpvOpTypeFunction, 3);
+    spirv_builder_emit(b, id_void_fn);
+    spirv_builder_emit(b, id_void);
+}
+
+static void emit_uint_constant_id(SPIRVBuilder* b, uint32_t uint_type, uint32_t result,
+                                  uint32_t value) {
+    emit_op(b, SpvOpConstant, 4);
+    spirv_builder_emit(b, uint_type);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, value);
+}
+
+/* Bind `var` to descriptor set 0 at `binding`. */
+static void emit_binding(SPIRVBuilder* b, uint32_t var, uint32_t binding) {
+    emit_decorate(b, var, SpvDecorationDescriptorSet, 0);
+    emit_decorate(b, var, SpvDecorationBinding, binding);
+}
+
+/* OpFunction ... OpLabel: the entry of every generated kernel. */
+static void emit_function_entry(SPIRVBuilder* b, uint32_t id_void, uint32_t id_func,
+                                uint32_t id_void_fn, uint32_t id_label) {
+    emit_op(b, SpvOpFunction, 5);
+    spirv_builder_emit(b, id_void);
+    spirv_builder_emit(b, id_func);
+    spirv_builder_emit(b, 0); /* FunctionControl None */
+    spirv_builder_emit(b, id_void_fn);
+    emit_op(b, SpvOpLabel, 2);
+    spirv_builder_emit(b, id_label);
+}
+
+static void emit_access_chain1(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result,
+                               uint32_t base, uint32_t index) {
+    emit_op(b, SpvOpAccessChain, 5);
+    spirv_builder_emit(b, ptr_type);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, base);
+    spirv_builder_emit(b, index);
+}
+
+static void emit_access_chain2(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result,
+                               uint32_t base, uint32_t index0, uint32_t index1) {
+    emit_op(b, SpvOpAccessChain, 6);
+    spirv_builder_emit(b, ptr_type);
+    spirv_builder_emit(b, result);
+    spirv_builder_emit(b, base);
+    spirv_builder_emit(b, index0);
+    spirv_builder_emit(b, index1);
+}
+
+/* Read gl_GlobalInvocationID.x, the flat element index of every kernel. */
+static uint32_t emit_global_invocation_x(SPIRVBuilder* b, uint32_t id_uint, uint32_t id_uint3,
+                                         uint32_t id_var_gid) {
+    uint32_t vec = spirv_builder_alloc_id(b);
+    emit_load(b, id_uint3, vec, id_var_gid);
+    uint32_t x = spirv_builder_alloc_id(b);
+    emit_composite_extract(b, id_uint, x, vec, 0);
+    return x;
+}
+
+/* Load `buffer[index]` from a struct-of-runtime-array storage buffer. */
+static uint32_t emit_load_element(SPIRVBuilder* b, uint32_t elem_type, uint32_t elem_ptr_type,
+                                  uint32_t buffer_var, uint32_t member, uint32_t index) {
+    uint32_t ptr = spirv_builder_alloc_id(b);
+    emit_access_chain2(b, elem_ptr_type, ptr, buffer_var, member, index);
+    uint32_t value = spirv_builder_alloc_id(b);
+    emit_load(b, elem_type, value, ptr);
+    return value;
+}
+
+/* Load a single struct member -- how the kernels read their `n` parameter. */
+static uint32_t emit_load_scalar(SPIRVBuilder* b, uint32_t type, uint32_t ptr_type,
+                                 uint32_t var, uint32_t member) {
+    uint32_t ptr = spirv_builder_alloc_id(b);
+    emit_access_chain1(b, ptr_type, ptr, var, member);
+    uint32_t value = spirv_builder_alloc_id(b);
+    emit_load(b, type, value, ptr);
+    return value;
+}
+
+static void emit_label(SPIRVBuilder* b, uint32_t id_label) {
+    emit_op(b, SpvOpLabel, 2);
+    spirv_builder_emit(b, id_label);
+}
+
+/* Guard the kernel body with `if (index < n)`, using a structured selection
+ * that merges at `id_label_end`. */
+static void emit_bounds_check(SPIRVBuilder* b, uint32_t id_bool, uint32_t id_index, uint32_t id_n,
+                              uint32_t id_label_body, uint32_t id_label_end) {
+    uint32_t id_cmp = spirv_builder_alloc_id(b);
+    emit_op(b, SpvOpULessThan, 5);
+    spirv_builder_emit(b, id_bool);
+    spirv_builder_emit(b, id_cmp);
+    spirv_builder_emit(b, id_index);
+    spirv_builder_emit(b, id_n);
+
+    emit_op(b, SpvOpSelectionMerge, 3);
+    spirv_builder_emit(b, id_label_end);
+    spirv_builder_emit(b, 0); /* SelectionControl None */
+    emit_op(b, SpvOpBranchConditional, 4);
+    spirv_builder_emit(b, id_cmp);
+    spirv_builder_emit(b, id_label_body);
+    spirv_builder_emit(b, id_label_end);
+}
+
 static uint32_t emit_float_constant(SPIRVBuilder* b, uint32_t float_type, float value) {
     uint32_t id = spirv_builder_alloc_id(b);
     uint32_t bits;
@@ -286,6 +462,55 @@ void cml_spirv_codegen_destroy(CMLSPIRVCodegen* cg) {
     cml_free(cg);
 }
 
+/* Core IDs every generated kernel allocates before it emits any type. */
+typedef struct {
+    uint32_t glsl_ext;
+    uint32_t id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn, id_rtarray;
+} SpirvCoreIds;
+
+/* Start a compute-shader module: reserve the five header words (back-patched by
+ * spirv_finish_kernel), emit the capability/import/memory-model triple, and
+ * pre-allocate the core type IDs in declaration order. */
+static SPIRVBuilder* spirv_begin_kernel(SpirvCoreIds* ids) {
+    SPIRVBuilder* b = spirv_builder_create();
+    if (!b)
+        return NULL;
+
+    for (int i = 0; i < 5; i++)
+        spirv_builder_emit(b, 0);
+
+    emit_capability(b);
+    ids->glsl_ext = emit_ext_import(b);
+    emit_memory_model(b);
+
+    ids->id_void    = spirv_builder_alloc_id(b);
+    ids->id_bool    = spirv_builder_alloc_id(b);
+    ids->id_uint    = spirv_builder_alloc_id(b);
+    ids->id_float   = spirv_builder_alloc_id(b);
+    ids->id_uint3   = spirv_builder_alloc_id(b);
+    ids->id_void_fn = spirv_builder_alloc_id(b);
+    ids->id_rtarray = spirv_builder_alloc_id(b);
+    return b;
+}
+
+/* Close the entry function, back-patch the module header (the five words
+ * reserved up front) and hand the finished word stream to the caller. */
+static uint32_t* spirv_finish_kernel(SPIRVBuilder* b, CMLSPIRVCodegen* cg, size_t* out_size) {
+    emit_op(b, SpvOpReturn, 1);
+    emit_op(b, SpvOpFunctionEnd, 1);
+
+    b->words[0] = SPIRV_MAGIC;
+    b->words[1] = SPIRV_VERSION;
+    b->words[2] = SPIRV_GENERATOR;
+    b->words[3] = b->next_id;
+    b->words[4] = 0;
+
+    cg->kernel_count++;
+    uint32_t* result = spirv_builder_finalize(b, out_size);
+    spirv_builder_destroy(b);
+    return result;
+}
+
 /*
  * Generate a unary compute shader:
  *   layout(set=0, binding=0) buffer InBuf  { float data[]; } inBuf;
@@ -303,32 +528,16 @@ uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
     (void)name;
     if (!cg || !out_size) return NULL;
 
-    SPIRVBuilder* b = spirv_builder_create();
+    SpirvCoreIds ids;
+    size_t header_offset = 0;
+    SPIRVBuilder* b = spirv_begin_kernel(&ids);
     if (!b) return NULL;
 
-    /* Reserve space for header (5 words) — filled in at the end */
-    size_t header_offset = b->len;
-    for (int i = 0; i < 5; i++) spirv_builder_emit(b, 0);
-
-    /* OpCapability Shader */
-    emit_capability(b);
-
-    /* OpExtInstImport "GLSL.std.450" */
-    uint32_t glsl_ext = emit_ext_import(b);
-
-    /* OpMemoryModel Logical GLSL450 */
-    emit_memory_model(b);
-
-    /* Pre-allocate IDs for types and variables */
-    uint32_t id_void      = spirv_builder_alloc_id(b);
-    uint32_t id_bool      = spirv_builder_alloc_id(b);
-    uint32_t id_uint      = spirv_builder_alloc_id(b);
-    uint32_t id_float     = spirv_builder_alloc_id(b);
-    uint32_t id_uint3     = spirv_builder_alloc_id(b);
-    uint32_t id_void_fn   = spirv_builder_alloc_id(b);
-
-    /* Runtime array and struct types */
-    uint32_t id_rtarray_f = spirv_builder_alloc_id(b); /* float[] */
+    uint32_t id_void = ids.id_void, id_bool = ids.id_bool, id_uint = ids.id_uint,
+             id_float = ids.id_float, id_uint3 = ids.id_uint3,
+             id_void_fn = ids.id_void_fn, id_rtarray_f = ids.id_rtarray;
+    uint32_t glsl_ext = ids.glsl_ext;
+    (void)id_bool;
     uint32_t id_struct_in = spirv_builder_alloc_id(b); /* struct { float[] } */
     uint32_t id_struct_out= spirv_builder_alloc_id(b);
     uint32_t id_struct_p  = spirv_builder_alloc_id(b); /* struct { uint } */
@@ -373,116 +582,46 @@ uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
 
     emit_decorate(b, id_rtarray_f, SpvDecorationArrayStride, 4);
 
-    emit_decorate(b, id_var_in, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_in, SpvDecorationBinding, 0);
-    emit_decorate(b, id_var_out, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_out, SpvDecorationBinding, 1);
-    emit_decorate(b, id_var_p, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_p, SpvDecorationBinding, 2);
-
+    emit_binding(b, id_var_in, 0);
+    emit_binding(b, id_var_out, 1);
+    emit_binding(b, id_var_p, 2);
     /* Type declarations */
-    emit_op(b, SpvOpTypeVoid, 2); spirv_builder_emit(b, id_void);
-    emit_op(b, SpvOpTypeBool, 2); spirv_builder_emit(b, id_bool);
-    emit_op(b, SpvOpTypeInt, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, 32); spirv_builder_emit(b, 0); /* 32-bit unsigned */
-    emit_op(b, SpvOpTypeFloat, 3); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, 32);
-    emit_op(b, SpvOpTypeVector, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_uint); spirv_builder_emit(b, 3);
-    emit_op(b, SpvOpTypeFunction, 3); spirv_builder_emit(b, id_void_fn);
-    spirv_builder_emit(b, id_void);
+    emit_scalar_types(b, id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn);
+    emit_runtime_array(b, id_rtarray_f, id_float);
+    emit_struct(b, id_struct_in, id_rtarray_f);
+    emit_struct(b, id_struct_out, id_rtarray_f);
+    emit_struct(b, id_struct_p, id_uint);
 
-    emit_op(b, SpvOpTypeRuntimeArray, 3); spirv_builder_emit(b, id_rtarray_f);
-    spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_in);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_out);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_p);
-    spirv_builder_emit(b, id_uint);
-
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_in);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_in);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_out);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_out);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_struct_p);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_uint);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, SpvStorageClassInput); spirv_builder_emit(b, id_uint3);
+    emit_pointer_type(b, id_ptr_sb_in, SpvStorageClassStorageBuffer, id_struct_in);
+    emit_pointer_type(b, id_ptr_sb_out, SpvStorageClassStorageBuffer, id_struct_out);
+    emit_pointer_type(b, id_ptr_sb_p, SpvStorageClassUniform, id_struct_p);
+    emit_pointer_type(b, id_ptr_sb_f, SpvStorageClassStorageBuffer, id_float);
+    emit_pointer_type(b, id_ptr_sb_u, SpvStorageClassUniform, id_uint);
+    emit_pointer_type(b, id_ptr_in_u3, SpvStorageClassInput, id_uint3);
 
     /* Constants */
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_0); spirv_builder_emit(b, 0);
-
+    emit_uint_constant_id(b, id_uint, id_const_0, 0);
     /* Variables */
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_in);
-    spirv_builder_emit(b, id_var_in); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_out);
-    spirv_builder_emit(b, id_var_out); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, id_var_p); spirv_builder_emit(b, SpvStorageClassUniform);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, id_var_gid); spirv_builder_emit(b, SpvStorageClassInput);
+    emit_variable(b, id_ptr_sb_in, id_var_in, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_out, id_var_out, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_p, id_var_p, SpvStorageClassUniform);
+    emit_variable(b, id_ptr_in_u3, id_var_gid, SpvStorageClassInput);
 
     /* Function body */
     uint32_t id_label_entry = spirv_builder_alloc_id(b);
     uint32_t id_label_body  = spirv_builder_alloc_id(b);
     uint32_t id_label_end   = spirv_builder_alloc_id(b);
 
-    emit_op(b, SpvOpFunction, 5); spirv_builder_emit(b, id_void);
-    spirv_builder_emit(b, id_main); spirv_builder_emit(b, 0); /* None */
-    spirv_builder_emit(b, id_void_fn);
-
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_entry);
-
+    emit_function_entry(b, id_void, id_main, id_void_fn, id_label_entry);
     /* Load GlobalInvocationID.x */
-    uint32_t id_gid_vec = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_gid_vec); spirv_builder_emit(b, id_var_gid);
-
-    uint32_t id_gid_x = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_gid_x); spirv_builder_emit(b, id_gid_vec);
-    spirv_builder_emit(b, 0); /* component 0 */
-
+    uint32_t id_gid_x = emit_global_invocation_x(b, id_uint, id_uint3, id_var_gid);
     /* Load n from params */
-    uint32_t id_n_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, id_n_ptr); spirv_builder_emit(b, id_var_p);
-    spirv_builder_emit(b, id_const_0);
-
-    uint32_t id_n = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_n); spirv_builder_emit(b, id_n_ptr);
-
+    uint32_t id_n = emit_load_scalar(b, id_uint, id_ptr_sb_u, id_var_p, id_const_0);
     /* Bounds check: if (idx >= n) return */
-    uint32_t id_cmp = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpULessThan, 5); spirv_builder_emit(b, id_bool);
-    spirv_builder_emit(b, id_cmp); spirv_builder_emit(b, id_gid_x);
-    spirv_builder_emit(b, id_n);
-
-    emit_op(b, SpvOpSelectionMerge, 3);
-    spirv_builder_emit(b, id_label_end); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpBranchConditional, 4);
-    spirv_builder_emit(b, id_cmp); spirv_builder_emit(b, id_label_body);
-    spirv_builder_emit(b, id_label_end);
-
+    emit_bounds_check(b, id_bool, id_gid_x, id_n, id_label_body, id_label_end);
     /* Body: load input[idx] */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_body);
-
-    uint32_t id_in_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_in_ptr); spirv_builder_emit(b, id_var_in);
-    spirv_builder_emit(b, id_const_0); spirv_builder_emit(b, id_gid_x);
-
-    uint32_t id_val = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_val); spirv_builder_emit(b, id_in_ptr);
-
+    emit_label(b, id_label_body);
+    uint32_t id_val = emit_load_element(b, id_float, id_ptr_sb_f, id_var_in, id_const_0, id_gid_x);
     /* Apply operation */
     uint32_t id_result = spirv_builder_alloc_id(b);
     switch (op) {
@@ -578,17 +717,13 @@ uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
 
     /* Store result to output[idx] */
     uint32_t id_out_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_out_ptr); spirv_builder_emit(b, id_var_out);
-    spirv_builder_emit(b, id_const_0); spirv_builder_emit(b, id_gid_x);
-
-    emit_op(b, SpvOpStore, 3);
-    spirv_builder_emit(b, id_out_ptr); spirv_builder_emit(b, id_result);
+    emit_access_chain2(b, id_ptr_sb_f, id_out_ptr, id_var_out, id_const_0, id_gid_x);
+    emit_store(b, id_out_ptr, id_result);
 
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_label_end);
 
     /* End label */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_end);
+    emit_label(b, id_label_end);
     emit_op(b, SpvOpReturn, 1);
     emit_op(b, SpvOpFunctionEnd, 1);
 
@@ -596,7 +731,8 @@ uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
     b->words[header_offset + 0] = SPIRV_MAGIC;
     b->words[header_offset + 1] = SPIRV_VERSION;
     b->words[header_offset + 2] = SPIRV_GENERATOR;
-    b->words[header_offset + 3] = b->next_id; /* bound */
+    b->words[header_offset + 3] = b->next_id;
+/* bound */
     b->words[header_offset + 4] = 0;
 
     cg->kernel_count++;
@@ -620,25 +756,15 @@ uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name
      * two loads and the binary op between them.
      */
 
-    SPIRVBuilder* b = spirv_builder_create();
+    SpirvCoreIds ids;
+    SPIRVBuilder* b = spirv_begin_kernel(&ids);
     if (!b) return NULL;
 
-    /* Header placeholder */
-    for (int i = 0; i < 5; i++) spirv_builder_emit(b, 0);
-
-    emit_capability(b);
-    uint32_t glsl_ext = emit_ext_import(b);
-    emit_memory_model(b);
-
-    /* Allocate type IDs */
-    uint32_t id_void    = spirv_builder_alloc_id(b);
-    uint32_t id_bool    = spirv_builder_alloc_id(b);
-    uint32_t id_uint    = spirv_builder_alloc_id(b);
-    uint32_t id_float   = spirv_builder_alloc_id(b);
-    uint32_t id_uint3   = spirv_builder_alloc_id(b);
-    uint32_t id_void_fn = spirv_builder_alloc_id(b);
-
-    uint32_t id_rtarray = spirv_builder_alloc_id(b);
+    uint32_t id_void = ids.id_void, id_bool = ids.id_bool, id_uint = ids.id_uint,
+             id_float = ids.id_float, id_uint3 = ids.id_uint3,
+             id_void_fn = ids.id_void_fn, id_rtarray = ids.id_rtarray;
+    uint32_t glsl_ext = ids.glsl_ext;
+    (void)id_bool;
     uint32_t id_s_a     = spirv_builder_alloc_id(b);
     uint32_t id_s_out   = spirv_builder_alloc_id(b);
     uint32_t id_s_b     = spirv_builder_alloc_id(b);
@@ -668,95 +794,40 @@ uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name
     emit_member_decorate(b, id_s_out, 0, SpvDecorationOffset, 0);
     emit_member_decorate(b, id_s_b, 0, SpvDecorationOffset, 0);
     emit_decorate(b, id_rtarray, SpvDecorationArrayStride, 4);
-    emit_decorate(b, id_va, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_va, SpvDecorationBinding, 0);
-    emit_decorate(b, id_vo, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_vo, SpvDecorationBinding, 1);
-    emit_decorate(b, id_vb, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_vb, SpvDecorationBinding, 2);
-
+    emit_binding(b, id_va, 0);
+    emit_binding(b, id_vo, 1);
+    emit_binding(b, id_vb, 2);
     /* Types */
-    emit_op(b, SpvOpTypeVoid, 2); spirv_builder_emit(b, id_void);
-    emit_op(b, SpvOpTypeBool, 2); spirv_builder_emit(b, id_bool);
-    (void)id_bool;
-    emit_op(b, SpvOpTypeInt, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, 32); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpTypeFloat, 3); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, 32);
-    emit_op(b, SpvOpTypeVector, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_uint); spirv_builder_emit(b, 3);
-    emit_op(b, SpvOpTypeFunction, 3); spirv_builder_emit(b, id_void_fn);
-    spirv_builder_emit(b, id_void);
+    emit_scalar_types(b, id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn);
+    emit_runtime_array(b, id_rtarray, id_float);
+    emit_struct(b, id_s_a, id_rtarray);
+    emit_struct(b, id_s_out, id_rtarray);
+    emit_struct(b, id_s_b, id_rtarray);
 
-    emit_op(b, SpvOpTypeRuntimeArray, 3); spirv_builder_emit(b, id_rtarray);
-    spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_s_a);
-    spirv_builder_emit(b, id_rtarray);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_s_out);
-    spirv_builder_emit(b, id_rtarray);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_s_b);
-    spirv_builder_emit(b, id_rtarray);
-
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_p_sb_a);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_s_a);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_p_sb_o);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_s_out);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_p_sb_b);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_s_b);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_p_sb_f);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_p_in_u3);
-    spirv_builder_emit(b, SpvStorageClassInput); spirv_builder_emit(b, id_uint3);
+    emit_pointer_type(b, id_p_sb_a, SpvStorageClassStorageBuffer, id_s_a);
+    emit_pointer_type(b, id_p_sb_o, SpvStorageClassStorageBuffer, id_s_out);
+    emit_pointer_type(b, id_p_sb_b, SpvStorageClassStorageBuffer, id_s_b);
+    emit_pointer_type(b, id_p_sb_f, SpvStorageClassStorageBuffer, id_float);
+    emit_pointer_type(b, id_p_in_u3, SpvStorageClassInput, id_uint3);
 
     /* Constants */
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_c0); spirv_builder_emit(b, 0);
-
+    emit_uint_constant_id(b, id_uint, id_c0, 0);
     /* Variables */
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_p_sb_a);
-    spirv_builder_emit(b, id_va); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_p_sb_o);
-    spirv_builder_emit(b, id_vo); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_p_sb_b);
-    spirv_builder_emit(b, id_vb); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_p_in_u3);
-    spirv_builder_emit(b, id_vgid); spirv_builder_emit(b, SpvStorageClassInput);
+    emit_variable(b, id_p_sb_a, id_va, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_p_sb_o, id_vo, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_p_sb_b, id_vb, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_p_in_u3, id_vgid, SpvStorageClassInput);
 
     /* Function */
     uint32_t id_l_entry = spirv_builder_alloc_id(b);
 
-    emit_op(b, SpvOpFunction, 5); spirv_builder_emit(b, id_void);
-    spirv_builder_emit(b, id_main); spirv_builder_emit(b, 0);
-    spirv_builder_emit(b, id_void_fn);
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_l_entry);
-
+    emit_function_entry(b, id_void, id_main, id_void_fn, id_l_entry);
     /* Load global invocation ID.x */
-    uint32_t id_gv = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_gv); spirv_builder_emit(b, id_vgid);
-    uint32_t id_gx = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_gx); spirv_builder_emit(b, id_gv);
-    spirv_builder_emit(b, 0);
-
+    uint32_t id_gx = emit_global_invocation_x(b, id_uint, id_uint3, id_vgid);
     /* Load A[idx] */
-    uint32_t id_ap = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_p_sb_f);
-    spirv_builder_emit(b, id_ap); spirv_builder_emit(b, id_va);
-    spirv_builder_emit(b, id_c0); spirv_builder_emit(b, id_gx);
-    uint32_t id_a = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_a); spirv_builder_emit(b, id_ap);
-
+    uint32_t id_a = emit_load_element(b, id_float, id_p_sb_f, id_va, id_c0, id_gx);
     /* Load B[idx] */
-    uint32_t id_bp = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_p_sb_f);
-    spirv_builder_emit(b, id_bp); spirv_builder_emit(b, id_vb);
-    spirv_builder_emit(b, id_c0); spirv_builder_emit(b, id_gx);
-    uint32_t id_bv = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_bv); spirv_builder_emit(b, id_bp);
-
+    uint32_t id_bv = emit_load_element(b, id_float, id_p_sb_f, id_vb, id_c0, id_gx);
     /* Apply binary op */
     uint32_t id_res = spirv_builder_alloc_id(b);
     switch (op) {
@@ -812,26 +883,10 @@ uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name
 
     /* Store result */
     uint32_t id_op = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_p_sb_f);
-    spirv_builder_emit(b, id_op); spirv_builder_emit(b, id_vo);
-    spirv_builder_emit(b, id_c0); spirv_builder_emit(b, id_gx);
-    emit_op(b, SpvOpStore, 3);
-    spirv_builder_emit(b, id_op); spirv_builder_emit(b, id_res);
+    emit_access_chain2(b, id_p_sb_f, id_op, id_vo, id_c0, id_gx);
+    emit_store(b, id_op, id_res);
 
-    emit_op(b, SpvOpReturn, 1);
-    emit_op(b, SpvOpFunctionEnd, 1);
-
-    /* Patch header */
-    b->words[0] = SPIRV_MAGIC;
-    b->words[1] = SPIRV_VERSION;
-    b->words[2] = SPIRV_GENERATOR;
-    b->words[3] = b->next_id;
-    b->words[4] = 0;
-
-    cg->kernel_count++;
-    uint32_t* result = spirv_builder_finalize(b, out_size);
-    spirv_builder_destroy(b);
-    return result;
+    return spirv_finish_kernel(b, cg, out_size);
 }
 
 /*
@@ -864,25 +919,14 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
     (void)name;
     if (!cg || !out_size) return NULL;
 
-    SPIRVBuilder* b = spirv_builder_create();
+    SpirvCoreIds ids;
+    SPIRVBuilder* b = spirv_begin_kernel(&ids);
     if (!b) return NULL;
 
-    /* Header placeholder */
-    for (int i = 0; i < 5; i++) spirv_builder_emit(b, 0);
-
-    emit_capability(b);
-    emit_ext_import(b);
-    emit_memory_model(b);
-
-    /* Pre-allocate type IDs */
-    uint32_t id_void      = spirv_builder_alloc_id(b);
-    uint32_t id_bool      = spirv_builder_alloc_id(b);
-    uint32_t id_uint      = spirv_builder_alloc_id(b);
-    uint32_t id_float     = spirv_builder_alloc_id(b);
-    uint32_t id_uint3     = spirv_builder_alloc_id(b);
-    uint32_t id_void_fn   = spirv_builder_alloc_id(b);
-
-    uint32_t id_rtarray_f = spirv_builder_alloc_id(b);
+    uint32_t id_void = ids.id_void, id_bool = ids.id_bool, id_uint = ids.id_uint,
+             id_float = ids.id_float, id_uint3 = ids.id_uint3,
+             id_void_fn = ids.id_void_fn, id_rtarray_f = ids.id_rtarray;
+    (void)id_bool;
     uint32_t id_struct_in = spirv_builder_alloc_id(b);
     uint32_t id_struct_out= spirv_builder_alloc_id(b);
     uint32_t id_struct_p  = spirv_builder_alloc_id(b);
@@ -937,61 +981,33 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
     emit_member_decorate(b, id_struct_p, 0, SpvDecorationOffset, 0);
     emit_decorate(b, id_rtarray_f, SpvDecorationArrayStride, 4);
 
-    emit_decorate(b, id_var_in, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_in, SpvDecorationBinding, 0);
-    emit_decorate(b, id_var_out, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_out, SpvDecorationBinding, 1);
-    emit_decorate(b, id_var_p, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_p, SpvDecorationBinding, 2);
-
+    emit_binding(b, id_var_in, 0);
+    emit_binding(b, id_var_out, 1);
+    emit_binding(b, id_var_p, 2);
     /* Type declarations */
-    emit_op(b, SpvOpTypeVoid, 2); spirv_builder_emit(b, id_void);
-    emit_op(b, SpvOpTypeBool, 2); spirv_builder_emit(b, id_bool);
-    emit_op(b, SpvOpTypeInt, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, 32); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpTypeFloat, 3); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, 32);
-    emit_op(b, SpvOpTypeVector, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_uint); spirv_builder_emit(b, 3);
-    emit_op(b, SpvOpTypeFunction, 3); spirv_builder_emit(b, id_void_fn);
-    spirv_builder_emit(b, id_void);
-
-    emit_op(b, SpvOpTypeRuntimeArray, 3); spirv_builder_emit(b, id_rtarray_f);
-    spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_in);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_out);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_p);
-    spirv_builder_emit(b, id_uint);
+    emit_scalar_types(b, id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn);
+    emit_runtime_array(b, id_rtarray_f, id_float);
+    emit_struct(b, id_struct_in, id_rtarray_f);
+    emit_struct(b, id_struct_out, id_rtarray_f);
+    emit_struct(b, id_struct_p, id_uint);
 
     /* Pointer types */
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_in);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_in);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_out);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_out);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_struct_p);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_uint);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, SpvStorageClassInput); spirv_builder_emit(b, id_uint3);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_wg_f);
-    spirv_builder_emit(b, SpvStorageClassWorkgroup); spirv_builder_emit(b, id_float);
+    emit_pointer_type(b, id_ptr_sb_in, SpvStorageClassStorageBuffer, id_struct_in);
+    emit_pointer_type(b, id_ptr_sb_out, SpvStorageClassStorageBuffer, id_struct_out);
+    emit_pointer_type(b, id_ptr_sb_p, SpvStorageClassUniform, id_struct_p);
+    emit_pointer_type(b, id_ptr_sb_f, SpvStorageClassStorageBuffer, id_float);
+    emit_pointer_type(b, id_ptr_sb_u, SpvStorageClassUniform, id_uint);
+    emit_pointer_type(b, id_ptr_in_u3, SpvStorageClassInput, id_uint3);
+    emit_pointer_type(b, id_ptr_wg_f, SpvStorageClassWorkgroup, id_float);
 
     /* float[256] array type */
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_256u); spirv_builder_emit(b, 256);
+    emit_uint_constant_id(b, id_uint, id_const_256u, 256);
     emit_op(b, SpvOpTypeArray, 4); spirv_builder_emit(b, id_arr_256);
     spirv_builder_emit(b, id_float); spirv_builder_emit(b, id_const_256u);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_wg_arr);
-    spirv_builder_emit(b, SpvStorageClassWorkgroup); spirv_builder_emit(b, id_arr_256);
+    emit_pointer_type(b, id_ptr_wg_arr, SpvStorageClassWorkgroup, id_arr_256);
 
     /* Constants */
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, 0);
+    emit_uint_constant_id(b, id_uint, id_const_0u, 0);
     uint32_t id_const_0f = emit_float_constant(b, id_float, 0.0f);
 
     /* Stride constants for unrolled reduction: 128, 64, 32, 16, 8, 4, 2, 1 */
@@ -1007,53 +1023,22 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
         SpvMemorySemanticsWorkgroupMemoryMask | SpvMemorySemanticsAcquireReleaseMask);
 
     /* Variables */
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_in);
-    spirv_builder_emit(b, id_var_in); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_out);
-    spirv_builder_emit(b, id_var_out); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, id_var_p); spirv_builder_emit(b, SpvStorageClassUniform);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, id_var_gid); spirv_builder_emit(b, SpvStorageClassInput);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, id_var_lid); spirv_builder_emit(b, SpvStorageClassInput);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_wg_arr);
-    spirv_builder_emit(b, id_var_sdata); spirv_builder_emit(b, SpvStorageClassWorkgroup);
+    emit_variable(b, id_ptr_sb_in, id_var_in, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_out, id_var_out, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_p, id_var_p, SpvStorageClassUniform);
+    emit_variable(b, id_ptr_in_u3, id_var_gid, SpvStorageClassInput);
+    emit_variable(b, id_ptr_in_u3, id_var_lid, SpvStorageClassInput);
+    emit_variable(b, id_ptr_wg_arr, id_var_sdata, SpvStorageClassWorkgroup);
 
     uint32_t id_label_entry = spirv_builder_alloc_id(b);
 
-    emit_op(b, SpvOpFunction, 5); spirv_builder_emit(b, id_void);
-    spirv_builder_emit(b, id_main); spirv_builder_emit(b, 0);
-    spirv_builder_emit(b, id_void_fn);
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_entry);
-
+    emit_function_entry(b, id_void, id_main, id_void_fn, id_label_entry);
     /* Load LocalInvocationID.x (tid) */
-    uint32_t id_lid_vec = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_lid_vec); spirv_builder_emit(b, id_var_lid);
-    uint32_t id_tid = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_tid); spirv_builder_emit(b, id_lid_vec);
-    spirv_builder_emit(b, 0);
-
+    uint32_t id_tid = emit_global_invocation_x(b, id_uint, id_uint3, id_var_lid);
     /* Load GlobalInvocationID.x (gid) */
-    uint32_t id_gid_vec = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_gid_vec); spirv_builder_emit(b, id_var_gid);
-    uint32_t id_gid_x = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_gid_x); spirv_builder_emit(b, id_gid_vec);
-    spirv_builder_emit(b, 0);
-
+    uint32_t id_gid_x = emit_global_invocation_x(b, id_uint, id_uint3, id_var_gid);
     /* Load n from params */
-    uint32_t id_n_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, id_n_ptr); spirv_builder_emit(b, id_var_p);
-    spirv_builder_emit(b, id_const_0u);
-    uint32_t id_n = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_n); spirv_builder_emit(b, id_n_ptr);
-
+    uint32_t id_n = emit_load_scalar(b, id_uint, id_ptr_sb_u, id_var_p, id_const_0u);
     /* Bounds check: load input[gid] if gid < n, else 0.0 */
     uint32_t id_cmp_bounds = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpULessThan, 5); spirv_builder_emit(b, id_bool);
@@ -1071,22 +1056,16 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
     spirv_builder_emit(b, id_label_skip);
 
     /* Load path: load inBuf.data[gid] */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_load);
-    uint32_t id_in_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_in_ptr); spirv_builder_emit(b, id_var_in);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, id_gid_x);
-    uint32_t id_loaded_val = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_loaded_val); spirv_builder_emit(b, id_in_ptr);
+    emit_label(b, id_label_load);
+    uint32_t id_loaded_val = emit_load_element(b, id_float, id_ptr_sb_f, id_var_in, id_const_0u, id_gid_x);
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_label_merge);
 
     /* Skip path: use 0.0 */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_skip);
+    emit_label(b, id_label_skip);
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_label_merge);
 
     /* Merge: phi to pick loaded value or 0.0 */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_merge);
+    emit_label(b, id_label_merge);
     uint32_t id_init_val = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpPhi, 7); spirv_builder_emit(b, id_float);
     spirv_builder_emit(b, id_init_val);
@@ -1095,11 +1074,8 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
 
     /* Store to shared memory: sdata[tid] = init_val */
     uint32_t id_sdata_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_wg_f);
-    spirv_builder_emit(b, id_sdata_ptr); spirv_builder_emit(b, id_var_sdata);
-    spirv_builder_emit(b, id_tid);
-    emit_op(b, SpvOpStore, 3);
-    spirv_builder_emit(b, id_sdata_ptr); spirv_builder_emit(b, id_init_val);
+    emit_access_chain1(b, id_ptr_wg_f, id_sdata_ptr, id_var_sdata, id_tid);
+    emit_store(b, id_sdata_ptr, id_init_val);
 
     /* Barrier */
     emit_op(b, SpvOpControlBarrier, 4);
@@ -1124,17 +1100,13 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
         spirv_builder_emit(b, id_cmp_s); spirv_builder_emit(b, id_lbl_reduce);
         spirv_builder_emit(b, id_lbl_skip2);
 
-        emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_reduce);
-
+        emit_label(b, id_lbl_reduce);
         /* Load sdata[tid] */
+        /* Keep the pointer: the accumulated sum is stored back through it. */
         uint32_t id_sd_ptr1 = spirv_builder_alloc_id(b);
-        emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_wg_f);
-        spirv_builder_emit(b, id_sd_ptr1); spirv_builder_emit(b, id_var_sdata);
-        spirv_builder_emit(b, id_tid);
+        emit_access_chain1(b, id_ptr_wg_f, id_sd_ptr1, id_var_sdata, id_tid);
         uint32_t id_sd_val1 = spirv_builder_alloc_id(b);
-        emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-        spirv_builder_emit(b, id_sd_val1); spirv_builder_emit(b, id_sd_ptr1);
-
+        emit_load(b, id_float, id_sd_val1, id_sd_ptr1);
         /* tid + stride */
         uint32_t id_tid_plus = spirv_builder_alloc_id(b);
         emit_op(b, SpvOpIAdd, 5); spirv_builder_emit(b, id_uint);
@@ -1142,25 +1114,16 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
         spirv_builder_emit(b, id_stride[step]);
 
         /* Load sdata[tid + stride] */
-        uint32_t id_sd_ptr2 = spirv_builder_alloc_id(b);
-        emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_wg_f);
-        spirv_builder_emit(b, id_sd_ptr2); spirv_builder_emit(b, id_var_sdata);
-        spirv_builder_emit(b, id_tid_plus);
-        uint32_t id_sd_val2 = spirv_builder_alloc_id(b);
-        emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-        spirv_builder_emit(b, id_sd_val2); spirv_builder_emit(b, id_sd_ptr2);
-
+        uint32_t id_sd_val2 = emit_load_scalar(b, id_float, id_ptr_wg_f, id_var_sdata, id_tid_plus);
         /* sdata[tid] += sdata[tid + stride] */
         uint32_t id_sum = spirv_builder_alloc_id(b);
         emit_op(b, SpvOpFAdd, 5); spirv_builder_emit(b, id_float);
         spirv_builder_emit(b, id_sum); spirv_builder_emit(b, id_sd_val1);
         spirv_builder_emit(b, id_sd_val2);
-        emit_op(b, SpvOpStore, 3);
-        spirv_builder_emit(b, id_sd_ptr1); spirv_builder_emit(b, id_sum);
+        emit_store(b, id_sd_ptr1, id_sum);
 
         emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_lbl_skip2);
-        emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_skip2);
-
+        emit_label(b, id_lbl_skip2);
         /* Barrier after each step */
         emit_op(b, SpvOpControlBarrier, 4);
         spirv_builder_emit(b, id_scope_wg);
@@ -1183,17 +1146,9 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
     spirv_builder_emit(b, id_cmp_zero); spirv_builder_emit(b, id_lbl_write);
     spirv_builder_emit(b, id_lbl_end);
 
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_write);
-
+    emit_label(b, id_lbl_write);
     /* Load sdata[0] */
-    uint32_t id_res_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_wg_f);
-    spirv_builder_emit(b, id_res_ptr); spirv_builder_emit(b, id_var_sdata);
-    spirv_builder_emit(b, id_const_0u);
-    uint32_t id_res_val = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_res_val); spirv_builder_emit(b, id_res_ptr);
-
+    uint32_t id_res_val = emit_load_scalar(b, id_float, id_ptr_wg_f, id_var_sdata, id_const_0u);
     /* For MEAN: divide by n */
     uint32_t id_final_val = id_res_val;
     if (op == UOP_MEAN) {
@@ -1209,30 +1164,14 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
 
     /* Store to outBuf.data[0] */
     uint32_t id_out_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_out_ptr); spirv_builder_emit(b, id_var_out);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, id_const_0u);
-    emit_op(b, SpvOpStore, 3);
-    spirv_builder_emit(b, id_out_ptr); spirv_builder_emit(b, id_final_val);
+    emit_access_chain2(b, id_ptr_sb_f, id_out_ptr, id_var_out, id_const_0u, id_const_0u);
+    emit_store(b, id_out_ptr, id_final_val);
 
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_lbl_end);
 
     /* End */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_end);
-    emit_op(b, SpvOpReturn, 1);
-    emit_op(b, SpvOpFunctionEnd, 1);
-
-    /* Patch header */
-    b->words[0] = SPIRV_MAGIC;
-    b->words[1] = SPIRV_VERSION;
-    b->words[2] = SPIRV_GENERATOR;
-    b->words[3] = b->next_id;
-    b->words[4] = 0;
-
-    cg->kernel_count++;
-    uint32_t* result = spirv_builder_finalize(b, out_size);
-    spirv_builder_destroy(b);
-    return result;
+    emit_label(b, id_lbl_end);
+    return spirv_finish_kernel(b, cg, out_size);
 }
 
 /*
@@ -1258,25 +1197,14 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     (void)name;
     if (!cg || !out_size) return NULL;
 
-    SPIRVBuilder* b = spirv_builder_create();
+    SpirvCoreIds ids;
+    SPIRVBuilder* b = spirv_begin_kernel(&ids);
     if (!b) return NULL;
 
-    /* Header placeholder */
-    for (int i = 0; i < 5; i++) spirv_builder_emit(b, 0);
-
-    emit_capability(b);
-    emit_ext_import(b);
-    emit_memory_model(b);
-
-    /* Pre-allocate type IDs */
-    uint32_t id_void      = spirv_builder_alloc_id(b);
-    uint32_t id_bool      = spirv_builder_alloc_id(b);
-    uint32_t id_uint      = spirv_builder_alloc_id(b);
-    uint32_t id_float     = spirv_builder_alloc_id(b);
-    uint32_t id_uint3     = spirv_builder_alloc_id(b);
-    uint32_t id_void_fn   = spirv_builder_alloc_id(b);
-
-    uint32_t id_rtarray_f = spirv_builder_alloc_id(b);
+    uint32_t id_void = ids.id_void, id_bool = ids.id_bool, id_uint = ids.id_uint,
+             id_float = ids.id_float, id_uint3 = ids.id_uint3,
+             id_void_fn = ids.id_void_fn, id_rtarray_f = ids.id_rtarray;
+    (void)id_bool;
     uint32_t id_struct_a  = spirv_builder_alloc_id(b);
     uint32_t id_struct_b  = spirv_builder_alloc_id(b);
     uint32_t id_struct_c  = spirv_builder_alloc_id(b);
@@ -1328,88 +1256,49 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
 
     emit_decorate(b, id_rtarray_f, SpvDecorationArrayStride, 4);
 
-    emit_decorate(b, id_var_a, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_a, SpvDecorationBinding, 0);
-    emit_decorate(b, id_var_b, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_b, SpvDecorationBinding, 1);
-    emit_decorate(b, id_var_c, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_c, SpvDecorationBinding, 2);
-    emit_decorate(b, id_var_p, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_p, SpvDecorationBinding, 3);
-
+    emit_binding(b, id_var_a, 0);
+    emit_binding(b, id_var_b, 1);
+    emit_binding(b, id_var_c, 2);
+    emit_binding(b, id_var_p, 3);
     /* Type declarations */
-    emit_op(b, SpvOpTypeVoid, 2); spirv_builder_emit(b, id_void);
-    emit_op(b, SpvOpTypeBool, 2); spirv_builder_emit(b, id_bool);
-    emit_op(b, SpvOpTypeInt, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, 32); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpTypeFloat, 3); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, 32);
-    emit_op(b, SpvOpTypeVector, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_uint); spirv_builder_emit(b, 3);
-    emit_op(b, SpvOpTypeFunction, 3); spirv_builder_emit(b, id_void_fn);
-    spirv_builder_emit(b, id_void);
-
-    emit_op(b, SpvOpTypeRuntimeArray, 3); spirv_builder_emit(b, id_rtarray_f);
-    spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_a);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_b);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_c);
-    spirv_builder_emit(b, id_rtarray_f);
+    emit_scalar_types(b, id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn);
+    emit_runtime_array(b, id_rtarray_f, id_float);
+    emit_struct(b, id_struct_a, id_rtarray_f);
+    emit_struct(b, id_struct_b, id_rtarray_f);
+    emit_struct(b, id_struct_c, id_rtarray_f);
     /* Params struct: { uint M, uint N, uint K } */
     emit_op(b, SpvOpTypeStruct, 5); spirv_builder_emit(b, id_struct_p);
     spirv_builder_emit(b, id_uint); spirv_builder_emit(b, id_uint);
     spirv_builder_emit(b, id_uint);
 
     /* Pointer types */
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_a);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_a);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_b);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_b);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_c);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_c);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_struct_p);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_uint);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, SpvStorageClassInput); spirv_builder_emit(b, id_uint3);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_fn_f);
-    spirv_builder_emit(b, SpvStorageClassFunction); spirv_builder_emit(b, id_float);
+    emit_pointer_type(b, id_ptr_sb_a, SpvStorageClassStorageBuffer, id_struct_a);
+    emit_pointer_type(b, id_ptr_sb_b, SpvStorageClassStorageBuffer, id_struct_b);
+    emit_pointer_type(b, id_ptr_sb_c, SpvStorageClassStorageBuffer, id_struct_c);
+    emit_pointer_type(b, id_ptr_sb_p, SpvStorageClassUniform, id_struct_p);
+    emit_pointer_type(b, id_ptr_sb_f, SpvStorageClassStorageBuffer, id_float);
+    emit_pointer_type(b, id_ptr_sb_u, SpvStorageClassUniform, id_uint);
+    emit_pointer_type(b, id_ptr_in_u3, SpvStorageClassInput, id_uint3);
+    emit_pointer_type(b, id_ptr_fn_f, SpvStorageClassFunction, id_float);
 
     /* Constants */
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_1u); spirv_builder_emit(b, 1);
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_2u); spirv_builder_emit(b, 2);
+    emit_uint_constant_id(b, id_uint, id_const_0u, 0);
+    emit_uint_constant_id(b, id_uint, id_const_1u, 1);
+    emit_uint_constant_id(b, id_uint, id_const_2u, 2);
     uint32_t id_const_0f = emit_float_constant(b, id_float, 0.0f);
 
     /* Variables */
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_a);
-    spirv_builder_emit(b, id_var_a); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_b);
-    spirv_builder_emit(b, id_var_b); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_c);
-    spirv_builder_emit(b, id_var_c); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, id_var_p); spirv_builder_emit(b, SpvStorageClassUniform);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, id_var_gid); spirv_builder_emit(b, SpvStorageClassInput);
+    emit_variable(b, id_ptr_sb_a, id_var_a, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_b, id_var_b, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_c, id_var_c, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_p, id_var_p, SpvStorageClassUniform);
+    emit_variable(b, id_ptr_in_u3, id_var_gid, SpvStorageClassInput);
 
     uint32_t id_label_entry = spirv_builder_alloc_id(b);
     uint32_t id_label_body  = spirv_builder_alloc_id(b);
     uint32_t id_label_end   = spirv_builder_alloc_id(b);
 
-    emit_op(b, SpvOpFunction, 5); spirv_builder_emit(b, id_void);
-    spirv_builder_emit(b, id_main); spirv_builder_emit(b, 0);
-    spirv_builder_emit(b, id_void_fn);
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_entry);
-
+    emit_function_entry(b, id_void, id_main, id_void_fn, id_label_entry);
     /* Allocate function-local variable for accumulator */
     uint32_t id_var_sum = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpVariable, 5); spirv_builder_emit(b, id_ptr_fn_f);
@@ -1417,45 +1306,18 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     spirv_builder_emit(b, id_const_0f);
 
     /* Load GlobalInvocationID */
+    /* Matmul needs both lanes of the invocation ID, not just .x. */
     uint32_t id_gid_vec = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_gid_vec); spirv_builder_emit(b, id_var_gid);
-
+    emit_load(b, id_uint3, id_gid_vec, id_var_gid);
     uint32_t id_col = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_col); spirv_builder_emit(b, id_gid_vec);
-    spirv_builder_emit(b, 0);
-
+    emit_composite_extract(b, id_uint, id_col, id_gid_vec, 0);
     uint32_t id_row = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_row); spirv_builder_emit(b, id_gid_vec);
-    spirv_builder_emit(b, 1);
+    emit_composite_extract(b, id_uint, id_row, id_gid_vec, 1);
 
     /* Load M, N, K from params */
-    uint32_t id_m_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, id_m_ptr); spirv_builder_emit(b, id_var_p);
-    spirv_builder_emit(b, id_const_0u);
-    uint32_t id_M = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_M); spirv_builder_emit(b, id_m_ptr);
-
-    uint32_t id_n_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, id_n_ptr); spirv_builder_emit(b, id_var_p);
-    spirv_builder_emit(b, id_const_1u);
-    uint32_t id_N = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_N); spirv_builder_emit(b, id_n_ptr);
-
-    uint32_t id_k_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, id_k_ptr); spirv_builder_emit(b, id_var_p);
-    spirv_builder_emit(b, id_const_2u);
-    uint32_t id_K = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_K); spirv_builder_emit(b, id_k_ptr);
-
+    uint32_t id_M = emit_load_scalar(b, id_uint, id_ptr_sb_u, id_var_p, id_const_0u);
+    uint32_t id_N = emit_load_scalar(b, id_uint, id_ptr_sb_u, id_var_p, id_const_1u);
+    uint32_t id_K = emit_load_scalar(b, id_uint, id_ptr_sb_u, id_var_p, id_const_2u);
     /* Bounds check: if (row >= M || col >= N) return */
     uint32_t id_cmp_row = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpULessThan, 5); spirv_builder_emit(b, id_bool);
@@ -1481,8 +1343,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     spirv_builder_emit(b, id_label_end);
 
     /* Body */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_body);
-
+    emit_label(b, id_label_body);
     /* Loop: for (k = 0; k < K; k++) */
     uint32_t id_lbl_loop_hdr  = spirv_builder_alloc_id(b);
     uint32_t id_lbl_loop_body = spirv_builder_alloc_id(b);
@@ -1492,8 +1353,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_lbl_loop_hdr);
 
     /* Loop header */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_loop_hdr);
-
+    emit_label(b, id_lbl_loop_hdr);
     /* Phi for k */
     uint32_t id_k = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpPhi, 7); spirv_builder_emit(b, id_uint);
@@ -1530,8 +1390,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     spirv_builder_emit(b, id_lbl_loop_end);
 
     /* Loop body */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_loop_body);
-
+    emit_label(b, id_lbl_loop_body);
     /* Compute index for A: row * K + k */
     uint32_t id_row_k = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpIMul, 5); spirv_builder_emit(b, id_uint);
@@ -1543,14 +1402,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     spirv_builder_emit(b, id_k);
 
     /* Load A[row * K + k] */
-    uint32_t id_a_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_a_ptr); spirv_builder_emit(b, id_var_a);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, id_a_idx);
-    uint32_t id_a_val = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_a_val); spirv_builder_emit(b, id_a_ptr);
-
+    uint32_t id_a_val = emit_load_element(b, id_float, id_ptr_sb_f, id_var_a, id_const_0u, id_a_idx);
     /* Compute index for B: k * N + col */
     uint32_t id_k_n = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpIMul, 5); spirv_builder_emit(b, id_uint);
@@ -1562,14 +1414,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     spirv_builder_emit(b, id_col);
 
     /* Load B[k * N + col] */
-    uint32_t id_b_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_b_ptr); spirv_builder_emit(b, id_var_b);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, id_b_idx);
-    uint32_t id_b_val = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, id_b_val); spirv_builder_emit(b, id_b_ptr);
-
+    uint32_t id_b_val = emit_load_element(b, id_float, id_ptr_sb_f, id_var_b, id_const_0u, id_b_idx);
     /* sum += A[...] * B[...] */
     uint32_t id_prod = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpFMul, 5); spirv_builder_emit(b, id_float);
@@ -1583,7 +1428,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_lbl_loop_cont);
 
     /* Continue block: k++ */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_loop_cont);
+    emit_label(b, id_lbl_loop_cont);
     uint32_t id_k_next = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpIAdd, 5); spirv_builder_emit(b, id_uint);
     spirv_builder_emit(b, id_k_next); spirv_builder_emit(b, id_k);
@@ -1596,8 +1441,7 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_lbl_loop_hdr);
 
     /* Loop end */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_lbl_loop_end);
-
+    emit_label(b, id_lbl_loop_end);
     /* Compute output index: row * N + col */
     uint32_t id_row_n = spirv_builder_alloc_id(b);
     emit_op(b, SpvOpIMul, 5); spirv_builder_emit(b, id_uint);
@@ -1610,30 +1454,14 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
 
     /* Store C[row * N + col] = sum */
     uint32_t id_c_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_c_ptr); spirv_builder_emit(b, id_var_c);
-    spirv_builder_emit(b, id_const_0u); spirv_builder_emit(b, id_c_idx);
-    emit_op(b, SpvOpStore, 3);
-    spirv_builder_emit(b, id_c_ptr); spirv_builder_emit(b, id_sum_phi);
+    emit_access_chain2(b, id_ptr_sb_f, id_c_ptr, id_var_c, id_const_0u, id_c_idx);
+    emit_store(b, id_c_ptr, id_sum_phi);
 
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_label_end);
 
     /* End label */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_end);
-    emit_op(b, SpvOpReturn, 1);
-    emit_op(b, SpvOpFunctionEnd, 1);
-
-    /* Patch header */
-    b->words[0] = SPIRV_MAGIC;
-    b->words[1] = SPIRV_VERSION;
-    b->words[2] = SPIRV_GENERATOR;
-    b->words[3] = b->next_id;
-    b->words[4] = 0;
-
-    cg->kernel_count++;
-    uint32_t* result = spirv_builder_finalize(b, out_size);
-    spirv_builder_destroy(b);
-    return result;
+    emit_label(b, id_label_end);
+    return spirv_finish_kernel(b, cg, out_size);
 }
 
 /*
@@ -1652,25 +1480,14 @@ uint32_t* cml_spirv_gen_fill(CMLSPIRVCodegen* cg, float value, const char* name,
     (void)name;
     if (!cg || !out_size) return NULL;
 
-    SPIRVBuilder* b = spirv_builder_create();
+    SpirvCoreIds ids;
+    SPIRVBuilder* b = spirv_begin_kernel(&ids);
     if (!b) return NULL;
 
-    /* Reserve space for header (5 words) */
-    for (int i = 0; i < 5; i++) spirv_builder_emit(b, 0);
-
-    emit_capability(b);
-    emit_ext_import(b);
-    emit_memory_model(b);
-
-    /* Pre-allocate IDs */
-    uint32_t id_void      = spirv_builder_alloc_id(b);
-    uint32_t id_bool      = spirv_builder_alloc_id(b);
-    uint32_t id_uint      = spirv_builder_alloc_id(b);
-    uint32_t id_float     = spirv_builder_alloc_id(b);
-    uint32_t id_uint3     = spirv_builder_alloc_id(b);
-    uint32_t id_void_fn   = spirv_builder_alloc_id(b);
-
-    uint32_t id_rtarray_f = spirv_builder_alloc_id(b);
+    uint32_t id_void = ids.id_void, id_bool = ids.id_bool, id_uint = ids.id_uint,
+             id_float = ids.id_float, id_uint3 = ids.id_uint3,
+             id_void_fn = ids.id_void_fn, id_rtarray_f = ids.id_rtarray;
+    (void)id_bool;
     uint32_t id_struct_out= spirv_builder_alloc_id(b);
     uint32_t id_struct_p  = spirv_builder_alloc_id(b);
 
@@ -1698,124 +1515,50 @@ uint32_t* cml_spirv_gen_fill(CMLSPIRVCodegen* cg, float value, const char* name,
     emit_member_decorate(b, id_struct_out, 0, SpvDecorationOffset, 0);
     emit_member_decorate(b, id_struct_p, 0, SpvDecorationOffset, 0);
     emit_decorate(b, id_rtarray_f, SpvDecorationArrayStride, 4);
-    emit_decorate(b, id_var_out, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_out, SpvDecorationBinding, 0);
-    emit_decorate(b, id_var_p, SpvDecorationDescriptorSet, 0);
-    emit_decorate(b, id_var_p, SpvDecorationBinding, 1);
-
+    emit_binding(b, id_var_out, 0);
+    emit_binding(b, id_var_p, 1);
     /* Type declarations */
-    emit_op(b, SpvOpTypeVoid, 2); spirv_builder_emit(b, id_void);
-    emit_op(b, SpvOpTypeBool, 2); spirv_builder_emit(b, id_bool);
-    emit_op(b, SpvOpTypeInt, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, 32); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpTypeFloat, 3); spirv_builder_emit(b, id_float);
-    spirv_builder_emit(b, 32);
-    emit_op(b, SpvOpTypeVector, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_uint); spirv_builder_emit(b, 3);
-    emit_op(b, SpvOpTypeFunction, 3); spirv_builder_emit(b, id_void_fn);
-    spirv_builder_emit(b, id_void);
+    emit_scalar_types(b, id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn);
+    emit_runtime_array(b, id_rtarray_f, id_float);
+    emit_struct(b, id_struct_out, id_rtarray_f);
+    emit_struct(b, id_struct_p, id_uint);
 
-    emit_op(b, SpvOpTypeRuntimeArray, 3); spirv_builder_emit(b, id_rtarray_f);
-    spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_out);
-    spirv_builder_emit(b, id_rtarray_f);
-    emit_op(b, SpvOpTypeStruct, 3); spirv_builder_emit(b, id_struct_p);
-    spirv_builder_emit(b, id_uint);
-
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_out);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_struct_out);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_struct_p);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, SpvStorageClassStorageBuffer); spirv_builder_emit(b, id_float);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, SpvStorageClassUniform); spirv_builder_emit(b, id_uint);
-    emit_op(b, SpvOpTypePointer, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, SpvStorageClassInput); spirv_builder_emit(b, id_uint3);
+    emit_pointer_type(b, id_ptr_sb_out, SpvStorageClassStorageBuffer, id_struct_out);
+    emit_pointer_type(b, id_ptr_sb_p, SpvStorageClassUniform, id_struct_p);
+    emit_pointer_type(b, id_ptr_sb_f, SpvStorageClassStorageBuffer, id_float);
+    emit_pointer_type(b, id_ptr_sb_u, SpvStorageClassUniform, id_uint);
+    emit_pointer_type(b, id_ptr_in_u3, SpvStorageClassInput, id_uint3);
 
     /* Constants */
-    emit_op(b, SpvOpConstant, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_const_0); spirv_builder_emit(b, 0);
-
+    emit_uint_constant_id(b, id_uint, id_const_0, 0);
     uint32_t id_fill_val = emit_float_constant(b, id_float, value);
 
     /* Variables */
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_out);
-    spirv_builder_emit(b, id_var_out); spirv_builder_emit(b, SpvStorageClassStorageBuffer);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_sb_p);
-    spirv_builder_emit(b, id_var_p); spirv_builder_emit(b, SpvStorageClassUniform);
-    emit_op(b, SpvOpVariable, 4); spirv_builder_emit(b, id_ptr_in_u3);
-    spirv_builder_emit(b, id_var_gid); spirv_builder_emit(b, SpvStorageClassInput);
+    emit_variable(b, id_ptr_sb_out, id_var_out, SpvStorageClassStorageBuffer);
+    emit_variable(b, id_ptr_sb_p, id_var_p, SpvStorageClassUniform);
+    emit_variable(b, id_ptr_in_u3, id_var_gid, SpvStorageClassInput);
 
     /* Function body */
     uint32_t id_label_entry = spirv_builder_alloc_id(b);
     uint32_t id_label_body  = spirv_builder_alloc_id(b);
     uint32_t id_label_end   = spirv_builder_alloc_id(b);
 
-    emit_op(b, SpvOpFunction, 5); spirv_builder_emit(b, id_void);
-    spirv_builder_emit(b, id_main); spirv_builder_emit(b, 0);
-    spirv_builder_emit(b, id_void_fn);
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_entry);
-
+    emit_function_entry(b, id_void, id_main, id_void_fn, id_label_entry);
     /* Load GlobalInvocationID.x */
-    uint32_t id_gid_vec = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint3);
-    spirv_builder_emit(b, id_gid_vec); spirv_builder_emit(b, id_var_gid);
-
-    uint32_t id_gid_x = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpCompositeExtract, 5); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_gid_x); spirv_builder_emit(b, id_gid_vec);
-    spirv_builder_emit(b, 0);
-
+    uint32_t id_gid_x = emit_global_invocation_x(b, id_uint, id_uint3, id_var_gid);
     /* Load n from params */
-    uint32_t id_n_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 5); spirv_builder_emit(b, id_ptr_sb_u);
-    spirv_builder_emit(b, id_n_ptr); spirv_builder_emit(b, id_var_p);
-    spirv_builder_emit(b, id_const_0);
-
-    uint32_t id_n = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpLoad, 4); spirv_builder_emit(b, id_uint);
-    spirv_builder_emit(b, id_n); spirv_builder_emit(b, id_n_ptr);
-
+    uint32_t id_n = emit_load_scalar(b, id_uint, id_ptr_sb_u, id_var_p, id_const_0);
     /* Bounds check: if (idx >= n) return */
-    uint32_t id_cmp = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpULessThan, 5); spirv_builder_emit(b, id_bool);
-    spirv_builder_emit(b, id_cmp); spirv_builder_emit(b, id_gid_x);
-    spirv_builder_emit(b, id_n);
-
-    emit_op(b, SpvOpSelectionMerge, 3);
-    spirv_builder_emit(b, id_label_end); spirv_builder_emit(b, 0);
-    emit_op(b, SpvOpBranchConditional, 4);
-    spirv_builder_emit(b, id_cmp); spirv_builder_emit(b, id_label_body);
-    spirv_builder_emit(b, id_label_end);
-
+    emit_bounds_check(b, id_bool, id_gid_x, id_n, id_label_body, id_label_end);
     /* Body: store fill value to output[idx] */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_body);
-
+    emit_label(b, id_label_body);
     uint32_t id_out_ptr = spirv_builder_alloc_id(b);
-    emit_op(b, SpvOpAccessChain, 6); spirv_builder_emit(b, id_ptr_sb_f);
-    spirv_builder_emit(b, id_out_ptr); spirv_builder_emit(b, id_var_out);
-    spirv_builder_emit(b, id_const_0); spirv_builder_emit(b, id_gid_x);
-
-    emit_op(b, SpvOpStore, 3);
-    spirv_builder_emit(b, id_out_ptr); spirv_builder_emit(b, id_fill_val);
+    emit_access_chain2(b, id_ptr_sb_f, id_out_ptr, id_var_out, id_const_0, id_gid_x);
+    emit_store(b, id_out_ptr, id_fill_val);
 
     emit_op(b, SpvOpBranch, 2); spirv_builder_emit(b, id_label_end);
 
     /* End label */
-    emit_op(b, SpvOpLabel, 2); spirv_builder_emit(b, id_label_end);
-    emit_op(b, SpvOpReturn, 1);
-    emit_op(b, SpvOpFunctionEnd, 1);
-
-    /* Patch header */
-    b->words[0] = SPIRV_MAGIC;
-    b->words[1] = SPIRV_VERSION;
-    b->words[2] = SPIRV_GENERATOR;
-    b->words[3] = b->next_id;
-    b->words[4] = 0;
-
-    cg->kernel_count++;
-    uint32_t* result = spirv_builder_finalize(b, out_size);
-    spirv_builder_destroy(b);
-    return result;
+    emit_label(b, id_label_end);
+    return spirv_finish_kernel(b, cg, out_size);
 }

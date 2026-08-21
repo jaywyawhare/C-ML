@@ -20,28 +20,6 @@ static Tensor* rnn_cell_module_forward(Module* module, Tensor* input) {
     return NULL;
 }
 
-static void rnn_cell_free(Module* module) {
-    if (module->parameters) {
-        for (int i = 0; i < module->num_parameters; i++) {
-            Parameter* p = module->parameters[i];
-            if (!p)
-                continue;
-            if (p->name)
-                cml_free(p->name);
-            if (p->tensor)
-                tensor_free(p->tensor);
-            cml_free(p);
-        }
-        cml_free(module->parameters);
-        module->parameters = NULL;
-    }
-    if (module->name) {
-        cml_free(module->name);
-        module->name = NULL;
-    }
-    cml_free(module);
-}
-
 Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input) return NULL;
 
@@ -74,13 +52,44 @@ Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
     return h_new;
 }
 
+/* Register a recurrent cell's parameter set: weight_ih [gates, input_size],
+ * weight_hh [gates, hidden_size] and, when `use_bias`, the two [gates] biases.
+ * The RNN, LSTM and GRU cells differ only in how many gates they stack. */
+static void add_cell_params(Module* cell, int gates, int input_size, int hidden_size, float scale,
+                            bool use_bias, TensorConfig* cfg, Parameter** weight_ih,
+                            Parameter** weight_hh, Parameter** bias_ih, Parameter** bias_hh) {
+    int wih_shape[] = {gates, input_size};
+    Tensor* wih = tensor_empty(wih_shape, 2, cfg);
+    nn_init_uniform(wih, -scale, scale);
+    module_add_parameter(cell, wih, "weight_ih", true);
+    *weight_ih = module_get_parameter(cell, "weight_ih");
+
+    int whh_shape[] = {gates, hidden_size};
+    Tensor* whh = tensor_empty(whh_shape, 2, cfg);
+    nn_init_uniform(whh, -scale, scale);
+    module_add_parameter(cell, whh, "weight_hh", true);
+    *weight_hh = module_get_parameter(cell, "weight_hh");
+
+    if (!use_bias) {
+        *bias_ih = NULL;
+        *bias_hh = NULL;
+        return;
+    }
+
+    int b_shape[] = {gates};
+    module_add_parameter(cell, tensor_zeros(b_shape, 1, cfg), "bias_ih", true);
+    *bias_ih = module_get_parameter(cell, "bias_ih");
+    module_add_parameter(cell, tensor_zeros(b_shape, 1, cfg), "bias_hh", true);
+    *bias_hh = module_get_parameter(cell, "bias_hh");
+}
+
 RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
                      DType dtype, DeviceType device) {
     RNNCell* cell = cml_malloc(sizeof(RNNCell));
     if (!cell) return NULL;
 
     if (module_init((Module*)cell, "RNNCell",
-                    rnn_cell_module_forward, rnn_cell_free) != 0) {
+                    rnn_cell_module_forward, NULL) != 0) {
         cml_free(cell);
         return NULL;
     }
@@ -93,35 +102,9 @@ RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
                         .has_dtype = true, .has_device = true};
     float scale = 1.0f / sqrtf((float)hidden_size);
 
-    /* weight_ih [hidden_size, input_size] */
-    int wih_shape[] = {hidden_size, input_size};
-    Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    nn_init_uniform(wih, -scale, scale);
-    module_add_parameter((Module*)cell, wih, "weight_ih", true);
-    cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
-
-    /* weight_hh [hidden_size, hidden_size] */
-    int whh_shape[] = {hidden_size, hidden_size};
-    Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    nn_init_uniform(whh, -scale, scale);
-    module_add_parameter((Module*)cell, whh, "weight_hh", true);
-    cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
-
-    /* Biases */
-    if (use_bias) {
-        int b_shape[] = {hidden_size};
-
-        Tensor* bih = tensor_zeros(b_shape, 1, &cfg);
-        module_add_parameter((Module*)cell, bih, "bias_ih", true);
-        cell->bias_ih = module_get_parameter((Module*)cell, "bias_ih");
-
-        Tensor* bhh = tensor_zeros(b_shape, 1, &cfg);
-        module_add_parameter((Module*)cell, bhh, "bias_hh", true);
-        cell->bias_hh = module_get_parameter((Module*)cell, "bias_hh");
-    } else {
-        cell->bias_ih = NULL;
-        cell->bias_hh = NULL;
-    }
+    add_cell_params((Module*)cell, hidden_size, input_size, hidden_size, scale, use_bias, &cfg,
+                    &cell->weight_ih, &cell->weight_hh, &cell->bias_ih,
+                    &cell->bias_hh);
 
     return cell;
 }
@@ -130,28 +113,6 @@ static Tensor* lstm_cell_module_forward(Module* module, Tensor* input) {
     (void)module;
     (void)input;
     return NULL;
-}
-
-static void lstm_cell_free(Module* module) {
-    if (module->parameters) {
-        for (int i = 0; i < module->num_parameters; i++) {
-            Parameter* p = module->parameters[i];
-            if (!p)
-                continue;
-            if (p->name)
-                cml_free(p->name);
-            if (p->tensor)
-                tensor_free(p->tensor);
-            cml_free(p);
-        }
-        cml_free(module->parameters);
-        module->parameters = NULL;
-    }
-    if (module->name) {
-        cml_free(module->name);
-        module->name = NULL;
-    }
-    cml_free(module);
 }
 
 void lstm_cell_forward(LSTMCell* cell, Tensor* input,
@@ -227,7 +188,7 @@ LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
     if (!cell) return NULL;
 
     if (module_init((Module*)cell, "LSTMCell",
-                    lstm_cell_module_forward, lstm_cell_free) != 0) {
+                    lstm_cell_module_forward, NULL) != 0) {
         cml_free(cell);
         return NULL;
     }
@@ -241,35 +202,9 @@ LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
     int gs    = 4 * hidden_size;
     float scale = 1.0f / sqrtf((float)hidden_size);
 
-    /* weight_ih [4*hidden_size, input_size] */
-    int wih_shape[] = {gs, input_size};
-    Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    nn_init_uniform(wih, -scale, scale);
-    module_add_parameter((Module*)cell, wih, "weight_ih", true);
-    cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
-
-    /* weight_hh [4*hidden_size, hidden_size] */
-    int whh_shape[] = {gs, hidden_size};
-    Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    nn_init_uniform(whh, -scale, scale);
-    module_add_parameter((Module*)cell, whh, "weight_hh", true);
-    cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
-
-    /* Biases */
-    if (use_bias) {
-        int b_shape[] = {gs};
-
-        Tensor* bih = tensor_zeros(b_shape, 1, &cfg);
-        module_add_parameter((Module*)cell, bih, "bias_ih", true);
-        cell->bias_ih = module_get_parameter((Module*)cell, "bias_ih");
-
-        Tensor* bhh = tensor_zeros(b_shape, 1, &cfg);
-        module_add_parameter((Module*)cell, bhh, "bias_hh", true);
-        cell->bias_hh = module_get_parameter((Module*)cell, "bias_hh");
-    } else {
-        cell->bias_ih = NULL;
-        cell->bias_hh = NULL;
-    }
+    add_cell_params((Module*)cell, gs, input_size, hidden_size, scale, use_bias, &cfg,
+                    &cell->weight_ih, &cell->weight_hh, &cell->bias_ih,
+                    &cell->bias_hh);
 
     return cell;
 }
@@ -278,28 +213,6 @@ static Tensor* gru_cell_module_forward(Module* module, Tensor* input) {
     (void)module;
     (void)input;
     return NULL;
-}
-
-static void gru_cell_free(Module* module) {
-    if (module->parameters) {
-        for (int i = 0; i < module->num_parameters; i++) {
-            Parameter* p = module->parameters[i];
-            if (!p)
-                continue;
-            if (p->name)
-                cml_free(p->name);
-            if (p->tensor)
-                tensor_free(p->tensor);
-            cml_free(p);
-        }
-        cml_free(module->parameters);
-        module->parameters = NULL;
-    }
-    if (module->name) {
-        cml_free(module->name);
-        module->name = NULL;
-    }
-    cml_free(module);
 }
 
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
@@ -362,7 +275,7 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
     if (!cell) return NULL;
 
     if (module_init((Module*)cell, "GRUCell",
-                    gru_cell_module_forward, gru_cell_free) != 0) {
+                    gru_cell_module_forward, NULL) != 0) {
         cml_free(cell);
         return NULL;
     }
@@ -376,35 +289,9 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
     int gs    = 3 * hidden_size;
     float scale = 1.0f / sqrtf((float)hidden_size);
 
-    /* weight_ih [3*hidden_size, input_size] */
-    int wih_shape[] = {gs, input_size};
-    Tensor* wih = tensor_empty(wih_shape, 2, &cfg);
-    nn_init_uniform(wih, -scale, scale);
-    module_add_parameter((Module*)cell, wih, "weight_ih", true);
-    cell->weight_ih = module_get_parameter((Module*)cell, "weight_ih");
-
-    /* weight_hh [3*hidden_size, hidden_size] */
-    int whh_shape[] = {gs, hidden_size};
-    Tensor* whh = tensor_empty(whh_shape, 2, &cfg);
-    nn_init_uniform(whh, -scale, scale);
-    module_add_parameter((Module*)cell, whh, "weight_hh", true);
-    cell->weight_hh = module_get_parameter((Module*)cell, "weight_hh");
-
-    /* Biases */
-    if (use_bias) {
-        int b_shape[] = {gs};
-
-        Tensor* bih = tensor_zeros(b_shape, 1, &cfg);
-        module_add_parameter((Module*)cell, bih, "bias_ih", true);
-        cell->bias_ih = module_get_parameter((Module*)cell, "bias_ih");
-
-        Tensor* bhh = tensor_zeros(b_shape, 1, &cfg);
-        module_add_parameter((Module*)cell, bhh, "bias_hh", true);
-        cell->bias_hh = module_get_parameter((Module*)cell, "bias_hh");
-    } else {
-        cell->bias_ih = NULL;
-        cell->bias_hh = NULL;
-    }
+    add_cell_params((Module*)cell, gs, input_size, hidden_size, scale, use_bias, &cfg,
+                    &cell->weight_ih, &cell->weight_hh, &cell->bias_ih,
+                    &cell->bias_hh);
 
     return cell;
 }
@@ -470,7 +357,7 @@ static void rnn_free(Module* module) {
         int total = rnn->num_layers * rnn->num_directions;
         for (int i = 0; i < total; i++) {
             if (rnn->cells[i]) {
-                rnn_cell_free((Module*)rnn->cells[i]);
+                module_free((Module*)rnn->cells[i]);
             }
         }
         cml_free(rnn->cells);
@@ -603,7 +490,7 @@ static void lstm_free(Module* module) {
         int total = lstm->num_layers * lstm->num_directions;
         for (int i = 0; i < total; i++) {
             if (lstm->cells[i]) {
-                lstm_cell_free((Module*)lstm->cells[i]);
+                module_free((Module*)lstm->cells[i]);
             }
         }
         cml_free(lstm->cells);
@@ -745,7 +632,7 @@ static void gru_free(Module* module) {
         int total = gru->num_layers * gru->num_directions;
         for (int i = 0; i < total; i++) {
             if (gru->cells[i]) {
-                gru_cell_free((Module*)gru->cells[i]);
+                module_free((Module*)gru->cells[i]);
             }
         }
         cml_free(gru->cells);

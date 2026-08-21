@@ -12,6 +12,40 @@
 #define CML_CKPT_MAGIC  "CKP\0"
 #define CML_MODEL_VERSION 1
 
+/* Serialize a module's parameters to an open file: count, then each param's
+ * name, dtype, shape and raw data. */
+static void write_model_params(FILE* f, Module* model) {
+    int32_t num_params = model->num_parameters;
+    fwrite(&num_params, sizeof(int32_t), 1, f);
+
+    for (int i = 0; i < model->num_parameters; i++) {
+        Parameter* param = model->parameters[i];
+        if (!param || !param->tensor)
+            continue;
+
+        Tensor* t = param->tensor;
+        tensor_ensure_executed(t);
+        const char* name = param->name ? param->name : "";
+        int32_t name_len = (int32_t)strlen(name);
+        fwrite(&name_len, sizeof(int32_t), 1, f);
+        fwrite(name, 1, (size_t)name_len, f);
+        int32_t dtype = (int32_t)t->dtype;
+        fwrite(&dtype, sizeof(int32_t), 1, f);
+        int32_t ndim = t->ndim;
+        fwrite(&ndim, sizeof(int32_t), 1, f);
+        for (int d = 0; d < t->ndim; d++) {
+            int32_t dim = t->shape[d];
+            fwrite(&dim, sizeof(int32_t), 1, f);
+        }
+        size_t elem_size   = cml_dtype_size(t->dtype);
+        uint64_t data_size = (uint64_t)(t->numel * elem_size);
+        fwrite(&data_size, sizeof(uint64_t), 1, f);
+        void* data = tensor_data_ptr(t);
+        if (data)
+            fwrite(data, 1, (size_t)data_size, f);
+    }
+}
+
 int model_save(Module* model, const char* filepath) {
     if (!model || !filepath) return -1;
 
@@ -24,41 +58,27 @@ int model_save(Module* model, const char* filepath) {
     uint32_t version = CML_MODEL_VERSION;
     fwrite(&version, sizeof(uint32_t), 1, f);
 
-    int32_t num_params = model->num_parameters;
-    fwrite(&num_params, sizeof(int32_t), 1, f);
-
-    for (int i = 0; i < model->num_parameters; i++) {
-        Parameter* param = model->parameters[i];
-        if (!param || !param->tensor) continue;
-
-        Tensor* t = param->tensor;
-        tensor_ensure_executed(t);
-        const char* name = param->name ? param->name : "";
-        int32_t name_len = (int32_t)strlen(name);
-        fwrite(&name_len, sizeof(int32_t), 1, f);
-        fwrite(name, 1, (size_t)name_len, f);
-        int32_t dtype = (int32_t)t->dtype;
-        fwrite(&dtype, sizeof(int32_t), 1, f);
-
-        int32_t ndim = t->ndim;
-        fwrite(&ndim, sizeof(int32_t), 1, f);
-
-        for (int d = 0; d < t->ndim; d++) {
-            int32_t dim = t->shape[d];
-            fwrite(&dim, sizeof(int32_t), 1, f);
-        }
-        size_t elem_size = cml_dtype_size(t->dtype);
-        uint64_t data_size = (uint64_t)(t->numel * elem_size);
-        fwrite(&data_size, sizeof(uint64_t), 1, f);
-
-        void* data = tensor_data_ptr(t);
-        if (data) {
-            fwrite(data, 1, (size_t)data_size, f);
-        }
-    }
+    write_model_params(f, model);
 
     fclose(f);
     return 0;
+}
+
+/* Read one serialized parameter's header -- length-prefixed name, dtype and
+ * rank -- returning the freshly allocated name, or NULL on allocation failure. */
+static char* read_param_header(FILE* f, int32_t* dtype, int32_t* ndim) {
+    int32_t name_len;
+    fread(&name_len, sizeof(int32_t), 1, f);
+
+    char* name = cml_malloc((size_t)(name_len + 1));
+    if (!name)
+        return NULL;
+    fread(name, 1, (size_t)name_len, f);
+    name[name_len] = '\0';
+
+    fread(dtype, sizeof(int32_t), 1, f);
+    fread(ndim, sizeof(int32_t), 1, f);
+    return name;
 }
 
 int model_load(Module* model, const char* filepath) {
@@ -84,17 +104,9 @@ int model_load(Module* model, const char* filepath) {
     fread(&num_params, sizeof(int32_t), 1, f);
 
     for (int i = 0; i < num_params; i++) {
-        int32_t name_len;
-        fread(&name_len, sizeof(int32_t), 1, f);
-        char* name = cml_malloc((size_t)(name_len + 1));
+        int32_t dtype, ndim;
+        char* name = read_param_header(f, &dtype, &ndim);
         if (!name) { fclose(f); return -1; }
-        fread(name, 1, (size_t)name_len, f);
-        name[name_len] = '\0';
-        int32_t dtype;
-        fread(&dtype, sizeof(int32_t), 1, f);
-
-        int32_t ndim;
-        fread(&ndim, sizeof(int32_t), 1, f);
 
         int* shape = cml_malloc((size_t)ndim * sizeof(int));
         for (int d = 0; d < ndim; d++) {
@@ -145,36 +157,7 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
     int32_t ep = epoch;
     fwrite(&ep, sizeof(int32_t), 1, f);
     fwrite(&loss, sizeof(float), 1, f);
-    int32_t num_params = model->num_parameters;
-    fwrite(&num_params, sizeof(int32_t), 1, f);
-
-    for (int i = 0; i < model->num_parameters; i++) {
-        Parameter* param = model->parameters[i];
-        if (!param || !param->tensor) continue;
-
-        Tensor* t = param->tensor;
-        tensor_ensure_executed(t);
-
-        const char* name = param->name ? param->name : "";
-        int32_t name_len = (int32_t)strlen(name);
-        fwrite(&name_len, sizeof(int32_t), 1, f);
-        fwrite(name, 1, (size_t)name_len, f);
-
-        int32_t dtype = (int32_t)t->dtype;
-        fwrite(&dtype, sizeof(int32_t), 1, f);
-        int32_t ndim = t->ndim;
-        fwrite(&ndim, sizeof(int32_t), 1, f);
-        for (int d = 0; d < t->ndim; d++) {
-            int32_t dim = t->shape[d];
-            fwrite(&dim, sizeof(int32_t), 1, f);
-        }
-
-        size_t elem_size = cml_dtype_size(t->dtype);
-        uint64_t data_size = (uint64_t)(t->numel * elem_size);
-        fwrite(&data_size, sizeof(uint64_t), 1, f);
-        void* data = tensor_data_ptr(t);
-        if (data) fwrite(data, 1, (size_t)data_size, f);
-    }
+    write_model_params(f, model);
     int32_t has_optim = optimizer ? 1 : 0;
     fwrite(&has_optim, sizeof(int32_t), 1, f);
 
@@ -227,17 +210,9 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
     fread(&num_params, sizeof(int32_t), 1, f);
 
     for (int i = 0; i < num_params; i++) {
-        int32_t name_len;
-        fread(&name_len, sizeof(int32_t), 1, f);
-        char* name = cml_malloc((size_t)(name_len + 1));
+        int32_t dtype, ndim;
+        char* name = read_param_header(f, &dtype, &ndim);
         if (!name) { fclose(f); return -1; }
-        fread(name, 1, (size_t)name_len, f);
-        name[name_len] = '\0';
-
-        int32_t dtype;
-        fread(&dtype, sizeof(int32_t), 1, f);
-        int32_t ndim;
-        fread(&ndim, sizeof(int32_t), 1, f);
         for (int d = 0; d < ndim; d++) { int32_t dim; fread(&dim, sizeof(int32_t), 1, f); }
 
         uint64_t data_size;

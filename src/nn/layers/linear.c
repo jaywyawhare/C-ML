@@ -118,26 +118,9 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
 
     linear->weight = module_get_parameter((Module*)linear, "weight");
     if (use_bias) {
-        int bias_shape[] = {out_features};
-        TensorConfig bias_config =
-            (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-        Tensor* bias = tensor_zeros(bias_shape, 1, &bias_config);
-        if (!bias) {
-            module_free((Module*)linear);
+        linear->bias = nn_add_bias_param((Module*)linear, out_features, dtype, device, bias_init);
+        if (!linear->bias)
             return NULL;
-        }
-        if (bias_init) {
-            bias_init(bias, out_features);
-        } else {
-            zeros_init(bias, out_features);
-        }
-        if (module_add_parameter((Module*)linear, bias, "bias", true) != 0) {
-            tensor_free(bias);
-            module_free((Module*)linear);
-            return NULL;
-        }
-
-        linear->bias = module_get_parameter((Module*)linear, "bias");
     } else {
         linear->bias = NULL;
     }

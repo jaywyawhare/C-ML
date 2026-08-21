@@ -2,6 +2,7 @@
 #define CML_NN_OPENAI_API_H
 
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stddef.h>
 
 #include "nn/serving.h"
@@ -14,7 +15,10 @@ extern "C" {
 typedef struct CMLOpenAIServer {
     int port;
     int listen_fd;
-    bool running;
+    /* Written by the thread calling cml_openai_server_stop, read by the accept
+     * loop in cml_openai_server_run. A plain bool here is a data race, and the
+     * compiler is free to hoist the load out of the loop. */
+    _Atomic bool running;
     void* model;
     void* tokenizer;
     int max_tokens;

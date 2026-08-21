@@ -53,6 +53,30 @@ ModuleList* nn_module_list(void) {
     return list;
 }
 
+/* Re-export `module`'s parameters on `list` under "<index>.<module>.<param>"
+ * names, aliasing rather than copying the tensors. */
+static void module_list_adopt_params(ModuleList* list, Module* module, int index) {
+    Parameter** params = NULL;
+    int num_params     = 0;
+    if (module_collect_parameters(module, &params, &num_params, true) != 0)
+        return;
+
+    for (int i = 0; i < num_params; i++) {
+        if (!params[i])
+            continue;
+        char param_name[256];
+        snprintf(param_name, sizeof(param_name), "%d.%s.%s", index, module->name,
+                 params[i]->name ? params[i]->name : "unnamed");
+        Tensor* pt = params[i]->tensor;
+        nn_tensor_param_alias(pt);
+        if (module_add_parameter((Module*)list, pt, param_name, params[i]->requires_grad) != 0)
+            pt->ref_count--;
+    }
+
+    if (params)
+        cml_free(params);
+}
+
 int module_list_append(ModuleList* list, Module* module) {
     if (!list || !module) return -1;
 
@@ -71,23 +95,7 @@ int module_list_append(ModuleList* list, Module* module) {
     list->modules[list->num_modules] = module;
     int module_index = list->num_modules;
     list->num_modules++;
-    Parameter** params = NULL;
-    int num_params     = 0;
-    if (module_collect_parameters(module, &params, &num_params, true) == 0) {
-        for (int i = 0; i < num_params; i++) {
-            if (params[i]) {
-                char param_name[256];
-                snprintf(param_name, sizeof(param_name), "%d.%s.%s", module_index, module->name,
-                         params[i]->name ? params[i]->name : "unnamed");
-                Tensor* pt = params[i]->tensor;
-                nn_tensor_param_alias(pt);
-                if (module_add_parameter((Module*)list, pt, param_name,
-                                         params[i]->requires_grad) != 0)
-                    pt->ref_count--;
-            }
-        }
-        if (params) cml_free(params);
-    }
+    module_list_adopt_params(list, module, module_index);
 
     return 0;
 }
@@ -114,23 +122,7 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
     }
     list->modules[index] = module;
     list->num_modules++;
-    Parameter** params = NULL;
-    int num_params     = 0;
-    if (module_collect_parameters(module, &params, &num_params, true) == 0) {
-        for (int i = 0; i < num_params; i++) {
-            if (params[i]) {
-                char param_name[256];
-                snprintf(param_name, sizeof(param_name), "%d.%s.%s", index, module->name,
-                         params[i]->name ? params[i]->name : "unnamed");
-                Tensor* pt = params[i]->tensor;
-                nn_tensor_param_alias(pt);
-                if (module_add_parameter((Module*)list, pt, param_name,
-                                         params[i]->requires_grad) != 0)
-                    pt->ref_count--;
-            }
-        }
-        if (params) cml_free(params);
-    }
+    module_list_adopt_params(list, module, index);
 
     return 0;
 }

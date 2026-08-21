@@ -1,6 +1,13 @@
 
+#include <execinfo.h>
+#include "ops/ir/flamegraph.h"
+
+/* Defined below, next to the interning table it uses. */
+static char* cml_capture_build_stack(void);
+static int cml_stack_is_internal(const char* folded);
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "core/cml_flags.h"
 #include "ops/ir/context.h"
 #include "ops/uops.h"
 #include "autograd/autograd.h"
@@ -249,6 +256,10 @@ const char* uop_type_to_string(UOpType type) {
         return "UNFOLD";
     case UOP_FOLD:
         return "FOLD";
+    case UOP_IM2COL:
+        return "IM2COL";
+    case UOP_COL2IM:
+        return "COL2IM";
     case UOP_SCATTER_ADD:
         return "SCATTER_ADD";
     case UOP_FUSED_ELEMENTWISE:
@@ -297,6 +308,27 @@ const char* uop_type_to_string(UOpType type) {
         return "MASKED_SELECT";
     case UOP_MESHGRID:
         return "MESHGRID";
+    /* These were missing, so every one of them printed as "UNKNOWN" wherever a
+     * uop is named -- the profile, the kernel studio, the graph export and the
+     * logs. A run using sigmoid or an optimizer step had unlabelled nodes. */
+    case UOP_TANH:
+        return "TANH";
+    case UOP_SIGMOID:
+        return "SIGMOID";
+    case UOP_MAXPOOL2D:
+        return "MAXPOOL2D";
+    case UOP_AVGPOOL2D:
+        return "AVGPOOL2D";
+    case UOP_CONV3D:
+        return "CONV3D";
+    case UOP_CONV_TRANSPOSE2D:
+        return "CONV_TRANSPOSE2D";
+    case UOP_CONV_TRANSPOSE3D:
+        return "CONV_TRANSPOSE3D";
+    case UOP_SGD_STEP:
+        return "SGD_STEP";
+    case UOP_ADAM_STEP:
+        return "ADAM_STEP";
     default:
         return "UNKNOWN";
     }
@@ -607,6 +639,16 @@ void cml_ir_free_node_params(struct IRNode* node) {
         if (p) cml_free(p);
         break;
     }
+    case UOP_IM2COL: {
+        Im2colParams* p = (Im2colParams*)node->params;
+        if (p) cml_free(p);
+        break;
+    }
+    case UOP_COL2IM: {
+        Col2imParams* p = (Col2imParams*)node->params;
+        if (p) cml_free(p);
+        break;
+    }
     case UOP_SCATTER_ADD: {
         ScatterAddParams* p = (ScatterAddParams*)node->params;
         if (p) cml_free(p);
@@ -782,6 +824,14 @@ static void free_ir_node(struct IRNode* node) {
         cml_free(node->output_name);
         node->output_name = NULL;
     }
+    if (node->scope) {
+        cml_free(node->scope);
+        node->scope = NULL;
+    }
+    if (node->build_stack) {
+        cml_free(node->build_stack);
+        node->build_stack = NULL;
+    }
 
     if (node->users) {
         cml_free(node->users);
@@ -834,11 +884,57 @@ static void free_ir_node(struct IRNode* node) {
     cml_free(node);
 }
 
+/* Pointers destroyed by the output phases of cml_ir_free.
+ *
+ * A tensor can be reachable both as node->output and as an ir->tensor_refs
+ * entry. The output phases force ref_count to 1 and free unconditionally, so
+ * the tensor_refs pass would then read (tr->ir_context) and free an object that
+ * is already gone. A freed pointer cannot be tested, so the identities have to
+ * be recorded while they are still valid. */
+typedef struct {
+    Tensor** p;
+    int      n, cap;
+} FreedSet;
+
+static void freed_set_add(FreedSet* fs, Tensor* t) {
+    if (!t || !fs->p) return;
+    if (fs->n == fs->cap) {
+        int cap    = fs->cap ? fs->cap * 2 : 64;
+        Tensor** np = cml_realloc(fs->p, (size_t)cap * sizeof(Tensor*));
+        if (!np) { cml_free(fs->p); fs->p = NULL; fs->n = 0; fs->cap = 0; return; }
+        fs->p   = np;
+        fs->cap = cap;
+    }
+    fs->p[fs->n++] = t;
+}
+
+static int freed_set_cmp(const void* a, const void* b) {
+    Tensor* x = *(Tensor* const*)a;
+    Tensor* y = *(Tensor* const*)b;
+    return (x > y) - (x < y);
+}
+
+static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
+    if (!fs->p || fs->n == 0) return false;
+    int lo = 0, hi = fs->n - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (fs->p[mid] == t) return true;
+        if (fs->p[mid] < t) lo = mid + 1;
+        else                hi = mid - 1;
+    }
+    return false;
+}
+
 void cml_ir_free(CMLGraph_t ir) {
     if (!ir)
         return;
 
     cml_ir_clear_global_if_current(ir);
+
+    FreedSet freed = {0};
+    freed.cap = 64;
+    freed.p   = cml_malloc((size_t)freed.cap * sizeof(Tensor*));
 
     /* Phase 1: Free forward output tensors.
      * Do not auto-execute pending nodes during teardown: lazy tensors can be
@@ -853,6 +949,7 @@ void cml_ir_free(CMLGraph_t ir) {
         }
         if (node->output) {
             Tensor* out   = node->output;
+            freed_set_add(&freed, out);
             out->ref_count = 1;
             tensor_free(out);
             node->output = NULL;
@@ -871,6 +968,7 @@ void cml_ir_free(CMLGraph_t ir) {
         }
         if (node->output) {
             Tensor* out   = node->output;
+            freed_set_add(&freed, out);
             out->ref_count = 1;
             tensor_free(out);
             node->output = NULL;
@@ -880,9 +978,17 @@ void cml_ir_free(CMLGraph_t ir) {
     }
 
     if (ir->tensor_refs) {
+        if (freed.p && freed.n > 1)
+            qsort(freed.p, (size_t)freed.n, sizeof(Tensor*), freed_set_cmp);
         for (int i = 0; i < ir->tensor_refs_count; i++) {
             if (ir->tensor_refs[i]) {
                 Tensor* tr = ir->tensor_refs[i];
+                /* Already destroyed as a node output above: the pointer is
+                 * dangling, so it must not be dereferenced or freed again. */
+                if (freed_set_contains(&freed, tr)) {
+                    ir->tensor_refs[i] = NULL;
+                    continue;
+                }
                 /* Only detach from THIS graph's context. Do NOT clear ir_node
                  * before tensor_free — tensor_free needs ir_node to clear the
                  * original node's output pointer when ref_count reaches 0. */
@@ -896,6 +1002,8 @@ void cml_ir_free(CMLGraph_t ir) {
         ir->tensor_refs       = NULL;
         ir->tensor_refs_count = 0;
     }
+
+    cml_free(freed.p);
 
     cml_intern_table_free(ir->intern_table);
     ir->intern_table = NULL;
@@ -1179,6 +1287,36 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     node->chain_id       = -1;
 
     node->ref_count = 1;
+    node->scope = NULL;
+    {
+        const char* sc = cml_ir_scope_current();
+        if (sc)
+            node->scope = cml_strdup(sc);
+    }
+    if (cml_flame_enabled()) {
+        node->build_stack = cml_capture_build_stack();
+        /* Nodes manufactured by a rewrite pass (decompose lowering a composite,
+         * the fuser collapsing a chain) are created from inside the executor, so
+         * their own stack says "cml_ir_execute > cml_ir_decompose" -- true, and
+         * useless: it attributes the work to the compiler rather than to the
+         * layer whose op is being rewritten. Inherit from the first input, which
+         * is the node being rewritten and already carries the model's stack.
+         * Doing it here covers every pass, including ones not written yet. */
+        if (cml_stack_is_internal(node->build_stack)) {
+            const char* inherited = NULL;
+            for (int i = 0; i < num_inputs && !inherited; i++) {
+                struct IRNode* in = (inputs[i] && inputs[i]->ir_node)
+                                        ? (struct IRNode*)inputs[i]->ir_node : NULL;
+                if (in && in->build_stack) inherited = in->build_stack;
+            }
+            if (inherited) {
+                cml_free(node->build_stack);
+                node->build_stack = cml_strdup(inherited);
+            }
+        }
+    } else {
+        node->build_stack = NULL;
+    }
     {
         struct IRNode* input_nodes[8];
         int hash_count = num_inputs < 8 ? num_inputs : 8;
@@ -1375,4 +1513,245 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     node->input_ndims  = input_ndims;
 
     return 0;
+}
+
+struct IRNode* cml_ir_find_by_output(CMLGraph_t ir, const char* output_name) {
+    if (!ir || !output_name)
+        return NULL;
+    for (struct IRNode* node = ir->head; node; node = node->next)
+        if (node->output_name && strcmp(node->output_name, output_name) == 0)
+            return node;
+    return NULL;
+}
+
+void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node) {
+    if (!ir || !node)
+        return;
+
+    if (ir->head == node) {
+        ir->head = node->next;
+        if (ir->tail == node)
+            ir->tail = NULL;
+        ir->node_count--;
+        return;
+    }
+
+    struct IRNode* prev = ir->head;
+    while (prev && prev->next != node)
+        prev = prev->next;
+    if (prev) {
+        prev->next = node->next;
+        if (ir->tail == node)
+            ir->tail = prev;
+        ir->node_count--;
+    }
+}
+
+void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_name) {
+    if (!ir || !old_name || !new_name)
+        return;
+    for (struct IRNode* n = ir->head; n; n = n->next) {
+        for (int i = 0; i < n->num_inputs; i++) {
+            if (n->input_names[i] && strcmp(n->input_names[i], old_name) == 0) {
+                cml_free(n->input_names[i]);
+                n->input_names[i] = cml_strdup(new_name);
+            }
+        }
+    }
+}
+
+void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode* before) {
+    if (!ir || !new_node)
+        return;
+    new_node->next = NULL;
+
+    if (!before || !ir->head) {
+        if (ir->tail)
+            ir->tail->next = new_node;
+        else
+            ir->head = new_node;
+        ir->tail = new_node;
+        ir->node_count++;
+        return;
+    }
+
+    if (ir->head == before) {
+        new_node->next = before;
+        ir->head = new_node;
+        ir->node_count++;
+        return;
+    }
+
+    struct IRNode* prev = ir->head;
+    while (prev && prev->next != before)
+        prev = prev->next;
+
+    if (prev) {
+        new_node->next = before;
+        prev->next = new_node;
+    } else {
+        ir->tail->next = new_node;
+        ir->tail = new_node;
+    }
+    ir->node_count++;
+}
+
+/* ── Module scope stack (graph view) ─────────────────────────────────────── */
+
+#define IR_SCOPE_MAX_DEPTH 32
+#define IR_SCOPE_MAX_LEN   256
+
+static _Thread_local char g_scope_path[IR_SCOPE_MAX_LEN];
+static _Thread_local int  g_scope_ends[IR_SCOPE_MAX_DEPTH]; /* path length after each push */
+static _Thread_local int  g_scope_depth = 0;
+static int g_scope_enabled = -1; /* -1 = not yet probed */
+
+bool cml_ir_scope_enabled(void) {
+    if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
+        return false;
+    if (g_scope_enabled < 0) {
+        const char* viz = getenv("VIZ");
+        g_scope_enabled = (viz && viz[0] != '0') ? 1 : 0;
+    }
+    return g_scope_enabled == 1;
+}
+
+/* Folded call stack of whoever is building this node.
+ *
+ * The flame graph's depth has to come from somewhere, and a lazy graph offers
+ * nothing at execution time: every kernel is dispatched from the same executor
+ * loop, so sampling there yields one stack for the whole program. The stack that
+ * carries meaning is the one that BUILT the node -- module_forward, the layer's
+ * forward, the uop helper -- so it is captured here, at construction.
+ *
+ * Addresses are resolved to names immediately because the strings are shared:
+ * identical stacks are interned, so the resolve cost is paid once per distinct
+ * call path (tens of them), not once per node.
+ */
+#define CML_BT_MAX 40      /* deepest stack kept */
+#define CML_BT_SKIP 2      /* this function + cml_ir_add_uop itself */
+
+/* Interned stacks: a small table keyed on the raw address vector, so the common
+ * case (thousands of nodes from a handful of call paths) costs one memcmp. */
+typedef struct {
+    void*  addrs[CML_BT_MAX];
+    int    n;
+    char*  folded;
+} BtEntry;
+static BtEntry g_bt[64];
+static int g_bt_n = 0;
+
+/* "/path/bin(function+0x2e) [0x...]" -> "function", or empty when the frame has
+ * no symbol. Static functions are absent from the dynamic table even with
+ * -rdynamic, and for those backtrace_symbols reports only the object path --
+ * emitting that would put the binary's own name in the stack once per
+ * unresolved frame, which reads like a real function and is not one. An empty
+ * name drops the frame instead. */
+static void bt_symbol(const char* raw, char* out, size_t cap) {
+    out[0] = '\0';
+    const char* open = strchr(raw, '(');
+    const char* plus = open ? strchr(open, '+') : NULL;
+    const char* end  = plus ? plus : (open ? strchr(open, ')') : NULL);
+    if (!open || !end || end <= open + 1)
+        return;                     /* "/path/bin() [0x..]" -- no symbol */
+    size_t n = (size_t)(end - open - 1);
+    if (n >= cap) n = cap - 1;
+    memcpy(out, open + 1, n);
+    out[n] = '\0';
+}
+
+/* Frames that are pure plumbing: they appear in every stack and say nothing
+ * about which part of the model is being built. */
+static int bt_is_noise(const char* fn) {
+    static const char* skip[] = {
+        "cml_ir_add_uop", "cml_ir_create_node", "ir_node_create",
+        "uop_binary_ex", "uop_unary_noparam", "uop_reduce_ex",
+        "finish_source_node", "attach_movement_op",
+        /* Process entry: true of every stack, so it distinguishes nothing. */
+        "_start", "__libc_start_main", "__libc_start_call_main", NULL,
+    };
+    for (int i = 0; skip[i]; i++)
+        if (strcmp(fn, skip[i]) == 0) return 1;
+    return 0;
+}
+
+/* True when a stack is rooted in the compiler rather than in model code. */
+static int cml_stack_is_internal(const char* folded) {
+    if (!folded || !*folded) return 1;
+    static const char* passes[] = {
+        "cml_ir_decompose", "cml_ir_fuse_elementwise", "cml_ir_fuse_matmul_epilogue",
+        "cml_ir_optimize", "cml_ir_execute", "cpu_execute_ir", "cml_ir_execute_fusion",
+        "cml_ir_reexecute", "cml_ir_execute_up_to", NULL,
+    };
+    for (int i = 0; passes[i]; i++)
+        if (strstr(folded, passes[i])) return 1;
+    return 0;
+}
+
+static char* cml_capture_build_stack(void) {
+    void* addrs[CML_BT_MAX];
+    int n = backtrace(addrs, CML_BT_MAX);
+    if (n <= CML_BT_SKIP) return NULL;
+
+    for (int i = 0; i < g_bt_n; i++) {
+        if (g_bt[i].n == n && memcmp(g_bt[i].addrs, addrs, (size_t)n * sizeof(void*)) == 0)
+            return g_bt[i].folded ? cml_strdup(g_bt[i].folded) : NULL;
+    }
+
+    char** syms = backtrace_symbols(addrs, n);
+    if (!syms) return NULL;
+
+    /* backtrace() is innermost-first; a flame graph reads root-first. */
+    char buf[2048];
+    size_t len = 0;
+    for (int i = n - 1; i >= CML_BT_SKIP; i--) {
+        char fn[192];
+        bt_symbol(syms[i], fn, sizeof(fn));
+        if (!fn[0] || bt_is_noise(fn)) continue;
+        size_t need = strlen(fn) + (len ? 1 : 0);
+        if (len + need >= sizeof(buf)) break;
+        if (len) buf[len++] = ';';
+        memcpy(buf + len, fn, strlen(fn));
+        len += strlen(fn);
+    }
+    buf[len] = '\0';
+    free(syms);   /* backtrace_symbols uses malloc, not the pool allocator */
+    if (!len) return NULL;
+
+    if (g_bt_n < (int)(sizeof(g_bt) / sizeof(g_bt[0]))) {
+        BtEntry* e = &g_bt[g_bt_n++];
+        memcpy(e->addrs, addrs, (size_t)n * sizeof(void*));
+        e->n = n;
+        e->folded = cml_strdup(buf);
+    }
+    return cml_strdup(buf);
+}
+
+void cml_ir_scope_push(const char* name) {
+    if (!cml_ir_scope_enabled() || !name || g_scope_depth >= IR_SCOPE_MAX_DEPTH)
+        return;
+
+    int len = (int)strlen(g_scope_path);
+    int add = (int)strlen(name) + (len > 0 ? 1 : 0);
+    if (len + add >= IR_SCOPE_MAX_LEN) {
+        /* Too deep to name: still push so the pop stays balanced. */
+        g_scope_ends[g_scope_depth++] = len;
+        return;
+    }
+    if (len > 0)
+        g_scope_path[len++] = '/';
+    strcpy(g_scope_path + len, name);
+    g_scope_ends[g_scope_depth++] = (int)strlen(g_scope_path);
+}
+
+void cml_ir_scope_pop(void) {
+    if (!cml_ir_scope_enabled() || g_scope_depth <= 0)
+        return;
+    g_scope_depth--;
+    int keep = g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0;
+    g_scope_path[keep] = '\0';
+}
+
+const char* cml_ir_scope_current(void) {
+    return (cml_ir_scope_enabled() && g_scope_path[0]) ? g_scope_path : NULL;
 }

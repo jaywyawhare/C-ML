@@ -351,7 +351,9 @@ static const char* adreno_unary_expr(UOpType t) {
     case UOP_ABS:     return "fabs(a)";
     case UOP_SIN:     return "sin(a)";
     case UOP_COS:     return "cos(a)";
-    case UOP_RELU:    return "fmax(a, 0.0f)";
+    /* fmax is IEEE maxNum and returns the non-NaN operand, so it would
+     * erase NaN; the flipped compare keeps it at no cost. */
+    case UOP_RELU:    return "(a < 0.0f ? 0.0f : a)";
     case UOP_SIGMOID: return "1.0f/(1.0f+exp(-a))";
     case UOP_TANH:    return "tanh(a)";
     default:          return NULL;
@@ -365,7 +367,7 @@ static const char* adreno_binary_expr(UOpType t) {
     case UOP_SUB: return "a - b";
     case UOP_MUL: return "a * b";
     case UOP_DIV: return "a / b";
-    case UOP_MAX: return "fmax(a, b)";
+    case UOP_MAX: return "((a != a) || (b != b)) ? (a + b) : fmax(a, b)";
     case UOP_POW: return "pow(a, b)";
     default:      return NULL;
     }

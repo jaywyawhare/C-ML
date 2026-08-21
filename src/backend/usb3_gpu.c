@@ -287,6 +287,18 @@ int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
     return cml_usb3_gpu_scsi_cmd(dev, cdb, 10, &buf, sizeof(buf), true);
 }
 
+/* Build the vendor SCSI CDB for a PCIe window access: opcode, sub-command,
+ * then the 64-bit device address and 32-bit length, both big-endian. */
+static void usb3_build_pcie_cdb(uint8_t* cdb, uint8_t sub_cmd, uint64_t addr, uint32_t len) {
+    memset(cdb, 0, 16);
+    cdb[0] = SCSI_VENDOR_CMD;
+    cdb[1] = sub_cmd;
+    for (int i = 0; i < 8; i++)
+        cdb[2 + i] = (uint8_t)((addr >> (56 - 8 * i)) & 0xFF);
+    for (int i = 0; i < 4; i++)
+        cdb[10 + i] = (uint8_t)((len >> (24 - 8 * i)) & 0xFF);
+}
+
 int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, size_t size) {
     if (!dev || !dev->connected || !data || size == 0) return -1;
 
@@ -298,25 +310,7 @@ int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, si
         if (chunk > dev->bulk_buf_size) chunk = dev->bulk_buf_size;
 
         uint8_t cdb[16];
-        memset(cdb, 0, sizeof(cdb));
-        cdb[0] = SCSI_VENDOR_CMD;
-        cdb[1] = SCSI_PCIE_WRITE;
-
-        uint64_t addr = gpu_addr + offset;
-        cdb[2] = (uint8_t)((addr >> 56) & 0xFF);
-        cdb[3] = (uint8_t)((addr >> 48) & 0xFF);
-        cdb[4] = (uint8_t)((addr >> 40) & 0xFF);
-        cdb[5] = (uint8_t)((addr >> 32) & 0xFF);
-        cdb[6] = (uint8_t)((addr >> 24) & 0xFF);
-        cdb[7] = (uint8_t)((addr >> 16) & 0xFF);
-        cdb[8] = (uint8_t)((addr >> 8) & 0xFF);
-        cdb[9] = (uint8_t)(addr & 0xFF);
-
-        uint32_t len32 = (uint32_t)chunk;
-        cdb[10] = (uint8_t)((len32 >> 24) & 0xFF);
-        cdb[11] = (uint8_t)((len32 >> 16) & 0xFF);
-        cdb[12] = (uint8_t)((len32 >> 8) & 0xFF);
-        cdb[13] = (uint8_t)(len32 & 0xFF);
+        usb3_build_pcie_cdb(cdb, SCSI_PCIE_WRITE, gpu_addr + offset, (uint32_t)chunk);
 
         memcpy(dev->bulk_buf, src + offset, chunk);
         int ret = cml_usb3_gpu_scsi_cmd(dev, cdb, 14, dev->bulk_buf, chunk, true);
@@ -341,25 +335,7 @@ int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t
         if (chunk > dev->bulk_buf_size) chunk = dev->bulk_buf_size;
 
         uint8_t cdb[16];
-        memset(cdb, 0, sizeof(cdb));
-        cdb[0] = SCSI_VENDOR_CMD;
-        cdb[1] = SCSI_PCIE_READ;
-
-        uint64_t addr = gpu_addr + offset;
-        cdb[2] = (uint8_t)((addr >> 56) & 0xFF);
-        cdb[3] = (uint8_t)((addr >> 48) & 0xFF);
-        cdb[4] = (uint8_t)((addr >> 40) & 0xFF);
-        cdb[5] = (uint8_t)((addr >> 32) & 0xFF);
-        cdb[6] = (uint8_t)((addr >> 24) & 0xFF);
-        cdb[7] = (uint8_t)((addr >> 16) & 0xFF);
-        cdb[8] = (uint8_t)((addr >> 8) & 0xFF);
-        cdb[9] = (uint8_t)(addr & 0xFF);
-
-        uint32_t len32 = (uint32_t)chunk;
-        cdb[10] = (uint8_t)((len32 >> 24) & 0xFF);
-        cdb[11] = (uint8_t)((len32 >> 16) & 0xFF);
-        cdb[12] = (uint8_t)((len32 >> 8) & 0xFF);
-        cdb[13] = (uint8_t)(len32 & 0xFF);
+        usb3_build_pcie_cdb(cdb, SCSI_PCIE_READ, gpu_addr + offset, (uint32_t)chunk);
 
         int ret = cml_usb3_gpu_scsi_cmd(dev, cdb, 14, dev->bulk_buf, chunk, false);
         if (ret != 0) {

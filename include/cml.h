@@ -75,6 +75,7 @@ void cml_track_module(struct Module* module);
 void cml_untrack_module(struct Module* module);
 void cml_track_optimizer(struct Optimizer* optimizer);
 void cml_track_dataset(struct Dataset* dataset);
+void cml_untrack_dataset(struct Dataset* dataset);
 
 Tensor* cml_empty(int* shape, int ndim, const TensorConfig* config);
 Tensor* cml_zeros(int* shape, int ndim, const TensorConfig* config);

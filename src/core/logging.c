@@ -56,3 +56,22 @@ void cml_log_message(LogLevel level, const char* file, int line, const char* fun
                 msg);
     }
 }
+
+void cml_json_write_escaped(FILE* f, const char* s) {
+    if (!s) {
+        fputs("null", f);
+        return;
+    }
+    fputc('"', f);
+    for (const char* p = s; *p; p++) {
+        if (*p == '"' || *p == '\\') {
+            fputc('\\', f);
+            fputc(*p, f);
+        } else if ((unsigned char)*p < 0x20) {
+            fprintf(f, "\\u%04x", (unsigned char)*p);
+        } else {
+            fputc(*p, f);
+        }
+    }
+    fputc('"', f);
+}

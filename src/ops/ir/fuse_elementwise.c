@@ -15,22 +15,43 @@
  */
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/intern.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
+#include "core/cml_flags.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-#define FUSED_UNUSED_REF (-1000000)
 
-/* mirror of execution.c's fused_op_supported */
+/* Fusion is an optimization, so it is off whenever optimization is off.
+ *
+ * This lives at the entry to the fusers rather than at their call sites: the
+ * execute paths reach them from three places, and gating each one separately
+ * had already gone wrong -- NOOPT=1 skipped the passes in cml_ir_optimize but
+ * the whole-graph execute paths fused anyway, so "optimization disabled" runs
+ * still executed fused kernels. Gate the transform, not the callers. */
+int cml_ir_fusion_enabled(void) {
+    static int checked = 0;
+    static int enabled = 0;
+    if (!checked) {
+        const char* env = getenv("FUSION_SCHEDULER");
+        enabled = !(env && env[0] == '0') && !cml_flag_enabled(CML_FLAG_DISABLE_FUSION) &&
+                  !cml_flag_enabled(CML_FLAG_NOOPT);
+        checked = 1;
+    }
+    return enabled;
+}
+
+/* Ops the fused elementwise kernel (fused_eval_block / fe_scalar_eval) can run. */
 static int fe_supported(UOpType t) {
     switch (t) {
     case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: case UOP_MAX:
     case UOP_MINIMUM: case UOP_POW: case UOP_NEG: case UOP_RECIP: case UOP_EXP:
     case UOP_LOG: case UOP_SQRT: case UOP_SIN: case UOP_COS: case UOP_ABS:
+    case UOP_RELU:
     case UOP_CMPLT: case UOP_CMPLE: case UOP_CMPGT: case UOP_CMPGE:
     case UOP_CMPEQ: case UOP_CMPNE: case UOP_WHERE: case UOP_FILL:
         return 1;
@@ -82,7 +103,7 @@ static __thread int g_fe_allow_grad = 0;
 void cml_ir_fuse_set_allow_grad(int on) { g_fe_allow_grad = on ? 1 : 0; }
 
 int cml_ir_fuse_elementwise(CMLGraph_t ir) {
-    if (!ir || !ir->head) return 0;
+    if (!ir || !ir->head || !cml_ir_fusion_enabled()) return 0;
 
     /* index nodes + count graph-internal uses of each node's output */
     int n = 0;
@@ -224,6 +245,20 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         struct IRNode* fnode = cml_calloc(1, sizeof(struct IRNode));
         if (!fnode) { cml_free(fp); cml_free(ops); cml_free(aa); cml_free(bb); cml_free(cc); cml_free(kk); continue; }
         fnode->type = UOP_FUSED_ELEMENTWISE;
+        /* Inherit provenance from the chain. The fused node is manufactured by
+         * this pass, long after the model was built, so it has no creation stack
+         * or module scope of its own -- and being the single hottest node in a
+         * run, it would otherwise be the one frame the profile cannot attribute.
+         * The root alone is not enough: it is often itself a lowered node from
+         * decompose, so take the first member that carries provenance. */
+        fnode->build_stack = NULL;
+        fnode->scope       = NULL;
+        for (int mi = 0; mi < m; mi++) {
+            if (!fnode->build_stack && members[mi]->build_stack)
+                fnode->build_stack = cml_strdup(members[mi]->build_stack);
+            if (!fnode->scope && members[mi]->scope)
+                fnode->scope = cml_strdup(members[mi]->scope);
+        }
         fnode->num_inputs = num_ext;
         fnode->params = fp;
         fnode->inputs = cml_malloc((size_t)num_ext * sizeof(Tensor*));
@@ -275,6 +310,10 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
             }
             if (cnode->input_names) { for (int i = 0; i < cnode->num_inputs; i++) cml_free(cnode->input_names[i]); cml_free(cnode->input_names); }
             cml_free(cnode->inputs); cml_free(cnode->output_name); cml_free(cnode->output_shape);
+            /* Leave the CSE table before the memory goes: it keys on node
+             * identity, so a fused-away node left interned is dereferenced by
+             * the next lookup that probes its slot. */
+            cml_intern_remove(ir->intern_table, cnode);
             cml_ir_free_node_params(cnode); cml_free(cnode);
             cnode = nx;
         }
@@ -285,6 +324,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         root->output = NULL;
         if (root->input_names) { for (int i = 0; i < root->num_inputs; i++) cml_free(root->input_names[i]); cml_free(root->input_names); }
         cml_free(root->inputs); cml_free(root->output_name); cml_free(root->output_shape);
+        cml_intern_remove(ir->intern_table, root);
         cml_ir_free_node_params(root); cml_free(root);
 
         ir->node_count -= (m - 1);
@@ -309,7 +349,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
  * (MATMUL_ACC_REF = the gemm result); every backend (BLAS, interpreter, JIT)
  * applies it. Runs AFTER cml_ir_fuse_elementwise. Returns #matmuls fused. */
 int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir) {
-    if (!ir || !ir->head) return 0;
+    if (!ir || !ir->head || !cml_ir_fusion_enabled()) return 0;
     int n = 0;
     for (struct IRNode* p = ir->head; p; p = p->next) n++;
     if (n < 2) return 0;
