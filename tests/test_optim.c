@@ -6,6 +6,8 @@
 
 #include "cml.h"
 #include "alloc/cml_allocator.h"
+#include "core/cml_flags.h"
+#include "autograd/autograd.h"
 #include "test_harness.h"
 
 #define APPROX_EQ(a, b) (fabsf((a) - (b)) < 1e-4f)
@@ -215,6 +217,79 @@ static int test_optim_for_model(void) {
     return 1;
 }
 
+/* FUSE_OPTIM only changes how the SGD updates are scheduled (all emitted then
+ * realized in one pass), not the math. Train two identical models on identical
+ * data -- one default, one with FUSE_OPTIM -- and require the weights to match.
+ * A double-applied momentum update (the main risk of the batched realize) would
+ * diverge here. */
+static int test_fuse_optim_matches_default(void) {
+    Sequential *ma, *mb; Parameter **pa, **pb; int na, nb;
+    create_test_model(&ma, &pa, &na);
+    create_test_model(&mb, &pb, &nb);
+    if (na != nb || na == 0) return 0;
+
+    /* Align B's initial weights to A's (both were randomly initialized). */
+    for (int i = 0; i < na; i++) {
+        Tensor *ta = pa[i]->tensor, *tb = pb[i]->tensor;
+        if (ta->numel != tb->numel) return 0;
+        memcpy(tb->data, ta->data, ta->numel * sizeof(float));
+    }
+
+    Optimizer* oa = cml_optim_sgd(pa, na, 0.05f, 0.0f, 0.9f); /* momentum on */
+    Optimizer* ob = cml_optim_sgd(pb, nb, 0.05f, 0.0f, 0.9f);
+    if (!oa || !ob) return 0;
+
+    cml_nn_module_set_training((Module*)ma, true);
+    cml_nn_module_set_training((Module*)mb, true);
+
+    float xin[8] = {0.5f, -0.3f, 0.1f, 0.9f, -0.7f, 0.2f, 0.4f, -0.6f}; /* [4,2] */
+    float yt[4]  = {1.0f, 0.0f, -1.0f, 0.5f};                            /* [4,1] */
+    int xs[2] = {4, 2}, ys[2] = {4, 1};
+
+    for (int step = 0; step < 4; step++) {
+        /* Default path */
+        Tensor* xa = tensor_from_data(xin, xs, 2, NULL);
+        Tensor* ya = tensor_from_data(yt, ys, 2, NULL);
+        optimizer_zero_grad(oa);
+        Tensor* outa  = cml_nn_module_forward((Module*)ma, xa);
+        Tensor* lossa = cml_nn_mse_loss(outa, ya);
+        tensor_backward(lossa, NULL, false, false);
+        optimizer_step(oa);
+        tensor_free(lossa); tensor_free(outa); tensor_free(xa); tensor_free(ya);
+        cml_reset_ir_context();
+
+        /* FUSE_OPTIM path */
+        int prev = cml_flag_push(CML_FLAG_FUSE_OPTIM, 1);
+        Tensor* xb = tensor_from_data(xin, xs, 2, NULL);
+        Tensor* yb = tensor_from_data(yt, ys, 2, NULL);
+        optimizer_zero_grad(ob);
+        Tensor* outb  = cml_nn_module_forward((Module*)mb, xb);
+        Tensor* lossb = cml_nn_mse_loss(outb, yb);
+        tensor_backward(lossb, NULL, false, false);
+        optimizer_step(ob);
+        tensor_free(lossb); tensor_free(outb); tensor_free(xb); tensor_free(yb);
+        cml_reset_ir_context();
+        cml_flag_pop(CML_FLAG_FUSE_OPTIM, prev);
+    }
+
+    int ok = 1;
+    for (int i = 0; i < na && ok; i++) {
+        const float* a = (const float*)pa[i]->tensor->data;
+        const float* b = (const float*)pb[i]->tensor->data;
+        for (size_t j = 0; j < pa[i]->tensor->numel; j++) {
+            if (fabsf(a[j] - b[j]) > 1e-5f) {
+                printf("(param %d[%zu]: default=%.6f fused=%.6f) ", i, j, a[j], b[j]);
+                ok = 0; break;
+            }
+        }
+    }
+
+    optimizer_free(oa); optimizer_free(ob);
+    cml_free(pa); cml_free(pb);
+    module_free((Module*)ma); module_free((Module*)mb);
+    return ok;
+}
+
 int main(void) {
     cml_init();
 
@@ -231,6 +306,7 @@ int main(void) {
     TEST(zero_grad);
     TEST(optim_for_model);
     TEST(lr_scheduler_step);
+    TEST(fuse_optim_matches_default);
 
     return TEST_SUMMARY();
 }

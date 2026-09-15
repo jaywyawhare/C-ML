@@ -1,6 +1,7 @@
 #include "optim.h"
 #include "tensor/realize.h"
 #include "ops/uops.h"
+#include "core/cml_flags.h"
 #include "core/logging.h"
 #include "core/training_metrics.h"
 #include "core/error_stack.h"
@@ -670,6 +671,33 @@ static void sgd_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
+    /* FUSE_OPTIM: emit every parameter's uop_sgd_step into the graph first and
+     * realize them in a single pass, instead of realizing each update on its own
+     * (the default). The executor is idempotent (is_executed-guarded), so once
+     * the whole batch runs, each adopt_param_data below finds its update already
+     * computed and only swaps the data pointer -- no re-execution, no
+     * double-applied momentum. The per-parameter updates are independent, so
+     * co-scheduling lets the elementwise fuser pack them together. */
+    bool fuse = cml_flag_enabled(CML_FLAG_FUSE_OPTIM);
+
+    int total = 0;
+    for (int g = 0; g < optimizer->num_param_groups; g++)
+        total += optimizer->param_groups[g].num_parameters;
+
+    Tensor** pending_dst = NULL;
+    Tensor** pending_upd = NULL;
+    int pending_n = 0;
+    if (fuse && total > 0) {
+        pending_dst = (Tensor**)cml_malloc(sizeof(Tensor*) * (size_t)total);
+        pending_upd = (Tensor**)cml_malloc(sizeof(Tensor*) * (size_t)total);
+        if (!pending_dst || !pending_upd) {
+            /* Allocation failed: fall back to the per-parameter path. */
+            cml_free(pending_dst); cml_free(pending_upd);
+            pending_dst = pending_upd = NULL;
+            fuse = false;
+        }
+    }
+
     for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
         ParameterGroup* group = &optimizer->param_groups[g_idx];
         float lr              = group->lr;
@@ -703,10 +731,28 @@ static void sgd_step(Optimizer* optimizer) {
             Tensor* new_p = uop_sgd_step(tensor, grad, mom_buf, &sp);
             if (!new_p) continue;
 
-            adopt_param_data(tensor, new_p);
+            if (fuse) {
+                pending_dst[pending_n] = tensor;
+                pending_upd[pending_n] = new_p;
+                pending_n++;
+            } else {
+                adopt_param_data(tensor, new_p);
+            }
         }
 
         group->step_count++;
+    }
+
+    if (fuse) {
+        /* Realize the last-emitted update first: cml_ir_execute_up_to walks the
+         * graph head-to-tail, so this single pass computes every earlier update
+         * too. Then adopt each (already-executed, so a pointer swap only). */
+        if (pending_n > 0)
+            tensor_ensure_executed(pending_upd[pending_n - 1]);
+        for (int k = 0; k < pending_n; k++)
+            adopt_param_data(pending_dst[k], pending_upd[k]);
+        cml_free(pending_dst);
+        cml_free(pending_upd);
     }
 }
 

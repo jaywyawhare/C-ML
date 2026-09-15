@@ -1003,15 +1003,15 @@ void cml_graph_cache_reset_global(void);
 void cml_autograd_step_end(Tensor* keep) {
     if (keep)
         tensor_realize(keep);   /* materialize + detach so the reset won't free it */
-    /* FUSE_OPTIM requests keeping the optimizer update in the backward graph.
-     * The eager optimizer path can't fuse graph nodes yet, so we honor the
-     * request conservatively: keep the per-step reset (correctness) and note it
-     * once. Full graph-level fusion is a follow-up. */
+    /* FUSE_OPTIM: the SGD step now emits every parameter's update into the graph
+     * and realizes them in one co-scheduled pass (see sgd_step in optim.c), so
+     * the elementwise fuser can pack the independent per-parameter updates. Other
+     * optimizers (Adam, etc.) still realize per parameter; note that once. */
     if (cml_flag_enabled(CML_FLAG_FUSE_OPTIM)) {
         static bool warned = false;
         if (!warned) {
-            LOG_INFO("FUSE_OPTIM set: optimizer-update graph fusion is not yet "
-                     "implemented; using the standard per-step path");
+            LOG_INFO("FUSE_OPTIM set: SGD updates are co-scheduled; other "
+                     "optimizers still use the per-step path");
             warned = true;
         }
     }

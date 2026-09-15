@@ -37,6 +37,13 @@ CUDA/ROCm device); PTX text emission is the portable validation.
 - **DDP** (`src/distributed/data_parallel.c`): `find_unused_parameters` now
   reserves a zero-filled bucket slot for gradient-less params so every rank's
   bucket layout matches (the all-reduce would otherwise sum mismatched slots).
+- **`FUSE_OPTIM`** (`src/optim.c`): the SGD step now emits every parameter's
+  `uop_sgd_step` into the graph and realizes them in a single co-scheduled pass
+  (idempotent executor => no double-applied momentum), instead of realizing each
+  update on its own. `test_fuse_optim_matches_default` in `test_optim.c` trains
+  identical models with and without the flag and requires the weights to match;
+  the convergence suite passes under `FUSE_OPTIM=1`. Other optimizers (Adam,
+  etc.) still realize per parameter.
 - **Async disk I/O** (`src/backend/disk_backend.c`): real io_uring behind
   `CML_HAS_IO_URING` (CMake-detected liburing), synchronous fallback otherwise.
   Test in `test_disk_backend.c`.
@@ -64,11 +71,6 @@ Each is a cross-cutting engine change with real correctness risk, or needs
 hardware not present, so forcing code here would be worse than the honest
 fallback:
 
-- **`FUSE_OPTIM` graph fusion** (`src/cml.c`) — the SGD update is already emitted
-  as IR (`uop_sgd_step`), but `adopt_param_data` realizes each parameter
-  immediately; co-scheduling the whole backward+update graph is a fusion-
-  scheduler change touching optim.c + realize + the step-reset path. Honored
-  conservatively (per-step path).
 - **JIT kernel recording** (`src/ops/ir/tiny_jit.c`) — the trace/replay design
   targets *compiled* kernels (`cml_kernel_fn_t(args, n, grid, block)`); CPU
   execution has no compiled kernel to record, so faithful recording would mean a
