@@ -1,0 +1,65 @@
+name: Fuzz & Sanitizers
+
+on:
+  schedule:
+    # nightly at 03:00 UTC
+    - cron: '0 3 * * *'
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'tests/test_fuzzer_ops.c'
+      - 'tests/test_unary_fuzz.c'
+      - 'tests/test_broadcast_fuzz.c'
+      - '.github/workflows/fuzz.yml'
+  workflow_dispatch:
+
+jobs:
+  asan-fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - test_fuzzer_ops
+          - test_unary_fuzz
+          - test_broadcast_fuzz
+          - test_axis_ops_fuzz
+          - test_op_matrix
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure with sanitizers
+        run: cmake -S . -B build-asan -DENABLE_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build-asan -j"$(nproc)" --target ${{ matrix.suite }}
+
+      - name: Run ${{ matrix.suite }} under ASan/UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ./build-asan/bin/${{ matrix.suite }}
+
+  python-pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install numpy + pytest
+        run: python -m pip install numpy pytest
+
+      - name: Build C library (release)
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j"$(nproc)"
+
+      - name: Python test suite
+        run: |
+          cd python
+          python cml/build_cffi.py
+          python -m pytest tests/ -q

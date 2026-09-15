@@ -29,6 +29,15 @@ typedef struct Module {
     int num_parameters;      // Number of parameters
     int parameters_capacity; // Capacity of parameters array
 
+    /* Non-trainable state tensors (e.g. BatchNorm running mean/var). Not
+     * gradient-synced; DDP broadcasts them from rank 0 at forward time when
+     * config.broadcast_buffers is set. The Tensor* is NOT owned — the layer
+     * keeps its own pointer and frees it. */
+    Tensor** buffers;
+    char** buffer_names;
+    int num_buffers;
+    int buffers_capacity;
+
     struct Module* next; // Next module in sequence (for containers)
 
     bool training;   // Training mode flag
@@ -38,6 +47,11 @@ typedef struct Module {
     const char* version;     // Module version
     const char* description; // Module description
 } Module;
+
+/* Register a non-trainable state buffer under `name` (copied). The module
+ * does not take ownership of `tensor`. Returns 0 on success. */
+int module_add_buffer(Module* module, Tensor* tensor, const char* name);
+Tensor* module_get_buffer(Module* module, const char* name);
 
 int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free);
 

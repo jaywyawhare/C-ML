@@ -76,6 +76,12 @@ int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id,
 Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
                                Tensor* Q, const CMLGQAConfig* config);
 
+/* Batched paged attention: Q is [batch, seq_len, num_heads*head_dim] and
+ * seq_ids[b] is the cache sequence attending for batch row b. Output is
+ * [batch, seq_len, num_heads*head_dim] on CPU f32. */
+Tensor* cml_paged_gqa_forward_batch(CMLPagedKVCache* cache, const int* seq_ids,
+                                     Tensor* Q, const CMLGQAConfig* config);
+
 #ifdef __cplusplus
 }
 #endif

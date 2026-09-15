@@ -28,7 +28,7 @@ class Parameter:
     @property
     def tensor(self):
         t = self._param.tensor
-        return Tensor(t) if t != ffi.NULL else None
+        return Tensor.borrow(t) if t != ffi.NULL else None
 
     data = tensor
 
@@ -37,7 +37,7 @@ class Parameter:
         t = self._param.tensor
         if t == ffi.NULL or t.grad == ffi.NULL:
             return None
-        return Tensor(t.grad)
+        return Tensor.borrow(t.grad)
 
 
 class Module:

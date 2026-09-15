@@ -33,6 +33,7 @@
 #include "ops/uops.h"
 #include "core/gguf.h"
 #include "core/safetensors.h"
+#include "backend/threadpool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -466,6 +467,23 @@ int cml_init(void) {
 
     cml_graph_context_init();
 
+    /* Global worker pool for parallel elementwise/reduction kernels
+     * (simd_*_parallel). Thread count: CML_THREADS, else auto-detect. */
+    {
+        const char* threads_env = getenv("CML_THREADS");
+        size_t threads = (threads_env && atoi(threads_env) > 0)
+                             ? (size_t)atoi(threads_env)
+                             : 0;
+        ThreadPool* pool = threadpool_create(threads);
+        if (pool) {
+            threadpool_set_global(pool);
+            LOG_DEBUG("C-ML thread pool started (%zu workers)",
+                      threadpool_get_num_threads(pool));
+        } else {
+            LOG_WARNING("Thread pool unavailable; elementwise kernels run serial");
+        }
+    }
+
     if (!g_cml_atexit_registered) {
         atexit(cml_auto_cleanup);
         g_cml_atexit_registered = true;
@@ -500,6 +518,10 @@ int cml_cleanup(void) {
 
     g_cml_initialized = false;
     g_cml_init_count  = 0;
+
+    /* Stop workers before any teardown touches shared state.
+     * threadpool_set_global(NULL) destroys the previous pool. */
+    threadpool_set_global(NULL);
 
     // Reset global IR context FIRST to detach all tensors from IR
     // This must happen before freeing any tensors to prevent dangling pointers
@@ -814,6 +836,18 @@ Tensor* cml_concat(Tensor** tensors, int num_tensors, int dim) {
 Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim) {
     return tensor_stack(tensors, num_tensors, dim);
 }
+Tensor* cml_where(Tensor* condition, Tensor* x, Tensor* y) {
+    return tensor_where(condition, x, y);
+}
+Tensor* cml_einsum(const char* equation, Tensor** tensors, int num_tensors) {
+    return tensor_einsum(equation, tensors, num_tensors);
+}
+Tensor* cml_roll(Tensor* a, int shift, int axis) { return tensor_roll(a, shift, axis); }
+Tensor* cml_copysign(Tensor* a, Tensor* b) { return tensor_copysign(a, b); }
+Tensor* cml_logaddexp(Tensor* a, Tensor* b) { return tensor_logaddexp(a, b); }
+Tensor* cml_one_hot(Tensor* indices, int num_classes) {
+    return tensor_one_hot(indices, num_classes);
+}
 
 Sequential* cml_nn_sequential(void) { return nn_sequential(); }
 Sequential* cml_nn_sequential_add(Sequential* seq, Module* layer) {
@@ -1111,6 +1145,14 @@ Tensor* cml_argmin(Tensor* a, int dim) { return tensor_argmin(a, dim); }
 
 Tensor* cml_cumsum(Tensor* a, int dim) { return uop_cumsum(a, dim); }
 
+Tensor* cml_cumprod(Tensor* a, int dim) { return uop_cumprod(a, dim); }
+
+Tensor* cml_logcumsumexp(Tensor* a, int dim) { return uop_logcumsumexp(a, dim); }
+
+Tensor* cml_argsort(Tensor* a, int dim, bool descending) {
+    return uop_argsort(a, dim, descending);
+}
+
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return tensor_var(a, dim, unbiased, keepdim);
 }
@@ -1402,6 +1444,9 @@ Tensor* cml_f_pixel_unshuffle(Tensor* input, int downscale_factor) {
 void cml_autocast_enter(DType target_dtype) { autocast_enter(target_dtype); }
 void cml_autocast_exit(void) { autocast_exit(); }
 bool cml_autocast_is_enabled(void) { return autocast_is_enabled(); }
+DType cml_autocast_default_dtype(void) { return autocast_default_dtype(); }
+void cml_autocast_set_dtype(DType dtype) { autocast_set_dtype(dtype); }
+DType cml_autocast_get_dtype(void) { return autocast_get_dtype(); }
 GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
                                    int growth_interval) {
     return grad_scaler_create(init_scale, growth_factor, backoff_factor, growth_interval);
@@ -1435,6 +1480,13 @@ void cml_sparse_free(SparseCOOData* sparse) { sparse_free(sparse); }
 Tensor* cml_sort(Tensor* a, int dim, bool descending) { return tensor_sort(a, dim, descending); }
 Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
     return tensor_topk(a, k, dim, largest, sorted);
+}
+Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest,
+                              Tensor** indices_out) {
+    if (!a || !indices_out)
+        return uop_topk(a, k, dim, largest, NULL);
+    *indices_out = NULL;
+    return uop_topk(a, k, dim, largest, indices_out);
 }
 Tensor* cml_masked_select(Tensor* a, Tensor* mask) { return tensor_masked_select(a, mask); }
 Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {

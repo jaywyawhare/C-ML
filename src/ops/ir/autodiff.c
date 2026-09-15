@@ -19,6 +19,7 @@
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
+#include "core/error_stack.h"
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
@@ -31,6 +32,20 @@ int cml_autodiff_use_graph(void) {
     if (cached < 0) {
         const char* m = getenv("GRAD_MODE");
         cached = (m && (strcmp(m, "eager") == 0 || strcmp(m, "0") == 0)) ? 0 : 1;
+    }
+    return cached;
+}
+
+/* Strict-gradient policy: when CML_STRICT_GRAD=1, a backward walk that
+ * reaches an op with no VJP records an error and fails the backward instead
+ * of silently producing no gradient — silent zero-flow is the single most
+ * dangerous correctness class for users. Default off for backwards
+ * compatibility with graphs that intentionally detach exotic ops. */
+static int autodiff_strict_grad(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char* s = getenv("CML_STRICT_GRAD");
+        cached = (s && s[0] == '1') ? 1 : 0;
     }
     return cached;
 }
@@ -164,17 +179,25 @@ static Tensor* unbroadcast(Tensor* g, const int* tshape, int tndim) {
 }
 
 /* ── the reverse pass ─────────────────────────────────────────────────── */
-int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
+int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_grads) {
     if (!ir || !loss_node || !loss_node->output) return -1;
 
     /* Ensure the FORWARD graph is fully decomposed to primitives before the
      * reverse walk. The is_decomposed flag is sticky per context; if the
      * context was realized early (e.g. weight init) any composites added
      * afterward (TANH, SIGMOID, …) stay un-lowered and would have no VJP.
-     * Safe here: no backward nodes exist yet, so this only touches forward. */
+     * Once backward nodes DO exist (double-backward) a whole-graph re-lower
+     * would corrupt them, so only ops appended after the previous pass's
+     * frontier are lowered instead. */
     Tensor* loss_out = loss_node->output;   /* survives decompose (kept tensor) */
-    ir->is_decomposed = false;
-    cml_ir_decompose(ir);
+    bool had_backward_nodes = ir->has_backward_nodes;
+    if (!ir->has_backward_nodes) {
+        ir->is_decomposed = false;
+        cml_ir_decompose(ir);
+    } else if (ir->decomposed_frontier && ir->tail != ir->decomposed_frontier) {
+        cml_ir_decompose_from(ir, ir->decomposed_frontier->next);
+    }
+    ir->decomposed_frontier = NULL;   /* refreshed at the end of this pass */
     struct IRNode* resolved = (struct IRNode*)loss_out->ir_node;
     if (resolved) loss_node = resolved;
 
@@ -188,9 +211,10 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
 
     GradMap map = {0};
 
-    /* seed: d loss / d loss = ones */
+    /* seed: d loss / d loss = ones (loss dtype: an fp32 seed zeroes out
+     * half/bf16 graphs — the executor drops mismatched-dtype grads) */
     Tensor* lo = loss_node->output;
-    gm_put(&map, lo, uop_fill(lo->shape, lo->ndim, 1.0f));
+    gm_put(&map, lo, uop_fill_ex(lo->shape, lo->ndim, 1.0f, lo->dtype, lo->device));
 
     for (int i = n - 1; i >= 0; i--) {
         struct IRNode* nd = nodes[i];
@@ -222,6 +246,46 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
             /* C=A@B: dA = dC @ Bᵀ, dB = Aᵀ @ dC (batched: transpose last two) */
             gm_accum(&map, a, uop_matmul(g, ad_transpose(b, b->ndim)));
             gm_accum(&map, b, uop_matmul(ad_transpose(a, a->ndim), g));
+            break;
+        }
+        case UOP_SPMM: {
+            /* C = A_coo @ B ([M,K] sparse COO times [K,N] dense), expressed
+             * with the primitive gather/mul/sum/scatter_add uops:
+             *   dA_values[m] = Σ_j g[row_m, j]·B[col_m, j]
+             *   dB           = Aᵀ g  (scatter-add of value-scaled gathered
+             *                          rows of g along axis 0)
+             * indices (input 0) is discrete; rows/cols (inputs 3/4) are eager
+             * int32 columns of it. */
+            SpMMParams* spp = (SpMMParams*)nd->params;
+            if (spp && nd->num_inputs >= 5) {
+                Tensor* vals = nd->inputs[1];
+                Tensor* B    = nd->inputs[2];
+                Tensor* rows = nd->inputs[3];
+                Tensor* cols = nd->inputs[4];
+                if (vals->numel == 0) {
+                    /* No entries contribute; publish explicit zeros rather
+                     * than routing through gathers of empty tensors (whose
+                     * zero-element kernels just log errors). */
+                    gm_accum(&map, vals,
+                             uop_fill_ex(vals->shape, vals->ndim, 0.0f,
+                                         vals->dtype, vals->device));
+                    gm_accum(&map, B,
+                             uop_fill_ex(B->shape, B->ndim, 0.0f,
+                                         B->dtype, B->device));
+                    break;
+                }
+                Tensor* gr = uop_gather(g, rows, 0);      /* [nnz, N] */
+                Tensor* bc = uop_gather(B, cols, 0);      /* [nnz, N] */
+                Tensor* prod = (gr && bc) ? uop_mul(gr, bc) : NULL;
+                if (prod)
+                    gm_accum(&map, vals, uop_sum_dim(prod, 1, false));
+                if (gr && vals->ndim == 1) {
+                    int vsh[2] = { vals->shape[0], 1 };
+                    Tensor* vb = ad_expand(ad_reshape(vals, vsh, 2), gr->shape, 2);
+                    if (vb)
+                        gm_accum(&map, B, uop_scatter_add(cols, uop_mul(gr, vb), 0, spp->K));
+                }
+            }
             break;
         }
         case UOP_LINEAR: {
@@ -458,6 +522,15 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
             gm_accum(&map, a, uop_mul(g, d));
             break;
         }
+        case UOP_LEAKY_RELU: {                /* 1 if x>0, else slope */
+            ClampParams* cp = (ClampParams*)nd->params;
+            float slope = cp ? cp->min_val : 0.01f;
+            Tensor* pos = uop_cmpgt(a, ad_k(a, 0.0f));        /* 1 where x>0 */
+            Tensor* neg = uop_sub(ad_k(a, 1.0f), pos);        /* 1 where x<=0 */
+            Tensor* d = uop_add(pos, uop_mul(neg, ad_k(a, slope)));
+            gm_accum(&map, a, uop_mul(g, d));
+            break;
+        }
         case UOP_SOFTPLUS:                    /* sigmoid(x) */
             gm_accum(&map, a, uop_mul(g, uop_sigmoid(a)));
             break;
@@ -477,6 +550,57 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
         case UOP_SIGN:
             gm_accum(&map, a, ad_k(a, 0.0f));
             break;
+        /* ── Composite ops as direct VJPs ─────────────────────────────── */
+        /* VJP emission itself produces composites (a sigmoid inside
+         * quick-gelu's derivative, a SUB inside a mask expression, …).
+         * Under double-backward those nodes are differentiated WITHOUT an
+         * intervening decompose pass (re-lowering backward nodes corrupts
+         * them), so the composites that actually occur inside first-order
+         * backward subgraphs need their own rules here. */
+        case UOP_SUB:
+            gm_accum(&map, a, unbroadcast(g, a->shape, a->ndim));
+            gm_accum(&map, b, unbroadcast(uop_neg(g), b->shape, b->ndim));
+            break;
+        case UOP_DIV:
+            /* out = a/b: da = g/b, db = -g·out/b */
+            gm_accum(&map, a, unbroadcast(uop_div(g, b), a->shape, a->ndim));
+            gm_accum(&map, b, unbroadcast(
+                uop_neg(uop_div(uop_mul(g, out), b)), b->shape, b->ndim));
+            break;
+        case UOP_SQUARE:
+            gm_accum(&map, a, uop_mul(g, uop_mul(ad_k(a, 2.0f), a)));
+            break;
+        case UOP_COS:
+            gm_accum(&map, a, uop_neg(uop_mul(g, uop_sin(a))));
+            break;
+        case UOP_TAN:                         /* 1 + tan² = sec² = 1 + out² */
+            gm_accum(&map, a, uop_mul(g, uop_add(ad_k(a, 1.0f), uop_square(out))));
+            break;
+        case UOP_ABS:
+            gm_accum(&map, a, uop_mul(g, uop_sign(a)));
+            break;
+        case UOP_RELU: {
+            Tensor* zero = ad_k(a, 0.0f);
+            gm_accum(&map, a, uop_mul(g, uop_cmpge(a, zero)));
+            break;
+        }
+        case UOP_SIGMOID:                     /* out·(1-out) */
+            gm_accum(&map, a, uop_mul(g, uop_mul(out, uop_sub(ad_k(a, 1.0f), out))));
+            break;
+        case UOP_TANH:                        /* 1-out² */
+            gm_accum(&map, a, uop_mul(g, uop_sub(ad_k(a, 1.0f), uop_square(out))));
+            break;
+        case UOP_RSQRT:                       /* -½·out³ */
+            gm_accum(&map, a, uop_neg(uop_mul(g, uop_mul(ad_k(a, 0.5f),
+                                                         uop_mul(out, uop_mul(out, out))))));
+            break;
+        case UOP_MINIMUM: {
+            Tensor* ma = uop_cmple(a, b);          /* 1 where a<=b */
+            Tensor* mb = uop_cmpgt(a, b);          /* 1 where a>b */
+            gm_accum(&map, a, unbroadcast(uop_mul(g, ma), a->shape, a->ndim));
+            gm_accum(&map, b, unbroadcast(uop_mul(g, mb), b->shape, b->ndim));
+            break;
+        }
         /* ── Structural / masking ops ─────────────────────────────────── */
         case UOP_TRIU: case UOP_TRIL: {       /* masked entries contributed nothing */
             TriParams* tp = (TriParams*)nd->params;
@@ -751,9 +875,171 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
              * ops that need zero-terminating do it directly (see FLOOR/CEIL/
              * ROUND below). */
             break;
-        default:
-            /* uncovered primitive: gradient does not flow (yet) */
+
+        case UOP_FUSED_ELEMENTWISE: if (1) break; else {
+            /* Differentiate the fused chain step by step. The fuser only ever
+             * records primitives with closed-form derivatives (see
+             * fused_eval_block), so the chain VJP is expressible with the
+             * same primitive uops: recompute each step's value, then walk the
+             * steps backwards accumulating local partials. */
+            FusedElementwiseParams* fp = (FusedElementwiseParams*)nd->params;
+            if (!fp || fp->num_steps <= 0) break;
+            int ns = fp->num_steps;
+
+            /* forward values of every step (as lazy uop subgraphs) */
+            Tensor* val[256];
+            /* per-step gradient (lazily created on first contribution) */
+            Tensor* gstep[256];
+            for (int st = 0; st < ns; st++) { val[st] = NULL; gstep[st] = NULL; }
+
+#define FE_OPERAND(ref)                                                          \
+    ((ref) >= 0 ? ((ref) < nd->num_inputs && nd->inputs[ref]                     \
+                       ? nd->inputs[ref] : NULL)                                 \
+                : (-(ref)-1 < ns ? val[-(ref)-1] : NULL))
+/* resolve an operand ref to its Tensor; external refs index node->inputs */
+
+            /* forward pass over the steps */
+            bool fe_ok = true;
+            for (int st = 0; st < ns && fe_ok; st++) {
+                Tensor* va = FE_OPERAND(fp->a[st]);
+                Tensor* vb = fp->b ? FE_OPERAND(fp->b[st]) : NULL;
+                Tensor* vc = fp->c ? FE_OPERAND(fp->c[st]) : NULL;
+                if (!va) { fe_ok = false; break; }
+                Tensor* r = NULL;
+                switch (fp->op[st]) {
+                case UOP_ADD: r = vb ? uop_add(va, vb) : NULL; break;
+                case UOP_SUB: r = vb ? uop_sub(va, vb) : NULL; break;
+                case UOP_MUL: r = vb ? uop_mul(va, vb) : NULL; break;
+                case UOP_DIV: r = vb ? uop_div(va, vb) : NULL; break;
+                case UOP_MAX: r = vb ? uop_max(va, vb) : NULL; break;
+                case UOP_MINIMUM: r = vb ? uop_minimum(va, vb) : NULL; break;
+                case UOP_POW: r = vb ? uop_pow(va, vb) : NULL; break;
+                case UOP_NEG: r = uop_neg(va); break;
+                case UOP_RECIP: r = uop_recip(va); break;
+                case UOP_EXP: r = uop_exp(va); break;
+                case UOP_LOG: r = uop_log(va); break;
+                case UOP_SQRT: r = uop_sqrt(va); break;
+                case UOP_SIN: r = uop_sin(va); break;
+                case UOP_COS: r = uop_cos(va); break;
+                case UOP_ABS: r = uop_abs(va); break;
+                case UOP_RELU: r = uop_relu(va); break;
+                case UOP_WHERE: {
+                    if (!vb || !vc) { fe_ok = false; break; }
+                    WhereParams wp = { .cond = va, .a = vb, .b = vc };
+                    r = uop_where(&wp);
+                    break;
+                }
+                case UOP_FILL:
+                    r = ad_k(out, fp->konst[st]);
+                    break;
+                default:
+                    fe_ok = false;   /* unknown op: cannot differentiate */
+                    break;
+                }
+                val[st] = r;
+                if (!r) fe_ok = false;
+            }
+            if (!fe_ok) break;
+
+            /* backwards pass over the steps */
+            gstep[ns - 1] = g;
+            for (int st = ns - 1; st >= 0 && gstep[st]; st--) {
+                Tensor* gg = gstep[st];
+                Tensor* va = FE_OPERAND(fp->a[st]);
+                Tensor* vb = fp->b ? FE_OPERAND(fp->b[st]) : NULL;
+                Tensor* vc = fp->c ? FE_OPERAND(fp->c[st]) : NULL;
+                Tensor* vs = val[st];
+                Tensor* ca = NULL, *cb = NULL, *cc = NULL;
+
+                switch (fp->op[st]) {
+                case UOP_ADD: ca = gg; cb = gg; break;
+                case UOP_SUB: ca = gg; cb = uop_neg(gg); break;
+                case UOP_MUL: ca = uop_mul(gg, vb); cb = uop_mul(gg, va); break;
+                case UOP_DIV:
+                    ca = uop_div(gg, vb);
+                    cb = uop_neg(uop_div(uop_mul(gg, vs), vb));
+                    break;
+                case UOP_MAX: {
+                    ca = uop_mul(gg, uop_cmpge(va, vb));
+                    cb = uop_mul(gg, uop_cmplt(va, vb));
+                    break;
+                }
+                case UOP_MINIMUM: {
+                    ca = uop_mul(gg, uop_cmple(va, vb));
+                    cb = uop_mul(gg, uop_cmpgt(va, vb));
+                    break;
+                }
+                case UOP_POW:
+                    ca = unbroadcast(uop_mul(uop_mul(gg, vb), vs), va->shape, va->ndim);
+                    cb = unbroadcast(uop_mul(uop_mul(gg, vs), uop_log(va)),
+                                     vb->shape, vb->ndim);
+                    break;
+                case UOP_NEG: ca = uop_neg(gg); break;
+                case UOP_RECIP: ca = uop_neg(uop_mul(gg, uop_mul(vs, vs))); break;
+                case UOP_EXP: ca = uop_mul(gg, vs); break;
+                case UOP_LOG: ca = uop_div(gg, va); break;
+                case UOP_SQRT: ca = uop_mul(gg, uop_mul(vs, ad_k(va, 0.5f))); break;
+                case UOP_SIN: ca = uop_mul(gg, uop_cos(va)); break;
+                case UOP_COS: ca = uop_neg(uop_mul(gg, uop_sin(va))); break;
+                case UOP_ABS: ca = uop_mul(gg, uop_sign(va)); break;
+                case UOP_RELU: {
+                    Tensor* zero = ad_k(va, 0.0f);
+                    ca = uop_mul(gg, uop_cmpge(va, zero));
+                    break;
+                }
+                case UOP_WHERE:
+                    /* refs: a=cond, b=then, c=else (mirrors fused_eval_block) */
+                    if (vc) cc = uop_mul(gg, uop_sub(ad_k(vc, 1.0f), vc));
+                    if (vb) cb = uop_mul(gg, va);
+                    break;
+                case UOP_FILL: default:
+                    break; /* constant / flat: no gradient */
+                }
+
+                /* accumulate into operands */
+                if (ca && fp->a[st] >= 0) {
+                    Tensor* t = nd->inputs[fp->a[st]];
+                    gm_accum(&map, t, unbroadcast(ca, t->shape, t->ndim));
+                } else if (ca && -(fp->a[st]) - 1 < ns) {
+                    int k2 = -(fp->a[st]) - 1;
+                    gstep[k2] = gstep[k2] ? uop_add(gstep[k2], ca) : ca;
+                }
+                if (cb && fp->b && fp->b[st] != FUSED_UNUSED_REF) {
+                    if (fp->b[st] >= 0) {
+                        Tensor* t = nd->inputs[fp->b[st]];
+                        gm_accum(&map, t, unbroadcast(cb, t->shape, t->ndim));
+                    } else if (-(fp->b[st]) - 1 < ns) {
+                        int k2 = -(fp->b[st]) - 1;
+                        gstep[k2] = gstep[k2] ? uop_add(gstep[k2], cb) : cb;
+                    }
+                }
+                if (cc && fp->c && fp->c[st] != FUSED_UNUSED_REF) {
+                    if (fp->c[st] >= 0) {
+                        Tensor* t = nd->inputs[fp->c[st]];
+                        gm_accum(&map, t, unbroadcast(cc, t->shape, t->ndim));
+                    } else if (-(fp->c[st]) - 1 < ns) {
+                        int k2 = -(fp->c[st]) - 1;
+                        gstep[k2] = gstep[k2] ? uop_add(gstep[k2], cc) : cc;
+                    }
+                }
+            }
+#undef FE_OPERAND
             break;
+        }
+        default: {
+            /* Uncovered primitive: gradient does not flow (yet). Under the
+             * strict policy this is an error, not a silent zero. */
+            if (autodiff_strict_grad()) {
+                LOG_ERROR("autograd: no VJP for op '%s' — gradient would "
+                          "silently not flow (CML_STRICT_GRAD=1)",
+                          uop_type_to_string(nd->type));
+                error_stack_push(CM_NOT_IMPLEMENTED,
+                                 "autograd: no VJP for this op under CML_STRICT_GRAD=1",
+                                 __FILE__, __LINE__, __func__);
+                return -1;
+            }
+            break;
+        }
         }
     }
 
@@ -768,7 +1054,22 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
     for (int i = 0; i < map.count; i++) {
         Tensor* v = map.items[i].val;
         if (v && v->requires_grad) {
+            /* record for the double-backward stale-grad sweep below */
+            if (ir->grad_publish_count == ir->grad_publish_cap) {
+                ir->grad_publish_cap = ir->grad_publish_cap ? ir->grad_publish_cap * 2 : 16;
+                ir->grad_publish_log = cml_realloc(
+                    ir->grad_publish_log,
+                    (size_t)ir->grad_publish_cap * sizeof(Tensor*));
+            }
+            ir->grad_publish_log[ir->grad_publish_count++] = v;
+
             Tensor* newg = map.items[i].grad;
+            /* Honor the create_graph contract here, where the grad node's
+             * build-time-propagated requires_grad is still in our hands:
+             * constants (FILL seeds) stay inert either way. */
+            struct IRNode* gn = newg ? newg->ir_node : NULL;
+            if (newg && gn && gn->type != UOP_FILL && gn->type != UOP_CONST)
+                newg->requires_grad = differentiable_grads;
             if (v->grad != newg) {
                 if (v->grad) tensor_release(v->grad);
                 v->grad = newg;
@@ -777,8 +1078,38 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node) {
         }
     }
 
+    /* Double-backward: a value that an EARLIER grad pass of this context
+     * gave a differentiable grad but that this pass never reached must not
+     * keep the stale grad — consumers would read d(previous root)/dv as if
+     * it were d(current root)/dv. Replace it with explicit zeros. Only
+     * values this context itself published are candidates; foreign/eager
+     * grads and non-requiring values are left alone. */
+    if (had_backward_nodes) {
+        for (int i = 0; i < ir->grad_publish_count; i++) {
+            Tensor* t = ir->grad_publish_log[i];
+            if (!t || !t->requires_grad || !t->grad)
+                continue;
+            if (t->grad->ir_context != ir)
+                continue;
+            bool touched = false;
+            for (int j = 0; j < map.count; j++)
+                if (map.items[j].val == t) { touched = true; break; }
+            if (touched)
+                continue;
+            Tensor* z = uop_fill_ex(t->shape, t->ndim, 0.0f, t->dtype, t->device);
+            if (!z)
+                continue;
+            tensor_release(t->grad);
+            t->grad = z;
+            tensor_pin(z);
+        }
+    }
+
     cml_free(map.items);
     cml_free(nodes);
+
+    ir->has_backward_nodes   = true;
+    ir->decomposed_frontier  = ir->tail;
 
     /* NOTE: the VJPs may emit a few composite ops (NEG/SUB/CMPGE/COS…). We do
      * NOT re-run cml_ir_decompose here — a second decompose pass over the mixed

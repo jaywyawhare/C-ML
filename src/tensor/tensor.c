@@ -50,7 +50,9 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
         !tensor_nbytes_checked(numel, dtype, &total_size))
         return NULL;
 
-    Tensor* t = (Tensor*)cml_malloc(sizeof(Tensor));
+    /* calloc: every field must start zeroed — Tensor structs are recycled from
+     * the allocator freelist, where free() poisons pointer fields. */
+    Tensor* t = (Tensor*)cml_calloc(1, sizeof(Tensor));
     if (!t)
         return NULL;
 
@@ -95,6 +97,7 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     t->quant_type        = CML_QUANT_NONE;
     t->quant_data        = NULL;
     t->quant_data_bytes  = 0;
+    t->quant_block_size  = 0;
     t->owns_data         = true;
     t->from_buffer_cache = false;
 
@@ -249,9 +252,19 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
 }
 
 bool tensor_numel_checked(const int* shape, int ndim, size_t* out) {
+    if (!out || ndim < 0 || (!shape && ndim > 0))
+        return false;
     size_t numel = 1;
     for (int i = 0; i < ndim; i++) {
-        if (shape[i] < 0 || numel > SIZE_MAX / (size_t)shape[i])
+        if (shape[i] < 0)
+            return false;
+        /* Zero dims short-circuit before the overflow division below (the
+         * old form divided by shape[i], so a single 0 dim raised SIGFPE). */
+        if (shape[i] == 0) {
+            *out = 0;
+            return true;
+        }
+        if ((size_t)shape[i] > SIZE_MAX / numel)
             return false;
         numel *= (size_t)shape[i];
     }
@@ -509,7 +522,9 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         return node->output;
     }
 
-    Tensor* t = (Tensor*)cml_malloc(sizeof(Tensor));
+    /* calloc: every field must start zeroed — Tensor structs are recycled from
+     * the allocator freelist, where free() poisons pointer fields. */
+    Tensor* t = (Tensor*)cml_calloc(1, sizeof(Tensor));
     if (!t)
         return NULL;
 
@@ -551,8 +566,16 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     }
 
     if (node->num_inputs > 0 && node->inputs && node->inputs[0]) {
-        t->dtype  = node->inputs[0]->dtype;
-        t->device = node->inputs[0]->device;
+        /* Role-based dtype: for ops whose first input is NOT the data operand
+         * the output must take the dtype of the data operand instead.
+         * UOP_SCATTER_ADD is {index, src}: inheriting index's dtype made every
+         * embedding gradient an INT32 buffer (floats written into it read back
+         * as denormal garbage ≈ 0 — silent zero gradients). */
+        int di = 0;
+        if (node->type == UOP_SCATTER_ADD && node->num_inputs > 1 && node->inputs[1])
+            di = 1;
+        t->dtype  = node->inputs[di]->dtype;
+        t->device = node->inputs[di]->device;
     } else {
         /* Zero-input creation ops store their desired dtype/device on the node.
          * Both fields default to 0 which equals DTYPE_FLOAT32 / DEVICE_CPU. */
@@ -589,6 +612,7 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->quant_type        = CML_QUANT_NONE;
     t->quant_data        = NULL;
     t->quant_data_bytes  = 0;
+    t->quant_block_size  = 0;
     t->from_buffer_cache = false;
 
     node->output = t;
@@ -665,7 +689,7 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
  * execution-plan data into an owned allocation so the tensor is self-contained,
  * then clear all links into the (possibly about-to-be-freed) graph. Used when a
  * graph teardown encounters a tensor an external owner still holds. */
-static void tensor_detach_keep(Tensor* t) {
+void tensor_detach_keep(Tensor* t) {
     if (!t)
         return;
     if (t->data && !t->owns_data) {
@@ -679,6 +703,10 @@ static void tensor_detach_keep(Tensor* t) {
             /* Can't copy — drop the borrowed pointer so we never free plan memory. */
             t->data = NULL;
         }
+        /* If this tensor shares a storage block (a pinned view), drop its
+         * reference now that it owns a private copy. Copy first: releasing
+         * may free the block this tensor used to alias. */
+        tensor_storage_release(t);
     }
     if (t->ir_node) {
         struct IRNode* node = (struct IRNode*)t->ir_node;
@@ -702,6 +730,59 @@ void tensor_release(Tensor* t) {
     if (t->external_refs > 0)
         t->external_refs--;
     tensor_free(t);
+}
+
+/* --- Shared storage lifetime for views ---------------------------------- */
+
+static CMLTensorStorage* tensor_storage_attach(Tensor* owner) {
+    if (!owner || owner->storage || !owner->owns_data || !owner->data ||
+        owner->buffer_handle)
+        return owner ? owner->storage : NULL;
+
+    CMLTensorStorage* s = cml_calloc(1, sizeof(CMLTensorStorage));
+    if (!s)
+        return NULL;
+    s->data             = owner->data;
+    s->nbytes           = owner->numel * cml_dtype_size(owner->dtype);
+    s->refs             = 1;
+    s->from_buffer_cache = owner->from_buffer_cache;
+    s->device           = owner->device;
+    owner->storage      = s;
+    return s;
+}
+
+void tensor_storage_share(Tensor* view, Tensor* src) {
+    if (!view || !src)
+        return;
+    /* Prefer an existing shared block (views-of-views propagate the root's
+     * block); otherwise attach one to src when src owns its data. Never walk
+     * ->base here: the base Tensor struct may already be gone even while the
+     * data block it owned is still alive through shared storage. */
+    CMLTensorStorage* s = src->storage ? src->storage : tensor_storage_attach(src);
+    if (!s)
+        return; /* No owned block to share — legacy non-owning view contract. */
+    s->refs++;
+    view->storage = s;
+}
+
+void tensor_storage_release(Tensor* t) {
+    if (!t || !t->storage)
+        return;
+    CMLTensorStorage* s = t->storage;
+    t->storage          = NULL;
+    if (--s->refs > 0)
+        return; /* Block stays alive for the remaining references. */
+
+    if (s->device == DEVICE_CPU || s->device == DEVICE_AUTO) {
+        if (s->from_buffer_cache && s->nbytes > 0) {
+            cml_buffer_cache_free(s->data, s->nbytes);
+        } else {
+            cml_free(s->data);
+        }
+    } else {
+        device_free(s->data, s->device);
+    }
+    cml_free(s);
 }
 
 void tensor_free(Tensor* t) {
@@ -739,7 +820,11 @@ void tensor_free(Tensor* t) {
         t->buffer_handle = NULL;
         t->data          = NULL;
     } else if (t->owns_data && t->data) {
-        if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
+        if (t->storage) {
+            /* Owner of a shared block: drop our reference; the block is freed
+             * only when the last view has released it too. */
+            tensor_storage_release(t);
+        } else if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
             if (t->from_buffer_cache && t->numel > 0) {
                 cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
             } else {
@@ -748,6 +833,13 @@ void tensor_free(Tensor* t) {
         } else {
             device_free(t->data, t->device);
         }
+        /* Null after free: a second tensor_free on an already-destroyed tensor
+         * must not return the same block to the buffer cache twice. */
+        t->data = NULL;
+    } else if (!t->owns_data && t->storage) {
+        /* A view holding the base's block alive through shared storage. */
+        tensor_storage_release(t);
+        t->data = NULL;
     }
 
     if (t->shape)
@@ -762,6 +854,7 @@ void tensor_free(Tensor* t) {
         t->grad = NULL;
         tensor_release(g);
     }
+
 
     if (t->user_data) {
         cml_free(t->user_data);
@@ -1707,6 +1800,9 @@ int tensor_assign(Tensor* t, Tensor* src) {
         if (t->buffer_handle) {
             cml_backend_buffer_free(t->buffer_handle);
             t->buffer_handle = NULL;
+        } else if (t->storage) {
+            /* Shared block: views may still read the old data through it. */
+            tensor_storage_release(t);
         } else if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
             cml_free(t->data);
         } else {

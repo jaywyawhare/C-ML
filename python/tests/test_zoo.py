@@ -4,6 +4,16 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import pytest
+
+# The CFFI extension must be built first (cd python && python3 cml/build_cffi.py).
+# Skip cleanly rather than erroring on machines without it.
+try:
+    import cml  # noqa: F401
+except ImportError as e:
+    pytest.skip(f"cml CFFI module not built ({e}); run `python3 cml/build_cffi.py` "
+                "in python/ first", allow_module_level=True)
+
 
 def test_mlp_mnist_creation():
     """Test MLP-MNIST model creation without CML library."""

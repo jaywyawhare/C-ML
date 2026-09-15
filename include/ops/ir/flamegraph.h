@@ -40,6 +40,12 @@ double cml_flame_now_ms(void);
  * -1 on error or when disabled / no spans. Does not clear the buffer. */
 int cml_flame_export(const char* path);
 
+/* Write the same spans to `path` in Chrome Trace Event format (complete "X"
+ * events, ts/dur in microseconds) so a profile opens directly in
+ * chrome://tracing or the Perfetto UI. Returns 0 on success, -1 on error or
+ * when disabled / no spans. Does not clear the buffer. */
+int cml_flame_export_chrome_trace(const char* path);
+
 /* Number of spans currently buffered. */
 int cml_flame_num_spans(void);
 

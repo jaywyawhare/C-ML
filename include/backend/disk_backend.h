@@ -1,6 +1,8 @@
 /*
  * Memory-maps tensor data from disk, enabling datasets larger than RAM.
- * Supports synchronous I/O with optional io_uring async I/O on Linux.
+ * Synchronous and mmap I/O are implemented; CML_DISK_ASYNC uses io_uring when
+ * the library was built with liburing (CML_HAS_IO_URING) and otherwise falls
+ * back to synchronous reads (creation logs a warning in that case).
  */
 
 #ifndef CML_DISK_BACKEND_H

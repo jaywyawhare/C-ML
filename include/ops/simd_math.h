@@ -80,8 +80,18 @@ void simd_set_parallel_threshold(size_t threshold);
 void simd_add_f32_parallel(const float* a, const float* b, float* out, size_t n);
 void simd_mul_f32_parallel(const float* a, const float* b, float* out, size_t n);
 void simd_sub_f32_parallel(const float* a, const float* b, float* out, size_t n);
+void simd_div_f32_parallel(const float* a, const float* b, float* out, size_t n);
 void simd_max_f32_parallel(const float* a, const float* b, float* out, size_t n);
 void simd_exp_f32_parallel(const float* in, float* out, size_t n);
+void simd_neg_f32_parallel(const float* in, float* out, size_t n);
+void simd_log_f32_parallel(const float* in, float* out, size_t n);
+void simd_sqrt_f32_parallel(const float* in, float* out, size_t n);
+void simd_abs_f32_parallel(const float* in, float* out, size_t n);
+void simd_sigmoid_f32_parallel(const float* in, float* out, size_t n);
+void simd_tanh_f32_parallel(const float* in, float* out, size_t n);
+void simd_sin_f32_parallel(const float* in, float* out, size_t n);
+void simd_cos_f32_parallel(const float* in, float* out, size_t n);
+void simd_tan_f32_parallel(const float* in, float* out, size_t n);
 float simd_sum_f32_parallel(const float* data, size_t n);
 
 #ifdef __cplusplus

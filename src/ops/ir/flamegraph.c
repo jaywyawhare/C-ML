@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 /* Timings for one kernel signature, accumulated over the whole run.
  *
@@ -362,6 +365,38 @@ int cml_flame_export(const char* path) {
     fprintf(f, "]}");
 
     fprintf(f, "}\n");
+    fclose(f);
+    return 0;
+}
+
+/* One complete ("X") event per recorded execution. The timeline spans are the
+ * source: they already carry per-execution start/duration relative to
+ * g_t_origin, so converting to Chrome's microsecond axis is a x1000 on both.
+ * pid/tid are constant because capture runs on the dispatching thread of one
+ * process; the interesting breakdown lives in cat/kind and args instead. */
+int cml_flame_export_chrome_trace(const char* path) {
+    if (!cml_flame_enabled() || g_count == 0 || !path) return -1;
+
+    FILE* f = fopen(path, "w");
+    if (!f) return -1;
+
+    fprintf(f, "{\"traceEvents\":[");
+    for (int i = 0; i < g_nspans; i++) {
+        FlameSpan* sp = &g_spans[i];
+        FlameEntry* e = &g_entries[sp->entry];
+        fprintf(f, "%s{\"name\":\"%s\",\"cat\":\"%s\",\"ph\":\"X\","
+                   "\"ts\":%.3f,\"dur\":%.3f,\"pid\":%d,\"tid\":0,"
+                   "\"args\":{\"phase\":\"%s\",\"scope\":\"%s\",\"numel\":%lld}}",
+                i ? "," : "",
+                e->op ? e->op : "?",
+                e->kind ? e->kind : "other",
+                (double)sp->t0 * 1000.0, (double)sp->dur * 1000.0,
+                (int)getpid(),
+                e->phase ? e->phase : "forward",
+                e->scope ? e->scope : "",
+                e->numel);
+    }
+    fprintf(f, "],\"displayTimeUnit\":\"ns\"}\n");
     fclose(f);
     return 0;
 }

@@ -185,6 +185,66 @@ def tensor(data, dtype=None, device=None, requires_grad=False) -> "Tensor":
     return Tensor(data, dtype=dtype, device=device, requires_grad=requires_grad)
 
 
+def einsum(equation: str, *operands) -> "Tensor":
+    """NumPy-style ``einsum("ij,jk->ik", a, b)`` over Tensor operands."""
+    ops = [o if isinstance(o, Tensor) else Tensor(o) for o in operands]
+    arr = ffi.new("Tensor*[]", [o._tensor for o in ops])
+    out = lib.cml_einsum(equation.encode(), arr, len(ops))
+    if out == ffi.NULL:
+        raise ValueError(f"einsum: invalid equation {equation!r} or operand shapes")
+    return Tensor(out)
+
+
+def where(condition, x, y) -> "Tensor":
+    """NumPy/torch-style ``where(cond, x, y)``."""
+    ct = condition if isinstance(condition, Tensor) \
+        else Tensor(np.asarray(condition, dtype=np.float32))
+    xt = x if isinstance(x, Tensor) else Tensor(np.asarray(x, dtype=np.float32))
+    yt = y if isinstance(y, Tensor) else Tensor(np.asarray(y, dtype=np.float32))
+    return Tensor(lib.cml_where(ct._tensor, xt._tensor, yt._tensor))
+
+
+# Type-promotion lattice (torch semantics, restricted to the dtypes the
+# bindings can represent). Higher rank wins within a category; a floating
+# operand always wins over an integral one. All ranks here are distinct, so
+# "wider" is simply the higher rank.
+_PROMOTE_RANK = {
+    DTYPE_BOOL: 0,
+    DTYPE_INT8: 1,
+    DTYPE_UINT8: 2,
+    DTYPE_INT32: 3,
+    DTYPE_INT64: 4,
+    DTYPE_FLOAT16: 5,
+    DTYPE_BFLOAT16: 6,
+    DTYPE_FLOAT32: 7,
+    DTYPE_FLOAT64: 8,
+}
+
+
+def result_type(a, b) -> int:
+    """DType produced by a binary op mixing dtypes ``a`` and ``b`` (torch
+    ``torch.result_type``). Accepts dtype ids or Tensors."""
+    da = a.dtype if isinstance(a, Tensor) else a
+    db = b.dtype if isinstance(b, Tensor) else b
+    ra = _PROMOTE_RANK.get(da)
+    rb = _PROMOTE_RANK.get(db)
+    if ra is None or rb is None:
+        raise ValueError(f"result_type: unsupported dtype(s): {da}, {db}")
+    return da if ra >= rb else db
+
+
+def pad(x, pad_widths, mode: str = "constant", value: float = 0.0) -> "Tensor":
+    """Pad a tensor (``torch.nn.functional.pad``-style).
+
+    Accepts either an int (symmetric padding on every dim), a flat sequence of
+    2*ndim ints interpreted as ``(before, after)`` pairs starting from the LAST
+    dim (torch order), or a nested sequence of per-dim ``(before, after)``
+    pairs in dim order (numpy order).
+    """
+    t = x if isinstance(x, Tensor) else Tensor(x)
+    return t.pad(pad_widths, mode=mode, value=value)
+
+
 class Tensor:
     _shape_cache: Optional[Tuple[int, ...]] = None
 
@@ -196,6 +256,7 @@ class Tensor:
         existing C tensor handle (a CFFI cdata pointer) which is simply wrapped.
         """
         self._shape_cache = None
+        self._borrowed = False
 
         # Internal fast path: wrap an existing C tensor pointer as-is.
         if isinstance(data, ffi.CData):
@@ -224,9 +285,22 @@ class Tensor:
             if moved is not self:
                 self._tensor, moved._tensor = moved._tensor, self._tensor
 
+    @classmethod
+    def borrow(cls, c_tensor):
+        """Wrap a C tensor handle this Python side does NOT own (e.g. a module
+        parameter owned by its Module). No pin is taken and __del__ never
+        releases, so repeatedly wrapping the same handle cannot shorten the
+        owner's lifetime."""
+        obj = cls.__new__(cls)
+        obj._shape_cache = None
+        obj._borrowed = True
+        obj._tensor = c_tensor if c_tensor is not None else ffi.NULL
+        return obj
+
     def __del__(self):
         if (
-            hasattr(self, "_tensor")
+            not getattr(self, "_borrowed", False)
+            and hasattr(self, "_tensor")
             and self._tensor is not None
             and self._tensor != ffi.NULL
         ):
@@ -235,56 +309,91 @@ class Tensor:
             lib.tensor_release(self._tensor)
 
     @staticmethod
-    def _as_operand(other):
+    def _as_operand(other, dtype=None):
         """Coerce a binary-op operand to a Tensor (scalars become a 1-element
-        tensor that the C ops broadcast), or return None for unsupported types."""
+        tensor that the C ops broadcast), or return None for unsupported types.
+
+        Python scalars are weakly typed (torch rule): they adopt the tensor's
+        dtype instead of widening it — except a float scalar meeting an
+        integral tensor, which promotes to float32 like torch's default
+        floating dtype.
+        """
         if isinstance(other, Tensor):
             return other
         if isinstance(other, (bool, int, float)):
-            return Tensor.from_numpy(np.array([float(other)], dtype=np.float32))
+            if dtype is None:
+                dtype = DTYPE_FLOAT32
+            elif isinstance(other, float) and dtype not in (DTYPE_FLOAT32, DTYPE_FLOAT64):
+                dtype = DTYPE_FLOAT32
+            if dtype in DTYPE_TO_NUMPY:
+                return Tensor.from_numpy(
+                    np.array([other], dtype=np.dtype(DTYPE_NAMES[dtype])),
+                    dtype=dtype)
+            # dtype outside the numpy round-trip table: build f32, then cast
+            return Tensor.from_numpy(
+                np.array([float(other)], dtype=np.float32)).cast(dtype)
         return None
 
-    def __add__(self, other):
-        o = self._as_operand(other)
-        if o is None:
+    def _binary(self, other, lib_fn):
+        """Shared binary-op path. Promotes both operands to one dtype before
+        dispatching (the C engine does not promote mixed-dtype inputs).
+        Python scalars are weakly typed: they adopt the tensor's dtype,
+        except a float scalar meeting an integral tensor, which widens the
+        result to float32 (torch's default-floating-dtype rule)."""
+        if isinstance(other, Tensor):
+            dt = result_type(self.dtype, other.dtype)
+            a = self if self.dtype == dt else self.cast(dt)
+            b = other if other.dtype == dt else other.cast(dt)
+        elif isinstance(other, (bool, int, float)):
+            dt = self.dtype
+            if isinstance(other, float) and dt not in (DTYPE_FLOAT32, DTYPE_FLOAT64):
+                dt = DTYPE_FLOAT32
+            a = self if self.dtype == dt else self.cast(dt)
+            b = Tensor._as_operand(other, dt)
+        else:
             return NotImplemented
-        return Tensor(lib.cml_add(self._tensor, o._tensor))
+        return Tensor(lib_fn(a._tensor, b._tensor))
+
+    def __add__(self, other):
+        return self._binary(other, lib.cml_add)
 
     def __radd__(self, other):
         return self.__add__(other)
 
     def __sub__(self, other):
-        o = self._as_operand(other)
-        if o is None:
-            return NotImplemented
-        return Tensor(lib.cml_sub(self._tensor, o._tensor))
+        return self._binary(other, lib.cml_sub)
 
     def __rsub__(self, other):
-        o = self._as_operand(other)
-        if o is None:
-            return NotImplemented
-        return Tensor(lib.cml_sub(o._tensor, self._tensor))
+        return self._rbin(other, lib.cml_sub)
 
     def __mul__(self, other):
-        o = self._as_operand(other)
-        if o is None:
-            return NotImplemented
-        return Tensor(lib.cml_mul(self._tensor, o._tensor))
+        return self._binary(other, lib.cml_mul)
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __truediv__(self, other):
-        o = self._as_operand(other)
-        if o is None:
-            return NotImplemented
-        return Tensor(lib.cml_div(self._tensor, o._tensor))
+        return self._binary(other, lib.cml_div)
 
     def __rtruediv__(self, other):
-        o = self._as_operand(other)
-        if o is None:
+        return self._rbin(other, lib.cml_div)
+
+    def _rbin(self, other, lib_fn):
+        """Reflected binary op with the tensor on the right: computes
+        other <op> self under the same promotion/weak-scalar rules."""
+        if isinstance(other, Tensor):
+            dt = result_type(self.dtype, other.dtype)
+            a = other if other.dtype == dt else other.cast(dt)
+            b = self if self.dtype == dt else self.cast(dt)
+        elif isinstance(other, (bool, int, float)):
+            dt = self.dtype
+            if isinstance(other, float) and dt not in (DTYPE_FLOAT32, DTYPE_FLOAT64):
+                dt = DTYPE_FLOAT32
+            a = Tensor._as_operand(other, dt)
+            b = self if self.dtype == dt else self.cast(dt)
+        else:
             return NotImplemented
-        return Tensor(lib.cml_div(o._tensor, self._tensor))
+        return Tensor(lib_fn(a._tensor, b._tensor))
 
     def __matmul__(self, other):
         if isinstance(other, Tensor):
@@ -487,6 +596,132 @@ class Tensor:
     def matmul(self, other: "Tensor") -> "Tensor":
         return Tensor(lib.cml_matmul(self._tensor, other._tensor))
 
+    def where(self, condition, other):
+        """torch-style ``self.where(cond, other)``: cond ? self : other."""
+        if not isinstance(condition, Tensor):
+            condition = Tensor(np.asarray(condition, dtype=np.float32))
+        if not isinstance(other, Tensor):
+            other = Tensor(np.asarray(other, dtype=np.float32))
+        return Tensor(lib.cml_where(condition._tensor, self._tensor, other._tensor))
+
+    def roll(self, shift: int, axis: int = 0) -> "Tensor":
+        """NumPy-style circular shift along ``axis``."""
+        return Tensor(lib.cml_roll(self._tensor, int(shift), int(axis)))
+
+    def copysign(self, other) -> "Tensor":
+        if not isinstance(other, Tensor):
+            other = Tensor(np.asarray(other, dtype=np.float32))
+        return Tensor(lib.cml_copysign(self._tensor, other._tensor))
+
+    def logaddexp(self, other) -> "Tensor":
+        if not isinstance(other, Tensor):
+            other = Tensor(np.asarray(other, dtype=np.float32))
+        return Tensor(lib.cml_logaddexp(self._tensor, other._tensor))
+
+    def one_hot(self, num_classes: int) -> "Tensor":
+        """``self`` holds integer class indices; returns one-hot encoding with
+        a new trailing axis of size ``num_classes``."""
+        return Tensor(lib.cml_one_hot(self._tensor, int(num_classes)))
+
+    def cumsum(self, dim: int = -1) -> "Tensor":
+        return Tensor(lib.cml_cumsum(self._tensor, dim))
+
+    def cumprod(self, dim: int = -1) -> "Tensor":
+        return Tensor(lib.cml_cumprod(self._tensor, dim))
+
+    def logcumsumexp(self, dim: int = -1) -> "Tensor":
+        return Tensor(lib.cml_logcumsumexp(self._tensor, dim))
+
+    def argsort(self, dim: int = -1, descending: bool = False) -> "Tensor":
+        return Tensor(lib.cml_argsort(self._tensor, dim, descending))
+
+    def topk(self, k: int, dim: int = -1, largest: bool = True,
+             sorted: bool = True) -> Tuple["Tensor", "Tensor"]:
+        """torch-style top-k: returns ``(values, indices)``."""
+        idx_ptr = ffi.new("Tensor**")
+        values = lib.cml_topk_with_indices(self._tensor, int(k), dim, largest, idx_ptr)
+        if values == ffi.NULL:
+            raise ValueError(f"topk: invalid k={k} or dim={dim} for shape {self.shape}")
+        indices = Tensor(idx_ptr[0]) if idx_ptr[0] != ffi.NULL else None
+        return Tensor(values), indices
+
+    def masked_select(self, mask) -> "Tensor":
+        """Select elements where ``mask`` (broadcastable bool tensor/array) is
+        true; returns a flat 1-D tensor (torch.masked_select semantics)."""
+        if not isinstance(mask, Tensor):
+            mask = Tensor(np.asarray(mask, dtype=np.float32))
+        return Tensor(lib.cml_masked_select(self._tensor, mask._tensor))
+
+    def median(self, dim: Optional[int] = None):
+        """Median along ``dim``, or the global median when ``dim`` is None.
+        numpy semantics: for even counts the two central values are averaged
+        (``torch.median`` instead returns the lower one)."""
+        n = self.numel
+        if n == 0:
+            raise ValueError("median of an empty tensor")
+        if dim is None:
+            s = self.flatten().sort(-1)
+            if n % 2:
+                v = lib.tensor_get_float(s._tensor, n // 2)
+            else:
+                v = 0.5 * (lib.tensor_get_float(s._tensor, n // 2 - 1)
+                           + lib.tensor_get_float(s._tensor, n // 2))
+            return Tensor.from_numpy(
+                np.array([v], dtype=np.float32))
+        shp = self.shape
+        d = dim + len(shp) if dim < 0 else dim
+        cnt = shp[d]
+        s = self.sort(d)
+        mid = cnt // 2
+        if cnt % 2:
+            out = s._gather_indices([mid], d)
+        else:
+            out = s._gather_indices([mid - 1, mid], d).mean(d)
+        return out.squeeze(d)
+
+    def unique(self) -> "Tensor":
+        """Sorted unique values of ``self`` (eager composition over numpy,
+        like ``log10``)."""
+        u = np.unique(self.numpy())
+        return Tensor.from_numpy(u.astype(np.float32))
+
+    def pad(self, pad_widths, mode: str = "constant", value: float = 0.0) -> "Tensor":
+        """Pad this tensor. See module-level ``cml.pad`` for the accepted
+        ``pad_widths`` forms; ``mode`` is one of ``constant``/``reflect``/
+        ``replicate`` (``edge`` is accepted as an alias of ``replicate``,
+        ``symmetric`` is not supported)."""
+        nd = self.ndim
+        if nd < 1:
+            raise ValueError("pad requires at least a 1-D tensor")
+        if isinstance(pad_widths, (int, np.integer)):
+            pairs = [(int(pad_widths), int(pad_widths))] * nd
+        elif isinstance(pad_widths, (list, tuple)) and len(pad_widths) > 0 \
+                and isinstance(pad_widths[0], (list, tuple)):
+            # nested per-dim (before, after), dim order
+            if len(pad_widths) != nd:
+                raise ValueError(f"pad: expected {nd} (before, after) pairs, "
+                                 f"got {len(pad_widths)}")
+            pairs = [(int(p[0]), int(p[1])) for p in pad_widths]
+        else:
+            # flat sequence of ints, torch order: last dim first. Fewer than
+            # 2*nd ints pad only the trailing dims (leading dims untouched),
+            # like torch.nn.functional.pad.
+            flat = [int(w) for w in pad_widths]
+            if len(flat) % 2 != 0 or len(flat) > 2 * nd:
+                raise ValueError(f"pad: expected up to {2 * nd} ints (even count) "
+                                 f"for a {nd}-D tensor, got {len(flat)}")
+            tail = [(flat[i], flat[i + 1]) for i in range(0, len(flat), 2)][::-1]
+            pairs = [(0, 0)] * (nd - len(tail)) + tail
+        widths = ffi.new("int[]", [w for p in pairs for w in p])
+        m = mode.lower()
+        if m == "constant":
+            return Tensor(lib.cml_pad(self._tensor, widths, nd, float(value)))
+        if m == "reflect":
+            return Tensor(lib.cml_pad_reflect(self._tensor, widths, nd))
+        if m in ("replicate", "edge"):
+            return Tensor(lib.cml_pad_replicate(self._tensor, widths, nd))
+        raise ValueError(f"pad: unsupported mode {mode!r}")
+
     def relu(self): return Tensor(lib.cml_relu(self._tensor))
     def sigmoid(self): return Tensor(lib.cml_sigmoid(self._tensor))
     def tanh(self): return Tensor(lib.cml_tanh(self._tensor))
@@ -677,6 +912,34 @@ class Tensor:
             raise TypeError("len() of unsized tensor")
         return shape[0]
 
+    def _shrink_dim(self, dim: int, start: int, stop: int) -> "Tensor":
+        """Slice [start, stop) along ``dim`` (lazy, single shrink node)."""
+        shp = self.shape
+        starts = [0] * len(shp)
+        ends = list(shp)
+        starts[dim] = start
+        ends[dim] = stop
+        return Tensor(lib.uop_shrink(self._tensor,
+                                     ffi.new("int[]", starts),
+                                     ffi.new("int[]", ends), len(shp)))
+
+    def _gather_indices(self, indices, dim: int) -> "Tensor":
+        """Gather along ``dim`` with an integer index array (lazy gather).
+        uop_gather follows dim-0 shape semantics (index.shape + trailing
+        dims), so for inner dims we bubble ``dim`` to the front with adjacent
+        transposes (order-preserving), gather, and bubble it back."""
+        idx = Tensor.from_numpy(
+            np.asarray(indices, dtype=np.float32).reshape(-1))
+        if dim == 0:
+            return Tensor(lib.uop_gather(self._tensor, idx._tensor, 0))
+        t = self
+        for ax in range(dim, 0, -1):
+            t = t.transpose(ax - 1, ax)
+        g = Tensor(lib.uop_gather(t._tensor, idx._tensor, 0))
+        for ax in range(1, dim + 1):
+            g = g.transpose(ax - 1, ax)
+        return g
+
     def __getitem__(self, idx):
         if isinstance(idx, int):
             shape = self.shape
@@ -690,26 +953,124 @@ class Tensor:
                 )
             if len(shape) == 1:
                 return lib.tensor_get_float(self._tensor, idx)
-            return Tensor.from_numpy(self.numpy()[idx])
+            return self._shrink_dim(0, idx, idx + 1).squeeze(0)
         elif isinstance(idx, tuple):
             shape = self.shape
-            if len(idx) != len(shape):
-                raise IndexError(f"too many indices for tensor of dimension {len(shape)}")
-            flat_idx = 0
-            stride = 1
-            for i in range(len(shape) - 1, -1, -1):
-                dim_idx = idx[i]
-                if dim_idx < 0:
-                    dim_idx = shape[i] + dim_idx
-                if dim_idx < 0 or dim_idx >= shape[i]:
+            if (len(idx) == len(shape)
+                    and all(isinstance(i, int) and not isinstance(i, bool) for i in idx)):
+                flat_idx = 0
+                stride = 1
+                for i in range(len(shape) - 1, -1, -1):
+                    dim_idx = idx[i]
+                    if dim_idx < 0:
+                        dim_idx = shape[i] + dim_idx
+                    if dim_idx < 0 or dim_idx >= shape[i]:
+                        raise IndexError(
+                            f"index {idx[i]} out of range for dimension {i} "
+                            f"with size {shape[i]}"
+                        )
+                    flat_idx += dim_idx * stride
+                    stride *= shape[i]
+                return lib.tensor_get_float(self._tensor, flat_idx)
+
+        # General path: normalize to a tuple of per-dim items.
+        items = idx if isinstance(idx, tuple) else (idx,)
+        nd = self.ndim
+
+        # Expand Ellipsis into enough full slices to fill the remaining dims.
+        n_ellipsis = sum(1 for it in items if it is Ellipsis)
+        if n_ellipsis > 1:
+            raise IndexError("an index can only have a single ellipsis ('...')")
+        if n_ellipsis:
+            pos = items.index(Ellipsis)
+            fill = (slice(None),) * (nd - (len(items) - 1))
+            items = items[:pos] + fill + items[pos + 1:]
+
+        t = self
+        dim = 0
+        for item in items:
+            if item is None:
+                t = t.unsqueeze(dim)
+                continue  # newaxis does not consume a source dim
+            shp = t.shape
+            if dim >= len(shp):
+                raise IndexError(
+                    f"too many indices for tensor of dimension {len(shp)}")
+            size = shp[dim]
+
+            if isinstance(item, (int, np.integer)) and not isinstance(item, bool):
+                i = int(item)
+                if i < 0:
+                    i += size
+                if i < 0 or i >= size:
                     raise IndexError(
-                        f"index {idx[i]} out of range for dimension {i} with size {shape[i]}"
-                    )
-                flat_idx += dim_idx * stride
-                stride *= shape[i]
-            return lib.tensor_get_float(self._tensor, flat_idx)
-        else:
-            raise TypeError(f"indices must be integers or tuples, not {type(idx).__name__}")
+                        f"index {item} out of range for dimension {dim} with size {size}")
+                t = t._shrink_dim(dim, i, i + 1).squeeze(dim)
+                continue  # consumed the dim
+
+            if isinstance(item, slice):
+                if item.step not in (None, 1):
+                    return Tensor.from_numpy(self.numpy()[idx])
+                s, e, _ = slice(item.start, item.stop, 1).indices(size)
+                t = t._shrink_dim(dim, s, e)
+                dim += 1
+                continue
+
+            # list / ndarray / Tensor: integer-array or boolean-mask index.
+            if isinstance(item, (list, np.ndarray, Tensor)):
+                if isinstance(item, Tensor):
+                    arr = item.numpy()
+                else:
+                    arr = np.asarray(item)
+                # Comparisons currently yield f32 0/1 tensors — accept them
+                # (and any all-0/1 array) as boolean masks.
+                is_mask = arr.dtype == bool or (
+                    arr.dtype.kind == "f" and arr.size > 0
+                    and bool(((arr == 0) | (arr == 1)).all()))
+                if is_mask:
+                    if arr.ndim == len(t.shape) - dim:
+                        # Full-rank mask over the remaining dims: flattened
+                        # selection (torch/numpy semantics).
+                        mt = item if isinstance(item, Tensor) else \
+                            Tensor.from_numpy(arr.astype(np.float32))
+                        return Tensor(lib.cml_masked_select(t._tensor, mt._tensor))
+                    sel = np.nonzero(arr.astype(bool))[0]
+                    t = t._gather_indices(sel, dim)
+                    dim += 1
+                    continue
+                elif arr.ndim == 0:
+                    i = int(arr)
+                    if i < 0:
+                        i += size
+                    if i < 0 or i >= size:
+                        raise IndexError(f"index {arr} out of range for dimension {dim}")
+                    t = t._shrink_dim(dim, i, i + 1).squeeze(dim)
+                    continue
+                elif arr.ndim >= 1:
+                    sel = arr.astype(np.int64)
+                    if np.any((sel < -size) | (sel >= size)):
+                        raise IndexError(
+                            f"index out of range for dimension {dim} with size {size}")
+                    sel = np.where(sel < 0, sel + size, sel)
+                    # uop_gather takes flat 1-D indices; restore the index
+                    # array's shape on the output (torch advanced-indexing
+                    # semantics: result = index.shape + remaining dims).
+                    rest = tuple(t.shape[dim + 1:])
+                    t = t._gather_indices(sel.reshape(-1), dim)
+                    want = tuple(int(v) for v in arr.shape) + rest
+                    if dim == 0 and t.shape != want:
+                        t = t.reshape(want)
+                    elif dim > 0:
+                        want = tuple(t.shape[:dim]) + \
+                            tuple(int(v) for v in arr.shape) + rest
+                        if t.shape != want:
+                            t = t.reshape(want)
+                    dim += 1
+                    continue
+
+            return Tensor.from_numpy(self.numpy()[idx])
+
+        return t
 
     def __setitem__(self, idx, value: float):
         if isinstance(idx, int):

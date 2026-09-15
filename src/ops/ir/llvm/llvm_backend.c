@@ -7,6 +7,7 @@
 #include "ops/ir/process_replay.h"
 #include "core/logging.h"
 #include "backend/blas.h"
+#include "backend/threadpool.h"
 
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
@@ -162,13 +163,18 @@ static void add_noalias(LLVMContextRef ctx, LLVMValueRef fn, unsigned n_ptrs) {
 
 typedef struct {
     LLVMValueRef      i;      /* phi (induction variable)   */
+    LLVMValueRef      start;  /* loop start value (for close_loop incoming) */
     LLVMBasicBlockRef body;
     LLVMBasicBlockRef exit;
     LLVMBasicBlockRef header;
 } LoopInfo;
 
+/* Emit a counted loop with i in [start, end).  For threaded kernels start is a
+ * runtime parameter (= chunk offset), so bcast_index(i, ...) sees the global
+ * element index and the modulo broadcast is correct even when chunked. */
 static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx,
-                          LLVMValueRef fn, LLVMValueRef n, const char* name) {
+                          LLVMValueRef fn, LLVMValueRef start,
+                          LLVMValueRef end, const char* name) {
     LoopInfo info;
     LLVMTypeRef i64 = LLVMInt64TypeInContext(ctx);
 
@@ -180,12 +186,13 @@ static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx,
     info.header = LLVMAppendBasicBlockInContext(ctx, fn, h);
     info.body   = LLVMAppendBasicBlockInContext(ctx, fn, body);
     info.exit   = LLVMAppendBasicBlockInContext(ctx, fn, ex);
+    info.start  = start;
 
     LLVMBuildBr(bld, info.header);
 
     LLVMPositionBuilderAtEnd(bld, info.header);
     info.i = LLVMBuildPhi(bld, i64, "i");
-    LLVMValueRef cond = LLVMBuildICmp(bld, LLVMIntULT, info.i, n, "cond");
+    LLVMValueRef cond = LLVMBuildICmp(bld, LLVMIntULT, info.i, end, "cond");
     LLVMBuildCondBr(bld, cond, info.body, info.exit);
 
     LLVMPositionBuilderAtEnd(bld, info.body);
@@ -199,8 +206,7 @@ static void close_loop(LLVMBuilderRef bld, LoopInfo* info,
     LLVMValueRef i_next = LLVMBuildAdd(bld, info->i, one, "i.next");
     LLVMBuildBr(bld, info->header);
 
-    LLVMValueRef zero = LLVMConstInt(i64, 0, 0);
-    LLVMValueRef in_vals[] = { zero, i_next };
+    LLVMValueRef in_vals[] = { info->start, i_next };
     LLVMBasicBlockRef in_bbs[] = { entry_bb, info->body };
     LLVMAddIncoming(info->i, in_vals, in_bbs, 2);
 }
@@ -303,8 +309,11 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, ptr, i64, i64, i64 };
-    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 6, 0);
+    /* start/end are runtime parameters for threaded dispatch: the loop iterates
+     * i in [start, end) and writes to out[i - start].  bcast_index uses i
+     * directly, so the modulo broadcast is correct even when chunked. */
+    LLVMTypeRef params[] = { ptr, ptr, ptr, i64, i64, i64, i64, i64 };
+    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 8, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 3); /* in0, in1, out are noalias */
 
@@ -312,12 +321,14 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef in1   = LLVMGetParam(fn, 1);
     LLVMValueRef out   = LLVMGetParam(fn, 2);
     LLVMValueRef out_n = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
+    LLVMValueRef start = LLVMGetParam(fn, 6);
+    LLVMValueRef end   = LLVMGetParam(fn, 7);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "elem");
+    LoopInfo loop = emit_loop(bld, ctx, fn, start, end, "elem");
 
     LLVMValueRef i0 = bcast_index(bld, ctx, loop.i, in0_numel, out_numel);
     LLVMValueRef i1 = bcast_index(bld, ctx, loop.i, in1_numel, out_numel);
@@ -391,7 +402,9 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         return NULL;
     }
 
-    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
+    /* out[i - start]: the chunk-local index for output storage */
+    LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
+    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout");
     LLVMBuildStore(bld, result, gep_out);
     close_loop(bld, &loop, entry);
 
@@ -414,20 +427,22 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, i64, i64 };
-    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 4, 0);
+    LLVMTypeRef params[] = { ptr, ptr, i64, i64, i64, i64 };
+    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 6, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 2); /* in, out are noalias */
 
     LLVMValueRef in_p  = LLVMGetParam(fn, 0);
     LLVMValueRef out   = LLVMGetParam(fn, 1);
     LLVMValueRef out_n = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
+    LLVMValueRef start = LLVMGetParam(fn, 4);
+    LLVMValueRef end   = LLVMGetParam(fn, 5);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "elem");
+    LoopInfo loop = emit_loop(bld, ctx, fn, start, end, "elem");
 
     LLVMValueRef idx    = bcast_index(bld, ctx, loop.i, in_numel, out_numel);
     LLVMValueRef gep_in = LLVMBuildGEP2(bld, f32, in_p, &idx, 1, "pin");
@@ -648,7 +663,8 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     }
 
 store_result:;
-    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
+    LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
+    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout");
     LLVMBuildStore(bld, result, gep_out);
     close_loop(bld, &loop, entry);
 
@@ -885,7 +901,7 @@ static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name,
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "fill");
+    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "fill");
     LLVMValueRef gep = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "p");
     LLVMBuildStore(bld, fval, gep);
     close_loop(bld, &loop, entry);
@@ -908,8 +924,8 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, ptr, ptr, i64, i64, i64, i64 };
-    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 8, 0);
+    LLVMTypeRef params[] = { ptr, ptr, ptr, ptr, i64, i64, i64, i64, i64, i64 };
+    LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 10, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 4);
 
@@ -918,12 +934,14 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef b_p    = LLVMGetParam(fn, 2);
     LLVMValueRef out    = LLVMGetParam(fn, 3);
     LLVMValueRef out_n  = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
+    LLVMValueRef start  = LLVMGetParam(fn, 8);
+    LLVMValueRef end    = LLVMGetParam(fn, 9);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "where");
+    LoopInfo loop = emit_loop(bld, ctx, fn, start, end, "where");
 
     LLVMValueRef zf  = LLVMConstReal(f32, 0.0);
 
@@ -941,8 +959,9 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef is_true = LLVMBuildFCmp(bld, LLVMRealONE, vc, zf, "it");
     LLVMValueRef result  = LLVMBuildSelect(bld, is_true, va, vb, "r");
 
+    LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
     LLVMBuildStore(bld, result,
-        LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
+        LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout"));
     close_loop(bld, &loop, entry);
 
     LLVMPositionBuilderAtEnd(bld, loop.exit);
@@ -977,7 +996,7 @@ static LLVMModuleRef build_gather_op(LLVMContextRef ctx, const char* fn_name,
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, N, "gather");
+    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), N, "gather");
 
     LLVMValueRef idx_f  = LLVMBuildLoad2(bld, f32,
         LLVMBuildGEP2(bld, f32, indices, &loop.i, 1, "pidx"), "idxf");
@@ -1088,7 +1107,7 @@ static LLVMModuleRef build_expand_op(LLVMContextRef ctx, const char* fn_name,
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "expand");
+    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "expand");
     LLVMValueRef idx = bcast_index(bld, ctx, loop.i, in_numel, out_numel);
     LLVMValueRef v   = LLVMBuildLoad2(bld, f32,
         LLVMBuildGEP2(bld, f32, in_p, &idx, 1, "pin"), "v");
@@ -1125,7 +1144,7 @@ static LLVMModuleRef build_reshape_op(LLVMContextRef ctx, const char* fn_name,
     LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, n, "copy");
+    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), n, "copy");
     LLVMValueRef v = LLVMBuildLoad2(bld, f32,
         LLVMBuildGEP2(bld, f32, in_p, &loop.i, 1, "pin"), "v");
     LLVMBuildStore(bld, v, LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
@@ -1390,7 +1409,7 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
         inptr[k] = LLVMBuildLoad2(bld, ptr, gepk, "inp");
     }
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, out_n, "fe");
+    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "fe");
 
     int ns = fp->num_steps;
     LLVMValueRef reg[256];
@@ -1455,6 +1474,130 @@ static bool is_reduction(UOpType t) {
 /* -------------------------------------------------------------------------
  * Per-node JIT execution
  * ---------------------------------------------------------------------- */
+/* ---- Threaded dispatch for elementwise JIT kernels --------------------
+ * All threaded kernels (binary, unary, where) now take (start, end) as
+ * their final two i64 parameters.  The loop iterates i in [start, end),
+ * writes to out[i - start], and uses the global i for broadcast indexing
+ * via bcast_index(i, in_numel, out_numel).  This makes threading correct
+ * for broadcast operands without the old same-shape guard. */
+#define JIT_PARALLEL_MIN_ELEMS (1 << 16)
+
+typedef struct {
+    void (*fn)(const float*, const float*, float*,
+               int64_t, int64_t, int64_t, int64_t, int64_t);
+    const float* a; const float* b; float* out;
+    int64_t n, na, nb;
+} JBTaskCtx;
+
+static void jb_task(void* d, size_t start, size_t end) {
+    JBTaskCtx* t = (JBTaskCtx*)d;
+    t->fn(t->a, t->b, t->out, t->n, t->na, t->nb,
+          (int64_t)start, (int64_t)end);
+}
+
+static void jb_run(void* fnv, float* a, float* b, float* out,
+                   int64_t n, int64_t na, int64_t nb) {
+    if (n >= JIT_PARALLEL_MIN_ELEMS) {
+        JBTaskCtx ctx = { (void (*)(const float*, const float*, float*,
+                                    int64_t, int64_t, int64_t, int64_t, int64_t))fnv,
+                          a, b, out, n, na, nb };
+        threadpool_parallel_for(threadpool_get_global(), jb_task, &ctx, (size_t)n);
+        return;
+    }
+    ((void (*)(const float*, const float*, float*, int64_t, int64_t, int64_t,
+               int64_t, int64_t))(void*)fnv)(a, b, out, n, na, nb, 0, n);
+}
+
+typedef struct {
+    void (*fn)(const float*, float*, int64_t, int64_t, int64_t, int64_t);
+    const float* a; float* out;
+    int64_t n, na;
+} JUTaskCtx;
+
+static void ju_task(void* d, size_t start, size_t end) {
+    JUTaskCtx* t = (JUTaskCtx*)d;
+    t->fn(t->a, t->out, t->n, t->na, (int64_t)start, (int64_t)end);
+}
+
+static void ju_run(void* fnv, float* a, float* out, int64_t n, int64_t na) {
+    if (n >= JIT_PARALLEL_MIN_ELEMS) {
+        JUTaskCtx ctx = { (void (*)(const float*, float*, int64_t, int64_t,
+                                    int64_t, int64_t))fnv,
+                          a, out, n, na };
+        threadpool_parallel_for(threadpool_get_global(), ju_task, &ctx, (size_t)n);
+        return;
+    }
+    ((void (*)(const float*, float*, int64_t, int64_t, int64_t,
+               int64_t))(void*)fnv)(a, out, n, na, 0, n);
+}
+
+typedef struct {
+    void (*fn)(float*, int64_t);
+    float* out;
+} JFTaskCtx;
+
+static void jf_task(void* d, size_t start, size_t end) {
+    JFTaskCtx* t = (JFTaskCtx*)d;
+    t->fn(t->out + start, (int64_t)(end - start));
+}
+
+static void jf_run(void* fnv, float* out, int64_t n) {
+    if (n >= JIT_PARALLEL_MIN_ELEMS) {
+        JFTaskCtx ctx = { *(void (**)(float*, int64_t))&fnv, out };
+        threadpool_parallel_for(threadpool_get_global(), jf_task, &ctx, (size_t)n);
+        return;
+    }
+    ((void (*)(float*, int64_t))(void*)fnv)(out, n);
+}
+
+typedef struct {
+    void (*fn)(float*, int64_t, float);
+    float* out;
+    int64_t n;
+    float v;
+} JVTaskCtx;
+
+static void jv_task(void* d, size_t start, size_t end) {
+    JVTaskCtx* t = (JVTaskCtx*)d;
+    t->fn(t->out + start, (int64_t)(end - start), t->v);
+}
+
+static void jv_run(void* fnv, float* out, int64_t n, float v) {
+    if (n >= JIT_PARALLEL_MIN_ELEMS) {
+        JVTaskCtx ctx = { *(void (**)(float*, int64_t, float))&fnv, out, n, v };
+        threadpool_parallel_for(threadpool_get_global(), jv_task, &ctx, (size_t)n);
+        return;
+    }
+    ((void (*)(float*, int64_t, float))(void*)fnv)(out, n, v);
+}
+
+typedef struct {
+    void (*fn)(const float*, const float*, const float*, float*,
+               int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
+    const float* c; const float* a; const float* b; float* out;
+    int64_t n, nc, na, nb;
+} JWTaskCtx;
+
+static void jw_task(void* d, size_t start, size_t end) {
+    JWTaskCtx* t = (JWTaskCtx*)d;
+    t->fn(t->c, t->a, t->b, t->out, t->n, t->nc, t->na, t->nb,
+          (int64_t)start, (int64_t)end);
+}
+
+static void jw_run(void* fnv, float* cond, float* a, float* b, float* out,
+                   int64_t n, int64_t nc, int64_t na, int64_t nb) {
+    if (n >= JIT_PARALLEL_MIN_ELEMS) {
+        JWTaskCtx ctx = { (void (*)(const float*, const float*, const float*, float*,
+                                    int64_t, int64_t, int64_t, int64_t, int64_t, int64_t))fnv,
+                          cond, a, b, out, n, nc, na, nb };
+        threadpool_parallel_for(threadpool_get_global(), jw_task, &ctx, (size_t)n);
+        return;
+    }
+    ((void (*)(const float*, const float*, const float*, float*, int64_t, int64_t,
+               int64_t, int64_t, int64_t, int64_t))(void*)fnv)(
+        cond, a, b, out, n, nc, na, nb, 0, n);
+}
+
 static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     if (!node || !node->output) return -1;
 
@@ -1744,24 +1887,22 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     if (is_binary_op(type)) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
-        typedef void (*bfn_t)(float*, float*, float*, int64_t, int64_t, int64_t);
-        ((bfn_t)(void*)fn)(
-            (float*)node->inputs[0]->data,
-            (float*)node->inputs[1]->data,
-            (float*)out->data,
-            (int64_t)out->numel,
-            (int64_t)node->inputs[0]->numel,
-            (int64_t)node->inputs[1]->numel);
+        jb_run((void*)fn,
+               (float*)node->inputs[0]->data,
+               (float*)node->inputs[1]->data,
+               (float*)out->data,
+               (int64_t)out->numel,
+               (int64_t)node->inputs[0]->numel,
+               (int64_t)node->inputs[1]->numel);
 
     } else if (is_unary_op(type)) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
             return cpu_execute_node(node);
-        typedef void (*ufn_t)(float*, float*, int64_t, int64_t);
-        ((ufn_t)(void*)fn)(
-            (float*)node->inputs[0]->data,
-            (float*)out->data,
-            (int64_t)out->numel,
-            (int64_t)node->inputs[0]->numel);
+        ju_run((void*)fn,
+               (float*)node->inputs[0]->data,
+               (float*)out->data,
+               (int64_t)out->numel,
+               (int64_t)node->inputs[0]->numel);
 
     } else if (is_reduction(type)) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
@@ -1777,6 +1918,12 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
             return cpu_execute_node(node);
         Tensor* a = node->inputs[0]; Tensor* b = node->inputs[1];
         if (a->ndim < 2 || b->ndim < 2) return cpu_execute_node(node);
+        /* The JIT kernel computes a single [M,K]x[K,N] GEMM. Batched matmuls
+         * (out->numel != M*N, leading dims broadcast) must take the
+         * interpreter's batch-aware path instead of silently computing one
+         * wrong 2-D GEMM over the whole buffer. */
+        size_t mn = (size_t)a->shape[a->ndim-2] * (size_t)b->shape[b->ndim-1];
+        if (out->numel != mn) return cpu_execute_node(node);
         typedef void (*mfn_t)(float*, float*, float*, int64_t, int64_t, int64_t);
         ((mfn_t)(void*)fn)(
             (float*)a->data, (float*)b->data, (float*)out->data,
@@ -1787,24 +1934,21 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     } else if (type == UOP_FILL) {
         FillParams* p = (FillParams*)node->params;
         float fv = p ? p->value : 0.0f;
-        typedef void (*ffn_t)(float*, int64_t, float);
-        ((ffn_t)(void*)fn)((float*)out->data, (int64_t)out->numel, fv);
+        jv_run((void*)fn, (float*)out->data, (int64_t)out->numel, fv);
 
     } else if (type == UOP_WHERE) {
         if (node->num_inputs < 3 || !node->inputs[0]->data ||
             !node->inputs[1]->data || !node->inputs[2]->data)
             return cpu_execute_node(node);
-        typedef void (*wfn_t)(float*, float*, float*, float*,
-                              int64_t, int64_t, int64_t, int64_t);
-        ((wfn_t)(void*)fn)(
-            (float*)node->inputs[0]->data,
-            (float*)node->inputs[1]->data,
-            (float*)node->inputs[2]->data,
-            (float*)out->data,
-            (int64_t)out->numel,
-            (int64_t)node->inputs[0]->numel,
-            (int64_t)node->inputs[1]->numel,
-            (int64_t)node->inputs[2]->numel);
+        jw_run((void*)fn,
+               (float*)node->inputs[0]->data,
+               (float*)node->inputs[1]->data,
+               (float*)node->inputs[2]->data,
+               (float*)out->data,
+               (int64_t)out->numel,
+               (int64_t)node->inputs[0]->numel,
+               (int64_t)node->inputs[1]->numel,
+               (int64_t)node->inputs[2]->numel);
 
     } else if (type == UOP_GATHER) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)

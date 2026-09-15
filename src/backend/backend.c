@@ -328,7 +328,16 @@ int backend_init(BackendType type) {
         }
         break;
     case BACKEND_BLAS:
+        g_current_backend->ops = scalar_ops;
+        break;
     case BACKEND_CUDA:
+        /* The legacy backend API has no CUDA compute path — this selects host
+         * scalar ops only. Fail loudly instead of lending the label false
+         * credibility; GPU execution goes through dispatch/IR (cml_dispatch_*,
+         * cml_ir_execute) or HCQ. */
+        LOG_ERROR("backend_init(BACKEND_CUDA): the legacy backend API does not "
+                  "perform GPU compute; use cml_dispatch_execute_on / cml_ir_execute "
+                  "for CUDA. Falling back to host scalar ops.");
         g_current_backend->ops = scalar_ops;
         break;
     case BACKEND_OPENCL:
@@ -344,10 +353,17 @@ int backend_init(BackendType type) {
     case BACKEND_SSE:
     case BACKEND_AVX:
     case BACKEND_BLAS:
+        // SIMD not available, use scalar fallback
+        g_current_backend->ops = scalar_ops;
+        break;
     case BACKEND_CUDA:
     case BACKEND_METAL:
     case BACKEND_ROCM:
-        // SIMD not available, use scalar fallback
+        /* Legacy API: no GPU compute path here (see the BACKEND_CUDA note in
+         * the SSE build). Loud, not silent. */
+        LOG_ERROR("backend_init(%d): the legacy backend API does not perform GPU "
+                  "compute on this platform; use cml_dispatch_execute_on / cml_ir_execute. "
+                  "Falling back to host scalar ops.", (int)type);
         g_current_backend->ops = scalar_ops;
         break;
     case BACKEND_OPENCL:

@@ -5,7 +5,9 @@
 #include <windows.h>
 static void cml_sleep_ms(unsigned int ms) { Sleep(ms); }
 #else
+#ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 700
+#endif
 #include <unistd.h>
 static void cml_sleep_ms(unsigned int ms) { usleep(ms * 1000); }
 #endif

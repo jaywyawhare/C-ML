@@ -36,6 +36,14 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
         return NULL;
     }
 
+    /* A view aliases the base's data pointer. If the base is still lazy (an
+     * IR node that has not been realized), its ->data is NULL and the view
+     * would be born dangling with no way to realize later — views carry no
+     * ir_node. Realize the base first so the view sees valid storage. */
+    if (t->ir_node && (!t->is_executed || !t->data)) {
+        tensor_ensure_executed(t);
+    }
+
     if (can_reshape_as_view(t, new_shape, new_ndim)) {
         Tensor* view = cml_calloc(1, sizeof(Tensor));
         if (!view) {
@@ -70,6 +78,13 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
         view->requires_grad = t->requires_grad;
         view->ref_count     = 1;
         view->base          = t->base ? t->base : t;
+        view->storage       = NULL;
+        /* Keep the base's data block alive while this view exists: link it to
+         * shared storage (attached to the owning root on first view). When the
+         * root is not an owned allocation (e.g. borrowed plan buffer) no
+         * storage can be attached and the documented non-owning contract
+         * applies — the base must outlive the view. */
+        tensor_storage_share(view, t);
 
         LOG_DEBUG("Created reshape view: (%d, ...) -> (%d, ...)", t->ndim, new_ndim);
 
@@ -131,6 +146,9 @@ Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size
     view->requires_grad = t->requires_grad;
     view->ref_count     = 1;
     view->base          = t->base ? t->base : t;
+    view->storage       = NULL;
+    /* Same shared-storage contract as the reshape view above. */
+    tensor_storage_share(view, t);
 
     LOG_DEBUG("Created custom strided view");
 

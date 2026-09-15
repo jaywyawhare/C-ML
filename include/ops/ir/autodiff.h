@@ -15,7 +15,11 @@ extern "C" {
 
 /* Seed d(loss)/d(loss)=1 at loss_node and walk the graph in reverse, emitting
  * VJP UOPs and setting v->grad (a lazy tensor) for every requires_grad value. */
-int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node);
+/* Reverse-mode gradient over the primitive graph rooted at `loss_node`.
+ * `differentiable_grads` controls the requires_grad flag on the published
+ * lazy grad tensors: true makes them re-differentiable (double-backward via
+ * tensor_backward create_graph=true); false leaves them inert results. */
+int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_grads);
 
 /* 1 if backward should use graph-level autodiff (GRAD_MODE=graph), else 0. */
 int cml_autodiff_use_graph(void);

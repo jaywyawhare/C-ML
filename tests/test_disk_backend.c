@@ -167,6 +167,40 @@ static int test_free_null(void) {
     return 1;
 }
 
+/* Async read + wait. Uses io_uring when compiled with liburing, else the
+ * synchronous fallback; the contract (data present after wait) is identical. */
+static int test_async_read(void) {
+    setup_test_dir();
+    CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_ASYNC);
+    if (!b) return 0;
+
+    int shape[] = {2, 5};
+    TensorConfig tc = {0};
+    Tensor* t = tensor_empty(shape, 2, &tc);
+    if (!t) { cml_disk_backend_free(b); return 0; }
+    for (size_t i = 0; i < t->numel; i++)
+        ((float*)t->data)[i] = (float)i + 100.0f;
+
+    if (cml_disk_save_tensor(b, "async_test", t) != 0) {
+        tensor_free(t); cml_disk_backend_free(b); return 0;
+    }
+
+    size_t bytes = t->numel * sizeof(float);
+    float* buf = (float*)malloc(bytes);
+    if (!buf) { tensor_free(t); cml_disk_backend_free(b); return 0; }
+
+    int ok = 1;
+    if (cml_disk_async_read(b, "async_test", buf, bytes) != 0) ok = 0;
+    if (ok && cml_disk_wait(b) != 0) ok = 0;
+    for (size_t i = 0; i < t->numel && ok; i++)
+        if (buf[i] != ((float*)t->data)[i]) ok = 0;
+
+    free(buf);
+    tensor_free(t);
+    cml_disk_backend_free(b);
+    return ok;
+}
+
 int main(void) {
     printf("Disk Backend Tests\n");
     setup_test_dir();
@@ -179,6 +213,7 @@ int main(void) {
     RUN_TEST(test_disk_tensor_to_tensor);
     RUN_TEST(test_print_no_crash);
     RUN_TEST(test_free_null);
+    RUN_TEST(test_async_read);
 
     return TEST_SUMMARY();
 }

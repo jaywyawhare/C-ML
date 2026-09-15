@@ -1,5 +1,6 @@
 #include "core/hevc.h"
 #include "core/logging.h"
+#include "core/error_stack.h"
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
@@ -291,36 +292,15 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
     uint8_t* rbsp = rbsp_from_nal(nal->data + payload_offset, payload_size, &rbsp_size);
     if (!rbsp) return NULL;
 
-    /* Stub: no actual HEVC decoding — allocate a placeholder luma plane.
-     * Real decode requires slice header parsing, prediction, transform, deblocking. */
-    LOG_WARNING("[hevc] decode_idr is a stub; returning blank 64x64 placeholder frame");
-    int w = 64, h = 64;
-    int stride = w;
-
-    CMLHEVCFrame* frame = (CMLHEVCFrame*)cml_calloc(1, sizeof(CMLHEVCFrame));
-    if (!frame) {
-        cml_free(rbsp);
-        return NULL;
-    }
-
-    frame->data = (uint8_t*)cml_calloc((size_t)(stride * h), 1);
-    if (!frame->data) {
-        cml_free(rbsp);
-        cml_free(frame);
-        return NULL;
-    }
-
-    size_t copy_len = rbsp_size < (size_t)(stride * h) ? rbsp_size : (size_t)(stride * h);
-    memcpy(frame->data, rbsp, copy_len);
-
-    frame->width = w;
-    frame->height = h;
-    frame->stride = stride;
-    frame->pts = parser->frame_count++;
-    frame->nal_type = nal->type;
-
+    /* Frame reconstruction (slice header parsing, intra prediction, transform,
+     * deblocking) is not implemented — fail loudly instead of returning a
+     * fake frame that would silently corrupt any pipeline consuming it. The
+     * parser/NAL/SPS layers above are fully functional. */
     cml_free(rbsp);
-    return frame;
+    LOG_ERROR("[hevc] intra frame decoding is not implemented; NAL was parsed "
+              "but no pixels can be produced");
+    CML_ERR_RET(CM_NOT_IMPLEMENTED,
+                "hevc: frame decoding not implemented", NULL);
 }
 
 void cml_hevc_frame_free(CMLHEVCFrame* frame) {

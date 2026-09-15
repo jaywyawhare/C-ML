@@ -456,6 +456,27 @@ static inline void wino_f23_output_transform(const float M[16], float Y[4]) {
 }
 #endif
 
+/* Read one index element from an index tensor of any integer/float dtype.
+ * Gather/scatter used to read every index tensor through a float* cast,
+ * which turned int32 indices into denormal floats and (int) casts of those
+ * into 0 -- silently gathering row 0 and scattering gradients to row 0. */
+static int cml_index_read(const Tensor* t, size_t i) {
+    const void* d = t ? t->data : NULL;
+    if (!d) return 0;
+    switch (t->dtype) {
+    case DTYPE_INT32:  return ((const int32_t*)d)[i];
+    case DTYPE_INT64:  return (int)((const int64_t*)d)[i];
+    case DTYPE_INT16:  return ((const int16_t*)d)[i];
+    case DTYPE_INT8:   return ((const int8_t*)d)[i];
+    case DTYPE_UINT8:  return (int)((const uint8_t*)d)[i];
+    case DTYPE_UINT16: return (int)((const uint16_t*)d)[i];
+    case DTYPE_UINT32: return (int)((const uint32_t*)d)[i];
+    case DTYPE_FLOAT64:return (int)((const double*)d)[i];
+    case DTYPE_FLOAT32:
+    default:           return (int)((const float*)d)[i];
+    }
+}
+
 /* BLAS-batched Winograd F(2,3) with hardcoded transforms.
  * Uses add/sub-only transforms (no generic matmul) + batched GEMM/inline
  * multiply at each of the 16 Winograd points. */
@@ -974,9 +995,32 @@ static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch,
         }                                                                      \
     } while (0)
 
+    /* Half types compute in f32 and round back into the storage format, the
+     * same convention the elementwise/reduce paths use. */
+#define CML_MATMUL_HALF(STYPE, LOAD, STORE)                                    \
+    do {                                                                       \
+        const STYPE* a = (const STYPE*)A;                                      \
+        const STYPE* b = (const STYPE*)B;                                      \
+        STYPE* c       = (STYPE*)C;                                            \
+        for (int bt = 0; bt < batch; bt++) {                                  \
+            const STYPE* ab = a + (size_t)bt * a_stride;                       \
+            const STYPE* bb = b + (size_t)bt * b_stride;                       \
+            STYPE* cb       = c + (size_t)bt * (size_t)M * N;                  \
+            for (int m = 0; m < M; m++)                                        \
+                for (int n = 0; n < N; n++) {                                  \
+                    float s = 0;                                               \
+                    for (int k = 0; k < K; k++)                                \
+                        s += LOAD(ab[(size_t)m * K + k]) * LOAD(bb[(size_t)k * N + n]); \
+                    cb[(size_t)m * N + n] = STORE(s);                          \
+                }                                                              \
+        }                                                                      \
+    } while (0)
+
     switch (dt) {
     case DTYPE_FLOAT32: CML_MATMUL_T(float,   float);   return 0;
     case DTYPE_FLOAT64: CML_MATMUL_T(double,  double);  return 0;
+    case DTYPE_FLOAT16: CML_MATMUL_HALF(uint16_t, fp16_to_float, float_to_fp16);   return 0;
+    case DTYPE_BFLOAT16:CML_MATMUL_HALF(uint16_t, bf16_to_float, float_to_bf16);   return 0;
     case DTYPE_INT64:   CML_MATMUL_T(int64_t, int64_t); return 0;
     case DTYPE_INT32:   CML_MATMUL_T(int32_t, int64_t); return 0;
     case DTYPE_INT16:   CML_MATMUL_T(int16_t, int64_t); return 0;
@@ -984,6 +1028,7 @@ static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch,
     default:            return -1;
     }
 #undef CML_MATMUL_T
+#undef CML_MATMUL_HALF
 }
 
 /* Dtype-generic direct conv2d (naive but fully general: groups / stride /
@@ -1046,13 +1091,46 @@ static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
             }                                                                         \
     } while (0)
 
+    /* Half types compute in f32 and round back into the storage format. */
+#define CML_CONV_HALF(STYPE, LOAD, STORE)                                             \
+    do {                                                                              \
+        const STYPE* I = (const STYPE*)input_t->data;                                 \
+        const STYPE* W = (const STYPE*)weight_t->data;                                \
+        const STYPE* B = (const STYPE*)bias;                                          \
+        STYPE* O = (STYPE*)out->data;                                                 \
+        for (int b = 0; b < batch; b++)                                               \
+            for (int oc = 0; oc < out_ch; oc++) {                                     \
+                int g = oc / ocg;                                                     \
+                for (int oh = 0; oh < out_h; oh++)                                    \
+                    for (int ow = 0; ow < out_w; ow++) {                              \
+                        float acc = B ? LOAD(B[oc]) : 0.0f;                           \
+                        for (int ci = 0; ci < icg; ci++) {                            \
+                            int ic = g * icg + ci;                                    \
+                            for (int r = 0; r < kh; r++)                              \
+                                for (int s = 0; s < kw; s++) {                        \
+                                    int ih = oh * sh - ph + r * dh;                   \
+                                    int iw = ow * sw - pw + s * dw;                   \
+                                    if (ih < 0 || ih >= in_h || iw < 0 || iw >= in_w) continue; \
+                                    float iv = (float)LOAD(I[(((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw]); \
+                                    float wv = (float)LOAD(W[(((size_t)oc * icg + ci) * kh + r) * kw + s]); \
+                                    acc += iv * wv;                                   \
+                                }                                                     \
+                        }                                                             \
+                        O[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow] = STORE(acc); \
+                    }                                                                 \
+            }                                                                         \
+    } while (0)
+
     switch (dt) {
     case DTYPE_FLOAT64: CML_CONV_T(double,  double);  return 0;
+    case DTYPE_FLOAT16: CML_CONV_HALF(uint16_t, fp16_to_float, float_to_fp16); return 0;
+    case DTYPE_BFLOAT16:CML_CONV_HALF(uint16_t, bf16_to_float, float_to_bf16); return 0;
     case DTYPE_INT64:   CML_CONV_T(int64_t, int64_t); return 0;
     case DTYPE_INT32:   CML_CONV_T(int32_t, int64_t); return 0;
     default:            return -1;
     }
 #undef CML_CONV_T
+#undef CML_CONV_HALF
 }
 
 /* ── Fused elementwise kernel helpers ─────────────────────────────────── */
@@ -1908,7 +1986,7 @@ not_empty_reduction:;
         if (!in1_data || !in2_data)
             return -1;
         if (in1_numel == in2_numel && in1_numel == out->numel) {
-            simd_div_f32(in1_data, in2_data, out_data, out->numel);
+            simd_div_f32_parallel(in1_data, in2_data, out_data, out->numel);
         } else {
             for (size_t i = 0; i < out->numel; i++) {
                 size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
@@ -1933,16 +2011,18 @@ not_empty_reduction:;
         }                                                                       \
         break;
 
-    UNARY_ACT(UOP_NEG,     simd_neg_f32,     -_x)
-    UNARY_ACT(UOP_EXP,     simd_exp_f32,     expf(_x))
-    UNARY_ACT(UOP_LOG,     simd_log_f32,     logf(_x))
-    UNARY_ACT(UOP_SQRT,    simd_sqrt_f32,    sqrtf(_x))
-    UNARY_ACT(UOP_ABS,     simd_abs_f32,     fabsf(_x))
-    UNARY_ACT(UOP_SIGMOID, simd_sigmoid_f32, 1.0f / (1.0f + expf(-_x)))
-    UNARY_ACT(UOP_TANH,    simd_tanh_f32,    tanhf(_x))
-    UNARY_ACT(UOP_SIN,     simd_sin_f32,     sinf(_x))
-    UNARY_ACT(UOP_COS,     simd_cos_f32,     cosf(_x))
-    UNARY_ACT(UOP_TAN,     simd_tan_f32,     tanf(_x))
+    /* Exact-size elementwise unaries route through the threadpool-parallel
+     * variants (threshold-gated inside; broadcast still takes the scalar path). */
+    UNARY_ACT(UOP_NEG,     simd_neg_f32_parallel,     -_x)
+    UNARY_ACT(UOP_EXP,     simd_exp_f32_parallel,     expf(_x))
+    UNARY_ACT(UOP_LOG,     simd_log_f32_parallel,     logf(_x))
+    UNARY_ACT(UOP_SQRT,    simd_sqrt_f32_parallel,    sqrtf(_x))
+    UNARY_ACT(UOP_ABS,     simd_abs_f32_parallel,     fabsf(_x))
+    UNARY_ACT(UOP_SIGMOID, simd_sigmoid_f32_parallel, 1.0f / (1.0f + expf(-_x)))
+    UNARY_ACT(UOP_TANH,    simd_tanh_f32_parallel,    tanhf(_x))
+    UNARY_ACT(UOP_SIN,     simd_sin_f32_parallel,     sinf(_x))
+    UNARY_ACT(UOP_COS,     simd_cos_f32_parallel,     cosf(_x))
+    UNARY_ACT(UOP_TAN,     simd_tan_f32_parallel,     tanf(_x))
     UNARY_ACT(UOP_RECIP,   simd_recip_f32,   (_x != 0.0f) ? (1.0f / _x) : 0.0f)
 #undef UNARY_ACT
 
@@ -2125,6 +2205,18 @@ not_empty_reduction:;
             if (batch < 1) batch = 1;
             size_t a_stride = (a->numel == (size_t)M * (size_t)K) ? 0 : (size_t)M * (size_t)K;
             size_t b_stride = (b->numel == (size_t)K * (size_t)N) ? 0 : (size_t)K * (size_t)N;
+
+            /* f64: route 2-D GEMM through cblas_dgemm when available. */
+            CMLBlasContext* dctx = get_blas_context();
+            if (out->dtype == DTYPE_FLOAT64 && batch == 1 && !a_stride && !b_stride &&
+                dctx && dctx->initialized &&
+                cml_blas_dgemm(dctx, (const double*)a->data, (const double*)b->data,
+                               (double*)out->data, M, N, K, 1.0, 0.0) == 0) {
+                node->is_executed = true;
+                out->is_executed  = true;
+                return 0;
+            }
+
             if (cpu_matmul_generic(a->data, b->data, out->data, batch,
                                    a_stride, b_stride, M, K, N, out->dtype) == 0) {
                 node->is_executed = true;
@@ -2146,97 +2238,106 @@ not_empty_reduction:;
                                         b->quant_scale, b->quant_zero_point,
                                         out_data, M, K, N) == 0)
                 break;
+        } else if (b->quant_type == CML_QUANT_AFFINE_INT4 && b->quant_data) {
+            /* Weight-only packed int4: nibbles stay compressed, x/y are f32. */
+            if (cml_qmatmul_affine_int4(in1_data, (const uint8_t*)b->quant_data,
+                                        b->quant_scale, b->quant_zero_point,
+                                        out_data, M, K, N) == 0)
+                break;
+        } else if (b->quant_type == CML_QUANT_NF4 && b->quant_data &&
+                   b->quant_block_size > 0) {
+            /* Block-wise NF4: payload is [num_scales floats][packed nibbles]. */
+            size_t wn         = (size_t)K * (size_t)N;
+            int num_scales    = (int)((wn + (size_t)b->quant_block_size - 1) /
+                                      (size_t)b->quant_block_size);
+            const uint8_t* blob = (const uint8_t*)b->quant_data;
+            if (cml_qmatmul_nf4(in1_data, blob + (size_t)num_scales * sizeof(float),
+                                (const float*)blob, num_scales, b->quant_block_size,
+                                out_data, M, K, N) == 0)
+                break;
         }
 
-        CMLBlasContext* blas = get_blas_context();
-        if (blas && blas->initialized) {
-            /* Check if input B is a transpose node — fuse transpose into sgemm */
-            struct IRNode* b_node = b->ir_node;
-            if (b_node && b_node->type == UOP_PERMUTE && b_node->num_inputs == 1 &&
-                b_node->inputs[0] && b_node->inputs[0]->ndim == 2) {
-                /* B = transpose(B_orig), so matmul A @ B = A @ B_orig^T
-                 * Use sgemm_ex with transB=true on the original (non-transposed) data */
-                Tensor* b_orig     = b_node->inputs[0];
-                float* b_orig_data = (float*)b_orig->data;
-                if (!b_orig_data)
-                    b_orig_data = (float*)tensor_data_ptr(b_orig);
-                if (b_orig_data) {
-                    /* B_orig is [N, K], we want A[M,K] @ B_orig[N,K]^T = [M,N] */
-                    int result = cml_blas_sgemm_ex(blas, in1_data, b_orig_data, out_data, M, N, K,
-                                                   1.0f, 0.0f, false, true);
-                    if (result == 0)
+        /* Batched matmul: leading dimensions broadcast like numpy (a or b with
+         * exactly one [M,K]/[K,N] slice is shared across the batch). The old
+         * code fed the WHOLE buffers to sgemm as one 2-D GEMM, which produced
+         * correct results only for batch 1. */
+        {
+            size_t mn    = (size_t)M * (size_t)N;
+            int batch    = (mn > 0) ? (int)(out->numel / mn) : 1;
+            if (batch < 1) batch = 1;
+            size_t a_slice = (size_t)M * (size_t)K;
+            size_t b_slice = (size_t)K * (size_t)N;
+            bool a_bcast = (a->numel == a_slice);
+            bool b_bcast = (b->numel == b_slice);
+#ifdef CML_TRACE_MM
+            fprintf(stderr, "TRACE-MM cpu node=%p M=%d N=%d K=%d batch=%d "
+                    "out=%p a=%p b=%p\n", (void*)node, M, N, K, batch,
+                    (void*)out_data, (void*)in1_data, (void*)in2_data);
+#endif
+
+            CMLBlasContext* blas = get_blas_context();
+            bool use_blas = blas && blas->initialized;
+
+            if (use_blas && batch == 1 && !a_bcast && !b_bcast) {
+                /* Fuse a trailing transpose of a 2-D B into sgemm. */
+                struct IRNode* b_node = b->ir_node;
+                if (b_node && b_node->type == UOP_PERMUTE && b_node->num_inputs == 1 &&
+                    b_node->inputs[0] && b_node->inputs[0]->ndim == 2) {
+                    Tensor* b_orig     = b_node->inputs[0];
+                    float* b_orig_data = (float*)b_orig->data;
+                    if (!b_orig_data)
+                        b_orig_data = (float*)tensor_data_ptr(b_orig);
+                    if (b_orig_data &&
+                        cml_blas_sgemm_ex(blas, in1_data, b_orig_data, out_data, M, N, K,
+                                          1.0f, 0.0f, false, true) == 0)
                         break;
                 }
+                if (cml_blas_sgemm(blas, in1_data, in2_data, out_data, M, N, K,
+                                   1.0f, 0.0f) != 0)
+                    LOG_WARNING("BLAS sgemm failed, falling back to naive matmul");
+                else
+                    break;
             }
-            int result = cml_blas_sgemm(blas, in1_data, in2_data, out_data, M, N, K, 1.0f, 0.0f);
-            if (result == 0) {
-                break; // BLAS succeeded
-            }
-            // Fall through to naive implementation if BLAS failed
-            LOG_WARNING("BLAS sgemm failed, falling back to naive matmul");
-        }
 
-        // Naive matmul fallback with cache-friendly access pattern
-        memset(out_data, 0, out->numel * sizeof(float));
-        /* BEAM=1: consult the beam-search autotuner for the block size of this
-         * matmul shape (cached per-shape). Default remains the fixed 32. */
-        /* Bounds the per-row accumulator below; the autotuner may raise
-         * BLOCK, so clamp it rather than let it index off the array. */
-        int BLOCK = 32;
-        if (cml_beam_search_enabled()) {
-            static CMLBeamSearchCtx* g_beam_ctx = NULL;
-            if (!g_beam_ctx) g_beam_ctx = cml_beam_search_create();
-            if (g_beam_ctx) {
-                uint64_t h = 0x9E3779B97F4A7C15ULL;
-                h ^= (uint64_t)M * 0x100000001B3ULL;
-                h ^= (uint64_t)N * 0x1000193ULL;
-                h ^= (uint64_t)K;
-                CMLBeamConfig best;
-                int dims[3] = {M, N, K};
-                if (cml_beam_search_tune(g_beam_ctx, h, (size_t)M * (size_t)N,
-                                         3, dims, &best) == 0 &&
-                    best.block_size_x >= 8 && best.block_size_x <= 256) {
-                    BLOCK = best.block_size_x;
-                    if (BLOCK > CML_MATMUL_MAX_BLOCK) BLOCK = CML_MATMUL_MAX_BLOCK;
-                    if (BLOCK < 1) BLOCK = 1;
-                }
-            }
-        }
-        for (int m0 = 0; m0 < M; m0 += BLOCK) {
-            for (int n0 = 0; n0 < N; n0 += BLOCK) {
-                for (int k0 = 0; k0 < K; k0 += BLOCK) {
-                    int m_end = (m0 + BLOCK < M) ? m0 + BLOCK : M;
-                    int n_end = (n0 + BLOCK < N) ? n0 + BLOCK : N;
-                    int k_end = (k0 + BLOCK < K) ? k0 + BLOCK : K;
+            /* Per-batch GEMM: BLAS slices when available, blocked naive otherwise.
+             * Broadcast operands reuse their single slice for every batch index. */
+            for (int bi = 0; bi < batch; bi++) {
+                const float* ap = in1_data + (size_t)bi * (a_bcast ? 0 : a_slice);
+                const float* bp = in2_data + (size_t)bi * (b_bcast ? 0 : b_slice);
+                float* op_      = out_data + (size_t)bi * mn;
 
-                    /* Accumulate the k-block in a register row before adding
-                     * it to the output.
-                     *
-                     * Writing `out[m][n] += a*b` inside the k loop performs K
-                     * sequential roundings into one location, so the dot product
-                     * loses O(K * eps) -- 6.6e-5 relative at K=16384, the same
-                     * flaw pairwise summation fixed for reductions. BLAS covers
-                     * the large shapes, but small M/N (batch-size-1 inference,
-                     * for instance) land here. Accumulating per block cuts the
-                     * chain to K/BLOCK + BLOCK terms and keeps `n` innermost, so
-                     * the loop still vectorises. */
-                    for (int m = m0; m < m_end; m++) {
-                        float acc[CML_MATMUL_MAX_BLOCK];
-                        int   n_len = n_end - n0;
-                        for (int n = 0; n < n_len; n++) acc[n] = 0.0f;
-                        for (int k = k0; k < k_end; k++) {
-                            float a_mk = in1_data[m * K + k];
-                            for (int n = 0; n < n_len; n++) {
-                                acc[n] += a_mk * in2_data[k * N + n0 + n];
+                if (use_blas &&
+                    cml_blas_sgemm(blas, ap, bp, op_, M, N, K, 1.0f, 0.0f) == 0)
+                    continue;
+
+                memset(op_, 0, mn * sizeof(float));
+                int BLOCK = 32;
+                for (int m0 = 0; m0 < M; m0 += BLOCK) {
+                    for (int n0 = 0; n0 < N; n0 += BLOCK) {
+                        for (int k0 = 0; k0 < K; k0 += BLOCK) {
+                            int m_end = (m0 + BLOCK < M) ? m0 + BLOCK : M;
+                            int n_end = (n0 + BLOCK < N) ? n0 + BLOCK : N;
+                            int k_end = (k0 + BLOCK < K) ? k0 + BLOCK : K;
+
+                            for (int m = m0; m < m_end; m++) {
+                                float acc[CML_MATMUL_MAX_BLOCK];
+                                int   n_len = n_end - n0;
+                                for (int n = 0; n < n_len; n++) acc[n] = 0.0f;
+                                for (int k = k0; k < k_end; k++) {
+                                    float a_mk = ap[m * K + k];
+                                    for (int n = 0; n < n_len; n++) {
+                                        acc[n] += a_mk * bp[k * N + n0 + n];
+                                    }
+                                }
+                                for (int n = 0; n < n_len; n++)
+                                    op_[m * N + n0 + n] += acc[n];
                             }
                         }
-                        for (int n = 0; n < n_len; n++)
-                            out_data[m * N + n0 + n] += acc[n];
                     }
                 }
             }
+            break;
         }
-        break;
     }
 
     case UOP_CMPLT:
@@ -2385,9 +2486,8 @@ not_empty_reduction:;
         // For cross-entropy: input is [N, C], indices is [N], output is [N]
         if (node->num_inputs < 2)
             return -1;
-        float* input_data = (float*)node->inputs[0]->data;
-        float* index_data = (float*)node->inputs[1]->data;
-        if (!input_data || !index_data)
+        const float* input_data = (const float*)node->inputs[0]->data;
+        if (!input_data || !node->inputs[1]->data)
             return -1;
 
         GatherParams* params = (GatherParams*)node->params;
@@ -2405,7 +2505,7 @@ not_empty_reduction:;
             size_t n_rows = (size_t)input->shape[0];
             size_t n_cols = (size_t)input->shape[1];
             for (size_t i = 0; i < n_rows && i < out->numel; i++) {
-                int idx = (int)index_data[i];
+                int idx = cml_index_read(indices, i);
                 if (idx < 0 || idx >= (int)n_cols) {
                     LOG_ERROR("UOP_GATHER: index %d out of bounds [0, %zu)", idx, n_cols);
                     return -1;
@@ -2432,7 +2532,7 @@ not_empty_reduction:;
             size_t out_idx = 0;
             for (size_t o = 0; o < outer_size; o++) {
                 for (size_t j = 0; j < indices->numel; j++) {
-                    int idx = (int)index_data[j];
+                    int idx = cml_index_read(indices, j);
                     if (idx < 0 || idx >= (int)dim_size) {
                         LOG_ERROR("UOP_GATHER: index %d out of bounds [0, %zu)", idx, dim_size);
                         return -1;
@@ -3607,12 +3707,10 @@ not_empty_reduction:;
     }
 
     case UOP_SCATTER_ADD: {
-        /* index_add (adjoint of gather): inputs [index, src].
-         * out[.., index[i], ..] += src[.., i, ..] along `dim`. */
         if (node->num_inputs < 2 || !node->params) return -1;
-        float* idx_data = (float*)node->inputs[0]->data;
         float* src_data = (float*)node->inputs[1]->data;
-        if (!idx_data || !src_data) return -1;
+        if (!node->inputs[0]->data || !src_data) return -1;
+        Tensor* idx_tensor = node->inputs[0];
         ScatterAddParams* sp = (ScatterAddParams*)node->params;
         Tensor* src = node->inputs[1];
         int dim = sp->dim;
@@ -3624,7 +3722,7 @@ not_empty_reduction:;
         memset(out_data, 0, out->numel * sizeof(float));
         for (size_t o = 0; o < outer; o++)
             for (size_t j = 0; j < src_dim; j++) {
-                int idx = (int)idx_data[dim == 0 ? j : (o * src_dim + j)];
+                int idx = cml_index_read(idx_tensor, dim == 0 ? j : (o * src_dim + j));
                 if (idx < 0 || idx >= (int)out_dim) continue;
                 for (size_t k = 0; k < inner; k++)
                     out_data[(o * out_dim + (size_t)idx) * inner + k] +=
@@ -4863,6 +4961,31 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
     return cpu_execute_ir(ir);
 }
 
+/* Resolve BACKEND= once through the canonical dispatch parser so every
+ * execution entry point honors the same backend set. Previously
+ * cml_ir_execute only recognized "opencl" and cml_ir_execute_up_to only
+ * metal/opencl, silently ignoring cuda/rocm/vulkan/nv/am/nir/webgpu. Returns
+ * the requested backend (CML_BACKEND_CPU_FALLBACK when unset/unparseable —
+ * never a GPU route) and the dispatch context to run it on. */
+static int ir_resolve_env_backend(CMLBackendType* out_backend,
+                                  CMLDispatchContext** out_ctx) {
+    static int resolved              = 0;
+    static CMLBackendType backend    = CML_BACKEND_CPU_FALLBACK;
+    static CMLDispatchContext* rctx  = NULL;
+    if (!resolved) {
+        const char* env = getenv("BACKEND");
+        if (env) {
+            rctx = cml_dispatch_get_global();
+            if (rctx && cml_dispatch_set_from_env(rctx) == 0)
+                backend = rctx->preferred;
+        }
+        resolved = 1;
+    }
+    *out_backend = backend;
+    *out_ctx     = rctx;
+    return backend != CML_BACKEND_CPU_FALLBACK && rctx != NULL;
+}
+
 int cml_ir_execute(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute");
@@ -4876,17 +4999,14 @@ int cml_ir_execute(CMLGraph_t ir) {
         cml_ir_decompose(ir);
     }
 
-    /* Check if graph should target a GPU backend via BACKEND env */
-    const char* backend_env = getenv("BACKEND");
-    if (backend_env &&
-        (strcasecmp(backend_env, "opencl") == 0 || strcasecmp(backend_env, "cl") == 0)) {
-        CMLDispatchContext* ctx = cml_dispatch_get_global();
-        if (ctx) {
-            int r = cml_dispatch_execute_on(ctx, CML_BACKEND_OPENCL, ir, NULL, 0, NULL, 0);
-            if (r == 0)
-                return 0;
-        }
-        /* Fall through to CPU if OpenCL fails */
+    /* Route through dispatch when BACKEND= requests a GPU/backend path. */
+    CMLBackendType env_backend;
+    CMLDispatchContext* env_ctx;
+    if (ir_resolve_env_backend(&env_backend, &env_ctx)) {
+        int r = cml_dispatch_execute_on(env_ctx, env_backend, ir, NULL, 0, NULL, 0);
+        if (r == 0)
+            return 0;
+        LOG_WARNING("BACKEND=%d execution failed; falling back to CPU", (int)env_backend);
     }
 
     return cml_ir_execute_cpu(ir);
@@ -4898,31 +5018,17 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
         return -1;
     }
 
-    target_node->is_used = true;
+    /* NOTE: do NOT pre-mark target_node->is_used here. The partial-execution
+     * DCE walk below seeds its stack with the target ONLY if it is not yet
+     * marked; pre-marking it made the DFS push nothing, so no upstream node
+     * was ever marked or executed — the target then ran alone on unwritten
+     * inputs and its (zero-filled) output was reported as a valid result. */
 
-    /* Check if graph should target a GPU backend via BACKEND env.
-     * Cache env check + dispatch context to avoid repeated getenv()/lookup. */
-    static int s_backend_checked              = 0;
-    static int s_use_backend                  = 0;
-    static CMLBackendType s_backend_type      = CML_BACKEND_CPU_FALLBACK;
-    static CMLDispatchContext* s_dispatch_ctx = NULL;
-    if (!s_backend_checked) {
-        const char* backend_env = getenv("BACKEND");
-        if (backend_env) {
-            if (strcasecmp(backend_env, "metal") == 0 || strcasecmp(backend_env, "mtl") == 0) {
-                s_backend_type = CML_BACKEND_METAL;
-                s_use_backend  = 1;
-            } else if (strcasecmp(backend_env, "opencl") == 0 ||
-                       strcasecmp(backend_env, "cl") == 0) {
-                s_backend_type = CML_BACKEND_OPENCL;
-                s_use_backend  = 1;
-            }
-        }
-        if (s_use_backend)
-            s_dispatch_ctx = cml_dispatch_get_global();
-        s_backend_checked = 1;
-    }
-    if (s_use_backend && s_dispatch_ctx) {
+    /* Route through dispatch when BACKEND= requests a GPU/backend path —
+     * same canonical parser as cml_ir_execute (was metal/opencl only). */
+    CMLBackendType env_backend;
+    CMLDispatchContext* s_dispatch_ctx;
+    if (ir_resolve_env_backend(&env_backend, &s_dispatch_ctx)) {
         /* Temporarily truncate the linked list at target_node so the GPU
          * backend only dispatches the nodes required for partial execution. */
         struct IRNode* saved_tail = ir->tail;
@@ -4940,7 +5046,7 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
             _n = _n->next;
         }
         ir->node_count = cnt;
-        int r = cml_dispatch_execute_on(s_dispatch_ctx, s_backend_type, ir, NULL, 0, NULL, 0);
+        int r = cml_dispatch_execute_on(s_dispatch_ctx, env_backend, ir, NULL, 0, NULL, 0);
         target_node->next = saved_next;
         ir->tail          = saved_tail;
         ir->node_count    = saved_count;

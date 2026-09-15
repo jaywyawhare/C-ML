@@ -58,9 +58,9 @@ where = ["."]
 include = ["cml*"]
 
 [tool.setuptools.package-data]
-"cml" = ["py.typed", "*.pyi"]
+# build_cffi.py drops _cml_lib.<ext> directly into cml/, not a submodule
+"cml" = ["py.typed", "*.pyi", "*.so", "*.dylib", "*.dll"]
 "cml.viz" = ["static/**/*"]
-"cml._lib" = ["*.so", "*.dylib", "*.dll"]
 
 [tool.black]
 line-length = 100

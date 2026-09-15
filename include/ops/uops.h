@@ -238,6 +238,12 @@ typedef enum {
     UOP_IM2COL,          // fused 2D im2col: [N,C,H,W] -> [N*OH*OW, C*kh*kw] (Im2colParams)
     UOP_COL2IM,          // adjoint of IM2COL: scatter-add cols back to [N,C,H,W] (Col2imParams)
 
+    /* Sparse COO @ dense matmul (built by sparse_matmul). Inputs:
+     * {indices [nnz,2] int32, values [nnz], dense B [K,N], rows [nnz] int32,
+     *  cols [nnz] int32}. Rows/cols are the split coordinate columns, kept as
+     * eager tensors so the VJP can gather/scatter with the primitive uops. */
+    UOP_SPMM,            // C = A_coo @ B  (SpMMParams)
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -736,6 +742,13 @@ typedef struct {
     int stride;       // window stride
     int output_len;   // length of the reconstructed (folded) last axis
 } FoldParams;
+
+/* Sparse COO @ dense matmul: only the dense output extent [M, K] — the
+ * coordinate columns travel as eager input tensors (see UOP_SPMM). */
+typedef struct {
+    int M; // rows of the sparse operand
+    int K; // cols of the sparse operand == rows of the dense operand
+} SpMMParams;
 
 typedef struct {
     int dim;       // axis to scatter-add along (indices select positions here)

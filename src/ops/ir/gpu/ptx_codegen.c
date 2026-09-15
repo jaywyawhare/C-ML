@@ -126,10 +126,15 @@ static int ptx_write_store_binary(char* buf, int buf_size) {
 static bool ptx_is_unary_op(UOpType t) {
     switch (t) {
     case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
-    case UOP_ABS: case UOP_SIN: case UOP_COS: case UOP_SIGMOID:
-    case UOP_TANH: case UOP_RECIP: case UOP_FLOOR: case UOP_CEIL:
+    case UOP_ABS: case UOP_SIN: case UOP_COS: case UOP_TAN:
+    case UOP_SIGMOID: case UOP_TANH: case UOP_RECIP:
+    case UOP_FLOOR: case UOP_CEIL:
     case UOP_ELU: case UOP_SELU: case UOP_SILU: case UOP_MISH:
     case UOP_HARDSWISH:
+    case UOP_GELU: case UOP_QUICK_GELU: case UOP_LEAKY_RELU:
+    case UOP_HARD_SIGMOID: case UOP_HARD_TANH: case UOP_RELU6:
+    case UOP_SQUARE: case UOP_RSQRT: case UOP_EXP2: case UOP_LOG2:
+    case UOP_SIGN:
         return true;
     default:
         return false;
@@ -141,6 +146,8 @@ static bool ptx_is_binary_op(UOpType t) {
     case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV:
     case UOP_MAX: case UOP_POW: case UOP_CMPLT: case UOP_MOD:
     case UOP_IDIV:
+    case UOP_MINIMUM: case UOP_CMPGT: case UOP_CMPGE:
+    case UOP_CMPLE: case UOP_CMPEQ: case UOP_CMPNE:
         return true;
     default:
         return false;
@@ -176,6 +183,14 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
 
     char* ptx = (char*)cml_malloc(PTX_BUF_SIZE);
     if (!ptx) return NULL;
+
+    /* Irrational activation constants are emitted as bit patterns rather than
+     * hand-encoded hex, so the values match the CPU path exactly. */
+    char hex_gelu_k1[16], hex_gelu_k2[16], hex_qgelu_k[16], hex_leaky[16];
+    float_to_ptx_hex(0.7978845608f, hex_gelu_k1, sizeof(hex_gelu_k1)); /* sqrt(2/pi) */
+    float_to_ptx_hex(0.044715f,     hex_gelu_k2, sizeof(hex_gelu_k2));
+    float_to_ptx_hex(1.702f,        hex_qgelu_k, sizeof(hex_qgelu_k));
+    float_to_ptx_hex(0.01f,         hex_leaky,   sizeof(hex_leaky));   /* default slope */
 
     int pos = 0;
     pos += ptx_write_header(ptx + pos, PTX_BUF_SIZE - pos, cg->sm_version);
@@ -216,6 +231,13 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
     case UOP_COS:
         pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
             "    cos.approx.f32 %%f1, %%f0;\n\n");
+        break;
+    case UOP_TAN:
+        // tan(x) = sin(x) / cos(x)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    sin.approx.f32 %%f2, %%f0;\n"
+            "    cos.approx.f32 %%f3, %%f0;\n"
+            "    div.approx.f32 %%f1, %%f2, %%f3;\n\n");
         break;
     case UOP_SIGMOID:
         // sigmoid(x) = 1/(1+exp(-x)) = 1/(1+exp2(-x*log2e))
@@ -316,6 +338,99 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
             "    selp.f32 %%f1, 0f00000000, %%f2, %%p2;\n"  // x < -3 ? 0 : mid
             "    selp.f32 %%f1, %%f0, %%f1, %%p1;\n\n");    // x > 3 ? x : result
         break;
+    case UOP_SQUARE:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    mul.f32 %%f1, %%f0, %%f0;\n\n");
+        break;
+    case UOP_RSQRT:
+        // 1/sqrt(x), matching the CPU path (no fabs, unlike UOP_SQRT)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    rsqrt.approx.f32 %%f1, %%f0;\n\n");
+        break;
+    case UOP_EXP2:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    ex2.approx.f32 %%f1, %%f0;\n\n");
+        break;
+    case UOP_LOG2:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    lg2.approx.f32 %%f1, %%f0;\n\n");
+        break;
+    case UOP_SIGN:
+        // (x>0)?1:(x<0?-1:0); NaN -> 0 (ordered compares are false for NaN)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.gt.f32 %%p1, %%f0, 0f00000000;\n"
+            "    setp.lt.f32 %%p2, %%f0, 0f00000000;\n"
+            "    mov.f32 %%f1, 0f00000000;\n"
+            "    selp.f32 %%f1, 0fBF800000, %%f1, %%p2;\n"   // x<0 ? -1 : 0
+            "    selp.f32 %%f1, 0f3F800000, %%f1, %%p1;\n\n"); // x>0 ? 1 : prev
+        break;
+    case UOP_LEAKY_RELU:
+        // x > 0 ? x : slope*x (default slope 0.01, as ELU's fixed alpha)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.gt.f32 %%p1, %%f0, 0f00000000;\n"
+            "    mul.f32 %%f2, %%f0, %s;\n"
+            "    selp.f32 %%f1, %%f0, %%f2, %%p1;\n\n", hex_leaky);
+        break;
+    case UOP_RELU6:
+        // clamp(x, 0, 6) with NaN passthrough; 6.0 = 0f40C00000
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.lt.f32 %%p1, %%f0, 0f00000000;\n"      // x < 0
+            "    setp.gt.f32 %%p2, %%f0, 0f40C00000;\n"      // x > 6
+            "    mov.f32 %%f1, %%f0;\n"
+            "    selp.f32 %%f1, 0f00000000, %%f1, %%p1;\n"   // x<0 ? 0 : x
+            "    selp.f32 %%f1, 0f40C00000, %%f1, %%p2;\n\n"); // x>6 ? 6 : prev
+        break;
+    case UOP_HARD_TANH:
+        // clamp(x, -1, 1) with NaN passthrough
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.lt.f32 %%p1, %%f0, 0fBF800000;\n"      // x < -1
+            "    setp.gt.f32 %%p2, %%f0, 0f3F800000;\n"      // x > 1
+            "    mov.f32 %%f1, %%f0;\n"
+            "    selp.f32 %%f1, 0fBF800000, %%f1, %%p1;\n"
+            "    selp.f32 %%f1, 0f3F800000, %%f1, %%p2;\n\n");
+        break;
+    case UOP_HARD_SIGMOID:
+        // min(max((x+3)/6, 0), 1); PTX min/max.f32 return the non-NaN operand,
+        // matching the CPU fmin/fmax. 3.0=0f40400000, 1/6=0f3E2AAAAB
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    add.f32 %%f1, %%f0, 0f40400000;\n"          // x + 3
+            "    mul.f32 %%f1, %%f1, 0f3E2AAAAB;\n"          // (x+3)/6
+            "    max.f32 %%f1, %%f1, 0f00000000;\n"          // max(., 0)
+            "    min.f32 %%f1, %%f1, 0f3F800000;\n\n");      // min(., 1)
+        break;
+    case UOP_QUICK_GELU:
+        // x * sigmoid(1.702*x) = x / (1 + exp(-1.702*x)); exp via ex2(y*log2e)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    neg.f32 %%f2, %%f0;\n"                       // -x
+            "    mul.f32 %%f2, %%f2, %s;\n"                   // -1.702x
+            "    mul.f32 %%f2, %%f2, 0f3FB8AA3B;\n"          // * log2(e)
+            "    ex2.approx.f32 %%f2, %%f2;\n"                // exp(-1.702x)
+            "    add.f32 %%f2, %%f2, 0f3F800000;\n"          // 1 + exp(...)
+            "    rcp.approx.f32 %%f2, %%f2;\n"                // sigmoid(1.702x)
+            "    mul.f32 %%f1, %%f0, %%f2;\n\n", hex_qgelu_k);
+        break;
+    case UOP_GELU:
+        // 0.5*x*(1 + tanh(k1*(x + k2*x^3))), tanh via 2*sigmoid(2y)-1.
+        // k1 = sqrt(2/pi), k2 = 0.044715; matches the CPU tanh approximation.
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    mul.f32 %%f2, %%f0, %%f0;\n"                 // x^2
+            "    mul.f32 %%f2, %%f2, %%f0;\n"                 // x^3
+            "    mul.f32 %%f2, %%f2, %s;\n"                   // k2*x^3
+            "    add.f32 %%f2, %%f2, %%f0;\n"                 // x + k2*x^3
+            "    mul.f32 %%f2, %%f2, %s;\n"                   // y = k1*(...)
+            "    add.f32 %%f3, %%f2, %%f2;\n"                 // 2y
+            "    neg.f32 %%f3, %%f3;\n"                       // -2y
+            "    mul.f32 %%f3, %%f3, 0f3FB8AA3B;\n"          // -2y*log2e
+            "    ex2.approx.f32 %%f3, %%f3;\n"                // exp(-2y)
+            "    add.f32 %%f3, %%f3, 0f3F800000;\n"          // 1+exp(-2y)
+            "    rcp.approx.f32 %%f3, %%f3;\n"                // sigmoid(2y)
+            "    add.f32 %%f3, %%f3, %%f3;\n"                 // 2*sigmoid
+            "    sub.f32 %%f3, %%f3, 0f3F800000;\n"          // tanh(y)
+            "    add.f32 %%f3, %%f3, 0f3F800000;\n"          // 1+tanh(y)
+            "    mul.f32 %%f1, %%f0, 0f3F000000;\n"          // 0.5x
+            "    mul.f32 %%f1, %%f1, %%f3;\n\n",             // 0.5x*(1+tanh)
+            hex_gelu_k2, hex_gelu_k1);
+        break;
     default:
         cml_free(ptx);
         return NULL;
@@ -359,6 +474,37 @@ char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name)
     case UOP_MAX:
         pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
             "    max.f32 %%f2, %%f0, %%f1;\n\n");
+        break;
+    case UOP_MINIMUM:
+        // PTX min.f32 returns the non-NaN operand, as the existing MAX case
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    min.f32 %%f2, %%f0, %%f1;\n\n");
+        break;
+    case UOP_CMPGT:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.gt.f32 %%p1, %%f0, %%f1;\n"
+            "    selp.f32 %%f2, 0f3F800000, 0f00000000, %%p1;\n\n");
+        break;
+    case UOP_CMPGE:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.ge.f32 %%p1, %%f0, %%f1;\n"
+            "    selp.f32 %%f2, 0f3F800000, 0f00000000, %%p1;\n\n");
+        break;
+    case UOP_CMPLE:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.le.f32 %%p1, %%f0, %%f1;\n"
+            "    selp.f32 %%f2, 0f3F800000, 0f00000000, %%p1;\n\n");
+        break;
+    case UOP_CMPEQ:
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.eq.f32 %%p1, %%f0, %%f1;\n"
+            "    selp.f32 %%f2, 0f3F800000, 0f00000000, %%p1;\n\n");
+        break;
+    case UOP_CMPNE:
+        // PTX setp.ne is true when either operand is NaN, matching C's a != b
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+            "    setp.ne.f32 %%p1, %%f0, %%f1;\n"
+            "    selp.f32 %%f2, 0f3F800000, 0f00000000, %%p1;\n\n");
         break;
     case UOP_POW:
         // pow(a,b) = exp2(b * log2(a))

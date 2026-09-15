@@ -8,6 +8,7 @@
 #include "tensor/realize.h"
 #include "autograd/autograd.h"
 #include "ops/ir/internal.h"
+#include "nn/layers/sequential.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,50 @@ void nn_tensor_param_alias(Tensor* t) {
         t->ref_count++;
 }
 
+int module_add_buffer(Module* module, Tensor* tensor, const char* name) {
+    if (!module || !tensor || !name)
+        return -1;
+
+    if (module_get_buffer(module, name)) {
+        LOG_WARNING("Buffer '%s' already exists in module '%s'", name, module->name);
+        return -1;
+    }
+
+    if (module->num_buffers >= module->buffers_capacity) {
+        int new_capacity = module->buffers_capacity == 0 ? 4 : module->buffers_capacity * 2;
+        Tensor** new_buffers = cml_realloc(module->buffers,
+                                           (size_t)new_capacity * sizeof(Tensor*));
+        char** new_names = cml_realloc(module->buffer_names,
+                                       (size_t)new_capacity * sizeof(char*));
+        if (!new_buffers || !new_names) {
+            LOG_ERROR("Failed to grow buffer registry for module '%s'", module->name);
+            return -1;
+        }
+        module->buffers          = new_buffers;
+        module->buffer_names     = new_names;
+        module->buffers_capacity = new_capacity;
+    }
+
+    char* copy = cml_strdup(name);
+    if (!copy)
+        return -1;
+
+    module->buffers[module->num_buffers]      = tensor;
+    module->buffer_names[module->num_buffers] = copy;
+    module->num_buffers++;
+    return 0;
+}
+
+Tensor* module_get_buffer(Module* module, const char* name) {
+    if (!module || !name)
+        return NULL;
+    for (int i = 0; i < module->num_buffers; i++) {
+        if (module->buffer_names[i] && strcmp(module->buffer_names[i], name) == 0)
+            return module->buffers[i];
+    }
+    return NULL;
+}
+
 int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free) {
     if (!module || !name)
         return -1;
@@ -34,6 +79,10 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
     module->parameters          = NULL;
     module->num_parameters      = 0;
     module->parameters_capacity = 0;
+    module->buffers             = NULL;
+    module->buffer_names        = NULL;
+    module->num_buffers         = 0;
+    module->buffers_capacity    = 0;
     module->next                = NULL;
     module->training            = false;
     module->user_data           = NULL;
@@ -45,7 +94,10 @@ int module_init(Module* module, const char* name, ForwardFn forward, FreeFn free
 }
 
 Module* module_create(const char* name, ForwardFn forward, FreeFn free) {
-    Module* module = cml_malloc(sizeof(Module));
+    /* calloc: Module structs are recycled by the allocator; every field must
+     * start zeroed. module_init below sets the standard fields explicitly,
+     * but future additions are covered by the zeroing. */
+    Module* module = cml_calloc(1, sizeof(Module));
     if (!module)
         return NULL;
 
@@ -96,6 +148,20 @@ void module_free(Module* module) {
         cml_free(module->parameters);
         module->parameters = NULL;
     }
+
+    /* Buffer names are owned; the Tensors are not (layers free their own). */
+    if (module->buffer_names) {
+        for (int i = 0; i < module->num_buffers; i++)
+            if (module->buffer_names[i])
+                cml_free(module->buffer_names[i]);
+        cml_free(module->buffer_names);
+        module->buffer_names = NULL;
+    }
+    if (module->buffers) {
+        cml_free(module->buffers);
+        module->buffers = NULL;
+    }
+    module->num_buffers = 0;
 
     autograd_free_module_hooks(module);
 
@@ -382,19 +448,16 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
     if (!module || !params_out || !num_params_out)
         return -1;
 
-    
+    /* sequential_add flattens container children's parameters into the
+     * container's own array, so this walk is complete for Sequential models
+     * without recursing (recursing would double-count the aliases). */
     int total_params = module->num_parameters;
     if (recursive) {
-        
         Module* current = module->next;
         while (current) {
             total_params += current->num_parameters;
             current = current->next;
         }
-
-        
-        
-        
     }
 
     if (total_params == 0) {
@@ -409,27 +472,18 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
         return -1;
     }
 
-    
     int idx = 0;
 
-    
-    for (int i = 0; i < module->num_parameters; i++) {
-        if (module->parameters[i]) {
+    for (int i = 0; i < module->num_parameters; i++)
+        if (module->parameters[i])
             params[idx++] = module->parameters[i];
-        }
-    }
 
-    
-    if (recursive) {
-        Module* current = module->next;
-        while (current) {
-            for (int i = 0; i < current->num_parameters; i++) {
-                if (current->parameters[i]) {
-                    params[idx++] = current->parameters[i];
-                }
-            }
-            current = current->next;
-        }
+    Module* current = recursive ? module->next : NULL;
+    while (current) {
+        for (int i = 0; i < current->num_parameters; i++)
+            if (current->parameters[i])
+                params[idx++] = current->parameters[i];
+        current = current->next;
     }
 
     *params_out     = params;
@@ -437,7 +491,6 @@ int module_collect_parameters(Module* module, Parameter*** params_out, int* num_
 
     LOG_DEBUG("Collected %d parameters from module '%s' (recursive=%d)", idx, module->name,
               recursive);
-
     return 0;
 }
 

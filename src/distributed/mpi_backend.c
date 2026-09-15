@@ -271,8 +271,6 @@ static int mpi_wait(DistWork* work) {
 
 static int mpi_init(void* ctx, int world_size, int rank) {
     MPIContext* mpi = mpi_get_ctx(ctx);
-    (void)world_size;
-    (void)rank;
     if (!mpi)
         return -1;
 
@@ -281,6 +279,23 @@ static int mpi_init(void* ctx, int world_size, int rank) {
         if (result != 0)
             return -1;
         mpi->initialized = true;
+    }
+
+    /* Validate the caller's rank/world against what MPI actually reports —
+     * the arguments used to be ignored entirely, so a stale or wrong launch
+     * configuration (e.g. mpirun -np 2 with a hard-coded world of 1) silently
+     * produced mismatched collectives instead of a clear error. */
+    if (mpi->MPI_Comm_rank && mpi->MPI_Comm_size && mpi->initialized) {
+        int real_rank = -1, real_size = 0;
+        if (mpi->MPI_Comm_rank(CML_MPI_COMM_WORLD, &real_rank) != 0 ||
+            mpi->MPI_Comm_size(CML_MPI_COMM_WORLD, &real_size) != 0)
+            return -1;
+        if ((world_size > 0 && real_size != world_size) ||
+            (rank >= 0 && real_rank != rank)) {
+            LOG_ERROR("MPI backend: launcher says rank %d/%d but MPI reports "
+                      "rank %d of %d", rank, world_size, real_rank, real_size);
+            return -1;
+        }
     }
 
     return 0;

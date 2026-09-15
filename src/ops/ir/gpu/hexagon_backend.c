@@ -17,6 +17,17 @@ static remote_handle_invoke_fn fn_remote_handle_invoke  = NULL;
 static remote_handle_close_fn  fn_remote_handle_close   = NULL;
 
 static void* try_dlopen_dsp(void) {
+    /* Mock/alternative transport override (used by tests to exercise the
+     * full session lifecycle without DSP hardware). */
+    const char* override = getenv("CML_DSP_RPC_LIB");
+    if (override && override[0]) {
+        void* h = dlopen(override, RTLD_LAZY);
+        if (h) {
+            LOG_DEBUG("Opened %s (CML_DSP_RPC_LIB override)", override);
+            return h;
+        }
+        LOG_WARNING("CML_DSP_RPC_LIB='%s' could not be opened: %s", override, dlerror());
+    }
     void* h = dlopen("libcdsprpc.so", RTLD_LAZY);
     if (h) {
         LOG_DEBUG("Opened libcdsprpc.so (CDSP RPC)");

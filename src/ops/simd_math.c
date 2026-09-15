@@ -256,8 +256,18 @@ typedef struct { const float* in; float* out; } ParallelUnaryData;
 DEFINE_PARALLEL_BINARY(add)
 DEFINE_PARALLEL_BINARY(mul)
 DEFINE_PARALLEL_BINARY(sub)
+DEFINE_PARALLEL_BINARY(div)
 DEFINE_PARALLEL_BINARY(max)
 DEFINE_PARALLEL_UNARY(exp)
+DEFINE_PARALLEL_UNARY(neg)
+DEFINE_PARALLEL_UNARY(log)
+DEFINE_PARALLEL_UNARY(sqrt)
+DEFINE_PARALLEL_UNARY(abs)
+DEFINE_PARALLEL_UNARY(sigmoid)
+DEFINE_PARALLEL_UNARY(tanh)
+DEFINE_PARALLEL_UNARY(sin)
+DEFINE_PARALLEL_UNARY(cos)
+DEFINE_PARALLEL_UNARY(tan)
 
 typedef struct { const float* data; float* partial_sums; size_t num_threads; size_t chunk; } ParallelSumData;
 

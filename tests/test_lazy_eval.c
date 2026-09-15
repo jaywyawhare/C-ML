@@ -474,6 +474,86 @@ static void test_pool2d_layers_stay_lazy(void) {
     cml_reset_ir_context();
 }
 
+/* ── 13. Mid-graph realization must execute upstream nodes ──────────────── */
+
+static void test_midgraph_realization_executes_upstream(void) {
+    printf("Test: realizing a mid-graph tensor executes its producers\n");
+
+    /* Two matmul chains sharing inputs, realized mid-graph:
+     *   p  = A @ B                       (shared intermediate)
+     *   s1 = p @ transpose(p)            (chain 1 — realized first)
+     *   s2 = p @ transpose2(p)           (chain 2 — still pending)
+     * Realizing s1 must run p and the first permute. The historical bug
+     * pre-marked the target as used, which made the DCE seed nothing: only
+     * the target executed, on unwritten inputs, and its zero-filled buffer
+     * was returned as a valid result. MATMUL is load-bearing here: it does
+     * not decompose, so no replacement node rescues a poisoned mark (an
+     * elementwise variant of this test passes even with the bug present,
+     * because decompose rebuilds the target and clears the poison). */
+    float a_data[24], b_data[24];   /* A=[4,6], B=[6,4] */
+    for (int i = 0; i < 24; i++) {
+        a_data[i] = (float)((i * 7) % 11) - 5.0f;
+        b_data[i] = (float)((i * 5) % 13) / 6.0f - 1.0f;
+    }
+    int ashape[] = {4, 6};
+    int bshape[] = {6, 4};
+    TensorConfig cfg = {0};
+
+    Tensor* A = tensor_from_data(a_data, ashape, 2, &cfg);
+    Tensor* B = tensor_from_data(b_data, bshape, 2, &cfg);
+    if (!A || !B) { CHECK("graph setup", 0); return; }
+
+    /* chain 1: P = A@B ; S1 = P @ Pᵀ via explicit permute */
+    Tensor* P = uop_matmul(A, B);
+    PermuteParams pp = {.perm = (int[]){1, 0}, .num_dims = 2};
+    Tensor* Pt1 = uop_permute(P, &pp);
+    Tensor* S1 = uop_matmul(P, Pt1);
+
+    /* chain 2 reuses P with a second permute node */
+    Tensor* Pt2 = uop_permute(P, &pp);
+    Tensor* S2 = uop_matmul(P, Pt2);
+
+    CHECK("S1 pending before realization", S1 && !S1->is_executed);
+
+    /* Realize chain 1 while chain 2 is still pending */
+    float* pd = P ? (float*)tensor_data_ptr(P) : NULL;
+    float* s1 = S1 ? (float*)tensor_data_ptr(S1) : NULL;
+    int ok = s1 != NULL && pd != NULL;
+    /* Guard against a false pass where both buffers are zero-filled */
+    int p_nonzero = 0;
+    for (int i = 0; i < 24; i++)
+        if (fabsf(pd[i]) > 1e-6f) { p_nonzero = 1; break; }
+    ok = ok && p_nonzero;
+    if (ok) {
+        /* S1[i][j] = row_i(P) · row_j(P); P is [4,4] */
+        for (int i = 0; i < 4 && ok; i++) {
+            for (int j = 0; j < 4 && ok; j++) {
+                double acc = 0.0;
+                for (int k = 0; k < 4; k++)
+                    acc += (double)pd[i * 4 + k] * (double)pd[j * 4 + k];
+                if (fabsf((float)acc - s1[i * 4 + j]) > 1e-3f)
+                    ok = 0;
+            }
+        }
+    }
+    CHECK("s1 = P @ Pᵀ matches reference exactly", ok);
+    CHECK("s1 not silently zero-filled", ok);
+
+    /* Chain 2 must produce identical values through the shared P */
+    float* s2 = S2 ? (float*)tensor_data_ptr(S2) : NULL;
+    ok = s2 != NULL;
+    if (ok) {
+        for (int i = 0; i < 16 && ok; i++)
+            if (fabsf(s1[i] - s2[i]) > 1e-5f) ok = 0;
+    }
+    CHECK("second chain sharing P agrees", ok);
+
+    tensor_free(A); tensor_free(B); tensor_free(P);
+    tensor_free(Pt1); tensor_free(S1);
+    tensor_free(Pt2); tensor_free(S2);
+    cml_reset_ir_context();
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 
 int main(void) {
@@ -491,6 +571,7 @@ int main(void) {
     test_permute_does_not_force_source_execution();
     test_dropout_layer_stays_lazy();
     test_pool2d_layers_stay_lazy();
+    test_midgraph_realization_executes_upstream();
 
     return TEST_SUMMARY();
 }

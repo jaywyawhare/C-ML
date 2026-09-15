@@ -10,6 +10,7 @@
 #include "ops/uops.h"
 #include "backend/blas.h"
 #include "ops/simd_math.h"
+#include "alloc/cml_allocator.h"
 
 #ifdef __SSE__
 #include <xmmintrin.h>
@@ -648,6 +649,57 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    /* C = A_coo @ B ([M,K] sparse COO times [K,N] dense).
+     * dA_values[m] = sum_j gC[row_m, j] * B[col_m, j]
+     * dB[col_m, :] += A_values[m] * gC[row_m, :]
+     * The coordinate columns ride along as inputs 3/4; indices (input 0) is
+     * discrete and takes no gradient. */
+    case UOP_SPMM: {
+        SpMMParams* sp = (SpMMParams*)node->params;
+        Tensor* vals   = in2;
+        Tensor* dense  = (node->num_inputs >= 3 && node->inputs) ? node->inputs[2] : NULL;
+        Tensor* rows_t = (node->num_inputs >= 5 && node->inputs) ? node->inputs[3] : NULL;
+        Tensor* cols_t = (node->num_inputs >= 5 && node->inputs) ? node->inputs[4] : NULL;
+        if (!sp || !vals || !dense || !rows_t || !cols_t || !dense->data || !out->data)
+            break;
+
+        int N = (out->ndim == 2) ? out->shape[1] : 0;
+        if (N <= 0 || rows_t->numel != vals->numel || cols_t->numel != vals->numel)
+            break;
+
+        const int32_t* rows = (const int32_t*)rows_t->data;
+        const int32_t* cols = (const int32_t*)cols_t->data;
+        float* val_data     = (float*)vals->data;
+        float* dense_data   = (float*)dense->data;
+        if (!rows || !cols || !val_data)
+            break;
+        float* og = out_grad;
+
+        if (vals->requires_grad) {
+            Tensor* g1 = ensure_grad(vals);
+            if (g1 && g1->data) {
+                float* gv = (float*)g1->data;
+                for (int m = 0; m < vals->numel; m++) {
+                    float sum = 0.0f;
+                    for (int n = 0; n < N; n++)
+                        sum += og[rows[m] * N + n] * dense_data[cols[m] * N + n];
+                    gv[m] += sum;
+                }
+            }
+        }
+
+        if (dense->requires_grad) {
+            Tensor* g2 = ensure_grad(dense);
+            if (g2 && g2->data) {
+                float* gd = (float*)g2->data;
+                for (int m = 0; m < vals->numel; m++)
+                    for (int n = 0; n < N; n++)
+                        gd[cols[m] * N + n] += val_data[m] * og[rows[m] * N + n];
+            }
+        }
+        break;
+    }
+
     case UOP_LINEAR: {
         if (!in1 || !in2 || in1->ndim < 2 || in2->ndim != 2)
             break;
@@ -1110,6 +1162,24 @@ static int cpu_backward_node(struct IRNode* node) {
                     float sig = 1.0f / (1.0f + expf(-x));
                     float grad = sig * (1.0f + x * (1.0f - sig));
                     g1_data[i % in1->numel] += out_grad[i] * grad;
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_LEAKY_RELU: {
+        // d(leaky_relu)/dx = x > 0 ? 1 : slope
+        if (in1 && in1->requires_grad && in1->data) {
+            ClampParams* cp = (ClampParams*)node->params;
+            float slope = cp ? cp->min_val : 0.01f;
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                float* in1_data = (float*)in1->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    float x = in1_data[i % in1->numel];
+                    g1_data[i % in1->numel] += out_grad[i] * (x > 0.0f ? 1.0f : slope);
                 }
             }
         }
@@ -2970,17 +3040,208 @@ static int cpu_backward_node(struct IRNode* node) {
         }
         break;
 
+    case UOP_MASKED_FILL: {
+        /* out = mask ? value : in1  ->  d/in1 = grad where mask == 0 */
+        if (in1 && in1->requires_grad && in1->data && node->num_inputs > 1 &&
+            node->inputs[1] && node->inputs[1]->data) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data   = (float*)g1->data;
+                float* mask_data = (float*)node->inputs[1]->data;
+                for (size_t i = 0; i < out_numel; i++) {
+                    size_t mi = i % node->inputs[1]->numel;
+                    if (mask_data[mi] == 0.0f)
+                        g1_data[i % in1->numel] += out_grad[i];
+                }
+            }
+        }
+        break;
+    }
+
+    case UOP_SCATTER_ADD: {
+        /* adjoint of gather: dsrc[i] = grad[index[i]] (index gets no grad) */
+        if (node->num_inputs >= 2 && node->params && in2 && in2->requires_grad &&
+            in2->data && node->inputs[0] && node->inputs[0]->data) {
+            Tensor* g2 = ensure_grad(in2);
+            if (g2 && g2->data) {
+                float* idx_data = (float*)node->inputs[0]->data;
+                ScatterAddParams* sp = (ScatterAddParams*)node->params;
+                int dim = sp->dim;
+                size_t outer = 1, inner = 1;
+                for (int d = 0; d < dim; d++) outer *= (size_t)in2->shape[d];
+                for (int d = dim + 1; d < in2->ndim; d++) inner *= (size_t)in2->shape[d];
+                size_t src_dim = (size_t)in2->shape[dim];
+                size_t out_dim = (size_t)sp->dim_size;
+                float* g2_data = (float*)g2->data;
+                for (size_t o = 0; o < outer; o++)
+                    for (size_t j = 0; j < src_dim; j++) {
+                        int idx = (int)idx_data[dim == 0 ? j : (o * src_dim + j)];
+                        if (idx < 0 || idx >= (int)out_dim) continue;
+                        for (size_t k = 0; k < inner; k++)
+                            g2_data[(o * src_dim + j) * inner + k] +=
+                                out_grad[(o * out_dim + (size_t)idx) * inner + k];
+                    }
+            }
+        }
+        break;
+    }
+
+    case UOP_IM2COL: {
+        /* adjoint: col2im — scatter-add overlapping windows back to [N,C,H,W] */
+        if (in1 && in1->requires_grad && in1->data && node->params &&
+            in1->ndim == 4) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                Im2colParams* ip = (Im2colParams*)node->params;
+                int N = in1->shape[0], C = in1->shape[1];
+                int H = in1->shape[2], W = in1->shape[3];
+                int OH = (H + 2 * ip->ph - ip->dh * (ip->kh - 1) - 1) / ip->sh + 1;
+                int OW = (W + 2 * ip->pw - ip->dw * (ip->kw - 1) - 1) / ip->sw + 1;
+                size_t K = (size_t)C * ip->kh * ip->kw;
+                float* g1_data = (float*)g1->data;
+                memset(g1_data, 0, in1->numel * sizeof(float));
+                for (int n = 0; n < N; n++)
+                    for (int c = 0; c < C; c++) {
+                        float* och = g1_data + ((size_t)n * C + c) * H * W;
+                        for (int ki = 0; ki < ip->kh; ki++)
+                            for (int kj = 0; kj < ip->kw; kj++) {
+                                size_t col = ((size_t)c * ip->kh + ki) * ip->kw + kj;
+                                for (int oh = 0; oh < OH; oh++) {
+                                    int ih = oh * ip->sh + ki * ip->dh - ip->ph;
+                                    if (ih < 0 || ih >= H) continue;
+                                    for (int ow = 0; ow < OW; ow++) {
+                                        int iw = ow * ip->sw + kj * ip->dw - ip->pw;
+                                        if (iw < 0 || iw >= W) continue;
+                                        size_t row = (size_t)(n * OH + oh) * OW + ow;
+                                        och[(size_t)ih * W + iw] += out_grad[row * K + col];
+                                    }
+                                }
+                            }
+                    }
+            }
+        }
+        break;
+    }
+
+    case UOP_COL2IM: {
+        /* adjoint: im2col — extract overlapping windows from the gradient */
+        if (in1 && in1->requires_grad && in1->data && node->params) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                Col2imParams* cp = (Col2imParams*)node->params;
+                int C = cp->C, H = cp->H, W = cp->W;
+                int OH = (H + 2 * cp->ph - cp->dh * (cp->kh - 1) - 1) / cp->sh + 1;
+                int OW = (W + 2 * cp->pw - cp->dw * (cp->kw - 1) - 1) / cp->sw + 1;
+                size_t K = (size_t)C * cp->kh * cp->kw;
+                int N = (OH * OW > 0) ? (int)(in1->shape[0] / (OH * OW)) : 0;
+                float* g1_data = (float*)g1->data;
+                memset(g1_data, 0, in1->numel * sizeof(float));
+                for (int n = 0; n < N; n++)
+                    for (int c = 0; c < C; c++)
+                        for (int ki = 0; ki < cp->kh; ki++)
+                            for (int kj = 0; kj < cp->kw; kj++) {
+                                size_t col = ((size_t)c * cp->kh + ki) * cp->kw + kj;
+                                for (int oh = 0; oh < OH; oh++) {
+                                    int ih = oh * cp->sh + ki * cp->dh - cp->ph;
+                                    if (ih < 0 || ih >= H) continue;
+                                    for (int ow = 0; ow < OW; ow++) {
+                                        int iw = ow * cp->sw + kj * cp->dw - cp->pw;
+                                        if (iw < 0 || iw >= W) continue;
+                                        size_t row = (size_t)(n * OH + oh) * OW + ow;
+                                        g1_data[row * K + col] += out_grad[((size_t)n * C + c) * H * W + (size_t)ih * W + iw];
+                                    }
+                                }
+                            }
+            }
+        }
+        break;
+    }
+
+    case UOP_FOLD: {
+        /* adjoint of UNFOLD: gx[..., w*stride+k] += g[..., w, k] */
+        if (in1 && in1->requires_grad && in1->data && node->params) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                FoldParams* fp = (FoldParams*)node->params;
+                int ndim_in = in1->ndim;
+                size_t batch = 1;
+                for (int d = 0; d < ndim_in - 2; d++)
+                    batch *= (size_t)in1->shape[d];
+                int nw = fp->output_len > 0
+                             ? (in1->shape[ndim_in - 2])
+                             : 0;
+                size_t L = in1->numel /
+                           ((size_t)(nw > 0 ? nw : 1) *
+                            (size_t)(fp->kernel_size > 0 ? fp->kernel_size : 1));
+                float* g1_data = (float*)g1->data;
+                memset(g1_data, 0, in1->numel * sizeof(float));
+                for (size_t b = 0; b < batch; b++)
+                    for (int w = 0; w < nw; w++)
+                        for (int k = 0; k < fp->kernel_size; k++) {
+                            size_t dst = b * L + (size_t)(w * fp->stride + k);
+                            size_t src = (b * (size_t)nw + (size_t)w) *
+                                             (size_t)fp->kernel_size + (size_t)k;
+                            if (dst < in1->numel)
+                                g1_data[dst] += out_grad[src];
+                        }
+            }
+        }
+        break;
+    }
+
+    /* zero gradient: piecewise-constant and boolean-producing ops. The
+     * derivative is 0 almost everywhere, so an explicit no-op is the correct
+     * rule (matching what FLOOR/CEIL/ROUND already do above). */
+    case UOP_CEIL: case UOP_ROUND: case UOP_TRUNC:
+    case UOP_CMPEQ: case UOP_CMPGE: case UOP_CMPGT:
+    case UOP_CMPLE: case UOP_CMPNE:
+    case UOP_ISINF: case UOP_ISNAN: case UOP_ISFINITE:
+    case UOP_LOGICAL_AND: case UOP_LOGICAL_OR: case UOP_LOGICAL_NOT:
+    case UOP_ALL: case UOP_ANY:
+        break;
+
+    /* no gradient: constants / creation ops */
+    case UOP_FILL: case UOP_CONST: case UOP_ALLOC: case UOP_EYE_OP:
+    case UOP_ARANGE_OP: case UOP_RAND_UNIFORM: case UOP_RAND_NORMAL:
+    case UOP_RAND_INT: case UOP_ONE_HOT:
+        break;
+
+    /* no gradient: discrete / index-producing ops */
+    case UOP_ARGMAX: case UOP_ARGMIN: case UOP_ARGSORT: case UOP_NONZERO:
+        break;
+
+    /* no gradient: integer / bitwise ops */
+    case UOP_BITWISE_AND: case UOP_BITWISE_OR: case UOP_BITWISE_XOR:
+    case UOP_BITWISE_NOT: case UOP_LSHIFT: case UOP_RSHIFT:
+        break;
+
+    /* no gradient: in-place optimizer steps sit outside differentiation */
+    case UOP_SGD_STEP: case UOP_ADAM_STEP:
+        break;
+
     default:
         // Unsupported op - gradients not computed
+    {
+        static int strict = -1;
+        if (strict < 0) {
+            const char* s = getenv("CML_STRICT_GRAD");
+            strict = (s && s[0] == '1') ? 1 : 0;
+        }
+        if (strict) {
+            LOG_ERROR("CPU backward: no gradient rule for op type %d "
+                      "(CML_STRICT_GRAD=1)", node->type);
+            return -1;
+        }
         LOG_DEBUG("CPU backward: no gradient rule for op type %d", node->type);
-        break;
+    }
+    break;
     }
 
     return 0;
 }
 
-static int cpu_execute_backward(CMLGraph_t ir) {
-    if (!ir)
+static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
+    if (!ir || !loss_node)
         return -1;
 
     int node_count   = 0;
@@ -3010,13 +3271,87 @@ static int cpu_execute_backward(CMLGraph_t ir) {
 
     /* Loss gradient is already set up by cml_ir_execute_backward — no need to redo here */
 
+    /* Restrict the pass to the loss-rooted subgraph. A node with
+     * requires_grad whose output does not feed the loss (a detached training
+     * metric, an auxiliary branch) must not run backward: its gradients are
+     * unused and running it is wasted work at best. Reachability is computed
+     * backwards over input->ir_node edges from the tail. Inputs always sit at
+     * lower indices in this list (nodes are appended after their inputs), so a
+     * single reverse sweep suffices — given an index map from node pointer to
+     * position, built here as a small open-addressing table. */
+    unsigned char* reach = (unsigned char*)cml_calloc((size_t)node_count, 1);
+    size_t map_cap       = 16;
+    while (map_cap < (size_t)node_count * 2)
+        map_cap <<= 1;
+    struct {
+        const struct IRNode* key;
+        int idx;
+    }* map = (void*)cml_calloc(map_cap, sizeof(*map));
+    if (!reach || !map) {
+        cml_free(reach);
+        cml_free(map);
+        if (nodes != stack_buf)
+            cml_free(nodes);
+        LOG_ERROR("Failed to allocate backward reachability structures");
+        return -1;
+    }
+    for (int i = 0; i < node_count; i++) {
+        size_t slot = ((uintptr_t)nodes[i] >> 3) & (map_cap - 1);
+        while (map[slot].key && map[slot].key != nodes[i])
+            slot = (slot + 1) & (map_cap - 1);
+        map[slot].key = nodes[i];
+        map[slot].idx = i;
+    }
+#define BWD_IDX(p)                                                                          \
+    ({                                                                                      \
+        size_t _slot = ((uintptr_t)(p) >> 3) & (map_cap - 1);                               \
+        int _found   = -1;                                                                  \
+        while (map[_slot].key) {                                                            \
+            if (map[_slot].key == (p)) {                                                    \
+                _found = map[_slot].idx;                                                    \
+                break;                                                                      \
+            }                                                                               \
+            _slot = (_slot + 1) & (map_cap - 1);                                            \
+        }                                                                                   \
+        _found;                                                                             \
+    })
+
+    reach[node_count - 1] = 1; /* provisional: tail is a root */
+    {
+        /* The requested loss node roots the traversal; it may or may not be
+         * the graph tail. */
+        int li = BWD_IDX(loss_node);
+        if (li >= 0)
+            reach[li] = 1;
+    }
     for (int i = node_count - 1; i >= 0; i--) {
-        /* Backward DCE: skip nodes where no input requires a gradient.
-         * cml_ir_build_backward sets requires_grad via a forward scan. */
-        if (!nodes[i]->requires_grad)
+        if (!reach[i])
+            continue;
+        struct IRNode* cur = nodes[i];
+        for (int j = 0; j < cur->num_inputs && cur->inputs; j++) {
+            Tensor* inp = cur->inputs[j];
+            if (!inp || !inp->ir_node || inp->ir_node == cur)
+                continue;
+            int idx = BWD_IDX(inp->ir_node);
+            /* In-graph inputs are at lower indices; anything else belongs to
+             * another graph or is a leaf and has no backward here. */
+            if (idx >= 0 && idx < i)
+                reach[idx] = 1;
+        }
+    }
+#undef BWD_IDX
+    cml_free(map);
+
+    for (int i = node_count - 1; i >= 0; i--) {
+        /* Backward DCE: skip nodes outside the loss-rooted subgraph and nodes
+         * where no input requires a gradient (cml_ir_build_backward sets
+         * requires_grad via a forward scan). */
+        if (!reach[i] || !nodes[i]->requires_grad)
             continue;
         cpu_backward_node(nodes[i]);
     }
+
+    cml_free(reach);
 
     if (nodes != stack_buf)
         cml_free(nodes);
@@ -3028,10 +3363,18 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_backward");
         return -1;
     }
+    return cml_ir_execute_backward_from(ir, ir->tail);
+}
 
-    struct IRNode* node = ir->tail;
+int cml_ir_execute_backward_from(CMLGraph_t ir, struct IRNode* loss_node) {
+    if (!ir) {
+        LOG_ERROR("NULL IR passed to cml_ir_execute_backward_from");
+        return -1;
+    }
+
+    struct IRNode* node = loss_node;
     if (!node) {
-        LOG_ERROR("No tail node in IR graph");
+        LOG_ERROR("No loss node for backward pass");
         return -1;
     }
 
@@ -3039,6 +3382,11 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
      * backward DCE.  cml_ir_build_backward is idempotent (forward scan). */
     cml_ir_build_backward(ir, node);
 
+    /* Loss gradient seed. Eager allocation + memset, NOT tensor_zeros: the
+     * lazy fill would be an IR node whose ->data is NULL until executed, and
+     * writing the 1.0 seed through it below (or accumulating into it during
+     * backward) would dereference NULL or re-execute the forward graph
+     * mid-backward. Same convention as ensure_grad() above. */
     if (node->output && node->output->requires_grad) {
         if (!node->output->grad) {
             Tensor* output      = node->output;
@@ -3046,18 +3394,21 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
                                    .device     = output->device,
                                    .has_dtype  = true,
                                    .has_device = true};
-            node->output->grad  = tensor_zeros(output->shape, output->ndim, &config);
+            node->output->grad  = tensor_empty(output->shape, output->ndim, &config);
             if (!node->output->grad) {
                 LOG_ERROR("Failed to allocate gradient tensor");
                 return -1;
             }
+            if (node->output->grad->data)
+                memset(node->output->grad->data, 0,
+                       node->output->grad->numel * cml_dtype_size(node->output->grad->dtype));
         }
         if (node->output->numel == 1) {
-            if (node->output->dtype == DTYPE_FLOAT32) {
+            if (node->output->dtype == DTYPE_FLOAT32 && node->output->grad->data) {
                 *(float*)node->output->grad->data = 1.0f;
             }
         }
     }
 
-    return cpu_execute_backward(ir);
+    return cpu_execute_backward(ir, node);
 }

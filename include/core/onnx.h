@@ -88,6 +88,25 @@ int cml_onnx_run(CMLONNXModel* model, Tensor** inputs, int num_inputs,
                  Tensor** outputs, int num_outputs);
 int cml_onnx_list_supported_ops(const char*** ops_out, int* count_out);
 
+/*
+ * Export a CML IR graph to an ONNX model file (opset 11).
+ *
+ *   ir            graph to export (outputs[0]->ir_context is typical)
+ *   graph_inputs  placeholder leaf tensors; become named graph inputs
+ *                 ("input_0", "input_1", ...). May be NULL/0 for graphs with
+ *                 no free variables (weights are then exported as
+ *                 initializers).
+ *   graph_outputs tensors whose values the model computes; must be produced
+ *                 by `ir` (or be eager leaves, which are identity-copied).
+ *
+ * Ops without an ONNX equivalent fail with a logged error naming the UOp.
+ * Returns 0 on success.
+ */
+int cml_onnx_export_graph(struct CMLGraph* ir,
+                          Tensor** graph_inputs, int num_inputs,
+                          Tensor** graph_outputs, int num_outputs,
+                          const char* filepath);
+
 #ifdef __cplusplus
 }
 #endif

@@ -19,6 +19,12 @@ extern "C" {
    primitive chains). */
 int cml_ir_decompose(CMLGraph_t ir);
 
+/* Decompose only the node range starting at `start` (NULL means head).
+ * Used by double-backward to lower ops appended between two grad passes
+ * without touching already-emitted backward nodes, which a whole-graph
+ * re-lower would corrupt. Marks the context decomposed like the full pass. */
+int cml_ir_decompose_from(CMLGraph_t ir, struct IRNode* start);
+
 #ifdef __cplusplus
 }
 #endif

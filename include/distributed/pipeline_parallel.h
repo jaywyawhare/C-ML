@@ -18,7 +18,9 @@ typedef struct PipelineStage {
 typedef struct {
     int num_micro_batches;  /* Number of micro-batches (default: 4) */
     int num_stages;         /* Number of pipeline stages */
-    bool interleaved;       /* Use interleaved schedule (1F1B) */
+    bool interleaved;       /* NOT YET HONORED: the schedule is always the
+                             * GPipe all-forwards-then-all-backwards order;
+                             * setting this has no effect yet. */
 } PipelineConfig;
 
 typedef struct CMLPipelineParallel {

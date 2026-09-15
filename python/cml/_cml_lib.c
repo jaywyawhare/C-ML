@@ -576,47 +576,48 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
     #include "tensor/realize.h"
     #include "torch/torch_c.h"
     #include "distributed/distributed.h"
+    #include "core/onnx.h"
     
 
 /************************************************************/
 
 static void *_cffi_types[] = {
-/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1049), // AdaptiveAvgPool1d *()(int)
+/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1069), // AdaptiveAvgPool1d *()(int)
 /*  1 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
 /*  2 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1051), // AdaptiveAvgPool2d *()(int, int)
+/*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1071), // AdaptiveAvgPool2d *()(int, int)
 /*  4 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /*  5 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1053), // AdaptiveMaxPool1d *()(int)
+/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1073), // AdaptiveMaxPool1d *()(int)
 /*  8 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /*  9 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 10 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1055), // AdaptiveMaxPool2d *()(int, int)
+/* 10 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1075), // AdaptiveMaxPool2d *()(int, int)
 /* 11 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 12 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 13 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 14 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1057), // AvgPool1d *()(int, int, int, _Bool, _Bool)
+/* 14 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1077), // AvgPool1d *()(int, int, int, _Bool, _Bool)
 /* 15 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 16 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 17 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 18 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1), // _Bool
 /* 19 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 20 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 21 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1059), // AvgPool2d *()(int, int, int, _Bool, _Bool)
+/* 21 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1079), // AvgPool2d *()(int, int, int, _Bool, _Bool)
 /* 22 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 24 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 25 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 26 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 27 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1061), // AvgPool3d *()(int, int, int, _Bool, _Bool)
+/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1081), // AvgPool3d *()(int, int, int, _Bool, _Bool)
 /* 29 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 30 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 31 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 32 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 33 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 34 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1063), // BatchNorm1d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
+/* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1083), // BatchNorm1d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
 /* 36 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 37 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13), // float
 /* 38 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -625,7 +626,7 @@ static void *_cffi_types[] = {
 /* 41 */ _CFFI_OP(_CFFI_OP_ENUM, 0), // DType
 /* 42 */ _CFFI_OP(_CFFI_OP_ENUM, 1), // DeviceType
 /* 43 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1065), // BatchNorm2d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
+/* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1085), // BatchNorm2d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
 /* 45 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 46 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 47 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -634,7 +635,7 @@ static void *_cffi_types[] = {
 /* 50 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 51 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 52 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 53 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1067), // BatchNorm3d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
+/* 53 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1087), // BatchNorm3d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
 /* 54 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 55 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 56 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -643,7 +644,7 @@ static void *_cffi_types[] = {
 /* 59 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 60 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 61 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 62 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1070), // Conv1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 62 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1090), // Conv1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
 /* 63 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 64 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 65 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -654,7 +655,7 @@ static void *_cffi_types[] = {
 /* 70 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 71 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 72 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 73 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1072), // Conv2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 73 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1092), // Conv2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
 /* 74 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 75 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 76 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -665,7 +666,7 @@ static void *_cffi_types[] = {
 /* 81 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 82 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 83 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 84 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1074), // Conv3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 84 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1094), // Conv3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
 /* 85 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 86 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 87 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -676,7 +677,7 @@ static void *_cffi_types[] = {
 /* 92 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 93 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 94 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 95 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1076), // ConvTranspose1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 95 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1096), // ConvTranspose1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
 /* 96 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 97 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 98 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -687,7 +688,7 @@ static void *_cffi_types[] = {
 /* 103 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 104 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 105 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 106 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1078), // ConvTranspose2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 106 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1098), // ConvTranspose2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
 /* 107 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 108 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 109 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -698,7 +699,7 @@ static void *_cffi_types[] = {
 /* 114 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 115 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 116 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 117 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1080), // ConvTranspose3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 117 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1100), // ConvTranspose3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
 /* 118 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 119 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 120 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -710,37 +711,37 @@ static void *_cffi_types[] = {
 /* 126 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 127 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 128 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // DType()(Tensor const *)
-/* 129 */ _CFFI_OP(_CFFI_OP_POINTER, 1151), // Tensor const *
+/* 129 */ _CFFI_OP(_CFFI_OP_POINTER, 1171), // Tensor const *
 /* 130 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 131 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // DType()(void)
 /* 132 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 133 */ _CFFI_OP(_CFFI_OP_FUNCTION, 824), // Dataset *()(char const *)
-/* 134 */ _CFFI_OP(_CFFI_OP_POINTER, 1168), // char const *
+/* 133 */ _CFFI_OP(_CFFI_OP_FUNCTION, 836), // Dataset *()(char const *)
+/* 134 */ _CFFI_OP(_CFFI_OP_POINTER, 1188), // char const *
 /* 135 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 136 */ _CFFI_OP(_CFFI_OP_FUNCTION, 42), // DeviceType()(Tensor const *)
 /* 137 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
 /* 138 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 139 */ _CFFI_OP(_CFFI_OP_FUNCTION, 42), // DeviceType()(void)
 /* 140 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 141 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1083), // Dropout *()(float, _Bool)
+/* 141 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1103), // Dropout *()(float, _Bool)
 /* 142 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 143 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 144 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 145 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1085), // Embedding *()(int, int, int, DType, DeviceType)
+/* 145 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1105), // Embedding *()(int, int, int, DType, DeviceType)
 /* 146 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 147 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 148 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 149 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 150 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 151 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 152 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1087), // Flatten *()(int, int)
+/* 152 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1107), // Flatten *()(int, int)
 /* 153 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 154 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 155 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 156 */ _CFFI_OP(_CFFI_OP_FUNCTION, 448), // GGUFContext *()(char const *)
 /* 157 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 158 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 159 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1090), // GRU *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
+/* 159 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1110), // GRU *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
 /* 160 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 161 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 162 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -751,7 +752,7 @@ static void *_cffi_types[] = {
 /* 167 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 168 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 169 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 170 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1092), // GRUCell *()(int, int, _Bool, DType, DeviceType)
+/* 170 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1112), // GRUCell *()(int, int, _Bool, DType, DeviceType)
 /* 171 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 172 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 173 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
@@ -764,7 +765,7 @@ static void *_cffi_types[] = {
 /* 180 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 181 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 182 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 183 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1095), // GroupNorm *()(int, int, float, _Bool, DType, DeviceType)
+/* 183 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1115), // GroupNorm *()(int, int, float, _Bool, DType, DeviceType)
 /* 184 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 185 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 186 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -772,9 +773,9 @@ static void *_cffi_types[] = {
 /* 188 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 189 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 190 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 191 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1097), // Identity *()(void)
+/* 191 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1117), // Identity *()(void)
 /* 192 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 193 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1099), // InstanceNorm2d *()(int, float, _Bool, DType, DeviceType)
+/* 193 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1119), // InstanceNorm2d *()(int, float, _Bool, DType, DeviceType)
 /* 194 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 195 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 196 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
@@ -782,12 +783,12 @@ static void *_cffi_types[] = {
 /* 198 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 199 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 200 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(LRScheduler *, int, float)
-/* 201 */ _CFFI_OP(_CFFI_OP_POINTER, 1101), // LRScheduler *
+/* 201 */ _CFFI_OP(_CFFI_OP_POINTER, 1121), // LRScheduler *
 /* 202 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 203 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 204 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 205 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, float)
-/* 206 */ _CFFI_OP(_CFFI_OP_POINTER, 1125), // Optimizer *
+/* 206 */ _CFFI_OP(_CFFI_OP_POINTER, 1145), // Optimizer *
 /* 207 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 208 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 209 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, float, int, float)
@@ -821,7 +822,7 @@ static void *_cffi_types[] = {
 /* 237 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 238 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 239 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 240 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1102), // LSTM *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
+/* 240 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1122), // LSTM *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
 /* 241 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 242 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 243 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -832,69 +833,69 @@ static void *_cffi_types[] = {
 /* 248 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 249 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 250 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 251 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1104), // LSTMCell *()(int, int, _Bool, DType, DeviceType)
+/* 251 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1124), // LSTMCell *()(int, int, _Bool, DType, DeviceType)
 /* 252 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 253 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 254 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 255 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 256 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 257 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 258 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1106), // LayerNorm *()(int, float, _Bool, DType, DeviceType)
+/* 258 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1126), // LayerNorm *()(int, float, _Bool, DType, DeviceType)
 /* 259 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 260 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 261 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 262 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 263 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 264 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 265 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1107), // LayerNorm2d *()(int, float, _Bool, DType, DeviceType)
+/* 265 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1127), // LayerNorm2d *()(int, float, _Bool, DType, DeviceType)
 /* 266 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 267 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 268 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 269 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 270 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 271 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 272 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1110), // LeakyReLU *()(float, _Bool)
+/* 272 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1130), // LeakyReLU *()(float, _Bool)
 /* 273 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 274 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 275 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 276 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1112), // Linear *()(int, int, DType, DeviceType, _Bool)
+/* 276 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1132), // Linear *()(int, int, DType, DeviceType, _Bool)
 /* 277 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 278 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 279 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 280 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 281 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 282 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 283 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1112), // Linear *()(int, int, _Bool)
+/* 283 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1132), // Linear *()(int, int, _Bool)
 /* 284 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 285 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 286 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 287 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 288 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1114), // MaxPool1d *()(int, int, int, int, _Bool)
+/* 288 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1134), // MaxPool1d *()(int, int, int, int, _Bool)
 /* 289 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 290 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 291 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 292 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 293 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 294 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 295 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1116), // MaxPool2d *()(int, int, int, int, _Bool)
+/* 295 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1136), // MaxPool2d *()(int, int, int, int, _Bool)
 /* 296 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 297 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 298 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 299 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 300 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 301 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 302 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1118), // MaxPool3d *()(int, int, int, int, _Bool)
+/* 302 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1138), // MaxPool3d *()(int, int, int, int, _Bool)
 /* 303 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 304 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 305 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 306 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 307 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 308 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 309 */ _CFFI_OP(_CFFI_OP_FUNCTION, 859), // ModuleDict *()(void)
+/* 309 */ _CFFI_OP(_CFFI_OP_FUNCTION, 871), // ModuleDict *()(void)
 /* 310 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 311 */ _CFFI_OP(_CFFI_OP_FUNCTION, 867), // ModuleList *()(void)
+/* 311 */ _CFFI_OP(_CFFI_OP_FUNCTION, 879), // ModuleList *()(void)
 /* 312 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 313 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1123), // MultiHeadAttention *()(int, int, float, DType, DeviceType)
+/* 313 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1143), // MultiHeadAttention *()(int, int, float, DType, DeviceType)
 /* 314 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 315 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 316 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -902,7 +903,7 @@ static void *_cffi_types[] = {
 /* 318 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 319 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 320 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Module *, float, float, float)
-/* 321 */ _CFFI_OP(_CFFI_OP_POINTER, 1120), // Module *
+/* 321 */ _CFFI_OP(_CFFI_OP_POINTER, 1140), // Module *
 /* 322 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 323 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 324 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -916,7 +917,7 @@ static void *_cffi_types[] = {
 /* 332 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 333 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 334 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Parameter * *, int, float, float, float)
-/* 335 */ _CFFI_OP(_CFFI_OP_POINTER, 1128), // Parameter * *
+/* 335 */ _CFFI_OP(_CFFI_OP_POINTER, 1148), // Parameter * *
 /* 336 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 337 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 338 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -947,22 +948,22 @@ static void *_cffi_types[] = {
 /* 363 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 364 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 365 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 366 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1126), // PReLU *()(int, float, DType, DeviceType)
+/* 366 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1146), // PReLU *()(int, float, DType, DeviceType)
 /* 367 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 368 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 369 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 370 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 371 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 372 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1130), // PixelShuffle *()(int)
+/* 372 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1150), // PixelShuffle *()(int)
 /* 373 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 374 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 375 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1132), // PixelUnshuffle *()(int)
+/* 375 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1152), // PixelUnshuffle *()(int)
 /* 376 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 377 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 378 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1134), // QRResult()(Tensor *)
-/* 379 */ _CFFI_OP(_CFFI_OP_POINTER, 1151), // Tensor *
+/* 378 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1154), // QRResult()(Tensor *)
+/* 379 */ _CFFI_OP(_CFFI_OP_POINTER, 1171), // Tensor *
 /* 380 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 381 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1135), // RNN *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
+/* 381 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1155), // RNN *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
 /* 382 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 383 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 384 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -973,34 +974,34 @@ static void *_cffi_types[] = {
 /* 389 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 390 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 391 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 392 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1137), // RNNCell *()(int, int, _Bool, DType, DeviceType)
+/* 392 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1157), // RNNCell *()(int, int, _Bool, DType, DeviceType)
 /* 393 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 394 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 395 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 396 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 397 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 398 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 399 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1139), // ReLU *()(_Bool)
+/* 399 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1159), // ReLU *()(_Bool)
 /* 400 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 401 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 402 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1139), // ReLU *()(void)
+/* 402 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1159), // ReLU *()(void)
 /* 403 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 404 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1141), // SVDResult()(Tensor *)
+/* 404 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1161), // SVDResult()(Tensor *)
 /* 405 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 406 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 407 */ _CFFI_OP(_CFFI_OP_FUNCTION, 456), // SafeTensorsContext *()(char const *)
 /* 408 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 409 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 410 */ _CFFI_OP(_CFFI_OP_FUNCTION, 411), // Sequential *()(Sequential *, Module *)
-/* 411 */ _CFFI_OP(_CFFI_OP_POINTER, 1143), // Sequential *
+/* 411 */ _CFFI_OP(_CFFI_OP_POINTER, 1163), // Sequential *
 /* 412 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
 /* 413 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 414 */ _CFFI_OP(_CFFI_OP_FUNCTION, 411), // Sequential *()(void)
 /* 415 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 416 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1144), // Sigmoid *()(void)
+/* 416 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1164), // Sigmoid *()(void)
 /* 417 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 418 */ _CFFI_OP(_CFFI_OP_FUNCTION, 419), // SparseCOOData *()(SparseCOOData *)
-/* 419 */ _CFFI_OP(_CFFI_OP_POINTER, 1146), // SparseCOOData *
+/* 419 */ _CFFI_OP(_CFFI_OP_POINTER, 1166), // SparseCOOData *
 /* 420 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 421 */ _CFFI_OP(_CFFI_OP_FUNCTION, 419), // SparseCOOData *()(Tensor *)
 /* 422 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
@@ -1011,11 +1012,11 @@ static void *_cffi_types[] = {
 /* 427 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // int const *
 /* 428 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 429 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 430 */ _CFFI_OP(_CFFI_OP_FUNCTION, 983), // StateDict *()(Module *, char const *)
+/* 430 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1003), // StateDict *()(Module *, char const *)
 /* 431 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
 /* 432 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 433 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 434 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1148), // Tanh *()(void)
+/* 434 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1168), // Tanh *()(void)
 /* 435 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 436 */ _CFFI_OP(_CFFI_OP_FUNCTION, 437), // Tensor * *()(Tensor * *, int, int *)
 /* 437 */ _CFFI_OP(_CFFI_OP_POINTER, 379), // Tensor * *
@@ -1029,15 +1030,15 @@ static void *_cffi_types[] = {
 /* 445 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
 /* 446 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 447 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(GGUFContext *, char const *)
-/* 448 */ _CFFI_OP(_CFFI_OP_POINTER, 1089), // GGUFContext *
+/* 448 */ _CFFI_OP(_CFFI_OP_POINTER, 1109), // GGUFContext *
 /* 449 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 450 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 451 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(GradScaler *, Tensor *)
-/* 452 */ _CFFI_OP(_CFFI_OP_POINTER, 1094), // GradScaler *
+/* 452 */ _CFFI_OP(_CFFI_OP_POINTER, 1114), // GradScaler *
 /* 453 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 454 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 455 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(SafeTensorsContext *, char const *)
-/* 456 */ _CFFI_OP(_CFFI_OP_POINTER, 1142), // SafeTensorsContext *
+/* 456 */ _CFFI_OP(_CFFI_OP_POINTER, 1162), // SafeTensorsContext *
 /* 457 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 458 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 459 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Sequential *, Tensor *)
@@ -1050,10 +1051,10 @@ static void *_cffi_types[] = {
 /* 466 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 467 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(SparseCOOData *, TensorConfig const *)
 /* 468 */ _CFFI_OP(_CFFI_OP_NOOP, 419),
-/* 469 */ _CFFI_OP(_CFFI_OP_POINTER, 1152), // TensorConfig const *
+/* 469 */ _CFFI_OP(_CFFI_OP_POINTER, 1172), // TensorConfig const *
 /* 470 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 471 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(StateDict const *, char const *)
-/* 472 */ _CFFI_OP(_CFFI_OP_POINTER, 1147), // StateDict const *
+/* 472 */ _CFFI_OP(_CFFI_OP_POINTER, 1167), // StateDict const *
 /* 473 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 474 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
 /* 475 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor * *, int, int)
@@ -1159,607 +1160,626 @@ static void *_cffi_types[] = {
 /* 575 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 576 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 577 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 578 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, _Bool, _Bool)
+/* 578 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, _Bool, Tensor * *)
 /* 579 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 580 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 581 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 582 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 583 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 583 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
 /* 584 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 585 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, int)
+/* 585 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, _Bool, _Bool)
 /* 586 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 587 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 588 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 589 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 590 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 591 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(TorchRuntimeModule *, Tensor *)
-/* 592 */ _CFFI_OP(_CFFI_OP_POINTER, 1156), // TorchRuntimeModule *
+/* 589 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 590 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 591 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 592 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, int)
 /* 593 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 594 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 595 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(char const *)
-/* 596 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 594 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 595 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 596 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 597 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 598 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float const *, int)
-/* 599 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float const *
-/* 600 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 598 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(TorchRuntimeModule *, Tensor *)
+/* 599 */ _CFFI_OP(_CFFI_OP_POINTER, 1176), // TorchRuntimeModule *
+/* 600 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 601 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 602 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float const *, int, int)
-/* 603 */ _CFFI_OP(_CFFI_OP_NOOP, 599),
-/* 604 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 605 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 606 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 607 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, float, TensorConfig const *)
-/* 608 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 609 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 610 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 611 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 612 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 613 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, float, TorchTensorOptions const *)
-/* 614 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 615 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 616 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 617 */ _CFFI_OP(_CFFI_OP_POINTER, 727), // TorchTensorOptions const *
+/* 602 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(char const *)
+/* 603 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 604 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 605 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(char const *, Tensor * *, int)
+/* 606 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 607 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
+/* 608 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 609 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 610 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float const *, int)
+/* 611 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float const *
+/* 612 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 613 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 614 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float const *, int, int)
+/* 615 */ _CFFI_OP(_CFFI_OP_NOOP, 611),
+/* 616 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 617 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 618 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 619 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, int, TensorConfig const *)
+/* 619 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, float, TensorConfig const *)
 /* 620 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 621 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 622 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 622 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 623 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
 /* 624 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 625 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, int, TorchTensorOptions const *)
+/* 625 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, float, TorchTensorOptions const *)
 /* 626 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 627 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 628 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 629 */ _CFFI_OP(_CFFI_OP_NOOP, 617),
+/* 628 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 629 */ _CFFI_OP(_CFFI_OP_POINTER, 739), // TorchTensorOptions const *
 /* 630 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 631 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TensorConfig const *)
-/* 632 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 633 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 634 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 635 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 636 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TensorConfig const *, float)
-/* 637 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 638 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 639 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 640 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 641 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 642 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TorchTensorOptions const *)
-/* 643 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 644 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 645 */ _CFFI_OP(_CFFI_OP_NOOP, 617),
-/* 646 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 647 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TorchTensorOptions const *, float)
-/* 648 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 649 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 650 */ _CFFI_OP(_CFFI_OP_NOOP, 617),
-/* 651 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 652 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 653 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, int, TensorConfig const *)
-/* 654 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 655 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 631 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, int, TensorConfig const *)
+/* 632 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 633 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 634 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 635 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 636 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 637 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, int, TorchTensorOptions const *)
+/* 638 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 639 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 640 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 641 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
+/* 642 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 643 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TensorConfig const *)
+/* 644 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 645 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 646 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 647 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 648 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TensorConfig const *, float)
+/* 649 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 650 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 651 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 652 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 653 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 654 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TorchTensorOptions const *)
+/* 655 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
 /* 656 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 657 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 657 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
 /* 658 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 659 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, int, int, TensorConfig const *)
+/* 659 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TorchTensorOptions const *, float)
 /* 660 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
 /* 661 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 662 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 663 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 664 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 665 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 666 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int)
+/* 662 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
+/* 663 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 664 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 665 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, int, TensorConfig const *)
+/* 666 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
 /* 667 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 668 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 669 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, TensorConfig const *)
-/* 670 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 671 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 672 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 673 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, TorchTensorOptions const *)
+/* 668 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 669 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 670 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 671 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, int, int, TensorConfig const *)
+/* 672 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 673 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 674 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 675 */ _CFFI_OP(_CFFI_OP_NOOP, 617),
-/* 676 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 677 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, int)
-/* 678 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 675 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 676 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 677 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 678 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int)
 /* 679 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 680 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 681 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, int, int *, int, TensorConfig const *)
+/* 681 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, TensorConfig const *)
 /* 682 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 683 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 684 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 685 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 686 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 687 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 688 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(struct Module *, Tensor *)
-/* 689 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 690 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 691 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 692 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void *, int *, int, TensorConfig const *)
-/* 693 */ _CFFI_OP(_CFFI_OP_POINTER, 1178), // void *
-/* 694 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 683 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 684 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 685 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, TorchTensorOptions const *)
+/* 686 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 687 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
+/* 688 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 689 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, int)
+/* 690 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 691 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 692 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 693 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, int, int *, int, TensorConfig const *)
+/* 694 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 695 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 696 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 697 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 698 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void *, int *, int, TorchTensorOptions const *)
-/* 699 */ _CFFI_OP(_CFFI_OP_NOOP, 693),
-/* 700 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 701 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 702 */ _CFFI_OP(_CFFI_OP_NOOP, 617),
+/* 696 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 697 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 698 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 699 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 700 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(struct Module *, Tensor *)
+/* 701 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 702 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 703 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 704 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void const *, int *, int, TensorConfig const *)
-/* 705 */ _CFFI_OP(_CFFI_OP_POINTER, 1178), // void const *
+/* 704 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void *, int *, int, TensorConfig const *)
+/* 705 */ _CFFI_OP(_CFFI_OP_POINTER, 1197), // void *
 /* 706 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
 /* 707 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 708 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
 /* 709 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 710 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1152), // TensorConfig()(TorchTensorOptions const *)
-/* 711 */ _CFFI_OP(_CFFI_OP_NOOP, 617),
-/* 712 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 713 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1008), // TorchMemoryManager *()(size_t)
-/* 714 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28), // size_t
+/* 710 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void *, int *, int, TorchTensorOptions const *)
+/* 711 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
+/* 712 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 713 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 714 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
 /* 715 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 716 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1008), // TorchMemoryManager *()(void *, size_t)
-/* 717 */ _CFFI_OP(_CFFI_OP_NOOP, 693),
-/* 718 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 719 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 720 */ _CFFI_OP(_CFFI_OP_FUNCTION, 592), // TorchRuntimeModule *()(Module *)
-/* 721 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 722 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 723 */ _CFFI_OP(_CFFI_OP_FUNCTION, 592), // TorchRuntimeModule *()(char const *)
-/* 724 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 725 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 726 */ _CFFI_OP(_CFFI_OP_FUNCTION, 727), // TorchTensorOptions()(TorchTensorOptions, DType)
-/* 727 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 66), // TorchTensorOptions
-/* 728 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 729 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 730 */ _CFFI_OP(_CFFI_OP_FUNCTION, 727), // TorchTensorOptions()(TorchTensorOptions, DeviceType)
-/* 731 */ _CFFI_OP(_CFFI_OP_NOOP, 727),
-/* 732 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 733 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 734 */ _CFFI_OP(_CFFI_OP_FUNCTION, 727), // TorchTensorOptions()(TorchTensorOptions, _Bool)
-/* 735 */ _CFFI_OP(_CFFI_OP_NOOP, 727),
-/* 736 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 716 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void const *, int *, int, TensorConfig const *)
+/* 717 */ _CFFI_OP(_CFFI_OP_POINTER, 1197), // void const *
+/* 718 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 719 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 720 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 721 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 722 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1172), // TensorConfig()(TorchTensorOptions const *)
+/* 723 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
+/* 724 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 725 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1028), // TorchMemoryManager *()(size_t)
+/* 726 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28), // size_t
+/* 727 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 728 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1028), // TorchMemoryManager *()(void *, size_t)
+/* 729 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
+/* 730 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
+/* 731 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 732 */ _CFFI_OP(_CFFI_OP_FUNCTION, 599), // TorchRuntimeModule *()(Module *)
+/* 733 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 734 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 735 */ _CFFI_OP(_CFFI_OP_FUNCTION, 599), // TorchRuntimeModule *()(char const *)
+/* 736 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 737 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 738 */ _CFFI_OP(_CFFI_OP_FUNCTION, 727), // TorchTensorOptions()(void)
-/* 739 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 740 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1157), // TransformerDecoder *()(int, int, int, float, int, DType, DeviceType)
-/* 741 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 742 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 743 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 744 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 745 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 746 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 747 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 748 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 749 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1159), // TransformerDecoderLayer *()(int, int, int, float, DType, DeviceType)
-/* 750 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 751 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 752 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 753 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 754 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 755 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 756 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 757 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1161), // TransformerEncoder *()(int, int, int, float, int, DType, DeviceType)
-/* 758 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 759 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 760 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 761 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 738 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(TorchTensorOptions, DType)
+/* 739 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 66), // TorchTensorOptions
+/* 740 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 741 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 742 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(TorchTensorOptions, DeviceType)
+/* 743 */ _CFFI_OP(_CFFI_OP_NOOP, 739),
+/* 744 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 745 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 746 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(TorchTensorOptions, _Bool)
+/* 747 */ _CFFI_OP(_CFFI_OP_NOOP, 739),
+/* 748 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 749 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 750 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(void)
+/* 751 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 752 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1177), // TransformerDecoder *()(int, int, int, float, int, DType, DeviceType)
+/* 753 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 754 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 755 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 756 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 757 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 758 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 759 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 760 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 761 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1179), // TransformerDecoderLayer *()(int, int, int, float, DType, DeviceType)
 /* 762 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 763 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 764 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 765 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 766 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1163), // TransformerEncoderLayer *()(int, int, int, float, DType, DeviceType)
-/* 767 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 768 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 769 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 770 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 771 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 772 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 773 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 774 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1165), // Upsample *()(float, int const *, int, UpsampleMode, _Bool)
-/* 775 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 776 */ _CFFI_OP(_CFFI_OP_NOOP, 427),
-/* 777 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 778 */ _CFFI_OP(_CFFI_OP_NOOP, 542),
-/* 779 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 780 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 781 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Module *)
-/* 782 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 783 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 784 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor *)
-/* 785 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 786 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 787 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor const *)
-/* 788 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 789 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 790 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(void)
-/* 791 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 792 */ _CFFI_OP(_CFFI_OP_FUNCTION, 134), // char const *()(Optimizer *)
-/* 793 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 794 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 795 */ _CFFI_OP(_CFFI_OP_FUNCTION, 134), // char const *()(void)
-/* 796 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 797 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1169), // double()(void)
+/* 763 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 764 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 765 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 766 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 767 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 768 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 769 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1181), // TransformerEncoder *()(int, int, int, float, int, DType, DeviceType)
+/* 770 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 771 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 772 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 773 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 774 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 775 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 776 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 777 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 778 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1183), // TransformerEncoderLayer *()(int, int, int, float, DType, DeviceType)
+/* 779 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 780 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 781 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 782 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 783 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 784 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 785 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 786 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1185), // Upsample *()(float, int const *, int, UpsampleMode, _Bool)
+/* 787 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 788 */ _CFFI_OP(_CFFI_OP_NOOP, 427),
+/* 789 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 790 */ _CFFI_OP(_CFFI_OP_NOOP, 542),
+/* 791 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 792 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 793 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Module *)
+/* 794 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 795 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 796 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor *)
+/* 797 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 798 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 799 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1170), // float *()(Tensor *)
-/* 800 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 799 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor const *)
+/* 800 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
 /* 801 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 802 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *)
-/* 803 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
-/* 804 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 805 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *, float)
-/* 806 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
-/* 807 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 802 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(void)
+/* 803 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 804 */ _CFFI_OP(_CFFI_OP_FUNCTION, 134), // char const *()(Optimizer *)
+/* 805 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
+/* 806 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 807 */ _CFFI_OP(_CFFI_OP_FUNCTION, 134), // char const *()(void)
 /* 808 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 809 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Optimizer *, int)
-/* 810 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 811 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 812 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 813 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *)
-/* 814 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 815 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 816 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *, size_t)
-/* 817 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 818 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 819 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 820 */ _CFFI_OP(_CFFI_OP_FUNCTION, 427), // int const *()(Tensor const *)
-/* 821 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 822 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 823 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Dataset *, char const *)
-/* 824 */ _CFFI_OP(_CFFI_OP_POINTER, 1082), // Dataset *
-/* 825 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 826 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 827 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(DistBackendType, int, int)
-/* 828 */ _CFFI_OP(_CFFI_OP_ENUM, 2), // DistBackendType
-/* 829 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 830 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 809 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1189), // double()(void)
+/* 810 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 811 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1190), // float *()(Tensor *)
+/* 812 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 813 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 814 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *)
+/* 815 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
+/* 816 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 817 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *, float)
+/* 818 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
+/* 819 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 820 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 821 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Optimizer *, int)
+/* 822 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
+/* 823 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 824 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 825 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *)
+/* 826 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 827 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 828 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *, size_t)
+/* 829 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 830 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
 /* 831 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 832 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(GGUFContext *, char const *, Tensor *)
-/* 833 */ _CFFI_OP(_CFFI_OP_NOOP, 448),
-/* 834 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 835 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 836 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 837 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Parameter * * *, int *, _Bool)
-/* 838 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 839 */ _CFFI_OP(_CFFI_OP_POINTER, 335), // Parameter * * *
-/* 840 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 841 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 842 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 843 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, StateDict const *, _Bool)
-/* 844 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 845 */ _CFFI_OP(_CFFI_OP_NOOP, 472),
-/* 846 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 847 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 848 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Tensor *, char const *, TorchPTEExportOptions const *)
-/* 849 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 850 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 851 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 852 */ _CFFI_OP(_CFFI_OP_POINTER, 1154), // TorchPTEExportOptions const *
-/* 853 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 854 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, char const *)
-/* 855 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 856 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 857 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 858 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *)
-/* 859 */ _CFFI_OP(_CFFI_OP_POINTER, 1121), // ModuleDict *
-/* 860 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 861 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *, char const *, Module *)
-/* 862 */ _CFFI_OP(_CFFI_OP_NOOP, 859),
+/* 832 */ _CFFI_OP(_CFFI_OP_FUNCTION, 427), // int const *()(Tensor const *)
+/* 833 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
+/* 834 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 835 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Dataset *, char const *)
+/* 836 */ _CFFI_OP(_CFFI_OP_POINTER, 1102), // Dataset *
+/* 837 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 838 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 839 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(DistBackendType, int, int)
+/* 840 */ _CFFI_OP(_CFFI_OP_ENUM, 2), // DistBackendType
+/* 841 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 842 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 843 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 844 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(GGUFContext *, char const *, Tensor *)
+/* 845 */ _CFFI_OP(_CFFI_OP_NOOP, 448),
+/* 846 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 847 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 848 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 849 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Parameter * * *, int *, _Bool)
+/* 850 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 851 */ _CFFI_OP(_CFFI_OP_POINTER, 335), // Parameter * * *
+/* 852 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 853 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 854 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 855 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, StateDict const *, _Bool)
+/* 856 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 857 */ _CFFI_OP(_CFFI_OP_NOOP, 472),
+/* 858 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 859 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 860 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Tensor *, char const *, TorchPTEExportOptions const *)
+/* 861 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 862 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 863 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 864 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 864 */ _CFFI_OP(_CFFI_OP_POINTER, 1174), // TorchPTEExportOptions const *
 /* 865 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 866 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *)
-/* 867 */ _CFFI_OP(_CFFI_OP_POINTER, 1122), // ModuleList *
-/* 868 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 869 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, Module *)
-/* 870 */ _CFFI_OP(_CFFI_OP_NOOP, 867),
-/* 871 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 866 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, char const *)
+/* 867 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 868 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 869 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 870 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *)
+/* 871 */ _CFFI_OP(_CFFI_OP_POINTER, 1141), // ModuleDict *
 /* 872 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 873 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, int, Module *)
-/* 874 */ _CFFI_OP(_CFFI_OP_NOOP, 867),
-/* 875 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 873 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *, char const *, Module *)
+/* 874 */ _CFFI_OP(_CFFI_OP_NOOP, 871),
+/* 875 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
 /* 876 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
 /* 877 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 878 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(SafeTensorsContext *, char const *, Tensor *)
-/* 879 */ _CFFI_OP(_CFFI_OP_NOOP, 456),
-/* 880 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 881 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 882 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 883 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *)
-/* 884 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 885 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 886 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *, DistReduceOp)
-/* 887 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 888 */ _CFFI_OP(_CFFI_OP_ENUM, 3), // DistReduceOp
+/* 878 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *)
+/* 879 */ _CFFI_OP(_CFFI_OP_POINTER, 1142), // ModuleList *
+/* 880 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 881 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, Module *)
+/* 882 */ _CFFI_OP(_CFFI_OP_NOOP, 879),
+/* 883 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 884 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 885 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, int, Module *)
+/* 886 */ _CFFI_OP(_CFFI_OP_NOOP, 879),
+/* 887 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 888 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
 /* 889 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 890 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor const *)
-/* 891 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 892 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 893 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(void)
+/* 890 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(SafeTensorsContext *, char const *, Tensor *)
+/* 891 */ _CFFI_OP(_CFFI_OP_NOOP, 456),
+/* 892 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 893 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 894 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 895 */ _CFFI_OP(_CFFI_OP_FUNCTION, 714), // size_t()(DType)
-/* 896 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 895 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *)
+/* 896 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
 /* 897 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 898 */ _CFFI_OP(_CFFI_OP_FUNCTION, 714), // size_t()(Tensor const *)
-/* 899 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 900 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 901 */ _CFFI_OP(_CFFI_OP_FUNCTION, 714), // size_t()(TorchMemoryManager const *)
-/* 902 */ _CFFI_OP(_CFFI_OP_POINTER, 1153), // TorchMemoryManager const *
-/* 903 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 904 */ _CFFI_OP(_CFFI_OP_FUNCTION, 714), // size_t()(int *, int)
-/* 905 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 906 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 907 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 908 */ _CFFI_OP(_CFFI_OP_FUNCTION, 693), // void *()(Tensor *)
-/* 909 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 910 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 911 */ _CFFI_OP(_CFFI_OP_FUNCTION, 693), // void *()(int, char const *, void *)
-/* 912 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 913 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 914 */ _CFFI_OP(_CFFI_OP_NOOP, 693),
-/* 915 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 916 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1042), // void *(*()(void))(int, char const *, void *)
+/* 898 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *, DistReduceOp)
+/* 899 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 900 */ _CFFI_OP(_CFFI_OP_ENUM, 3), // DistReduceOp
+/* 901 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 902 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor const *)
+/* 903 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
+/* 904 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 905 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(struct CMLGraph *, Tensor * *, int, Tensor * *, int, char const *)
+/* 906 */ _CFFI_OP(_CFFI_OP_POINTER, 1193), // struct CMLGraph *
+/* 907 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
+/* 908 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 909 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
+/* 910 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 911 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 912 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 913 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(void)
+/* 914 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 915 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(DType)
+/* 916 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 917 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 918 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(CleanupContext *)
-/* 919 */ _CFFI_OP(_CFFI_OP_POINTER, 1069), // CleanupContext *
+/* 918 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(Tensor const *)
+/* 919 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
 /* 920 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 921 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(DType)
-/* 922 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 921 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(TorchMemoryManager const *)
+/* 922 */ _CFFI_OP(_CFFI_OP_POINTER, 1173), // TorchMemoryManager const *
 /* 923 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 924 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Dataset *)
-/* 925 */ _CFFI_OP(_CFFI_OP_NOOP, 824),
-/* 926 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 927 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(DeviceType)
-/* 928 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 929 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 930 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(GGUFContext *)
-/* 931 */ _CFFI_OP(_CFFI_OP_NOOP, 448),
-/* 932 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 933 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(GradScaler *)
-/* 934 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
+/* 924 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(int *, int)
+/* 925 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 926 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 927 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 928 */ _CFFI_OP(_CFFI_OP_FUNCTION, 705), // void *()(Tensor *)
+/* 929 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 930 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 931 */ _CFFI_OP(_CFFI_OP_FUNCTION, 705), // void *()(int, char const *, void *)
+/* 932 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 933 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 934 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
 /* 935 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 936 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(GradScaler *, Parameter * *, int)
-/* 937 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
-/* 938 */ _CFFI_OP(_CFFI_OP_NOOP, 335),
-/* 939 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 936 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1062), // void *(*()(void))(int, char const *, void *)
+/* 937 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 938 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(CleanupContext *)
+/* 939 */ _CFFI_OP(_CFFI_OP_POINTER, 1089), // CleanupContext *
 /* 940 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 941 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(GradScaler *, void(*)(void *), void *)
-/* 942 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
-/* 943 */ _CFFI_OP(_CFFI_OP_POINTER, 1044), // void(*)(void *)
-/* 944 */ _CFFI_OP(_CFFI_OP_NOOP, 693),
-/* 945 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 946 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(LRScheduler *)
-/* 947 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
-/* 948 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 949 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(LogLevel)
-/* 950 */ _CFFI_OP(_CFFI_OP_ENUM, 5), // LogLevel
-/* 951 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 952 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Module *, _Bool)
-/* 953 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 954 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 941 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(DType)
+/* 942 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 943 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 944 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Dataset *)
+/* 945 */ _CFFI_OP(_CFFI_OP_NOOP, 836),
+/* 946 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 947 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(DeviceType)
+/* 948 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 949 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 950 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GGUFContext *)
+/* 951 */ _CFFI_OP(_CFFI_OP_NOOP, 448),
+/* 952 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 953 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GradScaler *)
+/* 954 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
 /* 955 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 956 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Optimizer *)
-/* 957 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 958 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 959 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Optimizer *, _Bool)
-/* 960 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 961 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 962 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 963 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Optimizer *, float)
-/* 964 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 965 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 966 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 967 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Optimizer *, int, float)
-/* 968 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 969 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 970 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 956 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GradScaler *, Parameter * *, int)
+/* 957 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
+/* 958 */ _CFFI_OP(_CFFI_OP_NOOP, 335),
+/* 959 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 960 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 961 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GradScaler *, void(*)(void *), void *)
+/* 962 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
+/* 963 */ _CFFI_OP(_CFFI_OP_POINTER, 1064), // void(*)(void *)
+/* 964 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
+/* 965 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 966 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(LRScheduler *)
+/* 967 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
+/* 968 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 969 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(LogLevel)
+/* 970 */ _CFFI_OP(_CFFI_OP_ENUM, 5), // LogLevel
 /* 971 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 972 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(SafeTensorsContext *)
-/* 973 */ _CFFI_OP(_CFFI_OP_NOOP, 456),
-/* 974 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 975 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Sequential *, Module *)
-/* 976 */ _CFFI_OP(_CFFI_OP_NOOP, 411),
-/* 977 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 972 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Module *, _Bool)
+/* 973 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 974 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 975 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 976 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *)
+/* 977 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
 /* 978 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 979 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(SparseCOOData *)
-/* 980 */ _CFFI_OP(_CFFI_OP_NOOP, 419),
-/* 981 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 982 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(StateDict *)
-/* 983 */ _CFFI_OP(_CFFI_OP_POINTER, 1147), // StateDict *
-/* 984 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 985 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Tensor *)
-/* 986 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 987 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 988 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Tensor *, Tensor *, _Bool, _Bool)
-/* 989 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 990 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 991 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 992 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 993 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 994 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Tensor *, _Bool)
-/* 995 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 996 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 997 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 998 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Tensor *, float)
-/* 999 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1000 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 979 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *, _Bool)
+/* 980 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
+/* 981 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 982 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 983 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *, float)
+/* 984 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
+/* 985 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 986 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 987 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *, int, float)
+/* 988 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
+/* 989 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 990 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 991 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 992 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(SafeTensorsContext *)
+/* 993 */ _CFFI_OP(_CFFI_OP_NOOP, 456),
+/* 994 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 995 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Sequential *, Module *)
+/* 996 */ _CFFI_OP(_CFFI_OP_NOOP, 411),
+/* 997 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 998 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 999 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(SparseCOOData *)
+/* 1000 */ _CFFI_OP(_CFFI_OP_NOOP, 419),
 /* 1001 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1002 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(Tensor *, size_t, float)
-/* 1003 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1004 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 1005 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 1006 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1007 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(TorchMemoryManager *)
-/* 1008 */ _CFFI_OP(_CFFI_OP_POINTER, 1153), // TorchMemoryManager *
-/* 1009 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1010 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(TorchRuntimeModule *)
-/* 1011 */ _CFFI_OP(_CFFI_OP_NOOP, 592),
-/* 1012 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1013 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(TorchRuntimeModule *, TorchMemoryManager *)
-/* 1014 */ _CFFI_OP(_CFFI_OP_NOOP, 592),
-/* 1015 */ _CFFI_OP(_CFFI_OP_NOOP, 1008),
-/* 1016 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1017 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(_Bool)
-/* 1018 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 1019 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1020 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(int *, int *, int *, char const * *)
-/* 1021 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 1022 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 1023 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 1024 */ _CFFI_OP(_CFFI_OP_POINTER, 134), // char const * *
-/* 1025 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1026 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(int)
-/* 1027 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 1028 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1029 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(size_t *, size_t *, size_t *, size_t *)
-/* 1030 */ _CFFI_OP(_CFFI_OP_POINTER, 714), // size_t *
-/* 1031 */ _CFFI_OP(_CFFI_OP_NOOP, 1030),
-/* 1032 */ _CFFI_OP(_CFFI_OP_NOOP, 1030),
-/* 1033 */ _CFFI_OP(_CFFI_OP_NOOP, 1030),
-/* 1034 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1035 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(struct Module *)
-/* 1036 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 1037 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1038 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(uint64_t)
-/* 1039 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 24), // uint64_t
-/* 1040 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1041 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(void *(*)(int, char const *, void *))
-/* 1042 */ _CFFI_OP(_CFFI_OP_POINTER, 911), // void *(*)(int, char const *, void *)
-/* 1043 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1044 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(void *)
-/* 1045 */ _CFFI_OP(_CFFI_OP_NOOP, 693),
-/* 1046 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1047 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1178), // void()(void)
+/* 1002 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(StateDict *)
+/* 1003 */ _CFFI_OP(_CFFI_OP_POINTER, 1167), // StateDict *
+/* 1004 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1005 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *)
+/* 1006 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 1007 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1008 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, Tensor *, _Bool, _Bool)
+/* 1009 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 1010 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 1011 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1012 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1013 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1014 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, _Bool)
+/* 1015 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 1016 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1017 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1018 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, float)
+/* 1019 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 1020 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 1021 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1022 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, size_t, float)
+/* 1023 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 1024 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
+/* 1025 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 1026 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1027 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(TorchMemoryManager *)
+/* 1028 */ _CFFI_OP(_CFFI_OP_POINTER, 1173), // TorchMemoryManager *
+/* 1029 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1030 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(TorchRuntimeModule *)
+/* 1031 */ _CFFI_OP(_CFFI_OP_NOOP, 599),
+/* 1032 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1033 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(TorchRuntimeModule *, TorchMemoryManager *)
+/* 1034 */ _CFFI_OP(_CFFI_OP_NOOP, 599),
+/* 1035 */ _CFFI_OP(_CFFI_OP_NOOP, 1028),
+/* 1036 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1037 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(_Bool)
+/* 1038 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1039 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1040 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(int *, int *, int *, char const * *)
+/* 1041 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 1042 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 1043 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 1044 */ _CFFI_OP(_CFFI_OP_POINTER, 134), // char const * *
+/* 1045 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1046 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(int)
+/* 1047 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 1048 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1049 */ _CFFI_OP(_CFFI_OP_POINTER, 1050), // AdaptiveAvgPool1d *
-/* 1050 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 2), // AdaptiveAvgPool1d
-/* 1051 */ _CFFI_OP(_CFFI_OP_POINTER, 1052), // AdaptiveAvgPool2d *
-/* 1052 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 3), // AdaptiveAvgPool2d
-/* 1053 */ _CFFI_OP(_CFFI_OP_POINTER, 1054), // AdaptiveMaxPool1d *
-/* 1054 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 4), // AdaptiveMaxPool1d
-/* 1055 */ _CFFI_OP(_CFFI_OP_POINTER, 1056), // AdaptiveMaxPool2d *
-/* 1056 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 5), // AdaptiveMaxPool2d
-/* 1057 */ _CFFI_OP(_CFFI_OP_POINTER, 1058), // AvgPool1d *
-/* 1058 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 6), // AvgPool1d
-/* 1059 */ _CFFI_OP(_CFFI_OP_POINTER, 1060), // AvgPool2d *
-/* 1060 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 7), // AvgPool2d
-/* 1061 */ _CFFI_OP(_CFFI_OP_POINTER, 1062), // AvgPool3d *
-/* 1062 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 8), // AvgPool3d
-/* 1063 */ _CFFI_OP(_CFFI_OP_POINTER, 1064), // BatchNorm1d *
-/* 1064 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 9), // BatchNorm1d
-/* 1065 */ _CFFI_OP(_CFFI_OP_POINTER, 1066), // BatchNorm2d *
-/* 1066 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 10), // BatchNorm2d
-/* 1067 */ _CFFI_OP(_CFFI_OP_POINTER, 1068), // BatchNorm3d *
-/* 1068 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 11), // BatchNorm3d
-/* 1069 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 14), // CleanupContext
-/* 1070 */ _CFFI_OP(_CFFI_OP_POINTER, 1071), // Conv1d *
-/* 1071 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 15), // Conv1d
-/* 1072 */ _CFFI_OP(_CFFI_OP_POINTER, 1073), // Conv2d *
-/* 1073 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 16), // Conv2d
-/* 1074 */ _CFFI_OP(_CFFI_OP_POINTER, 1075), // Conv3d *
-/* 1075 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 17), // Conv3d
-/* 1076 */ _CFFI_OP(_CFFI_OP_POINTER, 1077), // ConvTranspose1d *
-/* 1077 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 18), // ConvTranspose1d
-/* 1078 */ _CFFI_OP(_CFFI_OP_POINTER, 1079), // ConvTranspose2d *
-/* 1079 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 19), // ConvTranspose2d
-/* 1080 */ _CFFI_OP(_CFFI_OP_POINTER, 1081), // ConvTranspose3d *
-/* 1081 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 20), // ConvTranspose3d
-/* 1082 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 21), // Dataset
-/* 1083 */ _CFFI_OP(_CFFI_OP_POINTER, 1084), // Dropout *
-/* 1084 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 22), // Dropout
-/* 1085 */ _CFFI_OP(_CFFI_OP_POINTER, 1086), // Embedding *
-/* 1086 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 23), // Embedding
-/* 1087 */ _CFFI_OP(_CFFI_OP_POINTER, 1088), // Flatten *
-/* 1088 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 24), // Flatten
-/* 1089 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 25), // GGUFContext
-/* 1090 */ _CFFI_OP(_CFFI_OP_POINTER, 1091), // GRU *
-/* 1091 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 26), // GRU
-/* 1092 */ _CFFI_OP(_CFFI_OP_POINTER, 1093), // GRUCell *
-/* 1093 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 27), // GRUCell
-/* 1094 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 28), // GradScaler
-/* 1095 */ _CFFI_OP(_CFFI_OP_POINTER, 1096), // GroupNorm *
-/* 1096 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 29), // GroupNorm
-/* 1097 */ _CFFI_OP(_CFFI_OP_POINTER, 1098), // Identity *
-/* 1098 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 31), // Identity
-/* 1099 */ _CFFI_OP(_CFFI_OP_POINTER, 1100), // InstanceNorm2d *
-/* 1100 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 32), // InstanceNorm2d
-/* 1101 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 33), // LRScheduler
-/* 1102 */ _CFFI_OP(_CFFI_OP_POINTER, 1103), // LSTM *
-/* 1103 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 34), // LSTM
-/* 1104 */ _CFFI_OP(_CFFI_OP_POINTER, 1105), // LSTMCell *
-/* 1105 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 35), // LSTMCell
-/* 1106 */ _CFFI_OP(_CFFI_OP_POINTER, 1109), // LayerNorm *
-/* 1107 */ _CFFI_OP(_CFFI_OP_POINTER, 1108), // LayerNorm2d *
-/* 1108 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 37), // LayerNorm2d
-/* 1109 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 36), // LayerNorm
-/* 1110 */ _CFFI_OP(_CFFI_OP_POINTER, 1111), // LeakyReLU *
-/* 1111 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 38), // LeakyReLU
-/* 1112 */ _CFFI_OP(_CFFI_OP_POINTER, 1113), // Linear *
-/* 1113 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 39), // Linear
-/* 1114 */ _CFFI_OP(_CFFI_OP_POINTER, 1115), // MaxPool1d *
-/* 1115 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 40), // MaxPool1d
-/* 1116 */ _CFFI_OP(_CFFI_OP_POINTER, 1117), // MaxPool2d *
-/* 1117 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 41), // MaxPool2d
-/* 1118 */ _CFFI_OP(_CFFI_OP_POINTER, 1119), // MaxPool3d *
-/* 1119 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 42), // MaxPool3d
-/* 1120 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 43), // Module
-/* 1121 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 44), // ModuleDict
-/* 1122 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 45), // ModuleList
-/* 1123 */ _CFFI_OP(_CFFI_OP_POINTER, 1124), // MultiHeadAttention *
-/* 1124 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 46), // MultiHeadAttention
-/* 1125 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 47), // Optimizer
-/* 1126 */ _CFFI_OP(_CFFI_OP_POINTER, 1127), // PReLU *
-/* 1127 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 48), // PReLU
-/* 1128 */ _CFFI_OP(_CFFI_OP_POINTER, 1129), // Parameter *
-/* 1129 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 49), // Parameter
-/* 1130 */ _CFFI_OP(_CFFI_OP_POINTER, 1131), // PixelShuffle *
-/* 1131 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 50), // PixelShuffle
-/* 1132 */ _CFFI_OP(_CFFI_OP_POINTER, 1133), // PixelUnshuffle *
-/* 1133 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 51), // PixelUnshuffle
-/* 1134 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 0), // QRResult
-/* 1135 */ _CFFI_OP(_CFFI_OP_POINTER, 1136), // RNN *
-/* 1136 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 52), // RNN
-/* 1137 */ _CFFI_OP(_CFFI_OP_POINTER, 1138), // RNNCell *
-/* 1138 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 53), // RNNCell
-/* 1139 */ _CFFI_OP(_CFFI_OP_POINTER, 1140), // ReLU *
-/* 1140 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 54), // ReLU
-/* 1141 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 1), // SVDResult
-/* 1142 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 55), // SafeTensorsContext
-/* 1143 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 56), // Sequential
-/* 1144 */ _CFFI_OP(_CFFI_OP_POINTER, 1145), // Sigmoid *
-/* 1145 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 57), // Sigmoid
-/* 1146 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 58), // SparseCOOData
-/* 1147 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 59), // StateDict
-/* 1148 */ _CFFI_OP(_CFFI_OP_POINTER, 1149), // Tanh *
-/* 1149 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 60), // Tanh
-/* 1150 */ _CFFI_OP(_CFFI_OP_POINTER, 688), // Tensor *(*)(struct Module *, Tensor *)
-/* 1151 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 61), // Tensor
-/* 1152 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 62), // TensorConfig
-/* 1153 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 63), // TorchMemoryManager
-/* 1154 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 64), // TorchPTEExportOptions
-/* 1155 */ _CFFI_OP(_CFFI_OP_ENUM, 7), // TorchRuntimeKind
-/* 1156 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 65), // TorchRuntimeModule
-/* 1157 */ _CFFI_OP(_CFFI_OP_POINTER, 1158), // TransformerDecoder *
-/* 1158 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 67), // TransformerDecoder
-/* 1159 */ _CFFI_OP(_CFFI_OP_POINTER, 1160), // TransformerDecoderLayer *
-/* 1160 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 68), // TransformerDecoderLayer
-/* 1161 */ _CFFI_OP(_CFFI_OP_POINTER, 1162), // TransformerEncoder *
-/* 1162 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 69), // TransformerEncoder
-/* 1163 */ _CFFI_OP(_CFFI_OP_POINTER, 1164), // TransformerEncoderLayer *
-/* 1164 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 70), // TransformerEncoderLayer
-/* 1165 */ _CFFI_OP(_CFFI_OP_POINTER, 1166), // Upsample *
-/* 1166 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 71), // Upsample
-/* 1167 */ _CFFI_OP(_CFFI_OP_POINTER, 1168), // char *
-/* 1168 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 1169 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
-/* 1170 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float *
-/* 1171 */ _CFFI_OP(_CFFI_OP_POINTER, 1172), // struct CMLBackendBuffer *
-/* 1172 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 12), // struct CMLBackendBuffer
-/* 1173 */ _CFFI_OP(_CFFI_OP_POINTER, 1174), // struct CMLGraph *
-/* 1174 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 13), // struct CMLGraph
-/* 1175 */ _CFFI_OP(_CFFI_OP_POINTER, 1176), // struct IRNode *
-/* 1176 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 30), // struct IRNode
-/* 1177 */ _CFFI_OP(_CFFI_OP_POINTER, 1035), // void(*)(struct Module *)
-/* 1178 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/* 1049 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(size_t *, size_t *, size_t *, size_t *)
+/* 1050 */ _CFFI_OP(_CFFI_OP_POINTER, 726), // size_t *
+/* 1051 */ _CFFI_OP(_CFFI_OP_NOOP, 1050),
+/* 1052 */ _CFFI_OP(_CFFI_OP_NOOP, 1050),
+/* 1053 */ _CFFI_OP(_CFFI_OP_NOOP, 1050),
+/* 1054 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1055 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(struct Module *)
+/* 1056 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 1057 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1058 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(uint64_t)
+/* 1059 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 24), // uint64_t
+/* 1060 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1061 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(void *(*)(int, char const *, void *))
+/* 1062 */ _CFFI_OP(_CFFI_OP_POINTER, 931), // void *(*)(int, char const *, void *)
+/* 1063 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1064 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(void *)
+/* 1065 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
+/* 1066 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1067 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(void)
+/* 1068 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1069 */ _CFFI_OP(_CFFI_OP_POINTER, 1070), // AdaptiveAvgPool1d *
+/* 1070 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 2), // AdaptiveAvgPool1d
+/* 1071 */ _CFFI_OP(_CFFI_OP_POINTER, 1072), // AdaptiveAvgPool2d *
+/* 1072 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 3), // AdaptiveAvgPool2d
+/* 1073 */ _CFFI_OP(_CFFI_OP_POINTER, 1074), // AdaptiveMaxPool1d *
+/* 1074 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 4), // AdaptiveMaxPool1d
+/* 1075 */ _CFFI_OP(_CFFI_OP_POINTER, 1076), // AdaptiveMaxPool2d *
+/* 1076 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 5), // AdaptiveMaxPool2d
+/* 1077 */ _CFFI_OP(_CFFI_OP_POINTER, 1078), // AvgPool1d *
+/* 1078 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 6), // AvgPool1d
+/* 1079 */ _CFFI_OP(_CFFI_OP_POINTER, 1080), // AvgPool2d *
+/* 1080 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 7), // AvgPool2d
+/* 1081 */ _CFFI_OP(_CFFI_OP_POINTER, 1082), // AvgPool3d *
+/* 1082 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 8), // AvgPool3d
+/* 1083 */ _CFFI_OP(_CFFI_OP_POINTER, 1084), // BatchNorm1d *
+/* 1084 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 9), // BatchNorm1d
+/* 1085 */ _CFFI_OP(_CFFI_OP_POINTER, 1086), // BatchNorm2d *
+/* 1086 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 10), // BatchNorm2d
+/* 1087 */ _CFFI_OP(_CFFI_OP_POINTER, 1088), // BatchNorm3d *
+/* 1088 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 11), // BatchNorm3d
+/* 1089 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 14), // CleanupContext
+/* 1090 */ _CFFI_OP(_CFFI_OP_POINTER, 1091), // Conv1d *
+/* 1091 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 15), // Conv1d
+/* 1092 */ _CFFI_OP(_CFFI_OP_POINTER, 1093), // Conv2d *
+/* 1093 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 16), // Conv2d
+/* 1094 */ _CFFI_OP(_CFFI_OP_POINTER, 1095), // Conv3d *
+/* 1095 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 17), // Conv3d
+/* 1096 */ _CFFI_OP(_CFFI_OP_POINTER, 1097), // ConvTranspose1d *
+/* 1097 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 18), // ConvTranspose1d
+/* 1098 */ _CFFI_OP(_CFFI_OP_POINTER, 1099), // ConvTranspose2d *
+/* 1099 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 19), // ConvTranspose2d
+/* 1100 */ _CFFI_OP(_CFFI_OP_POINTER, 1101), // ConvTranspose3d *
+/* 1101 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 20), // ConvTranspose3d
+/* 1102 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 21), // Dataset
+/* 1103 */ _CFFI_OP(_CFFI_OP_POINTER, 1104), // Dropout *
+/* 1104 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 22), // Dropout
+/* 1105 */ _CFFI_OP(_CFFI_OP_POINTER, 1106), // Embedding *
+/* 1106 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 23), // Embedding
+/* 1107 */ _CFFI_OP(_CFFI_OP_POINTER, 1108), // Flatten *
+/* 1108 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 24), // Flatten
+/* 1109 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 25), // GGUFContext
+/* 1110 */ _CFFI_OP(_CFFI_OP_POINTER, 1111), // GRU *
+/* 1111 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 26), // GRU
+/* 1112 */ _CFFI_OP(_CFFI_OP_POINTER, 1113), // GRUCell *
+/* 1113 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 27), // GRUCell
+/* 1114 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 28), // GradScaler
+/* 1115 */ _CFFI_OP(_CFFI_OP_POINTER, 1116), // GroupNorm *
+/* 1116 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 29), // GroupNorm
+/* 1117 */ _CFFI_OP(_CFFI_OP_POINTER, 1118), // Identity *
+/* 1118 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 31), // Identity
+/* 1119 */ _CFFI_OP(_CFFI_OP_POINTER, 1120), // InstanceNorm2d *
+/* 1120 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 32), // InstanceNorm2d
+/* 1121 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 33), // LRScheduler
+/* 1122 */ _CFFI_OP(_CFFI_OP_POINTER, 1123), // LSTM *
+/* 1123 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 34), // LSTM
+/* 1124 */ _CFFI_OP(_CFFI_OP_POINTER, 1125), // LSTMCell *
+/* 1125 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 35), // LSTMCell
+/* 1126 */ _CFFI_OP(_CFFI_OP_POINTER, 1129), // LayerNorm *
+/* 1127 */ _CFFI_OP(_CFFI_OP_POINTER, 1128), // LayerNorm2d *
+/* 1128 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 37), // LayerNorm2d
+/* 1129 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 36), // LayerNorm
+/* 1130 */ _CFFI_OP(_CFFI_OP_POINTER, 1131), // LeakyReLU *
+/* 1131 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 38), // LeakyReLU
+/* 1132 */ _CFFI_OP(_CFFI_OP_POINTER, 1133), // Linear *
+/* 1133 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 39), // Linear
+/* 1134 */ _CFFI_OP(_CFFI_OP_POINTER, 1135), // MaxPool1d *
+/* 1135 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 40), // MaxPool1d
+/* 1136 */ _CFFI_OP(_CFFI_OP_POINTER, 1137), // MaxPool2d *
+/* 1137 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 41), // MaxPool2d
+/* 1138 */ _CFFI_OP(_CFFI_OP_POINTER, 1139), // MaxPool3d *
+/* 1139 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 42), // MaxPool3d
+/* 1140 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 43), // Module
+/* 1141 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 44), // ModuleDict
+/* 1142 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 45), // ModuleList
+/* 1143 */ _CFFI_OP(_CFFI_OP_POINTER, 1144), // MultiHeadAttention *
+/* 1144 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 46), // MultiHeadAttention
+/* 1145 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 47), // Optimizer
+/* 1146 */ _CFFI_OP(_CFFI_OP_POINTER, 1147), // PReLU *
+/* 1147 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 48), // PReLU
+/* 1148 */ _CFFI_OP(_CFFI_OP_POINTER, 1149), // Parameter *
+/* 1149 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 49), // Parameter
+/* 1150 */ _CFFI_OP(_CFFI_OP_POINTER, 1151), // PixelShuffle *
+/* 1151 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 50), // PixelShuffle
+/* 1152 */ _CFFI_OP(_CFFI_OP_POINTER, 1153), // PixelUnshuffle *
+/* 1153 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 51), // PixelUnshuffle
+/* 1154 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 0), // QRResult
+/* 1155 */ _CFFI_OP(_CFFI_OP_POINTER, 1156), // RNN *
+/* 1156 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 52), // RNN
+/* 1157 */ _CFFI_OP(_CFFI_OP_POINTER, 1158), // RNNCell *
+/* 1158 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 53), // RNNCell
+/* 1159 */ _CFFI_OP(_CFFI_OP_POINTER, 1160), // ReLU *
+/* 1160 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 54), // ReLU
+/* 1161 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 1), // SVDResult
+/* 1162 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 55), // SafeTensorsContext
+/* 1163 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 56), // Sequential
+/* 1164 */ _CFFI_OP(_CFFI_OP_POINTER, 1165), // Sigmoid *
+/* 1165 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 57), // Sigmoid
+/* 1166 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 58), // SparseCOOData
+/* 1167 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 59), // StateDict
+/* 1168 */ _CFFI_OP(_CFFI_OP_POINTER, 1169), // Tanh *
+/* 1169 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 60), // Tanh
+/* 1170 */ _CFFI_OP(_CFFI_OP_POINTER, 700), // Tensor *(*)(struct Module *, Tensor *)
+/* 1171 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 61), // Tensor
+/* 1172 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 62), // TensorConfig
+/* 1173 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 63), // TorchMemoryManager
+/* 1174 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 64), // TorchPTEExportOptions
+/* 1175 */ _CFFI_OP(_CFFI_OP_ENUM, 7), // TorchRuntimeKind
+/* 1176 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 65), // TorchRuntimeModule
+/* 1177 */ _CFFI_OP(_CFFI_OP_POINTER, 1178), // TransformerDecoder *
+/* 1178 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 67), // TransformerDecoder
+/* 1179 */ _CFFI_OP(_CFFI_OP_POINTER, 1180), // TransformerDecoderLayer *
+/* 1180 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 68), // TransformerDecoderLayer
+/* 1181 */ _CFFI_OP(_CFFI_OP_POINTER, 1182), // TransformerEncoder *
+/* 1182 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 69), // TransformerEncoder
+/* 1183 */ _CFFI_OP(_CFFI_OP_POINTER, 1184), // TransformerEncoderLayer *
+/* 1184 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 70), // TransformerEncoderLayer
+/* 1185 */ _CFFI_OP(_CFFI_OP_POINTER, 1186), // Upsample *
+/* 1186 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 71), // Upsample
+/* 1187 */ _CFFI_OP(_CFFI_OP_POINTER, 1188), // char *
+/* 1188 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 1189 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
+/* 1190 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float *
+/* 1191 */ _CFFI_OP(_CFFI_OP_POINTER, 1192), // struct CMLBackendBuffer *
+/* 1192 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 12), // struct CMLBackendBuffer
+/* 1193 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 13), // struct CMLGraph
+/* 1194 */ _CFFI_OP(_CFFI_OP_POINTER, 1195), // struct IRNode *
+/* 1195 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 30), // struct IRNode
+/* 1196 */ _CFFI_OP(_CFFI_OP_POINTER, 1055), // void(*)(struct Module *)
+/* 1197 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
 
 static int _cffi_const_DTYPE_FLOAT32(unsigned long long *o)
@@ -2431,6 +2451,60 @@ _cffi_f_cml_argmin(PyObject *self, PyObject *args)
 }
 #else
 #  define _cffi_f_cml_argmin _cffi_d_cml_argmin
+#endif
+
+static Tensor * _cffi_d_cml_argsort(Tensor * x0, int x1, _Bool x2)
+{
+  return cml_argsort(x0, x1, x2);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_argsort(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  int x1;
+  _Bool x2;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+
+  if (!PyArg_UnpackTuple(args, "cml_argsort", 3, 3, &arg0, &arg1, &arg2))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x2 = (_Bool)_cffi_to_c__Bool(arg2);
+  if (x2 == (_Bool)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_argsort(x0, x1, x2); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_argsort _cffi_d_cml_argsort
 #endif
 
 static Tensor * _cffi_d_cml_asin(Tensor * x0)
@@ -3216,6 +3290,59 @@ _cffi_f_cml_contiguous(PyObject *self, PyObject *arg0)
 #  define _cffi_f_cml_contiguous _cffi_d_cml_contiguous
 #endif
 
+static Tensor * _cffi_d_cml_copysign(Tensor * x0, Tensor * x1)
+{
+  return cml_copysign(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_copysign(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  Tensor * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_copysign", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_copysign(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_copysign _cffi_d_cml_copysign
+#endif
+
 static Tensor * _cffi_d_cml_cos(Tensor * x0)
 {
   return cml_cos(x0);
@@ -3252,6 +3379,54 @@ _cffi_f_cml_cos(PyObject *self, PyObject *arg0)
 }
 #else
 #  define _cffi_f_cml_cos _cffi_d_cml_cos
+#endif
+
+static Tensor * _cffi_d_cml_cumprod(Tensor * x0, int x1)
+{
+  return cml_cumprod(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_cumprod(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  int x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_cumprod", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_cumprod(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_cumprod _cffi_d_cml_cumprod
 #endif
 
 static Tensor * _cffi_d_cml_cumsum(Tensor * x0, int x1)
@@ -3332,7 +3507,7 @@ _cffi_f_cml_dataset_load(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(824));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(836));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3467,7 +3642,7 @@ _cffi_f_cml_dist_allreduce(PyObject *self, PyObject *args)
       return NULL;
   }
 
-  if (_cffi_to_c((char *)&x1, _cffi_type(888), arg1) < 0)
+  if (_cffi_to_c((char *)&x1, _cffi_type(900), arg1) < 0)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -3607,7 +3782,7 @@ _cffi_f_cml_dist_init(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "cml_dist_init", 3, 3, &arg0, &arg1, &arg2))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(828), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(840), arg0) < 0)
     return NULL;
 
   x1 = _cffi_to_c_int(arg1, int);
@@ -3829,6 +4004,65 @@ _cffi_f_cml_dtype_size(PyObject *self, PyObject *arg0)
 }
 #else
 #  define _cffi_f_cml_dtype_size _cffi_d_cml_dtype_size
+#endif
+
+static Tensor * _cffi_d_cml_einsum(char const * x0, Tensor * * x1, int x2)
+{
+  return cml_einsum(x0, x1, x2);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_einsum(PyObject *self, PyObject *args)
+{
+  char const * x0;
+  Tensor * * x1;
+  int x2;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+
+  if (!PyArg_UnpackTuple(args, "cml_einsum", 3, 3, &arg0, &arg1, &arg2))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(134), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(437), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(437), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_einsum(x0, x1, x2); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_einsum _cffi_d_cml_einsum
 #endif
 
 static Tensor * _cffi_d_cml_elu(Tensor * x0, float x1)
@@ -4485,10 +4719,10 @@ _cffi_f_cml_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(693), arg0, (char **)&x0);
+      _cffi_type(705), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(693), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4533,10 +4767,10 @@ _cffi_f_cml_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(693), arg0, (char **)&x0);
+      _cffi_type(705), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(693), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4826,7 +5060,7 @@ _cffi_f_cml_get_error_handler(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1042));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1062));
   return pyresult;
 }
 #else
@@ -4909,10 +5143,10 @@ _cffi_f_cml_get_version(PyObject *self, PyObject *args)
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1024), arg3, (char **)&x3);
+      _cffi_type(1044), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (char const * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1024), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(1044), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5402,15 +5636,15 @@ _cffi_f_cml_grad_scaler_step(PyObject *self, PyObject *args)
       return NULL;
   }
 
-  x1 = (void(*)(void *))_cffi_to_c_pointer(arg1, _cffi_type(943));
+  x1 = (void(*)(void *))_cffi_to_c_pointer(arg1, _cffi_type(963));
   if (x1 == (void(*)(void *))NULL && PyErr_Occurred())
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(693), arg2, (char **)&x2);
+      _cffi_type(705), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(693), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(705), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6097,37 +6331,37 @@ _cffi_f_cml_kernel_cache_stats(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1030), arg0, (char **)&x0);
+      _cffi_type(1050), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1030), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(1050), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1030), arg1, (char **)&x1);
+      _cffi_type(1050), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1030), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(1050), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1030), arg2, (char **)&x2);
+      _cffi_type(1050), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1030), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(1050), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1030), arg3, (char **)&x3);
+      _cffi_type(1050), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1030), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(1050), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6388,6 +6622,107 @@ _cffi_f_cml_log2(PyObject *self, PyObject *arg0)
 }
 #else
 #  define _cffi_f_cml_log2 _cffi_d_cml_log2
+#endif
+
+static Tensor * _cffi_d_cml_logaddexp(Tensor * x0, Tensor * x1)
+{
+  return cml_logaddexp(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_logaddexp(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  Tensor * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_logaddexp", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_logaddexp(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_logaddexp _cffi_d_cml_logaddexp
+#endif
+
+static Tensor * _cffi_d_cml_logcumsumexp(Tensor * x0, int x1)
+{
+  return cml_logcumsumexp(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_logcumsumexp(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  int x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_logcumsumexp", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_logcumsumexp(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_logcumsumexp _cffi_d_cml_logcumsumexp
 #endif
 
 static Tensor * _cffi_d_cml_long(Tensor * x0)
@@ -7751,7 +8086,7 @@ _cffi_f_cml_nn_adaptive_avgpool1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1049));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1069));
   return pyresult;
 }
 #else
@@ -7791,7 +8126,7 @@ _cffi_f_cml_nn_adaptive_avgpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1051));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1071));
   return pyresult;
 }
 #else
@@ -7821,7 +8156,7 @@ _cffi_f_cml_nn_adaptive_maxpool1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1053));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1073));
   return pyresult;
 }
 #else
@@ -7861,7 +8196,7 @@ _cffi_f_cml_nn_adaptive_maxpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1055));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1075));
   return pyresult;
 }
 #else
@@ -7919,7 +8254,7 @@ _cffi_f_cml_nn_avgpool1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1057));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1077));
   return pyresult;
 }
 #else
@@ -7977,7 +8312,7 @@ _cffi_f_cml_nn_avgpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1059));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1079));
   return pyresult;
 }
 #else
@@ -8035,7 +8370,7 @@ _cffi_f_cml_nn_avgpool3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1061));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1081));
   return pyresult;
 }
 #else
@@ -8103,7 +8438,7 @@ _cffi_f_cml_nn_batchnorm1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1063));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1083));
   return pyresult;
 }
 #else
@@ -8171,7 +8506,7 @@ _cffi_f_cml_nn_batchnorm2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1065));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1085));
   return pyresult;
 }
 #else
@@ -8239,7 +8574,7 @@ _cffi_f_cml_nn_batchnorm3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1067));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1087));
   return pyresult;
 }
 #else
@@ -8372,7 +8707,7 @@ _cffi_f_cml_nn_conv1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1070));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1090));
   return pyresult;
 }
 #else
@@ -8452,7 +8787,7 @@ _cffi_f_cml_nn_conv2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1072));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1092));
   return pyresult;
 }
 #else
@@ -8532,7 +8867,7 @@ _cffi_f_cml_nn_conv3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1074));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1094));
   return pyresult;
 }
 #else
@@ -8612,7 +8947,7 @@ _cffi_f_cml_nn_conv_transpose1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1076));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1096));
   return pyresult;
 }
 #else
@@ -8692,7 +9027,7 @@ _cffi_f_cml_nn_conv_transpose2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1078));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1098));
   return pyresult;
 }
 #else
@@ -8772,7 +9107,7 @@ _cffi_f_cml_nn_conv_transpose3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1080));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1100));
   return pyresult;
 }
 #else
@@ -8935,7 +9270,7 @@ _cffi_f_cml_nn_dropout(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1083));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1103));
   return pyresult;
 }
 #else
@@ -8991,7 +9326,7 @@ _cffi_f_cml_nn_embedding(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1085));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1105));
   return pyresult;
 }
 #else
@@ -9031,7 +9366,7 @@ _cffi_f_cml_nn_flatten(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1087));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1107));
   return pyresult;
 }
 #else
@@ -9093,7 +9428,7 @@ _cffi_f_cml_nn_groupnorm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1095));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1115));
   return pyresult;
 }
 #else
@@ -9173,7 +9508,7 @@ _cffi_f_cml_nn_gru(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1090));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1110));
   return pyresult;
 }
 #else
@@ -9229,7 +9564,7 @@ _cffi_f_cml_nn_gru_cell(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1092));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1112));
   return pyresult;
 }
 #else
@@ -9314,7 +9649,7 @@ _cffi_f_cml_nn_identity(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1097));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1117));
   return pyresult;
 }
 #else
@@ -9370,7 +9705,7 @@ _cffi_f_cml_nn_instancenorm2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1099));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1119));
   return pyresult;
 }
 #else
@@ -9479,7 +9814,7 @@ _cffi_f_cml_nn_layernorm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1106));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1126));
   return pyresult;
 }
 #else
@@ -9535,7 +9870,7 @@ _cffi_f_cml_nn_layernorm2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1107));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1127));
   return pyresult;
 }
 #else
@@ -9575,7 +9910,7 @@ _cffi_f_cml_nn_leaky_relu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1110));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1130));
   return pyresult;
 }
 #else
@@ -9631,7 +9966,7 @@ _cffi_f_cml_nn_linear(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1112));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1132));
   return pyresult;
 }
 #else
@@ -9711,7 +10046,7 @@ _cffi_f_cml_nn_lstm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1102));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1122));
   return pyresult;
 }
 #else
@@ -9767,7 +10102,7 @@ _cffi_f_cml_nn_lstm_cell(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1104));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1124));
   return pyresult;
 }
 #else
@@ -9878,7 +10213,7 @@ _cffi_f_cml_nn_maxpool1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1114));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1134));
   return pyresult;
 }
 #else
@@ -9936,7 +10271,7 @@ _cffi_f_cml_nn_maxpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1116));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1136));
   return pyresult;
 }
 #else
@@ -9994,7 +10329,7 @@ _cffi_f_cml_nn_maxpool3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1118));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1138));
   return pyresult;
 }
 #else
@@ -10020,7 +10355,7 @@ _cffi_f_cml_nn_module_dict(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(859));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(871));
   return pyresult;
 }
 #else
@@ -10173,7 +10508,7 @@ _cffi_f_cml_nn_module_list(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(867));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(879));
   return pyresult;
 }
 #else
@@ -10364,7 +10699,7 @@ _cffi_f_cml_nn_multihead_attention(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1123));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1143));
   return pyresult;
 }
 #else
@@ -10447,7 +10782,7 @@ _cffi_f_cml_nn_pixel_shuffle(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1130));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1150));
   return pyresult;
 }
 #else
@@ -10477,7 +10812,7 @@ _cffi_f_cml_nn_pixel_unshuffle(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1132));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1152));
   return pyresult;
 }
 #else
@@ -10527,7 +10862,7 @@ _cffi_f_cml_nn_prelu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1126));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1146));
   return pyresult;
 }
 #else
@@ -10557,7 +10892,7 @@ _cffi_f_cml_nn_relu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1139));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1159));
   return pyresult;
 }
 #else
@@ -10637,7 +10972,7 @@ _cffi_f_cml_nn_rnn(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1135));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1155));
   return pyresult;
 }
 #else
@@ -10693,7 +11028,7 @@ _cffi_f_cml_nn_rnn_cell(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1137));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1157));
   return pyresult;
 }
 #else
@@ -10851,7 +11186,7 @@ _cffi_f_cml_nn_sigmoid(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1144));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1164));
   return pyresult;
 }
 #else
@@ -10930,7 +11265,7 @@ _cffi_f_cml_nn_tanh(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1148));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1168));
   return pyresult;
 }
 #else
@@ -10998,7 +11333,7 @@ _cffi_f_cml_nn_transformer_decoder(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1157));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1177));
   return pyresult;
 }
 #else
@@ -11060,7 +11395,7 @@ _cffi_f_cml_nn_transformer_decoder_layer(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1159));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1179));
   return pyresult;
 }
 #else
@@ -11128,7 +11463,7 @@ _cffi_f_cml_nn_transformer_encoder(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1161));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1181));
   return pyresult;
 }
 #else
@@ -11190,7 +11525,7 @@ _cffi_f_cml_nn_transformer_encoder_layer(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1163));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1183));
   return pyresult;
 }
 #else
@@ -11324,7 +11659,7 @@ _cffi_f_cml_nn_upsample(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1165));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1185));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11354,6 +11689,54 @@ _cffi_f_cml_no_grad(PyObject *self, PyObject *noarg)
 }
 #else
 #  define _cffi_f_cml_no_grad _cffi_d_cml_no_grad
+#endif
+
+static Tensor * _cffi_d_cml_one_hot(Tensor * x0, int x1)
+{
+  return cml_one_hot(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_one_hot(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  int x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_one_hot", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_one_hot(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_one_hot _cffi_d_cml_one_hot
 #endif
 
 static Tensor * _cffi_d_cml_ones(int * x0, int x1, TensorConfig const * x2)
@@ -11521,6 +11904,93 @@ _cffi_f_cml_ones_like(PyObject *self, PyObject *arg0)
 }
 #else
 #  define _cffi_f_cml_ones_like _cffi_d_cml_ones_like
+#endif
+
+static int _cffi_d_cml_onnx_export_graph(struct CMLGraph * x0, Tensor * * x1, int x2, Tensor * * x3, int x4, char const * x5)
+{
+  return cml_onnx_export_graph(x0, x1, x2, x3, x4, x5);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_onnx_export_graph(PyObject *self, PyObject *args)
+{
+  struct CMLGraph * x0;
+  Tensor * * x1;
+  int x2;
+  Tensor * * x3;
+  int x4;
+  char const * x5;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  int result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+  PyObject *arg4;
+  PyObject *arg5;
+
+  if (!PyArg_UnpackTuple(args, "cml_onnx_export_graph", 6, 6, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(906), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (struct CMLGraph *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(906), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(437), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(437), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(437), arg3, (char **)&x3);
+  if (datasize != 0) {
+    x3 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(437), arg3, (char **)&x3,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x4 = _cffi_to_c_int(arg4, int);
+  if (x4 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(134), arg5, (char **)&x5);
+  if (datasize != 0) {
+    x5 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(134), arg5, (char **)&x5,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_onnx_export_graph(x0, x1, x2, x3, x4, x5); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_int(result, int);
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_onnx_export_graph _cffi_d_cml_onnx_export_graph
 #endif
 
 static Optimizer * _cffi_d_cml_optim_adadelta(Parameter * * x0, int x1, float x2, float x3, float x4)
@@ -12887,7 +13357,7 @@ _cffi_f_cml_qr(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1134));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1154));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13224,10 +13694,10 @@ _cffi_f_cml_register_cleanup_context(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(919), arg0, (char **)&x0);
+      _cffi_type(939), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (CleanupContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(919), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(939), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13487,6 +13957,60 @@ _cffi_f_cml_reshape(PyObject *self, PyObject *args)
 }
 #else
 #  define _cffi_f_cml_reshape _cffi_d_cml_reshape
+#endif
+
+static Tensor * _cffi_d_cml_roll(Tensor * x0, int x1, int x2)
+{
+  return cml_roll(x0, x1, x2);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_roll(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  int x1;
+  int x2;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+
+  if (!PyArg_UnpackTuple(args, "cml_roll", 3, 3, &arg0, &arg1, &arg2))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_roll(x0, x1, x2); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_roll _cffi_d_cml_roll
 #endif
 
 static Tensor * _cffi_d_cml_round(Tensor * x0)
@@ -13999,7 +14523,7 @@ _cffi_f_cml_set_error_handler(PyObject *self, PyObject *arg0)
 {
   void *(* x0)(int, char const *, void *);
 
-  x0 = (void *(*)(int, char const *, void *))_cffi_to_c_pointer(arg0, _cffi_type(1042));
+  x0 = (void *(*)(int, char const *, void *))_cffi_to_c_pointer(arg0, _cffi_type(1062));
   if (x0 == (void *(*)(int, char const *, void *))NULL && PyErr_Occurred())
     return NULL;
 
@@ -14027,7 +14551,7 @@ _cffi_f_cml_set_log_level(PyObject *self, PyObject *arg0)
 {
   LogLevel x0;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(950), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(970), arg0) < 0)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -15146,7 +15670,7 @@ _cffi_f_cml_svd(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1141));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1161));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15258,10 +15782,10 @@ _cffi_f_cml_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(693), arg0, (char **)&x0);
+      _cffi_type(705), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(693), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15324,10 +15848,10 @@ _cffi_f_cml_tensor_1d(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(599), arg0, (char **)&x0);
+      _cffi_type(611), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (float const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(611), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15374,10 +15898,10 @@ _cffi_f_cml_tensor_2d(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(599), arg0, (char **)&x0);
+      _cffi_type(611), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (float const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(611), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15471,6 +15995,77 @@ _cffi_f_cml_topk(PyObject *self, PyObject *args)
 #  define _cffi_f_cml_topk _cffi_d_cml_topk
 #endif
 
+static Tensor * _cffi_d_cml_topk_with_indices(Tensor * x0, int x1, int x2, _Bool x3, Tensor * * x4)
+{
+  return cml_topk_with_indices(x0, x1, x2, x3, x4);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_topk_with_indices(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  int x1;
+  int x2;
+  _Bool x3;
+  Tensor * * x4;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+  PyObject *arg4;
+
+  if (!PyArg_UnpackTuple(args, "cml_topk_with_indices", 5, 5, &arg0, &arg1, &arg2, &arg3, &arg4))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x3 = (_Bool)_cffi_to_c__Bool(arg3);
+  if (x3 == (_Bool)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(437), arg4, (char **)&x4);
+  if (datasize != 0) {
+    x4 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(437), arg4, (char **)&x4,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_topk_with_indices(x0, x1, x2, x3, x4); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_topk_with_indices _cffi_d_cml_topk_with_indices
+#endif
+
 static void _cffi_d_cml_track_dataset(Dataset * x0)
 {
   cml_track_dataset(x0);
@@ -15484,10 +16079,10 @@ _cffi_f_cml_track_dataset(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(824), arg0, (char **)&x0);
+      _cffi_type(836), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Dataset *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(824), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(836), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15927,6 +16522,70 @@ _cffi_f_cml_var(PyObject *self, PyObject *args)
 #  define _cffi_f_cml_var _cffi_d_cml_var
 #endif
 
+static Tensor * _cffi_d_cml_where(Tensor * x0, Tensor * x1, Tensor * x2)
+{
+  return cml_where(x0, x1, x2);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_where(PyObject *self, PyObject *args)
+{
+  Tensor * x0;
+  Tensor * x1;
+  Tensor * x2;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+
+  if (!PyArg_UnpackTuple(args, "cml_where", 3, 3, &arg0, &arg1, &arg2))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(379), arg2, (char **)&x2);
+  if (datasize != 0) {
+    x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_where(x0, x1, x2); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_where _cffi_d_cml_where
+#endif
+
 static Tensor * _cffi_d_cml_xavier_normal(int * x0, int x1, int x2, int x3, TensorConfig const * x4)
 {
   return cml_xavier_normal(x0, x1, x2, x3, x4);
@@ -16222,10 +16881,10 @@ _cffi_f_dataset_normalize(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(824), arg0, (char **)&x0);
+      _cffi_type(836), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Dataset *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(824), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(836), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16569,10 +17228,10 @@ _cffi_f_module_collect_parameters(PyObject *self, PyObject *args)
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(839), arg1, (char **)&x1);
+      _cffi_type(851), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Parameter * * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(839), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(851), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16628,10 +17287,10 @@ _cffi_f_module_dict_add(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(859), arg0, (char **)&x0);
+      _cffi_type(871), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleDict *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(859), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(871), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16684,10 +17343,10 @@ _cffi_f_module_dict_size(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(859), arg0, (char **)&x0);
+      _cffi_type(871), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleDict *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(859), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(871), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16855,10 +17514,10 @@ _cffi_f_module_list_append(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(867), arg0, (char **)&x0);
+      _cffi_type(879), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleList *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(867), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(879), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16910,10 +17569,10 @@ _cffi_f_module_list_insert(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(867), arg0, (char **)&x0);
+      _cffi_type(879), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleList *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(867), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(879), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16961,10 +17620,10 @@ _cffi_f_module_list_length(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(867), arg0, (char **)&x0);
+      _cffi_type(879), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleList *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(867), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(879), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17410,7 +18069,7 @@ _cffi_f_tensor_data_ptr(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(693));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(705));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -17517,10 +18176,10 @@ _cffi_f_tensor_from_data(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg0, (char **)&x0);
+      _cffi_type(717), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(717), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18070,10 +18729,10 @@ _cffi_f_torch_arange(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg3, (char **)&x3);
+      _cffi_type(629), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18515,10 +19174,10 @@ _cffi_f_torch_empty(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg2, (char **)&x2);
+      _cffi_type(629), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18587,10 +19246,10 @@ _cffi_f_torch_eye(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg1, (char **)&x1);
+      _cffi_type(629), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18635,10 +19294,10 @@ _cffi_f_torch_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(693), arg0, (char **)&x0);
+      _cffi_type(705), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(693), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18657,10 +19316,10 @@ _cffi_f_torch_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg3, (char **)&x3);
+      _cffi_type(629), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18718,10 +19377,10 @@ _cffi_f_torch_full(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg2, (char **)&x2);
+      _cffi_type(629), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19001,10 +19660,10 @@ _cffi_f_torch_get_version(PyObject *self, PyObject *args)
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1024), arg3, (char **)&x3);
+      _cffi_type(1044), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (char const * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1024), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(1044), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19321,10 +19980,10 @@ _cffi_f_torch_linspace(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg3, (char **)&x3);
+      _cffi_type(629), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19556,7 +20215,7 @@ _cffi_f_torch_memory_create(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1008));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1028));
   return pyresult;
 }
 #else
@@ -19576,10 +20235,10 @@ _cffi_f_torch_memory_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1008), arg0, (char **)&x0);
+      _cffi_type(1028), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchMemoryManager *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1008), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(1028), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19620,10 +20279,10 @@ _cffi_f_torch_memory_from_buffer(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(693), arg0, (char **)&x0);
+      _cffi_type(705), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(693), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19639,7 +20298,7 @@ _cffi_f_torch_memory_from_buffer(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1008));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1028));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19662,10 +20321,10 @@ _cffi_f_torch_memory_peak(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(902), arg0, (char **)&x0);
+      _cffi_type(922), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchMemoryManager const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(902), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(922), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19700,10 +20359,10 @@ _cffi_f_torch_memory_used(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(902), arg0, (char **)&x0);
+      _cffi_type(922), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchMemoryManager const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(902), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(922), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20008,7 +20667,7 @@ _cffi_f_torch_module_state_dict(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(983));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1003));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20180,7 +20839,7 @@ _cffi_f_torch_nn_linear(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1112));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1132));
   return pyresult;
 }
 #else
@@ -20259,7 +20918,7 @@ _cffi_f_torch_nn_relu(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1139));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1159));
   return pyresult;
 }
 #else
@@ -20456,10 +21115,10 @@ _cffi_f_torch_ones(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg2, (char **)&x2);
+      _cffi_type(629), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20776,7 +21435,7 @@ _cffi_f_torch_options(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(727));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
   return pyresult;
 }
 #else
@@ -20804,7 +21463,7 @@ _cffi_f_torch_options_device(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "torch_options_device", 2, 2, &arg0, &arg1))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(727), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(739), arg0) < 0)
     return NULL;
 
   if (_cffi_to_c((char *)&x1, _cffi_type(42), arg1) < 0)
@@ -20817,7 +21476,7 @@ _cffi_f_torch_options_device(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(727));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
   return pyresult;
 }
 #else
@@ -20845,7 +21504,7 @@ _cffi_f_torch_options_dtype(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "torch_options_dtype", 2, 2, &arg0, &arg1))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(727), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(739), arg0) < 0)
     return NULL;
 
   if (_cffi_to_c((char *)&x1, _cffi_type(41), arg1) < 0)
@@ -20858,7 +21517,7 @@ _cffi_f_torch_options_dtype(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(727));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
   return pyresult;
 }
 #else
@@ -20886,7 +21545,7 @@ _cffi_f_torch_options_requires_grad(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "torch_options_requires_grad", 2, 2, &arg0, &arg1))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(727), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(739), arg0) < 0)
     return NULL;
 
   x1 = (_Bool)_cffi_to_c__Bool(arg1);
@@ -20900,7 +21559,7 @@ _cffi_f_torch_options_requires_grad(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(727));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
   return pyresult;
 }
 #else
@@ -20925,10 +21584,10 @@ _cffi_f_torch_options_to_config(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg0, (char **)&x0);
+      _cffi_type(629), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20940,7 +21599,7 @@ _cffi_f_torch_options_to_config(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1152));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1172));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21040,10 +21699,10 @@ _cffi_f_torch_rand(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg2, (char **)&x2);
+      _cffi_type(629), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21099,10 +21758,10 @@ _cffi_f_torch_randn(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg2, (char **)&x2);
+      _cffi_type(629), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21395,10 +22054,10 @@ _cffi_f_torch_runtime_export_pte(PyObject *self, PyObject *args)
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(852), arg3, (char **)&x3);
+      _cffi_type(864), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchPTEExportOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(852), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(864), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21439,10 +22098,10 @@ _cffi_f_torch_runtime_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(592), arg0, (char **)&x0);
+      _cffi_type(599), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchRuntimeModule *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(592), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21484,10 +22143,10 @@ _cffi_f_torch_runtime_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(592), arg0, (char **)&x0);
+      _cffi_type(599), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchRuntimeModule *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(592), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21537,7 +22196,7 @@ _cffi_f_torch_runtime_from_module(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(592));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(599));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21575,7 +22234,7 @@ _cffi_f_torch_runtime_load_aot(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(592));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(599));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21613,7 +22272,7 @@ _cffi_f_torch_runtime_load_pte(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(592));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(599));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21640,19 +22299,19 @@ _cffi_f_torch_runtime_set_memory(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(592), arg0, (char **)&x0);
+      _cffi_type(599), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchRuntimeModule *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(592), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1008), arg1, (char **)&x1);
+      _cffi_type(1028), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TorchMemoryManager *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1008), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(1028), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21983,10 +22642,10 @@ _cffi_f_torch_state_dict_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(983), arg0, (char **)&x0);
+      _cffi_type(1003), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (StateDict *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(983), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(1003), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22234,7 +22893,7 @@ _cffi_f_torch_tensor_data_ptr(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(693));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(705));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22272,7 +22931,7 @@ _cffi_f_torch_tensor_data_ptr_f32(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1170));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1190));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23036,10 +23695,10 @@ _cffi_f_torch_zeros(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(617), arg2, (char **)&x2);
+      _cffi_type(629), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(617), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23800,22 +24459,23 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "UPSAMPLE_BICUBIC", (void *)_cffi_const_UPSAMPLE_BICUBIC, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "UPSAMPLE_BILINEAR", (void *)_cffi_const_UPSAMPLE_BILINEAR, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "UPSAMPLE_NEAREST", (void *)_cffi_const_UPSAMPLE_NEAREST, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
-  { "autograd_is_grad_enabled", (void *)_cffi_f_autograd_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_autograd_is_grad_enabled },
-  { "autograd_no_grad_enter", (void *)_cffi_f_autograd_no_grad_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_autograd_no_grad_enter },
-  { "autograd_no_grad_exit", (void *)_cffi_f_autograd_no_grad_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_autograd_no_grad_exit },
+  { "autograd_is_grad_enabled", (void *)_cffi_f_autograd_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_autograd_is_grad_enabled },
+  { "autograd_no_grad_enter", (void *)_cffi_f_autograd_no_grad_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_autograd_no_grad_enter },
+  { "autograd_no_grad_exit", (void *)_cffi_f_autograd_no_grad_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_autograd_no_grad_exit },
   { "cml_acos", (void *)_cffi_f_cml_acos, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_acos },
   { "cml_add", (void *)_cffi_f_cml_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_add },
-  { "cml_arange", (void *)_cffi_f_cml_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 607), (void *)_cffi_d_cml_arange },
+  { "cml_arange", (void *)_cffi_f_cml_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 619), (void *)_cffi_d_cml_arange },
   { "cml_argmax", (void *)_cffi_f_cml_argmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_argmax },
   { "cml_argmin", (void *)_cffi_f_cml_argmin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_argmin },
+  { "cml_argsort", (void *)_cffi_f_cml_argsort, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_argsort },
   { "cml_asin", (void *)_cffi_f_cml_asin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_asin },
   { "cml_atan", (void *)_cffi_f_cml_atan, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_atan },
-  { "cml_autocast_enter", (void *)_cffi_f_cml_autocast_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_cml_autocast_enter },
-  { "cml_autocast_exit", (void *)_cffi_f_cml_autocast_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_autocast_exit },
-  { "cml_autocast_is_enabled", (void *)_cffi_f_cml_autocast_is_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_cml_autocast_is_enabled },
-  { "cml_autograd_reset_after_step", (void *)_cffi_f_cml_autograd_reset_after_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_autograd_reset_after_step },
-  { "cml_autograd_step_end", (void *)_cffi_f_cml_autograd_step_end, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_cml_autograd_step_end },
-  { "cml_backward", (void *)_cffi_f_cml_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 988), (void *)_cffi_d_cml_backward },
+  { "cml_autocast_enter", (void *)_cffi_f_cml_autocast_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 941), (void *)_cffi_d_cml_autocast_enter },
+  { "cml_autocast_exit", (void *)_cffi_f_cml_autocast_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_autocast_exit },
+  { "cml_autocast_is_enabled", (void *)_cffi_f_cml_autocast_is_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_autocast_is_enabled },
+  { "cml_autograd_reset_after_step", (void *)_cffi_f_cml_autograd_reset_after_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_autograd_reset_after_step },
+  { "cml_autograd_step_end", (void *)_cffi_f_cml_autograd_step_end, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_cml_autograd_step_end },
+  { "cml_backward", (void *)_cffi_f_cml_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1008), (void *)_cffi_d_cml_backward },
   { "cml_bfloat16", (void *)_cffi_f_cml_bfloat16, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_bfloat16 },
   { "cml_bitcast", (void *)_cffi_f_cml_bitcast, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 483), (void *)_cffi_d_cml_bitcast },
   { "cml_bool_", (void *)_cffi_f_cml_bool_, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_bool_ },
@@ -23823,98 +24483,103 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_ceil", (void *)_cffi_f_cml_ceil, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_ceil },
   { "cml_chunk", (void *)_cffi_f_cml_chunk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 441), (void *)_cffi_d_cml_chunk },
   { "cml_clamp", (void *)_cffi_f_cml_clamp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 516), (void *)_cffi_d_cml_clamp },
-  { "cml_cleanup", (void *)_cffi_f_cml_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_cleanup },
-  { "cml_clear_last_error", (void *)_cffi_f_cml_clear_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_clear_last_error },
+  { "cml_cleanup", (void *)_cffi_f_cml_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_cleanup },
+  { "cml_clear_last_error", (void *)_cffi_f_cml_clear_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_clear_last_error },
   { "cml_clone", (void *)_cffi_f_cml_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_clone },
   { "cml_concat", (void *)_cffi_f_cml_concat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_cml_concat },
   { "cml_contiguous", (void *)_cffi_f_cml_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_contiguous },
+  { "cml_copysign", (void *)_cffi_f_cml_copysign, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_copysign },
   { "cml_cos", (void *)_cffi_f_cml_cos, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_cos },
+  { "cml_cumprod", (void *)_cffi_f_cml_cumprod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_cumprod },
   { "cml_cumsum", (void *)_cffi_f_cml_cumsum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_cumsum },
   { "cml_dataset_load", (void *)_cffi_f_cml_dataset_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 133), (void *)_cffi_d_cml_dataset_load },
   { "cml_detach", (void *)_cffi_f_cml_detach, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_detach },
-  { "cml_diagonal", (void *)_cffi_f_cml_diagonal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 585), (void *)_cffi_d_cml_diagonal },
-  { "cml_dist_allreduce", (void *)_cffi_f_cml_dist_allreduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 886), (void *)_cffi_d_cml_dist_allreduce },
-  { "cml_dist_barrier", (void *)_cffi_f_cml_dist_barrier, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_dist_barrier },
-  { "cml_dist_destroy", (void *)_cffi_f_cml_dist_destroy, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_dist_destroy },
-  { "cml_dist_get_rank", (void *)_cffi_f_cml_dist_get_rank, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_dist_get_rank },
-  { "cml_dist_get_world_size", (void *)_cffi_f_cml_dist_get_world_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_dist_get_world_size },
-  { "cml_dist_init", (void *)_cffi_f_cml_dist_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 827), (void *)_cffi_d_cml_dist_init },
-  { "cml_dist_is_initialized", (void *)_cffi_f_cml_dist_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_cml_dist_is_initialized },
+  { "cml_diagonal", (void *)_cffi_f_cml_diagonal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 592), (void *)_cffi_d_cml_diagonal },
+  { "cml_dist_allreduce", (void *)_cffi_f_cml_dist_allreduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_cml_dist_allreduce },
+  { "cml_dist_barrier", (void *)_cffi_f_cml_dist_barrier, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_dist_barrier },
+  { "cml_dist_destroy", (void *)_cffi_f_cml_dist_destroy, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_dist_destroy },
+  { "cml_dist_get_rank", (void *)_cffi_f_cml_dist_get_rank, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_dist_get_rank },
+  { "cml_dist_get_world_size", (void *)_cffi_f_cml_dist_get_world_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_dist_get_world_size },
+  { "cml_dist_init", (void *)_cffi_f_cml_dist_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 839), (void *)_cffi_d_cml_dist_init },
+  { "cml_dist_is_initialized", (void *)_cffi_f_cml_dist_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_dist_is_initialized },
   { "cml_div", (void *)_cffi_f_cml_div, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_div },
   { "cml_dot", (void *)_cffi_f_cml_dot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_dot },
   { "cml_double", (void *)_cffi_f_cml_double, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_double },
-  { "cml_dtype_size", (void *)_cffi_f_cml_dtype_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_cml_dtype_size },
+  { "cml_dtype_size", (void *)_cffi_f_cml_dtype_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 915), (void *)_cffi_d_cml_dtype_size },
+  { "cml_einsum", (void *)_cffi_f_cml_einsum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 605), (void *)_cffi_d_cml_einsum },
   { "cml_elu", (void *)_cffi_f_cml_elu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_elu },
-  { "cml_empty", (void *)_cffi_f_cml_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_empty },
-  { "cml_empty_1d", (void *)_cffi_f_cml_empty_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 666), (void *)_cffi_d_cml_empty_1d },
-  { "cml_empty_2d", (void *)_cffi_f_cml_empty_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 677), (void *)_cffi_d_cml_empty_2d },
-  { "cml_enable_grad", (void *)_cffi_f_cml_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_enable_grad },
+  { "cml_empty", (void *)_cffi_f_cml_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_empty },
+  { "cml_empty_1d", (void *)_cffi_f_cml_empty_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 678), (void *)_cffi_d_cml_empty_1d },
+  { "cml_empty_2d", (void *)_cffi_f_cml_empty_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 689), (void *)_cffi_d_cml_empty_2d },
+  { "cml_enable_grad", (void *)_cffi_f_cml_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_enable_grad },
   { "cml_erf", (void *)_cffi_f_cml_erf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_erf },
   { "cml_exp", (void *)_cffi_f_cml_exp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_exp },
   { "cml_exp2", (void *)_cffi_f_cml_exp2, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_exp2 },
-  { "cml_eye", (void *)_cffi_f_cml_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 669), (void *)_cffi_d_cml_eye },
+  { "cml_eye", (void *)_cffi_f_cml_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 681), (void *)_cffi_d_cml_eye },
   { "cml_f_interpolate", (void *)_cffi_f_cml_f_interpolate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 538), (void *)_cffi_d_cml_f_interpolate },
   { "cml_f_pixel_shuffle", (void *)_cffi_f_cml_f_pixel_shuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_f_pixel_shuffle },
   { "cml_f_pixel_unshuffle", (void *)_cffi_f_cml_f_pixel_unshuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_f_pixel_unshuffle },
   { "cml_flip", (void *)_cffi_f_cml_flip, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_flip },
   { "cml_floor", (void *)_cffi_f_cml_floor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_floor },
-  { "cml_force_cleanup", (void *)_cffi_f_cml_force_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_force_cleanup },
-  { "cml_free", (void *)_cffi_f_cml_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1044), (void *)_cffi_d_cml_free },
-  { "cml_from_blob", (void *)_cffi_f_cml_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 692), (void *)_cffi_d_cml_from_blob },
-  { "cml_from_url", (void *)_cffi_f_cml_from_url, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 595), (void *)_cffi_d_cml_from_url },
-  { "cml_full", (void *)_cffi_f_cml_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 636), (void *)_cffi_d_cml_full },
+  { "cml_force_cleanup", (void *)_cffi_f_cml_force_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_force_cleanup },
+  { "cml_free", (void *)_cffi_f_cml_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1064), (void *)_cffi_d_cml_free },
+  { "cml_from_blob", (void *)_cffi_f_cml_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 704), (void *)_cffi_d_cml_from_blob },
+  { "cml_from_url", (void *)_cffi_f_cml_from_url, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 602), (void *)_cffi_d_cml_from_url },
+  { "cml_full", (void *)_cffi_f_cml_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 648), (void *)_cffi_d_cml_full },
   { "cml_full_like", (void *)_cffi_f_cml_full_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_full_like },
-  { "cml_get_build_info", (void *)_cffi_f_cml_get_build_info, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 795), (void *)_cffi_d_cml_get_build_info },
+  { "cml_get_build_info", (void *)_cffi_f_cml_get_build_info, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 807), (void *)_cffi_d_cml_get_build_info },
   { "cml_get_default_device", (void *)_cffi_f_cml_get_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 139), (void *)_cffi_d_cml_get_default_device },
   { "cml_get_default_dtype", (void *)_cffi_f_cml_get_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 131), (void *)_cffi_d_cml_get_default_dtype },
-  { "cml_get_error_handler", (void *)_cffi_f_cml_get_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 916), (void *)_cffi_d_cml_get_error_handler },
-  { "cml_get_init_count", (void *)_cffi_f_cml_get_init_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_get_init_count },
-  { "cml_get_version", (void *)_cffi_f_cml_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1020), (void *)_cffi_d_cml_get_version },
-  { "cml_gguf_close", (void *)_cffi_f_cml_gguf_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 930), (void *)_cffi_d_cml_gguf_close },
+  { "cml_get_error_handler", (void *)_cffi_f_cml_get_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 936), (void *)_cffi_d_cml_get_error_handler },
+  { "cml_get_init_count", (void *)_cffi_f_cml_get_init_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_get_init_count },
+  { "cml_get_version", (void *)_cffi_f_cml_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1040), (void *)_cffi_d_cml_get_version },
+  { "cml_gguf_close", (void *)_cffi_f_cml_gguf_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 950), (void *)_cffi_d_cml_gguf_close },
   { "cml_gguf_open_read", (void *)_cffi_f_cml_gguf_open_read, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 156), (void *)_cffi_d_cml_gguf_open_read },
   { "cml_gguf_open_write", (void *)_cffi_f_cml_gguf_open_write, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 156), (void *)_cffi_d_cml_gguf_open_write },
   { "cml_gguf_read_tensor", (void *)_cffi_f_cml_gguf_read_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 447), (void *)_cffi_d_cml_gguf_read_tensor },
-  { "cml_gguf_write_tensor", (void *)_cffi_f_cml_gguf_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 832), (void *)_cffi_d_cml_gguf_write_tensor },
-  { "cml_glorot_uniform", (void *)_cffi_f_cml_glorot_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 659), (void *)_cffi_d_cml_glorot_uniform },
+  { "cml_gguf_write_tensor", (void *)_cffi_f_cml_gguf_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 844), (void *)_cffi_d_cml_gguf_write_tensor },
+  { "cml_glorot_uniform", (void *)_cffi_f_cml_glorot_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 671), (void *)_cffi_d_cml_glorot_uniform },
   { "cml_grad_scaler_create", (void *)_cffi_f_cml_grad_scaler_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 177), (void *)_cffi_d_cml_grad_scaler_create },
-  { "cml_grad_scaler_free", (void *)_cffi_f_cml_grad_scaler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 933), (void *)_cffi_d_cml_grad_scaler_free },
+  { "cml_grad_scaler_free", (void *)_cffi_f_cml_grad_scaler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 953), (void *)_cffi_d_cml_grad_scaler_free },
   { "cml_grad_scaler_scale", (void *)_cffi_f_cml_grad_scaler_scale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 451), (void *)_cffi_d_cml_grad_scaler_scale },
-  { "cml_grad_scaler_step", (void *)_cffi_f_cml_grad_scaler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 941), (void *)_cffi_d_cml_grad_scaler_step },
-  { "cml_grad_scaler_unscale", (void *)_cffi_f_cml_grad_scaler_unscale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 936), (void *)_cffi_d_cml_grad_scaler_unscale },
-  { "cml_grad_scaler_update", (void *)_cffi_f_cml_grad_scaler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 933), (void *)_cffi_d_cml_grad_scaler_update },
+  { "cml_grad_scaler_step", (void *)_cffi_f_cml_grad_scaler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 961), (void *)_cffi_d_cml_grad_scaler_step },
+  { "cml_grad_scaler_unscale", (void *)_cffi_f_cml_grad_scaler_unscale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 956), (void *)_cffi_d_cml_grad_scaler_unscale },
+  { "cml_grad_scaler_update", (void *)_cffi_f_cml_grad_scaler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 953), (void *)_cffi_d_cml_grad_scaler_update },
   { "cml_half", (void *)_cffi_f_cml_half, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_half },
   { "cml_hardswish", (void *)_cffi_f_cml_hardswish, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_hardswish },
   { "cml_idiv", (void *)_cffi_f_cml_idiv, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_idiv },
-  { "cml_init", (void *)_cffi_f_cml_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_cml_init },
+  { "cml_init", (void *)_cffi_f_cml_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_init },
   { "cml_int_", (void *)_cffi_f_cml_int_, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_int_ },
   { "cml_interpolate", (void *)_cffi_f_cml_interpolate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 532), (void *)_cffi_d_cml_interpolate },
-  { "cml_is_grad_enabled", (void *)_cffi_f_cml_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_cml_is_grad_enabled },
-  { "cml_is_initialized", (void *)_cffi_f_cml_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_cml_is_initialized },
-  { "cml_is_leaf", (void *)_cffi_f_cml_is_leaf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 784), (void *)_cffi_d_cml_is_leaf },
-  { "cml_kaiming_normal", (void *)_cffi_f_cml_kaiming_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 653), (void *)_cffi_d_cml_kaiming_normal },
-  { "cml_kaiming_uniform", (void *)_cffi_f_cml_kaiming_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 653), (void *)_cffi_d_cml_kaiming_uniform },
-  { "cml_kernel_cache_clear", (void *)_cffi_f_cml_kernel_cache_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_kernel_cache_clear },
-  { "cml_kernel_cache_hit_rate", (void *)_cffi_f_cml_kernel_cache_hit_rate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 797), (void *)_cffi_d_cml_kernel_cache_hit_rate },
-  { "cml_kernel_cache_print_stats", (void *)_cffi_f_cml_kernel_cache_print_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_kernel_cache_print_stats },
-  { "cml_kernel_cache_stats", (void *)_cffi_f_cml_kernel_cache_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1029), (void *)_cffi_d_cml_kernel_cache_stats },
+  { "cml_is_grad_enabled", (void *)_cffi_f_cml_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_is_grad_enabled },
+  { "cml_is_initialized", (void *)_cffi_f_cml_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_is_initialized },
+  { "cml_is_leaf", (void *)_cffi_f_cml_is_leaf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_cml_is_leaf },
+  { "cml_kaiming_normal", (void *)_cffi_f_cml_kaiming_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 665), (void *)_cffi_d_cml_kaiming_normal },
+  { "cml_kaiming_uniform", (void *)_cffi_f_cml_kaiming_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 665), (void *)_cffi_d_cml_kaiming_uniform },
+  { "cml_kernel_cache_clear", (void *)_cffi_f_cml_kernel_cache_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_kernel_cache_clear },
+  { "cml_kernel_cache_hit_rate", (void *)_cffi_f_cml_kernel_cache_hit_rate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 809), (void *)_cffi_d_cml_kernel_cache_hit_rate },
+  { "cml_kernel_cache_print_stats", (void *)_cffi_f_cml_kernel_cache_print_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_kernel_cache_print_stats },
+  { "cml_kernel_cache_stats", (void *)_cffi_f_cml_kernel_cache_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1049), (void *)_cffi_d_cml_kernel_cache_stats },
   { "cml_leaky_relu", (void *)_cffi_f_cml_leaky_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_leaky_relu },
   { "cml_lerp", (void *)_cffi_f_cml_lerp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 502), (void *)_cffi_d_cml_lerp },
-  { "cml_linspace", (void *)_cffi_f_cml_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 619), (void *)_cffi_d_cml_linspace },
+  { "cml_linspace", (void *)_cffi_f_cml_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_linspace },
   { "cml_log", (void *)_cffi_f_cml_log, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_log },
   { "cml_log2", (void *)_cffi_f_cml_log2, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_log2 },
+  { "cml_logaddexp", (void *)_cffi_f_cml_logaddexp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_logaddexp },
+  { "cml_logcumsumexp", (void *)_cffi_f_cml_logcumsumexp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_logcumsumexp },
   { "cml_long", (void *)_cffi_f_cml_long, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_long },
   { "cml_lr_scheduler_cosine", (void *)_cffi_f_cml_lr_scheduler_cosine, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 229), (void *)_cffi_d_cml_lr_scheduler_cosine },
   { "cml_lr_scheduler_exponential", (void *)_cffi_f_cml_lr_scheduler_exponential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 205), (void *)_cffi_d_cml_lr_scheduler_exponential },
-  { "cml_lr_scheduler_free", (void *)_cffi_f_cml_lr_scheduler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 946), (void *)_cffi_d_cml_lr_scheduler_free },
-  { "cml_lr_scheduler_get_lr", (void *)_cffi_f_cml_lr_scheduler_get_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 802), (void *)_cffi_d_cml_lr_scheduler_get_lr },
+  { "cml_lr_scheduler_free", (void *)_cffi_f_cml_lr_scheduler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 966), (void *)_cffi_d_cml_lr_scheduler_free },
+  { "cml_lr_scheduler_get_lr", (void *)_cffi_f_cml_lr_scheduler_get_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 814), (void *)_cffi_d_cml_lr_scheduler_get_lr },
   { "cml_lr_scheduler_multi_step", (void *)_cffi_f_cml_lr_scheduler_multi_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 223), (void *)_cffi_d_cml_lr_scheduler_multi_step },
   { "cml_lr_scheduler_one_cycle", (void *)_cffi_f_cml_lr_scheduler_one_cycle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 215), (void *)_cffi_d_cml_lr_scheduler_one_cycle },
   { "cml_lr_scheduler_polynomial", (void *)_cffi_f_cml_lr_scheduler_polynomial, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 234), (void *)_cffi_d_cml_lr_scheduler_polynomial },
   { "cml_lr_scheduler_reduce_on_plateau", (void *)_cffi_f_cml_lr_scheduler_reduce_on_plateau, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 209), (void *)_cffi_d_cml_lr_scheduler_reduce_on_plateau },
   { "cml_lr_scheduler_step", (void *)_cffi_f_cml_lr_scheduler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 229), (void *)_cffi_d_cml_lr_scheduler_step },
-  { "cml_lr_scheduler_update", (void *)_cffi_f_cml_lr_scheduler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 805), (void *)_cffi_d_cml_lr_scheduler_update },
+  { "cml_lr_scheduler_update", (void *)_cffi_f_cml_lr_scheduler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 817), (void *)_cffi_d_cml_lr_scheduler_update },
   { "cml_lr_scheduler_warmup", (void *)_cffi_f_cml_lr_scheduler_warmup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 200), (void *)_cffi_d_cml_lr_scheduler_warmup },
-  { "cml_manual_seed", (void *)_cffi_f_cml_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1038), (void *)_cffi_d_cml_manual_seed },
+  { "cml_manual_seed", (void *)_cffi_f_cml_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1058), (void *)_cffi_d_cml_manual_seed },
   { "cml_masked_select", (void *)_cffi_f_cml_masked_select, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_masked_select },
   { "cml_matmul", (void *)_cffi_f_cml_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_matmul },
   { "cml_max", (void *)_cffi_f_cml_max, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_max },
@@ -23923,10 +24588,10 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_min", (void *)_cffi_f_cml_min, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_min },
   { "cml_mish", (void *)_cffi_f_cml_mish, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_mish },
   { "cml_mod", (void *)_cffi_f_cml_mod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_mod },
-  { "cml_module_load_gguf", (void *)_cffi_f_cml_module_load_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 854), (void *)_cffi_d_cml_module_load_gguf },
-  { "cml_module_load_safetensors", (void *)_cffi_f_cml_module_load_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 854), (void *)_cffi_d_cml_module_load_safetensors },
-  { "cml_module_save_gguf", (void *)_cffi_f_cml_module_save_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 854), (void *)_cffi_d_cml_module_save_gguf },
-  { "cml_module_save_safetensors", (void *)_cffi_f_cml_module_save_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 854), (void *)_cffi_d_cml_module_save_safetensors },
+  { "cml_module_load_gguf", (void *)_cffi_f_cml_module_load_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_load_gguf },
+  { "cml_module_load_safetensors", (void *)_cffi_f_cml_module_load_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_load_safetensors },
+  { "cml_module_save_gguf", (void *)_cffi_f_cml_module_save_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_save_gguf },
+  { "cml_module_save_safetensors", (void *)_cffi_f_cml_module_save_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_save_safetensors },
   { "cml_mul", (void *)_cffi_f_cml_mul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_mul },
   { "cml_nn_adaptive_avgpool1d", (void *)_cffi_f_cml_nn_adaptive_avgpool1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 0), (void *)_cffi_d_cml_nn_adaptive_avgpool1d },
   { "cml_nn_adaptive_avgpool2d", (void *)_cffi_f_cml_nn_adaptive_avgpool2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 3), (void *)_cffi_d_cml_nn_adaptive_avgpool2d },
@@ -23968,12 +24633,12 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_nn_maxpool2d", (void *)_cffi_f_cml_nn_maxpool2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 295), (void *)_cffi_d_cml_nn_maxpool2d },
   { "cml_nn_maxpool3d", (void *)_cffi_f_cml_nn_maxpool3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 302), (void *)_cffi_d_cml_nn_maxpool3d },
   { "cml_nn_module_dict", (void *)_cffi_f_cml_nn_module_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 309), (void *)_cffi_d_cml_nn_module_dict },
-  { "cml_nn_module_eval", (void *)_cffi_f_cml_nn_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_cml_nn_module_eval },
-  { "cml_nn_module_forward", (void *)_cffi_f_cml_nn_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 688), (void *)_cffi_d_cml_nn_module_forward },
-  { "cml_nn_module_is_training", (void *)_cffi_f_cml_nn_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 781), (void *)_cffi_d_cml_nn_module_is_training },
+  { "cml_nn_module_eval", (void *)_cffi_f_cml_nn_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_nn_module_eval },
+  { "cml_nn_module_forward", (void *)_cffi_f_cml_nn_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 700), (void *)_cffi_d_cml_nn_module_forward },
+  { "cml_nn_module_is_training", (void *)_cffi_f_cml_nn_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 793), (void *)_cffi_d_cml_nn_module_is_training },
   { "cml_nn_module_list", (void *)_cffi_f_cml_nn_module_list, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 311), (void *)_cffi_d_cml_nn_module_list },
-  { "cml_nn_module_set_training", (void *)_cffi_f_cml_nn_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 952), (void *)_cffi_d_cml_nn_module_set_training },
-  { "cml_nn_module_train", (void *)_cffi_f_cml_nn_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_cml_nn_module_train },
+  { "cml_nn_module_set_training", (void *)_cffi_f_cml_nn_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 972), (void *)_cffi_d_cml_nn_module_set_training },
+  { "cml_nn_module_train", (void *)_cffi_f_cml_nn_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_nn_module_train },
   { "cml_nn_mse_loss", (void *)_cffi_f_cml_nn_mse_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_mse_loss },
   { "cml_nn_multihead_attention", (void *)_cffi_f_cml_nn_multihead_attention, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 313), (void *)_cffi_d_cml_nn_multihead_attention },
   { "cml_nn_nll_loss", (void *)_cffi_f_cml_nn_nll_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_nll_loss },
@@ -23989,17 +24654,19 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_nn_sigmoid", (void *)_cffi_f_cml_nn_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 416), (void *)_cffi_d_cml_nn_sigmoid },
   { "cml_nn_sparse_cross_entropy_loss", (void *)_cffi_f_cml_nn_sparse_cross_entropy_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_sparse_cross_entropy_loss },
   { "cml_nn_tanh", (void *)_cffi_f_cml_nn_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 434), (void *)_cffi_d_cml_nn_tanh },
-  { "cml_nn_transformer_decoder", (void *)_cffi_f_cml_nn_transformer_decoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 740), (void *)_cffi_d_cml_nn_transformer_decoder },
-  { "cml_nn_transformer_decoder_layer", (void *)_cffi_f_cml_nn_transformer_decoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 749), (void *)_cffi_d_cml_nn_transformer_decoder_layer },
-  { "cml_nn_transformer_encoder", (void *)_cffi_f_cml_nn_transformer_encoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 757), (void *)_cffi_d_cml_nn_transformer_encoder },
-  { "cml_nn_transformer_encoder_layer", (void *)_cffi_f_cml_nn_transformer_encoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 766), (void *)_cffi_d_cml_nn_transformer_encoder_layer },
+  { "cml_nn_transformer_decoder", (void *)_cffi_f_cml_nn_transformer_decoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 752), (void *)_cffi_d_cml_nn_transformer_decoder },
+  { "cml_nn_transformer_decoder_layer", (void *)_cffi_f_cml_nn_transformer_decoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 761), (void *)_cffi_d_cml_nn_transformer_decoder_layer },
+  { "cml_nn_transformer_encoder", (void *)_cffi_f_cml_nn_transformer_encoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 769), (void *)_cffi_d_cml_nn_transformer_encoder },
+  { "cml_nn_transformer_encoder_layer", (void *)_cffi_f_cml_nn_transformer_encoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 778), (void *)_cffi_d_cml_nn_transformer_encoder_layer },
   { "cml_nn_triplet_margin_loss", (void *)_cffi_f_cml_nn_triplet_margin_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 496), (void *)_cffi_d_cml_nn_triplet_margin_loss },
-  { "cml_nn_upsample", (void *)_cffi_f_cml_nn_upsample, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 774), (void *)_cffi_d_cml_nn_upsample },
-  { "cml_no_grad", (void *)_cffi_f_cml_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_no_grad },
-  { "cml_ones", (void *)_cffi_f_cml_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_ones },
-  { "cml_ones_1d", (void *)_cffi_f_cml_ones_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 666), (void *)_cffi_d_cml_ones_1d },
-  { "cml_ones_2d", (void *)_cffi_f_cml_ones_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 677), (void *)_cffi_d_cml_ones_2d },
+  { "cml_nn_upsample", (void *)_cffi_f_cml_nn_upsample, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 786), (void *)_cffi_d_cml_nn_upsample },
+  { "cml_no_grad", (void *)_cffi_f_cml_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_no_grad },
+  { "cml_one_hot", (void *)_cffi_f_cml_one_hot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_one_hot },
+  { "cml_ones", (void *)_cffi_f_cml_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_ones },
+  { "cml_ones_1d", (void *)_cffi_f_cml_ones_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 678), (void *)_cffi_d_cml_ones_1d },
+  { "cml_ones_2d", (void *)_cffi_f_cml_ones_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 689), (void *)_cffi_d_cml_ones_2d },
   { "cml_ones_like", (void *)_cffi_f_cml_ones_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_ones_like },
+  { "cml_onnx_export_graph", (void *)_cffi_f_cml_onnx_export_graph, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 905), (void *)_cffi_d_cml_onnx_export_graph },
   { "cml_optim_adadelta", (void *)_cffi_f_cml_optim_adadelta, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 334), (void *)_cffi_d_cml_optim_adadelta },
   { "cml_optim_adagrad", (void *)_cffi_f_cml_optim_adagrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 334), (void *)_cffi_d_cml_optim_adagrad },
   { "cml_optim_adam", (void *)_cffi_f_cml_optim_adam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_adam },
@@ -24010,46 +24677,47 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_optim_lars", (void *)_cffi_f_cml_optim_lars, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 349), (void *)_cffi_d_cml_optim_lars },
   { "cml_optim_muon", (void *)_cffi_f_cml_optim_muon, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 341), (void *)_cffi_d_cml_optim_muon },
   { "cml_optim_nadam", (void *)_cffi_f_cml_optim_nadam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_nadam },
-  { "cml_optim_realize_params", (void *)_cffi_f_cml_optim_realize_params, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_cml_optim_realize_params },
+  { "cml_optim_realize_params", (void *)_cffi_f_cml_optim_realize_params, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_optim_realize_params },
   { "cml_optim_rmsprop", (void *)_cffi_f_cml_optim_rmsprop, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 349), (void *)_cffi_d_cml_optim_rmsprop },
   { "cml_optim_sgd", (void *)_cffi_f_cml_optim_sgd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 334), (void *)_cffi_d_cml_optim_sgd },
   { "cml_optim_sgd_for_model", (void *)_cffi_f_cml_optim_sgd_for_model, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 320), (void *)_cffi_d_cml_optim_sgd_for_model },
-  { "cml_optim_step", (void *)_cffi_f_cml_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_cml_optim_step },
-  { "cml_optim_zero_grad", (void *)_cffi_f_cml_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_cml_optim_zero_grad },
+  { "cml_optim_step", (void *)_cffi_f_cml_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_optim_step },
+  { "cml_optim_zero_grad", (void *)_cffi_f_cml_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_optim_zero_grad },
   { "cml_pad", (void *)_cffi_f_cml_pad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 545), (void *)_cffi_d_cml_pad },
   { "cml_pad_reflect", (void *)_cffi_f_cml_pad_reflect, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_pad_reflect },
   { "cml_pad_replicate", (void *)_cffi_f_cml_pad_replicate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_pad_replicate },
   { "cml_pow", (void *)_cffi_f_cml_pow, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_pow },
   { "cml_prod", (void *)_cffi_f_cml_prod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_prod },
   { "cml_qr", (void *)_cffi_f_cml_qr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 378), (void *)_cffi_d_cml_qr },
-  { "cml_rand", (void *)_cffi_f_cml_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_rand },
+  { "cml_rand", (void *)_cffi_f_cml_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_rand },
   { "cml_rand_like", (void *)_cffi_f_cml_rand_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_rand_like },
-  { "cml_randint", (void *)_cffi_f_cml_randint, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 681), (void *)_cffi_d_cml_randint },
-  { "cml_randn", (void *)_cffi_f_cml_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_randn },
+  { "cml_randint", (void *)_cffi_f_cml_randint, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 693), (void *)_cffi_d_cml_randint },
+  { "cml_randn", (void *)_cffi_f_cml_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_randn },
   { "cml_randn_like", (void *)_cffi_f_cml_randn_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_randn_like },
-  { "cml_randperm", (void *)_cffi_f_cml_randperm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 669), (void *)_cffi_d_cml_randperm },
-  { "cml_register_cleanup_context", (void *)_cffi_f_cml_register_cleanup_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 918), (void *)_cffi_d_cml_register_cleanup_context },
+  { "cml_randperm", (void *)_cffi_f_cml_randperm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 681), (void *)_cffi_d_cml_randperm },
+  { "cml_register_cleanup_context", (void *)_cffi_f_cml_register_cleanup_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 938), (void *)_cffi_d_cml_register_cleanup_context },
   { "cml_relu", (void *)_cffi_f_cml_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_relu },
   { "cml_repeat", (void *)_cffi_f_cml_repeat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_repeat },
-  { "cml_requires_grad", (void *)_cffi_f_cml_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 784), (void *)_cffi_d_cml_requires_grad },
-  { "cml_reset_ir_context", (void *)_cffi_f_cml_reset_ir_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_reset_ir_context },
-  { "cml_reset_ir_graph_only", (void *)_cffi_f_cml_reset_ir_graph_only, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_cml_reset_ir_graph_only },
+  { "cml_requires_grad", (void *)_cffi_f_cml_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_cml_requires_grad },
+  { "cml_reset_ir_context", (void *)_cffi_f_cml_reset_ir_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_reset_ir_context },
+  { "cml_reset_ir_graph_only", (void *)_cffi_f_cml_reset_ir_graph_only, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_reset_ir_graph_only },
   { "cml_reshape", (void *)_cffi_f_cml_reshape, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_reshape },
+  { "cml_roll", (void *)_cffi_f_cml_roll, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_cml_roll },
   { "cml_round", (void *)_cffi_f_cml_round, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_round },
   { "cml_rsqrt", (void *)_cffi_f_cml_rsqrt, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_rsqrt },
-  { "cml_safetensors_close", (void *)_cffi_f_cml_safetensors_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 972), (void *)_cffi_d_cml_safetensors_close },
+  { "cml_safetensors_close", (void *)_cffi_f_cml_safetensors_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 992), (void *)_cffi_d_cml_safetensors_close },
   { "cml_safetensors_open_read", (void *)_cffi_f_cml_safetensors_open_read, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 407), (void *)_cffi_d_cml_safetensors_open_read },
   { "cml_safetensors_open_write", (void *)_cffi_f_cml_safetensors_open_write, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 407), (void *)_cffi_d_cml_safetensors_open_write },
   { "cml_safetensors_read_tensor", (void *)_cffi_f_cml_safetensors_read_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 455), (void *)_cffi_d_cml_safetensors_read_tensor },
-  { "cml_safetensors_write_tensor", (void *)_cffi_f_cml_safetensors_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 878), (void *)_cffi_d_cml_safetensors_write_tensor },
+  { "cml_safetensors_write_tensor", (void *)_cffi_f_cml_safetensors_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 890), (void *)_cffi_d_cml_safetensors_write_tensor },
   { "cml_scatter_reduce", (void *)_cffi_f_cml_scatter_reduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 555), (void *)_cffi_d_cml_scatter_reduce },
-  { "cml_seed", (void *)_cffi_f_cml_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1038), (void *)_cffi_d_cml_seed },
+  { "cml_seed", (void *)_cffi_f_cml_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1058), (void *)_cffi_d_cml_seed },
   { "cml_selu", (void *)_cffi_f_cml_selu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_selu },
-  { "cml_set_default_device", (void *)_cffi_f_cml_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 927), (void *)_cffi_d_cml_set_default_device },
-  { "cml_set_default_dtype", (void *)_cffi_f_cml_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_cml_set_default_dtype },
-  { "cml_set_error_handler", (void *)_cffi_f_cml_set_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1041), (void *)_cffi_d_cml_set_error_handler },
-  { "cml_set_log_level", (void *)_cffi_f_cml_set_log_level, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 949), (void *)_cffi_d_cml_set_log_level },
-  { "cml_set_requires_grad", (void *)_cffi_f_cml_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 994), (void *)_cffi_d_cml_set_requires_grad },
+  { "cml_set_default_device", (void *)_cffi_f_cml_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 947), (void *)_cffi_d_cml_set_default_device },
+  { "cml_set_default_dtype", (void *)_cffi_f_cml_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 941), (void *)_cffi_d_cml_set_default_dtype },
+  { "cml_set_error_handler", (void *)_cffi_f_cml_set_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1061), (void *)_cffi_d_cml_set_error_handler },
+  { "cml_set_log_level", (void *)_cffi_f_cml_set_log_level, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 969), (void *)_cffi_d_cml_set_log_level },
+  { "cml_set_requires_grad", (void *)_cffi_f_cml_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1014), (void *)_cffi_d_cml_set_requires_grad },
   { "cml_short", (void *)_cffi_f_cml_short, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_short },
   { "cml_sigmoid", (void *)_cffi_f_cml_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_sigmoid },
   { "cml_sign", (void *)_cffi_f_cml_sign, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_sign },
@@ -24059,7 +24727,7 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_sort", (void *)_cffi_f_cml_sort, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_sort },
   { "cml_sparse_coalesce", (void *)_cffi_f_cml_sparse_coalesce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 418), (void *)_cffi_d_cml_sparse_coalesce },
   { "cml_sparse_coo_tensor", (void *)_cffi_f_cml_sparse_coo_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 424), (void *)_cffi_d_cml_sparse_coo_tensor },
-  { "cml_sparse_free", (void *)_cffi_f_cml_sparse_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 979), (void *)_cffi_d_cml_sparse_free },
+  { "cml_sparse_free", (void *)_cffi_f_cml_sparse_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 999), (void *)_cffi_d_cml_sparse_free },
   { "cml_sparse_from_dense", (void *)_cffi_f_cml_sparse_from_dense, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 421), (void *)_cffi_d_cml_sparse_from_dense },
   { "cml_sparse_matmul", (void *)_cffi_f_cml_sparse_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 463), (void *)_cffi_d_cml_sparse_matmul },
   { "cml_sparse_to_dense", (void *)_cffi_f_cml_sparse_to_dense, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 467), (void *)_cffi_d_cml_sparse_to_dense },
@@ -24071,193 +24739,195 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_std", (void *)_cffi_f_cml_std, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 567), (void *)_cffi_d_cml_std },
   { "cml_sub", (void *)_cffi_f_cml_sub, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_sub },
   { "cml_sum", (void *)_cffi_f_cml_sum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_sum },
-  { "cml_summary", (void *)_cffi_f_cml_summary, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_cml_summary },
+  { "cml_summary", (void *)_cffi_f_cml_summary, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_summary },
   { "cml_svd", (void *)_cffi_f_cml_svd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 404), (void *)_cffi_d_cml_svd },
   { "cml_tan", (void *)_cffi_f_cml_tan, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_tan },
   { "cml_tanh", (void *)_cffi_f_cml_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_tanh },
-  { "cml_tensor", (void *)_cffi_f_cml_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 692), (void *)_cffi_d_cml_tensor },
-  { "cml_tensor_1d", (void *)_cffi_f_cml_tensor_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_cml_tensor_1d },
-  { "cml_tensor_2d", (void *)_cffi_f_cml_tensor_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 602), (void *)_cffi_d_cml_tensor_2d },
-  { "cml_topk", (void *)_cffi_f_cml_topk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 578), (void *)_cffi_d_cml_topk },
-  { "cml_track_dataset", (void *)_cffi_f_cml_track_dataset, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 924), (void *)_cffi_d_cml_track_dataset },
-  { "cml_track_module", (void *)_cffi_f_cml_track_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_cml_track_module },
-  { "cml_track_optimizer", (void *)_cffi_f_cml_track_optimizer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_cml_track_optimizer },
+  { "cml_tensor", (void *)_cffi_f_cml_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 704), (void *)_cffi_d_cml_tensor },
+  { "cml_tensor_1d", (void *)_cffi_f_cml_tensor_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 610), (void *)_cffi_d_cml_tensor_1d },
+  { "cml_tensor_2d", (void *)_cffi_f_cml_tensor_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 614), (void *)_cffi_d_cml_tensor_2d },
+  { "cml_topk", (void *)_cffi_f_cml_topk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 585), (void *)_cffi_d_cml_topk },
+  { "cml_topk_with_indices", (void *)_cffi_f_cml_topk_with_indices, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 578), (void *)_cffi_d_cml_topk_with_indices },
+  { "cml_track_dataset", (void *)_cffi_f_cml_track_dataset, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 944), (void *)_cffi_d_cml_track_dataset },
+  { "cml_track_module", (void *)_cffi_f_cml_track_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_track_module },
+  { "cml_track_optimizer", (void *)_cffi_f_cml_track_optimizer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_track_optimizer },
   { "cml_transpose", (void *)_cffi_f_cml_transpose, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_cml_transpose },
   { "cml_tril", (void *)_cffi_f_cml_tril, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_tril },
   { "cml_triu", (void *)_cffi_f_cml_triu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_triu },
   { "cml_unfold", (void *)_cffi_f_cml_unfold, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_cml_unfold },
   { "cml_unsqueeze", (void *)_cffi_f_cml_unsqueeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_unsqueeze },
-  { "cml_untrack_module", (void *)_cffi_f_cml_untrack_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_cml_untrack_module },
+  { "cml_untrack_module", (void *)_cffi_f_cml_untrack_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_untrack_module },
   { "cml_var", (void *)_cffi_f_cml_var, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 567), (void *)_cffi_d_cml_var },
-  { "cml_xavier_normal", (void *)_cffi_f_cml_xavier_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 659), (void *)_cffi_d_cml_xavier_normal },
-  { "cml_zero_grad", (void *)_cffi_f_cml_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_cml_zero_grad },
-  { "cml_zeros", (void *)_cffi_f_cml_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_zeros },
-  { "cml_zeros_1d", (void *)_cffi_f_cml_zeros_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 666), (void *)_cffi_d_cml_zeros_1d },
-  { "cml_zeros_2d", (void *)_cffi_f_cml_zeros_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 677), (void *)_cffi_d_cml_zeros_2d },
+  { "cml_where", (void *)_cffi_f_cml_where, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 491), (void *)_cffi_d_cml_where },
+  { "cml_xavier_normal", (void *)_cffi_f_cml_xavier_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 671), (void *)_cffi_d_cml_xavier_normal },
+  { "cml_zero_grad", (void *)_cffi_f_cml_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_cml_zero_grad },
+  { "cml_zeros", (void *)_cffi_f_cml_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_zeros },
+  { "cml_zeros_1d", (void *)_cffi_f_cml_zeros_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 678), (void *)_cffi_d_cml_zeros_1d },
+  { "cml_zeros_2d", (void *)_cffi_f_cml_zeros_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 689), (void *)_cffi_d_cml_zeros_2d },
   { "cml_zeros_like", (void *)_cffi_f_cml_zeros_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_zeros_like },
-  { "dataset_normalize", (void *)_cffi_f_dataset_normalize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 823), (void *)_cffi_d_dataset_normalize },
-  { "device_cuda_available", (void *)_cffi_f_device_cuda_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_device_cuda_available },
-  { "device_metal_available", (void *)_cffi_f_device_metal_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_device_metal_available },
-  { "device_rocm_available", (void *)_cffi_f_device_rocm_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_device_rocm_available },
-  { "error_stack_cleanup", (void *)_cffi_f_error_stack_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_error_stack_cleanup },
-  { "error_stack_clear", (void *)_cffi_f_error_stack_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_error_stack_clear },
-  { "error_stack_get_last_code", (void *)_cffi_f_error_stack_get_last_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_error_stack_get_last_code },
-  { "error_stack_get_last_message", (void *)_cffi_f_error_stack_get_last_message, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 795), (void *)_cffi_d_error_stack_get_last_message },
-  { "error_stack_has_errors", (void *)_cffi_f_error_stack_has_errors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_error_stack_has_errors },
-  { "error_stack_init", (void *)_cffi_f_error_stack_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_error_stack_init },
-  { "model_load", (void *)_cffi_f_model_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 854), (void *)_cffi_d_model_load },
-  { "module_collect_parameters", (void *)_cffi_f_module_collect_parameters, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 837), (void *)_cffi_d_module_collect_parameters },
-  { "module_dict_add", (void *)_cffi_f_module_dict_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 861), (void *)_cffi_d_module_dict_add },
-  { "module_dict_size", (void *)_cffi_f_module_dict_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 858), (void *)_cffi_d_module_dict_size },
-  { "module_forward", (void *)_cffi_f_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 688), (void *)_cffi_d_module_forward },
-  { "module_free", (void *)_cffi_f_module_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_module_free },
-  { "module_is_training", (void *)_cffi_f_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 781), (void *)_cffi_d_module_is_training },
-  { "module_list_append", (void *)_cffi_f_module_list_append, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 869), (void *)_cffi_d_module_list_append },
-  { "module_list_insert", (void *)_cffi_f_module_list_insert, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 873), (void *)_cffi_d_module_list_insert },
-  { "module_list_length", (void *)_cffi_f_module_list_length, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 866), (void *)_cffi_d_module_list_length },
-  { "module_set_training", (void *)_cffi_f_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 952), (void *)_cffi_d_module_set_training },
-  { "optimizer_free", (void *)_cffi_f_optimizer_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_optimizer_free },
-  { "optimizer_get_group_lr", (void *)_cffi_f_optimizer_get_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 809), (void *)_cffi_d_optimizer_get_group_lr },
-  { "optimizer_get_name", (void *)_cffi_f_optimizer_get_name, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 792), (void *)_cffi_d_optimizer_get_name },
-  { "optimizer_set_amsgrad", (void *)_cffi_f_optimizer_set_amsgrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 959), (void *)_cffi_d_optimizer_set_amsgrad },
-  { "optimizer_set_grad_clip_norm", (void *)_cffi_f_optimizer_set_grad_clip_norm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 963), (void *)_cffi_d_optimizer_set_grad_clip_norm },
-  { "optimizer_set_group_lr", (void *)_cffi_f_optimizer_set_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 967), (void *)_cffi_d_optimizer_set_group_lr },
-  { "optimizer_set_lr", (void *)_cffi_f_optimizer_set_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 963), (void *)_cffi_d_optimizer_set_lr },
+  { "dataset_normalize", (void *)_cffi_f_dataset_normalize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 835), (void *)_cffi_d_dataset_normalize },
+  { "device_cuda_available", (void *)_cffi_f_device_cuda_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_device_cuda_available },
+  { "device_metal_available", (void *)_cffi_f_device_metal_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_device_metal_available },
+  { "device_rocm_available", (void *)_cffi_f_device_rocm_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_device_rocm_available },
+  { "error_stack_cleanup", (void *)_cffi_f_error_stack_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_error_stack_cleanup },
+  { "error_stack_clear", (void *)_cffi_f_error_stack_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_error_stack_clear },
+  { "error_stack_get_last_code", (void *)_cffi_f_error_stack_get_last_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_error_stack_get_last_code },
+  { "error_stack_get_last_message", (void *)_cffi_f_error_stack_get_last_message, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 807), (void *)_cffi_d_error_stack_get_last_message },
+  { "error_stack_has_errors", (void *)_cffi_f_error_stack_has_errors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_error_stack_has_errors },
+  { "error_stack_init", (void *)_cffi_f_error_stack_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_error_stack_init },
+  { "model_load", (void *)_cffi_f_model_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_model_load },
+  { "module_collect_parameters", (void *)_cffi_f_module_collect_parameters, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 849), (void *)_cffi_d_module_collect_parameters },
+  { "module_dict_add", (void *)_cffi_f_module_dict_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 873), (void *)_cffi_d_module_dict_add },
+  { "module_dict_size", (void *)_cffi_f_module_dict_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 870), (void *)_cffi_d_module_dict_size },
+  { "module_forward", (void *)_cffi_f_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 700), (void *)_cffi_d_module_forward },
+  { "module_free", (void *)_cffi_f_module_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_module_free },
+  { "module_is_training", (void *)_cffi_f_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 793), (void *)_cffi_d_module_is_training },
+  { "module_list_append", (void *)_cffi_f_module_list_append, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 881), (void *)_cffi_d_module_list_append },
+  { "module_list_insert", (void *)_cffi_f_module_list_insert, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 885), (void *)_cffi_d_module_list_insert },
+  { "module_list_length", (void *)_cffi_f_module_list_length, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 878), (void *)_cffi_d_module_list_length },
+  { "module_set_training", (void *)_cffi_f_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 972), (void *)_cffi_d_module_set_training },
+  { "optimizer_free", (void *)_cffi_f_optimizer_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_optimizer_free },
+  { "optimizer_get_group_lr", (void *)_cffi_f_optimizer_get_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 821), (void *)_cffi_d_optimizer_get_group_lr },
+  { "optimizer_get_name", (void *)_cffi_f_optimizer_get_name, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 804), (void *)_cffi_d_optimizer_get_name },
+  { "optimizer_set_amsgrad", (void *)_cffi_f_optimizer_set_amsgrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 979), (void *)_cffi_d_optimizer_set_amsgrad },
+  { "optimizer_set_grad_clip_norm", (void *)_cffi_f_optimizer_set_grad_clip_norm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 983), (void *)_cffi_d_optimizer_set_grad_clip_norm },
+  { "optimizer_set_group_lr", (void *)_cffi_f_optimizer_set_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 987), (void *)_cffi_d_optimizer_set_group_lr },
+  { "optimizer_set_lr", (void *)_cffi_f_optimizer_set_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 983), (void *)_cffi_d_optimizer_set_lr },
   { "tensor_clone", (void *)_cffi_f_tensor_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_tensor_clone },
-  { "tensor_data_ptr", (void *)_cffi_f_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 908), (void *)_cffi_d_tensor_data_ptr },
-  { "tensor_ensure_executed", (void *)_cffi_f_tensor_ensure_executed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 883), (void *)_cffi_d_tensor_ensure_executed },
-  { "tensor_free", (void *)_cffi_f_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_tensor_free },
-  { "tensor_from_data", (void *)_cffi_f_tensor_from_data, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 704), (void *)_cffi_d_tensor_from_data },
-  { "tensor_get_float", (void *)_cffi_f_tensor_get_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 816), (void *)_cffi_d_tensor_get_float },
-  { "tensor_is_contiguous", (void *)_cffi_f_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 784), (void *)_cffi_d_tensor_is_contiguous },
-  { "tensor_is_scalar", (void *)_cffi_f_tensor_is_scalar, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 784), (void *)_cffi_d_tensor_is_scalar },
-  { "tensor_numel", (void *)_cffi_f_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 904), (void *)_cffi_d_tensor_numel },
-  { "tensor_pin", (void *)_cffi_f_tensor_pin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_tensor_pin },
-  { "tensor_realize", (void *)_cffi_f_tensor_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 883), (void *)_cffi_d_tensor_realize },
-  { "tensor_release", (void *)_cffi_f_tensor_release, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_tensor_release },
-  { "tensor_requires_grad", (void *)_cffi_f_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 784), (void *)_cffi_d_tensor_requires_grad },
-  { "tensor_set_float", (void *)_cffi_f_tensor_set_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1002), (void *)_cffi_d_tensor_set_float },
-  { "tensor_set_requires_grad", (void *)_cffi_f_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 994), (void *)_cffi_d_tensor_set_requires_grad },
+  { "tensor_data_ptr", (void *)_cffi_f_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 928), (void *)_cffi_d_tensor_data_ptr },
+  { "tensor_ensure_executed", (void *)_cffi_f_tensor_ensure_executed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_tensor_ensure_executed },
+  { "tensor_free", (void *)_cffi_f_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_tensor_free },
+  { "tensor_from_data", (void *)_cffi_f_tensor_from_data, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 716), (void *)_cffi_d_tensor_from_data },
+  { "tensor_get_float", (void *)_cffi_f_tensor_get_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 828), (void *)_cffi_d_tensor_get_float },
+  { "tensor_is_contiguous", (void *)_cffi_f_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_tensor_is_contiguous },
+  { "tensor_is_scalar", (void *)_cffi_f_tensor_is_scalar, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_tensor_is_scalar },
+  { "tensor_numel", (void *)_cffi_f_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 924), (void *)_cffi_d_tensor_numel },
+  { "tensor_pin", (void *)_cffi_f_tensor_pin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_tensor_pin },
+  { "tensor_realize", (void *)_cffi_f_tensor_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_tensor_realize },
+  { "tensor_release", (void *)_cffi_f_tensor_release, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_tensor_release },
+  { "tensor_requires_grad", (void *)_cffi_f_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_tensor_requires_grad },
+  { "tensor_set_float", (void *)_cffi_f_tensor_set_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1022), (void *)_cffi_d_tensor_set_float },
+  { "tensor_set_requires_grad", (void *)_cffi_f_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1014), (void *)_cffi_d_tensor_set_requires_grad },
   { "torch_add", (void *)_cffi_f_torch_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_add },
-  { "torch_arange", (void *)_cffi_f_torch_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 613), (void *)_cffi_d_torch_arange },
-  { "torch_backward", (void *)_cffi_f_torch_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 988), (void *)_cffi_d_torch_backward },
+  { "torch_arange", (void *)_cffi_f_torch_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 625), (void *)_cffi_d_torch_arange },
+  { "torch_backward", (void *)_cffi_f_torch_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1008), (void *)_cffi_d_torch_backward },
   { "torch_cat", (void *)_cffi_f_torch_cat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_torch_cat },
-  { "torch_cleanup", (void *)_cffi_f_torch_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_torch_cleanup },
-  { "torch_clear_error", (void *)_cffi_f_torch_clear_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_torch_clear_error },
+  { "torch_cleanup", (void *)_cffi_f_torch_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_cleanup },
+  { "torch_clear_error", (void *)_cffi_f_torch_clear_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_clear_error },
   { "torch_clone", (void *)_cffi_f_torch_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_clone },
   { "torch_contiguous", (void *)_cffi_f_torch_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_contiguous },
-  { "torch_cuda_device_count", (void *)_cffi_f_torch_cuda_device_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_torch_cuda_device_count },
-  { "torch_cuda_is_available", (void *)_cffi_f_torch_cuda_is_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_torch_cuda_is_available },
+  { "torch_cuda_device_count", (void *)_cffi_f_torch_cuda_device_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_cuda_device_count },
+  { "torch_cuda_is_available", (void *)_cffi_f_torch_cuda_is_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_cuda_is_available },
   { "torch_detach", (void *)_cffi_f_torch_detach, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_detach },
   { "torch_div", (void *)_cffi_f_torch_div, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_div },
-  { "torch_empty", (void *)_cffi_f_torch_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 642), (void *)_cffi_d_torch_empty },
-  { "torch_enable_grad", (void *)_cffi_f_torch_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_torch_enable_grad },
-  { "torch_eye", (void *)_cffi_f_torch_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 673), (void *)_cffi_d_torch_eye },
-  { "torch_from_blob", (void *)_cffi_f_torch_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 698), (void *)_cffi_d_torch_from_blob },
-  { "torch_full", (void *)_cffi_f_torch_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 647), (void *)_cffi_d_torch_full },
+  { "torch_empty", (void *)_cffi_f_torch_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_empty },
+  { "torch_enable_grad", (void *)_cffi_f_torch_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_enable_grad },
+  { "torch_eye", (void *)_cffi_f_torch_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 685), (void *)_cffi_d_torch_eye },
+  { "torch_from_blob", (void *)_cffi_f_torch_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 710), (void *)_cffi_d_torch_from_blob },
+  { "torch_full", (void *)_cffi_f_torch_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 659), (void *)_cffi_d_torch_full },
   { "torch_gelu", (void *)_cffi_f_torch_gelu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_gelu },
   { "torch_get_default_device", (void *)_cffi_f_torch_get_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 139), (void *)_cffi_d_torch_get_default_device },
   { "torch_get_default_dtype", (void *)_cffi_f_torch_get_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 131), (void *)_cffi_d_torch_get_default_dtype },
   { "torch_get_grad", (void *)_cffi_f_torch_get_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_get_grad },
-  { "torch_get_last_error", (void *)_cffi_f_torch_get_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 795), (void *)_cffi_d_torch_get_last_error },
-  { "torch_get_last_error_code", (void *)_cffi_f_torch_get_last_error_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_torch_get_last_error_code },
-  { "torch_get_num_threads", (void *)_cffi_f_torch_get_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_torch_get_num_threads },
-  { "torch_get_version", (void *)_cffi_f_torch_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1020), (void *)_cffi_d_torch_get_version },
-  { "torch_has_error", (void *)_cffi_f_torch_has_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_torch_has_error },
-  { "torch_inference_mode", (void *)_cffi_f_torch_inference_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1017), (void *)_cffi_d_torch_inference_mode },
-  { "torch_init", (void *)_cffi_f_torch_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 893), (void *)_cffi_d_torch_init },
-  { "torch_is_eager_mode", (void *)_cffi_f_torch_is_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_torch_is_eager_mode },
-  { "torch_is_grad_enabled", (void *)_cffi_f_torch_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 790), (void *)_cffi_d_torch_is_grad_enabled },
+  { "torch_get_last_error", (void *)_cffi_f_torch_get_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 807), (void *)_cffi_d_torch_get_last_error },
+  { "torch_get_last_error_code", (void *)_cffi_f_torch_get_last_error_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_get_last_error_code },
+  { "torch_get_num_threads", (void *)_cffi_f_torch_get_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_get_num_threads },
+  { "torch_get_version", (void *)_cffi_f_torch_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1040), (void *)_cffi_d_torch_get_version },
+  { "torch_has_error", (void *)_cffi_f_torch_has_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_has_error },
+  { "torch_inference_mode", (void *)_cffi_f_torch_inference_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1037), (void *)_cffi_d_torch_inference_mode },
+  { "torch_init", (void *)_cffi_f_torch_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_init },
+  { "torch_is_eager_mode", (void *)_cffi_f_torch_is_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_is_eager_mode },
+  { "torch_is_grad_enabled", (void *)_cffi_f_torch_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_is_grad_enabled },
   { "torch_linear", (void *)_cffi_f_torch_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 491), (void *)_cffi_d_torch_linear },
   { "torch_linear_relu", (void *)_cffi_f_torch_linear_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 491), (void *)_cffi_d_torch_linear_relu },
-  { "torch_linspace", (void *)_cffi_f_torch_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 625), (void *)_cffi_d_torch_linspace },
-  { "torch_manual_seed", (void *)_cffi_f_torch_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1038), (void *)_cffi_d_torch_manual_seed },
+  { "torch_linspace", (void *)_cffi_f_torch_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 637), (void *)_cffi_d_torch_linspace },
+  { "torch_manual_seed", (void *)_cffi_f_torch_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1058), (void *)_cffi_d_torch_manual_seed },
   { "torch_matmul", (void *)_cffi_f_torch_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_matmul },
   { "torch_max", (void *)_cffi_f_torch_max, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_max },
   { "torch_mean", (void *)_cffi_f_torch_mean, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_mean },
-  { "torch_memory_create", (void *)_cffi_f_torch_memory_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 713), (void *)_cffi_d_torch_memory_create },
-  { "torch_memory_free", (void *)_cffi_f_torch_memory_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1007), (void *)_cffi_d_torch_memory_free },
-  { "torch_memory_from_buffer", (void *)_cffi_f_torch_memory_from_buffer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 716), (void *)_cffi_d_torch_memory_from_buffer },
-  { "torch_memory_peak", (void *)_cffi_f_torch_memory_peak, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 901), (void *)_cffi_d_torch_memory_peak },
-  { "torch_memory_used", (void *)_cffi_f_torch_memory_used, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 901), (void *)_cffi_d_torch_memory_used },
+  { "torch_memory_create", (void *)_cffi_f_torch_memory_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 725), (void *)_cffi_d_torch_memory_create },
+  { "torch_memory_free", (void *)_cffi_f_torch_memory_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1027), (void *)_cffi_d_torch_memory_free },
+  { "torch_memory_from_buffer", (void *)_cffi_f_torch_memory_from_buffer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 728), (void *)_cffi_d_torch_memory_from_buffer },
+  { "torch_memory_peak", (void *)_cffi_f_torch_memory_peak, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_torch_memory_peak },
+  { "torch_memory_used", (void *)_cffi_f_torch_memory_used, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_torch_memory_used },
   { "torch_min", (void *)_cffi_f_torch_min, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_min },
-  { "torch_module_eval", (void *)_cffi_f_torch_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_torch_module_eval },
-  { "torch_module_forward", (void *)_cffi_f_torch_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 688), (void *)_cffi_d_torch_module_forward },
-  { "torch_module_is_training", (void *)_cffi_f_torch_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 781), (void *)_cffi_d_torch_module_is_training },
-  { "torch_module_load_state_dict", (void *)_cffi_f_torch_module_load_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 843), (void *)_cffi_d_torch_module_load_state_dict },
+  { "torch_module_eval", (void *)_cffi_f_torch_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_torch_module_eval },
+  { "torch_module_forward", (void *)_cffi_f_torch_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 700), (void *)_cffi_d_torch_module_forward },
+  { "torch_module_is_training", (void *)_cffi_f_torch_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 793), (void *)_cffi_d_torch_module_is_training },
+  { "torch_module_load_state_dict", (void *)_cffi_f_torch_module_load_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 855), (void *)_cffi_d_torch_module_load_state_dict },
   { "torch_module_state_dict", (void *)_cffi_f_torch_module_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 430), (void *)_cffi_d_torch_module_state_dict },
-  { "torch_module_train", (void *)_cffi_f_torch_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_torch_module_train },
-  { "torch_module_zero_grad", (void *)_cffi_f_torch_module_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1035), (void *)_cffi_d_torch_module_zero_grad },
+  { "torch_module_train", (void *)_cffi_f_torch_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_torch_module_train },
+  { "torch_module_zero_grad", (void *)_cffi_f_torch_module_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_torch_module_zero_grad },
   { "torch_mul", (void *)_cffi_f_torch_mul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_mul },
   { "torch_nn_linear", (void *)_cffi_f_torch_nn_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 283), (void *)_cffi_d_torch_nn_linear },
   { "torch_nn_mse_loss", (void *)_cffi_f_torch_nn_mse_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_nn_mse_loss },
   { "torch_nn_relu", (void *)_cffi_f_torch_nn_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 402), (void *)_cffi_d_torch_nn_relu },
   { "torch_nn_sequential", (void *)_cffi_f_torch_nn_sequential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 414), (void *)_cffi_d_torch_nn_sequential },
-  { "torch_nn_sequential_add", (void *)_cffi_f_torch_nn_sequential_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 975), (void *)_cffi_d_torch_nn_sequential_add },
+  { "torch_nn_sequential_add", (void *)_cffi_f_torch_nn_sequential_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 995), (void *)_cffi_d_torch_nn_sequential_add },
   { "torch_nn_sequential_forward", (void *)_cffi_f_torch_nn_sequential_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 459), (void *)_cffi_d_torch_nn_sequential_forward },
-  { "torch_no_grad", (void *)_cffi_f_torch_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_torch_no_grad },
-  { "torch_ones", (void *)_cffi_f_torch_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 642), (void *)_cffi_d_torch_ones },
+  { "torch_no_grad", (void *)_cffi_f_torch_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_no_grad },
+  { "torch_ones", (void *)_cffi_f_torch_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_ones },
   { "torch_ones_like", (void *)_cffi_f_torch_ones_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_ones_like },
   { "torch_optim_adam", (void *)_cffi_f_torch_optim_adam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 326), (void *)_cffi_d_torch_optim_adam },
-  { "torch_optim_free", (void *)_cffi_f_torch_optim_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_torch_optim_free },
+  { "torch_optim_free", (void *)_cffi_f_torch_optim_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_torch_optim_free },
   { "torch_optim_sgd", (void *)_cffi_f_torch_optim_sgd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 320), (void *)_cffi_d_torch_optim_sgd },
-  { "torch_optim_step", (void *)_cffi_f_torch_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_torch_optim_step },
-  { "torch_optim_zero_grad", (void *)_cffi_f_torch_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 956), (void *)_cffi_d_torch_optim_zero_grad },
-  { "torch_options", (void *)_cffi_f_torch_options, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 738), (void *)_cffi_d_torch_options },
-  { "torch_options_device", (void *)_cffi_f_torch_options_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 730), (void *)_cffi_d_torch_options_device },
-  { "torch_options_dtype", (void *)_cffi_f_torch_options_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 726), (void *)_cffi_d_torch_options_dtype },
-  { "torch_options_requires_grad", (void *)_cffi_f_torch_options_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 734), (void *)_cffi_d_torch_options_requires_grad },
-  { "torch_options_to_config", (void *)_cffi_f_torch_options_to_config, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 710), (void *)_cffi_d_torch_options_to_config },
+  { "torch_optim_step", (void *)_cffi_f_torch_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_torch_optim_step },
+  { "torch_optim_zero_grad", (void *)_cffi_f_torch_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_torch_optim_zero_grad },
+  { "torch_options", (void *)_cffi_f_torch_options, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 750), (void *)_cffi_d_torch_options },
+  { "torch_options_device", (void *)_cffi_f_torch_options_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 742), (void *)_cffi_d_torch_options_device },
+  { "torch_options_dtype", (void *)_cffi_f_torch_options_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 738), (void *)_cffi_d_torch_options_dtype },
+  { "torch_options_requires_grad", (void *)_cffi_f_torch_options_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 746), (void *)_cffi_d_torch_options_requires_grad },
+  { "torch_options_to_config", (void *)_cffi_f_torch_options_to_config, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 722), (void *)_cffi_d_torch_options_to_config },
   { "torch_pow", (void *)_cffi_f_torch_pow, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_pow },
-  { "torch_rand", (void *)_cffi_f_torch_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 642), (void *)_cffi_d_torch_rand },
-  { "torch_randn", (void *)_cffi_f_torch_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 642), (void *)_cffi_d_torch_randn },
+  { "torch_rand", (void *)_cffi_f_torch_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_rand },
+  { "torch_randn", (void *)_cffi_f_torch_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_randn },
   { "torch_randn_like", (void *)_cffi_f_torch_randn_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_randn_like },
-  { "torch_realize", (void *)_cffi_f_torch_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 883), (void *)_cffi_d_torch_realize },
+  { "torch_realize", (void *)_cffi_f_torch_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_torch_realize },
   { "torch_relu", (void *)_cffi_f_torch_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_relu },
-  { "torch_reset_ir", (void *)_cffi_f_torch_reset_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_torch_reset_ir },
-  { "torch_reset_ir_soft", (void *)_cffi_f_torch_reset_ir_soft, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1047), (void *)_cffi_d_torch_reset_ir_soft },
+  { "torch_reset_ir", (void *)_cffi_f_torch_reset_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_reset_ir },
+  { "torch_reset_ir_soft", (void *)_cffi_f_torch_reset_ir_soft, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_reset_ir_soft },
   { "torch_reshape", (void *)_cffi_f_torch_reshape, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_torch_reshape },
-  { "torch_runtime_export_pte", (void *)_cffi_f_torch_runtime_export_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 848), (void *)_cffi_d_torch_runtime_export_pte },
-  { "torch_runtime_forward", (void *)_cffi_f_torch_runtime_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 591), (void *)_cffi_d_torch_runtime_forward },
-  { "torch_runtime_free", (void *)_cffi_f_torch_runtime_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1010), (void *)_cffi_d_torch_runtime_free },
-  { "torch_runtime_from_module", (void *)_cffi_f_torch_runtime_from_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 720), (void *)_cffi_d_torch_runtime_from_module },
-  { "torch_runtime_load_aot", (void *)_cffi_f_torch_runtime_load_aot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 723), (void *)_cffi_d_torch_runtime_load_aot },
-  { "torch_runtime_load_pte", (void *)_cffi_f_torch_runtime_load_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 723), (void *)_cffi_d_torch_runtime_load_pte },
-  { "torch_runtime_set_memory", (void *)_cffi_f_torch_runtime_set_memory, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1013), (void *)_cffi_d_torch_runtime_set_memory },
-  { "torch_set_default_device", (void *)_cffi_f_torch_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 927), (void *)_cffi_d_torch_set_default_device },
-  { "torch_set_default_dtype", (void *)_cffi_f_torch_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_torch_set_default_dtype },
-  { "torch_set_eager_mode", (void *)_cffi_f_torch_set_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1017), (void *)_cffi_d_torch_set_eager_mode },
-  { "torch_set_num_threads", (void *)_cffi_f_torch_set_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1026), (void *)_cffi_d_torch_set_num_threads },
+  { "torch_runtime_export_pte", (void *)_cffi_f_torch_runtime_export_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 860), (void *)_cffi_d_torch_runtime_export_pte },
+  { "torch_runtime_forward", (void *)_cffi_f_torch_runtime_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_torch_runtime_forward },
+  { "torch_runtime_free", (void *)_cffi_f_torch_runtime_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1030), (void *)_cffi_d_torch_runtime_free },
+  { "torch_runtime_from_module", (void *)_cffi_f_torch_runtime_from_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 732), (void *)_cffi_d_torch_runtime_from_module },
+  { "torch_runtime_load_aot", (void *)_cffi_f_torch_runtime_load_aot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 735), (void *)_cffi_d_torch_runtime_load_aot },
+  { "torch_runtime_load_pte", (void *)_cffi_f_torch_runtime_load_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 735), (void *)_cffi_d_torch_runtime_load_pte },
+  { "torch_runtime_set_memory", (void *)_cffi_f_torch_runtime_set_memory, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1033), (void *)_cffi_d_torch_runtime_set_memory },
+  { "torch_set_default_device", (void *)_cffi_f_torch_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 947), (void *)_cffi_d_torch_set_default_device },
+  { "torch_set_default_dtype", (void *)_cffi_f_torch_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 941), (void *)_cffi_d_torch_set_default_dtype },
+  { "torch_set_eager_mode", (void *)_cffi_f_torch_set_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1037), (void *)_cffi_d_torch_set_eager_mode },
+  { "torch_set_num_threads", (void *)_cffi_f_torch_set_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1046), (void *)_cffi_d_torch_set_num_threads },
   { "torch_sigmoid", (void *)_cffi_f_torch_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_sigmoid },
   { "torch_softmax", (void *)_cffi_f_torch_softmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_torch_softmax },
   { "torch_squeeze", (void *)_cffi_f_torch_squeeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_torch_squeeze },
   { "torch_stack", (void *)_cffi_f_torch_stack, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_torch_stack },
-  { "torch_state_dict_free", (void *)_cffi_f_torch_state_dict_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 982), (void *)_cffi_d_torch_state_dict_free },
+  { "torch_state_dict_free", (void *)_cffi_f_torch_state_dict_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1002), (void *)_cffi_d_torch_state_dict_free },
   { "torch_state_dict_get", (void *)_cffi_f_torch_state_dict_get, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 471), (void *)_cffi_d_torch_state_dict_get },
   { "torch_sub", (void *)_cffi_f_torch_sub, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_sub },
   { "torch_sum", (void *)_cffi_f_torch_sum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_sum },
   { "torch_tanh", (void *)_cffi_f_torch_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_tanh },
-  { "torch_tensor_data_ptr", (void *)_cffi_f_torch_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 908), (void *)_cffi_d_torch_tensor_data_ptr },
-  { "torch_tensor_data_ptr_f32", (void *)_cffi_f_torch_tensor_data_ptr_f32, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_data_ptr_f32 },
+  { "torch_tensor_data_ptr", (void *)_cffi_f_torch_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 928), (void *)_cffi_d_torch_tensor_data_ptr },
+  { "torch_tensor_data_ptr_f32", (void *)_cffi_f_torch_tensor_data_ptr_f32, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 811), (void *)_cffi_d_torch_tensor_data_ptr_f32 },
   { "torch_tensor_device", (void *)_cffi_f_torch_tensor_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 136), (void *)_cffi_d_torch_tensor_device },
   { "torch_tensor_dtype", (void *)_cffi_f_torch_tensor_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 128), (void *)_cffi_d_torch_tensor_dtype },
-  { "torch_tensor_free", (void *)_cffi_f_torch_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_torch_tensor_free },
-  { "torch_tensor_has_lazy_ir", (void *)_cffi_f_torch_tensor_has_lazy_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 787), (void *)_cffi_d_torch_tensor_has_lazy_ir },
-  { "torch_tensor_is_contiguous", (void *)_cffi_f_torch_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 787), (void *)_cffi_d_torch_tensor_is_contiguous },
-  { "torch_tensor_is_materialized", (void *)_cffi_f_torch_tensor_is_materialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 787), (void *)_cffi_d_torch_tensor_is_materialized },
-  { "torch_tensor_item_float", (void *)_cffi_f_torch_tensor_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 813), (void *)_cffi_d_torch_tensor_item_float },
-  { "torch_tensor_ndim", (void *)_cffi_f_torch_tensor_ndim, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 890), (void *)_cffi_d_torch_tensor_ndim },
-  { "torch_tensor_numel", (void *)_cffi_f_torch_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 898), (void *)_cffi_d_torch_tensor_numel },
-  { "torch_tensor_ref_count", (void *)_cffi_f_torch_tensor_ref_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 890), (void *)_cffi_d_torch_tensor_ref_count },
-  { "torch_tensor_requires_grad", (void *)_cffi_f_torch_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 787), (void *)_cffi_d_torch_tensor_requires_grad },
-  { "torch_tensor_retain", (void *)_cffi_f_torch_tensor_retain, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_torch_tensor_retain },
-  { "torch_tensor_set_item_float", (void *)_cffi_f_torch_tensor_set_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 998), (void *)_cffi_d_torch_tensor_set_item_float },
-  { "torch_tensor_set_requires_grad", (void *)_cffi_f_torch_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 994), (void *)_cffi_d_torch_tensor_set_requires_grad },
-  { "torch_tensor_sizes", (void *)_cffi_f_torch_tensor_sizes, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 820), (void *)_cffi_d_torch_tensor_sizes },
+  { "torch_tensor_free", (void *)_cffi_f_torch_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_torch_tensor_free },
+  { "torch_tensor_has_lazy_ir", (void *)_cffi_f_torch_tensor_has_lazy_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_has_lazy_ir },
+  { "torch_tensor_is_contiguous", (void *)_cffi_f_torch_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_is_contiguous },
+  { "torch_tensor_is_materialized", (void *)_cffi_f_torch_tensor_is_materialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_is_materialized },
+  { "torch_tensor_item_float", (void *)_cffi_f_torch_tensor_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 825), (void *)_cffi_d_torch_tensor_item_float },
+  { "torch_tensor_ndim", (void *)_cffi_f_torch_tensor_ndim, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 902), (void *)_cffi_d_torch_tensor_ndim },
+  { "torch_tensor_numel", (void *)_cffi_f_torch_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 918), (void *)_cffi_d_torch_tensor_numel },
+  { "torch_tensor_ref_count", (void *)_cffi_f_torch_tensor_ref_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 902), (void *)_cffi_d_torch_tensor_ref_count },
+  { "torch_tensor_requires_grad", (void *)_cffi_f_torch_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_requires_grad },
+  { "torch_tensor_retain", (void *)_cffi_f_torch_tensor_retain, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_torch_tensor_retain },
+  { "torch_tensor_set_item_float", (void *)_cffi_f_torch_tensor_set_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1018), (void *)_cffi_d_torch_tensor_set_item_float },
+  { "torch_tensor_set_requires_grad", (void *)_cffi_f_torch_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1014), (void *)_cffi_d_torch_tensor_set_requires_grad },
+  { "torch_tensor_sizes", (void *)_cffi_f_torch_tensor_sizes, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 832), (void *)_cffi_d_torch_tensor_sizes },
   { "torch_transpose", (void *)_cffi_f_torch_transpose, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_torch_transpose },
   { "torch_unsqueeze", (void *)_cffi_f_torch_unsqueeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_torch_unsqueeze },
-  { "torch_zero_grad", (void *)_cffi_f_torch_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_torch_zero_grad },
-  { "torch_zeros", (void *)_cffi_f_torch_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 642), (void *)_cffi_d_torch_zeros },
+  { "torch_zero_grad", (void *)_cffi_f_torch_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_torch_zero_grad },
+  { "torch_zeros", (void *)_cffi_f_torch_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_zeros },
   { "torch_zeros_like", (void *)_cffi_f_torch_zeros_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_zeros_like },
   { "uop_gather", (void *)_cffi_f_uop_gather, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 507), (void *)_cffi_d_uop_gather },
   { "uop_shrink", (void *)_cffi_f_uop_shrink, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 521), (void *)_cffi_d_uop_shrink },
@@ -24281,13 +24951,13 @@ static const struct _cffi_field_s _cffi_fields[] = {
           _CFFI_OP(_CFFI_OP_NOOP, 379) },
   { "name", offsetof(Module, name),
             sizeof(((Module *)0)->name),
-            _CFFI_OP(_CFFI_OP_NOOP, 1167) },
+            _CFFI_OP(_CFFI_OP_NOOP, 1187) },
   { "forward", offsetof(Module, forward),
                sizeof(((Module *)0)->forward),
-               _CFFI_OP(_CFFI_OP_NOOP, 1150) },
+               _CFFI_OP(_CFFI_OP_NOOP, 1170) },
   { "free", offsetof(Module, free),
             sizeof(((Module *)0)->free),
-            _CFFI_OP(_CFFI_OP_NOOP, 1177) },
+            _CFFI_OP(_CFFI_OP_NOOP, 1196) },
   { "parameters", offsetof(Module, parameters),
                   sizeof(((Module *)0)->parameters),
                   _CFFI_OP(_CFFI_OP_NOOP, 335) },
@@ -24305,7 +24975,7 @@ static const struct _cffi_field_s _cffi_fields[] = {
                 _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "user_data", offsetof(Module, user_data),
                  sizeof(((Module *)0)->user_data),
-                 _CFFI_OP(_CFFI_OP_NOOP, 693) },
+                 _CFFI_OP(_CFFI_OP_NOOP, 705) },
   { "version", offsetof(Module, version),
                sizeof(((Module *)0)->version),
                _CFFI_OP(_CFFI_OP_NOOP, 134) },
@@ -24320,7 +24990,7 @@ static const struct _cffi_field_s _cffi_fields[] = {
                      _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "name", offsetof(Parameter, name),
             sizeof(((Parameter *)0)->name),
-            _CFFI_OP(_CFFI_OP_NOOP, 1167) },
+            _CFFI_OP(_CFFI_OP_NOOP, 1187) },
   { "indices", offsetof(SparseCOOData, indices),
                sizeof(((SparseCOOData *)0)->indices),
                _CFFI_OP(_CFFI_OP_NOOP, 379) },
@@ -24344,7 +25014,7 @@ static const struct _cffi_field_s _cffi_fields[] = {
             _CFFI_OP(_CFFI_OP_NOOP, 1) },
   { "numel", offsetof(Tensor, numel),
              sizeof(((Tensor *)0)->numel),
-             _CFFI_OP(_CFFI_OP_NOOP, 714) },
+             _CFFI_OP(_CFFI_OP_NOOP, 726) },
   { "dtype", offsetof(Tensor, dtype),
              sizeof(((Tensor *)0)->dtype),
              _CFFI_OP(_CFFI_OP_NOOP, 41) },
@@ -24353,16 +25023,16 @@ static const struct _cffi_field_s _cffi_fields[] = {
               _CFFI_OP(_CFFI_OP_NOOP, 42) },
   { "ir_node", offsetof(Tensor, ir_node),
                sizeof(((Tensor *)0)->ir_node),
-               _CFFI_OP(_CFFI_OP_NOOP, 1175) },
+               _CFFI_OP(_CFFI_OP_NOOP, 1194) },
   { "ir_context", offsetof(Tensor, ir_context),
                   sizeof(((Tensor *)0)->ir_context),
-                  _CFFI_OP(_CFFI_OP_NOOP, 1173) },
+                  _CFFI_OP(_CFFI_OP_NOOP, 906) },
   { "is_executed", offsetof(Tensor, is_executed),
                    sizeof(((Tensor *)0)->is_executed),
                    _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "data", offsetof(Tensor, data),
             sizeof(((Tensor *)0)->data),
-            _CFFI_OP(_CFFI_OP_NOOP, 693) },
+            _CFFI_OP(_CFFI_OP_NOOP, 705) },
   { "owns_data", offsetof(Tensor, owns_data),
                  sizeof(((Tensor *)0)->owns_data),
                  _CFFI_OP(_CFFI_OP_NOOP, 18) },
@@ -24383,19 +25053,19 @@ static const struct _cffi_field_s _cffi_fields[] = {
             _CFFI_OP(_CFFI_OP_NOOP, 379) },
   { "strides", offsetof(Tensor, strides),
                sizeof(((Tensor *)0)->strides),
-               _CFFI_OP(_CFFI_OP_NOOP, 1030) },
+               _CFFI_OP(_CFFI_OP_NOOP, 1050) },
   { "storage_offset", offsetof(Tensor, storage_offset),
                       sizeof(((Tensor *)0)->storage_offset),
-                      _CFFI_OP(_CFFI_OP_NOOP, 714) },
+                      _CFFI_OP(_CFFI_OP_NOOP, 726) },
   { "is_contiguous", offsetof(Tensor, is_contiguous),
                      sizeof(((Tensor *)0)->is_contiguous),
                      _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "buffer_handle", offsetof(Tensor, buffer_handle),
                      sizeof(((Tensor *)0)->buffer_handle),
-                     _CFFI_OP(_CFFI_OP_NOOP, 1171) },
+                     _CFFI_OP(_CFFI_OP_NOOP, 1191) },
   { "user_data", offsetof(Tensor, user_data),
                  sizeof(((Tensor *)0)->user_data),
-                 _CFFI_OP(_CFFI_OP_NOOP, 693) },
+                 _CFFI_OP(_CFFI_OP_NOOP, 705) },
   { "dtype", offsetof(TensorConfig, dtype),
              sizeof(((TensorConfig *)0)->dtype),
              _CFFI_OP(_CFFI_OP_NOOP, 41) },
@@ -24440,153 +25110,153 @@ static const struct _cffi_field_s _cffi_fields[] = {
                   _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "config", offsetof(TorchTensorOptions, config),
               sizeof(((TorchTensorOptions *)0)->config),
-              _CFFI_OP(_CFFI_OP_NOOP, 1152) },
+              _CFFI_OP(_CFFI_OP_NOOP, 1172) },
 };
 
 static const struct _cffi_struct_union_s _cffi_struct_unions[] = {
-  { "$QRResult", 1134, _CFFI_F_CHECK_FIELDS,
+  { "$QRResult", 1154, _CFFI_F_CHECK_FIELDS,
     sizeof(QRResult), offsetof(struct _cffi_align_typedef_QRResult, y), 0, 2 },
-  { "$SVDResult", 1141, _CFFI_F_CHECK_FIELDS,
+  { "$SVDResult", 1161, _CFFI_F_CHECK_FIELDS,
     sizeof(SVDResult), offsetof(struct _cffi_align_typedef_SVDResult, y), 2, 3 },
-  { "AdaptiveAvgPool1d", 1050, 0,
+  { "AdaptiveAvgPool1d", 1070, 0,
     sizeof(AdaptiveAvgPool1d), offsetof(struct _cffi_align__AdaptiveAvgPool1d, y), 5, 0 },
-  { "AdaptiveAvgPool2d", 1052, 0,
+  { "AdaptiveAvgPool2d", 1072, 0,
     sizeof(AdaptiveAvgPool2d), offsetof(struct _cffi_align__AdaptiveAvgPool2d, y), 5, 0 },
-  { "AdaptiveMaxPool1d", 1054, 0,
+  { "AdaptiveMaxPool1d", 1074, 0,
     sizeof(AdaptiveMaxPool1d), offsetof(struct _cffi_align__AdaptiveMaxPool1d, y), 5, 0 },
-  { "AdaptiveMaxPool2d", 1056, 0,
+  { "AdaptiveMaxPool2d", 1076, 0,
     sizeof(AdaptiveMaxPool2d), offsetof(struct _cffi_align__AdaptiveMaxPool2d, y), 5, 0 },
-  { "AvgPool1d", 1058, 0,
+  { "AvgPool1d", 1078, 0,
     sizeof(AvgPool1d), offsetof(struct _cffi_align__AvgPool1d, y), 5, 0 },
-  { "AvgPool2d", 1060, 0,
+  { "AvgPool2d", 1080, 0,
     sizeof(AvgPool2d), offsetof(struct _cffi_align__AvgPool2d, y), 5, 0 },
-  { "AvgPool3d", 1062, 0,
+  { "AvgPool3d", 1082, 0,
     sizeof(AvgPool3d), offsetof(struct _cffi_align__AvgPool3d, y), 5, 0 },
-  { "BatchNorm1d", 1064, 0,
+  { "BatchNorm1d", 1084, 0,
     sizeof(BatchNorm1d), offsetof(struct _cffi_align__BatchNorm1d, y), 5, 0 },
-  { "BatchNorm2d", 1066, 0,
+  { "BatchNorm2d", 1086, 0,
     sizeof(BatchNorm2d), offsetof(struct _cffi_align__BatchNorm2d, y), 5, 0 },
-  { "BatchNorm3d", 1068, 0,
+  { "BatchNorm3d", 1088, 0,
     sizeof(BatchNorm3d), offsetof(struct _cffi_align__BatchNorm3d, y), 5, 0 },
-  { "CMLBackendBuffer", 1172, _CFFI_F_OPAQUE,
+  { "CMLBackendBuffer", 1192, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "CMLGraph", 1174, _CFFI_F_OPAQUE,
+  { "CMLGraph", 1193, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "CleanupContext", 1069, _CFFI_F_OPAQUE,
+  { "CleanupContext", 1089, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Conv1d", 1071, 0,
+  { "Conv1d", 1091, 0,
     sizeof(Conv1d), offsetof(struct _cffi_align__Conv1d, y), 5, 0 },
-  { "Conv2d", 1073, 0,
+  { "Conv2d", 1093, 0,
     sizeof(Conv2d), offsetof(struct _cffi_align__Conv2d, y), 5, 0 },
-  { "Conv3d", 1075, 0,
+  { "Conv3d", 1095, 0,
     sizeof(Conv3d), offsetof(struct _cffi_align__Conv3d, y), 5, 0 },
-  { "ConvTranspose1d", 1077, 0,
+  { "ConvTranspose1d", 1097, 0,
     sizeof(ConvTranspose1d), offsetof(struct _cffi_align__ConvTranspose1d, y), 5, 0 },
-  { "ConvTranspose2d", 1079, 0,
+  { "ConvTranspose2d", 1099, 0,
     sizeof(ConvTranspose2d), offsetof(struct _cffi_align__ConvTranspose2d, y), 5, 0 },
-  { "ConvTranspose3d", 1081, 0,
+  { "ConvTranspose3d", 1101, 0,
     sizeof(ConvTranspose3d), offsetof(struct _cffi_align__ConvTranspose3d, y), 5, 0 },
-  { "Dataset", 1082, 0,
+  { "Dataset", 1102, 0,
     sizeof(Dataset), offsetof(struct _cffi_align__Dataset, y), 5, 0 },
-  { "Dropout", 1084, 0,
+  { "Dropout", 1104, 0,
     sizeof(Dropout), offsetof(struct _cffi_align__Dropout, y), 5, 0 },
-  { "Embedding", 1086, 0,
+  { "Embedding", 1106, 0,
     sizeof(Embedding), offsetof(struct _cffi_align__Embedding, y), 5, 0 },
-  { "Flatten", 1088, 0,
+  { "Flatten", 1108, 0,
     sizeof(Flatten), offsetof(struct _cffi_align__Flatten, y), 5, 0 },
-  { "GGUFContext", 1089, _CFFI_F_OPAQUE,
+  { "GGUFContext", 1109, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "GRU", 1091, 0,
+  { "GRU", 1111, 0,
     sizeof(GRU), offsetof(struct _cffi_align__GRU, y), 5, 0 },
-  { "GRUCell", 1093, 0,
+  { "GRUCell", 1113, 0,
     sizeof(GRUCell), offsetof(struct _cffi_align__GRUCell, y), 5, 0 },
-  { "GradScaler", 1094, _CFFI_F_OPAQUE,
+  { "GradScaler", 1114, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "GroupNorm", 1096, 0,
+  { "GroupNorm", 1116, 0,
     sizeof(GroupNorm), offsetof(struct _cffi_align__GroupNorm, y), 5, 0 },
-  { "IRNode", 1176, _CFFI_F_OPAQUE,
+  { "IRNode", 1195, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Identity", 1098, 0,
+  { "Identity", 1118, 0,
     sizeof(Identity), offsetof(struct _cffi_align__Identity, y), 5, 0 },
-  { "InstanceNorm2d", 1100, 0,
+  { "InstanceNorm2d", 1120, 0,
     sizeof(InstanceNorm2d), offsetof(struct _cffi_align__InstanceNorm2d, y), 5, 0 },
-  { "LRScheduler", 1101, _CFFI_F_OPAQUE,
+  { "LRScheduler", 1121, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "LSTM", 1103, 0,
+  { "LSTM", 1123, 0,
     sizeof(LSTM), offsetof(struct _cffi_align__LSTM, y), 5, 0 },
-  { "LSTMCell", 1105, 0,
+  { "LSTMCell", 1125, 0,
     sizeof(LSTMCell), offsetof(struct _cffi_align__LSTMCell, y), 5, 0 },
-  { "LayerNorm", 1109, 0,
+  { "LayerNorm", 1129, 0,
     sizeof(LayerNorm), offsetof(struct _cffi_align__LayerNorm, y), 5, 0 },
-  { "LayerNorm2d", 1108, 0,
+  { "LayerNorm2d", 1128, 0,
     sizeof(LayerNorm2d), offsetof(struct _cffi_align__LayerNorm2d, y), 5, 0 },
-  { "LeakyReLU", 1111, 0,
+  { "LeakyReLU", 1131, 0,
     sizeof(LeakyReLU), offsetof(struct _cffi_align__LeakyReLU, y), 5, 0 },
-  { "Linear", 1113, 0,
+  { "Linear", 1133, 0,
     sizeof(Linear), offsetof(struct _cffi_align__Linear, y), 5, 0 },
-  { "MaxPool1d", 1115, 0,
+  { "MaxPool1d", 1135, 0,
     sizeof(MaxPool1d), offsetof(struct _cffi_align__MaxPool1d, y), 5, 0 },
-  { "MaxPool2d", 1117, 0,
+  { "MaxPool2d", 1137, 0,
     sizeof(MaxPool2d), offsetof(struct _cffi_align__MaxPool2d, y), 5, 0 },
-  { "MaxPool3d", 1119, 0,
+  { "MaxPool3d", 1139, 0,
     sizeof(MaxPool3d), offsetof(struct _cffi_align__MaxPool3d, y), 5, 0 },
-  { "Module", 1120, _CFFI_F_CHECK_FIELDS,
+  { "Module", 1140, _CFFI_F_CHECK_FIELDS,
     sizeof(Module), offsetof(struct _cffi_align__Module, y), 5, 11 },
-  { "ModuleDict", 1121, 0,
+  { "ModuleDict", 1141, 0,
     sizeof(ModuleDict), offsetof(struct _cffi_align__ModuleDict, y), 16, 0 },
-  { "ModuleList", 1122, 0,
+  { "ModuleList", 1142, 0,
     sizeof(ModuleList), offsetof(struct _cffi_align__ModuleList, y), 16, 0 },
-  { "MultiHeadAttention", 1124, 0,
+  { "MultiHeadAttention", 1144, 0,
     sizeof(MultiHeadAttention), offsetof(struct _cffi_align__MultiHeadAttention, y), 16, 0 },
-  { "Optimizer", 1125, 0,
+  { "Optimizer", 1145, 0,
     sizeof(Optimizer), offsetof(struct _cffi_align__Optimizer, y), 16, 0 },
-  { "PReLU", 1127, 0,
+  { "PReLU", 1147, 0,
     sizeof(PReLU), offsetof(struct _cffi_align__PReLU, y), 16, 0 },
-  { "Parameter", 1129, _CFFI_F_CHECK_FIELDS,
+  { "Parameter", 1149, _CFFI_F_CHECK_FIELDS,
     sizeof(Parameter), offsetof(struct _cffi_align__Parameter, y), 16, 3 },
-  { "PixelShuffle", 1131, 0,
+  { "PixelShuffle", 1151, 0,
     sizeof(PixelShuffle), offsetof(struct _cffi_align__PixelShuffle, y), 19, 0 },
-  { "PixelUnshuffle", 1133, 0,
+  { "PixelUnshuffle", 1153, 0,
     sizeof(PixelUnshuffle), offsetof(struct _cffi_align__PixelUnshuffle, y), 19, 0 },
-  { "RNN", 1136, 0,
+  { "RNN", 1156, 0,
     sizeof(RNN), offsetof(struct _cffi_align__RNN, y), 19, 0 },
-  { "RNNCell", 1138, 0,
+  { "RNNCell", 1158, 0,
     sizeof(RNNCell), offsetof(struct _cffi_align__RNNCell, y), 19, 0 },
-  { "ReLU", 1140, 0,
+  { "ReLU", 1160, 0,
     sizeof(ReLU), offsetof(struct _cffi_align__ReLU, y), 19, 0 },
-  { "SafeTensorsContext", 1142, _CFFI_F_OPAQUE,
+  { "SafeTensorsContext", 1162, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Sequential", 1143, 0,
+  { "Sequential", 1163, 0,
     sizeof(Sequential), offsetof(struct _cffi_align__Sequential, y), 19, 0 },
-  { "Sigmoid", 1145, 0,
+  { "Sigmoid", 1165, 0,
     sizeof(Sigmoid), offsetof(struct _cffi_align__Sigmoid, y), 19, 0 },
-  { "SparseCOOData", 1146, _CFFI_F_CHECK_FIELDS,
+  { "SparseCOOData", 1166, _CFFI_F_CHECK_FIELDS,
     sizeof(SparseCOOData), offsetof(struct _cffi_align__SparseCOOData, y), 19, 5 },
-  { "StateDict", 1147, _CFFI_F_OPAQUE,
+  { "StateDict", 1167, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Tanh", 1149, 0,
+  { "Tanh", 1169, 0,
     sizeof(Tanh), offsetof(struct _cffi_align__Tanh, y), 24, 0 },
-  { "Tensor", 1151, 0,
+  { "Tensor", 1171, 0,
     sizeof(Tensor), offsetof(struct _cffi_align__Tensor, y), 24, 20 },
-  { "TensorConfig", 1152, _CFFI_F_CHECK_FIELDS,
+  { "TensorConfig", 1172, _CFFI_F_CHECK_FIELDS,
     sizeof(TensorConfig), offsetof(struct _cffi_align__TensorConfig, y), 44, 4 },
-  { "TorchMemoryManager", 1153, _CFFI_F_OPAQUE,
+  { "TorchMemoryManager", 1173, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "TorchPTEExportOptions", 1154, _CFFI_F_CHECK_FIELDS,
+  { "TorchPTEExportOptions", 1174, _CFFI_F_CHECK_FIELDS,
     sizeof(TorchPTEExportOptions), offsetof(struct _cffi_align__TorchPTEExportOptions, y), 48, 5 },
-  { "TorchRuntimeModule", 1156, _CFFI_F_OPAQUE,
+  { "TorchRuntimeModule", 1176, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "TorchTensorOptions", 727, _CFFI_F_CHECK_FIELDS,
+  { "TorchTensorOptions", 739, _CFFI_F_CHECK_FIELDS,
     sizeof(TorchTensorOptions), offsetof(struct _cffi_align__TorchTensorOptions, y), 53, 6 },
-  { "TransformerDecoder", 1158, 0,
+  { "TransformerDecoder", 1178, 0,
     sizeof(TransformerDecoder), offsetof(struct _cffi_align__TransformerDecoder, y), 59, 0 },
-  { "TransformerDecoderLayer", 1160, 0,
+  { "TransformerDecoderLayer", 1180, 0,
     sizeof(TransformerDecoderLayer), offsetof(struct _cffi_align__TransformerDecoderLayer, y), 59, 0 },
-  { "TransformerEncoder", 1162, 0,
+  { "TransformerEncoder", 1182, 0,
     sizeof(TransformerEncoder), offsetof(struct _cffi_align__TransformerEncoder, y), 59, 0 },
-  { "TransformerEncoderLayer", 1164, 0,
+  { "TransformerEncoderLayer", 1184, 0,
     sizeof(TransformerEncoderLayer), offsetof(struct _cffi_align__TransformerEncoderLayer, y), 59, 0 },
-  { "Upsample", 1166, 0,
+  { "Upsample", 1186, 0,
     sizeof(Upsample), offsetof(struct _cffi_align__Upsample, y), 59, 0 },
 };
 
@@ -24595,105 +25265,105 @@ static const struct _cffi_enum_s _cffi_enums[] = {
     "DTYPE_FLOAT32,DTYPE_FLOAT64,DTYPE_INT32,DTYPE_INT64,DTYPE_BOOL,DTYPE_FLOAT16,DTYPE_BFLOAT16,DTYPE_INT8,DTYPE_UINT8,DTYPE_INT16,DTYPE_UINT16,DTYPE_UINT32,DTYPE_UINT64,DTYPE_FLOAT8_E4M3,DTYPE_FLOAT8_E5M2" },
   { "$DeviceType", 42, _cffi_prim_int(sizeof(DeviceType), ((DeviceType)-1) <= 0),
     "DEVICE_CPU,DEVICE_CUDA,DEVICE_METAL,DEVICE_ROCM,DEVICE_SIM_GPU,DEVICE_AUTO" },
-  { "$DistBackendType", 828, _cffi_prim_int(sizeof(DistBackendType), ((DistBackendType)-1) <= 0),
+  { "$DistBackendType", 840, _cffi_prim_int(sizeof(DistBackendType), ((DistBackendType)-1) <= 0),
     "DIST_BACKEND_NCCL,DIST_BACKEND_MPI,DIST_BACKEND_GLOO,DIST_BACKEND_COUNT" },
-  { "$DistReduceOp", 888, _cffi_prim_int(sizeof(DistReduceOp), ((DistReduceOp)-1) <= 0),
+  { "$DistReduceOp", 900, _cffi_prim_int(sizeof(DistReduceOp), ((DistReduceOp)-1) <= 0),
     "DIST_REDUCE_SUM,DIST_REDUCE_PRODUCT,DIST_REDUCE_MAX,DIST_REDUCE_MIN,DIST_REDUCE_AVG" },
   { "$InterpMode", 536, _cffi_prim_int(sizeof(InterpMode), ((InterpMode)-1) <= 0),
     "INTERP_NEAREST,INTERP_BILINEAR" },
-  { "$LogLevel", 950, _cffi_prim_int(sizeof(LogLevel), ((LogLevel)-1) <= 0),
+  { "$LogLevel", 970, _cffi_prim_int(sizeof(LogLevel), ((LogLevel)-1) <= 0),
     "LOG_LEVEL_DEBUG,LOG_LEVEL_INFO,LOG_LEVEL_WARNING,LOG_LEVEL_ERROR" },
   { "$ScatterReduceMode", 560, _cffi_prim_int(sizeof(ScatterReduceMode), ((ScatterReduceMode)-1) <= 0),
     "SCATTER_REDUCE_SUM,SCATTER_REDUCE_PROD,SCATTER_REDUCE_MEAN,SCATTER_REDUCE_AMAX,SCATTER_REDUCE_AMIN" },
-  { "$TorchRuntimeKind", 1155, _cffi_prim_int(sizeof(TorchRuntimeKind), ((TorchRuntimeKind)-1) <= 0),
+  { "$TorchRuntimeKind", 1175, _cffi_prim_int(sizeof(TorchRuntimeKind), ((TorchRuntimeKind)-1) <= 0),
     "TORCH_RUNTIME_EAGER,TORCH_RUNTIME_AOT,TORCH_RUNTIME_PTE" },
   { "$UpsampleMode", 542, _cffi_prim_int(sizeof(UpsampleMode), ((UpsampleMode)-1) <= 0),
     "UPSAMPLE_NEAREST,UPSAMPLE_BILINEAR,UPSAMPLE_BICUBIC" },
 };
 
 static const struct _cffi_typename_s _cffi_typenames[] = {
-  { "AdaptiveAvgPool1d", 1050 },
-  { "AdaptiveAvgPool2d", 1052 },
-  { "AdaptiveMaxPool1d", 1054 },
-  { "AdaptiveMaxPool2d", 1056 },
-  { "AvgPool1d", 1058 },
-  { "AvgPool2d", 1060 },
-  { "AvgPool3d", 1062 },
-  { "BatchNorm1d", 1064 },
-  { "BatchNorm2d", 1066 },
-  { "BatchNorm3d", 1068 },
-  { "CMLBackendBuffer_t", 1171 },
-  { "CMLGlobalErrorHandler", 1042 },
-  { "CMLGraph_t", 1173 },
-  { "CleanupContext", 1069 },
-  { "Conv1d", 1071 },
-  { "Conv2d", 1073 },
-  { "Conv3d", 1075 },
-  { "ConvTranspose1d", 1077 },
-  { "ConvTranspose2d", 1079 },
-  { "ConvTranspose3d", 1081 },
+  { "AdaptiveAvgPool1d", 1070 },
+  { "AdaptiveAvgPool2d", 1072 },
+  { "AdaptiveMaxPool1d", 1074 },
+  { "AdaptiveMaxPool2d", 1076 },
+  { "AvgPool1d", 1078 },
+  { "AvgPool2d", 1080 },
+  { "AvgPool3d", 1082 },
+  { "BatchNorm1d", 1084 },
+  { "BatchNorm2d", 1086 },
+  { "BatchNorm3d", 1088 },
+  { "CMLBackendBuffer_t", 1191 },
+  { "CMLGlobalErrorHandler", 1062 },
+  { "CMLGraph_t", 906 },
+  { "CleanupContext", 1089 },
+  { "Conv1d", 1091 },
+  { "Conv2d", 1093 },
+  { "Conv3d", 1095 },
+  { "ConvTranspose1d", 1097 },
+  { "ConvTranspose2d", 1099 },
+  { "ConvTranspose3d", 1101 },
   { "DType", 41 },
-  { "Dataset", 1082 },
+  { "Dataset", 1102 },
   { "DeviceType", 42 },
-  { "DistBackendType", 828 },
-  { "DistReduceOp", 888 },
-  { "Dropout", 1084 },
-  { "Embedding", 1086 },
-  { "Flatten", 1088 },
-  { "ForwardFn", 1150 },
-  { "FreeFn", 1177 },
-  { "GGUFContext", 1089 },
-  { "GRU", 1091 },
-  { "GRUCell", 1093 },
-  { "GradScaler", 1094 },
-  { "GroupNorm", 1096 },
-  { "Identity", 1098 },
-  { "InstanceNorm2d", 1100 },
+  { "DistBackendType", 840 },
+  { "DistReduceOp", 900 },
+  { "Dropout", 1104 },
+  { "Embedding", 1106 },
+  { "Flatten", 1108 },
+  { "ForwardFn", 1170 },
+  { "FreeFn", 1196 },
+  { "GGUFContext", 1109 },
+  { "GRU", 1111 },
+  { "GRUCell", 1113 },
+  { "GradScaler", 1114 },
+  { "GroupNorm", 1116 },
+  { "Identity", 1118 },
+  { "InstanceNorm2d", 1120 },
   { "InterpMode", 536 },
-  { "LRScheduler", 1101 },
-  { "LSTM", 1103 },
-  { "LSTMCell", 1105 },
-  { "LayerNorm", 1109 },
-  { "LayerNorm2d", 1108 },
-  { "LeakyReLU", 1111 },
-  { "Linear", 1113 },
-  { "LogLevel", 950 },
-  { "MaxPool1d", 1115 },
-  { "MaxPool2d", 1117 },
-  { "MaxPool3d", 1119 },
-  { "Module", 1120 },
-  { "ModuleDict", 1121 },
-  { "ModuleList", 1122 },
-  { "MultiHeadAttention", 1124 },
-  { "Optimizer", 1125 },
-  { "PReLU", 1127 },
-  { "Parameter", 1129 },
-  { "PixelShuffle", 1131 },
-  { "PixelUnshuffle", 1133 },
-  { "QRResult", 1134 },
-  { "RNN", 1136 },
-  { "RNNCell", 1138 },
-  { "ReLU", 1140 },
-  { "SVDResult", 1141 },
-  { "SafeTensorsContext", 1142 },
+  { "LRScheduler", 1121 },
+  { "LSTM", 1123 },
+  { "LSTMCell", 1125 },
+  { "LayerNorm", 1129 },
+  { "LayerNorm2d", 1128 },
+  { "LeakyReLU", 1131 },
+  { "Linear", 1133 },
+  { "LogLevel", 970 },
+  { "MaxPool1d", 1135 },
+  { "MaxPool2d", 1137 },
+  { "MaxPool3d", 1139 },
+  { "Module", 1140 },
+  { "ModuleDict", 1141 },
+  { "ModuleList", 1142 },
+  { "MultiHeadAttention", 1144 },
+  { "Optimizer", 1145 },
+  { "PReLU", 1147 },
+  { "Parameter", 1149 },
+  { "PixelShuffle", 1151 },
+  { "PixelUnshuffle", 1153 },
+  { "QRResult", 1154 },
+  { "RNN", 1156 },
+  { "RNNCell", 1158 },
+  { "ReLU", 1160 },
+  { "SVDResult", 1161 },
+  { "SafeTensorsContext", 1162 },
   { "ScatterReduceMode", 560 },
-  { "Sequential", 1143 },
-  { "Sigmoid", 1145 },
-  { "SparseCOOData", 1146 },
-  { "StateDict", 1147 },
-  { "Tanh", 1149 },
-  { "Tensor", 1151 },
-  { "TensorConfig", 1152 },
-  { "TorchMemoryManager", 1153 },
-  { "TorchPTEExportOptions", 1154 },
-  { "TorchRuntimeKind", 1155 },
-  { "TorchRuntimeModule", 1156 },
-  { "TorchTensorOptions", 727 },
-  { "TransformerDecoder", 1158 },
-  { "TransformerDecoderLayer", 1160 },
-  { "TransformerEncoder", 1162 },
-  { "TransformerEncoderLayer", 1164 },
-  { "Upsample", 1166 },
+  { "Sequential", 1163 },
+  { "Sigmoid", 1165 },
+  { "SparseCOOData", 1166 },
+  { "StateDict", 1167 },
+  { "Tanh", 1169 },
+  { "Tensor", 1171 },
+  { "TensorConfig", 1172 },
+  { "TorchMemoryManager", 1173 },
+  { "TorchPTEExportOptions", 1174 },
+  { "TorchRuntimeKind", 1175 },
+  { "TorchRuntimeModule", 1176 },
+  { "TorchTensorOptions", 739 },
+  { "TransformerDecoder", 1178 },
+  { "TransformerDecoderLayer", 1180 },
+  { "TransformerEncoder", 1182 },
+  { "TransformerEncoderLayer", 1184 },
+  { "Upsample", 1186 },
   { "UpsampleMode", 542 },
 };
 
@@ -24704,12 +25374,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   _cffi_struct_unions,
   _cffi_enums,
   _cffi_typenames,
-  508,  /* num_globals */
+  519,  /* num_globals */
   72,  /* num_struct_unions */
   9,  /* num_enums */
   83,  /* num_typenames */
   NULL,  /* no includes */
-  1179,  /* num_types */
+  1198,  /* num_types */
   0,  /* flags */
 };
 

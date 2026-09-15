@@ -58,6 +58,14 @@ typedef struct CMLROCmBackend {
     hipError_t (*hipStreamDestroy)(hipStream_t stream);
     hipError_t (*hipStreamSynchronize)(hipStream_t stream);
     hipError_t (*hipDeviceSynchronize)(void);
+
+    /* Events (optional — HCQ signals use them when present; loaded lazily and
+     * may be NULL on old runtimes, in which case callers fall back to
+     * stream-synchronize semantics). */
+    hipError_t (*hipEventCreate)(void** event);
+    hipError_t (*hipEventDestroy)(void* event);
+    hipError_t (*hipEventRecord)(void* event, hipStream_t stream);
+    hipError_t (*hipEventSynchronize)(void* event);
 } CMLROCmBackend;
 
 typedef struct CMLROCmKernel {

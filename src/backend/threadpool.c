@@ -54,7 +54,12 @@ struct ThreadPool {
     size_t            chunk;      /* ceil(total / num_threads)              */
     size_t            num_chunks; /* == num_threads for a live batch        */
     _Atomic uint64_t  claim;      /* (generation << 32) | next chunk index  */
-    _Atomic size_t    done_chunks;/* chunks finished this batch             */
+    /* (generation << 32) | completed-chunk count for THAT generation. Packing
+     * matters: a straggler finishing a chunk of batch N while batch N+1 is
+     * live must not count toward N+1 — an unpacked counter let stale
+     * completions release the submitter before every chunk had run
+     * (use-after-free / hang). */
+    _Atomic uint64_t  done;       /* (generation << 32) | chunks finished   */
     uint64_t          generation; /* bumped per batch; workers track last   */
     bool              shutdown;
 };
@@ -91,16 +96,26 @@ static Batch batch_snapshot(const ThreadPool* pool) {
     return b;
 }
 
-/* Run one chunk index against `b` (no-op for empty tail chunks). Returns after
- * bumping done_chunks and, if it completed the batch, signalling. */
+/* Run one chunk index against `b` (no-op for empty tail chunks), then record
+ * the completion generation-tagged. A straggler whose batch has moved on finds
+ * a done-word with a different generation and drops the increment — it must
+ * not release a submitter waiting on a newer batch. */
 static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
     size_t start = c * b->chunk;
     size_t end   = start + b->chunk;
     if (end > b->total) end = b->total;
     if (start < end)
         b->func(b->data, start, end);
-    size_t done = atomic_fetch_add(&pool->done_chunks, 1) + 1;
-    if (done == b->num_chunks) {
+
+    for (;;) {
+        uint64_t cur = atomic_load(&pool->done);
+        if (CLAIM_GEN(cur) != b->gen)
+            return; /* batch already superseded; our result was accounted for */
+        if (atomic_compare_exchange_weak(&pool->done, &cur,
+                                         CLAIM_MAKE(b->gen, CLAIM_IDX(cur) + 1)))
+            break;
+    }
+    if (CLAIM_IDX(atomic_load(&pool->done)) == b->num_chunks) {
         pthread_mutex_lock(&pool->mutex);
         pthread_cond_signal(&pool->work_done);
         pthread_mutex_unlock(&pool->mutex);
@@ -168,7 +183,7 @@ ThreadPool* threadpool_create(size_t num_threads) {
     pool->generation  = 0;
     pool->shutdown    = false;
     atomic_store(&pool->claim, CLAIM_MAKE(0, 0));
-    atomic_store(&pool->done_chunks, 0);
+    atomic_store(&pool->done, CLAIM_MAKE(0, 0));
     pthread_mutex_init(&pool->mutex, NULL);
     pthread_cond_init(&pool->work_ready, NULL);
     pthread_cond_init(&pool->work_done, NULL);
@@ -227,7 +242,7 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
     pool->chunk      = (n + pool->num_threads - 1) / pool->num_threads;  /* ceil */
     pool->num_chunks = pool->num_threads;
     pool->generation++;
-    atomic_store(&pool->done_chunks, 0);
+    atomic_store(&pool->done, CLAIM_MAKE((uint32_t)pool->generation, 0));
     atomic_store(&pool->claim, CLAIM_MAKE(pool->generation, 0));
     Batch b = batch_snapshot(pool);
     pthread_cond_broadcast(&pool->work_ready);
@@ -236,8 +251,12 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
     /* The submitting thread is one of the workers. */
     drain_chunks(pool, &b);
 
+    /* Wait until every chunk of THIS generation has completed. The done word
+     * is generation-tagged, so stragglers from older batches cannot release
+     * us early (and our own wait cannot be satisfied by their work). */
     pthread_mutex_lock(&pool->mutex);
-    while (atomic_load(&pool->done_chunks) < pool->num_chunks)
+    while (CLAIM_GEN(atomic_load(&pool->done)) != (uint32_t)pool->generation ||
+           CLAIM_IDX(atomic_load(&pool->done)) < pool->num_chunks)
         pthread_cond_wait(&pool->work_done, &pool->mutex);
     pthread_mutex_unlock(&pool->mutex);
 }

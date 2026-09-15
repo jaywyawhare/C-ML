@@ -68,10 +68,9 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
 
     ddp->buckets = cml_calloc(ddp->num_buckets, sizeof(float*));
     ddp->bucket_sizes = cml_calloc(ddp->num_buckets, sizeof(size_t));
-    ddp->bucket_ready = cml_calloc(ddp->num_buckets, sizeof(bool));
     ddp->param_to_bucket = cml_calloc(ddp->num_params, sizeof(int));
 
-    if (!ddp->buckets || !ddp->bucket_sizes || !ddp->bucket_ready || !ddp->param_to_bucket) {
+    if (!ddp->buckets || !ddp->bucket_sizes || !ddp->param_to_bucket) {
         cml_ddp_free(ddp);
         return NULL;
     }
@@ -113,9 +112,32 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
     return ddp;
 }
 
+/* Broadcast every registered non-trainable buffer (e.g. BatchNorm running
+ * stats) from rank 0 so all ranks evaluate with identical state. Walks the
+ * Module->next chain; containers flatten children via ->next. */
+static void ddp_broadcast_buffers(CMLDataParallel* ddp) {
+    int world_size = ddp->group ? ddp->group->world_size : 1;
+    if (world_size <= 1)
+        return;
+
+    int count = 0;
+    for (Module* m = ddp->module; m; m = m->next) {
+        for (int i = 0; i < m->num_buffers; i++) {
+            if (m->buffers[i])
+                cml_dist_broadcast(m->buffers[i], 0);
+            count++;
+        }
+    }
+    if (count > 0)
+        LOG_DEBUG("DDP: broadcast %d buffers from rank 0", count);
+}
+
 Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input) {
     if (!ddp || !ddp->module || !input)
         return NULL;
+
+    if (ddp->config.broadcast_buffers && ddp->initialized)
+        ddp_broadcast_buffers(ddp);
 
     return module_forward(ddp->module, input);
 }
@@ -174,20 +196,37 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
  * may still be lazy (graph autodiff), so each is materialised before its data
  * pointer is touched -- otherwise the sync silently skips it. */
 static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
+    /* With find_unused_parameters, a parameter that produced no gradient this
+     * step still reserves its slot (zero-filled on pack). Otherwise ranks that
+     * exercised different subsets of the model would build differently-laid-out
+     * buckets and the all-reduce would sum mismatched elements. */
+    bool reserve = ddp->config.find_unused_parameters;
     size_t offset = 0;
     for (int i = 0; i < ddp->num_params; i++) {
         if (ddp->param_to_bucket[i] != b)
             continue;
 
         Parameter* p = ddp->all_params[i];
-        if (!p || !p->tensor || !p->tensor->grad)
+        size_t numel = (p && p->tensor) ? p->tensor->numel : 0;
+
+        bool has_grad = p && p->tensor && p->tensor->grad;
+        if (has_grad) {
+            tensor_ensure_executed(p->tensor->grad);
+            has_grad = (p->tensor->grad->data != NULL);
+        }
+
+        if (!has_grad) {
+            if (reserve && numel > 0 && ddp->buckets[b]) {
+                /* Zero the slot so this rank contributes nothing for the unused
+                 * parameter while keeping every rank's layout identical. */
+                if (pack)
+                    memset(ddp->buckets[b] + offset, 0, numel * sizeof(float));
+                offset += numel;
+            }
             continue;
-        tensor_ensure_executed(p->tensor->grad);
-        if (!p->tensor->grad->data)
-            continue;
+        }
 
         float* grad_data = (float*)p->tensor->grad->data;
-        size_t numel = p->tensor->numel;
         if (ddp->buckets[b]) {
             if (pack)
                 memcpy(ddp->buckets[b] + offset, grad_data, numel * sizeof(float));
@@ -260,7 +299,6 @@ void cml_ddp_free(CMLDataParallel* ddp) {
     }
 
     cml_free(ddp->bucket_sizes);
-    cml_free(ddp->bucket_ready);
     cml_free(ddp->param_to_bucket);
     cml_free(ddp->all_params);
     cml_free(ddp);

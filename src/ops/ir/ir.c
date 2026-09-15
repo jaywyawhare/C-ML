@@ -262,6 +262,8 @@ const char* uop_type_to_string(UOpType type) {
         return "COL2IM";
     case UOP_SCATTER_ADD:
         return "SCATTER_ADD";
+    case UOP_SPMM:
+        return "SPMM";
     case UOP_FUSED_ELEMENTWISE:
         return "FUSED_ELEMENTWISE";
     case UOP_CONST:
@@ -349,6 +351,14 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->is_executed                = false;
     ir->is_optimized               = false;
     ir->is_decomposed              = false;
+    /* Allocator blocks are recycled without zeroing (see cml_malloc), so
+     * every field must be set explicitly -- a stale has_backward_nodes from
+     * a freed context made the next context skip its forward decompose. */
+    ir->has_backward_nodes         = false;
+    ir->decomposed_frontier        = NULL;
+    ir->grad_publish_log           = NULL;
+    ir->grad_publish_count         = 0;
+    ir->grad_publish_cap           = 0;
     ir->execution_results          = NULL;
     ir->execution_results_count    = 0;
     ir->execution_results_capacity = 0;
@@ -654,6 +664,11 @@ void cml_ir_free_node_params(struct IRNode* node) {
         if (p) cml_free(p);
         break;
     }
+    case UOP_SPMM: {
+        SpMMParams* p = (SpMMParams*)node->params;
+        if (p) cml_free(p);
+        break;
+    }
     case UOP_FUSED_ELEMENTWISE: {
         FusedElementwiseParams* p = (FusedElementwiseParams*)node->params;
         if (p) {
@@ -792,11 +807,28 @@ void cml_ir_free_node_params(struct IRNode* node) {
     node->params = NULL;
 }
 
+static void free_ir_node(struct IRNode* node);
 static void free_ir_node(struct IRNode* node) {
     if (!node)
         return;
 
     if (--node->ref_count > 0)
+        return;
+
+    cml_ir_release_node_storage(node);
+
+    /* execution_result is owned by the tensor -- do not free here */
+    cml_free(node);
+}
+
+/* Canonical teardown of a node's owned storage, WITHOUT freeing the node
+ * itself and without ref_count accounting. This is the single source of
+ * truth for which fields a node owns (params, scope, build_stack, per-input
+ * shape arrays, ...); custom free paths must call this instead of open-coding
+ * the field list — the DCE removal path used to hand-roll it and leaked
+ * params/scope/build_stack/input_shapes on every removed node. */
+void cml_ir_release_node_storage(struct IRNode* node) {
+    if (!node)
         return;
 
     if (node->num_inputs < 0 || node->num_inputs > 1000) {
@@ -879,9 +911,6 @@ static void free_ir_node(struct IRNode* node) {
     }
 
     cml_ir_free_node_params(node);
-
-    /* execution_result is owned by the tensor -- do not free here */
-    cml_free(node);
 }
 
 /* Pointers destroyed by the output phases of cml_ir_free.
@@ -948,10 +977,17 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            Tensor* out   = node->output;
+            Tensor* out = node->output;
             freed_set_add(&freed, out);
-            out->ref_count = 1;
-            tensor_free(out);
+            if (out->external_refs > 0) {
+                /* An external owner (language binding) still holds this
+                 * output: detach it (copying borrowed plan data) instead of
+                 * destroying it under them. */
+                tensor_detach_keep(out);
+            } else {
+                out->ref_count = 1;
+                tensor_free(out);
+            }
             node->output = NULL;
         }
         node = node->next;
@@ -967,10 +1003,14 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            Tensor* out   = node->output;
+            Tensor* out = node->output;
             freed_set_add(&freed, out);
-            out->ref_count = 1;
-            tensor_free(out);
+            if (out->external_refs > 0) {
+                tensor_detach_keep(out);
+            } else {
+                out->ref_count = 1;
+                tensor_free(out);
+            }
             node->output = NULL;
         }
         node = node->next;
@@ -1052,6 +1092,15 @@ void cml_ir_free(CMLGraph_t ir) {
         cml_free(ir->tensor_names);
         ir->tensor_names = NULL;
         ir->tensor_count = 0;
+    }
+
+    /* Log of values that received lazy grads (see autodiff.c publish). The
+     * entries are plain Tensor* borrows owned elsewhere — only the array. */
+    if (ir->grad_publish_log) {
+        cml_free(ir->grad_publish_log);
+        ir->grad_publish_log   = NULL;
+        ir->grad_publish_count = 0;
+        ir->grad_publish_cap   = 0;
     }
 
     if (ir->execution_results) {

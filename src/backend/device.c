@@ -12,6 +12,7 @@
 #include "alloc/cml_allocator.h"
 
 #include "core/dynlib.h"
+#include "ops/ir/gpu/opencl_ir_backend.h"
 #ifdef __APPLE__
 #include <objc/objc.h>
 #include <objc/runtime.h>
@@ -363,6 +364,8 @@ const char* device_get_name(DeviceType device) {
         return "Metal";
     case DEVICE_ROCM:
         return "ROCm";
+    case DEVICE_OPENCL:
+        return "OpenCL";
     case DEVICE_SIM_GPU:
         return "SimGPU";
     case DEVICE_AUTO:
@@ -381,6 +384,8 @@ void device_print_info(void) {
     printf("  CUDA: %s\n", g_cuda_available ? "Yes" : "No");
     printf("  Metal: %s\n", g_metal_available ? "Yes" : "No");
     printf("  ROCm: %s\n", g_rocm_available ? "Yes" : "No");
+    printf("  OpenCL: %s (via OpenCL IR backend)\n",
+           cml_opencl_ir_available() ? "Yes" : "No");
 
     printf("  SimGPU: %s", g_sim_gpu_enabled ? "Yes" : "No");
     if (g_sim_gpu_enabled) {
@@ -513,6 +518,14 @@ void* device_alloc(size_t size, DeviceType device) {
         }
         break;
 
+    case DEVICE_OPENCL:
+        /* OpenCL device memory is cl_mem owned by the OpenCL IR backend; this
+         * host-pointer API cannot serve it. Fail loudly rather than silently
+         * handing back host memory the caller will treat as device-resident. */
+        LOG_ERROR("device_alloc: DEVICE_OPENCL is not served by this API — "
+                  "OpenCL buffers live in the OpenCL IR backend (cml_opencl_*)");
+        return NULL;
+
     case DEVICE_SIM_GPU:
         if (g_sim_gpu_enabled && g_sim_gpu_current < g_sim_gpu_count) {
             SimGPUDevice* dev = &g_sim_gpus[g_sim_gpu_current];
@@ -586,6 +599,13 @@ void device_free(void* ptr, DeviceType device) {
         } else {
             cml_free(ptr);
         }
+        break;
+
+    case DEVICE_OPENCL:
+        /* Nothing is ever allocated through device_alloc for OpenCL (it fails
+         * loudly), so a free here means the caller mixed APIs — say so. */
+        LOG_WARNING("device_free: DEVICE_OPENCL pointer %p was not allocated "
+                    "by device_alloc; ignoring", ptr);
         break;
 
     case DEVICE_SIM_GPU:

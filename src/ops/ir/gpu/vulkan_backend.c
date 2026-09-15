@@ -1134,8 +1134,11 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
             continue;
         if (!node->output)
             continue;
-        if (cml_vulkan_execute_node(backend, node) != 0)
-            return -1;
+        if (cml_vulkan_execute_node(backend, node) != 0) {
+            LOG_DEBUG("Vulkan: node op=%d unsupported, falling back to CPU", node->type);
+            if (cpu_execute_node(node) != 0)
+                return -1;
+        }
         node->is_executed = true;
         node->output->is_executed = true;
     }

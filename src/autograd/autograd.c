@@ -282,8 +282,7 @@ void tensor_zero_grad(Tensor* tensor) {
     }
 }
 
-void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
-    if (!tensor || !new_grad)
+void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {    if (!tensor || !new_grad)
         return;
 
     if (!tensor->requires_grad)
@@ -314,8 +313,15 @@ void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
 Tensor* tensor_get_grad(Tensor* tensor) { return tensor ? tensor->grad : NULL; }
 
 void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
+    /* The eager engine writes gradients as plain data, not graph nodes —
+     * there is nothing to differentiate through a second time. */
+    int graph_mode = cml_autodiff_use_graph();
+    if (create_graph && !graph_mode) {
+        LOG_WARNING("tensor_backward: create_graph is not supported by the "
+                    "eager engine (GRAD_MODE=eager); ignoring");
+        create_graph = false;
+    }
     (void)retain_graph;
-    (void)create_graph;
 
     if (!tensor) {
         LOG_ERROR("Cannot compute gradients for NULL tensor");
@@ -338,7 +344,6 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
      * together (below) — this is what lets forward elementwise chains fuse
      * (training-forward fusion), with use_count keeping backward-needed
      * intermediates materialized. Metrics capture moves after the execute. */
-    int graph_mode = cml_autodiff_use_graph();
     if (!graph_mode) {
         if (tensor_ensure_executed(tensor) != 0) {
             LOG_ERROR("Failed to execute tensor for backward pass");
@@ -400,17 +405,33 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
          * fuser fuse forward chains (use_count keeps backward-needed intermediates
          * materialized); it is cleared right after so no lone forward realization
          * ever fuses differentiable nodes. Assumes a ones/scalar seed. */
-        cml_ir_grad(tensor->ir_context, tensor->ir_node);
-        cml_ir_fuse_set_allow_grad(1);
+        /* Strict-gradient policy: a -1 here means CML_STRICT_GRAD=1 caught an
+         * op with no VJP — do not execute a backward graph missing gradient
+         * terms (it would silently train on partial gradients). */
+        if (cml_ir_grad(tensor->ir_context, tensor->ir_node, create_graph) != 0) {
+            LOG_ERROR("tensor_backward: gradient construction failed "
+                      "(missing VJP under CML_STRICT_GRAD=1?)");
+            return;
+        }
+        /* With create_graph the backward subgraph must keep its node
+         * identities: fusion rewrites VJP chains into single
+         * UOP_FUSED_ELEMENTWISE nodes, which a second grad pass cannot seed
+         * through correctly. Slower first execute, correct re-differentiation. */
+        if (!create_graph)
+            cml_ir_fuse_set_allow_grad(1);
         cml_ir_execute(tensor->ir_context);
-        cml_ir_fuse_set_allow_grad(0);
+        if (!create_graph)
+            cml_ir_fuse_set_allow_grad(0);
         training_metrics_auto_capture_loss(tensor);
     } else {
         if (cml_ir_build_backward(tensor->ir_context, tensor->ir_node) != 0) {
             LOG_ERROR("Failed to build backward graph");
             return;
         }
-        if (cml_ir_execute_backward(tensor->ir_context) != 0) {
+        /* Root at THIS tensor's node: previously execute_backward re-rooted at
+         * ir->tail, so calling backward on an earlier tensor silently
+         * back-propagated whatever node was built last. */
+        if (cml_ir_execute_backward_from(tensor->ir_context, tensor->ir_node) != 0) {
             LOG_ERROR("Failed to execute backward pass");
             return;
         }
@@ -775,8 +796,19 @@ int autograd_export_json(Tensor* root, const char* path) {
     if (!root || !path)
         return -1;
 
-    if (!root->ir_context || !root->ir_node) {
-        LOG_WARNING("Cannot export graph: tensor has no IR node (leaf tensor)");
+    if (!root->ir_context) {
+        LOG_WARNING("Cannot export graph: tensor has no IR context (leaf tensor)");
+        return -2;
+    }
+
+    /* The root's own node may have been detached by an optimization pass
+     * (e.g. fusion rewires outputs and clears ->ir_node) when execution ran
+     * inside backward. Fall back to the graph tail: exporting the graph the
+     * tensor belongs to is still meaningful. */
+    struct IRNode* export_root = root->ir_node ? root->ir_node
+                                               : root->ir_context->tail;
+    if (!export_root) {
+        LOG_WARNING("Cannot export graph: empty IR context");
         return -2;
     }
 
@@ -801,8 +833,8 @@ int autograd_export_json(Tensor* root, const char* path) {
     struct IRNode** stack = cml_malloc(stack_cap * sizeof(struct IRNode*));
     int stack_size        = 0;
     if (stack) {
-        stack[stack_size++] = root->ir_node;
-        map_get_or_insert(&reachable, (const void*)root->ir_node, 1);
+        stack[stack_size++] = export_root;
+        map_get_or_insert(&reachable, (const void*)export_root, 1);
 
         bool stack_ok = true;
         while (stack_size > 0 && stack_ok) {

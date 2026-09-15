@@ -248,6 +248,87 @@ static void test_nan_through_aot(void) {
     cml_aot_free(model);
 }
 
+/* EXPAND with a real broadcast ([1,3] -> [2,3]); the AOT path previously only
+ * handled scalar and identity expands. */
+static void test_expand_broadcast(void) {
+    printf("test_expand_broadcast\n");
+    cml_ir_reset_global_context();
+
+    float xdata[3] = {7.0f, 8.0f, 9.0f};
+    int xs[2] = {1, 3};
+    Tensor* x = tensor_from_data(xdata, xs, 2, NULL);
+    int newshape[2] = {2, 3};
+    Tensor* out = uop_expand_to(x, newshape, 2);
+    (void)out;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    AOTCompileOptions opts = cml_aot_default_options();
+    opts.format = AOT_FORMAT_SHARED_LIB;
+    const char* so = "/tmp/cml_aot_test_expand.so";
+    if (cml_aot_compile(ir, so, &opts) != 0) { printf("  FAIL compile\n"); tests_run++; return; }
+    CMLAOTModel* model = cml_aot_load(so);
+    if (!model) { printf("  FAIL load\n"); tests_run++; return; }
+
+    float outbuf[6] = {0};
+    int os[2] = {2, 3};
+    Tensor* ot = tensor_from_data(outbuf, os, 2, NULL);
+    Tensor* ins[1] = {x};
+    Tensor* outs[1] = {ot};
+    if (cml_aot_execute(model, ins, 1, outs, 1) != 0) {
+        printf("  FAIL execute\n"); tests_run++; cml_aot_free(model); return;
+    }
+    const float* got = (const float*)ot->data;
+    float expected[6] = {7, 8, 9, 7, 8, 9};
+    for (int i = 0; i < 6; i++) {
+        char lbl[32]; snprintf(lbl, sizeof(lbl), "expand[%d]", i);
+        check_close(lbl, got[i], expected[i]);
+    }
+    cml_aot_free(model);
+}
+
+/* Multi-dim reduction: sum a [2,2,2] over dims {0,2} -> [2]. */
+static void test_multidim_reduce(void) {
+    printf("test_multidim_reduce\n");
+    cml_ir_reset_global_context();
+
+    float xdata[8] = {1, 2, 3, 4, 5, 6, 7, 8}; /* [i,j,k] */
+    int xs[3] = {2, 2, 2};
+    Tensor* x = tensor_from_data(xdata, xs, 3, NULL);
+    int dims[2] = {0, 2};
+    ReduceParams rp = { .dims = dims, .num_dims = 2, .keepdim = false };
+    Tensor* out = uop_sum(x, &rp);
+    (void)out;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    AOTCompileOptions opts = cml_aot_default_options();
+    opts.format = AOT_FORMAT_SHARED_LIB;
+    const char* so = "/tmp/cml_aot_test_mdreduce.so";
+    if (cml_aot_compile(ir, so, &opts) != 0) { printf("  FAIL compile\n"); tests_run++; return; }
+    CMLAOTModel* model = cml_aot_load(so);
+    if (!model) { printf("  FAIL load\n"); tests_run++; return; }
+
+    float outbuf[2] = {0};
+    int os[1] = {2};
+    Tensor* ot = tensor_from_data(outbuf, os, 1, NULL);
+    Tensor* ins[1] = {x};
+    Tensor* outs[1] = {ot};
+    if (cml_aot_execute(model, ins, 1, outs, 1) != 0) {
+        printf("  FAIL execute\n"); tests_run++; cml_aot_free(model); return;
+    }
+    /* out[j] = sum_{i,k} x[i,j,k] */
+    float expected[2] = {0, 0};
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            for (int k = 0; k < 2; k++)
+                expected[j] += xdata[i * 4 + j * 2 + k];
+    const float* got = (const float*)ot->data;
+    for (int j = 0; j < 2; j++) {
+        char lbl[32]; snprintf(lbl, sizeof(lbl), "mdreduce[%d]", j);
+        check_close(lbl, got[j], expected[j]);
+    }
+    cml_aot_free(model);
+}
+
 int main(void) {
     if (cml_init() != 0) { printf("cml_init failed\n"); return 1; }
 
@@ -256,6 +337,8 @@ int main(void) {
     test_reductions();
     test_integral_constant();
     test_nan_through_aot();
+    test_expand_broadcast();
+    test_multidim_reduce();
 
     return TEST_SUMMARY();
 }

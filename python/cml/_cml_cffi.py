@@ -18,12 +18,13 @@ _INCLUDE_DIR = os.path.join(_REPO_ROOT, "include")
 # only exports CML_API-marked symbols, but the cdef references the full internal
 # API.  The static archive carries every symbol; we add its transitive deps
 # (LLVM, OpenCL, BLAS-via-dlopen, pthread) below.
-_STATIC_LIB = None
-for _c in (os.path.join(_REPO_ROOT, "build", "lib", "libcml.a"),
-           os.path.join(_REPO_ROOT, "lib", "libcml.a")):
-    if os.path.exists(_c):
-        _STATIC_LIB = _c
-        break
+_STATIC_LIB = os.environ.get("CML_STATIC_LIB") or None
+if _STATIC_LIB is None:
+    for _c in (os.path.join(_REPO_ROOT, "build", "lib", "libcml.a"),
+               os.path.join(_REPO_ROOT, "lib", "libcml.a")):
+        if os.path.exists(_c):
+            _STATIC_LIB = _c
+            break
 
 def _llvm_link_flags():
     for exe in ("llvm-config", "llvm-config-18", "llvm-config-17", "llvm-config-16"):
@@ -424,6 +425,9 @@ ffi.cdef(
     Tensor* cml_argmax(Tensor* a, int dim);
     Tensor* cml_argmin(Tensor* a, int dim);
     Tensor* cml_cumsum(Tensor* a, int dim);
+    Tensor* cml_cumprod(Tensor* a, int dim);
+    Tensor* cml_logcumsumexp(Tensor* a, int dim);
+    Tensor* cml_argsort(Tensor* a, int dim, bool descending);
     Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim);
     Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim);
 
@@ -442,6 +446,12 @@ ffi.cdef(
     Tensor* cml_detach(Tensor* a);
     Tensor* cml_concat(Tensor** tensors, int num_tensors, int dim);
     Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim);
+    Tensor* cml_where(Tensor* condition, Tensor* x, Tensor* y);
+    Tensor* cml_einsum(const char* equation, Tensor** tensors, int num_tensors);
+    Tensor* cml_roll(Tensor* a, int shift, int axis);
+    Tensor* cml_copysign(Tensor* a, Tensor* b);
+    Tensor* cml_logaddexp(Tensor* a, Tensor* b);
+    Tensor* cml_one_hot(Tensor* indices, int num_classes);
     Tensor* cml_squeeze(Tensor* a, int dim);
     Tensor* cml_unsqueeze(Tensor* a, int dim);
     Tensor* cml_flip(Tensor* a, int dim);
@@ -456,6 +466,8 @@ ffi.cdef(
     Tensor* cml_unfold(Tensor* a, int kernel_size, int stride);
     Tensor* cml_sort(Tensor* a, int dim, bool descending);
     Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted);
+    Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest,
+                                  Tensor** indices_out);
     Tensor* cml_masked_select(Tensor* a, Tensor* mask);
     Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
     Tensor* cml_diagonal(Tensor* a, int offset, int dim1, int dim2);
@@ -710,6 +722,12 @@ ffi.cdef(
     // cml.h: IR context management
 
     void cml_reset_ir_context(void);
+
+    // ONNX export (core/onnx.h)
+    int cml_onnx_export_graph(CMLGraph_t ir,
+                              Tensor** graph_inputs, int num_inputs,
+                              Tensor** graph_outputs, int num_outputs,
+                              const char* filepath);
     void cml_reset_ir_graph_only(void);
     void cml_autograd_step_end(Tensor* keep);
     void cml_autograd_reset_after_step(void);
@@ -730,6 +748,9 @@ ffi.cdef(
     void cml_autocast_enter(DType target_dtype);
     void cml_autocast_exit(void);
     bool cml_autocast_is_enabled(void);
+    DType cml_autocast_default_dtype(void);
+    void cml_autocast_set_dtype(DType dtype);
+    DType cml_autocast_get_dtype(void);
     GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor,
                                          float backoff_factor, int growth_interval);
     void cml_grad_scaler_free(GradScaler* scaler);
@@ -981,6 +1002,7 @@ ffi.set_source(
     #include "tensor/realize.h"
     #include "torch/torch_c.h"
     #include "distributed/distributed.h"
+    #include "core/onnx.h"
     """,
     include_dirs=[_INCLUDE_DIR],
     extra_compile_args=["-std=c11", "-O2"],

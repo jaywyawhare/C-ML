@@ -35,6 +35,22 @@ typedef struct {
     uint64_t data_size;
 } DiskTensorHeader;
 
+#ifdef CML_HAS_IO_URING
+#include <liburing.h>
+
+#define CML_URING_DEPTH 32
+
+/* Ring plus the per-request bookkeeping needed to complete and clean up in
+ * cml_disk_wait: each in-flight read keeps its fd open and remembers how many
+ * bytes it expected so the wait can verify the short-read case. */
+typedef struct {
+    struct io_uring ring;
+    int    pending_fds[CML_URING_DEPTH];
+    size_t pending_size[CML_URING_DEPTH];
+    int    num_pending;
+} DiskUring;
+#endif
+
 CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mode) {
     if (!base_path) return NULL;
 
@@ -47,12 +63,41 @@ CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mod
     b->io_mode = mode;
     b->read_only = false;
     b->has_io_uring = false;
+    b->ring = NULL;
+
+    if (mode == CML_DISK_ASYNC) {
+#ifdef CML_HAS_IO_URING
+        DiskUring* u = (DiskUring*)cml_calloc(1, sizeof(DiskUring));
+        if (u && io_uring_queue_init(CML_URING_DEPTH, &u->ring, 0) == 0) {
+            b->ring = u;
+            b->has_io_uring = true;
+        } else {
+            cml_free(u);
+            LOG_WARNING("cml_disk_backend_create: io_uring_queue_init failed; "
+                        "reads run synchronously");
+        }
+#else
+        /* io_uring not compiled in: honor the request with the sync fallback
+         * rather than silently pretending to be async. */
+        LOG_WARNING("cml_disk_backend_create: CML_DISK_ASYNC requested but "
+                    "io_uring support was not compiled in; reads run synchronously");
+#endif
+    }
 
     return b;
 }
 
 void cml_disk_backend_free(CMLDiskBackend* backend) {
     if (!backend) return;
+#ifdef CML_HAS_IO_URING
+    if (backend->has_io_uring && backend->ring) {
+        DiskUring* u = (DiskUring*)backend->ring;
+        for (int i = 0; i < u->num_pending; i++)
+            if (u->pending_fds[i] >= 0) close(u->pending_fds[i]);
+        io_uring_queue_exit(&u->ring);
+        cml_free(u);
+    }
+#endif
     cml_free(backend->base_path);
     cml_free(backend);
 }
@@ -75,13 +120,15 @@ int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tens
     hdr.dtype = (int32_t)tensor->dtype;
     for (int i = 0; i < tensor->ndim && i < 8; i++)
         hdr.shape[i] = tensor->shape[i];
-    hdr.data_size = tensor->numel * sizeof(float);
+    size_t elem_size = cml_dtype_size(tensor->dtype);
+    hdr.data_size = tensor->numel * elem_size;
 
     if (fwrite(&hdr, sizeof(hdr), 1, f) != 1) { fclose(f); return -1; }
 
-    /* Write tensor data */
+    /* Write tensor data — raw bytes in the tensor's own dtype (was f32-only,
+     * silently truncating every other dtype to its first quarter). */
     if (tensor->data && tensor->numel > 0) {
-        if (fwrite(tensor->data, sizeof(float), tensor->numel, f) != tensor->numel) {
+        if (fwrite(tensor->data, elem_size, tensor->numel, f) != tensor->numel) {
             fclose(f);
             return -1;
         }
@@ -89,7 +136,7 @@ int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tens
 
     fclose(f);
 
-    backend->bytes_written += sizeof(hdr) + tensor->numel * sizeof(float);
+    backend->bytes_written += sizeof(hdr) + hdr.data_size;
     backend->num_writes++;
     return 0;
 }
@@ -109,21 +156,33 @@ Tensor* cml_disk_load_tensor(CMLDiskBackend* backend, const char* name) {
     if (fread(&hdr, sizeof(hdr), 1, f) != 1) { fclose(f); return NULL; }
 
     if (memcmp(hdr.magic, "CMLTENS", 8) != 0) { fclose(f); return NULL; }
+    if (hdr.ndim <= 0 || hdr.ndim > 8) { fclose(f); return NULL; }
+
+    /* Honor the dtype recorded in the header (the loader used to zero the
+     * config and read everything as f32). */
+    DType dtype = (DType)hdr.dtype;
+    if ((int)dtype < 0 || (int)dtype >= 32) { fclose(f); return NULL; }
+    size_t elem_size = cml_dtype_size(dtype);
+    if (elem_size == 0 || hdr.data_size % elem_size != 0) { fclose(f); return NULL; }
 
     /* Create tensor */
     int shape[8];
     for (int i = 0; i < hdr.ndim && i < 8; i++)
         shape[i] = hdr.shape[i];
 
-    TensorConfig tc = {0};
+    TensorConfig tc = {.dtype = dtype, .device = DEVICE_CPU,
+                       .has_dtype = true, .has_device = true};
     Tensor* t = tensor_empty(shape, hdr.ndim, &tc);
     if (!t) { fclose(f); return NULL; }
 
-    /* Read data */
-    size_t elements = hdr.data_size / sizeof(float);
+    size_t elements = hdr.data_size / elem_size;
     if (t->data && elements > 0) {
-        size_t read = fread(t->data, sizeof(float), elements, f);
-        (void)read;
+        size_t read = fread(t->data, elem_size, elements, f);
+        if (read != elements) {
+            tensor_free(t);
+            fclose(f);
+            return NULL;
+        }
     }
 
     fclose(f);
@@ -241,9 +300,46 @@ Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt) {
 
 int cml_disk_async_read(CMLDiskBackend* backend, const char* name,
                          void* buffer, size_t size) {
-    /* Fall back to synchronous read */
     if (!backend || !name || !buffer) return -1;
 
+#ifdef CML_HAS_IO_URING
+    if (backend->has_io_uring && backend->ring) {
+        DiskUring* u = (DiskUring*)backend->ring;
+        /* Drain first if the ring is full so we never overflow the SQ. */
+        if (u->num_pending >= CML_URING_DEPTH && cml_disk_wait(backend) != 0)
+            return -1;
+
+        char* path = make_tensor_path(backend, name);
+        if (!path) return -1;
+        int fd = open(path, O_RDONLY);
+        cml_free(path);
+        if (fd < 0) return -1;
+
+        struct io_uring_sqe* sqe = io_uring_get_sqe(&u->ring);
+        if (!sqe) {
+            /* SQ momentarily full: flush and retry once. */
+            io_uring_submit(&u->ring);
+            sqe = io_uring_get_sqe(&u->ring);
+            if (!sqe) { close(fd); return -1; }
+        }
+
+        int slot = u->num_pending++;
+        u->pending_fds[slot]  = fd;
+        u->pending_size[slot] = size;
+        io_uring_prep_read(sqe, fd, buffer, (unsigned)size,
+                           (unsigned long long)sizeof(DiskTensorHeader));
+        io_uring_sqe_set_data64(sqe, (unsigned long long)slot);
+
+        if (io_uring_submit(&u->ring) < 0) {
+            close(fd);
+            u->num_pending--;
+            return -1;
+        }
+        return 0;
+    }
+#endif
+
+    /* Synchronous fallback: the read completes before returning. */
     char* path = make_tensor_path(backend, name);
     if (!path) return -1;
 
@@ -262,8 +358,38 @@ int cml_disk_async_read(CMLDiskBackend* backend, const char* name,
 }
 
 int cml_disk_wait(CMLDiskBackend* backend) {
-    (void)backend;
-    /* Synchronous fallback: nothing to wait for */
+    if (!backend) return -1;
+
+#ifdef CML_HAS_IO_URING
+    if (backend->has_io_uring && backend->ring) {
+        DiskUring* u = (DiskUring*)backend->ring;
+        int rc = 0;
+        int outstanding = u->num_pending;
+        for (int done = 0; done < outstanding; done++) {
+            struct io_uring_cqe* cqe = NULL;
+            if (io_uring_wait_cqe(&u->ring, &cqe) < 0 || !cqe) { rc = -1; break; }
+            unsigned long long slot = io_uring_cqe_get_data64(cqe);
+            int res = cqe->res;
+            io_uring_cqe_seen(&u->ring, cqe);
+
+            if (slot < (unsigned long long)CML_URING_DEPTH) {
+                if (u->pending_fds[slot] >= 0) {
+                    close(u->pending_fds[slot]);
+                    u->pending_fds[slot] = -1;
+                }
+                if (res < 0 || (size_t)res != u->pending_size[slot]) rc = -1;
+                else {
+                    backend->bytes_read += (uint64_t)res;
+                    backend->num_reads++;
+                }
+            }
+        }
+        u->num_pending = 0;
+        return rc;
+    }
+#endif
+
+    /* Synchronous fallback: reads already completed in cml_disk_async_read. */
     return 0;
 }
 

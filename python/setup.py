@@ -19,8 +19,16 @@ import subprocess
 import sys
 import os
 
-# Get version from __init__.py
-version = "0.0.3"
+# Single version source: [project] in pyproject.toml
+import configparser  # noqa: F401  (tomllib on py3.11+; fallback below)
+try:
+    import tomllib
+    with open("pyproject.toml", "rb") as f:
+        version = tomllib.load(f)["project"]["version"]
+except ModuleNotFoundError:
+    import re
+    with open("pyproject.toml") as f:
+        version = re.search(r'^version\s*=\s*"([^"]+)"', f.read(), re.M).group(1)
 
 # Read long description
 with open("README.md", "r", encoding="utf-8") as f:

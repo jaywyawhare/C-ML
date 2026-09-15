@@ -16,6 +16,10 @@
 #define HIPRTC_LIB_NAME NULL
 #endif
 
+#ifdef CML_HAS_HIP_MOCK
+#include "ops/ir/gpu/hip_mock.h"
+#endif
+
 #define HIP_SUCCESS 0
 #define hipMemcpyHostToDevice 1
 #define hipMemcpyDeviceToHost 2
@@ -94,6 +98,13 @@ static int load_hip_functions(CMLROCmBackend* backend) {
     LOAD_FUNC(hipStreamSynchronize);
     LOAD_FUNC(hipDeviceSynchronize);
 
+    /* Optional: HCQ signal support. Absence is not fatal — the HCQ adapter
+     * falls back to stream-synchronize semantics. */
+    LOAD_FUNC(hipEventCreate);
+    LOAD_FUNC(hipEventDestroy);
+    LOAD_FUNC(hipEventRecord);
+    LOAD_FUNC(hipEventSynchronize);
+
 #undef LOAD_FUNC
 
     if (!backend->hipInit || !backend->hipModuleLaunchKernel) {
@@ -109,6 +120,12 @@ int cml_rocm_backend_init(CMLROCmBackend* backend, int device_ordinal) {
         return -1;
     if (backend->initialized)
         return 0;
+
+#ifdef CML_HAS_HIP_MOCK
+    /* Mock driver: validates backend/HCQ code paths without an AMD GPU. */
+    if (cml_hip_mock_enabled_from_env())
+        return cml_rocm_backend_init_mock(backend);
+#endif
 
     if (load_hip_functions(backend) != 0)
         return -1;

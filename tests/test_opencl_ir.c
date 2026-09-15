@@ -76,6 +76,50 @@ static void test_matmul(void) {
     cml_free(cpu_copy);
 }
 
+static void test_batched_matmul(void) {
+    printf("Testing batched MATMUL on GPU...\n");
+    int B = 3, M = 64, K = 128, N = 64;
+
+    TensorConfig cfg = {0};
+    float* a_data = cml_malloc((size_t)B * M * K * sizeof(float));
+    float* b_data = cml_malloc((size_t)B * K * N * sizeof(float));
+    for (int i = 0; i < B * M * K; i++) a_data[i] = (float)(i % 7) * 0.1f;
+    for (int i = 0; i < B * K * N; i++) b_data[i] = (float)(i % 5) * 0.1f;
+
+    /* Hand-computed reference: independent GEMM per batch. */
+    float* ref = cml_malloc((size_t)B * M * N * sizeof(float));
+    for (int bi = 0; bi < B; bi++)
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < N; n++) {
+                float acc = 0.0f;
+                for (int k = 0; k < K; k++)
+                    acc += a_data[(bi * M + m) * K + k] * b_data[(bi * K + k) * N + n];
+                ref[(bi * M + m) * N + n] = acc;
+            }
+
+    int shape_a[] = {B, M, K};
+    int shape_b[] = {B, K, N};
+    setenv("BACKEND", "opencl", 1);
+    Tensor* ta = tensor_from_data(a_data, shape_a, 3, &cfg);
+    Tensor* tb = tensor_from_data(b_data, shape_b, 3, &cfg);
+    Tensor* tc = uop_matmul(ta, tb);
+    float* gpu_result = (float*)tensor_data_ptr(tc);
+
+    float diff = max_abs_diff(ref, gpu_result, B * M * N);
+    CHECK("batched MATMUL [3,64,128]x[3,128,64] correctness", diff < 1e-2f);
+    printf("    max abs diff: %e\n", diff);
+
+    tensor_free(ta);
+    tensor_free(tb);
+    tensor_free(tc);
+    cml_reset_ir_context();
+    unsetenv("BACKEND");
+
+    cml_free(a_data);
+    cml_free(b_data);
+    cml_free(ref);
+}
+
 static void test_elementwise(void) {
     printf("Testing elementwise ops on GPU...\n");
     int n = 1024;
@@ -210,6 +254,7 @@ int main(void) {
     printf("OpenCL GPU detected\n\n");
 
     test_matmul();
+    test_batched_matmul();
     test_elementwise();
     test_large_matmul_perf();
 

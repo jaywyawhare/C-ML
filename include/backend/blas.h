@@ -81,6 +81,11 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
 int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                       int K, float alpha, float beta, bool transA, bool transB);
 
+/* f64 GEMM through cblas_dgemm (row-major, no transposes). Returns -1 when
+ * no BLAS is available — the caller falls back to the generic kernel. */
+int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C,
+                   int M, int N, int K, double alpha, double beta);
+
 /* y = alpha * A @ x + beta * y */
 int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y, int M, int N,
                    float alpha, float beta);

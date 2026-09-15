@@ -303,93 +303,32 @@ int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id,
     return 0;
 }
 
-Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
-                               Tensor* Q, const CMLGQAConfig* config) {
-    if (!cache || !Q || !config) {
-        LOG_ERROR("cml_paged_gqa_forward: NULL argument");
-        return NULL;
-    }
-    if (seq_id < 0 || seq_id >= cache->max_sequences) {
-        LOG_ERROR("cml_paged_gqa_forward: invalid seq_id %d", seq_id);
-        return NULL;
-    }
-
-    CMLBlockTable* bt = &cache->sequences[seq_id];
-    if (!bt->block_ids) {
-        LOG_ERROR("cml_paged_gqa_forward: sequence %d not initialised", seq_id);
-        return NULL;
-    }
-
-    tensor_ensure_executed(Q);
-
-    if (Q->ndim != 3) {
-        LOG_ERROR("cml_paged_gqa_forward: Q must be 3D [batch, seq_len, num_heads*head_dim], "
-                  "got ndim=%d", Q->ndim);
-        return NULL;
-    }
-
+/* Core attention over one cache sequence, writing one batch row of output.
+ * q_row points at this row's [seq_q, num_heads*head_dim] slice; out_row is the
+ * matching output slice. Returns 0 on success. */
+static int paged_gqa_forward_seq(CMLPagedKVCache* cache, CMLBlockTable* bt,
+                                  const float* q_row, float* out_row, int seq_q,
+                                  const CMLGQAConfig* config) {
     int num_heads = config->num_heads;
     int num_kv_heads = config->num_kv_heads;
     int head_dim = config->head_dim;
-
-    if (num_heads <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
-        LOG_ERROR("cml_paged_gqa_forward: invalid config "
-                  "(num_heads=%d, kv_heads=%d, head_dim=%d)",
-                  num_heads, num_kv_heads, head_dim);
-        return NULL;
-    }
-    if (num_heads % num_kv_heads != 0) {
-        LOG_ERROR("cml_paged_gqa_forward: num_heads (%d) must be divisible by num_kv_heads (%d)",
-                  num_heads, num_kv_heads);
-        return NULL;
-    }
-    if (num_kv_heads != cache->num_kv_heads || head_dim != cache->head_dim) {
-        LOG_ERROR("cml_paged_gqa_forward: config mismatch with cache "
-                  "(config kv_heads=%d vs cache %d, config head_dim=%d vs cache %d)",
-                  num_kv_heads, cache->num_kv_heads, head_dim, cache->head_dim);
-        return NULL;
-    }
-
     int groups = num_heads / num_kv_heads;
-    int batch = Q->shape[0];
-    int seq_q = Q->shape[1];
     int kv_len = bt->seq_len;
 
-    if (batch != 1) {
-        LOG_ERROR("cml_paged_gqa_forward: paged attention only supports batch=1, got %d",
-                  batch);
-        return NULL;
-    }
     if (kv_len == 0) {
-        LOG_ERROR("cml_paged_gqa_forward: sequence %d has no cached tokens", seq_id);
-        return NULL;
+        LOG_ERROR("paged attention: sequence has no cached tokens");
+        return -1;
     }
 
     float scale = config->scale;
-    if (scale <= 0.0f) {
+    if (scale <= 0.0f)
         scale = 1.0f / sqrtf((float)head_dim);
-    }
 
-    float* q_data = (float*)tensor_data_ptr(Q);
-    if (!q_data) {
-        LOG_ERROR("cml_paged_gqa_forward: failed to get Q data pointer");
-        return NULL;
-    }
-
-    /* Allocate output: [1, seq_q, num_heads * head_dim] */
-    size_t out_size = (size_t)seq_q * num_heads * head_dim;
-    float* output = (float*)cml_calloc(out_size, sizeof(float));
-    if (!output) {
-        LOG_ERROR("cml_paged_gqa_forward: output allocation failed");
-        return NULL;
-    }
-
-    /* Allocate scratch for attention scores: [seq_q, kv_len] */
+    /* Scratch for attention scores: [seq_q, kv_len] */
     float* scores = (float*)cml_malloc((size_t)seq_q * kv_len * sizeof(float));
     if (!scores) {
-        LOG_ERROR("cml_paged_gqa_forward: scores allocation failed");
-        cml_free(output);
-        return NULL;
+        LOG_ERROR("paged attention: scores allocation failed");
+        return -1;
     }
 
     size_t kv_stride = (size_t)num_kv_heads * head_dim;  /* floats per token in a block */
@@ -409,8 +348,8 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
                 for (int t = 0; t < tokens_in_blk; t++, token_idx++) {
                     float dot = 0.0f;
                     for (int d = 0; d < head_dim; d++) {
-                        float q_val = q_data[(size_t)sq * num_heads * head_dim
-                                             + h * head_dim + d];
+                        float q_val = q_row[(size_t)sq * num_heads * head_dim
+                                            + h * head_dim + d];
                         float k_val = blk->key_data[(size_t)t * kv_stride
                                                     + kv_h * head_dim + d];
                         dot += q_val * k_val;
@@ -451,8 +390,8 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
                     for (int d = 0; d < head_dim; d++) {
                         float v_val = blk->value_data[(size_t)t * kv_stride
                                                       + kv_h * head_dim + d];
-                        output[(size_t)sq * num_heads * head_dim
-                               + h * head_dim + d] += w * v_val;
+                        out_row[(size_t)sq * num_heads * head_dim
+                                + h * head_dim + d] += w * v_val;
                     }
                 }
             }
@@ -460,9 +399,83 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
     }
 
     cml_free(scores);
+    return 0;
+}
 
-    /* Wrap output into a tensor [1, seq_q, num_heads * head_dim] */
-    int out_shape[] = {1, seq_q, num_heads * head_dim};
+static Tensor* paged_gqa_forward_impl(CMLPagedKVCache* cache, const int* seq_ids,
+                                       Tensor* Q, const CMLGQAConfig* config) {
+    if (!cache || !Q || !config) {
+        LOG_ERROR("cml_paged_gqa_forward: NULL argument");
+        return NULL;
+    }
+
+    tensor_ensure_executed(Q);
+
+    if (Q->ndim != 3) {
+        LOG_ERROR("cml_paged_gqa_forward: Q must be 3D [batch, seq_len, num_heads*head_dim], "
+                  "got ndim=%d", Q->ndim);
+        return NULL;
+    }
+
+    int num_heads = config->num_heads;
+    int num_kv_heads = config->num_kv_heads;
+    int head_dim = config->head_dim;
+
+    if (num_heads <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
+        LOG_ERROR("cml_paged_gqa_forward: invalid config "
+                  "(num_heads=%d, kv_heads=%d, head_dim=%d)",
+                  num_heads, num_kv_heads, head_dim);
+        return NULL;
+    }
+    if (num_heads % num_kv_heads != 0) {
+        LOG_ERROR("cml_paged_gqa_forward: num_heads (%d) must be divisible by num_kv_heads (%d)",
+                  num_heads, num_kv_heads);
+        return NULL;
+    }
+    if (num_kv_heads != cache->num_kv_heads || head_dim != cache->head_dim) {
+        LOG_ERROR("cml_paged_gqa_forward: config mismatch with cache "
+                  "(config kv_heads=%d vs cache %d, config head_dim=%d vs cache %d)",
+                  num_kv_heads, cache->num_kv_heads, head_dim, cache->head_dim);
+        return NULL;
+    }
+
+    int batch = Q->shape[0];
+    int seq_q = Q->shape[1];
+
+    /* Validate every sequence up-front so a bad id fails before any work. */
+    for (int b = 0; b < batch; b++) {
+        if (seq_ids[b] < 0 || seq_ids[b] >= cache->max_sequences ||
+            !cache->sequences[seq_ids[b]].block_ids) {
+            LOG_ERROR("cml_paged_gqa_forward: batch row %d uses invalid or "
+                      "uninitialised sequence %d", b, seq_ids[b]);
+            return NULL;
+        }
+    }
+
+    float* q_data = (float*)tensor_data_ptr(Q);
+    if (!q_data) {
+        LOG_ERROR("cml_paged_gqa_forward: failed to get Q data pointer");
+        return NULL;
+    }
+
+    size_t row_floats = (size_t)seq_q * num_heads * head_dim;
+    float* output = (float*)cml_calloc((size_t)batch * row_floats, sizeof(float));
+    if (!output) {
+        LOG_ERROR("cml_paged_gqa_forward: output allocation failed");
+        return NULL;
+    }
+
+    for (int b = 0; b < batch; b++) {
+        CMLBlockTable* bt = &cache->sequences[seq_ids[b]];
+        if (paged_gqa_forward_seq(cache, bt, q_data + (size_t)b * row_floats,
+                                  output + (size_t)b * row_floats, seq_q, config) != 0) {
+            cml_free(output);
+            return NULL;
+        }
+    }
+
+    /* Wrap output into a tensor [batch, seq_q, num_heads * head_dim] */
+    int out_shape[] = {batch, seq_q, num_heads * head_dim};
     TensorConfig out_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
                             .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
@@ -471,5 +484,37 @@ Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
     if (!result) {
         LOG_ERROR("cml_paged_gqa_forward: failed to create output tensor");
     }
+    return result;
+}
+
+Tensor* cml_paged_gqa_forward_batch(CMLPagedKVCache* cache, const int* seq_ids,
+                                     Tensor* Q, const CMLGQAConfig* config) {
+    if (!seq_ids) {
+        LOG_ERROR("cml_paged_gqa_forward_batch: NULL seq_ids");
+        return NULL;
+    }
+    return paged_gqa_forward_impl(cache, seq_ids, Q, config);
+}
+
+Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id,
+                               Tensor* Q, const CMLGQAConfig* config) {
+    if (!cache || !Q || !config) {
+        LOG_ERROR("cml_paged_gqa_forward: NULL argument");
+        return NULL;
+    }
+    if (seq_id < 0 || seq_id >= cache->max_sequences) {
+        LOG_ERROR("cml_paged_gqa_forward: invalid seq_id %d", seq_id);
+        return NULL;
+    }
+
+    /* Single-sequence API: every batch row attends to the same sequence. */
+    int batch = Q ? Q->ndim == 3 ? Q->shape[0] : 0 : 0;
+    int* ids = (int*)cml_malloc((size_t)(batch > 0 ? batch : 1) * sizeof(int));
+    if (!ids)
+        return NULL;
+    for (int b = 0; b < (batch > 0 ? batch : 1); b++)
+        ids[b] = seq_id;
+    Tensor* result = paged_gqa_forward_impl(cache, ids, Q, config);
+    cml_free(ids);
     return result;
 }

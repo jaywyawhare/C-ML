@@ -75,7 +75,10 @@ static int grad_matches(OpFn op) {
         if (isnan(fp) || isnan(fm)) return 0;
         float num = (fp - fm) / (2.0f * eps);
         float den = fmaxf(1.0f, fmaxf(fabsf(num), fabsf(ana[i])));
-        if (fabsf(num - ana[i]) / den > 0.02f) return 0;
+        if (fabsf(num - ana[i]) / den > 0.02f) {
+            printf("    MISMATCH i=%zu num=%.4f ana=%.4f\n", i, num, ana[i]);
+            return 0;
+        }
     }
     return 1;
 }
@@ -84,6 +87,8 @@ static int grad_matches(OpFn op) {
 static Tensor* w_hard_tanh(Tensor* a) { return uop_hard_tanh(a); }
 static Tensor* w_relu6(Tensor* a)     { return uop_relu6(a); }
 static Tensor* w_qgelu(Tensor* a)     { return uop_quick_gelu(a); }
+static Tensor* w_gelu(Tensor* a)      { return uop_gelu(a); }
+static Tensor* w_leaky_relu(Tensor* a){ return uop_leaky_relu(a, 0.01f); }
 static Tensor* w_triu(Tensor* a)      { return uop_triu(a, 0); }
 static Tensor* w_tril(Tensor* a)      { return uop_tril(a, 1); }
 static Tensor* w_roll(Tensor* a)      { return uop_roll(a, 1, 1); }
@@ -124,6 +129,8 @@ ELEMENTWISE(hard_sigmoid, uop_hard_sigmoid, -2.0f, 2.0f)
 ELEMENTWISE(hard_tanh,   w_hard_tanh,     -0.8f, 0.8f)
 ELEMENTWISE(relu6,       w_relu6,          0.5f, 5.0f)
 ELEMENTWISE(quick_gelu,  w_qgelu,         -1.5f, 1.5f)
+ELEMENTWISE(gelu,        w_gelu,          -1.5f, 1.5f)
+ELEMENTWISE(leaky_relu,  w_leaky_relu,    -1.5f, 1.5f)
 ELEMENTWISE(softplus,    uop_softplus,    -1.5f, 1.5f)
 ELEMENTWISE(softsign,    uop_softsign,    -1.5f, 1.5f)
 ELEMENTWISE(logsigmoid,  uop_logsigmoid,  -1.5f, 1.5f)
@@ -268,6 +275,48 @@ static int test_reshape3_reduce_axis2(void) { return reshape_then_reduce_backwar
 static int test_reshape4_reduce_axis0(void) { return reshape_then_reduce_backward(4, 0); }
 static int test_reshape4_reduce_axis2(void) { return reshape_then_reduce_backward(4, 2); }
 
+/* GATHER's VJP is a SCATTER_ADD whose FIRST input is an integer index tensor.
+ * The output tensor used to inherit inputs[0]'s dtype, so every embedding
+ * gradient came back as an INT32 buffer: float grads stored into it read back
+ * as denormal garbage ≈ 0 — silent zero gradients, grad_check embedding 17/18.
+ * The output must take the dtype of the DATA operand (inputs[1]). */
+static int test_gather_grad_dtype_and_value(void) {
+    cml_reset_ir_context();
+    int wsh[2] = {4, 2};
+    Tensor* w = tensor_zeros(wsh, 2, &cfg);
+    if (!w) return 0;
+    float wv[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    memcpy(tensor_data_ptr(w), wv, sizeof wv);
+    w->requires_grad = true;
+
+    TensorConfig icfg = {.dtype = DTYPE_INT32, .device = DEVICE_CPU,
+                         .has_dtype = true, .has_device = true};
+    int ish[1] = {3};
+    Tensor* idx = tensor_zeros(ish, 1, &icfg);
+    if (!idx) { cml_reset_ir_context(); return 0; }
+    int32_t iv[3] = {0, 2, 2};   /* duplicate row exercises accumulation */
+    memcpy(tensor_data_ptr(idx), iv, sizeof iv);
+
+    Tensor* g = uop_gather(w, idx, 0);
+    if (!g || g->dtype != DTYPE_FLOAT32) { cml_reset_ir_context(); return 0; }
+
+    ReduceParams rp = {0};
+    Tensor* tot = uop_sum(g, &rp);
+    if (!tot) { cml_reset_ir_context(); return 0; }
+    tensor_backward(tot, NULL, false, false);
+
+    int ok = w->grad != NULL && w->grad->dtype == DTYPE_FLOAT32;
+    if (ok) {
+        /* d(sum)/dw = counts of each index: row0 -> 1, row2 -> 2 */
+        float expect[8] = {1, 1, 0, 0, 2, 2, 0, 0};
+        float* gd = (float*)tensor_data_ptr(w->grad);
+        for (size_t i = 0; i < 8 && ok; i++)
+            if (fabsf(gd[i] - expect[i]) > 1e-4f) ok = 0;
+    }
+    cml_reset_ir_context();
+    return ok;
+}
+
 int main(void) {
     cml_init();
     printf("=== per-op autodiff ===\n");
@@ -275,6 +324,7 @@ int main(void) {
     TEST(asin); TEST(acos); TEST(atan); TEST(asinh); TEST(acosh); TEST(atanh);
     TEST(erf); TEST(sinh); TEST(cosh); TEST(log2); TEST(log10); TEST(exp2);
     TEST(hard_sigmoid); TEST(hard_tanh); TEST(relu6); TEST(quick_gelu);
+    TEST(gelu); TEST(leaky_relu);
     TEST(softplus); TEST(softsign); TEST(logsigmoid);
 
     TEST(triu); TEST(tril); TEST(roll); TEST(flatten);
@@ -292,6 +342,7 @@ int main(void) {
 
     TEST(reduce_multi_axis);
     TEST(topk_values_and_indices);
+    TEST(gather_grad_dtype_and_value);
 
     cml_cleanup();
     return TEST_SUMMARY();

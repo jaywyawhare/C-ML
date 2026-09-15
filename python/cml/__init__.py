@@ -13,7 +13,7 @@ except ImportError as e:
 
 from cml.core import (
     init, cleanup, seed, reset_graph,
-    Tensor, tensor,
+    Tensor, tensor, einsum, where, pad, result_type,
     get_device, set_device, get_dtype, set_dtype,
     is_device_available, is_grad_enabled,
     init_context, no_grad, enable_grad, set_grad_enabled,
@@ -33,6 +33,9 @@ from cml import nn
 from cml import optim
 from cml import losses
 from cml import distributed
+from cml import onnx
+from cml import safetensors
+from cml import checkpoint
 
 # Convenience top-level access (PyTorch-style: cml.Adam, cml.Linear, cml.ReLU).
 from cml.optim import (

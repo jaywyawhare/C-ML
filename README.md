@@ -73,10 +73,25 @@ int main(void) {
 | **LLM** | LoRA/QLoRA, Flash Attention, GQA, paged KV cache, RoPE, MoE, speculative decoding, LLaMA 7B-70B |
 | **Training** | 11 optimizers, 13 losses, 8 LR schedulers, gradient checkpointing, DDP, pipeline & tensor parallel |
 | **Compiler** | IR fusion (5 patterns), linearization, codegen to C/PTX/SPIR-V/WGSL/MSL, AOT, JIT, kernel cache |
-| **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL — userspace drivers for NV (RM ioctl) and AMD (KFD) |
+| **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL — userspace drivers for NV (RM ioctl) and AMD (KFD) (see maturity below) |
 | **Runtime** | LLVM JIT by default (shape-specialized SIMD; interpreter fallback), multi-dtype compute (f32/f64/f16/bf16/int), BLAS, TLSF allocator, memory pools, thread pool |
-| **I/O** | GGUF, SafeTensors, ONNX, PyTorch .pth, int8/NF4 quantization |
+| **I/O** | GGUF, SafeTensors, ONNX, PyTorch .pth, int8/int4/NF4 quantization |
 | **Python** | CFFI bindings, NumPy integration, operator overloading |
+
+### Backend maturity
+
+GPU paths are exercised by CI only through the CPU reference backend, mocks,
+and emulators — driver-call correctness needs the real hardware. Status per
+backend as of 2026-08:
+
+| Backend | Maturity | Notes |
+|---|---|---|
+| CPU (SIMD/BLAS/LLVM JIT) | stable | default; full test suite runs on it |
+| HCQ queue/signal/pipeline | stable | uniform ops dispatch incl. CPU reference (`test_hcq_cpu`, `test_hcq_registry`) |
+| CUDA / ROCm / OpenCL / Vulkan / WebGPU adapters | build-verified | compile everywhere, dlopen at runtime, fail cleanly without hardware; driver bodies unvalidated on-GPU |
+| NV (RM ioctl) / AM (KFD) drivers | experimental | full mock-based tests (`nv_mock`, `am_mock`); real ioctl paths need hardware |
+| Adreno / Hexagon / Thunder / USB | placeholder | identity/generic kernels or stubs; not for production |
+| Multi-GPU (peer copy, device placement) | simulated only | `DEVICE_SIM_GPU` device simulator |
 
 ---
 
@@ -97,6 +112,30 @@ drivers         HCQ, NV (RM ioctl), AM (KFD), TLSF, pools
      |
 hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, Adreno, Hexagon, CPU
 ```
+
+---
+
+## Testing & coverage
+
+156 C test programs (plus Python pytest) run in CI. The suite includes
+cross-dtype conformance (77 ops x 8 dtypes against f32 references), a VJP
+sweep that checks every eager-backward rule against central finite
+differences, an API contract sweep (bad arguments on every public surface),
+and HCQ/quantization/matmul exactness tests.
+
+Branch coverage is measured with union semantics — a branch counts as covered
+when ANY test binary takes it:
+
+```sh
+cmake -S . -B build-coverage -DCMAKE_C_FLAGS="--coverage -O0"
+cmake --build build-coverage -j
+cmake --build build-coverage --target coverage   # runs ctest serially + report
+```
+
+Serial execution is required: all binaries update one shared set of `.gcda`
+counters. Current baseline: ~58% line / ~38% branch outcomes; the largest
+remaining gaps are the hardware-gated `gpu/*` backends and the f32 SIMD fast
+paths.
 
 ---
 

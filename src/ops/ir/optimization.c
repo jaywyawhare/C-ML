@@ -80,6 +80,36 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
         ir->tail->is_used  = true;
     }
 
+    /* Additional roots: nodes whose output escaped the graph (pinned /
+     * externally referenced by a caller). Rooting only at the tail declares
+     * the producer of any intermediate tensor handed to the user dead in
+     * multi-output graphs — its "dead" node was holding live data. */
+    node = ir->head;
+    while (node) {
+        if (!node->is_used && node->output && node->output->external_refs > 0) {
+            if (stack_top >= stack_capacity) {
+                int new_capacity = stack_capacity * 2;
+                struct IRNode** new_stack =
+                    cml_realloc(stack, (size_t)new_capacity * sizeof(struct IRNode*));
+                if (!new_stack) {
+                    LOG_ERROR("Failed to grow DCE stack; marking all nodes as used");
+                    cml_free(stack);
+                    node = ir->head;
+                    while (node) {
+                        node->is_used = true;
+                        node          = node->next;
+                    }
+                    return;
+                }
+                stack          = new_stack;
+                stack_capacity = new_capacity;
+            }
+            stack[stack_top++] = node;
+            node->is_used      = true;
+        }
+        node = node->next;
+    }
+
     while (stack_top > 0) {
         struct IRNode* current = stack[--stack_top];
 
@@ -134,47 +164,12 @@ static int remove_dead_nodes(CMLGraph_t ir) {
                 node->output->ir_context = NULL;
             }
 
-            if (node->input_names) {
-                for (int i = 0; i < node->num_inputs; i++) {
-                    if (node->input_names[i]) {
-                        cml_free(node->input_names[i]);
-                    }
-                }
-                cml_free(node->input_names);
-            }
-            if (node->output_name) {
-                cml_free(node->output_name);
-            }
-            if (node->users) {
-                cml_free(node->users);
-            }
-            if (node->inputs) {
-                cml_free(node->inputs);
-            }
-            if (node->input_shapes) {
-                cml_free(node->input_shapes);
-            }
-            if (node->input_ndims) {
-                cml_free(node->input_ndims);
-            }
-            if (node->output_shape) {
-                cml_free(node->output_shape);
-            }
-            if (node->broadcast) {
-                if (node->broadcast->broadcast_dims) {
-                    cml_free(node->broadcast->broadcast_dims);
-                }
-                if (node->broadcast->broadcast_strides) {
-                    cml_free(node->broadcast->broadcast_strides);
-                }
-                cml_free(node->broadcast);
-            }
-            if (node->saved_for_backward) {
-                cml_free(node->saved_for_backward);
-            }
             /* Same reason as decompose: a dead node must leave the CSE table
              * before its memory goes, or a later lookup probes a freed node. */
             cml_intern_remove(ir->intern_table, node);
+            /* Canonical teardown — the hand-rolled field list this used to
+             * duplicate leaked params/scope/build_stack/input_shapes. */
+            cml_ir_release_node_storage(node);
             cml_free(node);
 
             ir->node_count--;

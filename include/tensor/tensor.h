@@ -42,7 +42,20 @@ typedef enum {
     CML_QUANT_GGUF_Q8_0,
     CML_QUANT_GGUF_Q4_0,
     CML_QUANT_AFFINE_INT8, /* per-tensor affine int8: q = round(x/scale)+zero_point */
+    CML_QUANT_AFFINE_INT4, /* per-tensor symmetric int4, packed 2/byte in quant_data */
+    CML_QUANT_NF4,         /* block-wise NF4, [scales | packed nibbles] in quant_data */
 } CMLQuantType;
+
+/* Shared storage: keeps a data block alive while any view references it.
+ * Attached lazily to the owning root tensor the first time a view is taken;
+ * the block is freed when the last referencing tensor (owner or view) dies. */
+typedef struct CMLTensorStorage {
+    void* data;             /* The shared block (== owner's data pointer) */
+    size_t nbytes;          /* Payload bytes of the original allocation */
+    int refs;               /* Owner + live views sharing this block */
+    bool from_buffer_cache; /* Block came from cml_buffer_cache_alloc */
+    DeviceType device;      /* Device the block lives on */
+} CMLTensorStorage;
 
 typedef struct Tensor {
     // Shape info (computed from IR, not execution)
@@ -79,6 +92,7 @@ typedef struct Tensor {
      * tensor_release and tensor_free. */
     int external_refs;
     struct Tensor* base; // Base tensor (if this is a view)
+    CMLTensorStorage* storage; // Shared storage block (owner + its views)
 
     size_t* strides;       // Stride array (for efficient views)
     size_t storage_offset; // Offset into data (for views/slices)
@@ -95,6 +109,8 @@ typedef struct Tensor {
      * the int8 weights live in ->data). dequant = (q - zero_point) * scale. */
     float quant_scale;
     int32_t quant_zero_point;
+    /* Block size for block-wise quant types (CML_QUANT_NF4); 0 otherwise. */
+    int32_t quant_block_size;
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);
@@ -155,6 +171,19 @@ void tensor_free(Tensor* t);
  * the tensor instead of freeing it, so the owner's later free is always safe. */
 void tensor_pin(Tensor* t);
 void tensor_release(Tensor* t);
+
+/* Detach a tensor from the IR graph without freeing it: copy any borrowed
+ * execution-plan data into an owned allocation and clear all links into the
+ * graph. Graph teardown uses this for tensors an external owner still holds. */
+void tensor_detach_keep(Tensor* t);
+
+/* Shared-storage lifetime for views. tensor_storage_share() links `view` to
+ * the storage block behind `src` (attaching one to src's root if needed), so
+ * the block outlives the base temporary; call it once at view creation.
+ * tensor_storage_release() drops a tensor's hold and frees the block when the
+ * last reference goes — use it wherever owned data is freed or replaced. */
+void tensor_storage_share(Tensor* view, Tensor* src);
+void tensor_storage_release(Tensor* t);
 Tensor* tensor_clone(Tensor* t);
 float tensor_get_float(Tensor* t, size_t idx);
 void tensor_set_float(Tensor* t, size_t idx, float value);

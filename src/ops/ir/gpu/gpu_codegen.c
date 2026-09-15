@@ -233,9 +233,44 @@ static LLVMModuleRef gpu_build_binary_op(LLVMContextRef ctx, UOpType type,
         result = LLVMBuildSelect(bld, uno, sum, m, "maxn");
         break;
     }
+    case UOP_MINIMUM: {
+        /* NaN propagates (torch.minimum), mirroring the MAX case above. */
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLT, v0, v1, "lt");
+        LLVMValueRef m   = LLVMBuildSelect(bld, cmp, v0, v1, "min");
+        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, v0, v1, "uno");
+        LLVMValueRef sum = LLVMBuildFAdd(bld, v0, v1, "nanprop");
+        result = LLVMBuildSelect(bld, uno, sum, m, "minn");
+        break;
+    }
     case UOP_CMPLT: {
         LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLT, v0, v1, "lt");
         result = LLVMBuildUIToFP(bld, cmp, f32, "cmplt");
+        break;
+    }
+    case UOP_CMPGT: {
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, v0, v1, "gt");
+        result = LLVMBuildUIToFP(bld, cmp, f32, "cmpgt");
+        break;
+    }
+    case UOP_CMPGE: {
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGE, v0, v1, "ge");
+        result = LLVMBuildUIToFP(bld, cmp, f32, "cmpge");
+        break;
+    }
+    case UOP_CMPLE: {
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLE, v0, v1, "le");
+        result = LLVMBuildUIToFP(bld, cmp, f32, "cmple");
+        break;
+    }
+    case UOP_CMPEQ: {
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOEQ, v0, v1, "eq");
+        result = LLVMBuildUIToFP(bld, cmp, f32, "cmpeq");
+        break;
+    }
+    case UOP_CMPNE: {
+        /* C's a != b is true for NaN operands: use the unordered predicate. */
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealUNE, v0, v1, "ne");
+        result = LLVMBuildUIToFP(bld, cmp, f32, "cmpne");
         break;
     }
     case UOP_POW: {
@@ -496,6 +531,131 @@ static LLVMModuleRef gpu_build_unary_op(LLVMContextRef ctx, UOpType type,
         LLVMValueRef mid = LLVMBuildFDiv(bld, xp3x, six, "mid");
         LLVMValueRef sel1 = LLVMBuildSelect(bld, cmp_le_n3, zero, mid, "s1");
         result = LLVMBuildSelect(bld, cmp_ge3, val, sel1, "hardswish");
+        break;
+    }
+    case UOP_GELU: {
+        /* 0.5*x*(1 + tanh(0.7978845608*(x + 0.044715*x^3))), the tanh
+         * approximation the CPU path uses (execution_typed.c). */
+        LLVMValueRef x2 = LLVMBuildFMul(bld, val, val, "x2");
+        LLVMValueRef x3 = LLVMBuildFMul(bld, x2, val, "x3");
+        LLVMValueRef c  = LLVMConstReal(f32, 0.044715);
+        LLVMValueRef cx3 = LLVMBuildFMul(bld, c, x3, "cx3");
+        LLVMValueRef inner_sum = LLVMBuildFAdd(bld, val, cx3, "isum");
+        LLVMValueRef k  = LLVMConstReal(f32, 0.7978845608);
+        LLVMValueRef y  = LLVMBuildFMul(bld, k, inner_sum, "y");
+        /* tanh(y) = 2*sigmoid(2y) - 1 */
+        LLVMValueRef two = LLVMConstReal(f32, 2.0);
+        LLVMValueRef one_f = LLVMConstReal(f32, 1.0);
+        LLVMValueRef two_y = LLVMBuildFMul(bld, two, y, "2y");
+        LLVMValueRef neg = LLVMBuildFNeg(bld, two_y, "neg2y");
+        GPU_INTRINSIC1("llvm.exp.f32", neg, "e");
+        LLVMValueRef e = result;
+        LLVMValueRef denom = LLVMBuildFAdd(bld, one_f, e, "denom");
+        LLVMValueRef sig = LLVMBuildFDiv(bld, one_f, denom, "sig");
+        LLVMValueRef sc = LLVMBuildFMul(bld, two, sig, "sc");
+        LLVMValueRef tanh_y = LLVMBuildFSub(bld, sc, one_f, "tanhy");
+        LLVMValueRef one_pt = LLVMBuildFAdd(bld, one_f, tanh_y, "1pt");
+        LLVMValueRef half = LLVMConstReal(f32, 0.5);
+        LLVMValueRef hx = LLVMBuildFMul(bld, half, val, "hx");
+        result = LLVMBuildFMul(bld, hx, one_pt, "gelu");
+        break;
+    }
+    case UOP_QUICK_GELU: {
+        /* x * sigmoid(1.702*x) = x / (1 + exp(-1.702*x)) */
+        LLVMValueRef k = LLVMConstReal(f32, 1.702);
+        LLVMValueRef kx = LLVMBuildFMul(bld, k, val, "kx");
+        LLVMValueRef neg = LLVMBuildFNeg(bld, kx, "negkx");
+        GPU_INTRINSIC1("llvm.exp.f32", neg, "e");
+        LLVMValueRef e = result;
+        LLVMValueRef one_f = LLVMConstReal(f32, 1.0);
+        LLVMValueRef denom = LLVMBuildFAdd(bld, one_f, e, "denom");
+        result = LLVMBuildFDiv(bld, val, denom, "qgelu");
+        break;
+    }
+    case UOP_LEAKY_RELU: {
+        /* x > 0 ? x : 0.01*x. The default negative slope; the graph-level
+         * const param is not threaded into codegen (as with ELU's alpha). */
+        LLVMValueRef zero = LLVMConstReal(f32, 0.0);
+        LLVMValueRef slope = LLVMConstReal(f32, 0.01);
+        LLVMValueRef sx = LLVMBuildFMul(bld, slope, val, "sx");
+        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, val, zero, "gt0");
+        result = LLVMBuildSelect(bld, cmp, val, sx, "leaky");
+        break;
+    }
+    case UOP_HARD_SIGMOID: {
+        /* min(max((x+3)/6, 0), 1) with IEEE maxnum/minnum, matching the CPU
+         * fmin/fmax (returns the non-NaN operand). */
+        LLVMValueRef three = LLVMConstReal(f32, 3.0);
+        LLVMValueRef six = LLVMConstReal(f32, 6.0);
+        LLVMValueRef zero = LLVMConstReal(f32, 0.0);
+        LLVMValueRef one_f = LLVMConstReal(f32, 1.0);
+        LLVMValueRef xp3 = LLVMBuildFAdd(bld, val, three, "xp3");
+        LLVMValueRef s = LLVMBuildFDiv(bld, xp3, six, "s");
+        LLVMTypeRef bin_params[] = { f32, f32 };
+        LLVMTypeRef bin_ft = LLVMFunctionType(f32, bin_params, 2, 0);
+        LLVMValueRef maxn = LLVMGetNamedFunction(mod, "llvm.maxnum.f32");
+        if (!maxn) maxn = LLVMAddFunction(mod, "llvm.maxnum.f32", bin_ft);
+        LLVMValueRef minn = LLVMGetNamedFunction(mod, "llvm.minnum.f32");
+        if (!minn) minn = LLVMAddFunction(mod, "llvm.minnum.f32", bin_ft);
+        LLVMValueRef mx_args[] = { s, zero };
+        LLVMValueRef mx = LLVMBuildCall2(bld, bin_ft, maxn, mx_args, 2, "mx");
+        LLVMValueRef mn_args[] = { mx, one_f };
+        result = LLVMBuildCall2(bld, bin_ft, minn, mn_args, 2, "hsig");
+        break;
+    }
+    case UOP_HARD_TANH: {
+        /* clamp(x, -1, 1) with NaN passthrough (isnan(x)?x). Ordered compares
+         * are false for NaN, so the value flows through unchanged. */
+        LLVMValueRef lo = LLVMConstReal(f32, -1.0);
+        LLVMValueRef hi = LLVMConstReal(f32, 1.0);
+        LLVMValueRef lt = LLVMBuildFCmp(bld, LLVMRealOLT, val, lo, "lt");
+        LLVMValueRef t1 = LLVMBuildSelect(bld, lt, lo, val, "t1");
+        LLVMValueRef gt = LLVMBuildFCmp(bld, LLVMRealOGT, t1, hi, "gt");
+        result = LLVMBuildSelect(bld, gt, hi, t1, "htanh");
+        break;
+    }
+    case UOP_RELU6: {
+        /* clamp(x, 0, 6) with NaN passthrough, as UOP_HARD_TANH. */
+        LLVMValueRef lo = LLVMConstReal(f32, 0.0);
+        LLVMValueRef hi = LLVMConstReal(f32, 6.0);
+        LLVMValueRef lt = LLVMBuildFCmp(bld, LLVMRealOLT, val, lo, "lt");
+        LLVMValueRef t1 = LLVMBuildSelect(bld, lt, lo, val, "t1");
+        LLVMValueRef gt = LLVMBuildFCmp(bld, LLVMRealOGT, t1, hi, "gt");
+        result = LLVMBuildSelect(bld, gt, hi, t1, "relu6");
+        break;
+    }
+    case UOP_SQUARE:
+        result = LLVMBuildFMul(bld, val, val, "square");
+        break;
+    case UOP_RSQRT: {
+        /* 1/sqrt(x), matching the CPU path (no fabs, unlike UOP_SQRT). */
+        GPU_INTRINSIC1("llvm.sqrt.f32", val, "sq");
+        LLVMValueRef sq = result;
+        LLVMValueRef one_f = LLVMConstReal(f32, 1.0);
+        result = LLVMBuildFDiv(bld, one_f, sq, "rsqrt");
+        break;
+    }
+    case UOP_EXP2:
+        GPU_INTRINSIC1("llvm.exp2.f32", val, "exp2");
+        break;
+    case UOP_LOG2:
+        GPU_INTRINSIC1("llvm.log2.f32", val, "log2");
+        break;
+    case UOP_FLOOR:
+        GPU_INTRINSIC1("llvm.floor.f32", val, "floor");
+        break;
+    case UOP_CEIL:
+        GPU_INTRINSIC1("llvm.ceil.f32", val, "ceil");
+        break;
+    case UOP_SIGN: {
+        /* (x>0)?1:(x<0?-1:0); NaN → 0, matching the CPU path. */
+        LLVMValueRef zero = LLVMConstReal(f32, 0.0);
+        LLVMValueRef one_f = LLVMConstReal(f32, 1.0);
+        LLVMValueRef neg_one = LLVMConstReal(f32, -1.0);
+        LLVMValueRef gt0 = LLVMBuildFCmp(bld, LLVMRealOGT, val, zero, "gt0");
+        LLVMValueRef lt0 = LLVMBuildFCmp(bld, LLVMRealOLT, val, zero, "lt0");
+        LLVMValueRef neg_or_zero = LLVMBuildSelect(bld, lt0, neg_one, zero, "noz");
+        result = LLVMBuildSelect(bld, gt0, one_f, neg_or_zero, "sign");
         break;
     }
     default:
@@ -1295,7 +1455,9 @@ static char* emit_gpu_code(CMLGPUCodegen* cg, LLVMModuleRef mod, size_t* out_siz
 static bool is_binary_op(UOpType type) {
     return type == UOP_ADD || type == UOP_SUB || type == UOP_MUL ||
            type == UOP_DIV || type == UOP_MAX || type == UOP_CMPLT ||
-           type == UOP_POW || type == UOP_IDIV || type == UOP_MOD;
+           type == UOP_POW || type == UOP_IDIV || type == UOP_MOD ||
+           type == UOP_MINIMUM || type == UOP_CMPGT || type == UOP_CMPGE ||
+           type == UOP_CMPLE || type == UOP_CMPNE || type == UOP_CMPEQ;
 }
 
 static bool is_unary_op(UOpType type) {
@@ -1304,7 +1466,12 @@ static bool is_unary_op(UOpType type) {
            type == UOP_COS || type == UOP_TAN || type == UOP_RECIP ||
            type == UOP_SIGMOID || type == UOP_TANH ||
            type == UOP_ELU || type == UOP_SELU || type == UOP_MISH ||
-           type == UOP_SILU || type == UOP_HARDSWISH;
+           type == UOP_SILU || type == UOP_HARDSWISH ||
+           type == UOP_GELU || type == UOP_QUICK_GELU || type == UOP_LEAKY_RELU ||
+           type == UOP_HARD_SIGMOID || type == UOP_HARD_TANH || type == UOP_RELU6 ||
+           type == UOP_SQUARE || type == UOP_RSQRT || type == UOP_EXP2 ||
+           type == UOP_LOG2 || type == UOP_FLOOR || type == UOP_CEIL ||
+           type == UOP_SIGN;
 }
 
 static bool is_reduction(UOpType type) {

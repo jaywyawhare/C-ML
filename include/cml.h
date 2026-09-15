@@ -148,6 +148,9 @@ Tensor* cml_prod(Tensor* a, int dim, bool keepdim);
 Tensor* cml_argmax(Tensor* a, int dim);
 Tensor* cml_argmin(Tensor* a, int dim);
 Tensor* cml_cumsum(Tensor* a, int dim);
+Tensor* cml_cumprod(Tensor* a, int dim);
+Tensor* cml_logcumsumexp(Tensor* a, int dim);
+Tensor* cml_argsort(Tensor* a, int dim, bool descending);
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim);
 Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim);
 
@@ -162,6 +165,12 @@ Tensor* cml_clone(Tensor* a);
 Tensor* cml_detach(Tensor* a);
 Tensor* cml_concat(Tensor** tensors, int num_tensors, int dim);
 Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim);
+Tensor* cml_where(Tensor* condition, Tensor* x, Tensor* y);
+Tensor* cml_einsum(const char* equation, Tensor** tensors, int num_tensors);
+Tensor* cml_roll(Tensor* a, int shift, int axis);
+Tensor* cml_copysign(Tensor* a, Tensor* b);
+Tensor* cml_logaddexp(Tensor* a, Tensor* b);
+Tensor* cml_one_hot(Tensor* indices, int num_classes);
 Tensor* cml_squeeze(Tensor* a, int dim);
 Tensor* cml_unsqueeze(Tensor* a, int dim);
 Tensor* cml_flip(Tensor* a, int dim);
@@ -176,6 +185,10 @@ Tensor* cml_pad_replicate(Tensor* a, int* pad_widths, int num_dims);
 Tensor* cml_unfold(Tensor* a, int kernel_size, int stride);
 Tensor* cml_sort(Tensor* a, int dim, bool descending);
 Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted);
+/* Like cml_topk but also writes the k index tensor through indices_out
+ * (NULL stores nothing). */
+Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest,
+                              Tensor** indices_out);
 Tensor* cml_masked_select(Tensor* a, Tensor* mask);
 Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
 Tensor* cml_diagonal(Tensor* a, int offset, int dim1, int dim2);
@@ -417,6 +430,9 @@ void cml_kernel_cache_print_stats(void);
 void cml_autocast_enter(DType target_dtype);
 void cml_autocast_exit(void);
 bool cml_autocast_is_enabled(void);
+DType cml_autocast_default_dtype(void);
+void cml_autocast_set_dtype(DType dtype);
+DType cml_autocast_get_dtype(void);
 GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor,
                                      float backoff_factor, int growth_interval);
 void cml_grad_scaler_free(GradScaler* scaler);

@@ -56,8 +56,9 @@ static DType onnx_dtype_to_cml(int onnx_dtype)
  *   2: f              (float)
  *   3: i              (int64)
  *   4: s              (bytes/string)
- *   6: floats         (repeated float, packed)
- *   7: ints           (repeated int64, packed)
+ *   5: t              (TensorProto, LEN)
+ *   7: floats         (repeated float, packed)
+ *   8: ints           (repeated int64, packed)
  *  20: type           (int32, AttributeType enum)
  */
 
@@ -96,7 +97,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
             }
             break;
 
-        case 6: /* floats (packed repeated float) */
+        case 7: /* floats (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
                 int count = (int)(f.value.bytes.length / sizeof(float));
                 attr->value.floats.data = (float *)cml_malloc(sizeof(float) * (size_t)count);
@@ -111,7 +112,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
             }
             break;
 
-        case 7: /* ints (packed repeated int64 -- but also non-packed) */
+        case 8: /* ints (packed repeated int64 -- but also non-packed) */
             if (f.wire_type == PB_WIRE_LEN) {
                 /* Packed encoding: each element is a varint */
                 PBReader sub = pb_reader_sub(&f);
@@ -245,14 +246,7 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
             onnx_dtype = (int)f.value.varint;
             break;
 
-        case 4: /* raw_data */
-            if (f.wire_type == PB_WIRE_LEN) {
-                raw_data = f.value.bytes.data;
-                raw_len  = f.value.bytes.length;
-            }
-            break;
-
-        case 5: /* float_data (packed repeated float) */
+        case 4: /* float_data (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
                 float_count = (int)(f.value.bytes.length / sizeof(float));
                 float_data = (float *)cml_malloc(sizeof(float) * (size_t)float_count);
@@ -261,6 +255,35 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
                     for (int i = 0; i < float_count; i++) {
                         float_data[i] = pb_read_float(&sub);
                     }
+                }
+            }
+            break;
+
+        case 9: /* raw_data (bytes) */
+            if (f.wire_type == PB_WIRE_LEN) {
+                raw_data = f.value.bytes.data;
+                raw_len  = f.value.bytes.length;
+            }
+            break;
+
+        case 7: /* int64_data (packed repeated int64) */
+            if (f.wire_type == PB_WIRE_LEN) {
+                /* Integer payloads decode element-wise into the float buffer
+                 * the loader materializes from (matching its float-centric
+                 * tensor_from_data path). */
+                PBReader sub = pb_reader_sub(&f);
+                int count = 0;
+                while (pb_reader_has_data(&sub)) {
+                    pb_read_varint(&sub);
+                    count++;
+                }
+                sub = pb_reader_sub(&f);
+                float_data = (float *)cml_malloc(sizeof(float) *
+                                                 (size_t)(count > 0 ? count : 1));
+                if (float_data) {
+                    for (int i = 0; i < count; i++)
+                        float_data[i] = (float)(int64_t)pb_read_varint(&sub);
+                    float_count = count;
                 }
             }
             break;
@@ -419,7 +442,7 @@ static int parse_graph(PBReader *rd, CMLONNXGraph *graph)
     }
 
     PBField f;
-    while (pb_read_field(rd, &f)) {
+        while (pb_read_field(rd, &f)) {
         switch (f.field_number) {
 
         case 1: /* node */

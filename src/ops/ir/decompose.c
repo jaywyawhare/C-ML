@@ -186,7 +186,8 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type,
 /**
  * Create a FILL node for a constant scalar broadcast to given shape.
  */
-static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, float value) {
+static struct IRNode* insert_fill_node_dt(CMLGraph_t ir, int* shape, int ndim, float value,
+                                          DType dtype) {
     FillParams* params = cml_malloc(sizeof(FillParams));
     if (!params) return NULL;
     params->value = value;
@@ -196,7 +197,16 @@ static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, floa
     memcpy(params->shape, shape, (size_t)ndim * sizeof(int));
 
     struct IRNode* node = create_primitive_node(ir, UOP_FILL, NULL, 0, params, shape, ndim);
+    /* Constants injected into a lowered half-precision subgraph must stay in
+     * that dtype: an fp32 fill promotes every downstream VJP to fp32 and the
+     * mixed-dtype matmul in the backward then drops the gradient entirely. */
+    if (node && node->output)
+        node->output->dtype = dtype;
     return node;
+}
+
+static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, float value) {
+    return insert_fill_node_dt(ir, shape, ndim, value, DTYPE_FLOAT32);
 }
 
 /**
@@ -316,12 +326,17 @@ static struct IRNode* chain_emit(CMLGraph_t ir, struct IRNode** head, struct IRN
 }
 
 /* chain_emit for a constant broadcast to `shape`. */
-static struct IRNode* chain_fill(CMLGraph_t ir, struct IRNode** head, struct IRNode** tail,
-                                 int* shape, int ndim, float value) {
-    struct IRNode* node = insert_fill_node(ir, shape, ndim, value);
+static struct IRNode* chain_fill_dt(CMLGraph_t ir, struct IRNode** head, struct IRNode** tail,
+                                    int* shape, int ndim, float value, DType dtype) {
+    struct IRNode* node = insert_fill_node_dt(ir, shape, ndim, value, dtype);
     if (node)
         chain_append(head, tail, node);
     return node;
+}
+
+static struct IRNode* chain_fill(CMLGraph_t ir, struct IRNode** head, struct IRNode** tail,
+                                 int* shape, int ndim, float value) {
+    return chain_fill_dt(ir, head, tail, shape, ndim, value, DTYPE_FLOAT32);
 }
 
 // Decomposition Rules
@@ -505,6 +520,32 @@ static int decompose_silu(CMLGraph_t ir, struct IRNode* node) {
 
     Tensor* mul_in[] = {x, sig->output};
     struct IRNode* result = chain_emit(ir, &head, &tail, UOP_MUL, mul_in, 2, NULL, shape, ndim);
+    if (!result) return -1;
+
+    replace_node_with_chain(ir, node, head, tail);
+    return 0;
+}
+
+/* GELU(x) = x * sigmoid(1.702 * x)  (tanh-approximation, matches QUICK_GELU).
+ * Decomposed so autodiff inherits VJPs for MUL + SIGMOID for free. */
+static int decompose_gelu(CMLGraph_t ir, struct IRNode* node) {
+    Tensor* x = node->inputs[0];
+    int* shape = x->shape;
+    int ndim = x->ndim;
+    struct IRNode *head = NULL, *tail = NULL;
+
+    struct IRNode* c = chain_fill(ir, &head, &tail, shape, ndim, 1.702f);
+    if (!c) return -1;
+
+    Tensor* mul_in[] = {x, c->output};
+    struct IRNode* sx = chain_emit(ir, &head, &tail, UOP_MUL, mul_in, 2, NULL, shape, ndim);
+    if (!sx) return -1;
+
+    struct IRNode* sig = chain_emit(ir, &head, &tail, UOP_SIGMOID, &sx->output, 1, NULL, shape, ndim);
+    if (!sig) return -1;
+
+    Tensor* out_in[] = {x, sig->output};
+    struct IRNode* result = chain_emit(ir, &head, &tail, UOP_MUL, out_in, 2, NULL, shape, ndim);
     if (!result) return -1;
 
     replace_node_with_chain(ir, node, head, tail);
@@ -1188,8 +1229,10 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
         n = (float)x->numel;
     }
 
-    // 1/n constant
-    struct IRNode* inv_n = chain_fill(ir, &head, &tail, out_shape, out_ndim, 1.0f / n);
+    // 1/n constant (in the input's dtype so the mean — forward and backward —
+    // stays in half precision when x is fp16/bf16)
+    struct IRNode* inv_n = chain_fill_dt(ir, &head, &tail, out_shape, out_ndim, 1.0f / n,
+                                         x->dtype);
     if (!inv_n) return -1;
 
     // sum / n
@@ -2479,10 +2522,7 @@ static int decompose_conv_transpose3d(CMLGraph_t ir, struct IRNode* node) {
 
 // Main Decomposition Pass
 
-int cml_ir_decompose(CMLGraph_t ir) {
-    if (!ir) return -1;
-    if (ir->is_decomposed) return 0;
-
+static int decompose_scan(CMLGraph_t ir, struct IRNode* start) {
     LOG_DEBUG("Running IR decomposition pass");
 
     /* Fixpoint: some rules EMIT other composite ops (e.g. VAR→…→SUB, softsign
@@ -2492,7 +2532,7 @@ int cml_ir_decompose(CMLGraph_t ir) {
     const int MAX_PASSES = 24;
     for (int pass = 0; pass < MAX_PASSES; pass++) {
     int counter_before = atomic_load(&g_decompose_counter);
-    struct IRNode* node = ir->head;
+    struct IRNode* node = start;
 
     while (node) {
         struct IRNode* next = node->next;
@@ -2509,6 +2549,7 @@ int cml_ir_decompose(CMLGraph_t ir) {
         case UOP_RELU:     result = decompose_relu(ir, node);     decomposed = true; break;
         case UOP_RELU6:    result = decompose_relu6(ir, node);    decomposed = true; break;
         case UOP_SILU:     result = decompose_silu(ir, node);     decomposed = true; break;
+        case UOP_GELU:     result = decompose_gelu(ir, node);     decomposed = true; break;
         case UOP_HARDSWISH:result = decompose_hardswish(ir, node);decomposed = true; break;
         case UOP_MISH:     result = decompose_mish(ir, node);     decomposed = true; break;
         case UOP_SIGMOID:  result = decompose_sigmoid(ir, node);  decomposed = true; break;
@@ -2587,4 +2628,16 @@ int cml_ir_decompose(CMLGraph_t ir) {
     ir->is_decomposed = true;
     LOG_DEBUG("IR decomposition pass complete");
     return 0;
+}
+
+int cml_ir_decompose(CMLGraph_t ir) {
+    if (!ir) return -1;
+    if (ir->is_decomposed) return 0;
+    return decompose_scan(ir, ir->head);
+}
+
+int cml_ir_decompose_from(CMLGraph_t ir, struct IRNode* start) {
+    if (!ir) return -1;
+    if (!start) return 0;
+    return decompose_scan(ir, start);
 }

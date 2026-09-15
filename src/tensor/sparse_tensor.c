@@ -5,6 +5,10 @@
 #include <string.h>
 #include <math.h>
 #include "alloc/cml_allocator.h"
+#include "ops/ir/context.h"
+#include "ops/ir/ir.h"
+#include "ops/ir/internal.h"
+#include "ops/uops.h"
 
 SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
                                   const int* dense_shape, int dense_ndim) {
@@ -241,6 +245,29 @@ Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
     return output;
 }
 
+/* Split the [nnz, 2] coordinate tensor into two eager INT32 columns. The
+ * backward VJPs gather/scatter rows with the primitive uops, which need 1-D
+ * index tensors; keeping them as eager tensors (not params blobs) lets both
+ * autograd engines read them without special-casing. Returns NULL on failure
+ * and owns nothing else. */
+static Tensor* spmm_split_coords(SparseCOOData* sparse, int column) {
+    int shape[] = {sparse->nnz};
+    TensorConfig cfg =
+        (TensorConfig){.dtype = DTYPE_INT32, .device = sparse->indices->device,
+                       .has_dtype = true, .has_device = true};
+    Tensor* out = tensor_empty(shape, 1, &cfg);
+    if (!out)
+        return NULL;
+    if (sparse->nnz > 0) {
+        tensor_ensure_executed(sparse->indices);
+        const int32_t* idx_data = (const int32_t*)sparse->indices->data;
+        int32_t* out_data       = (int32_t*)out->data;
+        for (int i = 0; i < sparse->nnz; i++)
+            out_data[i] = idx_data[i * 2 + column];
+    }
+    return out;
+}
+
 Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
     if (!sparse || !dense) {
         LOG_ERROR("sparse_matmul: NULL argument");
@@ -270,24 +297,109 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
         return NULL;
     }
 
-    /* Create output [M, N] zero tensor */
+    /* Create output [M, N] */
     int out_shape[] = {M, N};
     TensorConfig config = (TensorConfig){
         .dtype = dense->dtype, .device = dense->device, .has_dtype = true, .has_device = true};
-    Tensor* output = tensor_zeros(out_shape, 2, &config);
+
+    /* When autograd is in play, allocate eagerly instead of via tensor_zeros:
+     * the FILL node tensor_zeros creates would join the same graph as the
+     * SPMM node below, and realizing that node during backward would re-zero
+     * the already-computed result. */
+    bool any_grad = dense->requires_grad ||
+                    (sparse->values && sparse->values->requires_grad);
+    Tensor* output = NULL;
+    if (any_grad) {
+        output = tensor_empty(out_shape, 2, &config);
+        if (output) {
+            if (tensor_ensure_executed(output) != 0) {
+                tensor_free(output);
+                output = NULL;
+            } else {
+                memset(output->data, 0, output->numel * sizeof(float));
+                output->requires_grad = true;
+            }
+        }
+    } else {
+        output = tensor_zeros(out_shape, 2, &config);
+    }
     if (!output) {
         LOG_ERROR("sparse_matmul: failed to create output tensor");
         return NULL;
     }
 
-    if (sparse->nnz == 0) {
-        return output;
-    }
-
     tensor_ensure_executed(sparse->indices);
     tensor_ensure_executed(sparse->values);
     tensor_ensure_executed(dense);
-    tensor_ensure_executed(output);
+    if (!output->data) {
+        tensor_ensure_executed(output);
+    }
+
+    /* Record the op for autograd. spMM executes eagerly (the kernel below has
+     * already produced `output`), so the IR node is attached pre-executed:
+     * graph realization skips it via the is_executed flags, while both the
+     * eager and the graph-level backward walks can still find it and its
+     * inputs. Out-of-range coordinates are silently dropped by the forward
+     * kernel; gradients cannot be attributed for them, so such a sparse
+     * operand is simply not recorded as differentiable. */
+    if (any_grad) {
+        bool coords_valid = true;
+        if (sparse->nnz > 0) {
+            const int32_t* idx_data = (const int32_t*)sparse->indices->data;
+            for (int i = 0; i < sparse->nnz && coords_valid; i++) {
+                int row = idx_data[i * 2 + 0];
+                int col = idx_data[i * 2 + 1];
+                coords_valid = row >= 0 && row < M && col >= 0 && col < K;
+            }
+        }
+        Tensor* rows = NULL;
+        Tensor* cols = NULL;
+        CMLGraph_t ir = NULL;
+        bool attached = false;
+        if (coords_valid)
+            rows = spmm_split_coords(sparse, 0);
+        if (rows)
+            cols = spmm_split_coords(sparse, 1);
+        if (cols)
+            ir = cml_ir_get_or_create_context();
+        if (ir) {
+            SpMMParams* params = cml_malloc(sizeof(SpMMParams));
+            if (params) {
+                params->M = M;
+                params->K = K;
+                Tensor* inputs[] = {sparse->indices, sparse->values, dense, rows, cols};
+                if (cml_ir_add_uop(ir, UOP_SPMM, inputs, 5, params) == 0) {
+                    struct IRNode* node = cml_ir_get_tail(ir);
+                    if (node) {
+                        node->output_shape = tensor_shape_copy(out_shape, 2);
+                        node->output_ndim  = 2;
+                        node->output_dtype = dense->dtype;
+                        node->output_device = dense->device;
+                        node->requires_grad       = true;
+                        node->needs_input_grad[1] = sparse->values->requires_grad;
+                        node->needs_input_grad[2] = dense->requires_grad;
+                        output->ir_node    = node;
+                        output->ir_context = ir;
+                        node->output       = output;
+                        node->is_executed      = true;
+                        output->is_executed    = true;
+                        attached               = true;
+                    }
+                }
+            }
+        }
+        if (!attached) {
+            LOG_WARNING("sparse_matmul: could not record SPMM node — "
+                        "output will not be differentiable");
+            output->requires_grad = false;
+            if (rows) tensor_free(rows);
+            if (cols) tensor_free(cols);
+        }
+    }
+
+    if (sparse->nnz == 0) {
+        return output;
+    }
 
     int32_t* idx_data   = (int32_t*)sparse->indices->data;
     float* val_data     = (float*)sparse->values->data;

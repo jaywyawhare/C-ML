@@ -28,12 +28,27 @@ static const char* dtype_name(DType d) {
     switch (d) {
     case DTYPE_FLOAT32: return "f32";
     case DTYPE_FLOAT64: return "f64";
+    case DTYPE_FLOAT16: return "f16";
+    case DTYPE_BFLOAT16: return "bf16";
     case DTYPE_INT32:   return "i32";
     case DTYPE_INT64:   return "i64";
     case DTYPE_INT16:   return "i16";
     case DTYPE_INT8:    return "i8";
     case DTYPE_UINT8:   return "u8";
     default:            return "?";
+    }
+}
+
+/* Tolerance scales with the storage format's precision: the half types compute
+ * in f32 and round the result back, so an 8-bit-mantissa bf16 cannot match an
+ * f32 reference to 1e-5. Source values are small integers, so most results are
+ * exact anyway; the looser bound only matters for accumulated values (prod,
+ * matmul, logsumexp). */
+static double dtype_tol(DType d, double want) {
+    switch (d) {
+    case DTYPE_FLOAT16:  return fabs(want) * 1e-3 + 1e-3;
+    case DTYPE_BFLOAT16: return fabs(want) * 5e-3 + 5e-3;
+    default:             return fabs(want) * 1e-5 + 1e-5;
     }
 }
 
@@ -125,7 +140,7 @@ static void run_case(const Case* c, DType dt) {
                     if (frac < 1e-4 || frac > 1.0 - 1e-4) continue;
                     want = trunc(want);
                 }
-                double tol = fabs(want) * 1e-5 + 1e-5;
+                double tol = dtype_tol(dt, want);
                 if (fabs(got - want) > tol) {
                     printf("  %-22s %s: [%zu] got %g, expected %g (f32 gives %g)\n",
                            c->name, dtype_name(dt), i, got, want, ref[i]);
@@ -589,7 +604,8 @@ static void run_int_cases(DType dt) {
 int main(void) {
     cml_init();
 
-    const DType DTYPES[] = {DTYPE_FLOAT64, DTYPE_INT32, DTYPE_INT64, DTYPE_INT16, DTYPE_INT8};
+    const DType DTYPES[] = {DTYPE_FLOAT64, DTYPE_FLOAT16, DTYPE_BFLOAT16, DTYPE_UINT8,
+                            DTYPE_INT32, DTYPE_INT64, DTYPE_INT16, DTYPE_INT8};
     const int   NDT      = (int)(sizeof(DTYPES) / sizeof(DTYPES[0]));
     const int   NC       = (int)(sizeof(CASES) / sizeof(CASES[0]));
 

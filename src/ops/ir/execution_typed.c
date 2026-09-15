@@ -675,6 +675,39 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
         return 0;
     }
 
+    case UOP_GATHER: {
+        /* out[o, j, k] = a[o, idx[j], k] — gather along `dim` with 1-D
+         * indices of any dtype (read through cml_load_i64). Mirrors the
+         * f32 kernel's layout in execution.c. */
+        Tensor* idx = in_at(node, 1);
+        if (!ad || !od || !idx || !idx->data || idx->numel == 0) return -1;
+        GatherParams* p = (GatherParams*)node->params;
+        int dim = p ? p->dim : -1;
+        if (dim < 0) dim += a->ndim;
+        if (dim < 0 || dim >= a->ndim) return -1;
+
+        size_t outer = 1, inner = 1;
+        for (int d = 0; d < dim; d++)             outer *= (size_t)a->shape[d];
+        for (int d = dim + 1; d < a->ndim; d++)   inner *= (size_t)a->shape[d];
+        size_t dim_size = (size_t)a->shape[dim];
+
+        size_t oi = 0;
+        for (size_t o = 0; o < outer; o++) {
+            for (size_t j = 0; j < idx->numel; j++) {
+                int64_t iv = cml_load_i64(idx->data, j, idx->dtype);
+                if (iv < 0 || (size_t)iv >= dim_size) {
+                    LOG_ERROR("typed GATHER: index %lld out of bounds [0, %zu)",
+                              (long long)iv, dim_size);
+                    return -1;
+                }
+                for (size_t k = 0; k < inner && oi < out->numel; k++, oi++)
+                    ELEM_COPY(od, oi, ad,
+                              o * dim_size * inner + (size_t)iv * inner + k, esz);
+            }
+        }
+        return 0;
+    }
+
     case UOP_ROLL: {
         RollParams* p = (RollParams*)node->params;
         if (!ad || !p) return -1;

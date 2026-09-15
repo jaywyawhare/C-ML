@@ -532,8 +532,37 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
                 fprintf(cf, "    /* EXPAND (copy) */\n");
                 fprintf(cf, "    memcpy(%s, %s, %lld * sizeof(float));\n", o, a, (long long)n);
             } else {
-                LOG_ERROR("AOT: EXPAND with non-trivial broadcast not supported");
-                emit_ok = false;
+                /* General right-aligned broadcast: an input dim of size 1 (or a
+                 * dim the input doesn't have) contributes stride 0. */
+                Tensor* out_t = node->output;
+                int od = out_t->ndim, id = in0->ndim;
+                if (od < 1 || od > 16 || id > od) {
+                    LOG_ERROR("AOT: EXPAND unsupported rank (%d -> %d)", id, od);
+                    emit_ok = false;
+                    break;
+                }
+                int64_t istr[16], bstr[16]; /* input strides, broadcast stride per out dim */
+                if (id > 0) {
+                    istr[id - 1] = 1;
+                    for (int d = id - 2; d >= 0; d--) istr[d] = istr[d + 1] * in0->shape[d + 1];
+                }
+                int off = od - id; /* alignment offset */
+                for (int d = 0; d < od; d++) {
+                    int sd = d - off; /* corresponding input dim, or <0 if absent */
+                    bstr[d] = (sd >= 0 && in0->shape[sd] == out_t->shape[d]) ? istr[sd] : 0;
+                }
+                int64_t ostr[16];
+                ostr[od - 1] = 1;
+                for (int d = od - 2; d >= 0; d--) ostr[d] = ostr[d + 1] * out_t->shape[d + 1];
+                fprintf(cf, "    /* EXPAND (broadcast) */\n");
+                fprintf(cf, "    for (int64_t idx = 0; idx < %lld; idx++) {\n", (long long)n);
+                fprintf(cf, "        int64_t rem = idx, in_off = 0;\n");
+                for (int d = 0; d < od; d++) {
+                    fprintf(cf, "        { int64_t c = rem / %lld; rem -= c * %lld; in_off += c * %lld; }\n",
+                            (long long)ostr[d], (long long)ostr[d], (long long)bstr[d]);
+                }
+                fprintf(cf, "        %s[idx] = %s[in_off];\n", o, a);
+                fprintf(cf, "    }\n");
             }
             break;
 
@@ -583,8 +612,52 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
                 dim = in0->shape[d];
                 for (int i = d + 1; i < nd; i++) inner *= in0->shape[i];
             } else if (!full) {
-                LOG_ERROR("AOT: multi-dim partial reduction not supported");
-                emit_ok = false;
+                /* Reduce over an arbitrary set of dims. Handled inline below
+                 * rather than through aot_emit_reduce's outer/dim/inner form. */
+                if (nd > 16) { LOG_ERROR("AOT: reduce ndim > 16 unsupported"); emit_ok = false; break; }
+                bool reduced[16] = {false};
+                for (int i = 0; i < p->num_dims; i++) {
+                    int d = p->dims[i];
+                    if (d < 0) d += nd;
+                    if (d < 0 || d >= nd) { LOG_ERROR("AOT: bad reduce dim"); emit_ok = false; break; }
+                    reduced[d] = true;
+                }
+                if (!emit_ok) break;
+                int64_t istr[16], ostr_kept[16], count = 1;
+                istr[nd - 1] = 1;
+                for (int d = nd - 2; d >= 0; d--) istr[d] = istr[d + 1] * in0->shape[d + 1];
+                /* Compact output strides over the non-reduced dims, in order. */
+                int64_t s = 1;
+                for (int d = nd - 1; d >= 0; d--) {
+                    if (reduced[d]) { ostr_kept[d] = 0; count *= in0->shape[d]; }
+                    else { ostr_kept[d] = s; s *= in0->shape[d]; }
+                }
+                const char *mname, *minit, *macc;
+                switch (node->type) {
+                case UOP_SUM: case UOP_MEAN: mname = "SUM"; minit = "0.0f"; macc = "acc + v"; break;
+                case UOP_PROD:       mname = "PROD";       minit = "1.0f";      macc = "acc * v"; break;
+                case UOP_MAX_REDUCE: mname = "MAX_REDUCE"; minit = "-INFINITY"; macc = "(v != v || v > acc) ? v : acc"; break;
+                case UOP_MIN_REDUCE: mname = "MIN_REDUCE"; minit = "INFINITY";  macc = "(v != v || v < acc) ? v : acc"; break;
+                default: LOG_ERROR("AOT: unhandled reduction"); emit_ok = false; mname=""; minit=""; macc=""; break;
+                }
+                if (!emit_ok) break;
+                fprintf(cf, "    /* %s (multi-dim) */\n", mname);
+                fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s;\n",
+                        (long long)n, o, minit);
+                fprintf(cf, "    for (int64_t idx = 0; idx < %lld; idx++) {\n", (long long)na);
+                fprintf(cf, "        int64_t rem = idx, out_off = 0;\n");
+                for (int d = 0; d < nd; d++) {
+                    fprintf(cf, "        { int64_t c = rem / %lld; rem -= c * %lld; out_off += c * %lld; }\n",
+                            (long long)istr[d], (long long)istr[d], (long long)ostr_kept[d]);
+                }
+                fprintf(cf, "        float v = %s[idx];\n", a);
+                fprintf(cf, "        float acc = %s[out_off];\n", o);
+                fprintf(cf, "        %s[out_off] = %s;\n", o, macc);
+                fprintf(cf, "    }\n");
+                if (node->type == UOP_MEAN) {
+                    fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] /= %lld.0f;\n",
+                            (long long)n, o, (long long)count);
+                }
                 break;
             }
             const char *name, *init, *acc, *fin = "acc";

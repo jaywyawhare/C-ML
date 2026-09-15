@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "core/hevc.h"
+#include "core/error_stack.h"
 #include "test_harness.h"
 
 #define RUN_TEST(test) do { \
@@ -140,7 +141,7 @@ static int test_incremental_feed(void) {
     return ok;
 }
 
-static int test_iframe_decode_stub(void) {
+static int test_iframe_decode_unimplemented_fails_loudly(void) {
     CMLHEVCParser* p = cml_hevc_parser_create();
     if (!p) return 0;
 
@@ -160,9 +161,11 @@ static int test_iframe_decode_stub(void) {
         return 0;
     }
 
+    /* Frame reconstruction is not implemented: decode must return NULL and
+     * record the not-implemented error rather than a fake frame. */
     CMLHEVCFrame* frame = cml_hevc_decode_iframe(p, nal);
-    int ok = (frame != NULL && frame->width > 0 && frame->height > 0 && frame->data != NULL);
-    ok = ok && (frame->nal_type == HEVC_NAL_IDR_W_RADL);
+    int ok = (frame == NULL);
+    ok = ok && (error_stack_get_last_code() == CM_NOT_IMPLEMENTED);
 
     cml_hevc_frame_free(frame);
     cml_hevc_nal_free(nal);
@@ -224,7 +227,7 @@ int main(void) {
     RUN_TEST(test_three_byte_start_code);
     RUN_TEST(test_emulation_prevention);
     RUN_TEST(test_incremental_feed);
-    RUN_TEST(test_iframe_decode_stub);
+    RUN_TEST(test_iframe_decode_unimplemented_fails_loudly);
     RUN_TEST(test_non_idr_decode_returns_null);
     RUN_TEST(test_multiple_nal_sequence);
     RUN_TEST(test_nal_free_null);

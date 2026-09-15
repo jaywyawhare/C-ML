@@ -14,9 +14,34 @@ static AutocastContext g_autocast_ctx = {
     .target_dtype = DTYPE_FLOAT16
 };
 
+/* Target-dtype selector: read once from CML_AMP_DTYPE ("bf16"/"bfloat16"
+ * selects BFLOAT16), cached like GRAD_MODE in autodiff.c. Default stays
+ * FLOAT16 for backward compatibility. */
+static int autocast_env_dtype(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char* m = getenv("CML_AMP_DTYPE");
+        cached = (m && (strcmp(m, "bf16") == 0 || strcmp(m, "bfloat16") == 0))
+                     ? DTYPE_BFLOAT16
+                     : DTYPE_FLOAT16;
+    }
+    return cached;
+}
+
+static bool g_dtype_resolved = false;
+
+static void autocast_resolve_dtype(void) {
+    if (!g_dtype_resolved) {
+        g_autocast_ctx.target_dtype = (DType)autocast_env_dtype();
+        g_dtype_resolved            = true;
+    }
+}
+
 void autocast_enter(DType target_dtype) {
+    autocast_resolve_dtype();
     g_autocast_ctx.enabled      = true;
     g_autocast_ctx.target_dtype = target_dtype;
+    g_dtype_resolved            = true;
 }
 
 void autocast_exit(void) {
@@ -28,7 +53,22 @@ bool autocast_is_enabled(void) {
 }
 
 AutocastContext* autocast_get_context(void) {
+    autocast_resolve_dtype();
     return &g_autocast_ctx;
+}
+
+DType autocast_default_dtype(void) {
+    return (DType)autocast_env_dtype();
+}
+
+void autocast_set_dtype(DType dtype) {
+    g_autocast_ctx.target_dtype = dtype;
+    g_dtype_resolved            = true;
+}
+
+DType autocast_get_dtype(void) {
+    autocast_resolve_dtype();
+    return g_autocast_ctx.target_dtype;
 }
 
 bool autocast_should_keep_float32(OpType op) {
@@ -83,6 +123,11 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
 
     tensor_ensure_executed(loss);
 
+    /* bf16 shares fp32's 8-bit exponent range, so gradients cannot underflow
+     * the way they do in fp16 — loss scaling is unnecessary (a no-op). */
+    if (autocast_get_dtype() == DTYPE_BFLOAT16)
+        return loss;
+
     int scalar_shape[] = {1};
     TensorConfig config = (TensorConfig){
         .dtype = loss->dtype, .device = loss->device, .has_dtype = true, .has_device = true};
@@ -126,7 +171,11 @@ void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params)
     }
 
     scaler->found_inf = false;
-    float inv_scale = 1.0f / scaler->scale_factor;
+    /* Mirror grad_scaler_scale: under bf16 the loss was never scaled, so
+     * unscale by 1.0 and keep only the inf/nan detection. */
+    float inv_scale = (autocast_get_dtype() == DTYPE_BFLOAT16)
+                          ? 1.0f
+                          : 1.0f / scaler->scale_factor;
 
     for (int p = 0; p < num_params; p++) {
         if (!params[p] || !params[p]->tensor)

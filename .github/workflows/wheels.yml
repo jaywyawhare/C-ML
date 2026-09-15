@@ -1,0 +1,71 @@
+name: Python wheels
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    paths: ['python/**', 'CMakeLists.txt', '.github/workflows/wheels.yml']
+
+jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build sdist
+        run: pipx run build --sdist python/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+          - os: macos-14
+            arch: arm64
+          - os: windows-latest
+            arch: amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # The C library builds via CMake inside build_cffi.py; wheels bundle the
+      # compiled _cml_lib into the wheel (see python/cml/_cml_cffi.py).
+      - name: Build wheel
+        run: pipx run build --wheel python/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*.whl
+
+  test-install:
+    needs: [wheels]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'wheel-*', merge-multiple: true, path: dist }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Install and smoke-test
+        run: |
+          pip install dist/*.whl numpy pytest cffi
+          python -c "import cml; cml.init(); import numpy as np; \
+            t = cml.Tensor(np.arange(6, dtype=np.float32).reshape(2,3)); \
+            assert np.allclose(t.numpy(), np.arange(6, dtype=np.float32).reshape(2,3)); \
+            print('smoke OK')"

@@ -60,6 +60,13 @@ static Tensor* uop_binary(Tensor* a, Tensor* b, UOpType type) {
 static int set_reduce_output_shape(struct IRNode* node, Tensor* a, ReduceParams* params) {
     int dim = params && params->dims && params->num_dims > 0 ? params->dims[0] : -1;
     bool keepdim = params ? params->keepdim : false;
+    /* An explicitly-passed negative axis means "from the end", exactly as the
+     * reduce kernels read it. Before this normalization the two disagreed:
+     * shape inference treated dims=[-1] as a global reduce (shape [1]) while
+     * the kernel reduced along the last axis, so cml_prod(t, -1) returned
+     * row 0's product in a one-element tensor. */
+    if (params && params->dims && params->num_dims > 0 && dim < 0)
+        dim += a->ndim;
     int* out_shape = NULL;
     int out_ndim = 0;
 
@@ -683,6 +690,18 @@ Tensor* uop_slice(Tensor* a, SliceParams* params) {
         int start = params->start[i];
         int end   = params->end[i];
         int step  = params->step ? params->step[i] : 1;
+
+        /* step 0 divided here before the guard existed (SIGFPE); negative
+         * steps would produce negative strides this strided-view slice
+         * cannot represent. */
+        if (step < 1) {
+            LOG_ERROR("Slice: step must be >= 1, got %d (dim %d)", step, i);
+            cml_free(new_shape);
+            if (free_strides)
+                cml_free(strides);
+            error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+            return NULL;
+        }
 
         if (start < 0)
             start += a->shape[i];

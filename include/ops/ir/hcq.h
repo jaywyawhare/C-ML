@@ -24,6 +24,7 @@ typedef enum {
     CML_HCQ_VULKAN,
     CML_HCQ_NV,
     CML_HCQ_AM,
+    CML_HCQ_ROCM,
     CML_HCQ_BACKEND_COUNT
 } CMLHCQBackendType;
 
@@ -80,6 +81,22 @@ void cml_hcq_pipeline_destroy(CMLHCQPipeline* pipeline);
 int cml_hcq_pipeline_add_stage(CMLHCQPipeline* pipeline, CMLHCQQueue* queue);
 int cml_hcq_pipeline_execute(CMLHCQPipeline* pipeline);
 int cml_hcq_pipeline_synchronize(CMLHCQPipeline* pipeline);
+
+/* ROCm adapter (hcq_rocm.c): compiles everywhere, fails gracefully without
+ * libamdhip64. With CML_HIP_MOCK=1 (see gpu/hip_mock.h) the queue runs
+ * against the mock HIP driver and the journal can be inspected in tests. */
+struct CMLROCmBackend;
+CMLHCQQueue* cml_hcq_rocm_queue_create(void);
+void cml_hcq_rocm_queue_destroy(CMLHCQQueue* queue);
+int cml_hcq_rocm_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);
+int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes);
+int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes);
+int cml_hcq_rocm_queue_synchronize(CMLHCQQueue* queue);
+CMLHCQSignal* cml_hcq_rocm_signal_create(void);
+void cml_hcq_rocm_signal_destroy(CMLHCQSignal* signal);
+int cml_hcq_rocm_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
+int cml_hcq_rocm_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
+struct CMLROCmBackend* cml_hcq_rocm_queue_backend(CMLHCQQueue* queue);
 
 #ifdef __cplusplus
 }

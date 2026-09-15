@@ -375,6 +375,61 @@ static void test_bounds_check(void) {
     PASS();
 }
 
+/* Coverage for the elementwise ops added to close the REMAINING_WORK.md gap.
+ * Each check confirms the op emits (non-NULL, well-formed) and contains a
+ * signature instruction distinctive to its lowering. */
+static void test_new_unary_ops(void) {
+    struct { UOpType op; const char* name; const char* sig; } cases[] = {
+        { UOP_TAN,          "ptx_tan",         "div.approx.f32"   },
+        { UOP_GELU,         "ptx_gelu",        "ex2.approx.f32"   },
+        { UOP_QUICK_GELU,   "ptx_quick_gelu",  "rcp.approx.f32"   },
+        { UOP_LEAKY_RELU,   "ptx_leaky_relu",  "selp.f32"         },
+        { UOP_HARD_SIGMOID, "ptx_hard_sigmoid","min.f32"          },
+        { UOP_HARD_TANH,    "ptx_hard_tanh",   "selp.f32"         },
+        { UOP_RELU6,        "ptx_relu6",       "selp.f32"         },
+        { UOP_SQUARE,       "ptx_square",      "mul.f32"          },
+        { UOP_RSQRT,        "ptx_rsqrt",       "rsqrt.approx.f32" },
+        { UOP_EXP2,         "ptx_exp2",        "ex2.approx.f32"   },
+        { UOP_LOG2,         "ptx_log2",        "lg2.approx.f32"   },
+        { UOP_SIGN,         "ptx_sign",        "selp.f32"         },
+    };
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        printf("  TEST: %-50s ", cases[i].name);
+        char* p = cml_ptx_gen_unary(cg, cases[i].op, cases[i].name);
+        if (!p) { FAIL("emitter returned NULL"); continue; }
+        if (!strstr(p, ".entry") || !strstr(p, cases[i].sig)) {
+            FAIL("missing signature instruction"); cml_free(p); continue;
+        }
+        cml_free(p);
+        PASS();
+    }
+    cml_ptx_codegen_destroy(cg);
+}
+
+static void test_new_binary_ops(void) {
+    struct { UOpType op; const char* name; const char* sig; } cases[] = {
+        { UOP_MINIMUM, "ptx_minimum", "min.f32"     },
+        { UOP_CMPGT,   "ptx_cmpgt",   "setp.gt.f32" },
+        { UOP_CMPGE,   "ptx_cmpge",   "setp.ge.f32" },
+        { UOP_CMPLE,   "ptx_cmple",   "setp.le.f32" },
+        { UOP_CMPEQ,   "ptx_cmpeq",   "setp.eq.f32" },
+        { UOP_CMPNE,   "ptx_cmpne",   "setp.ne.f32" },
+    };
+    CMLPTXCodegen* cg = cml_ptx_codegen_create(50, NULL);
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        printf("  TEST: %-50s ", cases[i].name);
+        char* p = cml_ptx_gen_binary(cg, cases[i].op, cases[i].name);
+        if (!p) { FAIL("emitter returned NULL"); continue; }
+        if (!strstr(p, ".entry") || !strstr(p, cases[i].sig)) {
+            FAIL("missing signature instruction"); cml_free(p); continue;
+        }
+        cml_free(p);
+        PASS();
+    }
+    cml_ptx_codegen_destroy(cg);
+}
+
 int main(void) {
     printf("\nPTX Codegen Tests\n\n");
 
@@ -397,6 +452,9 @@ int main(void) {
     test_binary_pow();
     test_binary_mod();
     test_binary_idiv();
+
+    test_new_unary_ops();
+    test_new_binary_ops();
 
     test_fill();
     test_where();

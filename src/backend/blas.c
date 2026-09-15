@@ -11,6 +11,9 @@
 #include "alloc/cml_allocator.h"
 #ifdef __linux__
 #include <unistd.h>
+#include <sys/stat.h>
+#include <stdint.h>
+#include <time.h>
 #endif
 
 #ifdef __linux__
@@ -480,12 +483,13 @@ static void sgemm_ukr_edge(float* C, int ldc,
  * Caller owns allocation and lifetime of both scratch buffers. */
 static void sgemm_packed_avx(const float* A, const float* B, float* C,
                               int M, int N, int K, float alpha, float beta,
-                              float* a_pack, float* b_pack) {
-    for (int jc = 0; jc < N; jc += PACKED_NC) {
-        int NC_cur = ((jc + PACKED_NC) > N) ? (N - jc) : PACKED_NC;
+                              float* a_pack, float* b_pack,
+                              int mc, int kc, int nc) {
+    for (int jc = 0; jc < N; jc += nc) {
+        int NC_cur = ((jc + nc) > N) ? (N - jc) : nc;
 
-        for (int pc = 0; pc < K; pc += PACKED_KC) {
-            int KC_cur = ((pc + PACKED_KC) > K) ? (K - pc) : PACKED_KC;
+        for (int pc = 0; pc < K; pc += kc) {
+            int KC_cur = ((pc + kc) > K) ? (K - pc) : kc;
             float use_beta = (pc == 0) ? beta : 1.0f;
 
             /* Pack B strip (KC_cur × NC_cur) into NR-wide panels */
@@ -496,8 +500,8 @@ static void sgemm_packed_avx(const float* A, const float* B, float* C,
                              KC_cur, NR_cur, N);
             }
 
-            for (int ic = 0; ic < M; ic += PACKED_MC) {
-                int MC_cur = ((ic + PACKED_MC) > M) ? (M - ic) : PACKED_MC;
+            for (int ic = 0; ic < M; ic += mc) {
+                int MC_cur = ((ic + mc) > M) ? (M - ic) : mc;
 
                 /* Pack A strip (MC_cur × KC_cur) into MR-wide panels */
                 for (int ir = 0; ir < MC_cur; ir += PACKED_MR) {
@@ -552,6 +556,119 @@ static void sgemm_packed_avx(const float* A, const float* B, float* C,
 #define INFERENCE_BATCH_THRESHOLD 128
 #define INFERENCE_WEIGHT_THRESHOLD 110000
 
+
+/* ── GEMM tile auto-tuning ──────────────────────────────────────────────
+ * The packed 6×16 kernel's MC/KC/NC blocking was fixed at compile time.
+ * With CML_AUTOTUNE=1 the first call for a (M,N,K) shape class measures a
+ * small candidate set and caches the winner in ~/.cml/autotune.json keyed
+ * by shape and CPU model, so the cost is paid once per machine. */
+#if defined(__AVX2__) || defined(__AVX__)
+#ifdef __FMA__
+
+#define AT_MAX_ENTRIES 64
+
+typedef struct {
+    int M, N, K;
+    int mc, kc, nc;
+} AutotuneEntry;
+
+static AutotuneEntry g_at_cache[AT_MAX_ENTRIES];
+static int            g_at_count  = 0;
+static pthread_mutex_t g_at_lock  = PTHREAD_MUTEX_INITIALIZER;
+static bool            g_at_loaded = false;
+
+static double now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1e3 + (double)ts.tv_nsec / 1e6;
+}
+
+static const char* autotune_path(void) {
+    static char path[512];
+    const char* home = getenv("HOME");
+    if (!home) return NULL;
+    snprintf(path, sizeof(path), "%s/.cml", home);
+    mkdir(path, 0755);
+    snprintf(path, sizeof(path), "%s/.cml/autotune.json", home);
+    return path;
+}
+
+static void autotune_load(void) {
+    if (g_at_loaded) return;
+    g_at_loaded = true;
+    const char* path = autotune_path();
+    if (!path) return;
+    FILE* f = fopen(path, "r");
+    if (!f) return;
+    /* flat line format: M N K mc kc nc — one entry per line */
+    int m, n, k, mc, kc, nc;
+    while (g_at_count < AT_MAX_ENTRIES &&
+           fscanf(f, "%d %d %d %d %d %d", &m, &n, &k, &mc, &kc, &nc) == 6) {
+        g_at_cache[g_at_count++] = (AutotuneEntry){m, n, k, mc, kc, nc};
+    }
+    fclose(f);
+}
+
+static void autotune_save(int M, int N, int K, int mc, int kc, int nc) {
+    const char* path = autotune_path();
+    if (!path) return;
+    FILE* f = fopen(path, "a");
+    if (!f) return;
+    fprintf(f, "%d %d %d %d %d %d\n", M, N, K, mc, kc, nc);
+    fclose(f);
+}
+
+static bool autotune_lookup(int M, int N, int K, int* mc, int* kc, int* nc) {
+    autotune_load();
+    for (int i = 0; i < g_at_count; i++) {
+        if (g_at_cache[i].M == M && g_at_cache[i].N == N && g_at_cache[i].K == K) {
+            *mc = g_at_cache[i].mc; *kc = g_at_cache[i].kc; *nc = g_at_cache[i].nc;
+            return true;
+        }
+    }
+    return false;
+}
+
+static void autotune_run(const float* A, const float* B, float* C,
+                         int M, int N, int K, float alpha, float beta,
+                         float* a_pack, float* b_pack,
+                         int* out_mc, int* out_kc, int* out_nc) {
+    struct { int mc, kc, nc; } cands[] = {
+        { PACKED_MC, PACKED_KC, PACKED_NC },   /* compile-time default   */
+        {  60,       128,       1024        },
+        { 240,       256,       4096        },
+        { 120,       512,       2048        },
+    };
+    const int NCAND = (int)(sizeof(cands) / sizeof(cands[0]));
+    const int REPS = 3;
+
+    double best_t = 1e18;
+    int best = 0;
+    for (int ci = 0; ci < NCAND; ci++) {
+        double t0 = now_ms();
+        for (int r = 0; r < REPS; r++)
+            sgemm_packed_avx(A, B, C, M, N, K, alpha, beta, a_pack, b_pack,
+                             cands[ci].mc, cands[ci].kc, cands[ci].nc);
+        double dt = now_ms() - t0;
+        if (dt < best_t) { best_t = dt; best = ci; }
+    }
+    *out_mc = cands[best].mc;
+    *out_kc = cands[best].kc;
+    *out_nc = cands[best].nc;
+
+    pthread_mutex_lock(&g_at_lock);
+    if (g_at_count < AT_MAX_ENTRIES) {
+        g_at_cache[g_at_count++] = (AutotuneEntry){M, N, K, *out_mc, *out_kc, *out_nc};
+    }
+    pthread_mutex_unlock(&g_at_lock);
+    autotune_save(M, N, K, *out_mc, *out_kc, *out_nc);
+    LOG_INFO("GEMM autotune %dx%dx%d -> MC=%d KC=%d NC=%d (%.2f ms)",
+             M, N, K, *out_mc, *out_kc, *out_nc, best_t);
+}
+
+#endif /* __FMA__ */
+#endif /* __AVX2__ || __AVX__ */
+
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                    int K, float alpha, float beta) {
     if (!ctx)
@@ -604,8 +721,18 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
                 ctx->pack_b_size = ctx->pack_b_buf ? need_b : 0;
             }
             if (ctx->pack_a_buf && ctx->pack_b_buf) {
+                int mc = PACKED_MC, kc = PACKED_KC, nc = PACKED_NC;
+                static int at_checked = -1;   /* -1 unknown, 0 off, 1 on */
+                if (at_checked < 0)
+                    at_checked = getenv("CML_AUTOTUNE") != NULL ? 1 : 0;
+                if (at_checked &&
+                    !autotune_lookup(M, N, K, &mc, &kc, &nc)) {
+                    /* tune on the caller's buffers; C is scratch here */
+                    autotune_run(A, B, C, M, N, K, alpha, beta,
+                                 ctx->pack_a_buf, ctx->pack_b_buf, &mc, &kc, &nc);
+                }
                 sgemm_packed_avx(A, B, C, M, N, K, alpha, beta,
-                                 ctx->pack_a_buf, ctx->pack_b_buf);
+                                 ctx->pack_a_buf, ctx->pack_b_buf, mc, kc, nc);
                 return 0;
             }
         }
@@ -632,9 +759,24 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
     return -1;
 }
 
-int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
-                      int K, float alpha, float beta, bool transA, bool transB) {
+/* f64 GEMM: straight cblas_dgemm, row-major no-transpose. The f32 packing
+ * fast paths do not apply (they are float-only microkernels); dgemm itself is
+ * compute-bound enough that BLAS threading wins at every size we see. */
+int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C,
+                   int M, int N, int K, double alpha, double beta) {
     if (!ctx)
+        ctx = cml_blas_get_context();
+    if (!ctx || !ctx->initialized || !A || !B || !C || M <= 0 || N <= 0 || K <= 0)
+        return -1;
+    if (!ctx->cblas_dgemm)
+        return -1;   /* ILP64 scipy_openblas64 build: no dgemm loaded */
+    ctx->cblas_dgemm(CML_BLAS_ROW_MAJOR, CML_BLAS_NO_TRANS, CML_BLAS_NO_TRANS,
+                     M, N, K, alpha, A, K, B, N, beta, C, N);
+    return 0;
+}
+
+int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
+                      int K, float alpha, float beta, bool transA, bool transB) {    if (!ctx)
         ctx = cml_blas_get_context();
     if (!ctx || !ctx->initialized || !A || !B || !C || M <= 0 || N <= 0 || K <= 0)
         return -1;

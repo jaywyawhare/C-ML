@@ -92,6 +92,9 @@ struct IRNode {
 };
 
 void cml_ir_free_node_params(struct IRNode* node);
+/* Canonical teardown of a node's owned storage (params/scope/build_stack/
+ * shapes/...) without freeing the node or touching ref_count. */
+void cml_ir_release_node_storage(struct IRNode* node);
 
 struct CMLGraph {
     IRTarget target;
@@ -115,6 +118,20 @@ struct CMLGraph {
     int tensor_refs_capacity;
 
     bool is_decomposed;
+
+    /* Set once cml_ir_grad has emitted VJP nodes into this context. A
+     * re-decompose over forward+backward nodes corrupts references (see the
+     * note at the end of autodiff.c), so a second grad pass (double-backward)
+     * lowers only nodes appended after decomposed_frontier. */
+    bool has_backward_nodes;
+    struct IRNode* decomposed_frontier;
+
+    /* Values that received a lazy grad from a grad pass of THIS context.
+     * Double-backward uses it to zero stale differentiable grads that a
+     * later pass never reached (see autodiff.c). */
+    Tensor** grad_publish_log;
+    int grad_publish_count;
+    int grad_publish_cap;
 
     CMLInternTable* intern_table;
 };

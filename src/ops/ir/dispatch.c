@@ -94,6 +94,8 @@ static CMLHCQBackendType dispatch_backend_to_hcq(CMLBackendType backend) {
         return CML_HCQ_NV;
     case CML_BACKEND_AM:
         return CML_HCQ_AM;
+    case CML_BACKEND_ROCM:
+        return CML_HCQ_ROCM;
     default:
         return CML_HCQ_CPU;
     }
@@ -512,6 +514,8 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
         return CML_BACKEND_AM;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_ROCM))
         return CML_BACKEND_ROCM;
+    if (cml_dispatch_backend_available(ctx, CML_BACKEND_OPENCL))
+        return CML_BACKEND_OPENCL;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_NIR))
         return CML_BACKEND_NIR;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_METAL))
@@ -538,7 +542,14 @@ const char* cml_dispatch_backend_name(CMLBackendType backend) {
 
 int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CMLGraph_t ir,
                             Tensor** inputs, int nin, Tensor** outputs, int nout) {
-    (void)inputs; (void)nin; (void)outputs; (void)nout;
+    /* inputs/outputs are accepted for signature parity with
+     * cml_dispatch_execute (and are consumed by the kernel-cache lookup
+     * below); graph execution itself drives every tensor through the IR, so
+     * explicit I/O lists would be dead here. Warn rather than let callers
+     * believe they were honored. */
+    if ((inputs && nin > 0) || (outputs && nout > 0))
+        LOG_WARNING("cml_dispatch_execute_on: explicit inputs/outputs are not "
+                    "consumed by graph execution; the IR drives all tensors");
 
     if (!ctx || !ir)
         return -1;

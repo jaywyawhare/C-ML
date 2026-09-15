@@ -38,14 +38,26 @@ def find_cml_lib():
                 return path.parent
             return path
 
+    # Not built yet: configure + build via CMake so `pip install ./python`
+    # works from a clean checkout without a separate manual step.
+    print("CML library not found; building via CMake ...")
+    root = cml_root
+    build_dir = root / "build"
+    build_dir.mkdir(exist_ok=True)
+    subprocess.run(["cmake", "-S", str(root), "-B", str(build_dir)], check=True)
+    nproc = os.cpu_count() or 4
+    subprocess.run(
+        ["cmake", "--build", str(build_dir), "-j", str(nproc)],
+        check=True,
+    )
+
+    for path in [build_dir / "lib" / "libcml.a", build_dir / "lib" / "libcml.so"]:
+        if path.exists():
+            return path.parent
+
     raise RuntimeError(
-        "CML library not found. Please build CML first:\n"
-        "  cd /path/to/C-ML\n"
-        "  make\n"
-        "or\n"
-        "  mkdir build && cd build\n"
-        "  cmake -DBUILD_SHARED_LIBS=ON ..\n"
-        "  make"
+        "CMake build did not produce libcml under "
+        f"{build_dir}/lib"
     )
 
 
@@ -65,9 +77,12 @@ def build_bindings():
     print("Building CML CFFI bindings...")
 
     try:
+        # _cml_cffi.py sits next to this file; the cwd during a pip build is
+        # arbitrary, so put our package directory on the path explicitly.
+        sys.path.insert(0, str(Path(__file__).parent))
         from _cml_cffi import ffi
-    except ImportError:
-        print("Error: Could not import _cml_cffi")
+    except ImportError as e:
+        print(f"Error: Could not import _cml_cffi: {e}")
         sys.exit(1)
 
     try:

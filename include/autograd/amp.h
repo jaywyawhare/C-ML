@@ -36,6 +36,12 @@ void autocast_exit(void);
 bool autocast_is_enabled(void);
 AutocastContext* autocast_get_context(void);
 
+/* Target-dtype selection: defaults to DTYPE_FLOAT16; CML_AMP_DTYPE=bf16
+ * (or autocast_set_dtype) opts into bfloat16. */
+DType autocast_default_dtype(void);
+void autocast_set_dtype(DType dtype);
+DType autocast_get_dtype(void);
+
 /* Ops like softmax, layer norm, losses should stay in float32 */
 bool autocast_should_keep_float32(OpType op);
 

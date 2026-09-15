@@ -944,22 +944,11 @@ void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
 
 /* ─── Node execution helpers ───────────────────────────────────────────── */
 
-static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node,
-                            cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
-    Tensor* a = node->inputs[0];
-    Tensor* bb = node->inputs[1];
-
-    int M, K, N;
-    if (a->ndim == 2 && bb->ndim == 2) {
-        M = a->shape[0]; K = a->shape[1]; N = bb->shape[1];
-    } else if (a->ndim == 1 && bb->ndim == 2) {
-        M = 1; K = a->shape[0]; N = bb->shape[1];
-    } else if (a->ndim == 2 && bb->ndim == 1) {
-        M = a->shape[0]; K = a->shape[1]; N = 1;
-    } else {
-        return -1; /* batched matmul not yet supported */
-    }
-
+/* 2D GEMM dispatch: BEAM autotuner -> V3 aligned kernel -> naive fallback.
+ * Buffers may be sub-buffer views into a batched tensor (see the batched path),
+ * so this must not assume base-of-allocation offsets. */
+static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K,
+                          cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
     cl_kernel kernel;
     size_t global[2], local[2];
 
@@ -1013,6 +1002,87 @@ static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node,
         err = clEnqueueNDRangeKernel(b->queue, kernel, 2, NULL, global, NULL, 0, NULL, NULL);
     }
     return (err == CL_SUCCESS) ? 0 : -1;
+}
+
+/* Batched matmul: loop over batch slices, running the 2D GEMM on sub-buffer
+ * views. A 2D operand (batch count 1) is broadcast across all batches. Returns
+ * -1 if a slice offset isn't device-aligned so the caller falls back to CPU
+ * (correct, just unaccelerated) rather than failing. */
+static int ocl_matmul_batched(CMLOpenCLIRBackend* b, Tensor* a, Tensor* bb,
+                               cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
+    int M = a->shape[a->ndim - 2];
+    int K = a->shape[a->ndim - 1];
+    int Kb = bb->shape[bb->ndim - 2];
+    int N = bb->shape[bb->ndim - 1];
+    if (K != Kb) return -1;
+
+    int64_t batch_a = 1, batch_b = 1;
+    for (int i = 0; i < a->ndim - 2; i++)  batch_a *= a->shape[i];
+    for (int i = 0; i < bb->ndim - 2; i++) batch_b *= bb->shape[i];
+    int64_t batches = batch_a > batch_b ? batch_a : batch_b;
+    if (!((batch_a == batches || batch_a == 1) &&
+          (batch_b == batches || batch_b == 1)))
+        return -1; /* only scalar-batch broadcasting is supported */
+
+    /* Sub-buffer origins must satisfy CL_DEVICE_MEM_BASE_ADDR_ALIGN. */
+    cl_uint align_bits = 0;
+    if (clGetDeviceInfo(b->device, CL_DEVICE_MEM_BASE_ADDR_ALIGN,
+                        sizeof(align_bits), &align_bits, NULL) != CL_SUCCESS ||
+        align_bits == 0)
+        return -1;
+    size_t align_bytes = align_bits / 8;
+
+    size_t sa = (size_t)M * K * sizeof(float);
+    size_t sb = (size_t)Kb * N * sizeof(float);
+    size_t so = (size_t)M * N * sizeof(float);
+
+    for (int64_t g = 0; g < batches; g++) {
+        size_t off_a = (batch_a == 1 ? 0 : (size_t)g) * sa;
+        size_t off_b = (batch_b == 1 ? 0 : (size_t)g) * sb;
+        size_t off_o = (size_t)g * so;
+        if (off_a % align_bytes || off_b % align_bytes || off_o % align_bytes)
+            return -1; /* unaligned slice -> CPU fallback */
+
+        cl_int err = CL_SUCCESS;
+        cl_buffer_region ra = { off_a, sa }, rb = { off_b, sb }, ro = { off_o, so };
+        cl_mem sub_a = clCreateSubBuffer(buf_a, CL_MEM_READ_WRITE,
+                                         CL_BUFFER_CREATE_TYPE_REGION, &ra, &err);
+        if (err != CL_SUCCESS) return -1;
+        cl_mem sub_b = clCreateSubBuffer(buf_b, CL_MEM_READ_WRITE,
+                                         CL_BUFFER_CREATE_TYPE_REGION, &rb, &err);
+        if (err != CL_SUCCESS) { clReleaseMemObject(sub_a); return -1; }
+        cl_mem sub_o = clCreateSubBuffer(buf_out, CL_MEM_READ_WRITE,
+                                         CL_BUFFER_CREATE_TYPE_REGION, &ro, &err);
+        if (err != CL_SUCCESS) { clReleaseMemObject(sub_a); clReleaseMemObject(sub_b); return -1; }
+
+        int rc = ocl_matmul_2d(b, M, N, K, sub_a, sub_b, sub_o);
+        clReleaseMemObject(sub_a);
+        clReleaseMemObject(sub_b);
+        clReleaseMemObject(sub_o);
+        if (rc != 0) return -1;
+    }
+    return 0;
+}
+
+static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node,
+                            cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
+    Tensor* a = node->inputs[0];
+    Tensor* bb = node->inputs[1];
+
+    int M, K, N;
+    if (a->ndim == 2 && bb->ndim == 2) {
+        M = a->shape[0]; K = a->shape[1]; N = bb->shape[1];
+    } else if (a->ndim == 1 && bb->ndim == 2) {
+        M = 1; K = a->shape[0]; N = bb->shape[1];
+    } else if (a->ndim == 2 && bb->ndim == 1) {
+        M = a->shape[0]; K = a->shape[1]; N = 1;
+    } else if (a->ndim >= 2 && bb->ndim >= 2) {
+        return ocl_matmul_batched(b, a, bb, buf_a, buf_b, buf_out);
+    } else {
+        return -1; /* unsupported rank combination -> CPU fallback */
+    }
+
+    return ocl_matmul_2d(b, M, N, K, buf_a, buf_b, buf_out);
 }
 
 static int ocl_exec_binary(CMLOpenCLIRBackend* b, cl_kernel kernel,

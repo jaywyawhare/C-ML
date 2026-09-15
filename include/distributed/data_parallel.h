@@ -11,9 +11,13 @@ extern "C" {
 
 typedef struct {
     size_t bucket_size_bytes;    /* Gradient bucket size (default: 25MB) */
-    bool broadcast_buffers;      /* Broadcast non-parameter buffers */
-    bool find_unused_parameters; /* Find and skip unused params */
-    int gradient_as_bucket_view; /* Use gradient views (memory efficient) */
+    bool broadcast_buffers;      /* Honored: buffers broadcast from rank 0 at forward */
+    bool find_unused_parameters; /* Honored: unused params reserve a zero-filled
+                                  * bucket slot so every rank's layout matches */
+    /* Accepted for API familiarity but NOT yet honored: gradients are always
+     * copied into buckets rather than aliased into them. Inert (not silently
+     * wrong) until implemented. */
+    int gradient_as_bucket_view; /* NOT YET HONORED */
 } DDPConfig;
 
 typedef struct CMLDataParallel {
@@ -25,7 +29,6 @@ typedef struct CMLDataParallel {
     float** buckets;            /* Bucket buffers */
     int num_buckets;            /* Number of buckets */
     size_t* bucket_sizes;       /* Size of each bucket in floats */
-    bool* bucket_ready;         /* Whether bucket is ready for allreduce */
 
     /* Parameter tracking */
     Parameter** all_params;     /* All parameters */

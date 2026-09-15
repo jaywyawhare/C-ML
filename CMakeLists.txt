@@ -17,6 +17,17 @@ if(CML_WARNINGS_AS_ERRORS)
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-Werror>)
 endif()
 
+# Drop unreferenced code/data at link time (--gc-sections). Requires function/
+# data sections so the linker can see section granularity; only meaningful for
+# the shared lib and executables (static archives keep everything anyway).
+option(CML_LINK_GC_SECTIONS "Link with --gc-sections to drop unreferenced code" OFF)
+if(CML_LINK_GC_SECTIONS AND NOT MSVC)
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:C>:-ffunction-sections>
+        $<$<COMPILE_LANGUAGE:C>:-fdata-sections>)
+    add_link_options(-Wl,--gc-sections)
+endif()
+
 # Host-native codegen is a local-build convenience, not something a
 # distributed binary should ship with — turn off for packaging/CI.
 option(CML_NATIVE_OPTIMIZATIONS "Optimize for the build host CPU (-march=native)" ON)
@@ -126,6 +137,20 @@ if(ENABLE_OPENCL)
     endif()
 endif()
 
+option(ENABLE_IO_URING "Enable io_uring async disk I/O (Linux, requires liburing)" ON)
+set(IOURING_LIBS "")
+if(ENABLE_IO_URING AND UNIX AND NOT APPLE)
+    find_path(LIBURING_INCLUDE_DIR liburing.h)
+    find_library(LIBURING_LIBRARY uring)
+    if(LIBURING_INCLUDE_DIR AND LIBURING_LIBRARY)
+        message(STATUS "liburing found: ${LIBURING_LIBRARY}")
+        add_definitions(-DCML_HAS_IO_URING)
+        set(IOURING_LIBS ${LIBURING_LIBRARY})
+    else()
+        message(STATUS "liburing not found - async disk I/O falls back to synchronous")
+    endif()
+endif()
+
 option(ENABLE_METAL "Enable Metal backend (macOS only)" ON)
 set(METAL_FOUND FALSE)
 if(ENABLE_METAL AND APPLE)
@@ -209,7 +234,7 @@ set(CORE_SOURCES
 )
 
 if(ENABLE_ONNX)
-    list(APPEND CORE_SOURCES src/core/onnx.c src/core/onnx_ops.c)
+    list(APPEND CORE_SOURCES src/core/onnx.c src/core/onnx_ops.c src/core/onnx_export.c)
 endif()
 
 set(ALLOC_SOURCES
@@ -266,6 +291,8 @@ set(OPS_SOURCES
     src/ops/ir/hcq_vulkan.c
     src/ops/ir/hcq_nv.c
     src/ops/ir/hcq_am.c
+    src/ops/ir/hcq_rocm.c
+    src/ops/ir/hcq_webgpu.c
     src/ops/ir/beam_search.c
     src/ops/ir/opt_transforms.c
     src/ops/ir/tc_opt.c
@@ -301,6 +328,7 @@ set(OPS_SOURCES
     src/ops/ir/gpu/adreno_backend.c
     src/ops/ir/gpu/hexagon_backend.c
     src/ops/ir/gpu/hexagon_sim.c
+    src/ops/ir/gpu/hip_mock.c
     src/ops/ir/gpu/amd_profiling.c
     src/ops/ir/gpu/amx.c
     src/ops/ir/gpu/xmx.c
@@ -326,7 +354,10 @@ list(APPEND OPS_SOURCES
 )
 
 if(ENABLE_NIR)
-    list(APPEND OPS_SOURCES src/ops/ir/nir_compiler.c src/ops/ir/hcq_nir.c)
+    # nir_compiler.c / hcq_nir.c are always compiled (test_nir_compiler links
+    # them unconditionally); the option activates their dispatch integration
+    # via CML_HAS_NIR. The old `list(APPEND ...)` here double-compiled both TUs.
+    add_definitions(-DCML_HAS_NIR)
 endif()
 
 option(ENABLE_NAK "Enable NAK (Nouveau Architecture Kompiler) backend" OFF)
@@ -336,7 +367,7 @@ if(ENABLE_NAK)
 endif()
 list(APPEND OPS_SOURCES src/ops/ir/gpu/nak_backend.c)
 
-list(APPEND OPS_SOURCES src/ops/ir/fusion_schedule.c src/ops/ir/linearize.c)
+# fusion_schedule.c / linearize.c are already in the OPS_SOURCES base list.
 list(APPEND OPS_SOURCES src/ops/ir/spec.c src/ops/ir/late_passes.c)
 list(APPEND OPS_SOURCES
     src/ops/ir/validate.c
@@ -556,6 +587,9 @@ function(cml_link_all target)
     if(METAL_FOUND)
         target_link_libraries(${target} ${METAL_LIBS})
     endif()
+    if(IOURING_LIBS)
+        target_link_libraries(${target} ${IOURING_LIBS})
+    endif()
 endfunction()
 
 add_executable(cml main.c ${LIBRARY_SOURCES})
@@ -610,6 +644,11 @@ if(BUILD_TESTS)
     # backstop for any plain assert() added later.
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)
     file(GLOB TEST_SOURCES "tests/*.c")
+    # Mock-driver suites need special definitions/libraries; added below.
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_nv_driver.c$")
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_am_driver.c$")
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_hexagon_rpc.c$")
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_hip_mock.c$")
     foreach(test_source ${TEST_SOURCES})
         get_filename_component(test_name ${test_source} NAME_WE)
         add_executable(${test_name} ${test_source})
@@ -638,6 +677,29 @@ if(BUILD_TESTS)
     cml_apply_torch_selective_ops(test_am_mock)
     add_test(NAME test_am_mock COMMAND test_am_mock)
 
+    # --- mock hardware drivers (no physical device needed) -----------------
+
+    # FastRPC transport mock: shared library the Hexagon backend dlopen's via
+    # the CML_DSP_RPC_LIB override.
+    add_library(fastrpc_mock SHARED tools/fastrpc_mock.c)
+    set_target_properties(fastrpc_mock PROPERTIES OUTPUT_NAME fastrpc_mock)
+
+    add_executable(test_hexagon_rpc tests/test_hexagon_rpc.c)
+    target_link_libraries(test_hexagon_rpc cml_static)
+    cml_link_all(test_hexagon_rpc)
+    target_compile_definitions(test_hexagon_rpc PRIVATE
+        FASTRPC_MOCK_LIB="$<TARGET_FILE:fastrpc_mock>")
+    cml_apply_torch_selective_ops(test_hexagon_rpc)
+    add_test(NAME test_hexagon_rpc COMMAND test_hexagon_rpc)
+
+    # HIP driver mock: exercises the ROCm backend + HCQ adapter end to end.
+    # The library already contains hip_mock.c; enable its hook in this test.
+    add_executable(test_hip_mock tests/test_hip_mock.c ${LIBRARY_SOURCES})
+    target_compile_definitions(test_hip_mock PRIVATE CML_HAS_HIP_MOCK)
+    cml_link_all(test_hip_mock)
+    cml_apply_torch_selective_ops(test_hip_mock)
+    add_test(NAME test_hip_mock COMMAND test_hip_mock)
+
     if(ENABLE_SANITIZERS)
         set(CML_LSAN_SUPP "${CMAKE_SOURCE_DIR}/cmake/lsan_suppressions.txt")
         foreach(test_source ${TEST_SOURCES})
@@ -649,6 +711,21 @@ if(BUILD_TESTS)
             ENVIRONMENT "LSAN_OPTIONS=suppressions=${CML_LSAN_SUPP}:print_suppressions=0")
     endif()
 endif()
+
+# Branch-coverage build + report, SQLite-style union semantics (a branch is
+# covered when ANY test binary takes it):
+#
+#   cmake -S . -B build-coverage -DCMAKE_C_FLAGS="--coverage -O0"
+#   cmake --build build-coverage -j
+#   cmake --build build-coverage --target coverage
+#     -> runs ctest SERIALLY (all 150+ binaries share one set of .gcda
+#        counters; parallel runs corrupt them), then prints the merged
+#        per-file line/branch table via tools/coverage_report.sh
+add_custom_target(coverage
+    COMMAND ${CMAKE_CTEST_COMMAND} -j1 --output-on-failure
+    COMMAND ${CMAKE_SOURCE_DIR}/tools/coverage_report.sh ${CMAKE_BINARY_DIR}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 option(BUILD_EXAMPLES "Build example programs" ON)
 

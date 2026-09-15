@@ -718,12 +718,21 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
 
         dataloader_reset(val_loader);
 
+        /* Validation must run in eval mode (dropout off, batchnorm using
+         * running stats) and without building training state: realize batch
+         * tensors and reset the graph per batch exactly like the train loop,
+         * so graph state and pool memory cannot accumulate across epochs. */
+        module_set_training(model, false);
         float val_loss      = 0.0f;
         int num_val_batches = 0;
         while ((batch = dataloader_next_batch(val_loader)) != NULL) {
+            if (batch->X) tensor_realize(batch->X);
+            if (batch->y) tensor_realize(batch->y);
+            cml_ir_reset_global_context();
             Tensor* output = module_forward(model, batch->X);
             if (!output) {
                 LOG_ERROR("Validation forward pass failed");
+                module_set_training(model, true);
                 batch_free(batch);
                 return -1;
             }
@@ -731,6 +740,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
             if (!loss) {
                 LOG_ERROR("Validation loss computation failed");
                 tensor_free(output);
+                module_set_training(model, true);
                 batch_free(batch);
                 return -1;
             }
@@ -741,6 +751,8 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
             tensor_free(output);
             batch_free(batch);
         }
+        cml_ir_reset_global_context();
+        module_set_training(model, true);
         float avg_val_loss = num_val_batches > 0 ? val_loss / (float)num_val_batches : 0.0f;
         if (metrics) {
             training_metrics_record_epoch_full(metrics, (size_t)epoch, avg_train_loss, 0.0f, 0.0f,

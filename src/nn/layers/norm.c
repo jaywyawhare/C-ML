@@ -222,6 +222,10 @@ BatchNormState* nn_batchnorm_new(const char* name, int input_ndim, int num_featu
         if (nn_add_running_stats((Module*)bn, num_features, dtype, device, &bn->running_mean,
                                  &bn->running_var) != 0)
             return NULL;
+        /* Register in the module's buffer registry so DDP can broadcast the
+         * running stats from rank 0 at forward time (broadcast_buffers). */
+        module_add_buffer((Module*)bn, bn->running_mean, "running_mean");
+        module_add_buffer((Module*)bn, bn->running_var, "running_var");
     } else {
         bn->running_mean = NULL;
         bn->running_var  = NULL;

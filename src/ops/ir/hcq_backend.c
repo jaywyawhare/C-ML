@@ -171,6 +171,64 @@ extern int cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
 
+/* ROCm adapter (hcq_rocm.c): compiles everywhere, fails gracefully without
+ * libamdhip64 — same contract as the NV/AM adapters. */
+extern CMLHCQQueue* cml_hcq_rocm_queue_create(void);
+extern void cml_hcq_rocm_queue_destroy(CMLHCQQueue* queue);
+extern int cml_hcq_rocm_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);
+extern int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes);
+extern int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes);
+extern int cml_hcq_rocm_queue_synchronize(CMLHCQQueue* queue);
+extern CMLHCQSignal* cml_hcq_rocm_signal_create(void);
+extern void cml_hcq_rocm_signal_destroy(CMLHCQSignal* signal);
+extern int cml_hcq_rocm_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
+extern int cml_hcq_rocm_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
+extern int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms);
+
+static const CMLHCQBackendOps g_hcq_rocm_ops = {
+    .name = "ROCm",
+    .queue_create = cml_hcq_rocm_queue_create,
+    .queue_destroy = cml_hcq_rocm_queue_destroy,
+    .submit_kernel = cml_hcq_rocm_submit_kernel,
+    .memcpy_h2d = cml_hcq_rocm_memcpy_h2d,
+    .memcpy_d2h = cml_hcq_rocm_memcpy_d2h,
+    .queue_synchronize = cml_hcq_rocm_queue_synchronize,
+    .signal_create = cml_hcq_rocm_signal_create,
+    .signal_destroy = cml_hcq_rocm_signal_destroy,
+    .signal_record = cml_hcq_rocm_signal_record,
+    .queue_wait = cml_hcq_rocm_queue_wait,
+    .signal_wait_cpu = cml_hcq_rocm_signal_wait_cpu,
+};
+
+/* WebGPU adapter (hcq_webgpu.c): real implementation under CML_HAS_WEBGPU,
+ * graceful stubs otherwise — same contract as the NV adapter. */
+extern CMLHCQQueue* cml_hcq_webgpu_queue_create(void);
+extern void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* queue);
+extern int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);
+extern int cml_hcq_webgpu_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes);
+extern int cml_hcq_webgpu_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes);
+extern int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* queue);
+extern CMLHCQSignal* cml_hcq_webgpu_signal_create(void);
+extern void cml_hcq_webgpu_signal_destroy(CMLHCQSignal* signal);
+extern int cml_hcq_webgpu_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
+extern int cml_hcq_webgpu_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
+extern int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms);
+
+static const CMLHCQBackendOps g_hcq_webgpu_ops = {
+    .name = "WebGPU",
+    .queue_create = cml_hcq_webgpu_queue_create,
+    .queue_destroy = cml_hcq_webgpu_queue_destroy,
+    .submit_kernel = cml_hcq_webgpu_submit_kernel,
+    .memcpy_h2d = cml_hcq_webgpu_memcpy_h2d,
+    .memcpy_d2h = cml_hcq_webgpu_memcpy_d2h,
+    .queue_synchronize = cml_hcq_webgpu_queue_synchronize,
+    .signal_create = cml_hcq_webgpu_signal_create,
+    .signal_destroy = cml_hcq_webgpu_signal_destroy,
+    .signal_record = cml_hcq_webgpu_signal_record,
+    .queue_wait = cml_hcq_webgpu_queue_wait,
+    .signal_wait_cpu = cml_hcq_webgpu_signal_wait_cpu,
+};
+
 static CMLHCQQueue* hcq_vulkan_queue_create(void) {
     CMLHCQQueue* q = calloc(1, sizeof(CMLHCQQueue));
     if (!q)
@@ -330,6 +388,10 @@ const CMLHCQBackendOps* cml_hcq_backend_ops(CMLHCQBackendType backend) {
         return &g_hcq_nv_ops;
     case CML_HCQ_AM:
         return &g_hcq_am_ops;
+    case CML_HCQ_ROCM:
+        return &g_hcq_rocm_ops;
+    case CML_HCQ_WEBGPU:
+        return &g_hcq_webgpu_ops;
     default:
         return NULL;
     }
