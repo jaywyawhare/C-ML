@@ -115,7 +115,6 @@ def mlp_step(lib, hidden=512, batch=128):
                 tnn.Linear(hidden, 10),
             )
             with torch.no_grad():
-                self.f[0].weight.copy_(torch.from_numpy(W3.T) * 0)  # shape only
                 self.f[0].weight.copy_(torch.from_numpy(W1.T))
                 self.f[2].weight.copy_(torch.from_numpy(W2.T))
                 self.f[4].weight.copy_(torch.from_numpy(W3.T))
