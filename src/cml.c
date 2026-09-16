@@ -1166,8 +1166,28 @@ Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return tensor_std(a, dim, unbiased, keepdim);
 }
 
-Tensor* cml_squeeze(Tensor* a, int dim) { return tensor_squeeze(a, dim); }
-Tensor* cml_unsqueeze(Tensor* a, int dim) { return tensor_unsqueeze(a, dim); }
+/* squeeze/unsqueeze are size-1-dim reshapes; route through cml_reshape so they
+ * build a differentiable graph node rather than a bare view (which severed the
+ * backward graph, as raw reshape did before its fix). */
+Tensor* cml_squeeze(Tensor* a, int dim) {
+    if (!a || a->ndim < 1) return tensor_squeeze(a, dim);
+    int nd = a->ndim;
+    if (dim < 0) dim += nd;
+    if (dim < 0 || dim >= nd || a->shape[dim] != 1)
+        return cml_reshape(a, a->shape, nd);  /* nothing to drop: identity reshape */
+    int shape[16], j = 0;
+    for (int i = 0; i < nd; i++) if (i != dim) shape[j++] = a->shape[i];
+    return cml_reshape(a, shape, nd - 1);
+}
+Tensor* cml_unsqueeze(Tensor* a, int dim) {
+    if (!a || a->ndim + 1 > 16) return tensor_unsqueeze(a, dim);
+    int nd = a->ndim;
+    if (dim < 0) dim += nd + 1;
+    if (dim < 0 || dim > nd) return tensor_unsqueeze(a, dim);
+    int shape[16], j = 0;
+    for (int i = 0; i < nd + 1; i++) shape[i] = (i == dim) ? 1 : a->shape[j++];
+    return cml_reshape(a, shape, nd + 1);
+}
 Tensor* cml_flip(Tensor* a, int dim) { return tensor_flip(a, dim); }
 Tensor* cml_repeat(Tensor* a, int* repeats, int num_repeats) {
     return tensor_repeat(a, repeats, num_repeats);
