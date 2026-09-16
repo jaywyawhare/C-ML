@@ -50,6 +50,7 @@ typedef struct CMLGemmVariant {
     cl_kernel   kernel;
     size_t      local_size[2];   /* precomputed workgroup size */
     bool        valid;
+    double      cal_gflops;      /* one-time calibration score (0 = unmeasured) */
 } CMLGemmVariant;
 
 typedef struct CMLGemmCacheEntry {
@@ -109,6 +110,7 @@ typedef struct CMLOpenCLIRBackend {
     CMLGemmCacheEntry gemm_cache[CML_OCL_GEMM_CACHE_SIZE];
     cl_command_queue  profiling_queue;
     int               beam_width;       /* 0=off, N=search top-N variants per shape */
+    bool              beam_calibrated;  /* variants scored once at the calibration size */
 } CMLOpenCLIRBackend;
 
 bool                 cml_opencl_ir_available(void);

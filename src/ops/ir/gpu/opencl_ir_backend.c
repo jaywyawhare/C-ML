@@ -643,114 +643,133 @@ static void ocl_beam_cache_store(CMLOpenCLIRBackend* b, int M, int N, int K, int
     b->gemm_cache[0].variant_idx = vidx;
 }
 
-static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K,
-                              cl_mem buf_a, cl_mem buf_b) {
-    int cached = ocl_beam_cache_lookup(b, M, N, K);
-    if (cached >= 0) return cached;
+/* GEMM tiles are multiples of at most 128, so this is divisible by every
+ * variant's TSM/TSN/TSK. Large enough that big tiles get enough workgroups to
+ * show their throughput (128x128 gives 64 groups here vs only 16 at 512),
+ * small enough that calibration -- even with a few slow variants -- stays a
+ * ~1-2s one-time cost. */
+#define CML_OCL_BEAM_CAL 1024
 
-    size_t out_bytes = (size_t)M * N * sizeof(float);
+/* One timed GEMM launch (ns) of `kernel` at the calibration size. */
+static double ocl_beam_time_once(CMLOpenCLIRBackend* b, cl_kernel kernel,
+                                  const size_t global[2], const size_t local[2]) {
+    cl_event ev;
+    if (clEnqueueNDRangeKernel(b->profiling_queue, kernel, 2, NULL,
+                               global, local, 0, NULL, &ev) != CL_SUCCESS)
+        return 1e18;
+    clFinish(b->profiling_queue);
+    cl_ulong t0, t1;
+    clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t0), &t0, NULL);
+    clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t1), &t1, NULL);
+    clReleaseEvent(ev);
+    return (double)(t1 - t0);
+}
+
+/* Best-of-N GEMM runtime (ns) of one variant at the calibration size, on
+ * dedicated buffers. Bails after the first timed launch if it is already >4x
+ * `skip_ns` (a bad config -- register spill / poor occupancy), so a few slow
+ * variants cannot blow up calibration time. Returns 1e18 on failure. */
+static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var,
+                                      cl_mem A, cl_mem B, cl_mem C, double skip_ns) {
+    const int S = CML_OCL_BEAM_CAL;
+    CMLGemmVariantParams* p = &var->params;
+    size_t global[2] = { (size_t)(S / p->tsn) * var->local_size[0],
+                         (size_t)(S / p->tsm) * var->local_size[1] };
+    clSetKernelArg(var->kernel, 0, sizeof(cl_mem), &A);
+    clSetKernelArg(var->kernel, 1, sizeof(cl_mem), &B);
+    clSetKernelArg(var->kernel, 2, sizeof(cl_mem), &C);
+    clSetKernelArg(var->kernel, 3, sizeof(int), &(int){S});
+    clSetKernelArg(var->kernel, 4, sizeof(int), &(int){S});
+    clSetKernelArg(var->kernel, 5, sizeof(int), &(int){S});
+
+    if (clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL,
+                               global, var->local_size, 0, NULL, NULL) != CL_SUCCESS)
+        return 1e18;                      /* warmup */
+    clFinish(b->profiling_queue);
+
+    double best = ocl_beam_time_once(b, var->kernel, global, var->local_size);
+    if (best > skip_ns * 4.0) return best;  /* clearly bad -- don't spend more launches */
+    for (int r = 0; r < 2; r++) {
+        double ns = ocl_beam_time_once(b, var->kernel, global, var->local_size);
+        if (ns < best) best = ns;
+    }
+    return best;
+}
+
+/* Score every variant once at the calibration size. A tile config's *relative*
+ * speed is essentially size-independent, so per-shape selection can reuse these
+ * scores instead of re-probing at the real (possibly 4096+) size -- which made
+ * autotuning unusably slow. Runs once per backend. */
+static void ocl_beam_calibrate(CMLOpenCLIRBackend* b) {
+    b->beam_calibrated = true;
+    const int S = CML_OCL_BEAM_CAL;
+    size_t bytes = (size_t)S * S * sizeof(float);
     cl_int err;
-    cl_mem tmp_out = clCreateBuffer(b->context, CL_MEM_READ_WRITE, out_bytes, NULL, &err);
-    if (err != CL_SUCCESS) return -1;
+    cl_mem A = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
+    if (err != CL_SUCCESS) return;
+    cl_mem B = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
+    if (err != CL_SUCCESS) { clReleaseMemObject(A); return; }
+    cl_mem C = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
+    if (err != CL_SUCCESS) { clReleaseMemObject(A); clReleaseMemObject(B); return; }
 
-    int best_idx = -1;
-    double best_time = 1e18;
-
-    int max_try = b->beam_width > 0 ? b->beam_width : b->gemm_variant_count;
-    LOG_INFO("BEAM: autotuning GEMM M=%d N=%d K=%d (width=%d, %d variants)...",
-             M, N, K, max_try, b->gemm_variant_count);
-
-    int tried = 0;
-    for (int v = 0; v < b->gemm_variant_count && tried < max_try; v++) {
+    double best_ns = 1e18;
+    for (int v = 0; v < b->gemm_variant_count; v++) {
         CMLGemmVariant* var = &b->gemm_variants[v];
+        var->cal_gflops = 0.0;
         if (!var->valid) continue;
         CMLGemmVariantParams* p = &var->params;
-
-        if (M < p->tsm || N < p->tsn) continue;
-        if (M % p->tsm != 0 || N % p->tsn != 0 || K % p->tsk != 0) continue;
-        tried++;
-
-        size_t global[2] = {
-            (size_t)(N / p->tsn) * var->local_size[0],
-            (size_t)(M / p->tsm) * var->local_size[1]
-        };
-
-        clSetKernelArg(var->kernel, 0, sizeof(cl_mem), &buf_a);
-        clSetKernelArg(var->kernel, 1, sizeof(cl_mem), &buf_b);
-        clSetKernelArg(var->kernel, 2, sizeof(cl_mem), &tmp_out);
-        clSetKernelArg(var->kernel, 3, sizeof(int), &M);
-        clSetKernelArg(var->kernel, 4, sizeof(int), &N);
-        clSetKernelArg(var->kernel, 5, sizeof(int), &K);
-
-        clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL,
-                               global, var->local_size, 0, NULL, NULL);
-        clFinish(b->profiling_queue);
-
-        cl_event probe_ev;
-        clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL,
-                               global, var->local_size, 0, NULL, &probe_ev);
-        clFinish(b->profiling_queue);
-        {
-            cl_ulong pt0, pt1;
-            clGetEventProfilingInfo(probe_ev, CL_PROFILING_COMMAND_START, sizeof(pt0), &pt0, NULL);
-            clGetEventProfilingInfo(probe_ev, CL_PROFILING_COMMAND_END, sizeof(pt1), &pt1, NULL);
-            clReleaseEvent(probe_ev);
-            double probe_ns = (double)(pt1 - pt0);
-            /* Skip if >4x slower than best (register spill or bad config) */
-            if (best_time < 1e17 && probe_ns > best_time * 4.0) {
-                LOG_INFO("BEAM:   V%d: TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d -> SKIP (probe %.1fms, best %.1fms)",
-                         v, p->tsm, p->tsn, p->tsk, p->reg_m, p->reg_n, p->slm_pad,
-                         probe_ns/1e6, best_time/1e6);
-                continue;
-            }
-        }
-
-        clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL,
-                               global, var->local_size, 0, NULL, NULL);
-        clFinish(b->profiling_queue);
-
-        cl_event events[3];
-        for (int r = 0; r < 3; r++) {
-            clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL,
-                                   global, var->local_size, 0, NULL, &events[r]);
-        }
-        clFinish(b->profiling_queue);
-
-        double times[3];
-        for (int r = 0; r < 3; r++) {
-            cl_ulong t0, t1;
-            clGetEventProfilingInfo(events[r], CL_PROFILING_COMMAND_START, sizeof(t0), &t0, NULL);
-            clGetEventProfilingInfo(events[r], CL_PROFILING_COMMAND_END, sizeof(t1), &t1, NULL);
-            times[r] = (double)(t1 - t0);
-            clReleaseEvent(events[r]);
-        }
-
-        if (times[0] > times[1]) { double t = times[0]; times[0] = times[1]; times[1] = t; }
-        if (times[1] > times[2]) { double t = times[1]; times[1] = times[2]; times[2] = t; }
-        if (times[0] > times[1]) { double t = times[0]; times[0] = times[1]; times[1] = t; }
-        double median_ns = times[1];
-
-        double gflops = 2.0 * M * N * K / median_ns;
-        LOG_INFO("BEAM:   V%d: TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d -> %.1f GFLOPS (%.2f ms)",
-                 v, p->tsm, p->tsn, p->tsk, p->reg_m, p->reg_n, p->slm_pad,
-                 gflops, median_ns / 1e6);
-
-        if (median_ns < best_time) {
-            best_time = median_ns;
-            best_idx = v;
-        }
+        if (S % p->tsm || S % p->tsn || S % p->tsk) continue;
+        double ns = ocl_beam_probe_variant(b, var, A, B, C, best_ns);
+        if (ns < best_ns) best_ns = ns;
+        if (ns < 1e17) var->cal_gflops = 2.0 * S * S * S / ns;
+        LOG_INFO("BEAM cal V%d: TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d -> %.1f GFLOPS",
+                 v, p->tsm, p->tsn, p->tsk, p->reg_m, p->reg_n, p->slm_pad, var->cal_gflops);
     }
 
-    clReleaseMemObject(tmp_out);
+    clReleaseMemObject(A); clReleaseMemObject(B); clReleaseMemObject(C);
+}
+
+/* Pick the fastest calibrated variant whose tiles divide (M,N,K). Selection is
+ * O(variants) after the one-time calibration -- no per-shape kernel launches. */
+static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K,
+                              cl_mem buf_a, cl_mem buf_b) {
+    (void)buf_a; (void)buf_b;  /* selection uses calibration scores, not the live buffers */
+
+    int cached = ocl_beam_cache_lookup(b, M, N, K);
+    if (cached >= 0) return cached;
+    if (!b->beam_calibrated) ocl_beam_calibrate(b);
+
+    int max_try = b->beam_width > 0 ? b->beam_width : b->gemm_variant_count;
+    int best_idx = -1, tried = 0;
+    double best = 0.0;
+    for (int v = 0; v < b->gemm_variant_count && tried < max_try; v++) {
+        CMLGemmVariant* var = &b->gemm_variants[v];
+        if (!var->valid || var->cal_gflops <= 0.0) continue;
+        CMLGemmVariantParams* p = &var->params;
+        if (M < p->tsm || N < p->tsn) continue;
+        if (M % p->tsm || N % p->tsn || K % p->tsk) continue;
+        tried++;
+        if (var->cal_gflops > best) { best = var->cal_gflops; best_idx = v; }
+    }
+
+    /* When the hand-tuned V3 kernel applies (÷128 / ÷16) it is the best option
+     * at every size measured; the parameterized variants only ever match or lose
+     * to it, and single-size calibration cannot rank them reliably across sizes.
+     * So defer to V3 unconditionally here (return -1 -> the dispatcher's V3 path)
+     * -- enabling BEAM then never regresses. Autotuned variants are used only for
+     * ÷64 shapes V3 cannot handle, where they beat the naive fallback. */
+    bool v3_applies = (M % 128 == 0 && N % 128 == 0 && K % 16 == 0);
+    if (v3_applies) {
+        LOG_INFO("BEAM: %dx%dx%d -> V3 hand-tuned (best beam cal %.1f GFLOPS)", M, N, K, best);
+        return -1;
+    }
 
     if (best_idx >= 0) {
         CMLGemmVariantParams* bp = &b->gemm_variants[best_idx].params;
-        double gflops = 2.0 * M * N * K / best_time;
-        LOG_INFO("BEAM: WINNER V%d (TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d) -> %.1f GFLOPS",
-                 best_idx, bp->tsm, bp->tsn, bp->tsk, bp->reg_m, bp->reg_n, bp->slm_pad, gflops);
+        LOG_INFO("BEAM: %dx%dx%d -> V%d (TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d, cal %.1f GFLOPS)",
+                 M, N, K, best_idx, bp->tsm, bp->tsn, bp->tsk, bp->reg_m, bp->reg_n, bp->slm_pad, best);
         ocl_beam_cache_store(b, M, N, K, best_idx);
     }
-
     return best_idx;
 }
 
