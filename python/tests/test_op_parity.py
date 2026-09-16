@@ -196,3 +196,36 @@ def test_nondiff_forward_parity(name, cf, tf):
     fwd_t = tf(torch.tensor(X)).numpy()
     assert np.allclose(fwd_c, fwd_t, atol=TOL), \
         f"{name}: forward mismatch (max {np.abs(fwd_c - fwd_t).max():.3e})"
+
+
+# ── ops that exercise distinct backward-pass paths ─────────────────────────
+def test_cumsum_parity():
+    X3 = rs.randn(3, 5).astype(np.float32)
+    _check("cumsum", X3, lambda t: t.cumsum(1),
+           lambda t: torch.cumsum(t, dim=1))
+
+
+def test_prod_parity():
+    # bounded away from 0 so d(prod)/dx_i = prod/x_i stays well-conditioned
+    P = (rs.rand(3, 4).astype(np.float32) + 0.5)
+    _check("prod", P, lambda t: t.prod(dim=1),
+           lambda t: torch.prod(t, dim=1))
+
+
+def test_var_std_parity():
+    _check("var", X, lambda t: t.var(dim=1), lambda t: t.var(dim=1, unbiased=True))
+    _check("std", X, lambda t: t.std(dim=1), lambda t: t.std(dim=1, unbiased=True))
+
+
+def test_where_parity():
+    a = rs.randn(4, 5).astype(np.float32)
+    b = rs.randn(4, 5).astype(np.float32)
+    cond = (rs.rand(4, 5) > 0.5).astype(np.float32)
+    ac = cml.Tensor(a.copy()); ac.requires_grad_(True)
+    bc = cml.Tensor(b.copy()); bc.requires_grad_(True)
+    oc = ac.where(cml.Tensor(cond.copy()), bc); oc.sum().backward()
+    at = torch.tensor(a, requires_grad=True); bt = torch.tensor(b, requires_grad=True)
+    ot = torch.where(torch.tensor(cond) > 0, at, bt); ot.sum().backward()
+    assert np.allclose(np.asarray(oc.numpy()), ot.detach().numpy(), atol=TOL), "where fwd"
+    assert np.allclose(np.asarray(ac.grad.numpy()), at.grad.numpy(), atol=TOL), "where da"
+    assert np.allclose(np.asarray(bc.grad.numpy()), bt.grad.numpy(), atol=TOL), "where db"

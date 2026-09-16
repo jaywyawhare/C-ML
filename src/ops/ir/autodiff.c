@@ -625,8 +625,18 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             break;
         /* ── Reductions ───────────────────────────────────────────────── */
         case UOP_PROD: {                      /* d/dx_i prod = prod / x_i */
-            Tensor* ob = ad_expand(out, a->shape, a->ndim);
-            Tensor* gb = ad_expand(g, a->shape, a->ndim);
+            /* out and g are reduced; reshape to the keepdim shape before
+             * broadcasting back, or a non-keepdim reduce (e.g. [3,4]->[3])
+             * fails to right-align onto [3,4] (see UOP_SUM). */
+            ReduceParams* rp = (ReduceParams*)nd->params;
+            int ks[16]; for (int d = 0; d < a->ndim; d++) ks[d] = a->shape[d];
+            if (rp && rp->dims && rp->num_dims > 0)
+                for (int k = 0; k < rp->num_dims; k++) {
+                    int d = rp->dims[k]; if (d < 0) d += a->ndim; if (d >= 0 && d < a->ndim) ks[d] = 1;
+                }
+            else for (int d = 0; d < a->ndim; d++) ks[d] = 1;
+            Tensor* ob = ad_expand(ad_reshape(out, ks, a->ndim), a->shape, a->ndim);
+            Tensor* gb = ad_expand(ad_reshape(g, ks, a->ndim), a->shape, a->ndim);
             if (ob && gb) gm_accum(&map, a, uop_mul(gb, uop_div(ob, a)));
             break;
         }
