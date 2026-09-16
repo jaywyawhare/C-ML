@@ -121,12 +121,71 @@ static int test_reset_pressure(void) {
     return ok;
 }
 
+/* Attention-block soak: the reshape + batched-matmul + softmax path that
+ * severed the autograd graph before the cml_reshape fix. Trains one block for
+ * many steps to shake out lifecycle bugs (heap corruption, use-after-free,
+ * leaks across reset) on the exact composition transformers exercise. */
+static int test_attention_soak(void) {
+    const int B = 4, S = 6, d = 8, NP_MAX = 8;
+    Linear* lq = cml_nn_linear(d, d, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Linear* lk = cml_nn_linear(d, d, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Linear* lv = cml_nn_linear(d, d, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Linear* lo = cml_nn_linear(d, d, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Sequential* seq = nn_sequential();
+    if (!lq || !lk || !lv || !lo || !seq) return 0;
+    sequential_add(seq, (Module*)lq); sequential_add(seq, (Module*)lk);
+    sequential_add(seq, (Module*)lv); sequential_add(seq, (Module*)lo);
+
+    Parameter** params = NULL; int nparams = 0;
+    module_collect_parameters((Module*)seq, &params, &nparams, true);
+    Optimizer* opt = optim_sgd(params, nparams, 0.01f, 0.0f, 0.0f);
+    cml_free(params);
+    (void)NP_MAX;
+
+    int xs2[] = {B * S, d}, xs3[] = {B, S, d};
+    int ok = 1;
+    float first = 0.0f, last = 0.0f;
+    for (int step = 0; step < 100 && ok; step++) {
+        Tensor* X = tensor_randn(xs2, 2, &cfg);
+        Tensor* Yt = tensor_randn(xs3, 3, &cfg);
+        Tensor* q = cml_reshape(cml_nn_module_forward((Module*)lq, X), xs3, 3);
+        Tensor* k = cml_reshape(cml_nn_module_forward((Module*)lk, X), xs3, 3);
+        Tensor* v = cml_reshape(cml_nn_module_forward((Module*)lv, X), xs3, 3);
+        Tensor* scores = cml_matmul(q, cml_transpose(k, 1, 2));
+        Tensor* attn = cml_softmax(scores, -1);
+        Tensor* ctx = cml_matmul(attn, v);
+        int flat[] = {B * S, d};
+        Tensor* out = cml_nn_module_forward((Module*)lo, cml_reshape(ctx, flat, 2));
+        Tensor* loss = cml_nn_mse_loss(cml_reshape(out, xs3, 3), Yt);
+        ok &= loss != NULL;
+        if (loss) {
+            Tensor* one = tensor_ones(loss->shape, loss->ndim, &cfg);
+            tensor_backward(loss, one, false, false);  /* graph mode realizes loss here */
+            tensor_free(one);
+            float lv_ = (loss->data) ? ((float*)loss->data)[0] : 0.0f/0.0f;
+            if (lv_ != lv_) ok = 0;                     /* NaN => training diverged */
+            if (step == 0) first = lv_;
+            last = lv_;
+            optimizer_step(opt);
+            optimizer_zero_grad(opt);
+        }
+        cml_reset_ir_context();
+        (void)X; (void)Yt;
+    }
+    /* Must have trained (loss moved), not frozen (the old reshape-severed bug). */
+    ok &= (last < first);
+    optimizer_free(opt);
+    module_free((Module*)seq);
+    return ok;
+}
+
 int main(void) {
     cml_init();
     printf("=== lifecycle stress ===\n");
     TEST(model_churn);
     TEST(view_temporary_churn);
     TEST(reset_pressure);
+    TEST(attention_soak);
     cml_cleanup();
     return TEST_SUMMARY();
 }
