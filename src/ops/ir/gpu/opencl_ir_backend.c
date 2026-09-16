@@ -864,16 +864,20 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
 
     b->initialized = true;
 
-    const char* beam_env = getenv("BEAM");
-    int beam_width = 0;  /* default: all variants */
-    if (beam_env) {
-        beam_width = atoi(beam_env);
+    int beam_width = 0;
+    {
+        const char* beam_env = getenv("BEAM");
+        if (beam_env) beam_width = atoi(beam_env);
         if (beam_width < 0) beam_width = 0;
     }
 
-    /* BEAM=0 explicitly disables, absent means auto-enable */
-    if (beam_env && beam_width == 0) {
-        b->beam_width = 0;  /* explicitly disabled */
+    /* BEAM autotuning is opt-in (BEAM=<width>). It probes every GEMM variant
+     * with a blocking clFinish; a single bad config serializes badly, so
+     * auto-enabling stalled the first large matmul for minutes. Absent or
+     * BEAM=0 uses the fast V3/naive heuristic dispatch (BEAM=<large> tries all
+     * variants). */
+    if (beam_width == 0) {
+        b->beam_width = 0;
     } else {
 #ifdef CL_VERSION_2_0
         cl_queue_properties prof_props[] = {
@@ -892,7 +896,7 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
                 LOG_WARNING("BEAM: no valid variants compiled, disabling");
                 b->beam_width = 0;
             } else {
-                b->beam_width = beam_width > 0 ? beam_width : b->gemm_variant_count;
+                b->beam_width = beam_width;
                 LOG_INFO("BEAM: enabled with width=%d (%d variants compiled)",
                          b->beam_width, b->gemm_variant_count);
             }
