@@ -64,6 +64,16 @@ out-*/
 **/cmake_install.cmake
 CMakeUserPresets.json
 
+# In-source CMake artifacts that leak into the repo root when cmake is run
+# from the top level instead of build/ (the tracked root Makefile is one of
+# these; run `git rm --cached Makefile` to stop tracking it).
+/Makefile
+/CMLConfig.cmake
+/CMLConfigVersion.cmake
+/CTestTestfile.cmake
+/cml.pc
+/python/cml/cml/
+
 # Python
 __pycache__/
 .pytest_cache/
