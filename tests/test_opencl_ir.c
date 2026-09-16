@@ -120,6 +120,69 @@ static void test_batched_matmul(void) {
     cml_free(ref);
 }
 
+/* Validate each GPU-supported unary op numerically against the CPU path on the
+ * real device (extends coverage beyond RELU). sqrt/log get positive inputs. */
+static void test_gpu_unary_validation(void) {
+    printf("Testing GPU unary ops vs CPU...\n");
+    int n = 1024, shape[] = {n};
+    TensorConfig cfg = {0};
+    float* pos = cml_malloc(n * sizeof(float));
+    float* mix = cml_malloc(n * sizeof(float));
+    for (int i = 0; i < n; i++) { pos[i] = (float)(i + 1) * 0.01f; mix[i] = (float)(i - 512) * 0.02f; }
+
+    struct { const char* name; Tensor* (*fn)(Tensor*); int pos; } ops[] = {
+        {"exp",     uop_exp,     0}, {"log",  uop_log,  1}, {"sqrt", uop_sqrt, 1},
+        {"sigmoid", uop_sigmoid, 0}, {"tanh", uop_tanh, 0}, {"neg",  uop_neg,  0},
+    };
+    for (size_t k = 0; k < sizeof(ops) / sizeof(ops[0]); k++) {
+        float* in = ops[k].pos ? pos : mix;
+        Tensor* t = tensor_from_data(in, shape, 1, &cfg);
+        Tensor* r = ops[k].fn(t);
+        float* cpu = cml_malloc(n * sizeof(float));
+        memcpy(cpu, tensor_data_ptr(r), n * sizeof(float));
+        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+
+        setenv("BACKEND", "opencl", 1);
+        t = tensor_from_data(in, shape, 1, &cfg);
+        r = ops[k].fn(t);
+        float diff = max_abs_diff(cpu, (float*)tensor_data_ptr(r), n);
+        char lbl[64]; snprintf(lbl, sizeof(lbl), "GPU %s vs CPU", ops[k].name);
+        CHECK(lbl, diff < 1e-3f);
+        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+        unsetenv("BACKEND");
+        cml_free(cpu);
+    }
+    cml_free(pos); cml_free(mix);
+}
+
+static void test_gpu_reduction_validation(void) {
+    printf("Testing GPU reductions vs CPU...\n");
+    int n = 4096, shape[] = {n};
+    TensorConfig cfg = {0};
+    float* data = cml_malloc(n * sizeof(float));
+    for (int i = 0; i < n; i++) data[i] = (float)((i % 97) - 48) * 0.1f;
+
+    struct { const char* name; Tensor* (*fn)(Tensor*, ReduceParams*); } ops[] = {
+        {"sum", uop_sum}, {"mean", uop_mean}, {"max_reduce", uop_max_reduce},
+    };
+    for (size_t k = 0; k < sizeof(ops) / sizeof(ops[0]); k++) {
+        Tensor* t = tensor_from_data(data, shape, 1, &cfg);
+        Tensor* r = ops[k].fn(t, NULL);
+        float cpu = ((float*)tensor_data_ptr(r))[0];
+        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+
+        setenv("BACKEND", "opencl", 1);
+        t = tensor_from_data(data, shape, 1, &cfg);
+        r = ops[k].fn(t, NULL);
+        float gpu = ((float*)tensor_data_ptr(r))[0];
+        char lbl[64]; snprintf(lbl, sizeof(lbl), "GPU %s vs CPU", ops[k].name);
+        CHECK(lbl, fabsf(cpu - gpu) < 1e-2f * (1.0f + fabsf(cpu)));
+        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+        unsetenv("BACKEND");
+    }
+    cml_free(data);
+}
+
 static void test_elementwise(void) {
     printf("Testing elementwise ops on GPU...\n");
     int n = 1024;
@@ -255,6 +318,8 @@ int main(void) {
 
     test_matmul();
     test_batched_matmul();
+    test_gpu_unary_validation();
+    test_gpu_reduction_validation();
     test_elementwise();
     test_large_matmul_perf();
 
