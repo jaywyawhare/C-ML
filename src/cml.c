@@ -826,7 +826,14 @@ Tensor* cml_min(Tensor* a, int dim, bool keepdim) { return tensor_min(a, dim, ke
 Tensor* cml_matmul(Tensor* a, Tensor* b) { return tensor_matmul(a, b); }
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2) { return tensor_transpose(a, dim1, dim2); }
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim) {
-    return tensor_reshape(a, new_shape, new_ndim);
+    if (!a || !new_shape || new_ndim <= 0)
+        return NULL;
+    /* Route through uop_reshape so the reshape is a differentiable graph node
+     * (or an autograd-attached view), not a bare tensor_reshape view that
+     * severs the backward graph -- gradients would not reach producers of the
+     * reshaped tensor (e.g. attention/transformer blocks did not train). */
+    ReshapeParams p = { .new_shape = new_shape, .new_ndim = new_ndim };
+    return uop_reshape(a, &p);
 }
 Tensor* cml_clone(Tensor* a) { return tensor_clone(a); }
 Tensor* cml_detach(Tensor* a) { return tensor_detach(a); }

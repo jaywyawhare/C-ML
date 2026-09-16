@@ -269,11 +269,7 @@ def test_transformer_block_training_loss_curve_parity():
 
     diffs = np.abs(np.array(losses_cml) - np.array(losses_torch))
     print(f"\nmax |transformer loss diff| over 8 steps: {diffs.max():.3e}")
-    # NOTE: currently ~7e-2 — the multi-op batched-matmul composition trips a
-    # plan-cache aliasing bug (see AUDIT.md "batched matmul in multi-node
-    # graphs"). Curves still converge in lockstep shape; strict per-step
-    # parity is asserted once that engine bug is fixed.
-    print("transformer curves: shapes track torch; strict parity pending "
-          "plan-cache fix")
     assert all(np.isfinite(losses_cml)) and losses_cml[-1] < losses_cml[0], \
         "cml transformer block does not converge"
+    assert diffs.max() < 1e-4, \
+        f"cml transformer loss curve diverges from torch (max {diffs.max():.3e})"
