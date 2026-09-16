@@ -196,10 +196,9 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
  * may still be lazy (graph autodiff), so each is materialised before its data
  * pointer is touched -- otherwise the sync silently skips it. */
 static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
-    /* With find_unused_parameters, a parameter that produced no gradient this
-     * step still reserves its slot (zero-filled on pack). Otherwise ranks that
-     * exercised different subsets of the model would build differently-laid-out
-     * buckets and the all-reduce would sum mismatched elements. */
+    /* find_unused_parameters keeps a zero-filled slot for a gradient-less param
+     * so every rank's bucket layout matches; otherwise the all-reduce would sum
+     * mismatched elements. */
     bool reserve = ddp->config.find_unused_parameters;
     size_t offset = 0;
     for (int i = 0; i < ddp->num_params; i++) {
@@ -217,8 +216,6 @@ static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
 
         if (!has_grad) {
             if (reserve && numel > 0 && ddp->buckets[b]) {
-                /* Zero the slot so this rank contributes nothing for the unused
-                 * parameter while keeping every rank's layout identical. */
                 if (pack)
                     memset(ddp->buckets[b] + offset, 0, numel * sizeof(float));
                 offset += numel;

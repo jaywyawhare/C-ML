@@ -40,9 +40,8 @@ typedef struct {
 
 #define CML_URING_DEPTH 32
 
-/* Ring plus the per-request bookkeeping needed to complete and clean up in
- * cml_disk_wait: each in-flight read keeps its fd open and remembers how many
- * bytes it expected so the wait can verify the short-read case. */
+/* Ring plus per-request state cml_disk_wait needs: each in-flight read keeps
+ * its fd open until completion and its expected size for short-read detection. */
 typedef struct {
     struct io_uring ring;
     int    pending_fds[CML_URING_DEPTH];
@@ -77,8 +76,6 @@ CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mod
                         "reads run synchronously");
         }
 #else
-        /* io_uring not compiled in: honor the request with the sync fallback
-         * rather than silently pretending to be async. */
         LOG_WARNING("cml_disk_backend_create: CML_DISK_ASYNC requested but "
                     "io_uring support was not compiled in; reads run synchronously");
 #endif

@@ -1003,10 +1003,8 @@ void cml_graph_cache_reset_global(void);
 void cml_autograd_step_end(Tensor* keep) {
     if (keep)
         tensor_realize(keep);   /* materialize + detach so the reset won't free it */
-    /* FUSE_OPTIM: the SGD step now emits every parameter's update into the graph
-     * and realizes them in one co-scheduled pass (see sgd_step in optim.c), so
-     * the elementwise fuser can pack the independent per-parameter updates. Other
-     * optimizers (Adam, etc.) still realize per parameter; note that once. */
+    /* FUSE_OPTIM is honored by sgd_step (optim.c); other optimizers still
+     * realize per parameter. Note the latter once. */
     if (cml_flag_enabled(CML_FLAG_FUSE_OPTIM)) {
         static bool warned = false;
         if (!warned) {

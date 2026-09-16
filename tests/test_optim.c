@@ -217,11 +217,9 @@ static int test_optim_for_model(void) {
     return 1;
 }
 
-/* FUSE_OPTIM only changes how the SGD updates are scheduled (all emitted then
- * realized in one pass), not the math. Train two identical models on identical
- * data -- one default, one with FUSE_OPTIM -- and require the weights to match.
- * A double-applied momentum update (the main risk of the batched realize) would
- * diverge here. */
+/* FUSE_OPTIM changes only scheduling, not the math: identical models trained
+ * with and without it must reach identical weights. A double-applied momentum
+ * update (the batched-realize risk) would diverge here. */
 static int test_fuse_optim_matches_default(void) {
     Sequential *ma, *mb; Parameter **pa, **pb; int na, nb;
     create_test_model(&ma, &pa, &na);

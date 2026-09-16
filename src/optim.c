@@ -671,13 +671,9 @@ static void sgd_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    /* FUSE_OPTIM: emit every parameter's uop_sgd_step into the graph first and
-     * realize them in a single pass, instead of realizing each update on its own
-     * (the default). The executor is idempotent (is_executed-guarded), so once
-     * the whole batch runs, each adopt_param_data below finds its update already
-     * computed and only swaps the data pointer -- no re-execution, no
-     * double-applied momentum. The per-parameter updates are independent, so
-     * co-scheduling lets the elementwise fuser pack them together. */
+    /* FUSE_OPTIM defers each update's realize and runs them in one pass. The
+     * executor is is_executed-guarded, so the deferred adopt below never
+     * re-executes a node -- momentum stays single-applied. */
     bool fuse = cml_flag_enabled(CML_FLAG_FUSE_OPTIM);
 
     int total = 0;
@@ -691,7 +687,6 @@ static void sgd_step(Optimizer* optimizer) {
         pending_dst = (Tensor**)cml_malloc(sizeof(Tensor*) * (size_t)total);
         pending_upd = (Tensor**)cml_malloc(sizeof(Tensor*) * (size_t)total);
         if (!pending_dst || !pending_upd) {
-            /* Allocation failed: fall back to the per-parameter path. */
             cml_free(pending_dst); cml_free(pending_upd);
             pending_dst = pending_upd = NULL;
             fuse = false;
@@ -744,9 +739,8 @@ static void sgd_step(Optimizer* optimizer) {
     }
 
     if (fuse) {
-        /* Realize the last-emitted update first: cml_ir_execute_up_to walks the
-         * graph head-to-tail, so this single pass computes every earlier update
-         * too. Then adopt each (already-executed, so a pointer swap only). */
+        /* Realizing the last-emitted update walks the graph head-to-tail, so
+         * this single pass computes every earlier update too. */
         if (pending_n > 0)
             tensor_ensure_executed(pending_upd[pending_n - 1]);
         for (int k = 0; k < pending_n; k++)

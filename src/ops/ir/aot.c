@@ -541,14 +541,14 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
                     emit_ok = false;
                     break;
                 }
-                int64_t istr[16], bstr[16]; /* input strides, broadcast stride per out dim */
+                int64_t istr[16], bstr[16];
                 if (id > 0) {
                     istr[id - 1] = 1;
                     for (int d = id - 2; d >= 0; d--) istr[d] = istr[d + 1] * in0->shape[d + 1];
                 }
-                int off = od - id; /* alignment offset */
+                int off = od - id;
                 for (int d = 0; d < od; d++) {
-                    int sd = d - off; /* corresponding input dim, or <0 if absent */
+                    int sd = d - off; /* input dim aligned to out dim d, or <0 if absent */
                     bstr[d] = (sd >= 0 && in0->shape[sd] == out_t->shape[d]) ? istr[sd] : 0;
                 }
                 int64_t ostr[16];

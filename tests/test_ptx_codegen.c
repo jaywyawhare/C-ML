@@ -375,9 +375,8 @@ static void test_bounds_check(void) {
     PASS();
 }
 
-/* Coverage for the elementwise ops added to close the REMAINING_WORK.md gap.
- * Each check confirms the op emits (non-NULL, well-formed) and contains a
- * signature instruction distinctive to its lowering. */
+/* Each op must emit well-formed PTX containing an instruction distinctive to
+ * its lowering. */
 static void test_new_unary_ops(void) {
     struct { UOpType op; const char* name; const char* sig; } cases[] = {
         { UOP_TAN,          "ptx_tan",         "div.approx.f32"   },
