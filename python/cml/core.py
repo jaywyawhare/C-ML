@@ -557,7 +557,7 @@ class Tensor:
     def pow(self, other):
         if isinstance(other, Tensor):
             return Tensor(lib.cml_pow(self._tensor, other._tensor))
-        raise TypeError(f"pow requires a Tensor exponent, got {type(other)}")
+        return self.__pow__(other)  # scalar exponent, like torch.Tensor.pow
 
     def clamp(self, min_val, max_val):
         return Tensor(lib.cml_clamp(self._tensor, float(min_val), float(max_val)))

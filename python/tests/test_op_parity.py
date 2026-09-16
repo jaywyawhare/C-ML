@@ -117,3 +117,82 @@ def test_softmax_parity():
     _check("softmax", X,
            lambda t: t.softmax(1),
            lambda t: torch.softmax(t, dim=1))
+
+
+# ── broadened coverage ────────────────────────────────────────────────────
+@pytest.mark.parametrize("name,cf,tf,inp", [
+    ("reciprocal", lambda t: t.reciprocal(), torch.reciprocal, "XPOS"),
+    ("rsqrt",      lambda t: t.rsqrt(),      torch.rsqrt,      "XPOS"),
+    ("sin",        lambda t: t.sin(),        torch.sin,        "X"),
+    ("cos",        lambda t: t.cos(),        torch.cos,        "X"),
+    ("abs",        lambda t: abs(t),         torch.abs,        "X"),
+])
+def test_more_unary_parity(name, cf, tf, inp):
+    _check(name, XPOS if inp == "XPOS" else X, cf, tf)
+
+
+def test_clamp_parity():
+    _check("clamp", X, lambda t: t.clamp(-0.5, 0.5),
+           lambda t: t.clamp(-0.5, 0.5))
+
+
+def test_pow_parity():
+    _check("pow3", XPOS, lambda t: t.pow(3.0), lambda t: t.pow(3.0))
+
+
+def test_axis_reduction_parity():
+    X3 = rs.randn(2, 3, 4).astype(np.float32)
+    _check("sum_axis1",  X3, lambda t: t.sum(dim=1),  lambda t: t.sum(dim=1))
+    _check("mean_axis2", X3, lambda t: t.mean(dim=2), lambda t: t.mean(dim=2))
+
+
+def test_max_min_reduction_parity():
+    _check("max_axis1", X, lambda t: t.max(dim=1), lambda t: t.max(dim=1).values)
+    _check("min_axis1", X, lambda t: t.min(dim=1), lambda t: t.min(dim=1).values)
+
+
+def test_flatten_parity():
+    X3 = rs.randn(2, 3, 4).astype(np.float32)
+    _check("flatten", X3, lambda t: t.flatten(1), lambda t: torch.flatten(t, 1))
+
+
+def test_batched_matmul_parity():
+    a = rs.randn(3, 4, 6).astype(np.float32)
+    b = rs.randn(3, 6, 5).astype(np.float32)
+    ac = cml.Tensor(a.copy()); ac.requires_grad_(True)
+    bc = cml.Tensor(b.copy()); bc.requires_grad_(True)
+    oc = ac.matmul(bc); oc.sum().backward()
+    at = torch.tensor(a, requires_grad=True)
+    bt = torch.tensor(b, requires_grad=True)
+    ot = at @ bt; ot.sum().backward()
+    assert np.allclose(np.asarray(oc.numpy()).reshape(3, 4, 5), ot.detach().numpy(), atol=TOL), "bmm fwd"
+    assert np.allclose(np.asarray(ac.grad.numpy()).reshape(a.shape), at.grad.numpy(), atol=TOL), "bmm da"
+    assert np.allclose(np.asarray(bc.grad.numpy()).reshape(b.shape), bt.grad.numpy(), atol=TOL), "bmm db"
+
+
+def test_cat_stack_parity():
+    a = rs.randn(2, 3).astype(np.float32)
+    b = rs.randn(2, 3).astype(np.float32)
+    # cat
+    ac = cml.Tensor(a.copy()); ac.requires_grad_(True)
+    bc = cml.Tensor(b.copy()); bc.requires_grad_(True)
+    oc = cml.Tensor.cat([ac, bc], 0); oc.sum().backward()
+    at = torch.tensor(a, requires_grad=True); bt = torch.tensor(b, requires_grad=True)
+    ot = torch.cat([at, bt], 0); ot.sum().backward()
+    assert np.allclose(np.asarray(oc.numpy()).reshape(4, 3), ot.detach().numpy(), atol=TOL), "cat fwd"
+    assert np.allclose(np.asarray(ac.grad.numpy()), at.grad.numpy(), atol=TOL), "cat grad"
+
+
+@pytest.mark.parametrize("name,cf,tf", [
+    ("floor", lambda t: t.floor(), torch.floor),
+    ("ceil",  lambda t: t.ceil(),  torch.ceil),
+    ("round", lambda t: t.round(), torch.round),
+    ("sign",  lambda t: t.sign(),  torch.sign),
+])
+def test_nondiff_forward_parity(name, cf, tf):
+    """Non-differentiable ops: forward value must match (grad is zero/undefined)."""
+    xc = cml.Tensor(X.copy())
+    fwd_c = np.asarray(cf(xc).numpy())
+    fwd_t = tf(torch.tensor(X)).numpy()
+    assert np.allclose(fwd_c, fwd_t, atol=TOL), \
+        f"{name}: forward mismatch (max {np.abs(fwd_c - fwd_t).max():.3e})"
