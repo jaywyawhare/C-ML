@@ -679,7 +679,7 @@ static int cpu_backward_node(struct IRNode* node) {
             Tensor* g1 = ensure_grad(vals);
             if (g1 && g1->data) {
                 float* gv = (float*)g1->data;
-                for (int m = 0; m < vals->numel; m++) {
+                for (size_t m = 0; m < vals->numel; m++) {
                     float sum = 0.0f;
                     for (int n = 0; n < N; n++)
                         sum += og[rows[m] * N + n] * dense_data[cols[m] * N + n];
@@ -692,7 +692,7 @@ static int cpu_backward_node(struct IRNode* node) {
             Tensor* g2 = ensure_grad(dense);
             if (g2 && g2->data) {
                 float* gd = (float*)g2->data;
-                for (int m = 0; m < vals->numel; m++)
+                for (size_t m = 0; m < vals->numel; m++)
                     for (int n = 0; n < N; n++)
                         gd[cols[m] * N + n] += val_data[m] * og[rows[m] * N + n];
             }

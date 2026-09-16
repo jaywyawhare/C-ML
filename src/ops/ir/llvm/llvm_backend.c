@@ -320,7 +320,6 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef in0   = LLVMGetParam(fn, 0);
     LLVMValueRef in1   = LLVMGetParam(fn, 1);
     LLVMValueRef out   = LLVMGetParam(fn, 2);
-    LLVMValueRef out_n = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
     LLVMValueRef start = LLVMGetParam(fn, 6);
     LLVMValueRef end   = LLVMGetParam(fn, 7);
 
@@ -434,7 +433,6 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
 
     LLVMValueRef in_p  = LLVMGetParam(fn, 0);
     LLVMValueRef out   = LLVMGetParam(fn, 1);
-    LLVMValueRef out_n = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
     LLVMValueRef start = LLVMGetParam(fn, 4);
     LLVMValueRef end   = LLVMGetParam(fn, 5);
 
@@ -933,7 +931,6 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef a_p    = LLVMGetParam(fn, 1);
     LLVMValueRef b_p    = LLVMGetParam(fn, 2);
     LLVMValueRef out    = LLVMGetParam(fn, 3);
-    LLVMValueRef out_n  = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
     LLVMValueRef start  = LLVMGetParam(fn, 8);
     LLVMValueRef end    = LLVMGetParam(fn, 9);
 
@@ -1541,7 +1538,7 @@ static void jf_task(void* d, size_t start, size_t end) {
     t->fn(t->out + start, (int64_t)(end - start));
 }
 
-static void jf_run(void* fnv, float* out, int64_t n) {
+__attribute__((unused)) static void jf_run(void* fnv, float* out, int64_t n) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
         JFTaskCtx ctx = { *(void (**)(float*, int64_t))&fnv, out };
         threadpool_parallel_for(threadpool_get_global(), jf_task, &ctx, (size_t)n);
