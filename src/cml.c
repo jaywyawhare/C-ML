@@ -1188,7 +1188,9 @@ Tensor* cml_unsqueeze(Tensor* a, int dim) {
     for (int i = 0; i < nd + 1; i++) shape[i] = (i == dim) ? 1 : a->shape[j++];
     return cml_reshape(a, shape, nd + 1);
 }
-Tensor* cml_flip(Tensor* a, int dim) { return tensor_flip(a, dim); }
+/* Route through uop_flip so flip is a differentiable graph node (grad = flip
+ * back), not a bare tensor_flip view that severed the backward graph. */
+Tensor* cml_flip(Tensor* a, int dim) { return uop_flip(a, dim); }
 Tensor* cml_repeat(Tensor* a, int* repeats, int num_repeats) {
     return tensor_repeat(a, repeats, num_repeats);
 }

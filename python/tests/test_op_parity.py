@@ -111,6 +111,9 @@ def test_shape_parity():
     _check("reshape", X, lambda t: t.reshape(2, 10), lambda t: t.reshape(2, 10))
     # transpose
     _check("transpose", X, lambda t: t.transpose(0, 1), lambda t: t.transpose(0, 1))
+    # flip (also severed the graph before its uop_flip fix)
+    _check("flip0", X, lambda t: t.flip(0), lambda t: torch.flip(t, [0]))
+    _check("flip1", X, lambda t: t.flip(1), lambda t: torch.flip(t, [1]))
 
 
 def test_softmax_parity():

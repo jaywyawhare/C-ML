@@ -613,6 +613,11 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             gm_accum(&map, a, uop_roll(g, rp ? -rp->shift : 0, rp ? rp->dim : 0));
             break;
         }
+        case UOP_FLIP: {                      /* flip is its own inverse */
+            FlipParams* fp = (FlipParams*)nd->params;
+            gm_accum(&map, a, uop_flip(g, fp ? fp->dim : 0));
+            break;
+        }
         case UOP_UNFLATTEN:                   /* pure relayout */
         case UOP_FLATTEN:
             gm_accum(&map, a, ad_reshape(g, a->shape, a->ndim));

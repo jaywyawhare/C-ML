@@ -724,6 +724,21 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
         return 0;
     }
 
+    case UOP_FLIP: {
+        FlipParams* p = (FlipParams*)node->params;
+        if (!ad || !p) return -1;
+        int dim = axis_of(a->ndim == 1 ? 0 : p->dim, a->ndim);
+        if (dim < 0) return -1;
+        size_t outer, cnt, inner;
+        lanes_of(a, dim, &outer, &cnt, &inner);
+        for (size_t o = 0; o < outer; o++)
+            for (size_t j = 0; j < cnt; j++)
+                for (size_t m = 0; m < inner; m++)
+                    ELEM_COPY(od, (o * cnt + (cnt - 1 - j)) * inner + m,
+                              ad, (o * cnt + j) * inner + m, esz);
+        return 0;
+    }
+
     case UOP_TILE: {
         TileParams* p = (TileParams*)node->params;
         if (!ad || !p) return -1;

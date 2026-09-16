@@ -1486,6 +1486,19 @@ static void roll_axis_f32(const float* in, const Tensor* inp, int shift, int dim
                     in[(o * count + j) * inner + m];
 }
 
+static void flip_axis_f32(const float* in, const Tensor* inp, int dim, float* out) {
+    if (dim < 0) dim += inp->ndim;
+    if (dim < 0 || dim >= inp->ndim) return;
+    size_t outer, count, inner;
+    movement_lanes(inp, dim, &outer, &count, &inner);
+    if (count == 0) return;
+    for (size_t o = 0; o < outer; o++)
+        for (size_t j = 0; j < count; j++)
+            for (size_t m = 0; m < inner; m++)
+                out[(o * count + (count - 1 - j)) * inner + m] =
+                    in[(o * count + j) * inner + m];
+}
+
 static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int reps,
                                        int dim, float* out) {
     if (dim < 0) dim += inp->ndim;
@@ -3197,6 +3210,16 @@ not_empty_reduction:;
             RollParams* rp = (RollParams*)node->params;
             roll_axis_f32(in1_data, node->inputs[0], rp ? rp->shift : 0,
                           rp ? rp->dim : 0, out_data);
+        }
+        break;
+    }
+
+    case UOP_FLIP: {
+        if (!in1_data)
+            return -1;
+        {
+            FlipParams* fp = (FlipParams*)node->params;
+            flip_axis_f32(in1_data, node->inputs[0], fp ? fp->dim : 0, out_data);
         }
         break;
     }

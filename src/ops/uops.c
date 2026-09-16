@@ -2386,6 +2386,25 @@ Tensor* uop_roll(Tensor* a, int shift, int dim) {
     return finish_samesize_unary(ir, a);
 }
 
+Tensor* uop_flip(Tensor* a, int dim) {
+    if (!a) return NULL;
+    if (dim < 0) dim = a->ndim + dim;
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir) return NULL;
+
+    FlipParams* params = cml_malloc(sizeof(FlipParams));
+    if (!params) return NULL;
+    params->dim = dim;
+
+    Tensor* inputs[] = {a};
+    if (cml_ir_add_uop(ir, UOP_FLIP, inputs, 1, params) != 0) {
+        cml_free(params); return NULL;
+    }
+
+    return finish_samesize_unary(ir, a);
+}
+
 Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim) {
     if (!a) return NULL;
     if (start_dim < 0) start_dim = a->ndim + start_dim;

@@ -244,6 +244,9 @@ typedef enum {
      * eager tensors so the VJP can gather/scatter with the primitive uops. */
     UOP_SPMM,            // C = A_coo @ B  (SpMMParams)
 
+    UOP_FLIP,            // reverse along dimension (FlipParams) — appended here to
+                         // keep existing UOp enum values stable
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -641,6 +644,10 @@ typedef struct {
 } RollParams;
 
 typedef struct {
+    int dim;   // Dimension to reverse along
+} FlipParams;
+
+typedef struct {
     int start_dim; // First dimension to flatten
     int end_dim;   // Last dimension to flatten
 } FlattenParams;
@@ -665,6 +672,7 @@ Tensor* uop_cat(Tensor** tensors, int num_tensors, int dim);
 Tensor* uop_stack(Tensor** tensors, int num_tensors, int dim);
 Tensor* uop_scatter(Tensor* a, int dim, Tensor* index, Tensor* src);
 Tensor* uop_roll(Tensor* a, int shift, int dim);
+Tensor* uop_flip(Tensor* a, int dim);
 Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim);
 Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes);
 
