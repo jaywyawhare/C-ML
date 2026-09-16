@@ -263,6 +263,7 @@ set(BACKEND_SOURCES
 
 set(OPS_SOURCES
     src/ops/uops.c
+    src/ops/uops_optim_steps.c
     src/ops/winograd.c
     src/ops/ir/ir.c
     src/ops/ir/intern.c
