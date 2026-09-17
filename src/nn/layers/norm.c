@@ -136,37 +136,66 @@ static Tensor* batchnorm_forward(Module* module, Tensor* input) {
         spatial *= input->shape[i];
 
     bool training = module_is_training(module);
-    if (training && batchnorm_update_stats(bn, input, batch, channels, spatial) != 0)
-        return NULL;
-
-    Tensor* mean_tensor = training ? bn->current_mean : bn->running_mean;
-    Tensor* var_tensor  = training ? bn->current_var : bn->running_var;
-    if (!mean_tensor || !var_tensor) {
-        LOG_ERROR("%s: missing mean or variance tensor", module->name);
-        return NULL;
-    }
 
     int stat_shape[NORM_MAX_NDIM];
     channel_broadcast_shape(stat_shape, input->shape, input->ndim, 1);
-
-    Tensor* mean_broadcast =
-        uop_expand_to(uop_reshape_to(mean_tensor, stat_shape, input->ndim), input->shape,
-                      input->ndim);
-    Tensor* centered = uop_sub(input, mean_broadcast);
-
-    int channel_shape[] = {channels};
     TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* eps_tensor = tensor_full(channel_shape, 1, &config, bn->eps);
-    if (!eps_tensor)
-        return NULL;
 
-    Tensor* std = uop_sqrt(uop_add(var_tensor, eps_tensor));
-    tensor_free(eps_tensor);
+    Tensor* centered = NULL;
+    Tensor* std_broadcast = NULL;
 
-    Tensor* std_broadcast = uop_expand_to(uop_reshape_to(std, stat_shape, input->ndim),
-                                          input->shape, input->ndim);
-    Tensor* normalized    = uop_div(centered, std_broadcast);
+    if (training) {
+        /* Update running stats as a detached side effect (for eval), but compute
+         * the normalization's mean/var as differentiable uops of the input so the
+         * backward flows through the batch statistics -- treating them as
+         * constants gave a wrong (mean/var-invariance-violating) gradient.
+         * Reduce over [N, spatial] per channel via the proven single-dim keepdim
+         * reduces on a [N,C,S] view (multi-dim reduce keepdim mis-shapes here). */
+        if (batchnorm_update_stats(bn, input, batch, channels, spatial) != 0)
+            return NULL;
+
+        int grouped[] = {batch, channels, spatial};
+        Tensor* x3   = uop_reshape_to(input, grouped, 3);
+        Tensor* mean = uop_mean_dim(uop_mean_dim(x3, 2, true), 0, true);  /* [1,C,1] */
+        Tensor* centered3 = uop_sub(x3, mean);
+        Tensor* var  = uop_mean_dim(uop_mean_dim(uop_mul(centered3, centered3), 2, true), 0, true);
+
+        int one_shape[] = {1};
+        Tensor* eps_tensor = tensor_full(one_shape, 1, &config, bn->eps);
+        if (!eps_tensor)
+            return NULL;
+        Tensor* std3 = uop_sqrt(uop_add(var, eps_tensor));  /* [1,C,1] */
+        tensor_free(eps_tensor);
+
+        Tensor* normalized3 = uop_div(centered3, std3);
+        Tensor* normalized  = uop_reshape_to(normalized3, input->shape, input->ndim);
+        if (!normalized)
+            return NULL;
+        return nn_norm_affine(normalized, bn->weight, bn->bias, input->shape, input->ndim, 1);
+    } else {
+        Tensor* mean_tensor = bn->running_mean;
+        Tensor* var_tensor  = bn->running_var;
+        if (!mean_tensor || !var_tensor) {
+            LOG_ERROR("%s: missing mean or variance tensor", module->name);
+            return NULL;
+        }
+        Tensor* mean_broadcast =
+            uop_expand_to(uop_reshape_to(mean_tensor, stat_shape, input->ndim), input->shape,
+                          input->ndim);
+        centered = uop_sub(input, mean_broadcast);
+
+        int channel_shape[] = {channels};
+        Tensor* eps_tensor = tensor_full(channel_shape, 1, &config, bn->eps);
+        if (!eps_tensor)
+            return NULL;
+        Tensor* std = uop_sqrt(uop_add(var_tensor, eps_tensor));
+        tensor_free(eps_tensor);
+        std_broadcast = uop_expand_to(uop_reshape_to(std, stat_shape, input->ndim),
+                                      input->shape, input->ndim);
+    }
+
+    Tensor* normalized = uop_div(centered, std_broadcast);
     if (!normalized)
         return NULL;
 

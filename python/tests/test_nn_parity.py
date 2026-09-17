@@ -95,6 +95,34 @@ def test_groupnorm_parity():
         "groupnorm grad"
 
 
+def test_batchnorm2d_training_parity():
+    """Training-mode BN: the backward must flow through the batch mean/var (they
+    depend on the input), not treat them as constants."""
+    C = 3
+    bn = cnn.BatchNorm2d(C)
+    bn.train()
+    w, b = _params(bn)
+    X = rs.randn(4, C, 6, 6).astype(np.float32)
+    W = rs.randn(4, C, 6, 6).astype(np.float32)  # shared loss weights
+
+    xc = cml.Tensor(X.copy()); xc.requires_grad_(True)
+    oc = bn(xc)
+    (oc * cml.Tensor(W.copy())).sum().backward()
+    gc = np.asarray(xc.grad.numpy()).reshape(X.shape)
+
+    tbn = torch.nn.BatchNorm2d(C); tbn.train()
+    with torch.no_grad():
+        tbn.weight.copy_(torch.tensor(w.reshape(-1)))
+        tbn.bias.copy_(torch.tensor(b.reshape(-1)))
+    xt = torch.tensor(X, requires_grad=True)
+    (tbn(xt) * torch.tensor(W)).sum().backward()
+
+    assert np.allclose(np.asarray(oc.numpy()).reshape(X.shape), tbn(torch.tensor(X)).detach().numpy(),
+                       atol=1e-3), "batchnorm2d fwd"
+    assert np.allclose(gc, xt.grad.numpy(), atol=1e-3), \
+        f"batchnorm2d training grad (max {np.abs(gc - xt.grad.numpy()).max():.3e})"
+
+
 # ── shape ops ──────────────────────────────────────────────────────────────
 def test_unsqueeze_squeeze_parity():
     X = rs.randn(4, 5).astype(np.float32)
