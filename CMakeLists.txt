@@ -76,6 +76,10 @@ if(ENABLE_LLVM_BACKEND)
 
         if(HAS_LLVM_LLJIT)
             add_definitions(-DCML_HAS_LLVM_BACKEND ${LLVM_DEFINITIONS})
+            # Thread the LLVM major version to C so llvm_backend.c can pick the
+            # right ORC C-API (LLVMOrcCreateNewThreadSafeContextFromLLVMContext
+            # only exists from LLVM 19; 18 uses ThreadSafeContextGetContext).
+            add_definitions(-DCML_LLVM_VERSION_MAJOR=${LLVM_VERSION_MAJOR})
             # Resolve the link libraries with `llvm-config --libs`, which adapts
             # to the install layout: a single -lLLVM where only the monolithic
             # shared lib exists, or the component archives otherwise. The plain

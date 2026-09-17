@@ -1249,14 +1249,50 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
  * We extract that context via LLVMGetModuleContext and transfer its
  * ownership to the TSC; the JIT then owns TSM→TSC→context.
  * ---------------------------------------------------------------------- */
+#ifndef CML_LLVM_VERSION_MAJOR
+#define CML_LLVM_VERSION_MAJOR 19  /* assume a modern C API if unspecified */
+#endif
+
+/* Open a per-kernel LLVM context to build a module in, plus the ThreadSafeContext
+ * ORC will own. The ORC C-API for pairing an externally-built module with a TSC
+ * differs by version: LLVM >= 19 builds in a plain context and adopts it later
+ * via LLVMOrcCreateNewThreadSafeContextFromLLVMContext; LLVM 18 has no such
+ * adopt call, so we create the TSC up front and build in its own context
+ * (LLVMOrcThreadSafeContextGetContext), which newer LLVM removed. */
+static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
+#if CML_LLVM_VERSION_MAJOR >= 19
+    *out_tsc = NULL;                 /* created in compile_and_lookup from the module ctx */
+    return LLVMContextCreate();
+#else
+    LLVMOrcThreadSafeContextRef tsc = LLVMOrcCreateNewThreadSafeContext();
+    *out_tsc = tsc;
+    return tsc ? LLVMOrcThreadSafeContextGetContext(tsc) : NULL;
+#endif
+}
+
+/* Dispose an unused per-kernel context (module build failed before ORC adopted
+ * it). Mirrors open_kernel_ctx's ownership: LLVM >= 19 owns the plain context
+ * directly; LLVM 18's context is owned by the TSC. */
+static void dispose_kernel_ctx(LLVMContextRef ctx, LLVMOrcThreadSafeContextRef tsc) {
+#if CML_LLVM_VERSION_MAJOR >= 19
+    (void)tsc;
+    if (ctx) LLVMContextDispose(ctx);
+#else
+    (void)ctx;
+    if (tsc) LLVMOrcDisposeThreadSafeContext(tsc);
+#endif
+}
+
 static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
                                       LLVMModuleRef mod,
+                                      LLVMOrcThreadSafeContextRef tsc,
                                       const char* fn_name) {
     char* err = NULL;
     if (LLVMVerifyModule(mod, LLVMReturnStatusAction, &err) != 0) {
         LOG_ERROR("LLVM: Module verification failed: %s", err ? err : "?");
         LLVMDisposeMessage(err);
         LLVMDisposeModule(mod);
+        if (tsc) LLVMOrcDisposeThreadSafeContext(tsc);
         return NULL;
     }
     LLVMDisposeMessage(err);
@@ -1280,13 +1316,12 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
     }
 #endif
 
-    /* Transfer the module's context to ORC.  LLVMGetModuleContext returns the
-     * raw context that was passed to LLVMModuleCreateWithNameInContext when the
-     * module was built; wrapping it here transfers ownership to the TSC.
-     * The JIT then owns TSM → TSC → context, so there is no dangling pointer. */
-    LLVMContextRef mod_ctx = LLVMGetModuleContext(mod);
-    LLVMOrcThreadSafeContextRef tsc =
-        LLVMOrcCreateNewThreadSafeContextFromLLVMContext(mod_ctx);
+    /* Pair the module with a ThreadSafeContext and transfer ownership to ORC
+     * (JIT owns TSM → TSC → context). LLVM >= 19 adopts the module's own context;
+     * LLVM 18 already built the module inside `tsc`'s context (open_kernel_ctx). */
+#if CML_LLVM_VERSION_MAJOR >= 19
+    tsc = LLVMOrcCreateNewThreadSafeContextFromLLVMContext(LLVMGetModuleContext(mod));
+#endif
     LLVMOrcThreadSafeModuleRef tsm = LLVMOrcCreateNewThreadSafeModule(mod, tsc);
     LLVMOrcDisposeThreadSafeContext(tsc); /* drop our ref; TSM keeps context alive */
 
@@ -1705,12 +1740,13 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         if (!ffn) {
             char fn_name[64];
             snprintf(fn_name, sizeof(fn_name), "cml_fe%d", backend->kernel_count++);
-            LLVMContextRef kern_ctx = LLVMContextCreate();
+            LLVMOrcThreadSafeContextRef tsc = NULL;
+            LLVMContextRef kern_ctx = open_kernel_ctx(&tsc);
             if (!kern_ctx) return cpu_execute_node(node);
             LLVMModuleRef mod = build_fused_elementwise(kern_ctx, fn_name, fp,
                                                         out_numel, in_numel, node->num_inputs);
-            if (!mod) { LLVMContextDispose(kern_ctx); return cpu_execute_node(node); }
-            ffn = compile_and_lookup(backend, mod, fn_name);
+            if (!mod) { dispose_kernel_ctx(kern_ctx, tsc); return cpu_execute_node(node); }
+            ffn = compile_and_lookup(backend, mod, tsc, fn_name);
             if (!ffn) return cpu_execute_node(node);
             backend->op_cache[fslot].key = key;
             backend->op_cache[fslot].fn  = ffn;
@@ -1831,11 +1867,10 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         char fn_name[64];
         snprintf(fn_name, sizeof(fn_name), "cml_k%d", backend->kernel_count++);
 
-        /* Fresh context per kernel: LLVMOrcCreateNewThreadSafeContextFromLLVMContext
-         * transfers ownership, so a shared backend context becomes dangling after the
-         * first AddLLVMIRModule.  Give each kernel its own context; compile_and_lookup
-         * transfers ownership to ORC (TSC → TSM → JIT). */
-        LLVMContextRef kern_ctx = LLVMContextCreate();
+        /* Fresh per-kernel context (see open_kernel_ctx); compile_and_lookup
+         * transfers its ownership to ORC (TSC → TSM → JIT). */
+        LLVMOrcThreadSafeContextRef tsc = NULL;
+        LLVMContextRef kern_ctx = open_kernel_ctx(&tsc);
         if (!kern_ctx) return cpu_execute_node(node);
 
         LLVMModuleRef mod = NULL;
@@ -1864,14 +1899,14 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         } else if (type == UOP_EXPAND) {
             mod = build_expand_op(kern_ctx, fn_name, s0, s1);
         } else {
-            LLVMContextDispose(kern_ctx);
+            dispose_kernel_ctx(kern_ctx, tsc);
             return cpu_execute_node(node);
         }
 
-        if (!mod) { LLVMContextDispose(kern_ctx); return cpu_execute_node(node); }
+        if (!mod) { dispose_kernel_ctx(kern_ctx, tsc); return cpu_execute_node(node); }
 
-        fn = compile_and_lookup(backend, mod, fn_name);
-        /* kern_ctx ownership transferred to JIT via compile_and_lookup; do not free. */
+        fn = compile_and_lookup(backend, mod, tsc, fn_name);
+        /* context/tsc ownership transferred to JIT via compile_and_lookup; do not free. */
         if (!fn) return cpu_execute_node(node);
 
         backend->op_cache[slot].key = key;
