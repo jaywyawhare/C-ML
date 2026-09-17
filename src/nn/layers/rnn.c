@@ -347,8 +347,12 @@ static Tensor* concat_features(Tensor* a, Tensor* b) {
 }
 
 static Tensor* rnn_module_forward(Module* module, Tensor* input) {
-    (void)module; (void)input;
-    return NULL;
+    /* Module interface returns the sequence output; h_n is an extra graph output
+     * (left for the graph teardown, like torch's second return value). */
+    Tensor* output = NULL;
+    Tensor* h_n = NULL;
+    rnn_forward((RNN*)module, input, NULL, &output, &h_n);
+    return output;
 }
 
 static void rnn_free(Module* module) {
@@ -480,8 +484,11 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
 }
 
 static Tensor* lstm_module_forward(Module* module, Tensor* input) {
-    (void)module; (void)input;
-    return NULL;
+    Tensor* output = NULL;
+    Tensor* h_n = NULL;
+    Tensor* c_n = NULL;
+    lstm_forward((LSTM*)module, input, NULL, NULL, &output, &h_n, &c_n);
+    return output;
 }
 
 static void lstm_free(Module* module) {
@@ -622,8 +629,10 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
 }
 
 static Tensor* gru_module_forward(Module* module, Tensor* input) {
-    (void)module; (void)input;
-    return NULL;
+    Tensor* output = NULL;
+    Tensor* h_n = NULL;
+    gru_forward((GRU*)module, input, NULL, &output, &h_n);
+    return output;
 }
 
 static void gru_free(Module* module) {

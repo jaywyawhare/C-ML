@@ -123,6 +123,39 @@ def test_batchnorm2d_training_parity():
         f"batchnorm2d training grad (max {np.abs(gc - xt.grad.numpy()).max():.3e})"
 
 
+def test_rnn_forward_parity():
+    """RNN sequence forward vs torch (module_forward was a NULL stub before)."""
+    I, H, N, S = 5, 7, 3, 4
+    X = rs.randn(N, S, I).astype(np.float32)
+    m = cnn.RNN(I, H)  # batch_first=True
+    ps = _params(m)
+    o = np.asarray(m(cml.Tensor(X.copy())).numpy()).reshape(N, S, H)
+    tr = torch.nn.RNN(I, H, batch_first=True, nonlinearity="tanh")
+    with torch.no_grad():
+        tr.weight_ih_l0.copy_(torch.tensor(ps[0].reshape(H, I)))
+        tr.weight_hh_l0.copy_(torch.tensor(ps[1].reshape(H, H)))
+        tr.bias_ih_l0.copy_(torch.tensor(ps[2].reshape(H)))
+        tr.bias_hh_l0.copy_(torch.tensor(ps[3].reshape(H)))
+    ot, _ = tr(torch.tensor(X))
+    assert np.allclose(o, ot.detach().numpy(), atol=1e-3), \
+        f"rnn fwd (max {np.abs(o - ot.detach().numpy()).max():.3e})"
+
+
+@pytest.mark.parametrize("ctor", [
+    lambda: cnn.LSTM(6, 8), lambda: cnn.GRU(6, 8), lambda: cnn.RNN(6, 8),
+])
+def test_recurrent_grad_flows(ctor):
+    """The recurrent modules must produce a non-null output and flowing grads
+    (their module_forward wrappers were stubs returning NULL)."""
+    X = rs.randn(3, 5, 6).astype(np.float32)
+    m = ctor()
+    xc = cml.Tensor(X.copy()); xc.requires_grad_(True)
+    o = m(xc)
+    o.sum().backward()
+    assert xc.grad is not None, "recurrent module severed input gradient"
+    assert any(p.tensor.grad is not None for p in m.parameters()), "no param grad"
+
+
 # ── shape ops ──────────────────────────────────────────────────────────────
 def test_unsqueeze_squeeze_parity():
     X = rs.randn(4, 5).astype(np.float32)
