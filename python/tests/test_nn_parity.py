@@ -141,6 +141,27 @@ def test_rnn_forward_parity():
         f"rnn fwd (max {np.abs(o - ot.detach().numpy()).max():.3e})"
 
 
+@pytest.mark.parametrize("name,ctor,tctor,gates", [
+    ("lstm", lambda I, H: cnn.LSTM(I, H), torch.nn.LSTM, 4),
+    ("gru",  lambda I, H: cnn.GRU(I, H),  torch.nn.GRU,  3),
+])
+def test_lstm_gru_forward_parity(name, ctor, tctor, gates):
+    """LSTM/GRU sequence forward vs torch (same gate ordering: i,f,g,o / r,z,n)."""
+    I, H, N, S = 5, 7, 3, 4
+    X = rs.randn(N, S, I).astype(np.float32)
+    m = ctor(I, H); ps = _params(m)
+    o = np.asarray(m(cml.Tensor(X.copy())).numpy()).reshape(N, S, H)
+    t = tctor(I, H, batch_first=True)
+    with torch.no_grad():
+        t.weight_ih_l0.copy_(torch.tensor(ps[0].reshape(gates * H, I)))
+        t.weight_hh_l0.copy_(torch.tensor(ps[1].reshape(gates * H, H)))
+        t.bias_ih_l0.copy_(torch.tensor(ps[2].reshape(gates * H)))
+        t.bias_hh_l0.copy_(torch.tensor(ps[3].reshape(gates * H)))
+    ot, _ = t(torch.tensor(X))
+    assert np.allclose(o, ot.detach().numpy(), atol=1e-3), \
+        f"{name} fwd (max {np.abs(o - ot.detach().numpy()).max():.3e})"
+
+
 @pytest.mark.parametrize("ctor", [
     lambda: cnn.LSTM(6, 8), lambda: cnn.GRU(6, 8), lambda: cnn.RNN(6, 8),
 ])
