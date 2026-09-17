@@ -116,23 +116,17 @@ if(ENABLE_LLVM_BACKEND)
                 NAMES llvm-config llvm-config-22 llvm-config-21 llvm-config-20 llvm-config-19 llvm-config-18
                 HINTS ${LLVM_TOOLS_BINARY_DIR})
             if(LLVM_CONFIG_EXE)
-                # Prefer static component archives when they exist: some distro
-                # monolithic libLLVM.so builds (e.g. Ubuntu's LLVM 18 on CI) don't
-                # export the ORC C-API, so linking -lLLVM leaves
-                # LLVMOrcCreateNewThreadSafeContextFromLLVMContext undefined. Where
-                # no archives exist (e.g. a monolithic-only install), fall back to
-                # the shared lib, which does carry the symbol there.
-                execute_process(COMMAND ${LLVM_CONFIG_EXE} --libdir
-                    OUTPUT_VARIABLE _llvm_libdir OUTPUT_STRIP_TRAILING_WHITESPACE)
-                set(_llvm_static "")
-                if(EXISTS "${_llvm_libdir}/libLLVMOrcJIT.a")
-                    set(_llvm_static "--link-static")
-                endif()
-                execute_process(COMMAND ${LLVM_CONFIG_EXE} ${_llvm_static} --ldflags
+                # Link via llvm-config --libs: the shared libLLVM (or component
+                # archives, whichever the install provides) carries the ORC C-API
+                # and its C++ runtime. The code uses feature detection (above) to
+                # avoid API calls absent from the target's headers, so no static
+                # link is needed -- and static archives would drag in unresolved
+                # libstdc++ symbols from LLVM's C++ objects.
+                execute_process(COMMAND ${LLVM_CONFIG_EXE} --ldflags
                     OUTPUT_VARIABLE _llvm_ldflags OUTPUT_STRIP_TRAILING_WHITESPACE)
-                execute_process(COMMAND ${LLVM_CONFIG_EXE} ${_llvm_static} --libs core orcjit native nvptx amdgpu
+                execute_process(COMMAND ${LLVM_CONFIG_EXE} --libs core orcjit native nvptx amdgpu
                     OUTPUT_VARIABLE _llvm_libs OUTPUT_STRIP_TRAILING_WHITESPACE)
-                execute_process(COMMAND ${LLVM_CONFIG_EXE} ${_llvm_static} --system-libs
+                execute_process(COMMAND ${LLVM_CONFIG_EXE} --system-libs
                     OUTPUT_VARIABLE _llvm_syslibs OUTPUT_STRIP_TRAILING_WHITESPACE)
                 separate_arguments(LLVM_BACKEND_LIBS_LIST UNIX_COMMAND
                     "${_llvm_ldflags} ${_llvm_libs} ${_llvm_syslibs}")

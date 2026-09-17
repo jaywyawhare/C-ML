@@ -400,8 +400,7 @@ static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern,
                 return (result->captures[i].node == node);
         }
         CMLCaptureEntry* e = &result->captures[result->num_captures];
-        strncpy(e->name, pattern->capture_name, sizeof(e->name) - 1);
-        e->name[sizeof(e->name) - 1] = '\0';
+        snprintf(e->name, sizeof(e->name), "%s", pattern->capture_name);
         e->node = node;
         result->num_captures++;
         return true;
