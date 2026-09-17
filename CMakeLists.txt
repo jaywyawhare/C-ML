@@ -76,10 +76,26 @@ if(ENABLE_LLVM_BACKEND)
 
         if(HAS_LLVM_LLJIT)
             add_definitions(-DCML_HAS_LLVM_BACKEND ${LLVM_DEFINITIONS})
-            # A monolithic libLLVM.so install exposes every component (incl.
-            # nvptx/amdgpu) through the single LLVM target; otherwise link the
-            # mapped static/shared components.
-            if(TARGET LLVM)
+            # Resolve the link libraries with `llvm-config --libs`, which adapts
+            # to the install layout: a single -lLLVM where only the monolithic
+            # shared lib exists, or the component archives otherwise. The plain
+            # monolithic-target shortcut / llvm_map_components shortcuts each
+            # worked in only one of {local, CI} -- some libLLVM.so builds don't
+            # export the ORC C-API (LLVMOrcCreateNewThreadSafeContextFromLLVMContext),
+            # and some installs ship no component archives. llvm-config gets both.
+            find_program(LLVM_CONFIG_EXE
+                NAMES llvm-config llvm-config-22 llvm-config-21 llvm-config-20 llvm-config-19
+                HINTS ${LLVM_TOOLS_BINARY_DIR})
+            if(LLVM_CONFIG_EXE)
+                execute_process(COMMAND ${LLVM_CONFIG_EXE} --ldflags
+                    OUTPUT_VARIABLE _llvm_ldflags OUTPUT_STRIP_TRAILING_WHITESPACE)
+                execute_process(COMMAND ${LLVM_CONFIG_EXE} --libs core orcjit native nvptx amdgpu
+                    OUTPUT_VARIABLE _llvm_libs OUTPUT_STRIP_TRAILING_WHITESPACE)
+                execute_process(COMMAND ${LLVM_CONFIG_EXE} --system-libs
+                    OUTPUT_VARIABLE _llvm_syslibs OUTPUT_STRIP_TRAILING_WHITESPACE)
+                separate_arguments(LLVM_BACKEND_LIBS_LIST UNIX_COMMAND
+                    "${_llvm_ldflags} ${_llvm_libs} ${_llvm_syslibs}")
+            elseif(TARGET LLVM)
                 set(LLVM_BACKEND_LIBS_LIST LLVM)
             else()
                 include(${LLVM_CMAKE_DIR}/LLVM-Config.cmake)
