@@ -220,6 +220,27 @@ def test_var_std_parity():
     _check("std", X, lambda t: t.std(dim=1), lambda t: t.std(dim=1, unbiased=True))
 
 
+def test_roll_parity():
+    _check("roll", X, lambda t: t.roll(2, 1), lambda t: torch.roll(t, 2, 1))
+
+
+def test_cumprod_parity():
+    P = (rs.rand(3, 4).astype(np.float32) + 0.3)
+    _check("cumprod", P, lambda t: t.cumprod(1), lambda t: torch.cumprod(t, 1))
+
+
+def test_softmax_dims_parity():
+    X3 = rs.randn(2, 3, 4).astype(np.float32)
+    _check("softmax0", X3, lambda t: t.softmax(0), lambda t: torch.softmax(t, 0))
+    _check("softmax1", X3, lambda t: t.softmax(1), lambda t: torch.softmax(t, 1))
+
+
+def test_keepdim_transpose3d_parity():
+    X3 = rs.randn(2, 3, 4).astype(np.float32)
+    _check("sum_keepdim", X3, lambda t: t.sum(1, True), lambda t: t.sum(1, keepdim=True))
+    _check("transpose3d", X3, lambda t: t.transpose(0, 2), lambda t: t.transpose(0, 2))
+
+
 def test_masked_select_parity():
     a = rs.randn(4, 5).astype(np.float32)
     mask = (rs.rand(4, 5) > 0.4).astype(np.float32)
