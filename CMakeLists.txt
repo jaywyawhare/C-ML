@@ -76,10 +76,30 @@ if(ENABLE_LLVM_BACKEND)
 
         if(HAS_LLVM_LLJIT)
             add_definitions(-DCML_HAS_LLVM_BACKEND ${LLVM_DEFINITIONS})
-            # Thread the LLVM major version to C so llvm_backend.c can pick the
-            # right ORC C-API (LLVMOrcCreateNewThreadSafeContextFromLLVMContext
-            # only exists from LLVM 19; 18 uses ThreadSafeContextGetContext).
-            add_definitions(-DCML_LLVM_VERSION_MAJOR=${LLVM_VERSION_MAJOR})
+            # The ORC C-API for pairing an externally-built module with a
+            # ThreadSafeContext differs across LLVM versions: LLVM 19+ has
+            # LLVMOrcCreateNewThreadSafeContextFromLLVMContext, older ones use
+            # LLVMOrcThreadSafeContextGetContext. Detect which actually compiles
+            # (with -Werror, so a deprecated/absent decl is rejected) rather than
+            # guessing from the version number.
+            include(CheckCSourceCompiles)
+            set(CMAKE_REQUIRED_INCLUDES ${LLVM_INCLUDE_DIRS})
+            set(CMAKE_REQUIRED_FLAGS "-Werror")
+            check_c_source_compiles(
+                "#include <llvm-c/Orc.h>\nint main(void){(void)LLVMOrcCreateNewThreadSafeContextFromLLVMContext;return 0;}"
+                CML_HAVE_ORC_FROM_LLVM_CONTEXT)
+            check_c_source_compiles(
+                "#include <llvm-c/Orc.h>\nint main(void){(void)LLVMOrcThreadSafeContextGetContext;return 0;}"
+                CML_HAVE_ORC_TSC_GET_CONTEXT)
+            unset(CMAKE_REQUIRED_FLAGS)
+            unset(CMAKE_REQUIRED_INCLUDES)
+            add_definitions(-DCML_ORC_DETECTED)
+            if(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
+                add_definitions(-DCML_HAVE_ORC_FROM_LLVM_CONTEXT)
+            endif()
+            if(CML_HAVE_ORC_TSC_GET_CONTEXT)
+                add_definitions(-DCML_HAVE_ORC_TSC_GET_CONTEXT)
+            endif()
             # Resolve the link libraries with `llvm-config --libs`, which adapts
             # to the install layout: a single -lLLVM where only the monolithic
             # shared lib exists, or the component archives otherwise. The plain

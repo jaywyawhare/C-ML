@@ -76,7 +76,7 @@ static int grad_matches(OpFn op) {
         float num = (fp - fm) / (2.0f * eps);
         float den = fmaxf(1.0f, fmaxf(fabsf(num), fabsf(ana[i])));
         if (fabsf(num - ana[i]) / den > 0.02f) {
-            printf("    MISMATCH i=%zu num=%.4f ana=%.4f\n", i, num, ana[i]);
+            printf("    MISMATCH i=%d num=%.4f ana=%.4f\n", i, num, ana[i]);
             return 0;
         }
     }

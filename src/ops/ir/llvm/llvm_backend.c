@@ -1249,18 +1249,23 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
  * We extract that context via LLVMGetModuleContext and transfer its
  * ownership to the TSC; the JIT then owns TSM→TSC→context.
  * ---------------------------------------------------------------------- */
-#ifndef CML_LLVM_VERSION_MAJOR
-#define CML_LLVM_VERSION_MAJOR 19  /* assume a modern C API if unspecified */
+#if !defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT) && !defined(CML_HAVE_ORC_TSC_GET_CONTEXT)
+#  ifdef CML_ORC_DETECTED
+#    error "No usable ORC ThreadSafeContext C API on this LLVM (neither LLVMOrcCreateNewThreadSafeContextFromLLVMContext nor LLVMOrcThreadSafeContextGetContext compiled cleanly)"
+#  else
+/* No detection ran (e.g. non-CMake build): assume the modern adopt API. */
+#    define CML_HAVE_ORC_FROM_LLVM_CONTEXT 1
+#  endif
 #endif
 
 /* Open a per-kernel LLVM context to build a module in, plus the ThreadSafeContext
  * ORC will own. The ORC C-API for pairing an externally-built module with a TSC
- * differs by version: LLVM >= 19 builds in a plain context and adopts it later
- * via LLVMOrcCreateNewThreadSafeContextFromLLVMContext; LLVM 18 has no such
- * adopt call, so we create the TSC up front and build in its own context
- * (LLVMOrcThreadSafeContextGetContext), which newer LLVM removed. */
+ * differs across LLVM versions (see the CMake feature detection): the adopt call
+ * LLVMOrcCreateNewThreadSafeContextFromLLVMContext builds in a plain context and
+ * adopts it later; otherwise create the TSC up front and build in its own
+ * context via LLVMOrcThreadSafeContextGetContext. */
 static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
-#if CML_LLVM_VERSION_MAJOR >= 19
+#if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
     *out_tsc = NULL;                 /* created in compile_and_lookup from the module ctx */
     return LLVMContextCreate();
 #else
@@ -1274,7 +1279,7 @@ static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
  * it). Mirrors open_kernel_ctx's ownership: LLVM >= 19 owns the plain context
  * directly; LLVM 18's context is owned by the TSC. */
 static void dispose_kernel_ctx(LLVMContextRef ctx, LLVMOrcThreadSafeContextRef tsc) {
-#if CML_LLVM_VERSION_MAJOR >= 19
+#if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
     (void)tsc;
     if (ctx) LLVMContextDispose(ctx);
 #else
@@ -1319,7 +1324,7 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
     /* Pair the module with a ThreadSafeContext and transfer ownership to ORC
      * (JIT owns TSM → TSC → context). LLVM >= 19 adopts the module's own context;
      * LLVM 18 already built the module inside `tsc`'s context (open_kernel_ctx). */
-#if CML_LLVM_VERSION_MAJOR >= 19
+#if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
     tsc = LLVMOrcCreateNewThreadSafeContextFromLLVMContext(LLVMGetModuleContext(mod));
 #endif
     LLVMOrcThreadSafeModuleRef tsm = LLVMOrcCreateNewThreadSafeModule(mod, tsc);
