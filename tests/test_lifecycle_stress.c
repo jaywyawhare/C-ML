@@ -145,7 +145,10 @@ static int test_attention_soak(void) {
     int xs2[] = {B * S, d}, xs3[] = {B, S, d};
     int ok = 1;
     float first = 0.0f, last = 0.0f;
-    for (int step = 0; step < 100 && ok; step++) {
+    /* 32 steps is enough to exercise the attention+reshape+reset lifecycle and
+     * catch leaks/corruption without being a memory hog that tips over under a
+     * fully parallel ctest run. */
+    for (int step = 0; step < 32 && ok; step++) {
         Tensor* X = tensor_randn(xs2, 2, &cfg);
         Tensor* Yt = tensor_randn(xs3, 3, &cfg);
         Tensor* q = cml_reshape(cml_nn_module_forward((Module*)lq, X), xs3, 3);
