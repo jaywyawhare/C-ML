@@ -220,6 +220,19 @@ def test_var_std_parity():
     _check("std", X, lambda t: t.std(dim=1), lambda t: t.std(dim=1, unbiased=True))
 
 
+def test_masked_select_parity():
+    a = rs.randn(4, 5).astype(np.float32)
+    mask = (rs.rand(4, 5) > 0.4).astype(np.float32)
+    ac = cml.Tensor(a.copy()); ac.requires_grad_(True)
+    oc = ac.masked_select(cml.Tensor(mask.copy())); oc.sum().backward()
+    at = torch.tensor(a, requires_grad=True)
+    ot = torch.masked_select(at, torch.tensor(mask) > 0); ot.sum().backward()
+    assert np.allclose(np.sort(np.asarray(oc.numpy()).ravel()),
+                       np.sort(ot.detach().numpy()), atol=TOL), "masked_select fwd"
+    assert np.allclose(np.asarray(ac.grad.numpy()).reshape(a.shape),
+                       at.grad.numpy(), atol=TOL), "masked_select grad"
+
+
 def test_where_parity():
     a = rs.randn(4, 5).astype(np.float32)
     b = rs.randn(4, 5).astype(np.float32)

@@ -1515,7 +1515,9 @@ Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest,
     *indices_out = NULL;
     return uop_topk(a, k, dim, largest, indices_out);
 }
-Tensor* cml_masked_select(Tensor* a, Tensor* mask) { return tensor_masked_select(a, mask); }
+/* Route through uop_masked_select so it builds a differentiable node (VJP
+ * scatters grad back to selected positions) rather than a bare non-diff copy. */
+Tensor* cml_masked_select(Tensor* a, Tensor* mask) { return uop_masked_select(a, mask); }
 Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
     return tensor_meshgrid(tensors, num_tensors, num_outputs);
 }

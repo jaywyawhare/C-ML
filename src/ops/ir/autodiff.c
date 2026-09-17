@@ -810,14 +810,19 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             break;
         }
         case UOP_MASKED_SELECT: {
-            /* out is the selected elements in order, so the j-th selected
-             * element of `a` takes g[j]. cumsum(mask)-1 is exactly that j for
-             * every selected position; multiplying by the mask discards what
-             * the unselected positions gathered. */
+            /* out is the selected elements (over the flattened input) in order,
+             * so the j-th selected element takes g[j]. flat cumsum(mask)-1 is
+             * that j; clamp to 0 for leading-unselected positions (they gather a
+             * dummy index but the mask multiply discards it), then reshape the
+             * scattered grad back to the input's shape. gather needs 1-D indices,
+             * so this must run on the flattened mask, not an N-D one. */
             if (nd->num_inputs >= 2 && b) {
-                Tensor* pos = uop_sub(uop_cumsum(b, 0), ad_k(b, 1.0f));
+                int flat[1] = { (int)a->numel };
+                Tensor* bf  = ad_reshape(b, flat, 1);
+                Tensor* pos = uop_sub(uop_cumsum(bf, 0), ad_k(bf, 1.0f));
+                pos = uop_max(pos, ad_k(bf, 0.0f));       /* clamp index >= 0 */
                 Tensor* gg  = uop_gather(g, pos, 0);
-                if (gg) gm_accum(&map, a, uop_mul(gg, b));
+                if (gg) gm_accum(&map, a, ad_reshape(uop_mul(gg, bf), a->shape, a->ndim));
             }
             break;
         }
