@@ -84,14 +84,19 @@ if(ENABLE_LLVM_BACKEND)
             # guessing from the version number.
             include(CheckCSourceCompiles)
             set(CMAKE_REQUIRED_INCLUDES ${LLVM_INCLUDE_DIRS})
+            # Prefer the modern adopt call; require it to compile clean (-Werror
+            # rejects an absent/implicit declaration).
             set(CMAKE_REQUIRED_FLAGS "-Werror")
             check_c_source_compiles(
                 "#include <llvm-c/Orc.h>\nint main(void){(void)LLVMOrcCreateNewThreadSafeContextFromLLVMContext;return 0;}"
                 CML_HAVE_ORC_FROM_LLVM_CONTEXT)
+            # GetContext is deprecated on some LLVMs (18) but still usable; probe
+            # it WITHOUT -Werror so a deprecation doesn't hide it. The call site
+            # suppresses the deprecation warning locally.
+            unset(CMAKE_REQUIRED_FLAGS)
             check_c_source_compiles(
                 "#include <llvm-c/Orc.h>\nint main(void){(void)LLVMOrcThreadSafeContextGetContext;return 0;}"
                 CML_HAVE_ORC_TSC_GET_CONTEXT)
-            unset(CMAKE_REQUIRED_FLAGS)
             unset(CMAKE_REQUIRED_INCLUDES)
             add_definitions(-DCML_ORC_DETECTED)
             if(CML_HAVE_ORC_FROM_LLVM_CONTEXT)

@@ -1271,7 +1271,19 @@ static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
 #else
     LLVMOrcThreadSafeContextRef tsc = LLVMOrcCreateNewThreadSafeContext();
     *out_tsc = tsc;
-    return tsc ? LLVMOrcThreadSafeContextGetContext(tsc) : NULL;
+    if (!tsc) return NULL;
+    /* GetContext is deprecated on LLVM 18; it is the only pairing API there, so
+     * silence just this call rather than fail the -Werror build. */
+    LLVMContextRef c;
+#  if defined(__GNUC__) || defined(__clang__)
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#  endif
+    c = LLVMOrcThreadSafeContextGetContext(tsc);
+#  if defined(__GNUC__) || defined(__clang__)
+#    pragma GCC diagnostic pop
+#  endif
+    return c;
 #endif
 }
 
