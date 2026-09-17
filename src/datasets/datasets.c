@@ -138,7 +138,7 @@ static const char* download_and_gunzip(const char* url, const char* gz_name,
     /* Decompress */
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "gunzip -kf '%s' 2>/dev/null || gzip -dkf '%s' 2>/dev/null", gz_path, gz_path);
-    system(cmd);
+    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */ }
 
     if (stat(out, &st) == 0 && st.st_size > 0)
         return out;
@@ -394,7 +394,7 @@ static Dataset* load_cifar10(void) {
     const char* dir = cml_dataset_cache_dir();
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "tar -xzf '%s' -C '%s' 2>/dev/null", path, dir);
-    system(cmd);
+    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */ }
 
     /* Read 5 training batches + 1 test batch */
     int total = 60000;

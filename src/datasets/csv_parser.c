@@ -199,11 +199,11 @@ int cml_csv_parse(const char* filepath, int target_col,
     if (has_header) {
         fseek(f, data_start, SEEK_SET);
         /* Skip the first data line we already processed */
-        fgets(line, sizeof(line), f);
+        if (!fgets(line, sizeof(line), f)) { /* no data line to skip */ }
     } else {
         rewind(f);
         /* Skip the first data line */
-        fgets(line, sizeof(line), f);
+        if (!fgets(line, sizeof(line), f)) { /* no data line to skip */ }
     }
 
     while (fgets(line, sizeof(line), f) && row < line_count) {

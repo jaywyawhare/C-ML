@@ -10,7 +10,7 @@
 
 static void fill_random(float* b, int n, unsigned seed) {
     srand(seed);
-    for (int i = 0; i < n; i++) b[i] = (float)rand() / RAND_MAX - 0.5f;
+    for (int i = 0; i < n; i++) b[i] = (float)rand() / (float)RAND_MAX - 0.5f;
 }
 
 static int check_one(int N, int IC, int OC, int H, int W, int K, int stride, int pad) {

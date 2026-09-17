@@ -45,7 +45,7 @@ static void check_unary(const char* name, unary_fn op, float lo, float hi) {
     srand(1234);
     int shape[] = {6};
     float xd[6];
-    for (int i = 0; i < 6; i++) xd[i] = lo + (float)rand() / RAND_MAX * (hi - lo);
+    for (int i = 0; i < 6; i++) xd[i] = lo + (float)rand() / (float)RAND_MAX * (hi - lo);
 
     Tensor* x = leaf(xd, shape, 1, true);
     Tensor* y = op(x);

@@ -15,8 +15,11 @@
 #include "ops/ir/gpu/opencl_ir_backend.h"
 #include "alloc/cml_allocator.h"
 #include "test_harness.h"
-#endif
 
+/* The helpers and tests below use CHECK/TEST_SUMMARY from test_harness.h and the
+ * OpenCL backend, so they only exist when OpenCL is compiled in; otherwise main()
+ * skips cleanly. Keeping them unguarded tripped -Werror (unused funcs, implicit
+ * CHECK) on no-OpenCL CI configs. */
 
 static float max_abs_diff(float* a, float* b, int n) {
     float mx = 0;
@@ -307,6 +310,8 @@ static void test_large_matmul_perf(void) {
     cml_free(a_data);
     cml_free(b_data);
 }
+
+#endif /* CML_HAS_OPENCL */
 
 int main(void) {
 #ifdef CML_HAS_OPENCL

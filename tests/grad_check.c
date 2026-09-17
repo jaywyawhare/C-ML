@@ -27,7 +27,7 @@ static Tensor* make_rand(int* shape, int ndim, bool requires_grad) {
     if (!t) return NULL;
     float* d = (float*)tensor_data_ptr(t);
     for (size_t i = 0; i < t->numel; i++)
-        d[i] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
+        d[i] = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
     t->requires_grad = requires_grad;
     return t;
 }
@@ -39,7 +39,7 @@ static Tensor* make_rand_positive(int* shape, int ndim, bool requires_grad,
     if (!t) return NULL;
     float* d = (float*)tensor_data_ptr(t);
     for (size_t i = 0; i < t->numel; i++)
-        d[i] = lo + ((float)rand() / RAND_MAX) * (hi - lo);
+        d[i] = lo + ((float)rand() / (float)RAND_MAX) * (hi - lo);
     t->requires_grad = requires_grad;
     return t;
 }

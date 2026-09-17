@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
             for (int b = 0; b < cfg.batch_size; b++) {
                 for (int i = 0; i < img_c * img_h * img_w; i++)
                     batch_data[b * img_c * img_h * img_w + i] =
-                        (float)rand() / RAND_MAX;
+                        (float)rand() / (float)RAND_MAX;
                 random_crop_flip(batch_data + b * img_c * img_h * img_w,
                                  img_h, img_w, img_c);
                 batch_labels[b] = rand() % num_classes;
@@ -248,7 +248,7 @@ int main(int argc, char** argv) {
             for (int b = 0; b < cfg.batch_size; b++) {
                 for (int i = 0; i < img_c * img_h * img_w; i++)
                     batch_data[b * img_c * img_h * img_w + i] =
-                        (float)rand() / RAND_MAX;
+                        (float)rand() / (float)RAND_MAX;
                 batch_labels[b] = rand() % num_classes;
             }
 
