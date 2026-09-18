@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   build-and-test:
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -72,7 +73,7 @@ jobs:
         run: cmake --build build -j$(getconf _NPROCESSORS_ONLN)
 
       - name: Run tests
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --timeout 240
 
   examples:
     # The ~60 example targets are part of the public API surface; a compile
