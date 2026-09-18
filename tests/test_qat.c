@@ -211,7 +211,7 @@ static int test_ste_gradient_identity(void) {
 /* y = X @ W with W fake-quantized each step (observer recalibrating as SGD
  * moves it). The loss must drop well below its starting value. */
 static int test_linear_training_with_weight_fake_quant(void) {
-    const int N = 16, K = 3;
+    enum { N = 16, K = 3 };
     float xd[N * K], td[N];
     const float true_w[3] = {0.5f, -1.25f, 2.0f};
     for (int i = 0; i < N * K; i++) xd[i] = randf(-1.0f, 1.0f);
