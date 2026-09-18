@@ -52,7 +52,7 @@ static bool pb_reserve(PBBuf* b, size_t extra) {
 
 static bool pb_put(PBBuf* b, const void* p, size_t n) {
     if (!pb_reserve(b, n)) return false;
-    memcpy(b->data + b->len, p, n);
+    if (n && p) memcpy(b->data + b->len, p, n);  /* memcpy(_, NULL, 0) is UB */
     b->len += n;
     return true;
 }

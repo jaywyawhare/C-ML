@@ -341,7 +341,8 @@ int* tensor_shape_copy(int* shape, int ndim) {
     if (!new_shape) {
         CML_ERR_NULL("Failed to allocate memory for tensor shape copy");
     }
-    memcpy(new_shape, shape, (size_t)ndim * sizeof(int));
+    if (shape && ndim > 0)  /* memcpy(_, NULL, 0) is UB for a 0-dim tensor */
+        memcpy(new_shape, shape, (size_t)ndim * sizeof(int));
     return new_shape;
 }
 

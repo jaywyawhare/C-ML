@@ -206,7 +206,7 @@ static void mock_remove_topology(void) {
 
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_mock.topology_dir);
-    (void)system(cmd);
+    if (system(cmd) != 0) { /* best-effort cleanup of the mock topology dir */ }
     g_mock.topology_dir[0] = '\0';
 }
 
