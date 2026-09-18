@@ -16,7 +16,11 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build sdist
-        run: pipx run build --sdist --outdir dist python/
+        # Use the setup-python interpreter (not pipx's default) so the build
+        # Python matches everywhere.
+        run: |
+          python -m pip install build
+          python -m build --sdist --outdir dist python/
       - uses: actions/upload-artifact@v4
         with:
           name: sdist
@@ -46,9 +50,13 @@ jobs:
         with:
           python-version: '3.12'
       # The C library builds via CMake inside build_cffi.py; wheels bundle the
-      # compiled _cml_lib into the wheel (see python/cml/_cml_cffi.py).
+      # compiled _cml_lib into the wheel (see python/cml/_cml_cffi.py). Build
+      # with the setup-python interpreter (not pipx's default, which may be a
+      # different Python) so the cpXY-tagged wheel matches the test-install job.
       - name: Build wheel
-        run: pipx run build --wheel --outdir dist python/
+        run: |
+          python -m pip install build
+          python -m build --wheel --outdir dist python/
       - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ matrix.os }}-${{ matrix.arch }}
