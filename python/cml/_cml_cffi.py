@@ -61,11 +61,13 @@ if _can_link("-lOpenCL"):
     _EXTRA_LINK.append("-lOpenCL")   # only when the CML build actually used it
 _EXTRA_LINK += ["-lstdc++", "-lm", "-ldl", "-lpthread"]
 if sys.platform == "darwin":
-    # The macOS CML build enables the Metal backend, so libcml.a references
-    # Metal/Foundation symbols (e.g. MTLCreateSystemDefaultDevice) that must be
-    # resolved when the CFFI module is dlopen'd. Mirror CMake's METAL_LIBS.
+    # macOS CML enables the Metal backend and finds OpenCL as a framework
+    # (not -lOpenCL), so libcml.a references Metal/Foundation and OpenCL symbols
+    # (MTLCreateSystemDefaultDevice, clBuildProgram, …) that must resolve when
+    # the CFFI module is dlopen'd. Mirror CMake's METAL_LIBS + OpenCL::OpenCL.
     _EXTRA_LINK += ["-framework", "Metal", "-framework", "Foundation",
-                    "-framework", "MetalPerformanceShaders"]
+                    "-framework", "MetalPerformanceShaders",
+                    "-framework", "OpenCL"]
 
 ffi = FFI()
 
