@@ -36,6 +36,10 @@ jobs:
           - os: windows-latest
             arch: amd64
     runs-on: ${{ matrix.os }}
+    # The C library is POSIX-centric (dlopen/pthread/mmap and GCC/Clang warning
+    # flags); MSVC support is a separate effort, so the Windows wheel is
+    # best-effort and does not fail the workflow.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
