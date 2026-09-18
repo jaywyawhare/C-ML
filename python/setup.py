@@ -39,10 +39,15 @@ class BuildCFFI(build_py):
     """Custom build command that builds CFFI bindings."""
 
     def run(self):
-        # Build CFFI bindings
+        # Build CFFI bindings. Invoke the builder by file path rather than
+        # `-m cml.build_cffi`: the latter imports the `cml` package first, whose
+        # __init__ eagerly imports the not-yet-built _cml_lib and aborts the
+        # build with a chicken-and-egg ImportError.
         print("Building CFFI bindings...")
+        builder = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "cml", "build_cffi.py")
         try:
-            subprocess.check_call([sys.executable, "-m", "cml.build_cffi"])
+            subprocess.check_call([sys.executable, builder])
         except subprocess.CalledProcessError as e:
             print(f"Error building CFFI bindings: {e}")
             print("\nMake sure CML library is built first:\n" "  cd ..\n" "  make\n")
