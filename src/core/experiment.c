@@ -13,6 +13,16 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#define mkdir(path, mode) _mkdir(path)          /* Win32 mkdir takes no mode */
+#ifndef _SC_CLK_TCK
+#define _SC_CLK_TCK 2
+#endif
+#define sysconf(x) 100L                          /* no sysconf; CPU% uses /proc */
+#endif
+
 struct CMLRun {
     char            dir[1024];
     char            id[128];
@@ -178,7 +188,12 @@ CMLRun* cml_exp_run_init(const char* project, const char* name, const char* conf
     run->console = fopen(cpath, "wb");
 
     /* Run metadata (git commit, host, OS) — the run-overview page. */
+#ifdef _WIN32
+    { DWORD _sz = (DWORD)sizeof(run->host);
+      if (!GetComputerNameA(run->host, &_sz)) run->host[0] = '\0'; }
+#else
     if (gethostname(run->host, sizeof(run->host)) != 0) run->host[0] = '\0';
+#endif
 #ifdef _WIN32
     snprintf(run->os, sizeof(run->os), "Windows");
 #else

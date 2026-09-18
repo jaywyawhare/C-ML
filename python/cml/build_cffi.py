@@ -44,10 +44,18 @@ def find_cml_lib():
     root = cml_root
     build_dir = root / "build"
     build_dir.mkdir(exist_ok=True)
-    subprocess.run(["cmake", "-S", str(root), "-B", str(build_dir)], check=True)
+    # The wheel only needs the static library; skip tests/examples to keep the
+    # build fast and the compile surface small (matters most on Windows/MinGW).
+    subprocess.run(
+        ["cmake", "-S", str(root), "-B", str(build_dir),
+         "-DBUILD_TESTS=OFF", "-DBUILD_EXAMPLES=OFF",
+         "-DCMAKE_BUILD_TYPE=Release"],
+        check=True,
+    )
     nproc = os.cpu_count() or 4
     subprocess.run(
-        ["cmake", "--build", str(build_dir), "-j", str(nproc)],
+        ["cmake", "--build", str(build_dir), "--target", "cml_static",
+         "-j", str(nproc)],
         check=True,
     )
 
