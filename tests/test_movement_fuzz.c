@@ -157,7 +157,7 @@ typedef struct {
 
 static float ref_roll(const int* c, void* v) {
     Ctx* x = v;
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     memcpy(cc, c, sizeof(int) * (size_t)x->nd);
     int n = x->shape[x->dim];
     /* roll shifts content forward, so the source is `shift` behind. */
@@ -168,7 +168,7 @@ static float ref_roll(const int* c, void* v) {
 
 static float ref_repeat_interleave(const int* c, void* v) {
     Ctx* x = v;
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     memcpy(cc, c, sizeof(int) * (size_t)x->nd);
     cc[x->dim] = c[x->dim] / x->p;
     return x->in[flat_of(cc, x->st, x->nd)];
@@ -176,7 +176,7 @@ static float ref_repeat_interleave(const int* c, void* v) {
 
 static float ref_cat(const int* c, void* v) {
     Ctx* x = v;
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     memcpy(cc, c, sizeof(int) * (size_t)x->nd);
     int n = x->shape[x->dim];
     const float* src = x->in;
@@ -187,7 +187,7 @@ static float ref_cat(const int* c, void* v) {
 static float ref_stack(const int* c, void* v) {
     Ctx* x = v;
     /* output has nd+1 dims; drop the stacked axis to index the source */
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     int k = 0;
     for (int d = 0; d <= x->nd; d++) {
         if (d == x->dim) continue;
@@ -199,14 +199,14 @@ static float ref_stack(const int* c, void* v) {
 
 static float ref_tile(const int* c, void* v) {
     Ctx* x = v;
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     for (int d = 0; d < x->nd; d++) cc[d] = c[d] % x->shape[d];
     return x->in[flat_of(cc, x->st, x->nd)];
 }
 
 static float ref_pad(const int* c, void* v) {
     Ctx* x = v;
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     for (int d = 0; d < x->nd; d++) {
         int sc = c[d] - x->pad[2 * d];
         int n  = x->shape[d];
@@ -229,7 +229,7 @@ static float ref_pad(const int* c, void* v) {
 static float ref_diagonal(const int* c, void* v) {
     Ctx* x = v;
     /* output drops dim2; dim1's slot carries the diagonal index */
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     int slot = 0, oi = 0;
     int map[MAXD + 2];
     for (int d = 0; d < x->nd; d++) {
@@ -249,7 +249,7 @@ static float ref_diagonal(const int* c, void* v) {
 static float ref_gather(const int* c, void* v) {
     Ctx* x = v;
     /* index-select semantics: 1-D indices along ->dim (see uops.h) */
-    int cc[MAXD + 2];
+    int cc[MAXD + 2] = {0};
     memcpy(cc, c, sizeof(int) * (size_t)x->nd);
     cc[x->dim] = (int)x->in2[c[x->dim]];
     return x->in[flat_of(cc, x->st, x->nd)];
