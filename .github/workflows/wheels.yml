@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build sdist
-        run: pipx run build --sdist python/
+        run: pipx run build --sdist --outdir dist python/
       - uses: actions/upload-artifact@v4
         with:
           name: sdist
@@ -48,7 +48,7 @@ jobs:
       # The C library builds via CMake inside build_cffi.py; wheels bundle the
       # compiled _cml_lib into the wheel (see python/cml/_cml_cffi.py).
       - name: Build wheel
-        run: pipx run build --wheel python/
+        run: pipx run build --wheel --outdir dist python/
       - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ matrix.os }}-${{ matrix.arch }}
@@ -63,7 +63,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/download-artifact@v4
-        with: { pattern: 'wheel-*', merge-multiple: true, path: dist }
+        with: { pattern: 'wheel-${{ matrix.os }}-*', merge-multiple: true, path: dist }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - name: Install and smoke-test

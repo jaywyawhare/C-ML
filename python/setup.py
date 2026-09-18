@@ -15,9 +15,20 @@ Requirements:
 
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
+from setuptools.dist import Distribution
 import subprocess
 import sys
 import os
+
+
+class BinaryDistribution(Distribution):
+    """The wheel bundles a compiled _cml_lib extension, so it is platform- and
+    not pure-Python. Forcing has_ext_modules() makes bdist_wheel emit a
+    platform-tagged wheel (e.g. linux_x86_64) instead of py3-none-any, so wheels
+    for different OS/arch have distinct names and install only where they fit."""
+
+    def has_ext_modules(self):
+        return True
 
 # Single version source: [project] in pyproject.toml
 import configparser  # noqa: F401  (tomllib on py3.11+; fallback below)
@@ -97,6 +108,7 @@ setup(
     cmdclass={
         "build_py": BuildCFFI,
     },
+    distclass=BinaryDistribution,
     include_package_data=True,
     package_data={
         "cml": ["*.py"],
