@@ -7,6 +7,7 @@ It exposes the necessary C structures and functions for Python.
 
 import os
 import subprocess
+import sys
 from cffi import FFI
 
 # Repo root = .../C-ML  (this file is at .../C-ML/python/cml/_cml_cffi.py).
@@ -59,6 +60,12 @@ _EXTRA_LINK = _llvm_link_flags()
 if _can_link("-lOpenCL"):
     _EXTRA_LINK.append("-lOpenCL")   # only when the CML build actually used it
 _EXTRA_LINK += ["-lstdc++", "-lm", "-ldl", "-lpthread"]
+if sys.platform == "darwin":
+    # The macOS CML build enables the Metal backend, so libcml.a references
+    # Metal/Foundation symbols (e.g. MTLCreateSystemDefaultDevice) that must be
+    # resolved when the CFFI module is dlopen'd. Mirror CMake's METAL_LIBS.
+    _EXTRA_LINK += ["-framework", "Metal", "-framework", "Foundation",
+                    "-framework", "MetalPerformanceShaders"]
 
 ffi = FFI()
 
