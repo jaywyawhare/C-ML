@@ -36,18 +36,24 @@ static int test_bf16_training(void) {
     float xd[8];
     for (int i = 0; i < 8; i++) xd[i] = (float)i / 4.0f - 1.0f;
 
-    Tensor* Xb = tensor_full(xs, 2, &bcfg, 0.0f);
-    Tensor* Wb = tensor_full(ws, 2, &bcfg, 0.3f);
-    if (!Xb || !Wb) { if (Xb) tensor_free(Xb); if (Wb) tensor_free(Wb); return 0; }
-    for (size_t i = 0; i < Xb->numel; i++) tensor_set_float(Xb, i, xd[i]);
-
     float master_w = 0.3f;
-    cml_set_requires_grad(Wb, true);
-
     float first_loss = 0.0f, last_loss = INFINITY;
     bool grads_finite = true;
 
+    /* Each epoch is a self-contained graph: rebuild the (tiny) inputs from the
+     * fp32 master weight, run forward/backward, read the gradient, then reset
+     * the IR context. Persisting the tensors across epochs instead makes the
+     * autograd graph accumulate (replay cost goes quadratic — minutes of
+     * runtime) and leaves a bf16 grad that the next backward would try to
+     * accumulate into (bf16 has no elementwise-add kernel → crash). */
     for (int epoch = 0; epoch < 300 && grads_finite; epoch++) {
+        Tensor* Xb = tensor_full(xs, 2, &bcfg, 0.0f);
+        Tensor* Wb = tensor_full(ws, 2, &bcfg, 0.0f);
+        if (!Xb || !Wb) { grads_finite = false; cml_reset_ir_context(); break; }
+        for (size_t i = 0; i < Xb->numel; i++) tensor_set_float(Xb, i, xd[i]);
+        tensor_set_float(Wb, 0, master_w);   /* bf16-rounded master weight */
+        cml_set_requires_grad(Wb, true);
+
         /* target y = 4·x: exactly representable by the bias-free layer, and
          * same-dtype so the loss stays inside the bf16 subgraph and the
          * gradient flows back through the matmul VJP */
@@ -57,7 +63,7 @@ static int test_bf16_training(void) {
 
         Tensor* out  = cml_matmul(Xb, Wb);
         Tensor* loss = out ? cml_nn_mse_loss(out, Yb) : NULL;
-        if (!loss) { grads_finite = false; tensor_free(Yb); break; }
+        if (!loss) { grads_finite = false; cml_reset_ir_context(); break; }
         tensor_ensure_executed(loss);
         float l = tensor_get_float(loss, 0);
         if (epoch == 0) first_loss = l;
@@ -71,20 +77,17 @@ static int test_bf16_training(void) {
             tensor_ensure_executed(g);
             float gv = tensor_get_float(g, 0);
             if (!isfinite(gv)) grads_finite = false;
-            master_w -= 0.05f * gv;   /* fp32 master update, written back */
-            tensor_set_float(Wb, 0, master_w);
+            master_w -= 0.05f * gv;   /* fp32 master update */
         }
 
-        tensor_free(Yb);
-        tensor_free(loss);
-        tensor_free(out);
+        /* Xb, Wb, Yb, out, loss and the grad are all graph-owned; the reset
+         * frees them together, so they must not be tensor_free'd here. */
+        cml_reset_ir_context();
     }
 
     bool ok = grads_finite && last_loss < first_loss && last_loss < 1e-3f
               && isfinite(master_w);
 
-    tensor_free(Xb);
-    tensor_free(Wb);
     autocast_set_dtype(DTYPE_FLOAT16);
     return ok;
 }

@@ -722,13 +722,6 @@ if(BUILD_TESTS)
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
 
-    # bf16 autocast training soak runs 300 epochs through the bf16 subgraph and
-    # is very slow in unoptimized Debug builds (minutes); give it headroom so
-    # the tight global ctest --timeout (for catching hangs) doesn't trip it.
-    if(TEST test_amp_bf16)
-        set_tests_properties(test_amp_bf16 PROPERTIES TIMEOUT 1500)
-    endif()
-
     # The mock-driver suites simulate Linux kernel GPU/DSP driver interfaces
     # (NVIDIA ioctls, AMD KFD, HIP, Hexagon FastRPC) and link Linux-only
     # backend sources, so they only build on Linux.
