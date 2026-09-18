@@ -11,7 +11,7 @@
 static void mkdirs(const char* path) {
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "mkdir -p '%s'", path);
-    system(cmd);
+    if (system(cmd) != 0) { /* mkdir best-effort */ }
 }
 
 static void write_ppm(const char* path, int w, int h, unsigned char r, unsigned char g, unsigned char b) {
@@ -87,7 +87,7 @@ static void setup_librispeech_dir(void) {
 static void cleanup(void) {
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "rm -rf '%s'", tmpdir);
-    system(cmd);
+    if (system(cmd) != 0) { /* rm best-effort */ }
 }
 
 static int test_imagenet_open(void) {

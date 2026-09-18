@@ -304,7 +304,7 @@ static void check_and_launch_viz(void) {
 
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "python \"%s\" \"%s\"", script_path, exe_path);
-    system(cmd);
+    if (system(cmd) != 0) { /* best-effort launch of the viz script */ }
 
     // Note: On Windows, system() waits for the command to finish.
     // If we want async, we'd need CreateProcess.
