@@ -174,6 +174,7 @@ static void aot_emit_reduce(FILE* cf, const char* name, const char* O, const cha
 
 #endif /* CML_HAS_LLVM_BACKEND */
 
+#ifdef CML_HAS_LLVM_BACKEND
 /* Run `cmd`, echoing its output under `tool`, then delete `cleanup_path`.
  * Returns 0 on success, -1 when the tool could not run or exited non-zero. */
 static int aot_run_tool(const char* tool, const char* cmd, const char* cleanup_path) {
@@ -196,6 +197,7 @@ static int aot_run_tool(const char* tool, const char* cmd, const char* cleanup_p
     }
     return 0;
 }
+#endif /* CML_HAS_LLVM_BACKEND */
 
 int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOptions* options) {
 #ifdef CML_HAS_LLVM_BACKEND
