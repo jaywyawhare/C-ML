@@ -38,9 +38,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ccache
+      - name: Install ccache (Linux)
         run: sudo apt-get install -y ccache
         if: runner.os == 'Linux'
+
+      - name: Install ccache (macOS)
+        run: brew install ccache
+        if: runner.os == 'macOS'
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -62,7 +66,7 @@ jobs:
           CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build build -j$(getconf _NPROCESSORS_ONLN)
 
       - name: Run tests
         run: cd build && ctest --output-on-failure
