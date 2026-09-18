@@ -50,8 +50,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install numpy + pytest
-        run: python -m pip install numpy pytest
+      - name: Install numpy + pytest + cffi
+        run: python -m pip install numpy pytest cffi
 
       - name: Build C library (release)
         run: |
