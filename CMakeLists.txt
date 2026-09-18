@@ -32,9 +32,21 @@ endif()
 # distributed binary should ship with — turn off for packaging/CI.
 option(CML_NATIVE_OPTIMIZATIONS "Optimize for the build host CPU (-march=native)" ON)
 if(CML_NATIVE_OPTIMIZATIONS)
+    # Probe with -Werror so a flag that is merely accepted-with-a-warning
+    # (e.g. -march=native on Apple clang / arm64) is treated as unsupported
+    # rather than poisoning every subsequent compile under -Werror.
+    set(_save_req_flags "${CMAKE_REQUIRED_FLAGS}")
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -Werror")
     check_c_compiler_flag("-march=native" HAS_MARCH_NATIVE)
+    if(NOT HAS_MARCH_NATIVE)
+        # Apple silicon uses -mcpu=native; x86 uses -march=native.
+        check_c_compiler_flag("-mcpu=native" HAS_MCPU_NATIVE)
+    endif()
+    set(CMAKE_REQUIRED_FLAGS "${_save_req_flags}")
     if(HAS_MARCH_NATIVE)
         add_compile_options(-march=native)
+    elseif(HAS_MCPU_NATIVE)
+        add_compile_options(-mcpu=native)
     endif()
 endif()
 
