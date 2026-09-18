@@ -107,6 +107,7 @@ static void test_roundtrip_matmul_add_relu(void) {
         }
     }
 
+    free(bytes);
     remove(path);
     cml_reset_ir_context();
 }
@@ -156,6 +157,7 @@ static void test_roundtrip_linear(void) {
         CHECK("Gemm carries transB=1", transb == 1);
     }
 
+    free(bytes);
     remove(path);
     cml_reset_ir_context();
 }
