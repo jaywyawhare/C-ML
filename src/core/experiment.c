@@ -7,7 +7,9 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/utsname.h>
+#endif
 #include <unistd.h>
 #include <pthread.h>
 
@@ -177,8 +179,12 @@ CMLRun* cml_exp_run_init(const char* project, const char* name, const char* conf
 
     /* Run metadata (git commit, host, OS) — the run-overview page. */
     if (gethostname(run->host, sizeof(run->host)) != 0) run->host[0] = '\0';
+#ifdef _WIN32
+    snprintf(run->os, sizeof(run->os), "Windows");
+#else
     struct utsname un;
     if (uname(&un) == 0) snprintf(run->os, sizeof(run->os), "%s %s", un.sysname, un.release);
+#endif
     read_git(run->git, sizeof(run->git));
     /* Capture the launching command from /proc/self/cmdline (NUL-separated). */
     FILE* cl = fopen("/proc/self/cmdline", "rb");

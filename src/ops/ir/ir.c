@@ -1,5 +1,7 @@
 
+#ifndef _WIN32
 #include <execinfo.h>
+#endif
 #include "ops/ir/flamegraph.h"
 
 /* Defined below, next to the interning table it uses. */
@@ -1738,6 +1740,9 @@ static int cml_stack_is_internal(const char* folded) {
 }
 
 static char* cml_capture_build_stack(void) {
+#ifdef _WIN32
+    return NULL;   /* no execinfo/backtrace on Windows; flame graph omits stacks */
+#else
     void* addrs[CML_BT_MAX];
     int n = backtrace(addrs, CML_BT_MAX);
     if (n <= CML_BT_SKIP) return NULL;
@@ -1774,6 +1779,7 @@ static char* cml_capture_build_stack(void) {
         e->folded = cml_strdup(buf);
     }
     return cml_strdup(buf);
+#endif /* _WIN32 */
 }
 
 void cml_ir_scope_push(const char* name) {
