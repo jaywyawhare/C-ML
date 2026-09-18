@@ -95,7 +95,7 @@ static int test_dataset_bad_files(void) {
 
 static int test_dataset_lifecycle(void) {
     /* from_arrays + split + normalize + shuffle + loader round trip */
-    const int N = 10, F = 2;
+    enum { N = 10, F = 2 };
     float X[N*F], y[N];
     for (int i = 0; i < N*F; i++) X[i] = (float)i;
     for (int i = 0; i < N; i++) y[i] = (float)(i % 2);
