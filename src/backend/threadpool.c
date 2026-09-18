@@ -7,6 +7,9 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <stdatomic.h>
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
@@ -170,8 +173,14 @@ static void* worker_thread(void* arg) {
 
 ThreadPool* threadpool_create(size_t num_threads) {
     if (num_threads == 0) {
+#ifdef _WIN32
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        num_threads = si.dwNumberOfProcessors > 0 ? (size_t)si.dwNumberOfProcessors : 1;
+#else
         long n = sysconf(_SC_NPROCESSORS_ONLN);
         num_threads = (n > 0) ? (size_t)n : 1;
+#endif
     }
 
     ThreadPool* pool = cml_calloc(1, sizeof(ThreadPool));
