@@ -64,9 +64,13 @@ jobs:
       # GCC/Clang flags and the dynlib.h LoadLibrary shim.
       - name: Set up MinGW-w64 (Windows)
         if: runner.os == 'Windows'
-        uses: egor-tensin/setup-mingw@v2
+        uses: msys2/setup-msys2@v2
         with:
-          platform: x64
+          msystem: MINGW64
+          path-type: inherit
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
 
       - name: Build wheel (Windows/MinGW)
         if: runner.os == 'Windows'
