@@ -14,6 +14,7 @@
 #include "ops/ir/llvm/llvm_backend.h"
 #include <string.h>
 
+#ifdef CML_HAS_LLVM_BACKEND
 static int check(const char* name, int ok) {
     tests_run++;
     if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
@@ -29,9 +30,14 @@ static const TensorConfig cfg_i32 = {.dtype = DTYPE_INT32, .device = DEVICE_CPU,
                                      .has_dtype = true, .has_device = true};
 static const TensorConfig cfg_i64 = {.dtype = DTYPE_INT64, .device = DEVICE_CPU,
                                      .has_dtype = true, .has_device = true};
+#endif /* CML_HAS_LLVM_BACKEND */
 
 int main(void) {
     printf("=== JIT typed codegen (f64) ===\n");
+#ifndef CML_HAS_LLVM_BACKEND
+    printf("  SKIP: built without LLVM backend\n");
+    return 0;
+#else
 
     CMLLLVMBackend* be = cml_llvm_backend_init();
     if (!be) {
@@ -132,4 +138,5 @@ int main(void) {
 
     cml_llvm_backend_destroy(be);
     return TEST_SUMMARY();
+#endif /* CML_HAS_LLVM_BACKEND */
 }
