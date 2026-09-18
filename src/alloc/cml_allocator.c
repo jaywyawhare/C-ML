@@ -22,12 +22,26 @@
 #include <stdio.h>   /* only for optional stats print, remove if want zero dep */
 
 /* System backing allocator for internal slab/large acquisition only.
- * We must NEVER call our own cml_* here for bootstrapping the allocator itself. */
+ * We must NEVER call our own cml_* here for bootstrapping the allocator itself.
+ * On Windows there is no posix_memalign and _aligned_malloc'd memory must be
+ * freed with _aligned_free, so every system_* allocation goes through the
+ * aligned pair to keep alloc/free consistent. */
+#ifdef _WIN32
+#include <malloc.h>
+static inline void* system_malloc(size_t sz) { return _aligned_malloc(sz ? sz : 1, 16); }
+static inline void  system_free(void* p)     { _aligned_free(p); }
+static inline int   system_posix_memalign(void** memptr, size_t alignment, size_t size) {
+    void* q = _aligned_malloc(size ? size : 1, alignment);
+    *memptr = q;
+    return q ? 0 : 12;   /* 12 == ENOMEM */
+}
+#else
 static inline void* system_malloc(size_t sz) { return malloc(sz); }
 static inline void  system_free(void* p)     { free(p); }
 static inline int   system_posix_memalign(void** memptr, size_t alignment, size_t size) {
     return posix_memalign(memptr, alignment, size);
 }
+#endif
 
 /* Tunables for "fast as fuck" */
 #define CML_SLAB_SIZE          (256 * 1024)   /* 256 KiB slabs - sweet spot for cache + TLB */
