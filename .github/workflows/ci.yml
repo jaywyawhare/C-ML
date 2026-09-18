@@ -28,6 +28,9 @@ concurrency:
 jobs:
   build-and-test:
     timeout-minutes: 40
+    # macOS is a best-effort target (LLVM/CUDA/ROCm/io_uring/InfiniBand are
+    # Linux-only); its leg runs informationally and does not fail CI.
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:
