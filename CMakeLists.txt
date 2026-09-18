@@ -722,6 +722,10 @@ if(BUILD_TESTS)
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
 
+    # The mock-driver suites simulate Linux kernel GPU/DSP driver interfaces
+    # (NVIDIA ioctls, AMD KFD, HIP, Hexagon FastRPC) and link Linux-only
+    # backend sources, so they only build on Linux.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(test_nv_mock
         tests/test_nv_driver.c
         src/ops/ir/gpu/nv_mock.c
@@ -764,6 +768,7 @@ if(BUILD_TESTS)
     cml_link_all(test_hip_mock)
     cml_apply_torch_selective_ops(test_hip_mock)
     add_test(NAME test_hip_mock COMMAND test_hip_mock)
+    endif() # CMAKE_SYSTEM_NAME STREQUAL "Linux"
 
     if(ENABLE_SANITIZERS)
         set(CML_LSAN_SUPP "${CMAKE_SOURCE_DIR}/cmake/lsan_suppressions.txt")
@@ -772,8 +777,10 @@ if(BUILD_TESTS)
             set_tests_properties(${test_name} PROPERTIES
                 ENVIRONMENT "LSAN_OPTIONS=suppressions=${CML_LSAN_SUPP}:print_suppressions=0")
         endforeach()
-        set_tests_properties(test_nv_mock test_am_mock PROPERTIES
-            ENVIRONMENT "LSAN_OPTIONS=suppressions=${CML_LSAN_SUPP}:print_suppressions=0")
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+            set_tests_properties(test_nv_mock test_am_mock PROPERTIES
+                ENVIRONMENT "LSAN_OPTIONS=suppressions=${CML_LSAN_SUPP}:print_suppressions=0")
+        endif()
     endif()
 endif()
 
