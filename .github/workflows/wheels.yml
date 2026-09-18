@@ -53,9 +53,33 @@ jobs:
       # compiled _cml_lib into the wheel (see python/cml/_cml_cffi.py). Build
       # with the setup-python interpreter (not pipx's default, which may be a
       # different Python) so the cpXY-tagged wheel matches the test-install job.
-      - name: Build wheel
+      - name: Build wheel (POSIX)
+        if: runner.os != 'Windows'
         run: |
           python -m pip install build
+          python -m build --wheel --outdir dist python/
+
+      # Windows has no MSVC-compatible toolchain for the POSIX-centric C code, so
+      # build with MinGW-w64 (GCC): CMake and cffi both use gcc, matching the
+      # GCC/Clang flags and the dynlib.h LoadLibrary shim.
+      - name: Set up MinGW-w64 (Windows)
+        if: runner.os == 'Windows'
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+
+      - name: Build wheel (Windows/MinGW)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CC: gcc
+          CXX: g++
+          CMAKE_GENERATOR: "MinGW Makefiles"
+        run: |
+          python -m pip install build
+          # Make cffi's distutils extension build use MinGW gcc, not MSVC.
+          printf '[build]\ncompiler=mingw32\n[build_ext]\ncompiler=mingw32\n' \
+            > "$USERPROFILE/pydistutils.cfg"
           python -m build --wheel --outdir dist python/
       - uses: actions/upload-artifact@v4
         with:
