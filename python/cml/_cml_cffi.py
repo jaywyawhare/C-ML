@@ -38,7 +38,27 @@ def _llvm_link_flags():
             continue
     return []
 
-_EXTRA_LINK = _llvm_link_flags() + ["-lOpenCL", "-lstdc++", "-lm", "-ldl", "-lpthread"]
+def _can_link(*flags):
+    """True if the toolchain can link the given flags (e.g. -lOpenCL). libcml.a
+    is built by CMake on this same machine, so optional deps it linked are also
+    linkable here; probing keeps the CFFI link in sync with that build."""
+    import tempfile
+    cc = os.environ.get("CC", "cc")
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, "probe.c")
+        with open(src, "w") as f:
+            f.write("int main(void){return 0;}\n")
+        try:
+            subprocess.check_call([cc, src, "-o", os.path.join(d, "probe"), *flags],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            return False
+
+_EXTRA_LINK = _llvm_link_flags()
+if _can_link("-lOpenCL"):
+    _EXTRA_LINK.append("-lOpenCL")   # only when the CML build actually used it
+_EXTRA_LINK += ["-lstdc++", "-lm", "-ldl", "-lpthread"]
 
 ffi = FFI()
 
