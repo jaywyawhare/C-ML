@@ -59,7 +59,11 @@ def _can_link(*flags):
 _EXTRA_LINK = _llvm_link_flags()
 if _can_link("-lOpenCL"):
     _EXTRA_LINK.append("-lOpenCL")   # only when the CML build actually used it
-_EXTRA_LINK += ["-lstdc++", "-lm", "-ldl", "-lpthread"]
+if sys.platform == "win32":
+    # MinGW: LoadLibrary is in the CRT (no libdl); winpthread provides pthread.
+    _EXTRA_LINK += ["-lstdc++", "-lm", "-lpthread"]
+else:
+    _EXTRA_LINK += ["-lstdc++", "-lm", "-ldl", "-lpthread"]
 if sys.platform == "darwin":
     # macOS CML enables the Metal backend and finds OpenCL as a framework
     # (not -lOpenCL), so libcml.a references Metal/Foundation and OpenCL symbols
