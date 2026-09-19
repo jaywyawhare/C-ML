@@ -2,7 +2,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 #include "alloc/cml_allocator.h"
 
 /* libusb descriptor structure (partial, matches libusb_device_descriptor layout) */
@@ -73,17 +73,17 @@ static libusb_get_port_number_fn             fn_libusb_get_port_number          
 static libusb_get_string_descriptor_ascii_fn fn_libusb_get_string_descriptor_ascii = NULL;
 
 static void* open_libusb(void) {
-    void* h = dlopen("libusb-1.0.so", RTLD_LAZY);
+    void* h = CML_DLOPEN("libusb-1.0.so", RTLD_LAZY);
     if (!h) {
-        h = dlopen("libusb-1.0.so.0", RTLD_LAZY);
+        h = CML_DLOPEN("libusb-1.0.so.0", RTLD_LAZY);
     }
     return h;
 }
 
 #define LOAD_USB_SYM(name) do { \
-    fn_##name = (name##_fn)dlsym(lib, #name); \
+    fn_##name = (name##_fn)CML_DLSYM(lib, #name); \
     if (!fn_##name) { \
-        LOG_ERROR("USB: failed to load %s: %s", #name, dlerror()); \
+        LOG_ERROR("USB: failed to load %s: %s", #name, CML_DLERROR()); \
         return -1; \
     } \
 } while (0)
@@ -128,7 +128,7 @@ static const char* identify_device(uint16_t vendor_id, uint16_t product_id) {
 bool cml_usb_available(void) {
     void* h = open_libusb();
     if (h) {
-        dlclose(h);
+        CML_DLCLOSE(h);
         return true;
     }
     return false;
@@ -148,12 +148,12 @@ int cml_usb_enumerate(CMLUSBDevice** devices, int* num_devices) {
 
     if (!s_usb_lib) {
         if (load_libusb_symbols(lib) != 0) {
-            dlclose(lib);
+            CML_DLCLOSE(lib);
             return -1;
         }
         s_usb_lib = lib;
     } else {
-        dlclose(lib);
+        CML_DLCLOSE(lib);
     }
 
     void* ctx = NULL;
@@ -267,7 +267,7 @@ int cml_usb_open(CMLUSBDevice* device) {
             return -1;
         }
         if (load_libusb_symbols(lib) != 0) {
-            dlclose(lib);
+            CML_DLCLOSE(lib);
             return -1;
         }
         s_usb_lib = lib;

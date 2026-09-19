@@ -28,9 +28,13 @@
 #define LIB_CLOSE(handle) dlclose(handle)
 #elif defined(_WIN32)
 #include <windows.h>
+#include <direct.h>
 #define LIB_LOAD(path) LoadLibraryA(path)
-#define LIB_SYM(handle, name) GetProcAddress((HMODULE)handle, name)
+/* Cast FARPROC to void* so the typed-function-pointer assignments match the
+ * POSIX dlsym() path (void* -> fn ptr) rather than warning under -Werror. */
+#define LIB_SYM(handle, name) ((void*)GetProcAddress((HMODULE)handle, name))
 #define LIB_CLOSE(handle) FreeLibrary((HMODULE)handle)
+#define mkdir(path, mode) _mkdir(path)
 #else
 #define LIB_LOAD(path) NULL
 #define LIB_SYM(handle, name) NULL

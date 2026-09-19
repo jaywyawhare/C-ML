@@ -621,6 +621,17 @@ set(LIBRARY_SOURCES
     ${DATASET_SOURCES}
 )
 
+if(WIN32)
+    # POSIX-only niche backends (TCP sockets / mmap+ioctl) with no core callers:
+    # excluded from the Windows build rather than ported to winsock/Win32.
+    list(REMOVE_ITEM LIBRARY_SOURCES
+        src/backend/remote_device.c
+        src/backend/usb3_gpu.c
+        src/nn/openai_api.c
+        src/ops/ir/viz_server.c
+        src/ops/ir/gpu/amd_profiling.c)
+endif()
+
 function(cml_link_all target)
     # Scoped instead of a global include_directories(): BUILD_INTERFACE keeps
     # the source-tree path out of the installed CMLTargets export.
@@ -636,7 +647,13 @@ function(cml_link_all target)
     if(OpenCL_INCLUDE_DIRS)
         target_include_directories(${target} SYSTEM PRIVATE ${OpenCL_INCLUDE_DIRS})
     endif()
-    target_link_libraries(${target} m dl pthread)
+    # Windows/MinGW has no libdl (LoadLibrary is in the CRT) and libm/pthread
+    # come from the runtime/winpthread.
+    if(WIN32)
+        target_link_libraries(${target} m pthread ws2_32)
+    else()
+        target_link_libraries(${target} m dl pthread)
+    endif()
     if(LLVM_BACKEND_FOUND)
         target_link_libraries(${target} ${LLVM_BACKEND_LIBS_LIST})
     endif()

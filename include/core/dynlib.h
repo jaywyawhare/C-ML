@@ -24,7 +24,8 @@
 #elif defined(_WIN32)
 #include <windows.h>
 #define CML_DLOPEN(path, mode) LoadLibraryA(path)
-#define CML_DLSYM(handle, symbol) GetProcAddress((HMODULE)handle, symbol)
+/* Cast FARPROC to void* so assignments match the POSIX dlsym() shape. */
+#define CML_DLSYM(handle, symbol) ((void*)GetProcAddress((HMODULE)handle, symbol))
 #define CML_DLCLOSE(handle) FreeLibrary((HMODULE)handle)
 #define RTLD_LAZY 0
 #else
@@ -32,6 +33,13 @@
 #define CML_DLSYM(handle, symbol) NULL
 #define CML_DLCLOSE(handle) ((void)0)
 #define RTLD_LAZY 0
+#endif
+
+/* Human-readable last-error string; only POSIX dlfcn provides one. */
+#if defined(__linux__) || defined(__APPLE__)
+#define CML_DLERROR() dlerror()
+#else
+#define CML_DLERROR() "dynamic loading error"
 #endif
 
 #endif /* CML_CORE_DYNLIB_H */
