@@ -1038,7 +1038,10 @@ ffi.set_source(
     #include "core/onnx.h"
     """,
     include_dirs=[_INCLUDE_DIR],
-    extra_compile_args=["-std=c11", "-O2"],
+    # CML_STATIC_DEFINE makes CML_API expand to nothing so the headers don't
+    # mark functions __declspec(dllimport) on Windows (we link libcml.a
+    # statically; dllimport would produce unresolved __imp_* references).
+    extra_compile_args=["-std=c11", "-O2", "-DCML_STATIC_DEFINE"],
     extra_objects=[_STATIC_LIB] if _STATIC_LIB else [],
     extra_link_args=_EXTRA_LINK,
 )
