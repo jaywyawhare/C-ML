@@ -17,6 +17,9 @@ static int load_graph_symbols(CMLCUDAGraphBackend* gb) {
 #include <dlfcn.h>
 #define GET_SYM(name) dlsym(lib, #name)
 #elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN   /* avoid winnls/stralign.h inline-fn parse errors */
+#endif
 #include <windows.h>
 #include "alloc/cml_allocator.h"
 #define GET_SYM(name) (void*)GetProcAddress((HMODULE)lib, #name)
