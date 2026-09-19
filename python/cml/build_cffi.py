@@ -49,7 +49,10 @@ def find_cml_lib():
     subprocess.run(
         ["cmake", "-S", str(root), "-B", str(build_dir),
          "-DBUILD_TESTS=OFF", "-DBUILD_EXAMPLES=OFF",
-         "-DCMAKE_BUILD_TYPE=Release"],
+         "-DCMAKE_BUILD_TYPE=Release",
+         # Wheels are distributed to arbitrary CPUs; -march=native would bake in
+         # instructions (e.g. AVX-512) the install machine may not have (SIGILL).
+         "-DCML_NATIVE_OPTIMIZATIONS=OFF"],
         check=True,
     )
     nproc = os.cpu_count() or 4
