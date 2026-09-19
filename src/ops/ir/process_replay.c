@@ -9,6 +9,10 @@
 #include <dirent.h>
 #include <time.h>
 #include <stdbool.h>
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#endif
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 

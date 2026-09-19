@@ -10,6 +10,10 @@
 #include "core/dynlib.h"
 #include <time.h>
 #include <errno.h>
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#endif
 #include "alloc/cml_allocator.h"
 
 typedef struct sqlite3 sqlite3;
