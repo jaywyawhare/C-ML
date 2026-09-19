@@ -28,11 +28,15 @@
 #define CML_DLSYM(handle, symbol) ((void*)GetProcAddress((HMODULE)handle, symbol))
 #define CML_DLCLOSE(handle) FreeLibrary((HMODULE)handle)
 #define RTLD_LAZY 0
+#define RTLD_NOW 0
+#define RTLD_LOCAL 0
 #else
 #define CML_DLOPEN(path, mode) NULL
 #define CML_DLSYM(handle, symbol) NULL
 #define CML_DLCLOSE(handle) ((void)0)
 #define RTLD_LAZY 0
+#define RTLD_NOW 0
+#define RTLD_LOCAL 0
 #endif
 
 /* Human-readable last-error string; only POSIX dlfcn provides one. */

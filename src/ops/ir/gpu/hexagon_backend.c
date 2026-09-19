@@ -3,7 +3,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
@@ -21,19 +21,19 @@ static void* try_dlopen_dsp(void) {
      * full session lifecycle without DSP hardware). */
     const char* override = getenv("CML_DSP_RPC_LIB");
     if (override && override[0]) {
-        void* h = dlopen(override, RTLD_LAZY);
+        void* h = CML_DLOPEN(override, RTLD_LAZY);
         if (h) {
             LOG_DEBUG("Opened %s (CML_DSP_RPC_LIB override)", override);
             return h;
         }
-        LOG_WARNING("CML_DSP_RPC_LIB='%s' could not be opened: %s", override, dlerror());
+        LOG_WARNING("CML_DSP_RPC_LIB='%s' could not be opened: %s", override, CML_DLERROR());
     }
-    void* h = dlopen("libcdsprpc.so", RTLD_LAZY);
+    void* h = CML_DLOPEN("libcdsprpc.so", RTLD_LAZY);
     if (h) {
         LOG_DEBUG("Opened libcdsprpc.so (CDSP RPC)");
         return h;
     }
-    h = dlopen("libadsprpc.so", RTLD_LAZY);
+    h = CML_DLOPEN("libadsprpc.so", RTLD_LAZY);
     if (h) {
         LOG_DEBUG("Opened libadsprpc.so (ADSP RPC)");
         return h;
@@ -44,7 +44,7 @@ static void* try_dlopen_dsp(void) {
 bool cml_hexagon_available(void) {
     void* h = try_dlopen_dsp();
     if (h) {
-        dlclose(h);
+        CML_DLCLOSE(h);
         return true;
     }
     return false;
@@ -72,21 +72,21 @@ int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
         return -1;
     }
 
-    fn_remote_handle_open = (remote_handle_open_fn)dlsym(lib, "remote_handle_open");
+    fn_remote_handle_open = (remote_handle_open_fn)CML_DLSYM(lib, "remote_handle_open");
     if (!fn_remote_handle_open) {
-        LOG_ERROR("Failed to load remote_handle_open: %s", dlerror());
+        LOG_ERROR("Failed to load remote_handle_open: %s", CML_DLERROR());
         goto fail;
     }
 
-    fn_remote_handle_invoke = (remote_handle_invoke_fn)dlsym(lib, "remote_handle_invoke");
+    fn_remote_handle_invoke = (remote_handle_invoke_fn)CML_DLSYM(lib, "remote_handle_invoke");
     if (!fn_remote_handle_invoke) {
-        LOG_ERROR("Failed to load remote_handle_invoke: %s", dlerror());
+        LOG_ERROR("Failed to load remote_handle_invoke: %s", CML_DLERROR());
         goto fail;
     }
 
-    fn_remote_handle_close = (remote_handle_close_fn)dlsym(lib, "remote_handle_close");
+    fn_remote_handle_close = (remote_handle_close_fn)CML_DLSYM(lib, "remote_handle_close");
     if (!fn_remote_handle_close) {
-        LOG_ERROR("Failed to load remote_handle_close: %s", dlerror());
+        LOG_ERROR("Failed to load remote_handle_close: %s", CML_DLERROR());
         goto fail;
     }
 
@@ -113,7 +113,7 @@ int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
     return 0;
 
 fail:
-    dlclose(lib);
+    CML_DLCLOSE(lib);
     fn_remote_handle_open = NULL;
     fn_remote_handle_invoke = NULL;
     fn_remote_handle_close = NULL;
@@ -124,7 +124,7 @@ void cml_hexagon_backend_free(CMLHexagonBackend* backend) {
     if (!backend) return;
 
     if (backend->handle) {
-        dlclose(backend->handle);
+        CML_DLCLOSE(backend->handle);
         backend->handle = NULL;
         s_dsp_lib = NULL;
         fn_remote_handle_open = NULL;

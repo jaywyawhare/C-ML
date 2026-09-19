@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
@@ -81,17 +81,17 @@ static clGetProgramBuildInfo_fn     fn_clGetProgramBuildInfo     = NULL;
 static char s_device_info_buf[512];
 
 static void* open_opencl_lib(void) {
-    void* h = dlopen("libOpenCL.so", RTLD_LAZY);
+    void* h = CML_DLOPEN("libOpenCL.so", RTLD_LAZY);
     if (!h) {
-        h = dlopen("libOpenCL.so.1", RTLD_LAZY);
+        h = CML_DLOPEN("libOpenCL.so.1", RTLD_LAZY);
     }
     return h;
 }
 
 #define LOAD_CL_SYM(name) do { \
-    fn_##name = (name##_fn)dlsym(lib, #name); \
+    fn_##name = (name##_fn)CML_DLSYM(lib, #name); \
     if (!fn_##name) { \
-        LOG_ERROR("Adreno: failed to load %s: %s", #name, dlerror()); \
+        LOG_ERROR("Adreno: failed to load %s: %s", #name, CML_DLERROR()); \
         return -1; \
     } \
 } while (0)
@@ -176,24 +176,24 @@ bool cml_adreno_available(void) {
     void* lib = open_opencl_lib();
     if (!lib) return false;
 
-    clGetPlatformIDs_fn get_plat = (clGetPlatformIDs_fn)dlsym(lib, "clGetPlatformIDs");
-    clGetDeviceIDs_fn get_dev = (clGetDeviceIDs_fn)dlsym(lib, "clGetDeviceIDs");
-    clGetPlatformInfo_fn get_plat_info = (clGetPlatformInfo_fn)dlsym(lib, "clGetPlatformInfo");
-    clGetDeviceInfo_fn get_dev_info = (clGetDeviceInfo_fn)dlsym(lib, "clGetDeviceInfo");
+    clGetPlatformIDs_fn get_plat = (clGetPlatformIDs_fn)CML_DLSYM(lib, "clGetPlatformIDs");
+    clGetDeviceIDs_fn get_dev = (clGetDeviceIDs_fn)CML_DLSYM(lib, "clGetDeviceIDs");
+    clGetPlatformInfo_fn get_plat_info = (clGetPlatformInfo_fn)CML_DLSYM(lib, "clGetPlatformInfo");
+    clGetDeviceInfo_fn get_dev_info = (clGetDeviceInfo_fn)CML_DLSYM(lib, "clGetDeviceInfo");
 
     if (!get_plat || !get_dev || !get_plat_info || !get_dev_info) {
-        dlclose(lib);
+        CML_DLCLOSE(lib);
         return false;
     }
 
     cl_uint num_platforms = 0;
     if (get_plat(0, NULL, &num_platforms) != CL_SUCCESS || num_platforms == 0) {
-        dlclose(lib);
+        CML_DLCLOSE(lib);
         return false;
     }
 
     void** platforms = (void**)cml_calloc(num_platforms, sizeof(void*));
-    if (!platforms) { dlclose(lib); return false; }
+    if (!platforms) { CML_DLCLOSE(lib); return false; }
 
     bool found = false;
     if (get_plat(num_platforms, platforms, NULL) == CL_SUCCESS) {
@@ -225,7 +225,7 @@ bool cml_adreno_available(void) {
     }
 
     cml_free(platforms);
-    dlclose(lib);
+    CML_DLCLOSE(lib);
     return found;
 }
 
@@ -252,7 +252,7 @@ int cml_adreno_backend_init(CMLAdrenoBackend* backend) {
     }
 
     if (load_opencl_symbols(lib) != 0) {
-        dlclose(lib);
+        CML_DLCLOSE(lib);
         return -1;
     }
 
@@ -316,7 +316,7 @@ int cml_adreno_backend_init(CMLAdrenoBackend* backend) {
     return 0;
 
 fail:
-    dlclose(lib);
+    CML_DLCLOSE(lib);
     s_cl_lib = NULL;
     return -1;
 }
@@ -333,7 +333,7 @@ void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
         backend->cl_context = NULL;
     }
     if (s_cl_lib) {
-        dlclose(s_cl_lib);
+        CML_DLCLOSE(s_cl_lib);
         s_cl_lib = NULL;
     }
 

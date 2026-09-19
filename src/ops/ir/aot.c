@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 #include <ctype.h>
 #include <unistd.h>
 
@@ -866,28 +866,28 @@ CMLAOTModel* cml_aot_load(const char* path) {
         return NULL;
     }
 
-    void* handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+    void* handle = CML_DLOPEN(path, RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
-        LOG_ERROR("Failed to load AOT model: %s", dlerror());
+        LOG_ERROR("Failed to load AOT model: %s", CML_DLERROR());
         return NULL;
     }
 
     /* Look up the entry function */
-    void* forward_fn = dlsym(handle, "cml_model_forward");
+    void* forward_fn = CML_DLSYM(handle, "cml_model_forward");
     if (!forward_fn) {
         /* Try alternate name */
-        forward_fn = dlsym(handle, "main");
+        forward_fn = CML_DLSYM(handle, "main");
     }
 
     if (!forward_fn) {
         LOG_ERROR("No entry function found in AOT model");
-        dlclose(handle);
+        CML_DLCLOSE(handle);
         return NULL;
     }
 
     CMLAOTModel* model = calloc(1, sizeof(CMLAOTModel));
     if (!model) {
-        dlclose(handle);
+        CML_DLCLOSE(handle);
         return NULL;
     }
 
@@ -961,7 +961,7 @@ void cml_aot_free(CMLAOTModel* model) {
         return;
 
     if (model->handle)
-        dlclose(model->handle);
+        CML_DLCLOSE(model->handle);
 
     if (model->input_shapes) {
         for (int i = 0; i < model->num_inputs; i++)

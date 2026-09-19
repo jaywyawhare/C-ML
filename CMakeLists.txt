@@ -629,7 +629,12 @@ if(WIN32)
         src/backend/usb3_gpu.c
         src/nn/openai_api.c
         src/ops/ir/viz_server.c
-        src/ops/ir/gpu/amd_profiling.c)
+        src/ops/ir/gpu/amd_profiling.c
+        src/distributed/nccl_backend.c
+        src/distributed/gloo_backend.c
+        src/distributed/ib_transport.c)
+    # Replace the excluded socket comm backends with unavailable-stub factories.
+    list(APPEND LIBRARY_SOURCES src/distributed/dist_stubs_win.c)
 endif()
 
 function(cml_link_all target)

@@ -19,7 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 
 static const char* g_weights_base_url = "https://weights.cml-lib.org/v1";
 static char g_weights_dir[512] = "";

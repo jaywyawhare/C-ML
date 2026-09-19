@@ -2,7 +2,7 @@
 #include "distributed/distributed.h"
 #include "core/logging.h"
 #include <stdlib.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
@@ -310,7 +310,7 @@ static void mpi_destroy(void* ctx) {
         mpi->MPI_Finalize();
 
     if (mpi->handle)
-        dlclose(mpi->handle);
+        CML_DLCLOSE(mpi->handle);
 
     if (g_mpi_ctx == mpi)
         g_mpi_ctx = NULL;
@@ -319,15 +319,15 @@ static void mpi_destroy(void* ctx) {
 }
 
 DistCommOps* cml_dist_create_mpi_backend(void) {
-    void* handle = dlopen("libmpi.so", RTLD_NOW | RTLD_LOCAL);
+    void* handle = CML_DLOPEN("libmpi.so", RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
-        handle = dlopen("libmpi.so.40", RTLD_NOW | RTLD_LOCAL);
+        handle = CML_DLOPEN("libmpi.so.40", RTLD_NOW | RTLD_LOCAL);
     }
     if (!handle) {
-        handle = dlopen("libmpi.so.12", RTLD_NOW | RTLD_LOCAL);
+        handle = CML_DLOPEN("libmpi.so.12", RTLD_NOW | RTLD_LOCAL);
     }
     if (!handle) {
-        LOG_INFO("MPI not found: %s", dlerror());
+        LOG_INFO("MPI not found: %s", CML_DLERROR());
         return NULL;
     }
 
@@ -338,39 +338,39 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
      * OpenMPI yields garbage handles and undefined behavior. Detect OpenMPI via
      * one of its private globals and refuse rather than crash; the caller then
      * falls back to the Gloo backend. */
-    if (dlsym(handle, "ompi_mpi_comm_world")) {
+    if (CML_DLSYM(handle, "ompi_mpi_comm_world")) {
         LOG_WARNING("MPI backend: detected Open MPI, whose pointer-based handle "
                     "ABI is not supported by this integer-handle binding; "
                     "falling back to another backend");
-        dlclose(handle);
+        CML_DLCLOSE(handle);
         return NULL;
     }
 
     MPIContext* mpi = cml_calloc(1, sizeof(MPIContext));
     if (!mpi) {
-        dlclose(handle);
+        CML_DLCLOSE(handle);
         return NULL;
     }
 
     mpi->handle = handle;
 
-    *(void**)&mpi->MPI_Init = dlsym(handle, "MPI_Init");
-    *(void**)&mpi->MPI_Finalize = dlsym(handle, "MPI_Finalize");
-    *(void**)&mpi->MPI_Comm_rank = dlsym(handle, "MPI_Comm_rank");
-    *(void**)&mpi->MPI_Comm_size = dlsym(handle, "MPI_Comm_size");
-    *(void**)&mpi->MPI_Allreduce = dlsym(handle, "MPI_Allreduce");
-    *(void**)&mpi->MPI_Bcast = dlsym(handle, "MPI_Bcast");
-    *(void**)&mpi->MPI_Barrier = dlsym(handle, "MPI_Barrier");
-    *(void**)&mpi->MPI_Send = dlsym(handle, "MPI_Send");
-    *(void**)&mpi->MPI_Recv = dlsym(handle, "MPI_Recv");
-    *(void**)&mpi->MPI_Allgather = dlsym(handle, "MPI_Allgather");
-    *(void**)&mpi->MPI_Reduce_scatter = dlsym(handle, "MPI_Reduce_scatter");
-    *(void**)&mpi->MPI_Iallreduce = dlsym(handle, "MPI_Iallreduce");
-    *(void**)&mpi->MPI_Wait = dlsym(handle, "MPI_Wait");
+    *(void**)&mpi->MPI_Init = CML_DLSYM(handle, "MPI_Init");
+    *(void**)&mpi->MPI_Finalize = CML_DLSYM(handle, "MPI_Finalize");
+    *(void**)&mpi->MPI_Comm_rank = CML_DLSYM(handle, "MPI_Comm_rank");
+    *(void**)&mpi->MPI_Comm_size = CML_DLSYM(handle, "MPI_Comm_size");
+    *(void**)&mpi->MPI_Allreduce = CML_DLSYM(handle, "MPI_Allreduce");
+    *(void**)&mpi->MPI_Bcast = CML_DLSYM(handle, "MPI_Bcast");
+    *(void**)&mpi->MPI_Barrier = CML_DLSYM(handle, "MPI_Barrier");
+    *(void**)&mpi->MPI_Send = CML_DLSYM(handle, "MPI_Send");
+    *(void**)&mpi->MPI_Recv = CML_DLSYM(handle, "MPI_Recv");
+    *(void**)&mpi->MPI_Allgather = CML_DLSYM(handle, "MPI_Allgather");
+    *(void**)&mpi->MPI_Reduce_scatter = CML_DLSYM(handle, "MPI_Reduce_scatter");
+    *(void**)&mpi->MPI_Iallreduce = CML_DLSYM(handle, "MPI_Iallreduce");
+    *(void**)&mpi->MPI_Wait = CML_DLSYM(handle, "MPI_Wait");
 
     if (!mpi->MPI_Allreduce) {
         LOG_WARNING("MPI loaded but missing MPI_Allreduce");
-        dlclose(handle);
+        CML_DLCLOSE(handle);
         cml_free(mpi);
         return NULL;
     }
@@ -380,7 +380,7 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
     DistCommOps* ops = cml_calloc(1, sizeof(DistCommOps));
     if (!ops) {
         g_mpi_ctx = NULL;
-        dlclose(handle);
+        CML_DLCLOSE(handle);
         cml_free(mpi);
         return NULL;
     }

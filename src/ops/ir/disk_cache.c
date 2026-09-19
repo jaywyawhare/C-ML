@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
+#include "core/dynlib.h"
 #include <time.h>
 #include <errno.h>
 #include "alloc/cml_allocator.h"
@@ -66,7 +66,7 @@ static int load_sqlite(void) {
     };
 
     for (int i = 0; names[i]; i++) {
-        sql.handle = dlopen(names[i], RTLD_LAZY | RTLD_LOCAL);
+        sql.handle = CML_DLOPEN(names[i], RTLD_LAZY | RTLD_LOCAL);
         if (sql.handle) break;
     }
 
@@ -76,10 +76,10 @@ static int load_sqlite(void) {
     }
 
 #define LOAD_SYM(name) do { \
-    *(void**)&sql.name = dlsym(sql.handle, "sqlite3_" #name); \
+    *(void**)&sql.name = CML_DLSYM(sql.handle, "sqlite3_" #name); \
     if (!sql.name) { \
         LOG_ERROR("Failed to load sqlite3_%s", #name); \
-        dlclose(sql.handle); \
+        CML_DLCLOSE(sql.handle); \
         sql.handle = NULL; \
         return -1; \
     } \
@@ -97,7 +97,7 @@ static int load_sqlite(void) {
     LOAD_SYM(column_bytes);
     LOAD_SYM(finalize);
 
-    *(void**)&sql.free_fn = dlsym(sql.handle, "sqlite3_free");
+    *(void**)&sql.free_fn = CML_DLSYM(sql.handle, "sqlite3_free");
 
 #undef LOAD_SYM
 
@@ -233,14 +233,14 @@ typedef int (*fn_sqlite3_clear_bindings)(sqlite3_stmt*);
 static fn_sqlite3_reset get_reset(void) {
     static fn_sqlite3_reset fn = NULL;
     if (!fn && sql.handle)
-        *(void**)&fn = dlsym(sql.handle, "sqlite3_reset");
+        *(void**)&fn = CML_DLSYM(sql.handle, "sqlite3_reset");
     return fn;
 }
 
 static fn_sqlite3_clear_bindings get_clear_bindings(void) {
     static fn_sqlite3_clear_bindings fn = NULL;
     if (!fn && sql.handle)
-        *(void**)&fn = dlsym(sql.handle, "sqlite3_clear_bindings");
+        *(void**)&fn = CML_DLSYM(sql.handle, "sqlite3_clear_bindings");
     return fn;
 }
 
