@@ -4,6 +4,24 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Runtime symbol loading. These headers (esp. windows.h, which defines inline
+ * functions) must be included at file scope, not inside a function body, or GCC
+ * treats their definitions as illegal nested functions. GET_SYM references the
+ * local `lib`, so it is expanded at each call site. */
+#ifdef __linux__
+#include <dlfcn.h>
+#define GET_SYM(name) dlsym(lib, #name)
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include "alloc/cml_allocator.h"
+#define GET_SYM(name) (void*)GetProcAddress((HMODULE)lib, #name)
+#else
+#define GET_SYM(name) NULL
+#endif
+
 #define CUDA_SUCCESS 0
 #define CU_STREAM_CAPTURE_MODE_GLOBAL 0
 
@@ -12,20 +30,6 @@ static int load_graph_symbols(CMLCUDAGraphBackend* gb) {
 
     void* lib = gb->backend->cuda_lib;
     if (!lib) return -1;
-
-#ifdef __linux__
-#include <dlfcn.h>
-#define GET_SYM(name) dlsym(lib, #name)
-#elif defined(_WIN32)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN   /* avoid winnls/stralign.h inline-fn parse errors */
-#endif
-#include <windows.h>
-#include "alloc/cml_allocator.h"
-#define GET_SYM(name) (void*)GetProcAddress((HMODULE)lib, #name)
-#else
-#define GET_SYM(name) NULL
-#endif
 
     gb->cuStreamBeginCapture = GET_SYM(cuStreamBeginCapture);
     gb->cuStreamEndCapture = GET_SYM(cuStreamEndCapture);
