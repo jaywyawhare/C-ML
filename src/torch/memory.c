@@ -8,6 +8,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Windows has no C11 aligned_alloc; _aligned_malloc'd memory must be released
+ * with _aligned_free, so the arena buffer uses the aligned pair there. */
+#ifdef _WIN32
+#include <malloc.h>
+#define aligned_alloc(align, size) _aligned_malloc((size), (align))
+#define TORCH_ALIGNED_FREE(p) _aligned_free(p)
+#else
+#define TORCH_ALIGNED_FREE(p) free(p)
+#endif
+
 #define TORCH_MEMORY_ALIGN 64
 
 static size_t align_up(size_t n, size_t align) {
@@ -41,14 +51,14 @@ TorchMemoryManager* torch_memory_create(size_t size) {
     CMLContextParams params = {.mem_size = size, .mem_buffer = mgr->arena_buffer, .no_alloc = false};
     mgr->context = cml_context_new(params);
     if (!mgr->context) {
-        free(mgr->arena_buffer);
+        TORCH_ALIGNED_FREE(mgr->arena_buffer);
         free(mgr);
         return NULL;
     }
     mgr->graph_allocator = cml_graph_allocator_new(cml_backend_buffer_type_for_device(DEVICE_CPU));
     if (!mgr->graph_allocator) {
         cml_context_free(mgr->context);
-        free(mgr->arena_buffer);
+        TORCH_ALIGNED_FREE(mgr->arena_buffer);
         free(mgr);
         return NULL;
     }
@@ -93,7 +103,7 @@ void torch_memory_free(TorchMemoryManager* mgr) {
     if (mgr->context)
         cml_context_free(mgr->context);
     if (mgr->owns_buffer && mgr->arena_buffer)
-        free(mgr->arena_buffer);
+        TORCH_ALIGNED_FREE(mgr->arena_buffer);
     free(mgr);
 }
 
