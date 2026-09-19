@@ -31,8 +31,14 @@ jobs:
         run: npm ci
         working-directory: website
 
-      - name: Copy docs to public
-        run: cp -r ../docs/*.md public/docs/
+      # public/docs is a symlink to ../../docs in the repo; copying through it
+      # would target the source files themselves ("same file"). Replace it with
+      # a real directory of the markdown so Vite bundles docs into dist/docs.
+      - name: Materialize docs into public
+        run: |
+          rm -f public/docs
+          mkdir -p public/docs
+          cp ../docs/*.md public/docs/
         working-directory: website
 
       - name: Build

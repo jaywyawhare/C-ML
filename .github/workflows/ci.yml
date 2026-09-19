@@ -8,6 +8,7 @@ on:
       - 'src/**'
       - 'include/**'
       - 'tests/**'
+      - 'python/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - '.github/workflows/ci.yml'
@@ -17,6 +18,7 @@ on:
       - 'src/**'
       - 'include/**'
       - 'tests/**'
+      - 'python/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - '.github/workflows/ci.yml'
@@ -141,3 +143,40 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+  python-tests:
+    # Build the CFFI bindings against a fresh C library and run the Python
+    # suite (numpy/torch parity, autograd, onnx, safetensors, zoo). torch
+    # parity tests importorskip when torch is absent.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python deps
+        run: python -m pip install numpy pytest cffi setuptools
+      - name: Build CFFI bindings
+        run: cd python && python cml/build_cffi.py
+      - name: Run Python tests
+        run: cd python && python -m pytest tests/ -q
+
+  format-check:
+    # Informational for now: the tree is not yet fully clang-format-clean.
+    # Promote to a hard gate after a one-time repo-wide `clang-format -i`.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get install -y clang-format
+      - name: Check formatting
+        run: |
+          bad=0
+          while IFS= read -r f; do
+            if ! clang-format --dry-run --Werror "$f" >/dev/null 2>&1; then
+              echo "not formatted: $f"; bad=$((bad+1))
+            fi
+          done < <(git ls-files 'src/*.c' 'src/**/*.c' 'include/**/*.h' 'tests/*.c')
+          echo "non-conforming files: $bad"
+          test "$bad" -eq 0

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "c-ml"
-version = "0.1.0"
+version = "0.0.3"
 description = "C-ML: A lightweight machine learning library with Python bindings"
 readme = "README.md"
 license = {text = "DBaJ-GPL"}
